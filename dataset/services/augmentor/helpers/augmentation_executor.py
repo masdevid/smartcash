@@ -1,12 +1,13 @@
 """
 File: smartcash/dataset/services/augmentor/helpers/augmentation_executor.py
-Deskripsi: Helper untuk eksekusi augmentasi dengan tracking dinamis yang diperbaiki untuk synchronous processing
+Deskripsi: Helper untuk eksekusi augmentasi dengan tracking dinamis yang diperbaiki (fixed logger)
 """
 
 import time
 import os
-from typing import Dict, List, Any, Set, Optional
+from typing import Dict, List, Any, Set, Optional, Callable
 from collections import defaultdict
+from smartcash.common.logger import get_logger
 
 # Import utils yang sudah direfactor
 from smartcash.dataset.services.augmentor.helpers.tracking_helper import track_class_progress

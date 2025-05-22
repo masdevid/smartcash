@@ -1,11 +1,16 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/validation_utils.py
-Deskripsi: Utilitas validasi untuk augmentasi dataset dengan ekstraksi parameter yang diperbaiki
+Deskripsi: Utilitas validasi untuk augmentasi dataset dengan logger bridge
 """
 
 import os
 from typing import Dict, Any, List, Tuple, Optional
-from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+
+def setup_logger_if_needed(ui_components: Dict[str, Any]) -> None:
+    """Setup logger bridge jika belum ada."""
+    if 'logger' not in ui_components:
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, "validation_utils")
 
 def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -17,6 +22,8 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
     Returns:
         Dict dengan 'valid' (bool), 'message' (str), dan 'params' (dict) jika valid
     """
+    setup_logger_if_needed(ui_components)
+    
     try:
         # Extract parameters dari UI dengan multiple fallback
         params = {}
@@ -33,14 +40,14 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
             aug_types = _find_augmentation_types_in_components(ui_components)
         
         if not aug_types:
-            log_message(ui_components, "🔍 Debug: Mencari augmentation_types dalam UI components", "debug")
+            ui_components['logger'].debug("🔍 Debug: Mencari augmentation_types dalam UI components")
             for key, value in ui_components.items():
                 if hasattr(value, 'value') and isinstance(value.value, (list, tuple)):
-                    log_message(ui_components, f"🔍 Found list/tuple in {key}: {value.value}", "debug")
+                    ui_components['logger'].debug(f"🔍 Found list/tuple in {key}: {value.value}")
             return {'valid': False, 'message': 'Jenis augmentasi tidak ditemukan dalam UI'}
         
         params['types'] = list(aug_types) if isinstance(aug_types, (list, tuple)) else [aug_types]
-        log_message(ui_components, f"✅ Jenis augmentasi ditemukan: {params['types']}", "debug")
+        ui_components['logger'].debug(f"✅ Jenis augmentasi ditemukan: {params['types']}")
         
         # Validasi num_variations dengan fallback
         num_variations = _get_widget_value(ui_components, ['num_variations', 'variations', 'jumlah_variasi'], 2)
@@ -81,14 +88,14 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
         output_dir = ui_components.get('augmented_dir', 'data/augmented')
         disk_valid, disk_msg = validate_disk_space(ui_components, output_dir, 1000)
         if not disk_valid:
-            log_message(ui_components, f"⚠️ {disk_msg}", "warning")
+            ui_components['logger'].warning(f"⚠️ {disk_msg}")
         
         # Set additional params
         params['output_dir'] = output_dir
         params['data_dir'] = data_dir
         params['num_workers'] = 4  # Default workers
         
-        log_message(ui_components, f"✅ Parameter validasi berhasil: {params}", "debug")
+        ui_components['logger'].debug(f"✅ Parameter validasi berhasil: {params}")
         
         return {
             'valid': True,
@@ -98,7 +105,7 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
         
     except Exception as e:
         error_msg = f"Error validasi parameter: {str(e)}"
-        log_message(ui_components, error_msg, "error", "❌")
+        ui_components['logger'].error(f"❌ {error_msg}")
         return {'valid': False, 'message': error_msg}
 
 def _find_augmentation_types_in_components(ui_components: Dict[str, Any]) -> Any:
@@ -244,6 +251,8 @@ def validate_dataset_availability(ui_components: Dict[str, Any], split: str, dat
     Returns:
         Tuple (is_available, error_message)
     """
+    setup_logger_if_needed(ui_components)
+    
     # Validasi split
     if split not in ['train', 'valid', 'test']:
         return False, f"Split '{split}' tidak valid. Harus salah satu dari: train, valid, test"
@@ -280,9 +289,9 @@ def validate_dataset_availability(ui_components: Dict[str, Any], split: str, dat
         
         # Cek rasio image:label
         if len(image_files) != len(label_files):
-            log_message(ui_components, 
-                       f"Jumlah gambar ({len(image_files)}) tidak sama dengan label ({len(label_files)})", 
-                       "warning", "⚠️")
+            ui_components['logger'].warning(
+                f"⚠️ Jumlah gambar ({len(image_files)}) tidak sama dengan label ({len(label_files)})"
+            )
         
         return True, f"Dataset {split} siap: {len(image_files)} gambar, {len(label_files)} label"
         
@@ -301,6 +310,8 @@ def validate_disk_space(ui_components: Dict[str, Any], output_dir: str, estimate
     Returns:
         Tuple (has_enough_space, message)
     """
+    setup_logger_if_needed(ui_components)
+    
     try:
         import shutil
         
@@ -318,7 +329,7 @@ def validate_disk_space(ui_components: Dict[str, Any], output_dir: str, estimate
         
     except Exception as e:
         # Jika tidak bisa cek disk space, anggap OK
-        log_message(ui_components, f"Tidak bisa cek ruang disk: {str(e)}", "warning", "⚠️")
+        ui_components['logger'].warning(f"⚠️ Tidak bisa cek ruang disk: {str(e)}")
         return True, "Status ruang disk tidak dapat dipastikan"
 
 def validate_ui_components(ui_components: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -354,6 +365,8 @@ def get_validation_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary ringkasan validasi
     """
+    setup_logger_if_needed(ui_components)
+    
     summary = {
         'is_valid': True,
         'errors': [],

@@ -1,56 +1,41 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/confirmation_handler.py
-Deskripsi: Handler konfirmasi untuk augmentasi dataset
+Deskripsi: Handler untuk konfirmasi augmentasi dengan logger bridge (SRP)
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 from IPython.display import display
-from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message, setup_ui_logger
-from smartcash.ui.dataset.augmentation.utils.ui_state_manager import update_status_panel, disable_buttons
-from smartcash.ui.dataset.augmentation.utils.progress_manager import reset_progress_bar
-from smartcash.ui.dataset.augmentation.handlers.augmentation_executor import run_augmentation, process_augmentation_result
 
-def confirm_augmentation(ui_components: Dict[str, Any]) -> None:
+def show_augmentation_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any], 
+                                 ui_logger, on_confirm_callback: Callable) -> None:
     """
-    Tampilkan dialog konfirmasi untuk augmentasi dataset.
+    Tampilkan dialog konfirmasi untuk augmentasi.
     
     Args:
         ui_components: Dictionary komponen UI
+        params: Parameter augmentasi yang sudah divalidasi
+        ui_logger: UI Logger bridge
+        on_confirm_callback: Callback yang dipanggil saat konfirmasi diterima
     """
-    # Setup logger jika belum
-    ui_components = setup_ui_logger(ui_components)
-    
     from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
     
-    log_message(ui_components, "Menunggu konfirmasi augmentasi dataset", "info", "⏳")
+    # Ensure confirmation area exists
+    _ensure_confirmation_area(ui_components)
     
-    # Buat pesan konfirmasi
-    aug_types = _get_augmentation_types(ui_components)
-    split = _get_selected_split(ui_components)
-    message = f"Anda akan menjalankan augmentasi {', '.join(aug_types)} pada dataset {split}. "
-    message += "Proses ini akan menghasilkan gambar tambahan untuk meningkatkan variasi dataset. "
-    message += "Lanjutkan?"
+    # Build confirmation message
+    message = _build_confirmation_message(params)
     
-    # Reset status konfirmasi
-    ui_components['confirmation_result'] = False
-    
-    # Callback untuk konfirmasi
+    # Setup callbacks
     def on_confirm(b):
         ui_components['confirmation_area'].clear_output()
-        update_status_panel(ui_components, "Memulai proses augmentasi dataset", "info")
-        ui_components['confirmation_result'] = True
-        log_message(ui_components, "Konfirmasi augmentasi diterima", "info", "✅")
-        _execute_augmentation_after_confirm(ui_components)
+        ui_logger.info("✅ Konfirmasi augmentasi diterima")
+        on_confirm_callback()
     
-    # Callback untuk batal
     def on_cancel(b):
         ui_components['confirmation_area'].clear_output()
-        update_status_panel(ui_components, "Augmentasi dibatalkan oleh pengguna", "info")
-        ui_components['confirmation_result'] = False
-        log_message(ui_components, "Augmentasi dibatalkan oleh pengguna", "info", "❌")
-        _enable_augmentation_button(ui_components)
+        ui_logger.info("❌ Augmentasi dibatalkan oleh pengguna")
     
-    # Tampilkan dialog
+    # Create and display dialog
     dialog = create_confirmation_dialog(
         title="Konfirmasi Augmentasi Dataset",
         message=message,
@@ -62,50 +47,39 @@ def confirm_augmentation(ui_components: Dict[str, Any]) -> None:
     with ui_components['confirmation_area']:
         display(dialog)
     
-    update_status_panel(ui_components, "Silakan konfirmasi untuk melanjutkan augmentasi", "warning")
+    ui_logger.info("⏳ Menunggu konfirmasi pengguna")
 
-def _execute_augmentation_after_confirm(ui_components: Dict[str, Any]) -> None:
-    """Eksekusi augmentasi setelah konfirmasi diterima."""
-    reset_progress_bar(ui_components)
+def _build_confirmation_message(params: Dict[str, Any]) -> str:
+    """Build confirmation message dari parameter."""
+    aug_types = params.get('types', ['combined'])
+    split = params.get('split', 'train')
+    target_count = params.get('target_count', 500)
+    num_variations = params.get('num_variations', 2)
     
-    # Log parameter
-    params = _get_augmentation_params(ui_components)
-    log_message(ui_components, "Parameter augmentasi:", "info", "ℹ️")
-    for key, value in params.items():
-        log_message(ui_components, f"- {key}: {value}", "debug", "🔹")
+    message = f"Augmentasi {', '.join(aug_types)} pada dataset {split}.\n"
+    message += f"Target: {target_count} instance per kelas, {num_variations} variasi per gambar.\n"
     
-    # Nonaktifkan tombol selama augmentasi
-    disable_buttons(ui_components, True)
+    # Tambahkan info storage
+    if params.get('uses_symlink', False):
+        message += "Hasil akan otomatis tersimpan ke Google Drive via symlink.\n"
+    else:
+        message += "Hasil akan tersimpan di storage lokal.\n"
     
-    # Jalankan augmentasi
-    result = run_augmentation(ui_components)
-    process_augmentation_result(ui_components, result)
+    message += "\nLanjutkan proses augmentasi?"
+    
+    return message
 
-def _get_augmentation_types(ui_components: Dict[str, Any]) -> list:
-    """Dapatkan jenis augmentasi yang dipilih."""
-    aug_types = ui_components.get('augmentation_types', {})
-    if hasattr(aug_types, 'value'):
-        return list(aug_types.value) if aug_types.value else ['combined']
-    return ['combined']
-
-def _get_selected_split(ui_components: Dict[str, Any]) -> str:
-    """Dapatkan split yang dipilih."""
-    split_selector = ui_components.get('split_selector', {})
-    if hasattr(split_selector, 'value'):
-        return split_selector.value
-    return 'train'
-
-def _get_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Dapatkan parameter augmentasi dari UI."""
-    return {
-        'split': _get_selected_split(ui_components),
-        'augmentation_types': _get_augmentation_types(ui_components),
-        'num_variations': getattr(ui_components.get('num_variations', {}), 'value', 2),
-        'output_prefix': getattr(ui_components.get('output_prefix', {}), 'value', 'aug'),
-        'target_count': getattr(ui_components.get('target_count', {}), 'value', 1000)
-    }
-
-def _enable_augmentation_button(ui_components: Dict[str, Any]) -> None:
-    """Aktifkan tombol augmentasi."""
-    if 'augment_button' in ui_components:
-        ui_components['augment_button'].disabled = False
+def _ensure_confirmation_area(ui_components: Dict[str, Any]) -> None:
+    """Pastikan confirmation area tersedia."""
+    if 'confirmation_area' not in ui_components:
+        from ipywidgets import Output
+        ui_components['confirmation_area'] = Output()
+        
+        # Tambahkan ke UI jika memungkinkan
+        if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+            try:
+                children = list(ui_components['ui'].children)
+                children.append(ui_components['confirmation_area'])
+                ui_components['ui'].children = tuple(children)
+            except Exception:
+                pass  # Gagal menambahkan tidak masalah

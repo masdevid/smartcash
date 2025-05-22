@@ -1,11 +1,11 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/notification_manager.py
-Deskripsi: Manager untuk notifikasi pada modul augmentasi dataset
+Deskripsi: Manager untuk notifikasi pada modul augmentasi dataset dengan logger bridge
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.common.logger import get_logger
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
 
 class NotificationManager:
     """Manager untuk notifikasi pada modul augmentasi dataset."""
@@ -18,7 +18,8 @@ class NotificationManager:
             ui_components: Dictionary komponen UI
         """
         self.ui_components = ui_components
-        self.logger = ui_components.get('logger', get_logger())
+        # Gunakan logger bridge untuk mencegah circular dependency
+        self.ui_logger = create_ui_logger_bridge(ui_components, "notification_manager")
     
     def update_status(self, status_type: str, message: str) -> None:
         """
@@ -31,15 +32,15 @@ class NotificationManager:
         if 'update_status_panel' in self.ui_components and callable(self.ui_components['update_status_panel']):
             self.ui_components['update_status_panel'](self.ui_components, status_type, message)
         else:
-            # Fallback jika update_status_panel tidak tersedia
+            # Fallback menggunakan logger bridge
             if status_type == 'error':
-                self.logger.error(message)
+                self.ui_logger.error(message)
             elif status_type == 'warning':
-                self.logger.warning(message)
+                self.ui_logger.warning(message)
             elif status_type == 'success':
-                self.logger.info(message)
+                self.ui_logger.success(message)
             else:
-                self.logger.info(message)
+                self.ui_logger.info(message)
     
     def update_progress(self, progress: float, message: str = "") -> None:
         """
@@ -61,7 +62,7 @@ class NotificationManager:
             display_info: Informasi tambahan untuk ditampilkan
             split: Split dataset yang diproses (opsional)
         """
-        # Update status
+        # Update status menggunakan logger bridge
         self.update_status('info', f"{ICONS['start']} Memulai {process_name} {display_info}")
         
         # Panggil fungsi notifikasi jika tersedia
@@ -76,7 +77,7 @@ class NotificationManager:
             result: Dictionary hasil proses
             display_info: Informasi tambahan untuk ditampilkan
         """
-        # Update status
+        # Update status menggunakan logger bridge
         self.update_status('success', f"{ICONS['success']} Augmentasi {display_info} selesai")
         
         # Panggil fungsi notifikasi jika tersedia
@@ -90,7 +91,7 @@ class NotificationManager:
         Args:
             error_message: Pesan error yang terjadi
         """
-        # Update status
+        # Update status menggunakan logger bridge
         self.update_status('error', f"{ICONS['error']} Error pada augmentasi: {error_message}")
         
         # Panggil fungsi notifikasi jika tersedia

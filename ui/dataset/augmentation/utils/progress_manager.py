@@ -1,13 +1,21 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/progress_manager.py
-Deskripsi: Manager progress bar untuk augmentasi dataset (lengkap)
+Deskripsi: Manager progress bar untuk augmentasi dataset dengan logger bridge
 """
 
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+
+def setup_ui_logger_if_needed(ui_components: Dict[str, Any]) -> None:
+    """Setup UI logger bridge jika belum ada."""
+    if 'logger' not in ui_components:
+        ui_logger = create_ui_logger_bridge(ui_components, "progress_manager")
+        ui_components['logger'] = ui_logger
 
 def start_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Start progress tracking dengan pesan awal."""
+    setup_ui_logger_if_needed(ui_components)
+    
     # Reset progress bar terlebih dahulu
     reset_progress_bar(ui_components)
     
@@ -17,15 +25,17 @@ def start_progress(ui_components: Dict[str, Any], message: str) -> None:
     # Set progress awal
     update_progress(ui_components, 0, message)
     
-    log_message(ui_components, f"📊 Progress dimulai: {message}", "info")
+    ui_components['logger'].info(f"📊 Progress dimulai: {message}")
 
 def complete_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Complete progress dengan pesan akhir."""
+    setup_ui_logger_if_needed(ui_components)
+    
     # Set progress ke 100%
     update_progress(ui_components, 100, message)
     
     # Log completion
-    log_message(ui_components, f"✅ Progress selesai: {message}", "success")
+    ui_components['logger'].success(f"✅ Progress selesai: {message}")
     
     # Sembunyikan progress setelah delay singkat
     import time
@@ -43,10 +53,12 @@ def create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[int, in
     Returns:
         Callback function yang mengembalikan True untuk continue, False untuk stop
     """
+    setup_ui_logger_if_needed(ui_components)
+    
     def progress_callback(current: int, total: int, message: str = "") -> bool:
         # Cek stop request
         if ui_components.get('stop_requested', False):
-            log_message(ui_components, "⏹️ Stop request detected dalam progress callback", "warning")
+            ui_components['logger'].warning("⏹️ Stop request detected dalam progress callback")
             return False
         
         # Hitung persentase
@@ -62,6 +74,8 @@ def create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[int, in
 
 def reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """Reset progress bar ke kondisi awal."""
+    setup_ui_logger_if_needed(ui_components)
+    
     try:
         if 'progress_bar' in ui_components and ui_components['progress_bar'] is not None:
             ui_components['progress_bar'].value = 0
@@ -82,7 +96,7 @@ def reset_progress_bar(ui_components: Dict[str, Any]) -> None:
                 ui_components['current_progress'].layout.visibility = 'hidden'
                 
     except Exception as e:
-        log_message(ui_components, f"Gagal mereset progress bar: {str(e)}", "warning", "⚠️")
+        ui_components['logger'].warning(f"⚠️ Gagal mereset progress bar: {str(e)}")
 
 def show_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Tampilkan progress container dan set progress awal."""

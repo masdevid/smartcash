@@ -1,13 +1,13 @@
 """
 File: smartcash/dataset/services/augmentor/balanced_class_manager.py
-Deskripsi: Manager untuk balancing kelas dengan fokus pada layer 1 (0-6) dan layer 2 (7-13)
+Deskripsi: Manager untuk balancing kelas dengan logger yang diperbaiki (tanpa circular dependency)
 """
 
 from typing import Dict, List, Any, Set, Optional, Tuple
 from collections import defaultdict, Counter
 import os
 from pathlib import Path
-from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
+from smartcash.common.logger import get_logger
 
 class BalancedClassManager:
     """Manager untuk balancing kelas dengan fokus pada layer detection utama."""
@@ -17,20 +17,17 @@ class BalancedClassManager:
     LAYER_2_CLASSES = list(range(7, 14))   # Index 7-13: Nominal detection layer  
     LAYER_3_CLASSES = list(range(14, 17))  # Index 14-16: Security features (diabaikan)
     
-    def __init__(self, ui_components: Dict[str, Any] = None, logger=None):
+    def __init__(self, logger=None):
         """
         Inisialisasi BalancedClassManager.
         
         Args:
-            ui_components: Dictionary komponen UI untuk logging
             logger: Logger untuk logging
         """
-        self.ui_components = ui_components
-        self.logger = logger
+        self.logger = logger or get_logger(__name__)
         self.target_classes = self.LAYER_1_CLASSES + self.LAYER_2_CLASSES
         
-        if ui_components:
-            log_message(ui_components, f"🎯 Balancing fokus pada {len(self.target_classes)} kelas (Layer 1 & 2)", "info")
+        self.logger.info(f"🎯 Balancing fokus pada {len(self.target_classes)} kelas (Layer 1 & 2)")
     
     def analyze_class_distribution(
         self, 
@@ -56,8 +53,7 @@ class BalancedClassManager:
             'unknown': defaultdict(int)
         }
         
-        if self.ui_components:
-            log_message(self.ui_components, f"🔍 Menganalisis {len(image_files)} file untuk distribusi kelas", "info")
+        self.logger.info(f"🔍 Menganalisis {len(image_files)} file untuk distribusi kelas")
         
         for img_path in image_files:
             img_name = Path(img_path).stem
@@ -98,8 +94,7 @@ class BalancedClassManager:
                         files_by_class[class_idx].append(img_path)
                         
             except Exception as e:
-                if self.logger:
-                    self.logger.warning(f"Error reading label {label_path}: {str(e)}")
+                self.logger.warning(f"Error reading label {label_path}: {str(e)}")
                 continue
         
         # Hitung statistik layer
@@ -110,10 +105,7 @@ class BalancedClassManager:
             'target_classes_total': sum(class_counts[cls] for cls in self.target_classes)
         }
         
-        if self.ui_components:
-            log_message(self.ui_components, 
-                       f"📊 Layer 1: {layer_summary['layer_1_total']}, Layer 2: {layer_summary['layer_2_total']}, Layer 3: {layer_summary['layer_3_total']} (diabaikan)", 
-                       "info")
+        self.logger.info(f"📊 Layer 1: {layer_summary['layer_1_total']}, Layer 2: {layer_summary['layer_2_total']}, Layer 3: {layer_summary['layer_3_total']} (diabaikan)")
         
         return {
             'class_counts': dict(class_counts),
@@ -151,10 +143,7 @@ class BalancedClassManager:
         classes_needing_augmentation = sum(1 for need in augmentation_needs.values() if need > 0)
         total_augmentation_needed = sum(augmentation_needs.values())
         
-        if self.ui_components:
-            log_message(self.ui_components, 
-                       f"🎯 {classes_needing_augmentation}/{len(self.target_classes)} kelas perlu augmentasi ({total_augmentation_needed} total)",
-                       "info")
+        self.logger.info(f"🎯 {classes_needing_augmentation}/{len(self.target_classes)} kelas perlu augmentasi ({total_augmentation_needed} total)")
         
         return {
             'augmentation_needs': augmentation_needs,
@@ -192,24 +181,17 @@ class BalancedClassManager:
             
             available_files = files_by_class.get(class_idx, [])
             if not available_files:
-                if self.ui_components:
-                    log_message(self.ui_components, f"⚠️ Kelas {class_idx}: tidak ada file tersedia", "warning")
+                self.logger.warning(f"⚠️ Kelas {class_idx}: tidak ada file tersedia")
                 continue
             
             # Pilih file untuk kelas ini
-            # Gunakan semua file yang tersedia jika perlu
             files_to_use = available_files.copy()
             selected_files.update(files_to_use)
             
-            if self.ui_components:
-                log_message(self.ui_components, 
-                           f"✅ Kelas {class_idx}: dipilih {len(files_to_use)} file (butuh {needed} instance)",
-                           "info")
+            self.logger.info(f"✅ Kelas {class_idx}: dipilih {len(files_to_use)} file (butuh {needed} instance)")
         
         result_list = list(selected_files)
-        
-        if self.ui_components:
-            log_message(self.ui_components, f"🎯 Total {len(result_list)} file unik dipilih untuk balancing", "success")
+        self.logger.info(f"🎯 Total {len(result_list)} file unik dipilih untuk balancing")
         
         return result_list
     
@@ -230,8 +212,7 @@ class BalancedClassManager:
         Returns:
             Dictionary data siap untuk augmentasi
         """
-        if self.ui_components:
-            log_message(self.ui_components, f"🔄 Mempersiapkan balancing untuk {len(image_files)} file", "info")
+        self.logger.info(f"🔄 Mempersiapkan balancing untuk {len(image_files)} file")
         
         # Analisis distribusi
         class_distribution = self.analyze_class_distribution(image_files, labels_dir)
@@ -244,12 +225,8 @@ class BalancedClassManager:
         
         # Jika tidak ada yang perlu dibalance, gunakan sebagian file untuk augmentasi umum
         if not selected_files and image_files:
-            # Ambil maksimal 100 file untuk augmentasi umum
             selected_files = image_files[:min(100, len(image_files))]
-            if self.ui_components:
-                log_message(self.ui_components, 
-                           f"ℹ️ Tidak ada yang perlu dibalance, menggunakan {len(selected_files)} file untuk augmentasi umum",
-                           "info")
+            self.logger.info(f"ℹ️ Tidak ada yang perlu dibalance, menggunakan {len(selected_files)} file untuk augmentasi umum")
         
         return {
             'class_counts': class_distribution['class_counts'],
@@ -280,15 +257,14 @@ class BalancedClassManager:
         else:
             return "Unknown Layer"
 
-def get_balanced_class_manager(ui_components: Dict[str, Any] = None, logger=None) -> BalancedClassManager:
+def get_balanced_class_manager(logger=None) -> BalancedClassManager:
     """
     Factory function untuk mendapatkan balanced class manager.
     
     Args:
-        ui_components: Dictionary komponen UI
         logger: Logger
         
     Returns:
         Instance BalancedClassManager
     """
-    return BalancedClassManager(ui_components, logger)
+    return BalancedClassManager(logger)

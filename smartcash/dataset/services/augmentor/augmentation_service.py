@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_service.py
-Deskripsi: Layanan augmentasi dataset yang DRY menggunakan helper dan worker yang sudah ada
+Deskripsi: Layanan augmentasi dataset yang DRY menggunakan helper dan worker yang sudah ada (fixed logger)
 """
 
 import os
@@ -50,7 +50,7 @@ class AugmentationService:
         # Initialize components menggunakan yang sudah ada
         self.pipeline_factory = AugmentationPipelineFactory(self.config, self.logger)
         self.bbox_augmentor = BBoxAugmentor(self.config, self.logger)
-        self.balanced_manager = get_balanced_class_manager(ui_components, self.logger)
+        self.balanced_manager = get_balanced_class_manager(self.logger)
         
         # Stop signal
         self._stop_signal = False
@@ -120,7 +120,7 @@ class AugmentationService:
             if not validation_result['success']:
                 raise DatasetError(validation_result['error'])
             
-            self.logger.info(f"📊 Ditemukan {len(image_files)} file gambar untuk split {split}")
+            self.logger.info(f"📊 Dataset loaded: {len(image_files)} pasangan file")
             
             # Prepare balanced dataset jika diperlukan
             class_data = self._prepare_class_data(

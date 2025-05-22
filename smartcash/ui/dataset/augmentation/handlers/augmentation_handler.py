@@ -1,220 +1,140 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_handler.py
-Deskripsi: Handler utama untuk proses augmentasi dataset dengan integrasi yang diperbaiki
+Deskripsi: Handler utama untuk proses augmentasi dataset dengan logger bridge yang diperbaiki
 """
 
 import time
 from typing import Dict, Any
-from smartcash.common.logger import get_logger
-from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
-from smartcash.ui.dataset.augmentation.utils.parameter_extractor import get_parameter_extractor
-from smartcash.ui.dataset.augmentation.utils.progress_coordinator import get_progress_coordinator
-from smartcash.ui.dataset.augmentation.utils.symlink_setup_manager import get_symlink_setup_manager
-from smartcash.ui.dataset.augmentation.utils.stop_signal_manager import get_stop_signal_manager
-from smartcash.ui.dataset.augmentation.utils.result_formatter import get_result_formatter, AugmentationStatus
-from smartcash.ui.dataset.augmentation.utils.ui_state_manager import (
-    update_ui_before_augmentation, reset_ui_after_augmentation, 
-    show_confirmation, set_augmentation_state
-)
-
-# Konstanta namespace logger
-AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+from smartcash.ui.dataset.augmentation.handlers.parameter_handler import extract_and_validate_parameters
+from smartcash.ui.dataset.augmentation.handlers.symlink_handler import setup_augmentation_symlinks
+from smartcash.ui.dataset.augmentation.handlers.progress_handler import ProgressHandler
+from smartcash.ui.dataset.augmentation.handlers.confirmation_handler import show_augmentation_confirmation
+from smartcash.ui.dataset.augmentation.handlers.result_handler import handle_augmentation_result
+from smartcash.ui.dataset.augmentation.handlers.state_handler import StateHandler
 
 def handle_augmentation_button_click(ui_components: Dict[str, Any], button: Any = None) -> None:
     """
-    Handler untuk tombol mulai augmentasi dengan integrasi yang diperbaiki.
+    Handler untuk tombol mulai augmentasi dengan logger bridge dan SRP handlers.
     
     Args:
         ui_components: Dictionary komponen UI
         button: Button widget yang diklik
     """
-    logger = ui_components.get('logger', get_logger(AUGMENTATION_LOGGER_NAMESPACE))
+    # Setup logger bridge untuk komunikasi UI-Service
+    ui_logger = create_ui_logger_bridge(ui_components, "augmentation")
+    state_handler = StateHandler(ui_components, ui_logger)
     
     # Cek apakah sudah berjalan
-    if ui_components.get('augmentation_running', False):
-        log_message(ui_components, "⚠️ Augmentasi sedang berjalan", "warning")
+    if state_handler.is_running():
+        ui_logger.warning("⚠️ Augmentasi sedang berjalan")
         return
     
-    # Reset stop signal sebelum memulai
-    stop_manager = get_stop_signal_manager(ui_components)
-    stop_manager.reset_stop_signal()
+    # Reset state sebelum memulai
+    state_handler.reset_signals()
     
-    # Ekstrak dan validasi parameter menggunakan consolidated extractor
-    param_extractor = get_parameter_extractor(ui_components)
-    is_valid, error_message, validated_params = param_extractor.validate_parameters()
-    
+    # Ekstrak dan validasi parameter
+    is_valid, error_message, validated_params = extract_and_validate_parameters(ui_components, ui_logger)
     if not is_valid:
-        log_message(ui_components, f"❌ Validasi parameter gagal: {error_message}", "error")
+        ui_logger.error(f"❌ Validasi parameter gagal: {error_message}")
         return
     
     # Tampilkan konfirmasi
-    show_augmentation_confirmation(ui_components, validated_params)
+    show_augmentation_confirmation(ui_components, validated_params, ui_logger, 
+                                 lambda: execute_augmentation_process(ui_components, validated_params, ui_logger))
 
-def show_augmentation_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
-    """Tampilkan konfirmasi augmentasi dengan parameter yang sudah divalidasi."""
-    aug_types = params.get('types', ['combined'])
-    split = params.get('split', 'train')
-    target_count = params.get('target_count', 500)
-    
-    message = f"Augmentasi {', '.join(aug_types)} pada dataset {split}.\n"
-    message += f"Target: {target_count} instance per kelas, {params.get('num_variations', 2)} variasi per gambar.\n"
-    message += "Hasil akan otomatis tersimpan ke Google Drive jika symlink aktif. Lanjutkan?"
-    
-    def on_confirm():
-        log_message(ui_components, "✅ Konfirmasi augmentasi diterima", "info")
-        execute_augmentation_process(ui_components, params)
-    
-    def on_cancel():
-        log_message(ui_components, "❌ Augmentasi dibatalkan", "info")
-    
-    show_confirmation(ui_components, "Konfirmasi Augmentasi Dataset", message, on_confirm, on_cancel)
-
-def execute_augmentation_process(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
+def execute_augmentation_process(ui_components: Dict[str, Any], params: Dict[str, Any], ui_logger) -> None:
     """
-    Eksekusi proses augmentasi secara synchronous dengan integrasi lengkap.
+    Eksekusi proses augmentasi dengan handlers terpisah.
     
     Args:
         ui_components: Dictionary komponen UI
         params: Parameter augmentasi yang sudah divalidasi
+        ui_logger: UI Logger bridge
     """
-    logger = ui_components.get('logger', get_logger(AUGMENTATION_LOGGER_NAMESPACE))
     start_time = time.time()
-    
-    # Set state running
-    set_augmentation_state(ui_components, True)
-    update_ui_before_augmentation(ui_components)
-    
-    # Initialize managers
-    progress_coordinator = get_progress_coordinator(ui_components)
-    stop_manager = get_stop_signal_manager(ui_components)
-    symlink_manager = get_symlink_setup_manager(ui_components)
-    result_formatter = get_result_formatter()
+    state_handler = StateHandler(ui_components, ui_logger)
+    progress_handler = ProgressHandler(ui_components, ui_logger)
     
     try:
-        # Step 1: Setup symlink (5%)
-        progress_coordinator.start_progress(100, "🔗 Setup symlink untuk Google Drive...")
-        symlink_success, symlink_message, symlink_info = symlink_manager.setup_symlinks_for_augmentation()
+        # Set state running
+        state_handler.set_running(True)
+        
+        # Setup symlink (5-10%)
+        progress_handler.start_progress("🔗 Setup symlink untuk Google Drive...")
+        symlink_success, symlink_message, symlink_info = setup_augmentation_symlinks(ui_components, params, ui_logger)
         
         if not symlink_success:
-            result = result_formatter.create_error_result(f"Symlink setup gagal: {symlink_message}")
-            _handle_augmentation_result(ui_components, result, time.time() - start_time)
+            result = {'status': 'error', 'message': f"Symlink setup gagal: {symlink_message}"}
+            handle_augmentation_result(ui_components, result, time.time() - start_time, ui_logger)
             return
         
-        progress_coordinator.update_step("Symlink Setup", 10, "✅ Symlink setup berhasil")
-        
-        # Step 2: Verify paths (10%)
-        split = params.get('split', 'train')
-        path_success, path_message, path_info = symlink_manager.verify_augmentation_paths(split)
-        
-        if not path_success:
-            result = result_formatter.create_error_result(f"Path verification gagal: {path_message}")
-            _handle_augmentation_result(ui_components, result, time.time() - start_time)
-            return
-        
-        progress_coordinator.update_step("Path Verification", 20, "✅ Path verification berhasil")
-        
-        # Step 3: Initialize service dan jalankan augmentasi (20-90%)
-        progress_coordinator.update_step("Augmentasi", 25, "🚀 Memulai proses augmentasi...")
+        progress_handler.update_progress(15, "✅ Symlink setup berhasil")
         
         # Update params dengan symlink info
-        params.update({
-            'uses_symlink': symlink_info.get('uses_symlink', False),
-            'storage_type': symlink_info.get('storage_type', 'Local'),
-            'data_path': symlink_info.get('data_path', 'data')
-        })
+        params.update(symlink_info)
         
-        # Jalankan augmentasi dengan progress callback
-        service_callback = progress_coordinator.create_service_callback()
-        stop_callback = stop_manager.create_progress_callback_with_stop_check(service_callback)
+        # Jalankan augmentasi dengan progress callback (15-95%)
+        progress_handler.update_progress(20, "🚀 Memulai proses augmentasi...")
         
-        result = _run_augmentation_sync(ui_components, params, stop_callback)
+        # Setup progress callback untuk service
+        service_callback = progress_handler.create_service_callback()
         
-        # Step 4: Process result (90-100%)
-        progress_coordinator.update_step("Finalisasi", 95, "🔄 Memproses hasil augmentasi...")
+        # Jalankan augmentasi
+        result = _run_augmentation_with_service(ui_components, params, service_callback, ui_logger)
         
-        # Format result dengan info lengkap
-        duration = time.time() - start_time
-        formatted_result = result_formatter.format_service_result(
-            result, duration, split, 
-            params.get('storage_type', 'Local'),
-            params.get('uses_symlink', False)
-        )
-        
-        progress_coordinator.finish_progress("🎉 Augmentasi selesai!", formatted_result.status == AugmentationStatus.SUCCESS)
+        # Finalisasi (95-100%)
+        progress_handler.update_progress(98, "🔄 Memproses hasil augmentasi...")
         
         # Handle hasil akhir
-        _handle_augmentation_result(ui_components, formatted_result, duration)
+        duration = time.time() - start_time
+        handle_augmentation_result(ui_components, result, duration, ui_logger)
+        progress_handler.complete_progress("🎉 Augmentasi selesai!")
         
     except Exception as e:
         duration = time.time() - start_time
-        error_result = result_formatter.create_error_result(f"Error augmentasi: {str(e)}")
+        error_result = {'status': 'error', 'message': f"Error augmentasi: {str(e)}"}
         
-        progress_coordinator.finish_progress(f"❌ Error: {str(e)}", False)
-        _handle_augmentation_result(ui_components, error_result, duration)
-        
-        logger.error(f"🔥 Error augmentasi: {str(e)}")
+        progress_handler.complete_progress(f"❌ Error: {str(e)}", False)
+        handle_augmentation_result(ui_components, error_result, duration, ui_logger)
+        ui_logger.error(f"🔥 Error augmentasi: {str(e)}")
         
     finally:
-        # Pastikan state direset
-        set_augmentation_state(ui_components, False)
+        state_handler.set_running(False)
 
-def _run_augmentation_sync(ui_components: Dict[str, Any], params: Dict[str, Any], progress_callback) -> Dict[str, Any]:
+def _run_augmentation_with_service(ui_components: Dict[str, Any], params: Dict[str, Any], 
+                                  progress_callback, ui_logger) -> Dict[str, Any]:
     """
-    Jalankan augmentasi secara synchronous dengan balanced class manager.
+    Jalankan augmentasi menggunakan service dengan progress callback.
     
     Args:
         ui_components: Dictionary komponen UI
         params: Parameter augmentasi
         progress_callback: Callback untuk progress tracking
+        ui_logger: UI Logger bridge
         
     Returns:
         Dictionary hasil augmentasi
     """
     try:
-        # Import service dan balanced class manager
         from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
-        from smartcash.dataset.services.augmentor.balanced_class_manager import get_balanced_class_manager
         
-        # Initialize service dengan config yang tepat
+        # Initialize service dengan UI callback
         service_config = {
             'data_dir': params.get('data_path', 'data'),
             'augmented_dir': f"{params.get('data_path', 'data')}/augmented",
-            'num_workers': 1  # Synchronous processing untuk Colab
+            'num_workers': 1
         }
+        
+        # Pass UI components untuk progress reporting
+        ui_components['progress_callback'] = progress_callback
         
         service = AugmentationService(
             config=service_config,
             data_dir=params.get('data_path', 'data'),
-            logger=ui_components.get('logger'),
             num_workers=1,
             ui_components=ui_components
         )
-        
-        # Jika balance_classes enabled, gunakan balanced class manager
-        if params.get('balance_classes', False):
-            log_message(ui_components, "⚖️ Menggunakan balanced class manager (Layer 1 & 2)", "info")
-            
-            balanced_manager = get_balanced_class_manager(ui_components, ui_components.get('logger'))
-            
-            # Dapatkan list file untuk balancing
-            import os
-            split = params.get('split', 'train')
-            images_dir = os.path.join(params.get('data_path', 'data'), 'preprocessed', split, 'images')
-            labels_dir = os.path.join(params.get('data_path', 'data'), 'preprocessed', split, 'labels')
-            
-            image_files = [os.path.join(images_dir, f) for f in os.listdir(images_dir) 
-                          if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-            
-            # Prepare balanced dataset
-            balanced_data = balanced_manager.prepare_balanced_augmentation(
-                image_files, labels_dir, params.get('target_count', 500)
-            )
-            
-            # Override selected files dengan hasil balancing
-            if balanced_data.get('selected_files'):
-                log_message(ui_components, f"🎯 Balancing: {len(balanced_data['selected_files'])} file dipilih", "info")
-            else:
-                log_message(ui_components, "ℹ️ Tidak ada file yang perlu dibalance, menggunakan augmentasi umum", "info")
         
         # Jalankan augmentasi service
         result = service.augment_dataset(
@@ -238,89 +158,4 @@ def _run_augmentation_sync(ui_components: Dict[str, Any], params: Dict[str, Any]
             'message': f'Error saat augmentasi: {str(e)}',
             'generated_images': 0,
             'processed': 0
-        }
-
-def _handle_augmentation_result(ui_components: Dict[str, Any], result, duration: float) -> None:
-    """
-    Handle hasil augmentasi dan update UI dengan format yang konsisten.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        result: Hasil augmentasi (AugmentationResult atau dict)
-        duration: Durasi proses
-    """
-    # Convert ke format UI jika perlu
-    if hasattr(result, 'status'):
-        # AugmentationResult object
-        ui_result = get_result_formatter().format_ui_result(result)
-    else:
-        # Legacy dict format
-        from smartcash.ui.dataset.augmentation.utils.result_formatter import get_result_formatter
-        formatter = get_result_formatter()
-        formatted_result = formatter.format_service_result(result, duration)
-        ui_result = formatter.format_ui_result(formatted_result)
-    
-    # Update UI berdasarkan status
-    if ui_result['status'] == 'success':
-        log_message(ui_components, ui_result['message'], "success")
-        
-        # Tampilkan tombol cleanup jika berhasil
-        if 'cleanup_button' in ui_components and hasattr(ui_components['cleanup_button'], 'layout'):
-            ui_components['cleanup_button'].layout.display = 'block'
-        
-    elif ui_result['status'] == 'cancelled':
-        log_message(ui_components, ui_result['message'], "warning")
-        
-    else:
-        log_message(ui_components, ui_result['message'], "error")
-    
-    # Reset UI setelah selesai
-    reset_ui_after_augmentation(ui_components)
-    
-    # Log details untuk debugging
-    details = ui_result.get('details', {})
-    if details.get('generated_images', 0) > 0:
-        log_message(ui_components, 
-                   f"📊 Detail: {details['generated_images']} gambar, {details['success_rate']:.1f}% berhasil, {details['duration']:.1f}s",
-                   "debug")
-
-def get_augmentation_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Ekstrak konfigurasi augmentasi dari UI components menggunakan parameter extractor.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Dictionary konfigurasi augmentasi
-    """
-    # Gunakan parameter extractor yang sudah dikonsolidasi
-    extractor = get_parameter_extractor(ui_components)
-    return extractor.extract_service_parameters()
-
-def validate_dataset_availability(ui_components: Dict[str, Any], split: str) -> Dict[str, Any]:
-    """
-    Validasi ketersediaan dataset untuk augmentasi.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        split: Split dataset yang akan diaugmentasi
-        
-    Returns:
-        Dictionary hasil validasi
-    """
-    # Gunakan symlink manager untuk validasi path
-    symlink_manager = get_symlink_setup_manager(ui_components)
-    success, message, path_info = symlink_manager.verify_augmentation_paths(split)
-    
-    if success:
-        return {
-            'valid': True,
-            'message': message,
-            'paths': path_info
-        }
-    else:
-        return {
-            'valid': False,
-            'message': message
         }

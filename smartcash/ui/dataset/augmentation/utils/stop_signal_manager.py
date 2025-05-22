@@ -1,11 +1,11 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/stop_signal_manager.py
-Deskripsi: Manager untuk propagasi stop signal dari UI sampai worker level
+Deskripsi: Manager untuk propagasi stop signal dengan logger bridge
 """
 
 import threading
 from typing import Dict, Any, Optional, Callable
-from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
 
 class StopSignalManager:
     """Manager untuk mengelola stop signal propagation."""
@@ -18,6 +18,7 @@ class StopSignalManager:
             ui_components: Dictionary komponen UI
         """
         self.ui_components = ui_components
+        self.ui_logger = create_ui_logger_bridge(ui_components, "stop_signal_manager")
         self._stop_requested = False
         self._stop_callbacks = []
         self._lock = threading.Lock()  # Thread-safe access
@@ -37,7 +38,7 @@ class StopSignalManager:
             self.ui_components['stop_requested'] = True
             self.ui_components['augmentation_running'] = False
         
-        log_message(self.ui_components, f"⏹️ Stop request: {reason}", "warning")
+        self.ui_logger.warning(f"⏹️ Stop request: {reason}")
         
         # Panggil semua callbacks
         self._notify_stop_callbacks(reason)
@@ -59,7 +60,7 @@ class StopSignalManager:
             self.ui_components['stop_requested'] = False
             self._stop_callbacks.clear()
         
-        log_message(self.ui_components, "🔄 Stop signal direset", "debug")
+        self.ui_logger.debug("🔄 Stop signal direset")
     
     def register_stop_callback(self, callback: Callable[[str], None]) -> None:
         """
@@ -98,7 +99,7 @@ class StopSignalManager:
             try:
                 callback(reason)
             except Exception as e:
-                log_message(self.ui_components, f"⚠️ Error dalam stop callback: {str(e)}", "warning")
+                self.ui_logger.warning(f"⚠️ Error dalam stop callback: {str(e)}")
     
     def create_progress_callback_with_stop_check(self, original_callback: Optional[Callable] = None) -> Callable:
         """
@@ -113,7 +114,7 @@ class StopSignalManager:
         def wrapped_callback(*args, **kwargs) -> bool:
             # Cek stop signal terlebih dahulu
             if self.is_stop_requested():
-                log_message(self.ui_components, "⏹️ Stop signal detected dalam progress callback", "warning")
+                self.ui_logger.warning("⏹️ Stop signal detected dalam progress callback")
                 return False  # Signal to stop processing
             
             # Panggil original callback jika ada
@@ -121,7 +122,7 @@ class StopSignalManager:
                 try:
                     return original_callback(*args, **kwargs)
                 except Exception as e:
-                    log_message(self.ui_components, f"❌ Error dalam progress callback: {str(e)}", "error")
+                    self.ui_logger.error(f"❌ Error dalam progress callback: {str(e)}")
                     return False
             
             return True  # Continue processing

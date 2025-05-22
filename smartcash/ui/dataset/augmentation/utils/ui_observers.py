@@ -1,10 +1,11 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/ui_observers.py
-Deskripsi: Utility untuk observer pattern pada modul augmentasi dataset (diperbaiki args)
+Deskripsi: Utility untuk observer pattern pada modul augmentasi dataset dengan logger bridge
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
 
 def notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
     """
@@ -16,8 +17,11 @@ def notify_process_start(ui_components: Dict[str, Any], process_name: str, displ
         display_info: Informasi tambahan untuk ditampilkan
         split: Split dataset yang diproses (opsional)
     """
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
+    # Setup logger bridge jika belum ada
+    if 'logger' not in ui_components:
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, "ui_observers")
+    
+    ui_components['logger'].info(f"{ICONS['start']} Memulai {process_name} {display_info}")
     
     # Panggil callback jika tersedia
     if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
@@ -35,8 +39,11 @@ def notify_process_complete(ui_components: Dict[str, Any], result: Dict[str, Any
         result: Dictionary hasil proses
         display_info: Informasi tambahan untuk ditampilkan
     """
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['success']} Augmentasi {display_info} selesai")
+    # Setup logger bridge jika belum ada
+    if 'logger' not in ui_components:
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, "ui_observers")
+    
+    ui_components['logger'].success(f"{ICONS['success']} Augmentasi {display_info} selesai")
     
     # Panggil callback jika tersedia
     if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
@@ -50,8 +57,11 @@ def notify_process_error(ui_components: Dict[str, Any], error_message: str) -> N
         ui_components: Dictionary komponen UI
         error_message: Pesan error yang terjadi
     """
-    logger = ui_components.get('logger')
-    if logger: logger.error(f"{ICONS['error']} Error pada augmentasi: {error_message}")
+    # Setup logger bridge jika belum ada
+    if 'logger' not in ui_components:
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, "ui_observers")
+    
+    ui_components['logger'].error(f"{ICONS['error']} Error pada augmentasi: {error_message}")
     
     # Panggil callback jika tersedia
     if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
@@ -64,8 +74,11 @@ def notify_process_stop(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger')
-    if logger: logger.warning(f"{ICONS['warning']} Augmentasi dihentikan oleh pengguna")
+    # Setup logger bridge jika belum ada
+    if 'logger' not in ui_components:
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, "ui_observers")
+    
+    ui_components['logger'].warning(f"{ICONS['warning']} Augmentasi dihentikan oleh pengguna")
     
     # Panggil callback jika tersedia
     if 'on_process_stop' in ui_components and callable(ui_components['on_process_stop']):
@@ -113,6 +126,10 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
     Returns:
         Observer manager instance
     """
+    # Setup logger bridge untuk error reporting
+    if 'logger' not in ui_components:
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, "ui_observers")
+    
     try:
         # Coba import observer manager
         from smartcash.components.observer import ObserverManager
@@ -154,8 +171,7 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
         
     except ImportError:
         # Fallback jika observer manager tidak tersedia
-        from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
-        log_message(ui_components, "Observer manager tidak tersedia, menggunakan fallback", "warning", "⚠️")
+        ui_components['logger'].warning("⚠️ Observer manager tidak tersedia, menggunakan fallback")
         
         # Buat mock observer manager
         ui_components['observer_manager'] = MockObserverManager()

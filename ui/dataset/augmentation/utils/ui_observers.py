@@ -102,7 +102,7 @@ def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = 
     # Tampilkan tombol augment jika proses tidak sedang berjalan, sembunyikan jika sedang berjalan
     if 'augment_button' in ui_components and hasattr(ui_components['augment_button'], 'layout'):
         ui_components['augment_button'].layout.display = 'none' if disable else 'block'
-
+        
 def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
     """
     Register UI observers untuk notifikasi proses augmentasi.
@@ -141,11 +141,11 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
         def on_process_stop(event_type: str, data: Any = None):
             notify_process_stop(ui_components)
         
-        # Register callbacks ke observer manager
-        observer_manager.register(observer_group, 'process_start', on_process_start)
-        observer_manager.register(observer_group, 'process_complete', on_process_complete)
-        observer_manager.register(observer_group, 'process_error', on_process_error)
-        observer_manager.register(observer_group, 'process_stop', on_process_stop)
+        # Register callbacks ke observer manager (fix argument count)
+        observer_manager.register('process_start', on_process_start)
+        observer_manager.register('process_complete', on_process_complete)
+        observer_manager.register('process_error', on_process_error)
+        observer_manager.register('process_stop', on_process_stop)
         
         return observer_manager
         

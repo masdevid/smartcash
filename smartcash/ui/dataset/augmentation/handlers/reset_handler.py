@@ -1,68 +1,68 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/reset_handler.py
-Deskripsi: Handler untuk reset konfigurasi augmentasi (tanpa move_to_preprocessed)
+Deskripsi: Handler untuk reset konfigurasi augmentasi dengan sinkronisasi Google Drive yang diperbaiki
 """
 
 from typing import Dict, Any
 from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message, setup_ui_logger
 from smartcash.ui.dataset.augmentation.utils.ui_state_manager import update_status_panel
 from smartcash.ui.dataset.augmentation.utils.progress_manager import reset_progress_bar
+from smartcash.ui.dataset.augmentation.handlers.config_handler import reset_augmentation_config
 
 def handle_reset_button_click(ui_components: Dict[str, Any], button: Any = None) -> None:
     """
-    Handler untuk tombol reset augmentasi.
+    Handler untuk tombol reset augmentasi dengan Google Drive sync.
     
     Args:
         ui_components: Dictionary komponen UI
         button: Button widget (opsional)
     """
+    ui_components = setup_ui_logger(ui_components)
+    
+    # Disable tombol selama proses
+    if button and hasattr(button, 'disabled'):
+        button.disabled = True
+    
     try:
-        # Setup logger jika belum
-        ui_components = setup_ui_logger(ui_components)
+        update_status_panel(ui_components, "🔄 Mereset konfigurasi ke default...", "warning")
+        log_message(ui_components, "🔄 Mereset konfigurasi augmentasi ke default...", "info")
         
-        update_status_panel(ui_components, "Sedang mereset konfigurasi...", "warning")
-        log_message(ui_components, "Mereset konfigurasi augmentasi...", "info", "🔄")
+        # Reset konfigurasi dengan save ke Google Drive
+        result = reset_augmentation_config(ui_components)
         
-        # Reset semua field input
-        _reset_input_fields(ui_components)
-        
-        # Reset status konfirmasi
-        if 'confirmation_result' in ui_components:
-            ui_components['confirmation_result'] = False
-        
-        # Bersihkan area konfirmasi
-        if 'confirmation_area' in ui_components:
-            ui_components['confirmation_area'].clear_output()
-        
-        # Reset flag running
-        if 'augmentation_running' in ui_components:
-            ui_components['augmentation_running'] = False
-        
-        update_status_panel(ui_components, "Konfigurasi telah direset ke nilai default", "success")
-        log_message(ui_components, "Konfigurasi berhasil direset", "success", "✅")
+        if result:
+            # Reset status konfirmasi dan running flags
+            _reset_ui_states(ui_components)
+            
+            # Reset progress bar
+            reset_progress_bar(ui_components)
+            
+            log_message(ui_components, "✅ Konfigurasi berhasil direset dan disimpan ke Google Drive", "success")
+            update_status_panel(ui_components, "✅ Konfigurasi direset dan tersinkronisasi", "success")
+        else:
+            log_message(ui_components, "❌ Gagal mereset konfigurasi", "error")
+            update_status_panel(ui_components, "❌ Gagal mereset konfigurasi", "error")
         
     except Exception as e:
-        log_message(ui_components, f"Error saat mereset: {str(e)}", "error", "❌")
-        update_status_panel(ui_components, f"Gagal mereset: {str(e)}", "error")
+        log_message(ui_components, f"❌ Error saat mereset: {str(e)}", "error")
+        update_status_panel(ui_components, f"❌ Gagal mereset: {str(e)}", "error")
+    finally:
+        if button and hasattr(button, 'disabled'):
+            button.disabled = False
 
-def _reset_input_fields(ui_components: Dict[str, Any]) -> None:
-    """Reset semua field input ke nilai default (tanpa move_to_preprocessed)."""
-    default_values = {
-        'num_variations': 2,
-        'target_count': 1000,
-        'output_prefix': 'aug',
-        'balance_classes': False,
-        'validate_results': True
-    }
+def _reset_ui_states(ui_components: Dict[str, Any]) -> None:
+    """Reset UI states dan flags internal."""
     
-    for field, default_value in default_values.items():
-        if field in ui_components and hasattr(ui_components[field], 'value'):
-            ui_components[field].value = default_value
-            log_message(ui_components, f"Reset {field} ke default", "debug", "🔄")
+    # Reset status konfirmasi
+    if 'confirmation_result' in ui_components:
+        ui_components['confirmation_result'] = False
     
-    # Reset jenis augmentasi
-    if 'augmentation_types' in ui_components and hasattr(ui_components['augmentation_types'], 'value'):
-        ui_components['augmentation_types'].value = ['combined']
+    # Bersihkan area konfirmasi
+    if 'confirmation_area' in ui_components:
+        ui_components['confirmation_area'].clear_output()
     
-    # Reset progress bar
-    reset_progress_bar(ui_components)
+    # Reset flag running
+    ui_components['augmentation_running'] = False
+    ui_components['stop_requested'] = False
+    
+    log_message(ui_components, "🔄 UI states berhasil direset", "debug")

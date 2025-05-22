@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Handler konfigurasi untuk augmentasi dataset (tanpa move_to_preprocessed)
+Deskripsi: Handler konfigurasi untuk augmentasi dataset dengan save/reset yang diperbaiki untuk Google Drive
 """
 
 from typing import Dict, Any, Optional
@@ -13,164 +13,237 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     ui_components = setup_ui_logger(ui_components)
     
     try:
-        update_status_panel(ui_components, "Mempersiapkan konfigurasi augmentasi...", "info")
+        update_status_panel(ui_components, "📋 Mengambil konfigurasi dari UI...", "info")
         
+        # Ambil konfigurasi base
         config_manager = get_config_manager()
-        config = config_manager.get_config()
+        base_config = config_manager.get_config('augmentation') or {}
         
-        # Update dari UI
-        if 'output_dir' in ui_components:
-            config['augmentation'] = config.get('augmentation', {})
-            config['augmentation']['output_dir'] = ui_components['output_dir'].value
-            
-        if 'num_variations' in ui_components:
-            config['augmentation']['num_variations'] = ui_components['num_variations'].value
-            
-        if 'target_count' in ui_components:
-            config['augmentation']['target_count'] = ui_components['target_count'].value
-            
-        if 'output_prefix' in ui_components:
-            config['augmentation']['output_prefix'] = ui_components['output_prefix'].value
-            
-        if 'augmentation_types' in ui_components:
-            config['augmentation']['types'] = list(ui_components['augmentation_types'].value)
-            
-        if 'balance_classes' in ui_components:
-            config['augmentation']['balance_classes'] = ui_components['balance_classes'].value
-            
-        if 'validate_results' in ui_components:
-            config['augmentation']['validate_results'] = ui_components['validate_results'].value
+        # Pastikan struktur augmentation ada
+        if 'augmentation' not in base_config:
+            base_config['augmentation'] = {}
         
-        log_message(ui_components, "Konfigurasi augmentasi berhasil diupdate dari UI", "success", "✅")
-        update_status_panel(ui_components, "Konfigurasi augmentasi berhasil dipersiapkan", "success")
+        augmentation_config = base_config['augmentation']
         
-        return config
+        # Update dari UI components
+        _update_config_from_ui_fields(ui_components, augmentation_config)
+        
+        log_message(ui_components, "📋 Konfigurasi berhasil diambil dari UI", "success", "✅")
+        return base_config
         
     except Exception as e:
-        log_message(ui_components, f"Error saat mengambil konfigurasi dari UI: {str(e)}", "error", "❌")
-        update_status_panel(ui_components, f"Error saat mempersiapkan konfigurasi: {str(e)}", "error")
+        log_message(ui_components, f"❌ Error mengambil config dari UI: {str(e)}", "error")
         raise
 
-def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Update konfigurasi augmentasi dari UI components."""
-    ui_components = setup_ui_logger(ui_components)
+def _update_config_from_ui_fields(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+    """Update konfigurasi dari field UI."""
     
-    try:
-        config = get_config_from_ui(ui_components)
-        config_manager = get_config_manager()
-        config_manager.update_config(config)
-        
-        log_message(ui_components, "Konfigurasi augmentasi berhasil diupdate", "success", "✅")
-        update_status_panel(ui_components, "Konfigurasi augmentasi berhasil diupdate", "success")
-        
-        return config
-        
-    except Exception as e:
-        log_message(ui_components, f"Error saat update konfigurasi: {str(e)}", "error", "❌")
-        update_status_panel(ui_components, f"Error saat update konfigurasi: {str(e)}", "error")
-        raise
-
-def get_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Dapatkan konfigurasi augmentasi terbaru."""
-    ui_components = setup_ui_logger(ui_components)
+    # Mapping UI fields ke config keys
+    ui_field_mappings = {
+        'num_variations': 'num_variations',
+        'target_count': 'target_count', 
+        'output_prefix': 'output_prefix',
+        'balance_classes': 'balance_classes',
+        'validate_results': 'validate_results',
+        'process_bboxes': 'process_bboxes'
+    }
     
-    try:
-        config_manager = get_config_manager()
-        config = config_manager.get_config()
-        
-        augmentation_config = config.get('augmentation', {})
-        if not augmentation_config:
-            log_message(ui_components, "Konfigurasi augmentasi tidak ditemukan", "warning", "⚠️")
-            raise ValueError("Konfigurasi augmentasi tidak ditemukan")
-            
-        return augmentation_config
-        
-    except Exception as e:
-        log_message(ui_components, f"Error saat mengambil konfigurasi augmentasi: {str(e)}", "error", "❌")
-        raise
-
-def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str, Any] = None) -> None:
-    """Update komponen UI dari konfigurasi."""
-    ui_components = setup_ui_logger(ui_components)
+    # Update basic fields
+    for ui_field, config_key in ui_field_mappings.items():
+        if ui_field in ui_components and hasattr(ui_components[ui_field], 'value'):
+            config[config_key] = ui_components[ui_field].value
+            log_message(ui_components, f"🔄 {config_key}: {config[config_key]}", "debug")
     
-    try:
-        if config_to_use:
-            config = config_to_use
-        else:
-            config = get_augmentation_config(ui_components)
-        
-        # Update UI components (tanpa move_to_preprocessed)
-        if 'output_dir' in ui_components and 'output_dir' in config:
-            ui_components['output_dir'].value = config['output_dir']
-            
-        if 'num_variations' in ui_components and 'num_variations' in config:
-            ui_components['num_variations'].value = config['num_variations']
-            
-        if 'target_count' in ui_components and 'target_count' in config:
-            ui_components['target_count'].value = config['target_count']
-            
-        if 'output_prefix' in ui_components and 'output_prefix' in config:
-            ui_components['output_prefix'].value = config['output_prefix']
-            
-        if 'augmentation_types' in ui_components and 'types' in config:
-            ui_components['augmentation_types'].value = config['types']
-            
-        if 'balance_classes' in ui_components and 'balance_classes' in config:
-            ui_components['balance_classes'].value = config['balance_classes']
-            
-        if 'validate_results' in ui_components and 'validate_results' in config:
-            ui_components['validate_results'].value = config['validate_results']
-            
-        log_message(ui_components, "UI berhasil diupdate dari konfigurasi", "success", "✅")
-        
-    except Exception as e:
-        log_message(ui_components, f"Error saat update UI dari konfigurasi: {str(e)}", "error", "❌")
-        raise
+    # Update augmentation types
+    if 'augmentation_types' in ui_components:
+        widget = ui_components['augmentation_types']
+        if hasattr(widget, 'value'):
+            config['types'] = list(widget.value) if widget.value else ['combined']
+            log_message(ui_components, f"🎯 Types: {config['types']}", "debug")
+    
+    # Update target split
+    if 'target_split' in ui_components:
+        widget = ui_components['target_split'] 
+        if hasattr(widget, 'value'):
+            config['target_split'] = widget.value
+            log_message(ui_components, f"📂 Target split: {config['target_split']}", "debug")
 
 def save_augmentation_config(ui_components: Dict[str, Any]) -> bool:
-    """Simpan konfigurasi augmentasi ke file."""
+    """Simpan konfigurasi augmentasi ke file dengan sinkronisasi Google Drive."""
     ui_components = setup_ui_logger(ui_components)
     
     try:
+        update_status_panel(ui_components, "💾 Menyimpan konfigurasi augmentasi...", "info")
+        log_message(ui_components, "💾 Memulai proses penyimpanan konfigurasi", "info")
+        
+        # Ambil konfigurasi dari UI
         config = get_config_from_ui(ui_components)
+        
+        # Simpan menggunakan ConfigManager yang otomatis handle Google Drive
         config_manager = get_config_manager()
-        result = config_manager.save_config(config)
+        
+        # Simpan ke file augmentation_config.yaml
+        result = config_manager.save_config(config, 'augmentation')
         
         if result:
-            log_message(ui_components, "Konfigurasi augmentasi berhasil disimpan", "success", "✅")
+            log_message(ui_components, "✅ Konfigurasi berhasil disimpan ke Google Drive", "success")
+            update_status_panel(ui_components, "✅ Konfigurasi tersimpan dan tersinkronisasi", "success")
+            
+            # Verifikasi file tersimpan dengan membaca ulang
+            _verify_saved_config(ui_components, config_manager)
+            
         else:
-            log_message(ui_components, "Gagal menyimpan konfigurasi augmentasi", "error", "❌")
+            log_message(ui_components, "❌ Gagal menyimpan konfigurasi", "error")
+            update_status_panel(ui_components, "❌ Gagal menyimpan konfigurasi", "error")
         
         return result
         
     except Exception as e:
-        log_message(ui_components, f"Error saat menyimpan konfigurasi: {str(e)}", "error", "❌")
+        log_message(ui_components, f"❌ Error saat menyimpan: {str(e)}", "error")
+        update_status_panel(ui_components, f"❌ Error: {str(e)}", "error")
         return False
 
-def load_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Load konfigurasi augmentasi dari file."""
+def _verify_saved_config(ui_components: Dict[str, Any], config_manager) -> None:
+    """Verifikasi bahwa konfigurasi berhasil tersimpan."""
+    try:
+        # Baca ulang konfigurasi yang baru disimpan
+        saved_config = config_manager.get_config('augmentation', reload=True)
+        
+        if saved_config and 'augmentation' in saved_config:
+            log_message(ui_components, "🔍 Verifikasi: Konfigurasi berhasil tersimpan", "success")
+            
+            # Log beberapa key fields untuk verifikasi
+            aug_config = saved_config['augmentation']
+            log_message(ui_components, f"📊 Variasi: {aug_config.get('num_variations', 'N/A')}", "debug")
+            log_message(ui_components, f"🎯 Jenis: {aug_config.get('types', 'N/A')}", "debug")
+        else:
+            log_message(ui_components, "⚠️ Verifikasi: Struktur config tidak lengkap", "warning")
+            
+    except Exception as e:
+        log_message(ui_components, f"⚠️ Gagal verifikasi config: {str(e)}", "warning")
+
+def reset_augmentation_config(ui_components: Dict[str, Any]) -> bool:
+    """Reset konfigurasi augmentasi ke default dan simpan ke Google Drive."""
     ui_components = setup_ui_logger(ui_components)
     
     try:
-        config_manager = get_config_manager()
-        config = config_manager.load_config()
+        update_status_panel(ui_components, "🔄 Mereset konfigurasi ke default...", "info")
+        log_message(ui_components, "🔄 Memulai reset konfigurasi augmentasi", "info")
         
-        augmentation_config = config.get('augmentation', {})
+        # Get default config
+        default_config = _get_default_augmentation_config()
+        
+        # Update UI dengan default values
+        _update_ui_from_config_values(ui_components, default_config)
+        
+        # Simpan default config ke file
+        config_manager = get_config_manager()
+        full_config = {'augmentation': default_config}
+        
+        result = config_manager.save_config(full_config, 'augmentation')
+        
+        if result:
+            log_message(ui_components, "✅ Konfigurasi berhasil direset dan disimpan", "success")
+            update_status_panel(ui_components, "✅ Konfigurasi direset ke default", "success")
+            
+            # Verifikasi reset
+            _verify_saved_config(ui_components, config_manager)
+        else:
+            log_message(ui_components, "❌ Gagal menyimpan config default", "error")
+            update_status_panel(ui_components, "❌ Gagal menyimpan reset", "error")
+            
+        return result
+        
+    except Exception as e:
+        log_message(ui_components, f"❌ Error saat reset: {str(e)}", "error")
+        update_status_panel(ui_components, f"❌ Error reset: {str(e)}", "error")
+        return False
+
+def load_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Load konfigurasi augmentasi dari Google Drive."""
+    ui_components = setup_ui_logger(ui_components)
+    
+    try:
+        update_status_panel(ui_components, "📂 Memuat konfigurasi dari Google Drive...", "info")
+        log_message(ui_components, "📂 Memuat konfigurasi augmentasi", "info")
+        
+        config_manager = get_config_manager()
+        config = config_manager.get_config('augmentation', reload=True)  # Force reload dari Drive
+        
+        augmentation_config = config.get('augmentation', {}) if config else {}
         
         if augmentation_config:
-            log_message(ui_components, "Konfigurasi augmentasi berhasil dimuat", "success", "✅")
+            log_message(ui_components, "✅ Konfigurasi berhasil dimuat dari Google Drive", "success")
+            update_status_panel(ui_components, "✅ Konfigurasi dimuat dari Drive", "success")
+            
+            # Update UI dengan config yang dimuat
+            _update_ui_from_config_values(ui_components, augmentation_config)
+            
         else:
-            log_message(ui_components, "Konfigurasi augmentasi tidak ditemukan, menggunakan default", "warning", "⚠️")
+            log_message(ui_components, "⚠️ Config tidak ditemukan, menggunakan default", "warning")
             augmentation_config = _get_default_augmentation_config()
-        
+            
         return augmentation_config
         
     except Exception as e:
-        log_message(ui_components, f"Error saat memuat konfigurasi: {str(e)}", "error", "❌")
+        log_message(ui_components, f"❌ Error memuat config: {str(e)}", "error")
         return _get_default_augmentation_config()
 
+def _update_ui_from_config_values(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+    """Update UI components dari nilai konfigurasi."""
+    
+    # Update basic fields
+    ui_mappings = {
+        'num_variations': 'num_variations',
+        'target_count': 'target_count',
+        'output_prefix': 'output_prefix', 
+        'balance_classes': 'balance_classes',
+        'validate_results': 'validate_results'
+    }
+    
+    for ui_field, config_key in ui_mappings.items():
+        if ui_field in ui_components and config_key in config:
+            widget = ui_components[ui_field]
+            if hasattr(widget, 'value'):
+                widget.value = config[config_key]
+                log_message(ui_components, f"🔄 UI {ui_field} → {config[config_key]}", "debug")
+    
+    # Update augmentation types
+    if 'augmentation_types' in ui_components and 'types' in config:
+        widget = ui_components['augmentation_types']
+        if hasattr(widget, 'value'):
+            widget.value = config['types']
+            log_message(ui_components, f"🎯 UI types → {config['types']}", "debug")
+    
+    # Update target split
+    if 'target_split' in ui_components and 'target_split' in config:
+        widget = ui_components['target_split']
+        if hasattr(widget, 'value'):
+            widget.value = config['target_split']
+            log_message(ui_components, f"📂 UI target_split → {config['target_split']}", "debug")
+
+def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str, Any] = None) -> None:
+    """Update komponen UI dari konfigurasi yang diperbaiki."""
+    ui_components = setup_ui_logger(ui_components)
+    
+    try:
+        if config_to_use:
+            augmentation_config = config_to_use
+        else:
+            # Load dari file dengan reload forced
+            loaded_config = load_augmentation_config(ui_components)
+            augmentation_config = loaded_config
+        
+        _update_ui_from_config_values(ui_components, augmentation_config)
+        
+        log_message(ui_components, "✅ UI berhasil diupdate dari konfigurasi", "success")
+        
+    except Exception as e:
+        log_message(ui_components, f"❌ Error update UI dari config: {str(e)}", "error")
+        raise
+
 def _get_default_augmentation_config() -> Dict[str, Any]:
-    """Dapatkan konfigurasi default augmentasi (tanpa move_to_preprocessed)."""
+    """Dapatkan konfigurasi default augmentasi."""
     return {
         'enabled': True,
         'num_variations': 2,
@@ -182,5 +255,6 @@ def _get_default_augmentation_config() -> Dict[str, Any]:
         'num_workers': 4,
         'balance_classes': False,
         'target_count': 1000,
+        'target_split': 'train',
         'types': ['combined']
     }

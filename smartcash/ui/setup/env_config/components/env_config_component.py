@@ -88,7 +88,7 @@ class EnvConfigComponent:
         """Reset progress bar dengan pesan"""
         if 'progress_bar' in self.ui_components:
             try:
-                from smartcash.ui.components.progress_tracking import reset_progress
+                from smartcash.ui.setup.env_config.components.progress_tracking import reset_progress
                 reset_progress(self.ui_components, message)
             except ImportError:
                 # Fallback manual reset

@@ -95,7 +95,7 @@ def create_save_reset_buttons(
             sync_info
         ], layout=widgets.Layout(
             display='flex',
-            flex_flow='row nowrap',
+            flex_flow='column nowrap',
             justify_content='flex-end',
             align_items='flex-end',
             gap='10px',

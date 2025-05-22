@@ -32,16 +32,12 @@ def setup_cell(
         # Import komponen standar dengan pendekatan konsolidasi
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        from smartcash.ui.utils.ui_logger import log_to_ui, intercept_stdout_to_ui
         
         # Buat UI dasar minimal untuk intercept stdout sebelum inisialisasi lainnya
         import ipywidgets as widgets
         if 'status' not in ui_components:
             ui_components['status'] = widgets.Output()
             
-        # Tangkap stdout ke UI segera sebelum inisialisasi lainnya
-        intercept_stdout_to_ui(ui_components)
-        
         # Setup environment dan load konfigurasi (setelah intercept stdout)
         env, config = setup_notebook_environment(cell_name)
         

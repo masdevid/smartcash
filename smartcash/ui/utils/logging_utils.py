@@ -91,10 +91,6 @@ def redirect_all_logs_to_ui(ui_components: Dict[str, Any]) -> None:
     # Dapatkan UI logger
     ui_logger = ui_components['logger']
     
-    # Redirect stdout/stderr ke UI
-    from smartcash.ui.utils.ui_logger import intercept_stdout_to_ui
-    intercept_stdout_to_ui(ui_components)
-    
     # Redirect semua logger ke UI logger
     redirect_all_loggers_to_ui_logger(ui_logger)
     

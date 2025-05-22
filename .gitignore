@@ -29,8 +29,8 @@ coverage.xml
 *.log
 .pytest_cache/
 .mypy_cache/
-
 # Dataset
+.cursor
 data/
 */data/
 weights/

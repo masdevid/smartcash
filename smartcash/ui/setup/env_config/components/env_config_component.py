@@ -1,105 +1,127 @@
 """
 File: smartcash/ui/setup/env_config/components/env_config_component.py
-Deskripsi: Component UI untuk konfigurasi environment - diperbaiki dengan orchestrator dan proper error handling
+Deskripsi: Component UI yang diperbaiki dengan proper UI lifecycle dan progress management
 """
 
 from typing import Dict, Any
-from IPython.display import display
-import time 
+from IPython.display import display, clear_output
+
 from smartcash.ui.setup.env_config.components.ui_factory import UIFactory
 from smartcash.ui.setup.env_config.handlers.environment_orchestrator import EnvironmentOrchestrator
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
 from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
 
 class EnvConfigComponent:
-    """
-    Component UI untuk konfigurasi environment dengan orchestrator pattern
-    """
+    """Component UI environment config dengan lifecycle management yang lebih baik."""
     
     def __init__(self):
-        """Inisialisasi component dengan proper separation of concerns"""
+        self._displayed = False
+        self._setup_completed = False
         
-        # Create UI components first
-        self.ui_components = UIFactory.create_ui_components()
+        # Create UI components dengan error handling
+        try:
+            self.ui_components = UIFactory.create_ui_components()
+        except Exception as e:
+            self.ui_components = UIFactory.create_error_ui_components(f"Error creating UI: {str(e)}")
+            return
         
-        # Setup logging dengan namespace
+        # Setup logging dengan namespace dan level yang tepat
         self.ui_components['logger_namespace'] = ENV_CONFIG_LOGGER_NAMESPACE
         self.ui_components['env_config_initialized'] = True
         
-        # Setup UI logger
+        # Setup UI logger dengan filtering spam
         self.logger = setup_ipython_logging(
             self.ui_components,
             ENV_CONFIG_LOGGER_NAMESPACE,
-            redirect_all_logs=True
+            log_level=30,  # WARNING level untuk mengurangi spam
+            redirect_all_logs=False
         )
         
-        # Initialize orchestrator
-        self.orchestrator = EnvironmentOrchestrator(self.ui_components)
-        
-        # Connect button click handler
-        self.ui_components['setup_button'].on_click(self._handle_setup_click)
-        
-        # Track if setup was attempted
-        self.setup_attempted = False
+        try:
+            self.orchestrator = EnvironmentOrchestrator(self.ui_components)
+            self.ui_components['setup_button'].on_click(self._handle_setup_click)
+        except Exception as e:
+            self.logger.error(f"Error setup orchestrator: {str(e)}")
     
     def _handle_setup_click(self, button):
-        """
-        Handle setup button click dengan proper error handling dan progress reset
-        """
+        """Handle setup button dengan proper state management."""
         button.disabled = True
-        self.setup_attempted = True
         
         try:
-            # Clear previous status dan reset progress
+            # Reset UI state
             self._reset_ui_state()
             
-            # Perform setup melalui orchestrator
+            # Perform setup
             success = self.orchestrator.perform_setup()
             
-            # Update button state berdasarkan hasil
             if success:
-                # Keep button disabled jika berhasil
-                button.disabled = True
-                self._update_status("✅ Setup berhasil - Environment siap digunakan", "success")
+                self._setup_completed = True
+                button.disabled = True  # Keep disabled after success
+                self._hide_progress_after_success()
+                self._update_status("✅ Environment siap digunakan", "success")
             else:
-                # Enable button untuk retry jika gagal dan reset progress
-                button.disabled = False
-                self._update_status("❌ Setup gagal - Silakan coba lagi", "error")
-                # Reset progress bar explicitly
-                self._reset_progress_bar("Setup gagal - silakan coba lagi")
+                button.disabled = False  # Allow retry
+                self._reset_progress_bar("Setup gagal - coba lagi")
+                self._update_status("❌ Setup gagal", "error")
                 
         except Exception as e:
-            # Log error, enable button untuk retry, dan reset progress
-            self.logger.error(f"Error saat setup: {str(e)}")
+            self.logger.error(f"Error setup: {str(e)}")
             self._update_status(f"❌ Error: {str(e)}", "error")
-            self._reset_progress_bar("Error - silakan coba lagi")
+            self._reset_progress_bar("Error - coba lagi")
             button.disabled = False
     
     def _reset_ui_state(self):
-        """Reset UI state sebelum setup"""
+        """Reset UI state dengan proper cleanup."""
+        # Show progress bar
+        self._show_progress_bar()
+        
         # Reset progress
         self._reset_progress_bar("Memulai setup...")
         
-        # Clear log output
+        # Clear log dengan limit
         if 'log_output' in self.ui_components:
             self.ui_components['log_output'].clear_output(wait=True)
     
+    def _show_progress_bar(self):
+        """Show progress bar container."""
+        if 'progress_container' in self.ui_components:
+            self.ui_components['progress_container'].layout.visibility = 'visible'
+            self.ui_components['progress_container'].layout.display = 'block'
+    
+    def _hide_progress_after_success(self):
+        """Hide progress bar setelah setup berhasil."""
+        if 'progress_container' in self.ui_components and self._setup_completed:
+            # Hide dengan delay untuk smooth transition
+            import threading
+            import time
+            
+            def hide_with_delay():
+                time.sleep(2)  # Wait 2 seconds
+                if self._setup_completed:  # Double check
+                    try:
+                        self.ui_components['progress_container'].layout.visibility = 'hidden'
+                        self.ui_components['progress_container'].layout.display = 'none'
+                    except:
+                        pass  # Ignore errors during cleanup
+            
+            # Run in background thread
+            threading.Thread(target=hide_with_delay, daemon=True).start()
+    
     def _reset_progress_bar(self, message: str = ""):
-        """Reset progress bar dengan pesan"""
-        if 'progress_bar' in self.ui_components:
-            try:
-                from smartcash.ui.setup.env_config.components.progress_tracking import reset_progress
-                reset_progress(self.ui_components, message)
-            except ImportError:
-                # Fallback manual reset
-                if 'progress_bar' in self.ui_components:
-                    self.ui_components['progress_bar'].value = 0
-                    self.ui_components['progress_bar'].description = "0%"
-                if 'progress_message' in self.ui_components:
-                    self.ui_components['progress_message'].value = message
+        """Reset progress bar dengan message."""
+        try:
+            from smartcash.ui.setup.env_config.components.progress_tracking import reset_progress
+            reset_progress(self.ui_components, message)
+        except ImportError:
+            # Fallback manual
+            if 'progress_bar' in self.ui_components:
+                self.ui_components['progress_bar'].value = 0
+                self.ui_components['progress_bar'].description = "0%"
+            if 'progress_message' in self.ui_components:
+                self.ui_components['progress_message'].value = message
     
     def _update_status(self, message: str, status_type: str = "info"):
-        """Update status panel"""
+        """Update status panel dengan rate limiting."""
         if 'status_panel' in self.ui_components:
             try:
                 from smartcash.ui.utils.alert_utils import update_status_panel
@@ -108,65 +130,70 @@ class EnvConfigComponent:
                 pass
     
     def display(self):
-        """
-        Display the environment configuration UI dengan auto-check
-        """
-        # Display the UI components first
-        display(self.ui_components['ui_layout'])
-        time.sleep(1)
-        # Run auto check untuk determine initial state
+        """Display UI dengan idempotent behavior."""
+        # Prevent multiple displays
+        if self._displayed:
+            return
+        
         try:
-            self.logger.info("🔍 Checking environment status...")
+            # Clear output sebelum display untuk mencegah UI ganda
+            clear_output(wait=True)
+            
+            # Display UI
+            display(self.ui_components['ui_layout'])
+            self._displayed = True
+            
+            # Auto-check environment status
+            self._perform_auto_check()
+            
+        except Exception as e:
+            print(f"❌ Error displaying UI: {str(e)}")
+    
+    def _perform_auto_check(self):
+        """Auto-check environment dengan error handling."""
+        try:
             env_status = self.orchestrator.check_environment()
             
-            # Determine button state berdasarkan status
-            should_disable_button = self._should_disable_button(env_status)
-            self.ui_components['setup_button'].disabled = should_disable_button
+            # Update button state
+            should_disable = self._should_disable_button(env_status)
+            self.ui_components['setup_button'].disabled = should_disable
             
             # Update status message
             if env_status.get('ready', False):
-                self._update_status("✅ Environment sudah terkonfigurasi", "success")
+                self._setup_completed = True
+                self._hide_progress_after_success()
+                self._update_status("✅ Environment sudah dikonfigurasi", "success")
             elif env_status.get('missing_dirs'):
-                missing_dirs = ', '.join(env_status['missing_dirs'])
+                missing_dirs = ', '.join(env_status['missing_dirs'][:3])  # Limit display
+                if len(env_status['missing_dirs']) > 3:
+                    missing_dirs += "..."
                 self._update_status(f"🔧 Perlu setup - Missing: {missing_dirs}", "warning")
             else:
                 self._update_status("🔧 Environment perlu dikonfigurasi", "info")
             
-            # Initialize config manager jika environment ready
+            # Initialize config manager jika ready
             if env_status.get('ready') and 'config_manager' not in self.ui_components:
-                config_manager = self.orchestrator.config_manager.initialize_config_manager()
-                if config_manager:
-                    self.ui_components['config_manager'] = config_manager
+                try:
+                    config_manager = self.orchestrator.config_manager.initialize_config_manager()
+                    if config_manager:
+                        self.ui_components['config_manager'] = config_manager
+                except Exception:
+                    pass  # Silent fail
                     
         except Exception as e:
-            # Log error tapi jangan crash UI
-            self.logger.warning(f"Error saat auto-check: {str(e)}")
-            self._update_status("⚠️ Error saat checking - Silakan coba setup", "warning")
+            # Silent fail dengan minimal logging
+            self._update_status("⚠️ Error checking - Silakan setup", "warning")
             self.ui_components['setup_button'].disabled = False
     
     def _should_disable_button(self, env_status: Dict[str, Any]) -> bool:
-        """
-        Tentukan apakah button harus disabled berdasarkan status
-        
-        Args:
-            env_status: Status environment dari checker
-            
-        Returns:
-            True jika button harus disabled
-        """
-        # Jangan disable jika ada missing directories (user perlu bisa setup)
-        if env_status.get('missing_dirs'):
+        """Tentukan button state berdasarkan status."""
+        # Enable jika ada missing directories atau belum ready
+        if env_status.get('missing_dirs') or not env_status.get('ready', False):
             return False
         
-        # Jangan disable jika setup pernah gagal (user perlu bisa retry)
-        if self.setup_attempted:
-            return False
-        
-        # Disable hanya jika benar-benar ready dan tidak ada issue
+        # Disable jika sudah complete dan ready
         return env_status.get('ready', False)
 
-
-# Factory function untuk kompatibilitas
 def create_env_config_component() -> EnvConfigComponent:
-    """Factory function untuk membuat EnvConfigComponent"""
+    """Factory function untuk EnvConfigComponent."""
     return EnvConfigComponent()

@@ -97,7 +97,7 @@ def create_save_reset_buttons(
             display='flex',
             flex_flow='row nowrap',
             justify_content='flex-end',
-            align_items='right',
+            align_items='flex-end',
             gap='10px',
             width=container_width,
             margin='10px 0px'

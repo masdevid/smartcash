@@ -249,13 +249,10 @@ MARGINS = {
     'xl': '20px'
 }
 
-# # Import konstanta file dari common/constants
-# from smartcash.common import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
-
 # Ekstensi file untuk UI
 FILE_EXTENSIONS = {
-    'image': IMAGE_EXTENSIONS,
-    'video': VIDEO_EXTENSIONS,
+    'image': ['.jpg', '.jpeg', '.png', '.bmp', '.tiff'],
+    'video': ['.mp4', '.avi', '.mov', '.mkv', '.webm'],
     'document': ['.pdf', '.doc', '.docx', '.txt', '.csv', '.xls', '.xlsx', '.ppt', '.pptx'],
     'code': ['.py', '.js', '.java', '.cpp', '.c', '.h', '.html', '.css', '.json', '.xml']
 }

@@ -1,6 +1,6 @@
 """
 File: smartcash/common/environment.py
-Deskripsi: Environment manager yang diperkecil, fokus hanya pada core functionality tanpa duplikasi
+Deskripsi: Environment manager dengan logging minimal dan tanggung jawab yang jelas
 """
 
 import os
@@ -9,93 +9,96 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 
 def get_default_base_dir():
-    """Dapatkan direktori dasar default untuk aplikasi."""
-    return "/content" if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ else str(Path.home() / "SmartCash")
+    """Dapatkan direktori dasar default untuk aplikasi"""
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 class EnvironmentManager:
-    """Environment manager singleton untuk deteksi dan setup environment dasar."""
+    """Environment manager dengan logging minimal - fokus pada detection dan basic setup"""
     
     _instance = None
     
     def __new__(cls, *args, **kwargs):
-        if cls._instance is None: 
+        if cls._instance is None:
             cls._instance = super(EnvironmentManager, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
     
-    def __init__(self, base_dir: Optional[str] = None, logger = None):
-        if getattr(self, '_initialized', False): return
+    def __init__(self, base_dir: Optional[str] = None, logger=None):
+        if getattr(self, '_initialized', False):
+            return
             
-        self.logger = logger
         self._in_colab = self._detect_colab()
         self._drive_mounted = False
         self._drive_path = None
-        self._base_dir = Path(base_dir) if base_dir else Path('/content') if self._in_colab else Path(os.getcwd())
+        self.logger = logger  # Optional logger, tidak wajib
         
-        # Auto-detect drive tanpa verbose logging
-        if self._in_colab: 
-            self._detect_drive_silently()
+        # Set base directory
+        self._base_dir = (
+            Path(base_dir) if base_dir 
+            else Path('/content') if self._in_colab 
+            else Path(os.getcwd())
+        )
+        
+        # Auto-detect drive tanpa logging berlebihan
+        if self._in_colab:
+            self._detect_drive_silent()
             
         self._initialized = True
     
     @property
-    def is_colab(self) -> bool: 
+    def is_colab(self) -> bool:
         return self._in_colab
     
     @property
-    def base_dir(self) -> Path: 
+    def base_dir(self) -> Path:
         return self._base_dir
     
-    @property
-    def drive_path(self) -> Optional[Path]: 
+    @property 
+    def drive_path(self) -> Optional[Path]:
         return self._drive_path
     
     @property
-    def is_drive_mounted(self) -> bool: 
+    def is_drive_mounted(self) -> bool:
         return self._drive_mounted
     
     def _detect_colab(self) -> bool:
-        """Deteksi lingkungan Google Colab tanpa import logging."""
-        try:
-            import google.colab
-            return True
-        except ImportError:
-            return False
+        """Deteksi Colab tanpa import berlebihan"""
+        return bool(os.environ.get("COLAB_GPU")) or bool(os.environ.get("COLAB_TPU_ADDR"))
     
-    def _detect_drive_silently(self) -> bool:
-        """Deteksi drive tanpa verbose logging untuk menghindari spam."""
-        drive_mount_point = Path('/content/drive/MyDrive')
-        if drive_mount_point.exists():
-            self._drive_mounted = True  
-            self._drive_path = Path('/content')  # Gunakan /content sebagai base di Colab
+    def _detect_drive_silent(self) -> bool:
+        """Deteksi drive tanpa logging"""
+        drive_path = Path('/content/drive/MyDrive')
+        if drive_path.exists():
+            self._drive_mounted = True
+            self._drive_path = drive_path / 'SmartCash'
             return True
         return False
     
     def mount_drive(self) -> Tuple[bool, str]:
-        """Mount Google Drive dengan minimal logging."""
+        """Mount Google Drive dengan minimal logging"""
         if not self._in_colab:
             return False, "Bukan environment Colab"
         
-        if self._drive_mounted: 
+        if self._drive_mounted:
             return True, "Drive sudah terhubung"
         
         try:
             from google.colab import drive
             drive.mount('/content/drive')
             
-            self._drive_path = Path('/content')
+            # Set drive path
+            self._drive_path = Path('/content/drive/MyDrive/SmartCash')
+            self._drive_path.mkdir(parents=True, exist_ok=True)
             self._drive_mounted = True
             
             return True, "Drive berhasil terhubung"
         except Exception as e:
-            return False, f"Error mounting drive: {str(e)}"
-    
-    def get_path(self, relative_path: str) -> Path:
-        """Dapatkan path absolut berdasarkan environment."""
-        return self._base_dir / relative_path
+            return False, f"Gagal mount drive: {str(e)}"
     
     def get_system_info(self) -> Dict[str, Any]:
-        """Info sistem minimal tanpa verbose logging."""
+        """Get system info minimal"""
         info = {
             'environment': 'Google Colab' if self._in_colab else 'Local',
             'base_directory': str(self._base_dir),
@@ -103,7 +106,7 @@ class EnvironmentManager:
             'python_version': sys.version.split()[0]
         }
         
-        # GPU info minimal
+        # Deteksi GPU sederhana
         try:
             import torch
             info['cuda_available'] = torch.cuda.is_available()
@@ -115,9 +118,9 @@ class EnvironmentManager:
 # Singleton instance
 _environment_manager = None
 
-def get_environment_manager(base_dir: Optional[str] = None, logger = None) -> EnvironmentManager:
-    """Dapatkan instance singleton EnvironmentManager."""
+def get_environment_manager(base_dir: Optional[str] = None, logger=None) -> EnvironmentManager:
+    """Dapatkan singleton EnvironmentManager"""
     global _environment_manager
-    if _environment_manager is None: 
+    if _environment_manager is None:
         _environment_manager = EnvironmentManager(base_dir, logger)
     return _environment_manager

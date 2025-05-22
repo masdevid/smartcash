@@ -1,15 +1,7 @@
 """
 File: smartcash/ui/cells/cell_1_2_env_config.py
-Deskripsi: Entry point untuk environment configuration cell
+Deskripsi: Entry point minimalist untuk environment configuration
 """
 
-# Import environment singleton first (initialize it before anything else)
-from smartcash.common.environment import get_environment_manager
-env_manager = get_environment_manager()
-
-# Then import and display the environment configuration component
-from smartcash.ui.setup.env_config.components import EnvConfigComponent
-
-# Create and display environment configuration
-env_config = EnvConfigComponent()
-env_config.display()
+from smartcash.ui.setup.env_config.env_config_initializer import initialize_env_config_ui
+ui_components = initialize_env_config_ui()

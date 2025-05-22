@@ -65,20 +65,20 @@ def create_save_reset_buttons(
     
     if reset_handler:
         reset_button.on_click(reset_handler)
-    flex_end_layout = widgets.Layout(
+    
+    # Buat container untuk tombol
+    button_container = widgets.HBox([
+        save_button,
+        reset_button
+    ], layout=widgets.Layout(
         display='flex',
-        flex_flow='column nowrap',
+        flex_flow='row nowrap',
         justify_content='flex-end',
         align_items='center',
         gap='10px',
         width=container_width,
         margin='10px 0px'
-    )
-    # Buat container untuk tombol
-    button_container = widgets.HBox([
-        save_button,
-        reset_button
-    ], layout=flex_end_layout)
+    ))
     
     # Tambahkan keterangan sinkronisasi jika diperlukan
     sync_info = None
@@ -93,7 +93,15 @@ def create_save_reset_buttons(
         container = widgets.VBox([
             button_container,
             sync_info
-        ], layout=flex_end_layout)
+        ], layout=widgets.Layout(
+            display='flex',
+            flex_flow='row nowrap',
+            justify_content='flex-end',
+            align_items='right',
+            gap='10px',
+            width=container_width,
+            margin='10px 0px'
+        ))
     else:
         container = button_container
     

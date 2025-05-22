@@ -1,105 +1,96 @@
 """
 File: smartcash/ui/setup/env_config/handlers/auto_check_handler.py
-Deskripsi: Handler untuk auto check environment
+Deskripsi: Handler untuk auto check environment - disederhanakan dan mengurangi duplikasi
 """
 
 from datetime import datetime
-import sys
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable
 
-from smartcash.common.utils import is_colab
-from smartcash.common.constants.paths import COLAB_PATH
-from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
-from smartcash.ui.setup.env_config.handlers.base_handler import BaseHandler
-from smartcash.ui.setup.env_config.handlers.environment_handler import EnvironmentHandler
+from smartcash.ui.setup.env_config.handlers.base_handler import BaseHandler, EnvConfigHandlerMixin
 
-class AutoCheckHandler(BaseHandler):
+class AutoCheckHandler(BaseHandler, EnvConfigHandlerMixin):
     """
-    Handler untuk auto check environment
+    Handler untuk auto check environment - fokus pada checking dan validation
     """
     
-    def __init__(self, ui_callback: Optional[Dict[str, Callable]] = None):
+    def __init__(self, ui_components: Dict[str, Any] = None, ui_callback: Optional[Dict[str, Callable]] = None):
         """
-        Inisialisasi handler
+        Inisialisasi handler dengan UI components atau callbacks
         
         Args:
-            ui_callback: Dictionary callback untuk update UI
+            ui_components: Dictionary komponen UI (preferred)
+            ui_callback: Dictionary callback untuk update UI (legacy support)
         """
-        super().__init__(ui_callback, ENV_CONFIG_LOGGER_NAMESPACE)
-        
-        # Initialize environment handler
-        self.env_handler = EnvironmentHandler(ui_callback)
+        super().__init__(ui_components, ui_callback)
     
     def check_environment(self) -> Dict[str, Any]:
         """
-        Check environment and return status
-        
-        Returns:
-            Dict with environment status information
+        Check environment and return status dengan progress tracking
         """
         try:
-            # Update progress
-            self._update_progress(0.2, "Memeriksa environment...")
+            self._update_progress(0.1, "Memeriksa environment...")
             
-            # Get environment info
-            env_info = {
-                'is_colab': is_colab(),
-                'base_dir': self.env_handler.env_manager.base_dir,
-                'drive_mounted': self.env_handler.env_manager.is_drive_mounted,
-                'drive_path': self.env_handler.env_manager.drive_path,
-                'timestamp': datetime.now().strftime('%H:%M:%S')
-            }
+            # Validate environment setup
+            env_status = self.validate_environment_setup()
+            
+            # Add timestamp
+            env_status['timestamp'] = datetime.now().strftime('%H:%M:%S')
             
             # Log environment info
-            self._log_message(f"Memeriksa environment...", "info", "🔍")
-            self._log_message(f"Environment: {'Colab' if env_info['is_colab'] else 'Local'}", "info")
-            self._log_message(f"Base Directory: {env_info['base_dir']}", "info")
+            self._log_environment_info(env_status)
             
-            # Check required directories if in Colab
-            if env_info['is_colab']:
-                required_dirs = self.env_handler.required_dirs
-                
-                existing_dirs = []
-                missing_dirs = []
-                
-                for dir_name in required_dirs:
-                    if Path(f"{COLAB_PATH}/{dir_name}").exists():
-                        existing_dirs.append(dir_name)
-                    else:
-                        missing_dirs.append(dir_name)
-                
-                env_info['existing_dirs'] = existing_dirs
-                env_info['missing_dirs'] = missing_dirs
-                
-                # Log directory status
-                if existing_dirs:
-                    self._log_message(f"Direktori yang sudah ada: {', '.join(existing_dirs)}", "success", "✅")
-                if missing_dirs:
-                    self._log_message(f"Direktori yang belum ada: {', '.join(missing_dirs)}", "warning", "⚠️")
-            
-            # Update progress
+            # Update progress and status
             self._update_progress(1.0, "Pemeriksaan selesai")
+            self._update_final_status(env_status)
             
-            # Update status based on check results
-            if env_info['is_colab']:
-                if not env_info.get('missing_dirs', []):
-                    self._update_status("Environment sudah terkonfigurasi", "success")
-                    self._log_message("Environment sudah terkonfigurasi", "success", "✅")
-                else:
-                    self._update_status("Environment perlu dikonfigurasi", "info")
-                    self._log_message("Environment perlu dikonfigurasi", "info", "ℹ️")
-            else:
-                self._update_status("Berjalan di environment lokal", "info")
-                self._log_message("Berjalan di environment lokal", "info", "💻")
-            
-            self._log_message(f"Pemeriksaan environment selesai", "success", "✅")
-            
-            return env_info
+            return env_status
             
         except Exception as e:
-            self.logger.error(f"Error saat pemeriksaan environment: {str(e)}")
-                
-            self._log_message(f"Error saat pemeriksaan environment: {str(e)}", "error", "❌")
-            self._update_status(f"Error saat pemeriksaan environment: {str(e)}", "error")
-            return {'error': str(e)} 
+            error_msg = f"Error saat pemeriksaan environment: {str(e)}"
+            self._log_message(error_msg, "error", "❌")
+            self._update_status(error_msg, "error")
+            return {'error': str(e)}
+    
+    def _log_environment_info(self, env_status: Dict[str, Any]):
+        """Log informasi environment berdasarkan status"""
+        # Basic environment info
+        env_type = 'Colab' if env_status.get('is_colab', False) else 'Local'
+        self._log_message(f"Environment: {env_type} 💻", "info", "🔍")
+        
+        if 'base_dir' in env_status:
+            self._log_message(f"Base Directory: {env_status['base_dir']} 📁", "info")
+        
+        # Drive connection status
+        drive_connected = env_status.get('drive_connected', False)
+        if env_status.get('is_colab'):
+            drive_icon = "✅" if drive_connected else "❌"
+            drive_status = "Terhubung" if drive_connected else "Tidak terhubung"
+            self._log_message(f"Google Drive: {drive_status} {drive_icon}", 
+                            "success" if drive_connected else "warning")
+        
+        # Directory status
+        directories_exist = env_status.get('directories_exist', {})
+        if directories_exist:
+            existing_dirs = [k for k, v in directories_exist.items() if v]
+            missing_dirs = [k for k, v in directories_exist.items() if not v]
+            
+            if existing_dirs:
+                self._log_message(f"Direktori tersedia: {', '.join(existing_dirs)} ✅", "success")
+            if missing_dirs:
+                self._log_message(f"Direktori belum ada: {', '.join(missing_dirs)} ⚠️", "warning")
+    
+    def _update_final_status(self, env_status: Dict[str, Any]):
+        """Update status akhir berdasarkan hasil pemeriksaan"""
+        if env_status.get('error'):
+            return
+            
+        if env_status.get('ready', False):
+            self._update_status("Environment sudah terkonfigurasi", "success")
+            self._log_message("Environment sudah terkonfigurasi 🎉", "success", "✅")
+        elif env_status.get('is_colab', False):
+            self._update_status("Environment perlu dikonfigurasi", "info")
+            self._log_message("Environment perlu dikonfigurasi 🔧", "info", "ℹ️")
+        else:
+            self._update_status("Berjalan di environment lokal", "info")
+            self._log_message("Berjalan di environment lokal 🏠", "info", "💻")

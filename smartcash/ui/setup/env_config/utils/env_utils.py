@@ -1,95 +1,149 @@
 """
-File: smartcash/ui/setup/env_config/utils/env_utils.py
-Deskripsi: Utilitas untuk konfigurasi environment
+File: smartcash/ui/utils/env_ui_utils.py
+Deskripsi: Utilitas UI khusus untuk environment config - mengkonsolidasi helper functions
 """
 
-from typing import Dict, Any, Tuple, List
-import os
-import platform
-import sys
-from pathlib import Path
+from typing import Dict, Any, Optional
+from IPython.display import display
 
-def get_env_status(env_manager: Any) -> Dict[str, Any]:
+# Module logger name untuk konsistensi
+MODULE_LOGGER_NAME = "env_config"
+
+def update_status(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
     """
-    Dapatkan status environment
+    Update status panel dengan pesan dan tipe yang tepat
     
     Args:
-        env_manager: Environment manager
-    
-    Returns:
-        Dictionary berisi status environment
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan ditampilkan
+        status_type: Tipe status (info, success, warning, error)
     """
-    # Dapatkan informasi sistem
-    system_info = env_manager.get_system_info() if hasattr(env_manager, 'get_system_info') else {}
-    
-    # Dapatkan status drive
-    drive_status = {
-        'is_mounted': env_manager.is_drive_mounted if hasattr(env_manager, 'is_drive_mounted') else False,
-        'drive_path': str(env_manager.drive_path) if hasattr(env_manager, 'drive_path') else None
-    }
-    
-    # Dapatkan status direktori
-    directory_status = {}
-    if hasattr(env_manager, 'base_dir'):
-        base_dir = Path(env_manager.base_dir)
-        required_dirs = [
-            "configs",
-            "data",
-            "data/raw",
-            "data/processed",
-            "models",
-            "models/checkpoints",
-            "models/weights",
-            "output",
-            "logs"
-        ]
-        
-        for dir_name in required_dirs:
-            dir_path = base_dir / dir_name
-            directory_status[dir_name] = dir_path.exists()
-    
-    # Gabungkan semua status
-    return {
-        'system_info': system_info,
-        'drive_status': drive_status,
-        'directory_status': directory_status
-    }
+    if 'status_panel' in ui_components:
+        from smartcash.ui.components.status_panel import update_status_panel
+        update_status_panel(ui_components['status_panel'], message, status_type)
 
-def format_env_info(env_status: Dict[str, Any]) -> List[Tuple[str, str]]:
+def update_progress(ui_components: Dict[str, Any], value: float, message: str = "") -> None:
     """
-    Format informasi environment untuk ditampilkan
+    Update progress bar dan message
     
     Args:
-        env_status: Status environment
-    
-    Returns:
-        List tuple (label, value) untuk ditampilkan
+        ui_components: Dictionary komponen UI
+        value: Nilai progress (0.0 - 1.0)
+        message: Pesan progress opsional
     """
-    formatted_info = []
+    if 'progress_bar' in ui_components:
+        from smartcash.ui.components.progress_tracking import update_progress as update_progress_component
+        update_progress_component(
+            ui_components,
+            int(value * 100),  # Convert to percentage
+            100,
+            message
+        )
+
+def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
+    """
+    Log message ke output panel dengan formatting yang konsisten
     
-    # Format informasi sistem
-    system_info = env_status.get('system_info', {})
-    if system_info:
-        formatted_info.append(("Sistem Operasi", system_info.get('os', 'Tidak diketahui')))
-        formatted_info.append(("Python Version", system_info.get('python_version', 'Tidak diketahui')))
-        formatted_info.append(("Colab", "Ya" if system_info.get('is_colab', False) else "Tidak"))
-        formatted_info.append(("Kaggle", "Ya" if system_info.get('is_kaggle', False) else "Tidak"))
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan dilog
+        level: Level log (info, success, warning, error)
+        icon: Ikon opsional
+    """
+    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_log'):
+        # Gunakan append_log method jika tersedia
+        ui_components['log_output'].append_log(
+            message, 
+            level, 
+            namespace=ui_components.get('logger_namespace')
+        )
+    elif 'log_output' in ui_components:
+        # Fallback ke display biasa
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        with ui_components['log_output']:
+            display(create_status_indicator(level, message, icon))
+
+def reset_ui_state(ui_components: Dict[str, Any]) -> None:
+    """
+    Reset UI state ke kondisi awal
     
-    # Format status drive
-    drive_status = env_status.get('drive_status', {})
-    if drive_status:
-        formatted_info.append(("Google Drive", "Terhubung" if drive_status.get('is_mounted', False) else "Tidak terhubung"))
-        if drive_status.get('is_mounted', False) and drive_status.get('drive_path'):
-            formatted_info.append(("Drive Path", drive_status.get('drive_path', 'Tidak diketahui')))
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    # Reset progress
+    if 'progress_bar' in ui_components:
+        from smartcash.ui.components.progress_tracking import reset_progress
+        reset_progress(ui_components)
     
-    # Format status direktori
-    directory_status = env_status.get('directory_status', {})
-    if directory_status:
-        dir_status_str = ", ".join([f"{dir_name}" for dir_name, exists in directory_status.items() if exists])
-        formatted_info.append(("Direktori Tersedia", dir_status_str if dir_status_str else "Tidak ada"))
+    # Reset status
+    update_status(ui_components, "Siap untuk mengkonfigurasi environment", "info")
+    
+    # Clear log output
+    if 'log_output' in ui_components:
+        ui_components['log_output'].clear_output(wait=True)
+
+def show_environment_summary(ui_components: Dict[str, Any], env_status: Dict[str, Any]) -> None:
+    """
+    Tampilkan ringkasan status environment
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        env_status: Status environment dari check
+    """
+    # Summary message
+    env_type = "Google Colab" if env_status.get('is_colab', False) else "Lokal"
+    drive_status = "Terhubung" if env_status.get('drive_connected', False) else "Tidak terhubung"
+    ready_status = "Siap" if env_status.get('ready', False) else "Perlu setup"
+    
+    summary = f"""
+    📊 **Ringkasan Environment:**
+    - **Tipe**: {env_type}
+    - **Google Drive**: {drive_status}
+    - **Status**: {ready_status}
+    """
+    
+    log_message(ui_components, summary, "info", "📋")
+
+def handle_ui_error(ui_components: Dict[str, Any], error: Exception, context: str = "") -> None:
+    """
+    Handle error dengan logging dan status update yang proper
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        error: Exception yang terjadi
+        context: Konteks dimana error terjadi
+    """
+    error_msg = f"Error {context}: {str(error)}" if context else f"Error: {str(error)}"
+    
+    # Update status dan log
+    update_status(ui_components, error_msg, "error")
+    log_message(ui_components, error_msg, "error", "❌")
+    
+    # Enable button jika ada
+    if 'setup_button' in ui_components:
+        ui_components['setup_button'].disabled = False
+
+def validate_ui_components(ui_components: Dict[str, Any]) -> bool:
+    """
+    Validate bahwa UI components memiliki elemen yang diperlukan
+    
+    Args:
+        ui_components: Dictionary komponen UI
         
-        missing_dirs = ", ".join([f"{dir_name}" for dir_name, exists in directory_status.items() if not exists])
-        if missing_dirs:
-            formatted_info.append(("Direktori Tidak Tersedia", missing_dirs))
+    Returns:
+        True jika valid, False jika tidak
+    """
+    required_components = ['ui_layout']
+    optional_components = ['status_panel', 'log_output', 'progress_bar', 'setup_button']
     
-    return formatted_info
+    # Check required components
+    for component in required_components:
+        if component not in ui_components:
+            return False
+    
+    # Log missing optional components
+    missing_optional = [comp for comp in optional_components if comp not in ui_components]
+    if missing_optional:
+        print(f"⚠️ Optional UI components tidak ditemukan: {', '.join(missing_optional)}")
+    
+    return True

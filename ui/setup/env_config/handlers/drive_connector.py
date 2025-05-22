@@ -97,15 +97,18 @@ class DriveConnector:
                 if name == 'base':  # Skip base path
                     continue
                     
-                if not path.exists():
+                # Check if directory exists (including symlinks)
+                if not path.exists() and not Path(f"/content/{name}").exists():
                     path.mkdir(parents=True, exist_ok=True)
                     self.logger.info(f"📁 Dibuat direktori Drive: {name}")
                     created_count += 1
+                elif Path(f"/content/{name}").exists():
+                    self.logger.info(f"📁 Direktori {name} sudah ada di local")
             
             if created_count > 0:
                 self.logger.success(f"✅ Dibuat {created_count} direktori di Drive")
             else:
-                self.logger.info("📁 Semua direktori Drive sudah ada")
+                self.logger.info("📁 Semua direktori sudah tersedia")
             
             return True
             

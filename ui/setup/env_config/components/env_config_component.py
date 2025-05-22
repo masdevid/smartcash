@@ -44,13 +44,13 @@ class EnvConfigComponent:
     
     def _handle_setup_click(self, button):
         """
-        Handle setup button click dengan proper error handling
+        Handle setup button click dengan proper error handling dan progress reset
         """
         button.disabled = True
         self.setup_attempted = True
         
         try:
-            # Clear previous status
+            # Clear previous status dan reset progress
             self._reset_ui_state()
             
             # Perform setup melalui orchestrator
@@ -62,29 +62,41 @@ class EnvConfigComponent:
                 button.disabled = True
                 self._update_status("✅ Setup berhasil - Environment siap digunakan", "success")
             else:
-                # Enable button untuk retry jika gagal
+                # Enable button untuk retry jika gagal dan reset progress
                 button.disabled = False
                 self._update_status("❌ Setup gagal - Silakan coba lagi", "error")
+                # Reset progress bar explicitly
+                self._reset_progress_bar("Setup gagal - silakan coba lagi")
                 
         except Exception as e:
-            # Log error dan enable button untuk retry
+            # Log error, enable button untuk retry, dan reset progress
             self.logger.error(f"Error saat setup: {str(e)}")
             self._update_status(f"❌ Error: {str(e)}", "error")
+            self._reset_progress_bar("Error - silakan coba lagi")
             button.disabled = False
     
     def _reset_ui_state(self):
         """Reset UI state sebelum setup"""
         # Reset progress
-        if 'progress_bar' in self.ui_components:
-            try:
-                from smartcash.ui.components.progress_tracking import reset_progress
-                reset_progress(self.ui_components)
-            except ImportError:
-                pass
+        self._reset_progress_bar("Memulai setup...")
         
         # Clear log output
         if 'log_output' in self.ui_components:
             self.ui_components['log_output'].clear_output(wait=True)
+    
+    def _reset_progress_bar(self, message: str = ""):
+        """Reset progress bar dengan pesan"""
+        if 'progress_bar' in self.ui_components:
+            try:
+                from smartcash.ui.components.progress_tracking import reset_progress
+                reset_progress(self.ui_components, message)
+            except ImportError:
+                # Fallback manual reset
+                if 'progress_bar' in self.ui_components:
+                    self.ui_components['progress_bar'].value = 0
+                    self.ui_components['progress_bar'].description = "0%"
+                if 'progress_message' in self.ui_components:
+                    self.ui_components['progress_message'].value = message
     
     def _update_status(self, message: str, status_type: str = "info"):
         """Update status panel"""

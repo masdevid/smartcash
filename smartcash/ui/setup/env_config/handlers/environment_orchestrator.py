@@ -45,7 +45,7 @@ class EnvironmentOrchestrator:
     
     def perform_setup(self) -> bool:
         """
-        Lakukan setup environment lengkap dengan progress tracking
+        Lakukan setup environment lengkap dengan progress tracking dan error recovery
         
         Returns:
             Success status
@@ -70,17 +70,19 @@ class EnvironmentOrchestrator:
                 success, message = self.drive_connector.ensure_drive_mounted()
                 if not success:
                     self.logger.error(f"❌ Gagal setup: {message}")
+                    self._reset_progress("Setup gagal")
                     return False
                 
-                # Create drive directories
+                # Create drive directories - skip jika error tapi tidak critical
+                self._update_progress(0.35, "📁 Setup direktori Drive...")
                 if not self.drive_connector.create_drive_directories():
-                    self.logger.error("❌ Gagal membuat direktori Drive")
-                    return False
+                    self.logger.warning("⚠️ Beberapa direktori Drive gagal dibuat, melanjutkan...")
             
             # Step 3: Setup directories
             self._update_progress(0.5, "📁 Membuat direktori...")
             if not self.directory_manager.create_local_directories():
                 self.logger.error("❌ Gagal membuat direktori lokal")
+                self._reset_progress("Setup gagal")
                 return False
             
             # Step 4: Create symlinks (jika Colab)
@@ -88,7 +90,7 @@ class EnvironmentOrchestrator:
             if status['is_colab']:
                 drive_paths = self.drive_connector.get_drive_paths()
                 if not self.directory_manager.create_symlinks(drive_paths):
-                    self.logger.warning("⚠️ Beberapa symlink gagal dibuat")
+                    self.logger.warning("⚠️ Beberapa symlink gagal dibuat, melanjutkan...")
             
             # Step 5: Setup config directory
             self._update_progress(0.7, "📝 Setup konfigurasi...")
@@ -99,12 +101,13 @@ class EnvironmentOrchestrator:
             
             if not self.config_manager.setup_config_directory(drive_config_path):
                 self.logger.error("❌ Gagal setup direktori config")
+                self._reset_progress("Setup gagal")
                 return False
             
             # Step 6: Copy default configs
             self._update_progress(0.8, "📋 Menyalin konfigurasi...")
             if not self.config_manager.copy_default_configs():
-                self.logger.warning("⚠️ Beberapa config gagal disalin")
+                self.logger.warning("⚠️ Beberapa config gagal disalin, melanjutkan...")
             
             # Step 7: Initialize config manager
             self._update_progress(0.9, "🔧 Inisialisasi config manager...")
@@ -127,7 +130,7 @@ class EnvironmentOrchestrator:
             
         except Exception as e:
             self.logger.error(f"❌ Error saat setup: {str(e)}")
-            self._update_progress(0.0, "Setup gagal")
+            self._reset_progress("Setup gagal - silakan coba lagi")
             return False
     
     def _update_progress(self, value: float, message: str = ""):
@@ -136,5 +139,17 @@ class EnvironmentOrchestrator:
             try:
                 from smartcash.ui.components.progress_tracking import update_progress
                 update_progress(self.ui_components, int(value * 100), 100, message)
+            except ImportError:
+                pass
+    
+    def _reset_progress(self, message: str = ""):
+        """Reset progress bar ke 0 dengan pesan error"""
+        if 'progress_bar' in self.ui_components:
+            try:
+                from smartcash.ui.components.progress_tracking import reset_progress
+                reset_progress(self.ui_components)
+                # Set message jika ada
+                if message and 'progress_message' in self.ui_components:
+                    self.ui_components['progress_message'].value = message
             except ImportError:
                 pass

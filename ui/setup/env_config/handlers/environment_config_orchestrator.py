@@ -15,7 +15,7 @@ class EnvironmentConfigOrchestrator:
     def __init__(self, ui_components: Dict[str, Any]):
         """Inisialisasi orchestrator"""
         self.ui_components = ui_components
-        self.logger = create_ui_logger_bridge(ui_components, "env_orchestrator")
+        self.logger = create_ui_logger_bridge(ui_components, "env_config")
         self.status_checker = EnvironmentStatusChecker()
         self.drive_handler = DriveSetupHandler(ui_components)
     

@@ -1,38 +1,44 @@
 """
 File: smartcash/ui/utils/ui_logger.py
-Deskripsi: Logger UI yang diperbaiki dengan filtering spam dan debug logging yang lebih baik
+Deskripsi: UI Logger dengan stdout interception yang lebih efektif untuk mencegah log muncul di console
 """
 
 import logging
 import sys
 import os
+import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional, Set
+from typing import Dict, Any, Callable, Optional, List, Union
 from IPython.display import display, HTML
+import ipywidgets as widgets
 from datetime import datetime
-
 from smartcash.ui.utils.ui_logger_namespace import format_log_message
 
-__all__ = ['UILogger', 'create_ui_logger', 'get_current_ui_logger', 'log_to_ui']
+__all__ = [
+    'UILogger', 
+    'create_ui_logger', 
+    'get_current_ui_logger',
+    'log_to_ui',
+    'intercept_stdout_to_ui',
+    'restore_stdout'
+]
 
 class UILogger:
-    """Logger UI dengan filtering spam dan kontrol output yang lebih baik."""
+    """UI Logger dengan stdout interception yang diperbaiki"""
     
-    # Spam filter patterns
-    _SPAM_PATTERNS = {
-        'drive_detection', 'google drive', 'symlink config', 'setup config structure',
-        'config symlink', 'direktori config', 'template config', 'handler', 'inisialisasi'
-    }
-    
-    def __init__(self, ui_components: Dict[str, Any], name: str = "ui_logger", 
-                 log_to_file: bool = False, log_dir: str = "logs", log_level: int = logging.INFO):
+    def __init__(self, 
+                ui_components: Dict[str, Any], 
+                name: str = "ui_logger",
+                log_to_file: bool = False,
+                log_dir: str = "logs",
+                log_level: int = logging.INFO):
+        
         self.ui_components = ui_components
         self.name = name
         self.log_level = log_level
         self._in_log_to_ui = False
-        self._message_history: Set[str] = set()  # Prevent duplicate messages
         
-        # Setup Python logger dengan minimal handlers
+        # Setup Python logger dengan handler minimal
         self.logger = logging.getLogger(name)
         self.logger.setLevel(log_level)
         
@@ -40,69 +46,36 @@ class UILogger:
         for handler in self.logger.handlers[:]:
             self.logger.removeHandler(handler)
         
-        # Add console handler hanya untuk CRITICAL errors
-        console_handler = logging.StreamHandler(sys.__stderr__)
-        console_handler.setLevel(logging.CRITICAL)
-        console_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-        self.logger.addHandler(console_handler)
-        
-        # File logging jika diminta
+        # Hanya tambahkan file handler jika diminta
         if log_to_file:
             log_path = Path(log_dir)
             log_path.mkdir(parents=True, exist_ok=True)
             log_file = log_path / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-            
             file_handler = logging.FileHandler(log_file, encoding='utf-8')
             file_handler.setLevel(log_level)
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            formatter = logging.Formatter('%(message)s')
+            file_handler.setFormatter(formatter)
             self.logger.addHandler(file_handler)
             self.log_file_path = log_file
         else:
             self.log_file_path = None
     
-    def _is_spam_message(self, message: str) -> bool:
-        """Check apakah message adalah spam berdasarkan pattern."""
-        msg_lower = message.lower()
-        return any(pattern in msg_lower for pattern in self._SPAM_PATTERNS)
-    
-    def _should_skip_message(self, message: str, level: str) -> bool:
-        """Tentukan apakah message harus di-skip."""
-        if not message or not message.strip():
-            return True
-            
-        # Skip duplicate messages
-        msg_key = f"{level}:{message}"
-        if msg_key in self._message_history:
-            return True
-        
-        # Add to history (dengan limit untuk mencegah memory leak)
-        if len(self._message_history) > 1000:
-            self._message_history.clear()
-        self._message_history.add(msg_key)
-        
-        # Skip spam messages kecuali error/warning
-        if level not in ('error', 'warning', 'critical') and self._is_spam_message(message):
-            return True
-            
-        return False
-    
     def _log_to_ui(self, message: str, level: str = "info") -> None:
-        """Log pesan ke UI dengan filtering dan formatting yang lebih baik."""
-        if self._in_log_to_ui or self._should_skip_message(message, level):
+        """Log ke UI tanpa stdout interference"""
+        if not message or not message.strip() or self._in_log_to_ui:
             return
-        
+            
         self._in_log_to_ui = True
         
         try:
-            # Format message dengan namespace
             formatted_message = format_log_message(self.ui_components, message)
             timestamp = datetime.now().strftime('%H:%M:%S')
             
-            # Emoji dan color mapping
             emoji_map = {
-                "debug": "🔍", "info": "ℹ️", "success": "✅", 
+                "debug": "🔍", "info": "ℹ️", "success": "✅",
                 "warning": "⚠️", "error": "❌", "critical": "🔥"
             }
+            emoji = emoji_map.get(level, "ℹ️")
             
             try:
                 from smartcash.ui.utils.constants import COLORS
@@ -114,138 +87,177 @@ class UILogger:
                     "error": COLORS.get("danger", "#dc3545"),
                     "critical": COLORS.get("danger", "#dc3545")
                 }
+                color = color_map.get(level, COLORS.get("text", "#212529"))
             except ImportError:
-                color_map = {"info": "#007bff", "success": "#28a745", "warning": "#ffc107", "error": "#dc3545"}
+                color = "#212529"
             
-            emoji = emoji_map.get(level, "ℹ️")
-            color = color_map.get(level, "#212529")
-            
-            # HTML formatting dengan styling yang konsisten
-            html_content = f"""
-            <div style="margin:2px 0;padding:3px;border-radius:3px;font-family:'Monaco','Menlo',monospace;font-size:12px;">
-                <span style="color:#6c757d;">[{timestamp}]</span> 
+            formatted_html = f"""
+            <div style="margin:2px 0;padding:3px;border-radius:3px;">
+                <span style="color:#6c757d">[{timestamp}]</span> 
                 <span>{emoji}</span> 
-                <span style="color:{color};">{formatted_message}</span>
+                <span style="color:{color}">{formatted_message}</span>
             </div>
             """
             
-            # Output ke log_output dengan prioritas
+            # Output prioritas: log_output -> status -> fallback
             if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
                 with self.ui_components['log_output']:
-                    display(HTML(html_content))
+                    display(HTML(formatted_html))
             elif 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
                 with self.ui_components['status']:
-                    display(HTML(html_content))
-                    
+                    display(HTML(formatted_html))
+            
         finally:
             self._in_log_to_ui = False
     
     def debug(self, message: str) -> None:
-        """Log debug message - hanya tampilkan jika level DEBUG."""
-        if not message or not message.strip(): return
-        if self.log_level <= logging.DEBUG:
+        if message and message.strip() and self.log_level <= logging.DEBUG:
             self._log_to_ui(message, "debug")
     
     def info(self, message: str) -> None:
-        """Log info message."""
-        if not message or not message.strip(): return
-        self._log_to_ui(message, "info")
+        if message and message.strip():
+            self._log_to_ui(message, "info")
     
     def success(self, message: str) -> None:
-        """Log success message."""
-        if not message or not message.strip(): return
-        self._log_to_ui(message, "success")
+        if message and message.strip():
+            self._log_to_ui(message, "success")
     
     def warning(self, message: str) -> None:
-        """Log warning message.""" 
-        if not message or not message.strip(): return
-        self.logger.warning(message)  # Still log to Python logger
-        self._log_to_ui(message, "warning")
+        if message and message.strip():
+            self._log_to_ui(message, "warning")
     
     def error(self, message: str) -> None:
-        """Log error message."""
-        if not message or not message.strip(): return
-        self.logger.error(message)  # Still log to Python logger
-        self._log_to_ui(message, "error")
+        if message and message.strip():
+            self._log_to_ui(message, "error")
     
     def critical(self, message: str) -> None:
-        """Log critical message."""
-        if not message or not message.strip(): return
-        self.logger.critical(message)  # Still log to Python logger  
-        self._log_to_ui(message, "critical")
+        if message and message.strip():
+            self._log_to_ui(message, "critical")
 
-def create_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logger",
-                    log_to_file: bool = False, redirect_stdout: bool = False,
-                    log_dir: str = "logs", log_level: int = logging.INFO) -> UILogger:
-    """Buat UILogger dengan konfigurasi yang dioptimalkan."""
+def create_ui_logger(ui_components: Dict[str, Any], 
+                    name: str = "ui_logger",
+                    log_to_file: bool = False,
+                    redirect_stdout: bool = True,
+                    log_dir: str = "logs",
+                    log_level: int = logging.INFO) -> UILogger:
+    """Create UI logger dengan stdout interception yang diperbaiki"""
+    
     logger = UILogger(ui_components, name, log_to_file, log_dir, log_level)
     
-    # Redirect stdout jika diminta dan ada status widget
-    if redirect_stdout and 'log_output' in ui_components:
-        _setup_minimal_stdout_redirect(ui_components)
+    # Redirect stdout jika diminta
+    if redirect_stdout:
+        intercept_stdout_to_ui(ui_components)
     
-    # Integrasi dengan SmartCashLogger jika tersedia
-    try:
-        from smartcash.common.logger import get_logger
-        sc_logger = get_logger(name)
-        
-        def ui_log_callback(level, message):
-            if not message or not message.strip(): return
-            level_map = {'SUCCESS': 'success', 'WARNING': 'warning', 'ERROR': 'error', 'DEBUG': 'debug'}
-            logger._log_to_ui(message, level_map.get(level.name, 'info'))
-        
-        sc_logger.add_callback(ui_log_callback)
-        ui_components['smartcash_logger'] = sc_logger
-    except ImportError:
-        pass
+    # Suppress root logger untuk mencegah duplicate output
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()  # Clear semua handlers
+    root_logger.setLevel(logging.CRITICAL)  # Set ke level tinggi
     
     ui_components['logger'] = logger
     _register_current_ui_logger(logger)
     
     return logger
 
-def _setup_minimal_stdout_redirect(ui_components: Dict[str, Any]) -> None:
-    """Setup minimal stdout redirect tanpa spam."""
-    if 'custom_stdout' in ui_components:
-        return  # Sudah ter-setup
+def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
+    """Intercept stdout yang lebih agresif"""
     
-    class MinimalStdoutInterceptor:
+    if 'custom_stdout' in ui_components and ui_components.get('custom_stdout') == sys.stdout:
+        return
+    
+    class AggressiveUIStdoutInterceptor:
         def __init__(self, ui_components):
             self.ui_components = ui_components
             self.terminal = sys.__stdout__
+            self.buffer = ""
             self._in_write = False
             
+            # Filter patterns yang lebih komprehensif
+            self.ignore_patterns = [
+                'DEBUG:', '[DEBUG]', 'INFO:', '[INFO]', 'WARNING:', '[WARNING]',
+                'Using TensorFlow', 'Colab notebook', 'Your session crashed',
+                'Executing in eager mode', 'TensorFlow', 'NumExpr', 'Running on',
+                '/usr/local/lib', 'Config file not found', 'inisialisasi',
+                'setup', 'handler', 'initializing', 'Mounted at', 'Drive already',
+                'terdaftar', 'terinisialisasi', 'berhasil', 'dibuat', 'disalin'
+            ]
+            
         def write(self, message):
-            if self._in_write or not message.strip():
+            if self._in_write:
                 return
                 
             self._in_write = True
+            
             try:
-                # Write ke terminal asli
-                self.terminal.write(message)
-                
-                # Filter spam messages
-                if any(spam in message.lower() for spam in ['config', 'symlink', 'setup', 'inisialisasi']):
+                # Filter aggressive untuk mencegah duplicate logs
+                msg_strip = message.strip()
+                if not msg_strip or len(msg_strip) < 3:
                     return
                 
-                # Display ke UI hanya untuk message penting
-                if 'log_output' in self.ui_components:
-                    with self.ui_components['log_output']:
-                        display(HTML(f"<div style='font-family:monospace;font-size:12px;color:#333;'>{message.strip()}</div>"))
+                # Skip semua pattern yang tidak diinginkan
+                if any(pattern.lower() in msg_strip.lower() for pattern in self.ignore_patterns):
+                    return
+                
+                # Skip emoji-based messages (biasanya dari UI logger)
+                if any(emoji in msg_strip for emoji in ['✅', '❌', '⚠️', 'ℹ️', '🔍', '📁', '🔗', '📋']):
+                    return
+                
+                self.buffer += message
+                
+                if '\n' in self.buffer:
+                    lines = self.buffer.split('\n')
+                    self.buffer = lines[-1]
+                    
+                    for line in lines[:-1]:
+                        if line.strip() and not any(pattern.lower() in line.lower() for pattern in self.ignore_patterns):
+                            self._display_line(line)
+                            
             finally:
                 self._in_write = False
                 
+        def _display_line(self, line):
+            try:
+                formatted_line = format_log_message(self.ui_components, line)
+                
+                if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+                    with self.ui_components['log_output']:
+                        display(HTML(f"<div style='color:#212529'>{formatted_line}</div>"))
+            except Exception:
+                pass
+        
         def flush(self):
-            self.terminal.flush()
+            if self.buffer and self.buffer.strip():
+                self._display_line(self.buffer)
+                self.buffer = ""
+        
+        def isatty(self):
+            return False
+            
+        def fileno(self):
+            return self.terminal.fileno()
     
-    # Setup interceptor
+    # Replace stdout
     original_stdout = sys.stdout
     ui_components['original_stdout'] = original_stdout
-    interceptor = MinimalStdoutInterceptor(ui_components)
+    
+    interceptor = AggressiveUIStdoutInterceptor(ui_components)
     sys.stdout = interceptor
     ui_components['custom_stdout'] = interceptor
 
-# Singleton current logger
+def restore_stdout(ui_components: Dict[str, Any]) -> None:
+    """Restore stdout ke original"""
+    if 'original_stdout' in ui_components:
+        custom_stdout = ui_components.get('custom_stdout')
+        sys.stdout = ui_components['original_stdout']
+        ui_components.pop('original_stdout', None)
+        ui_components.pop('custom_stdout', None)
+        
+        if custom_stdout and hasattr(custom_stdout, 'flush'):
+            try:
+                custom_stdout.flush()
+            except:
+                pass
+
+# Global logger reference
 _current_ui_logger = None
 
 def _register_current_ui_logger(logger: UILogger) -> None:
@@ -256,41 +268,43 @@ def get_current_ui_logger() -> Optional[UILogger]:
     return _current_ui_logger
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
-    """Log pesan ke UI secara langsung tanpa spam."""
+    """Direct log ke UI tanpa stdout interference"""
     if not ui_components or not message or not message.strip():
         return
-    
-    # Skip spam messages
-    spam_patterns = {'drive', 'config', 'symlink', 'setup', 'handler'}
-    if level in ('info', 'debug') and any(pattern in message.lower() for pattern in spam_patterns):
-        return
-    
+        
     timestamp = datetime.now().strftime('%H:%M:%S')
-    emoji_map = {"debug": "🔍", "info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}
-    icon = icon or emoji_map.get(level, "ℹ️")
+    
+    if icon is None:
+        emoji_map = {"debug": "🔍", "info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌", "critical": "🔥"}
+        icon = emoji_map.get(level, "ℹ️")
     
     formatted_message = format_log_message(ui_components, message)
     
     try:
         from smartcash.ui.utils.constants import COLORS
-        color = {"info": "#007bff", "success": "#28a745", "warning": "#ffc107", "error": "#dc3545"}.get(level, "#212529")
+        color_map = {
+            "debug": COLORS.get("muted", "#6c757d"), "info": COLORS.get("primary", "#007bff"),
+            "success": COLORS.get("success", "#28a745"), "warning": COLORS.get("warning", "#ffc107"),
+            "error": COLORS.get("danger", "#dc3545"), "critical": COLORS.get("danger", "#dc3545")
+        }
+        color = color_map.get(level, COLORS.get("text", "#212529"))
     except ImportError:
         color = "#212529"
     
-    html_content = f"""
-    <div style="margin:2px 0;padding:3px;font-family:monospace;font-size:12px;">
+    formatted_html = f"""
+    <div style="margin:2px 0;padding:3px;border-radius:3px;">
         <span style="color:#6c757d">[{timestamp}]</span> 
         <span>{icon}</span> 
         <span style="color:{color}">{formatted_message}</span>
     </div>
     """
     
-    # Priority: log_output > status > print
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         with ui_components['log_output']:
-            display(HTML(html_content))
+            display(HTML(formatted_html))
     elif 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
         with ui_components['status']:
-            display(HTML(html_content))
-    else:
-        print(f"[{timestamp}] {icon} {formatted_message}")
+            display(HTML(formatted_html))
+    elif 'output' in ui_components and hasattr(ui_components['output'], 'clear_output'):
+        with ui_components['output']:
+            display(HTML(formatted_html))

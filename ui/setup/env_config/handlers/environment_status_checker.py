@@ -1,16 +1,16 @@
 """
-File: smartcash/ui/setup/env_config/handlers/environment_status_checker.py
-Deskripsi: Checker untuk status environment dengan validasi yang lebih spesifik dan tanpa logging berlebihan
+File: smartcash/ui/setup/env_config/handlers/environment_status_checker.py  
+Deskripsi: Status checker dengan proper Drive detection timing
 """
 
-from typing import Dict, Any, List
+import time
+from typing import Dict, Any
 from pathlib import Path
 
 class EnvironmentStatusChecker:
-    """Handler khusus untuk checking status environment tanpa logging berlebihan"""
+    """Environment status checker dengan Drive ready validation"""
     
     def __init__(self):
-        """Inisialisasi checker tanpa dependency external"""
         self.required_folders = ['data', 'configs', 'exports', 'logs', 'models', 'output']
         self.config_templates = [
             'base_config.yaml', 'colab_config.yaml', 'dataset_config.yaml',
@@ -19,7 +19,6 @@ class EnvironmentStatusChecker:
         ]
     
     def is_colab_environment(self) -> bool:
-        """Check apakah berjalan di Google Colab"""
         try:
             import google.colab
             return True
@@ -27,63 +26,113 @@ class EnvironmentStatusChecker:
             return False
     
     def check_drive_mount_status(self) -> Dict[str, Any]:
-        """Check status Google Drive mount tanpa logging berlebihan"""
+        """Check Drive status dengan proper validation"""
         if not self.is_colab_environment():
-            return {'mounted': True, 'path': None, 'type': 'local'}
+            return {'mounted': True, 'path': None, 'type': 'local', 'ready': True}
         
         drive_mount_point = Path('/content/drive/MyDrive')
         smartcash_drive_path = drive_mount_point / 'SmartCash'
         
+        if not drive_mount_point.exists():
+            return {'mounted': False, 'path': None, 'type': 'colab', 'ready': False}
+        
+        # Test Drive readiness
+        ready = self._test_drive_readiness(drive_mount_point)
+        
         return {
-            'mounted': drive_mount_point.exists(),
-            'path': str(smartcash_drive_path) if drive_mount_point.exists() else None,
-            'type': 'colab'
+            'mounted': True,
+            'path': str(smartcash_drive_path),
+            'type': 'colab',
+            'ready': ready
         }
     
+    def _test_drive_readiness(self, drive_path: Path) -> bool:
+        """Test apakah Drive benar-benar ready untuk operations"""
+        try:
+            # Test basic access
+            if not drive_path.exists():
+                return False
+            
+            # Test write capability
+            test_file = drive_path / '.smartcash_ready_test'
+            test_file.write_text('ready')
+            
+            # Immediate read test
+            content = test_file.read_text()
+            test_file.unlink()
+            
+            return content == 'ready'
+            
+        except Exception:
+            return False
+    
     def validate_repo_configs(self) -> Dict[str, bool]:
-        """Validasi config templates di repo"""
+        """Validate config templates di repo"""
         repo_config_path = Path('/content/smartcash/configs')
         return {config: (repo_config_path / config).exists() for config in self.config_templates}
     
     def check_drive_folders(self, drive_path: str = None) -> Dict[str, bool]:
-        """Check required folders di Drive"""
+        """Check folders di Drive dengan validation"""
         if not drive_path:
             return {folder: False for folder in self.required_folders}
         
         drive_base = Path(drive_path)
-        return {folder: (drive_base / folder).exists() for folder in self.required_folders}
+        results = {}
+        
+        for folder in self.required_folders:
+            folder_path = drive_base / folder
+            results[folder] = folder_path.exists() and folder_path.is_dir()
+        
+        return results
     
     def check_drive_configs(self, drive_path: str = None) -> Dict[str, bool]:
-        """Check config templates di Drive"""
+        """Check config files di Drive"""
         if not drive_path:
             return {config: False for config in self.config_templates}
         
         drive_config_path = Path(drive_path) / 'configs'
-        return {config: (drive_config_path / config).exists() for config in self.config_templates}
+        results = {}
+        
+        for config in self.config_templates:
+            config_file = drive_config_path / config
+            results[config] = config_file.exists() and config_file.is_file()
+        
+        return results
     
     def check_local_symlinks(self) -> Dict[str, Dict[str, Any]]:
-        """Check symlinks di Colab"""
+        """Check symlinks dengan validation yang proper"""
         if not self.is_colab_environment():
             return {folder: {'exists': True, 'is_symlink': False, 'valid': True} for folder in self.required_folders}
         
         results = {}
         for folder in self.required_folders:
             local_path = Path(f'/content/{folder}')
-            results[folder] = {
-                'exists': local_path.exists(),
-                'is_symlink': local_path.is_symlink() if local_path.exists() else False,
-                'valid': local_path.exists() and (local_path.is_symlink() or local_path.is_dir())
-            }
+            
+            if not local_path.exists():
+                results[folder] = {'exists': False, 'is_symlink': False, 'valid': False}
+            elif local_path.is_symlink():
+                # Test symlink validity
+                try:
+                    target_exists = local_path.resolve().exists()
+                    results[folder] = {
+                        'exists': True,
+                        'is_symlink': True,
+                        'valid': target_exists
+                    }
+                except Exception:
+                    results[folder] = {'exists': True, 'is_symlink': True, 'valid': False}
+            else:
+                results[folder] = {'exists': True, 'is_symlink': False, 'valid': True}
         
         return results
     
     def get_comprehensive_status(self) -> Dict[str, Any]:
-        """Get status lengkap environment tanpa logging"""
+        """Get comprehensive status dengan proper timing"""
         drive_status = self.check_drive_mount_status()
         repo_configs = self.validate_repo_configs()
         
-        # Check drive components jika mounted
-        if drive_status['mounted'] and drive_status['path']:
+        # Only check Drive components jika Drive ready
+        if drive_status['mounted'] and drive_status.get('ready', False) and drive_status['path']:
             drive_folders = self.check_drive_folders(drive_status['path'])
             drive_configs = self.check_drive_configs(drive_status['path'])
         else:
@@ -92,14 +141,15 @@ class EnvironmentStatusChecker:
         
         symlinks = self.check_local_symlinks()
         
-        # Determine readiness
+        # Determine readiness dengan Drive ready check
         repo_configs_ready = all(repo_configs.values())
         drive_folders_ready = all(drive_folders.values())
-        drive_configs_ready = sum(drive_configs.values()) >= 3  # Minimal 3 config files
+        drive_configs_ready = sum(drive_configs.values()) >= 3
         symlinks_ready = all(link['valid'] for link in symlinks.values())
         
         overall_ready = (
             drive_status['mounted'] and 
+            drive_status.get('ready', False) and
             repo_configs_ready and 
             drive_folders_ready and 
             drive_configs_ready and 

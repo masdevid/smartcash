@@ -4,10 +4,10 @@ Deskripsi: Inisialisasi dan ekspor modul-modul umum untuk SmartCash dengan penge
 """
 
 # ===== Konfigurasi =====
-# from smartcash.common.config import (
-#     get_config_manager, 
-#     SimpleConfigManager
-# )
+from smartcash.common.config import (
+    get_config_manager, 
+    SimpleConfigManager
+)
 
 from smartcash.common.default_config import (
     generate_default_config, 

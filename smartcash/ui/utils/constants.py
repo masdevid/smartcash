@@ -249,8 +249,8 @@ MARGINS = {
     'xl': '20px'
 }
 
-# Import konstanta file dari common/constants
-from smartcash.common import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+# # Import konstanta file dari common/constants
+# from smartcash.common import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 
 # Ekstensi file untuk UI
 FILE_EXTENSIONS = {

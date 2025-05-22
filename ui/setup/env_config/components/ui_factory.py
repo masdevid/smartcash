@@ -10,7 +10,7 @@ from ipywidgets import HBox, VBox, Label, Button, Output, HTML
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.components.status_panel import create_status_panel
-from smartcash.ui.components.progress_tracking import create_progress_tracking
+from smartcash.ui.setup.env_config.components.progress_tracking import create_progress_tracking
 from smartcash.ui.components.log_accordion import create_log_accordion
 
 class UIFactory:

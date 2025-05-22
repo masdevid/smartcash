@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Handler konfigurasi dengan logger bridge yang diperbaiki (SRP)
+Deskripsi: Handler konfigurasi dengan logger bridge dan ekspor fungsi lengkap (SRP)
 """
 
 from typing import Dict, Any, Optional
@@ -63,7 +63,7 @@ def load_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         
         if augmentation_config:
             ui_logger.success("✅ Konfigurasi berhasil dimuat dari Google Drive")
-            _update_ui_from_config_values(ui_components, augmentation_config, ui_logger)
+            update_ui_from_config(ui_components, augmentation_config, ui_logger)
         else:
             ui_logger.warning("⚠️ Config tidak ditemukan, menggunakan default")
             augmentation_config = _get_default_augmentation_config()
@@ -93,7 +93,7 @@ def reset_augmentation_config(ui_components: Dict[str, Any]) -> bool:
         default_config = _get_default_augmentation_config()
         
         # Update UI dengan default values
-        _update_ui_from_config_values(ui_components, default_config, ui_logger)
+        update_ui_from_config(ui_components, default_config, ui_logger)
         
         # Simpan default config ke file
         config_manager = get_config_manager()
@@ -112,6 +112,61 @@ def reset_augmentation_config(ui_components: Dict[str, Any]) -> bool:
     except Exception as e:
         ui_logger.error(f"❌ Error saat reset: {str(e)}")
         return False
+
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any], ui_logger=None) -> None:
+    """
+    Update UI components dari nilai konfigurasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Dictionary konfigurasi
+        ui_logger: UI Logger bridge (opsional)
+    """
+    # Setup logger jika tidak ada
+    if ui_logger is None:
+        ui_logger = create_ui_logger_bridge(ui_components, "config_handler")
+    
+    try:
+        ui_logger.debug("🔄 Mengupdate UI dari konfigurasi...")
+        
+        # Update basic fields
+        ui_mappings = {
+            'num_variations': 'num_variations',
+            'target_count': 'target_count',
+            'output_prefix': 'output_prefix', 
+            'balance_classes': 'balance_classes',
+            'validate_results': 'validate_results'
+        }
+        
+        for ui_field, config_key in ui_mappings.items():
+            if ui_field in ui_components and config_key in config:
+                widget = ui_components[ui_field]
+                if hasattr(widget, 'value'):
+                    widget.value = config[config_key]
+                    ui_logger.debug(f"🔄 UI {ui_field} → {config[config_key]}")
+        
+        # Update augmentation types
+        if 'augmentation_types' in ui_components and 'types' in config:
+            widget = ui_components['augmentation_types']
+            if hasattr(widget, 'value'):
+                types_value = config['types']
+                # Ensure types is a list/tuple untuk SelectMultiple widget
+                if isinstance(types_value, str):
+                    types_value = [types_value]
+                widget.value = types_value
+                ui_logger.debug(f"🎯 UI types → {types_value}")
+        
+        # Update target split
+        if 'target_split' in ui_components and 'target_split' in config:
+            widget = ui_components['target_split']
+            if hasattr(widget, 'value'):
+                widget.value = config['target_split']
+                ui_logger.debug(f"📂 UI target_split → {config['target_split']}")
+        
+        ui_logger.success("✅ UI berhasil diupdate dari konfigurasi")
+        
+    except Exception as e:
+        ui_logger.error(f"❌ Error update UI: {str(e)}")
 
 def _get_config_from_ui(ui_components: Dict[str, Any], ui_logger) -> Dict[str, Any]:
     """Dapatkan konfigurasi augmentasi dari UI components."""
@@ -170,38 +225,6 @@ def _update_config_from_ui_fields(ui_components: Dict[str, Any], config: Dict[st
             config['target_split'] = widget.value
             ui_logger.debug(f"📂 Target split: {config['target_split']}")
 
-def _update_ui_from_config_values(ui_components: Dict[str, Any], config: Dict[str, Any], ui_logger) -> None:
-    """Update UI components dari nilai konfigurasi."""
-    # Update basic fields
-    ui_mappings = {
-        'num_variations': 'num_variations',
-        'target_count': 'target_count',
-        'output_prefix': 'output_prefix', 
-        'balance_classes': 'balance_classes',
-        'validate_results': 'validate_results'
-    }
-    
-    for ui_field, config_key in ui_mappings.items():
-        if ui_field in ui_components and config_key in config:
-            widget = ui_components[ui_field]
-            if hasattr(widget, 'value'):
-                widget.value = config[config_key]
-                ui_logger.debug(f"🔄 UI {ui_field} → {config[config_key]}")
-    
-    # Update augmentation types
-    if 'augmentation_types' in ui_components and 'types' in config:
-        widget = ui_components['augmentation_types']
-        if hasattr(widget, 'value'):
-            widget.value = config['types']
-            ui_logger.debug(f"🎯 UI types → {config['types']}")
-    
-    # Update target split
-    if 'target_split' in ui_components and 'target_split' in config:
-        widget = ui_components['target_split']
-        if hasattr(widget, 'value'):
-            widget.value = config['target_split']
-            ui_logger.debug(f"📂 UI target_split → {config['target_split']}")
-
 def _verify_saved_config(config_manager, ui_logger) -> None:
     """Verifikasi bahwa konfigurasi berhasil tersimpan."""
     try:
@@ -231,3 +254,6 @@ def _get_default_augmentation_config() -> Dict[str, Any]:
         'target_split': 'train',
         'types': ['combined']
     }
+
+# Alias untuk backward compatibility
+_update_ui_from_config_values = update_ui_from_config

@@ -1,11 +1,91 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/ui_observers.py
-Deskripsi: Utility untuk observer pattern pada modul augmentasi dataset dengan logger bridge
+Deskripsi: Utility untuk observer pattern dengan BaseObserver compliance dan logger bridge
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+
+# Import BaseObserver untuk compliance
+try:
+    from smartcash.components.observer.base_observer import BaseObserver
+    from smartcash.components.observer.manager_observer import get_observer_manager
+    OBSERVER_AVAILABLE = True
+except ImportError:
+    OBSERVER_AVAILABLE = False
+    BaseObserver = None
+
+class UIAugmentationObserver(BaseObserver if OBSERVER_AVAILABLE else object):
+    """Observer khusus untuk UI augmentasi dataset yang comply dengan BaseObserver."""
+    
+    def __init__(self, ui_components: Dict[str, Any], name: str = "ui_augmentation"):
+        """
+        Inisialisasi UI Augmentation Observer.
+        
+        Args:
+            ui_components: Dictionary komponen UI
+            name: Nama observer
+        """
+        self.ui_components = ui_components
+        self.ui_logger = create_ui_logger_bridge(ui_components, "ui_augmentation_observer")
+        
+        # Inisialisasi BaseObserver jika tersedia
+        if OBSERVER_AVAILABLE and BaseObserver:
+            super().__init__(
+                name=name,
+                priority=50,
+                event_filter=['process_start', 'process_complete', 'process_error', 'process_stop']
+            )
+        else:
+            self.name = name
+            self.priority = 50
+    
+    def update(self, event_type: str, sender: Any, **kwargs) -> None:
+        """
+        Handle event updates dari observer manager.
+        
+        Args:
+            event_type: Tipe event yang diterima
+            sender: Pengirim event
+            **kwargs: Data tambahan event
+        """
+        try:
+            if event_type == 'process_start':
+                self._handle_process_start(kwargs)
+            elif event_type == 'process_complete':
+                self._handle_process_complete(kwargs)
+            elif event_type == 'process_error':
+                self._handle_process_error(kwargs)
+            elif event_type == 'process_stop':
+                self._handle_process_stop(kwargs)
+        except Exception as e:
+            self.ui_logger.warning(f"⚠️ Error handling {event_type}: {str(e)}")
+    
+    def _handle_process_start(self, data: Dict[str, Any]) -> None:
+        """Handle process start event."""
+        process_name = data.get('process_name', 'augmentation')
+        display_info = data.get('display_info', '')
+        split = data.get('split')
+        
+        notify_process_start(self.ui_components, process_name, display_info, split)
+    
+    def _handle_process_complete(self, data: Dict[str, Any]) -> None:
+        """Handle process complete event."""
+        result = data.get('result', {})
+        display_info = data.get('display_info', '')
+        
+        notify_process_complete(self.ui_components, result, display_info)
+    
+    def _handle_process_error(self, data: Dict[str, Any]) -> None:
+        """Handle process error event."""
+        error_message = data.get('error_message', 'Unknown error')
+        
+        notify_process_error(self.ui_components, error_message)
+    
+    def _handle_process_stop(self, data: Dict[str, Any]) -> None:
+        """Handle process stop event."""
+        notify_process_stop(self.ui_components)
 
 def notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
     """
@@ -115,10 +195,10 @@ def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = 
     # Tampilkan tombol augment jika proses tidak sedang berjalan, sembunyikan jika sedang berjalan
     if 'augment_button' in ui_components and hasattr(ui_components['augment_button'], 'layout'):
         ui_components['augment_button'].layout.display = 'none' if disable else 'block'
-        
+
 def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
     """
-    Register UI observers untuk notifikasi proses augmentasi.
+    Register UI observers untuk notifikasi proses augmentasi dengan BaseObserver compliance.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -131,57 +211,43 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
         ui_components['logger'] = create_ui_logger_bridge(ui_components, "ui_observers")
     
     try:
-        # Coba import observer manager
-        from smartcash.components.observer import ObserverManager
+        if not OBSERVER_AVAILABLE:
+            ui_components['logger'].warning("⚠️ Observer system tidak tersedia, menggunakan fallback")
+            ui_components['observer_manager'] = MockObserverManager()
+            return ui_components['observer_manager']
         
-        # Buat observer manager jika belum ada
-        if 'observer_manager' not in ui_components:
-            observer_manager = ObserverManager()
-            ui_components['observer_manager'] = observer_manager
-        else:
-            observer_manager = ui_components['observer_manager']
+        # Dapatkan observer manager
+        observer_manager = get_observer_manager()
+        ui_components['observer_manager'] = observer_manager
         
         # Setup observer group untuk augmentasi
         observer_group = 'augmentation_observers'
         ui_components['observer_group'] = observer_group
         
-        # Register observer callbacks dengan format yang benar (2-3 args)
-        def on_process_start(event_type: str, data: Dict[str, Any] = None):
-            if data:
-                notify_process_start(ui_components, event_type, data.get('display_info', ''), data.get('split'))
+        # Buat UI observer yang comply dengan BaseObserver
+        ui_observer = UIAugmentationObserver(ui_components, "augmentation_ui_observer")
         
-        def on_process_complete(event_type: str, data: Dict[str, Any] = None):
-            if data:
-                notify_process_complete(ui_components, data, data.get('display_info', ''))
+        # Event types yang akan diobservasi
+        event_types = ['process_start', 'process_complete', 'process_error', 'process_stop']
         
-        def on_process_error(event_type: str, data: str = None):
-            if data:
-                notify_process_error(ui_components, data)
+        # Register observer dengan event types
+        for event_type in event_types:
+            observer_manager.register(ui_observer, [event_type])
         
-        def on_process_stop(event_type: str, data: Any = None):
-            notify_process_stop(ui_components)
-        
-        # Register callbacks ke observer manager dengan format yang benar
-        observer_manager.register('process_start', on_process_start)
-        observer_manager.register('process_complete', on_process_complete)
-        observer_manager.register('process_error', on_process_error)
-        observer_manager.register('process_stop', on_process_stop)
-        
+        ui_components['logger'].success("✅ UI observers berhasil didaftarkan")
         return observer_manager
         
-    except ImportError:
-        # Fallback jika observer manager tidak tersedia
-        ui_components['logger'].warning("⚠️ Observer manager tidak tersedia, menggunakan fallback")
-        
-        # Buat mock observer manager
+    except Exception as e:
+        # Fallback jika observer manager gagal
+        ui_components['logger'].warning(f"⚠️ Observer manager gagal setup: {str(e)}, menggunakan fallback")
         ui_components['observer_manager'] = MockObserverManager()
         return ui_components['observer_manager']
 
 class MockObserverManager:
-    """Mock observer manager untuk fallback."""
+    """Mock observer manager untuk fallback saat observer system tidak tersedia."""
     
-    def register(self, event: str, callback):
-        """Mock register method dengan 2 args."""
+    def register(self, observer, event_types=None):
+        """Mock register method."""
         pass
     
     def notify(self, event: str, data: Any = None):
@@ -190,4 +256,8 @@ class MockObserverManager:
     
     def unregister_group(self, group: str):
         """Mock unregister method."""
+        pass
+    
+    def unregister_all(self):
+        """Mock unregister all method."""
         pass

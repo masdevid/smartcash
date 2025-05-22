@@ -30,7 +30,7 @@ class EnvConfigComponent:
         self.logger = setup_ipython_logging(
             self.ui_components,
             ENV_CONFIG_LOGGER_NAMESPACE,
-            redirect_all_logs=False
+            redirect_all_logs=True
         )
         
         # Initialize orchestrator

@@ -146,7 +146,7 @@ class EnvironmentOrchestrator:
         """Reset progress bar ke 0 dengan pesan error"""
         if 'progress_bar' in self.ui_components:
             try:
-                from smartcash.ui.components.progress_tracking import reset_progress
+                from smartcash.ui.setup.env_config.components.progress_tracking import reset_progress
                 reset_progress(self.ui_components)
                 # Set message jika ada
                 if message and 'progress_message' in self.ui_components:

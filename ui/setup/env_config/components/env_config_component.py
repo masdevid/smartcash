@@ -5,7 +5,7 @@ Deskripsi: Component UI untuk konfigurasi environment - diperbaiki dengan orches
 
 from typing import Dict, Any
 from IPython.display import display
-
+import time 
 from smartcash.ui.setup.env_config.components.ui_factory import UIFactory
 from smartcash.ui.setup.env_config.handlers.environment_orchestrator import EnvironmentOrchestrator
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
@@ -113,7 +113,7 @@ class EnvConfigComponent:
         """
         # Display the UI components first
         display(self.ui_components['ui_layout'])
-        
+        time.sleep(1)
         # Run auto check untuk determine initial state
         try:
             self.logger.info("🔍 Checking environment status...")

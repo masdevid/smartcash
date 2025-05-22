@@ -13,9 +13,8 @@ from smartcash.common.config.manager import get_config_manager
 from smartcash.ui.utils.ui_logger import create_ui_logger
 
 # Konstanta untuk namespace logger
-DEPENDENCY_INSTALLER_LOGGER_NAMESPACE = "smartcash.setup.dependency_installer"
-# Konstanta untuk ID namespace di UI
-MODULE_LOGGER_NAME = "DEP-INSTALLER"
+from smartcash.ui.utils.ui_logger_namespace import DEPENDENCY_INSTALLER_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_INSTALLER_LOGGER_NAMESPACE]
 
 def initialize_dependency_installer() -> Dict[str, Any]:
     """

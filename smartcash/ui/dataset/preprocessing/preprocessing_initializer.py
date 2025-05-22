@@ -12,9 +12,8 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger import create_ui_logger
 
 # Konstanta untuk namespace logger
-PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
-# Konstanta untuk ID namespace di UI
-MODULE_LOGGER_NAME = "PREPROCESSING"
+from smartcash.ui.utils.ui_logger_namespace import PREPROCESSING_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PREPROCESSING_LOGGER_NAMESPACE]
 
 # Import utils yang dibutuhkan untuk inisialisasi
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message, is_initialized

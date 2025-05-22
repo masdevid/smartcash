@@ -10,7 +10,7 @@ from smartcash.ui.utils.ui_logger import create_ui_logger
 from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
 
 # Konstanta untuk namespace logger
-AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
+from smartcash.ui.utils.ui_logger_namespace import AUGMENTATION_LOGGER_NAMESPACE
 
 # Import handlers
 from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import handle_augmentation_button_click

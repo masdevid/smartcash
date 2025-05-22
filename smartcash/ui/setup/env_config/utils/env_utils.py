@@ -7,7 +7,8 @@ from typing import Dict, Any, Optional
 from IPython.display import display
 
 # Module logger name untuk konsistensi
-MODULE_LOGGER_NAME = "env_config"
+from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[ENV_CONFIG_LOGGER_NAMESPACE]
 
 def update_status(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
     """

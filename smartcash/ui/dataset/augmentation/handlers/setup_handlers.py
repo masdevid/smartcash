@@ -1,95 +1,167 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/setup_handlers.py
-Deskripsi: Setup handler untuk augmentasi dataset
+Deskripsi: Setup handler untuk UI augmentasi dataset
 """
 
 from typing import Dict, Any, Optional
-from smartcash.common.logger import get_logger
-from smartcash.ui.dataset.augmentation.handlers.config_handler import get_augmentation_config
 from smartcash.common.config import get_config_manager
-
-logger = get_logger(__name__)
+from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message, setup_ui_logger
+from smartcash.ui.dataset.augmentation.utils.ui_state_manager import update_status_panel
+from smartcash.ui.dataset.augmentation.utils.progress_manager import setup_multi_progress, setup_progress_indicator
 
 def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    Setup handler untuk augmentasi dataset.
+    Setup handler untuk komponen UI augmentasi dataset.
     
     Args:
         ui_components: Dictionary komponen UI
-        env: Environment (opsional)
-        config: Konfigurasi (opsional)
-        
-    Returns:
-        Dictionary komponen UI yang telah diupdate
-    """
-    try:
-        # Get config
-        if config is None:
-            config = get_augmentation_config(ui_components)
-        
-        # Update UI components
-        if 'augmentation_options' in ui_components:
-            aug_options = ui_components['augmentation_options']
-            if hasattr(aug_options, 'children') and len(aug_options.children) >= 4:
-                # Update enabled checkbox
-                aug_options.children[0].value = config['augmentation']['enabled']
-                
-                # Update num variations slider
-                aug_options.children[1].value = config['augmentation']['num_variations']
-                
-                # Update output prefix
-                aug_options.children[2].value = config['augmentation']['output_prefix']
-                
-                # Update process bboxes checkbox
-                aug_options.children[3].value = config['augmentation']['process_bboxes']
-        
-        # Update output options
-        if 'output_options' in ui_components:
-            output_options = ui_components['output_options']
-            if hasattr(output_options, 'children') and len(output_options.children) >= 4:
-                # Update output dir
-                output_options.children[0].value = config['augmentation']['output_dir']
-                
-                # Update validate checkbox
-                output_options.children[1].value = config['augmentation']['validate_results']
-                
-                # Update resume checkbox
-                output_options.children[2].value = config['augmentation']['resume']
-                
-                # Update num workers slider
-                output_options.children[3].value = config['augmentation']['num_workers']
-        
-        # Update balance options
-        if 'balance_options' in ui_components:
-            balance_options = ui_components['balance_options']
-            if hasattr(balance_options, 'children') and len(balance_options.children) >= 2:
-                # Update balance classes checkbox
-                balance_options.children[0].value = config['augmentation']['balance_classes']
-                
-                # Update target count slider
-                balance_options.children[1].value = config['augmentation']['target_count']
-        
-        logger.info("✅ Augmentation handlers berhasil disetup")
-        
-        return ui_components
-        
-    except Exception as e:
-        logger.error(f"❌ Error saat setup augmentation handlers: {str(e)}")
-        return ui_components
-
-def setup_state_handler(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Setup handler untuk state augmentasi.
-    
-    Args:
-        ui_components: Dictionary komponen UI
+        env: Environment manager
+        config: Konfigurasi aplikasi
         
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    from smartcash.ui.dataset.augmentation.handlers.state_handler import detect_augmentation_state
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
     
-    # Deteksi state augmentasi
-    ui_components = detect_augmentation_state(ui_components)
+    # Setup observer untuk notifikasi
+    _setup_observers(ui_components)
+    
+    # Load konfigurasi dan update UI
+    try:
+        from smartcash.ui.dataset.augmentation.handlers.config_handler import update_ui_from_config
+        config_manager = get_config_manager()
+        
+        # Get augmentation config
+        augmentation_config = config_manager.get_module_config('augmentation')
+        
+        if augmentation_config and isinstance(augmentation_config, dict):
+            update_ui_from_config(ui_components, augmentation_config)
+        elif config and isinstance(config, dict):
+            update_ui_from_config(ui_components, config)
+    except Exception as e:
+        log_message(ui_components, f"Gagal memuat konfigurasi: {str(e)}", "warning", "⚠️")
+    
+    # Setup handlers untuk UI events
+    _setup_button_handlers(ui_components)
+    
+    # Setup progress tracking
+    _setup_progress_tracking(ui_components)
+    
+    # Setup cleanup function
+    _setup_cleanup(ui_components)
+    
+    # Save config ke UI components
+    ui_components['config'] = config or {}
+    
+    log_message(ui_components, "Augmentasi dataset handlers berhasil diinisialisasi", "success", "✅")
     
     return ui_components
+
+def _setup_observers(ui_components: Dict[str, Any]) -> None:
+    """Setup observer handlers untuk sistem notifikasi."""
+    try:
+        from smartcash.ui.dataset.augmentation.utils.ui_observers import register_ui_observers
+        
+        try:
+            from smartcash.ui.dataset.augmentation.utils.notification_manager import get_observer_manager
+            observer_manager = get_observer_manager()
+            ui_components['observer_manager'] = observer_manager
+            register_ui_observers(ui_components)
+            log_message(ui_components, "Observer sistem notifikasi berhasil disetup", "debug", "✅")
+        except (ImportError, AttributeError) as e:
+            log_message(ui_components, f"Observer manager tidak tersedia: {str(e)}", "warning", "⚠️")
+            from smartcash.components.observer import ObserverManager
+            ui_components['observer_manager'] = ObserverManager()
+            register_ui_observers(ui_components)
+            log_message(ui_components, "Menggunakan observer manager fallback", "info", "ℹ️")
+    except ImportError as e:
+        log_message(ui_components, f"Observer handler tidak tersedia: {str(e)}", "debug", "ℹ️")
+
+def _setup_button_handlers(ui_components: Dict[str, Any]) -> None:
+    """Setup handlers untuk tombol UI."""
+    from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import handle_augmentation_button_click
+    from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import handle_cleanup_button_click
+    from smartcash.ui.dataset.augmentation.handlers.reset_handler import handle_reset_button_click
+    from smartcash.ui.dataset.augmentation.handlers.save_handler import handle_save_button_click
+    
+    # Setup augmentation button
+    if 'augment_button' in ui_components:
+        ui_components['augment_button'].on_click(
+            lambda b: handle_augmentation_button_click(ui_components, b)
+        )
+    
+    # Setup cleanup button
+    if 'cleanup_button' in ui_components:
+        ui_components['cleanup_button'].on_click(
+            lambda b: handle_cleanup_button_click(ui_components, b)
+        )
+    
+    # Setup reset button
+    if 'reset_button' in ui_components:
+        ui_components['reset_button'].on_click(
+            lambda b: handle_reset_button_click(ui_components, b)
+        )
+    
+    # Setup save button
+    if 'save_button' in ui_components:
+        ui_components['save_button'].on_click(
+            lambda b: handle_save_button_click(ui_components, b)
+        )
+
+def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
+    """Setup progress tracking untuk augmentasi."""
+    try:
+        setup_multi_progress(ui_components)
+        setup_progress_indicator(ui_components)
+        log_message(ui_components, "Progress tracking berhasil disetup", "debug", "✅")
+    except Exception as e:
+        log_message(ui_components, f"Error saat setup progress tracking: {str(e)}", "warning", "⚠️")
+
+def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
+    """Setup cleanup function."""
+    def cleanup_resources():
+        """Fungsi untuk membersihkan resources."""
+        try:
+            # Reset progress
+            if 'progress_bar' in ui_components:
+                if hasattr(ui_components['progress_bar'], 'layout'):
+                    ui_components['progress_bar'].layout.visibility = 'hidden'
+                ui_components['progress_bar'].value = 0
+            
+            # Reset progress labels
+            for label_key in ['overall_label', 'step_label', 'progress_message']:
+                if label_key in ui_components and hasattr(ui_components[label_key], 'layout'):
+                    ui_components[label_key].layout.visibility = 'hidden'
+                    ui_components[label_key].value = ""
+            
+            # Unregister observer group
+            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
+                try:
+                    ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
+                except Exception:
+                    pass
+            
+            # Reset logging
+            try:
+                from smartcash.ui.utils.logging_utils import reset_logging
+                reset_logging()
+            except ImportError:
+                pass
+            
+            # Log cleanup
+            if 'log_message' in ui_components and callable(ui_components['log_message']):
+                ui_components['log_message']("Cleanup augmentasi berhasil", "debug", "🧹")
+        except Exception:
+            pass
+    
+    ui_components['cleanup'] = cleanup_resources
+    
+    # Register cleanup dengan IPython event
+    try:
+        from IPython import get_ipython
+        ip = get_ipython()
+        if ip is not None:
+            ip.events.register('pre_run_cell', lambda: cleanup_resources())
+    except (ImportError, AttributeError):
+        pass

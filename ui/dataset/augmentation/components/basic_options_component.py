@@ -89,20 +89,12 @@ def create_basic_options_component(config: Dict[str, Any] = None) -> widgets.VBo
         layout=widgets.Layout(width='auto')
     )
     
-    # Pindahkan ke preprocessed (dipindahkan dari augmentation_types_component)
-    move_to_preprocessed = widgets.Checkbox(
-        value=aug_config.get('augmentation', {}).get('move_to_preprocessed', True),
-        description='Buat Symlink ke Preprocessed',
-        indent=False,
-        layout=widgets.Layout(width='auto')
-    )
-    
     # Container untuk opsi dasar
     basic_options_container = widgets.VBox([
         num_variations,
         target_count,
         output_prefix,
-        widgets.HBox([balance_classes, move_to_preprocessed], layout=widgets.Layout(justify_content='space-between'))
+        balance_classes
     ], layout=widgets.Layout(padding='10px', width='100%'))
     
     return basic_options_container

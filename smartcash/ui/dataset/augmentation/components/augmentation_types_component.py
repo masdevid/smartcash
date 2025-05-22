@@ -83,8 +83,6 @@ def create_augmentation_types_component(config: Dict[str, Any] = None) -> widget
         layout=widgets.Layout(width='95%')
     )
     
-    # Checkbox telah dipindahkan ke basic_options_component atau dihilangkan
-    
     # Informasi tentang split
     split_info = widgets.HTML(
         f"""
@@ -99,7 +97,7 @@ def create_augmentation_types_component(config: Dict[str, Any] = None) -> widget
         """
     )
     
-    # Container untuk jenis augmentasi
+    # Container untuk jenis augmentasi (dibersihkan dari checkbox yang sudah dipindah)
     augmentation_types_container = widgets.VBox([
         widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['augmentation']} Jenis Augmentasi & Target Split</h5>"),
         widgets.HBox([

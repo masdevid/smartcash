@@ -137,7 +137,7 @@ class EnvironmentOrchestrator:
         """Update progress UI"""
         if 'progress_bar' in self.ui_components:
             try:
-                from smartcash.ui.components.progress_tracking import update_progress
+                from smartcash.ui.setup.env_config.components.progress_tracking import update_progress
                 update_progress(self.ui_components, int(value * 100), 100, message)
             except ImportError:
                 pass

@@ -104,8 +104,8 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Save/Reset buttons
     save_reset_buttons = create_save_reset_buttons(
-        save_label="Simpan Konfigurasi",
-        reset_label="Reset ke Default", 
+        save_label="Simpan",
+        reset_label="Reset", 
         save_tooltip="Simpan konfigurasi split dan sinkronkan ke Google Drive",
         reset_tooltip="Reset konfigurasi ke nilai default",
         with_sync_info=True

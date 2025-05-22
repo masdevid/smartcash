@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/ui_observers.py
-Deskripsi: Utility untuk observer pattern pada modul augmentasi dataset
+Deskripsi: Utility untuk observer pattern pada modul augmentasi dataset (diperbaiki args)
 """
 
 from typing import Dict, Any, Optional
@@ -128,20 +128,23 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
         observer_group = 'augmentation_observers'
         ui_components['observer_group'] = observer_group
         
-        # Register observer callbacks
-        def on_process_start(event_type: str, data: Dict[str, Any]):
-            notify_process_start(ui_components, event_type, data.get('display_info', ''), data.get('split'))
+        # Register observer callbacks dengan format yang benar (2-3 args)
+        def on_process_start(event_type: str, data: Dict[str, Any] = None):
+            if data:
+                notify_process_start(ui_components, event_type, data.get('display_info', ''), data.get('split'))
         
-        def on_process_complete(event_type: str, data: Dict[str, Any]):
-            notify_process_complete(ui_components, data, data.get('display_info', ''))
+        def on_process_complete(event_type: str, data: Dict[str, Any] = None):
+            if data:
+                notify_process_complete(ui_components, data, data.get('display_info', ''))
         
-        def on_process_error(event_type: str, data: str):
-            notify_process_error(ui_components, data)
+        def on_process_error(event_type: str, data: str = None):
+            if data:
+                notify_process_error(ui_components, data)
         
         def on_process_stop(event_type: str, data: Any = None):
             notify_process_stop(ui_components)
         
-        # Register callbacks ke observer manager (fix argument count)
+        # Register callbacks ke observer manager dengan format yang benar
         observer_manager.register('process_start', on_process_start)
         observer_manager.register('process_complete', on_process_complete)
         observer_manager.register('process_error', on_process_error)
@@ -155,19 +158,14 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
         log_message(ui_components, "Observer manager tidak tersedia, menggunakan fallback", "warning", "⚠️")
         
         # Buat mock observer manager
-        class MockObserverManager:
-            def register(self, group: str, event: str, callback): pass
-            def notify(self, event: str, data: Any = None): pass
-            def unregister_group(self, group: str): pass
-        
         ui_components['observer_manager'] = MockObserverManager()
         return ui_components['observer_manager']
 
 class MockObserverManager:
     """Mock observer manager untuk fallback."""
     
-    def register(self, group: str, event: str, callback):
-        """Mock register method."""
+    def register(self, event: str, callback):
+        """Mock register method dengan 2 args."""
         pass
     
     def notify(self, event: str, data: Any = None):

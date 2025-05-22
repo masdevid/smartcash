@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_executor.py
-Deskripsi: Executor untuk menjalankan proses augmentasi tanpa threading (Colab compatible)
+Deskripsi: Executor untuk menjalankan proses augmentasi dengan symlink yang benar
 """
 
 import os
@@ -9,10 +9,11 @@ from typing import Dict, Any, Callable, Optional, List
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
+from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
 from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
 
 class AugmentationExecutor:
-    """Executor untuk proses augmentasi tanpa threading (Colab compatible)."""
+    """Executor untuk proses augmentasi dengan path symlink yang benar."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         """
@@ -26,6 +27,17 @@ class AugmentationExecutor:
         self.progress_callback: Optional[Callable] = None
         self.stop_requested = False
         
+        # Deteksi environment
+        self.is_colab = self._detect_colab_environment()
+        
+    def _detect_colab_environment(self) -> bool:
+        """Deteksi apakah berjalan di Colab."""
+        try:
+            import google.colab
+            return True
+        except ImportError:
+            return False
+            
     def set_progress_callback(self, callback: Callable) -> None:
         """Set callback untuk progress updates."""
         self.progress_callback = callback
@@ -41,8 +53,8 @@ class AugmentationExecutor:
             Dictionary hasil augmentasi
         """
         try:
-            # Setup direktori dan path
-            setup_result = self._setup_directories(params)
+            # Setup direktori dengan symlink yang benar
+            setup_result = self._setup_directories_with_symlink(params)
             if not setup_result['success']:
                 return {'status': 'error', 'message': setup_result['message']}
             
@@ -58,19 +70,46 @@ class AugmentationExecutor:
             self.logger.error(f"🔥 Error executor: {str(e)}")
             return {'status': 'error', 'message': f'Error executor: {str(e)}'}
     
-    def _setup_directories(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Setup direktori output untuk augmentasi."""
+    def _setup_directories_with_symlink(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Setup direktori output menggunakan struktur symlink yang benar."""
         try:
-            data_dir = self.ui_components.get('data_dir', 'data')
             split = params.get('split_target', 'train')
             
-            # Direktori output
-            output_dir = os.path.join(data_dir, 'augmented', split)
+            if self.is_colab:
+                # Di Colab: gunakan path symlink yang benar
+                # /content/data/augmented/split (otomatis ke Drive via symlink)
+                data_base = f"{COLAB_PATH}/data"  # /content/data (symlink ke Drive)
+                output_dir = os.path.join(data_base, 'augmented', split)
+                
+                # Cek apakah symlink aktif
+                data_symlink_active = os.path.islink(data_base) and os.path.exists(data_base)
+                
+                if data_symlink_active:
+                    actual_target = os.path.realpath(data_base)
+                    log_message(self.ui_components, f"🔗 Data symlink aktif: {data_base} -> {actual_target}", "info")
+                    storage_type = "Google Drive (via symlink)"
+                else:
+                    log_message(self.ui_components, f"⚠️ Data symlink tidak aktif, menggunakan direktori lokal", "warning")
+                    storage_type = "Local (symlink belum setup)"
+                
+                params['storage_type'] = storage_type
+                params['uses_symlink'] = data_symlink_active
+                
+            else:
+                # Local development
+                data_dir = self.ui_components.get('data_dir', 'data')
+                output_dir = os.path.join(data_dir, 'augmented', split)
+                params['storage_type'] = "Local"
+                params['uses_symlink'] = False
+            
+            # Buat direktori output (otomatis ke Drive jika symlink aktif)
             os.makedirs(os.path.join(output_dir, 'images'), exist_ok=True)
             os.makedirs(os.path.join(output_dir, 'labels'), exist_ok=True)
             
             params['output_dir'] = output_dir
-            log_message(self.ui_components, f"📁 Setup direktori: {output_dir}", "info")
+            
+            log_message(self.ui_components, f"📁 Output directory: {output_dir}", "info")
+            log_message(self.ui_components, f"📍 Storage: {params['storage_type']}", "info")
             
             return {'success': True}
             
@@ -80,15 +119,26 @@ class AugmentationExecutor:
     def _load_dataset_info(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Load informasi dataset untuk augmentasi."""
         try:
-            data_dir = self.ui_components.get('data_dir', 'data')
             split = params.get('split_target', 'train')
             
-            # Path dataset
-            dataset_path = os.path.join(data_dir, 'preprocessed', split)
+            if self.is_colab:
+                # Di Colab: gunakan path symlink
+                data_base = f"{COLAB_PATH}/data"  # /content/data (symlink)
+                dataset_path = os.path.join(data_base, 'preprocessed', split)
+            else:
+                # Local development
+                data_dir = self.ui_components.get('data_dir', 'data')
+                dataset_path = os.path.join(data_dir, 'preprocessed', split)
+            
             images_path = os.path.join(dataset_path, 'images')
             labels_path = os.path.join(dataset_path, 'labels')
             
             # Load daftar file
+            if not os.path.exists(images_path):
+                return {'success': False, 'message': f'Direktori images tidak ditemukan: {images_path}'}
+            if not os.path.exists(labels_path):
+                return {'success': False, 'message': f'Direktori labels tidak ditemukan: {labels_path}'}
+            
             image_files = [f for f in os.listdir(images_path) 
                           if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
             label_files = [f for f in os.listdir(labels_path) 
@@ -109,7 +159,7 @@ class AugmentationExecutor:
             if not matched_files:
                 return {'success': False, 'message': 'Tidak ada pasangan gambar-label yang valid'}
             
-            log_message(self.ui_components, f"📊 Dataset loaded: {len(matched_files)} file pairs", "info")
+            log_message(self.ui_components, f"📊 Dataset loaded: {len(matched_files)} pasangan file", "info")
             
             return {
                 'success': True,
@@ -127,7 +177,7 @@ class AugmentationExecutor:
     
     def _run_augmentation(self, params: Dict[str, Any], dataset_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Jalankan proses augmentasi secara sequential dengan tqdm (tanpa multiprocessing).
+        Jalankan proses augmentasi dengan output melalui symlink.
         
         Args:
             params: Parameter augmentasi
@@ -144,7 +194,12 @@ class AugmentationExecutor:
         generated_count = 0
         processed_count = 0
         
+        output_dir = params['output_dir']
+        storage_type = params.get('storage_type', 'Unknown')
+        uses_symlink = params.get('uses_symlink', False)
+        
         log_message(self.ui_components, f"🚀 Memulai augmentasi {total_tasks} tasks", "info")
+        log_message(self.ui_components, f"📍 Storage: {storage_type}", "info")
         
         # Gunakan tqdm untuk progress bar
         with tqdm(total=total_tasks, desc="🔄 Augmentasi", unit="gambar", colour="green") as pbar:
@@ -158,8 +213,10 @@ class AugmentationExecutor:
                         break
                     
                     try:
-                        # Augmentasi single image
-                        result = self._augment_single_image(file_info, params, variation)
+                        # Augmentasi single image (output otomatis ke Drive jika symlink aktif)
+                        result = self._augment_single_image(
+                            file_info, params, variation, output_dir
+                        )
                         
                         if result['success']:
                             generated_count += 1
@@ -191,28 +248,38 @@ class AugmentationExecutor:
                 'status': 'cancelled',
                 'message': 'Augmentasi dibatalkan',
                 'generated_images': generated_count,
-                'processed': processed_count
+                'processed': processed_count,
+                'storage_type': storage_type
             }
         
         success_rate = (generated_count / total_tasks) * 100 if total_tasks > 0 else 0
         
+        # Message dengan info storage
+        result_msg = f'Augmentasi selesai: {generated_count}/{total_tasks} ({success_rate:.1f}%)'
+        if uses_symlink:
+            result_msg += f' | Disimpan ke Google Drive via symlink'
+        
         return {
             'status': 'success' if success_rate > 80 else 'warning',
-            'message': f'Augmentasi selesai: {generated_count}/{total_tasks} ({success_rate:.1f}%)',
+            'message': result_msg,
             'generated_images': generated_count,
             'processed': processed_count,
             'success_rate': success_rate,
-            'output_dir': params['output_dir']
+            'output_dir': output_dir,
+            'storage_type': storage_type,
+            'uses_symlink': uses_symlink
         }
     
-    def _augment_single_image(self, file_info: Dict[str, Any], params: Dict[str, Any], variation: int) -> Dict[str, Any]:
+    def _augment_single_image(self, file_info: Dict[str, Any], params: Dict[str, Any], 
+                             variation: int, output_dir: str) -> Dict[str, Any]:
         """
-        Augmentasi single image dengan parameter tertentu.
+        Augmentasi single image dengan output melalui symlink.
         
         Args:
             file_info: Info file (image, label, base_name)
             params: Parameter augmentasi
             variation: Nomor variasi (0, 1, 2, ...)
+            output_dir: Direktori output (otomatis ke Drive jika symlink aktif)
             
         Returns:
             Dictionary hasil augmentasi
@@ -224,11 +291,11 @@ class AugmentationExecutor:
             # Buat service instance
             service = AugmentationService()
             
-            # Generate augmented image
+            # Generate augmented image (output otomatis ke Drive jika symlink aktif)
             result = service.augment_single_file(
                 image_path=file_info['image'],
                 label_path=file_info['label'],
-                output_dir=params['output_dir'],
+                output_dir=output_dir,
                 types=params.get('types', ['combined']),
                 variation_id=variation,
                 prefix=params.get('output_prefix', 'aug')

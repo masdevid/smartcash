@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/helpers/augmentation_executor.py
-Deskripsi: Helper untuk eksekusi augmentasi dengan tracking dinamis, prioritisasi kelas, dan pelaporan progress yang dioptimalkan
+Deskripsi: Helper untuk eksekusi augmentasi dengan tracking dinamis yang diperbaiki untuk synchronous processing
 """
 
 import time
@@ -9,7 +9,6 @@ from typing import Dict, List, Any, Set, Optional
 from collections import defaultdict
 
 # Import utils yang sudah direfactor
-from smartcash.dataset.services.augmentor.helpers.parallel_helper import process_files_with_executor
 from smartcash.dataset.services.augmentor.helpers.tracking_helper import track_class_progress
 from smartcash.dataset.utils.file_mapping_utils import select_prioritized_files_for_class
 from smartcash.dataset.utils.move_utils import create_symlinks_to_preprocessed
@@ -38,11 +37,10 @@ def execute_prioritized_class_augmentation(
     if is_non_balancing_mode:
         service.logger.info(f"🔄 Menjalankan augmentasi tanpa balancing untuk {len(selected_files)} file")
         
-        # Untuk mode non-balancing, proses semua file sekaligus
-        augmentation_results = process_files_with_executor(
+        # Untuk mode non-balancing, proses semua file dengan synchronous processing
+        augmentation_results = process_files_synchronously(
             selected_files,
             augmentation_params,
-            n_workers,
             "Augmentasi semua file",
             service.report_progress
         )
@@ -68,16 +66,6 @@ def execute_prioritized_class_augmentation(
         # Log hasil
         service.logger.info(f"✅ Augmentasi selesai: {total_generated} variasi dibuat dari {len(selected_files)} file")
         
-        # Report progres hasil
-        service.report_progress(
-            message=f"✅ Augmentasi selesai: {total_generated} variasi dibuat",
-            status="success", step=1,
-            progress=len(selected_files),
-            total=len(selected_files),
-            module_type="augmentation",
-            context="augmentation_only"
-        )
-        
         return result_stats
     
     # Mode balancing - prioritaskan kelas dengan one-liner sort berdasarkan kebutuhan dan jumlah instance
@@ -91,10 +79,9 @@ def execute_prioritized_class_augmentation(
         service.logger.info(f"🔄 Menjalankan augmentasi yang dipaksa untuk {len(selected_files)} file")
         
         # Untuk mode forced augmentation, proses semua file sekaligus
-        augmentation_results = process_files_with_executor(
+        augmentation_results = process_files_synchronously(
             selected_files,
             augmentation_params,
-            n_workers,
             "Augmentasi yang dipaksa",
             service.report_progress
         )
@@ -106,27 +93,6 @@ def execute_prioritized_class_augmentation(
         # Update statistik
         result_stats['total_files_augmented'] = len(selected_files)
         result_stats['total_generated'] = total_generated
-        
-        # Tambahkan statistik umum
-        result_stats['class_stats']['forced'] = {
-            'original': len(selected_files),
-            'files_augmented': len(selected_files),
-            'target': target_count,
-            'before_augmentation': 0,
-            'generated': total_generated,
-            'success_rate': success_count / max(1, len(selected_files))
-        }
-        
-        # Log hasil
-        service.logger.info(f"✅ Augmentasi yang dipaksa selesai: {total_generated} variasi dibuat dari {len(selected_files)} file")
-        
-        # Report progres hasil
-        service.report_progress(
-            message=f"✅ Augmentasi yang dipaksa selesai: {total_generated} variasi dibuat",
-            status="success", step=1,
-            progress=len(selected_files),
-            total=len(selected_files)
-        )
         
         return result_stats
     
@@ -143,7 +109,7 @@ def execute_prioritized_class_augmentation(
     # Tracking progress global
     processed_file_count = 0
     
-    # Proses kelas secara berurutan berdasarkan prioritas
+    # Proses kelas secara berurutan berdasarkan prioritas dengan synchronous processing
     for i, class_id in enumerate(classes_to_augment):
         if service._stop_signal: break
             
@@ -169,22 +135,16 @@ def execute_prioritized_class_augmentation(
         service.report_progress(
             message=f"Augmentasi kelas {class_id} ({i+1}/{len(classes_to_augment)})",
             status="info", step=1, 
-            current_progress=processed_file_count, 
-            current_total=total_files_all_classes,
-            split_step=class_step,
-            class_id=class_id
+            progress=int(processed_file_count / total_files_all_classes * 100) if total_files_all_classes > 0 else 0,
+            total=100
         )
         
-        # Augmentasi kelas dengan proses parallel
-        class_results = process_files_with_executor(
+        # Augmentasi kelas dengan proses synchronous
+        class_results = process_files_synchronously(
             files_for_class, 
             {**augmentation_params, 'class_id': class_id},
-            n_workers,
             f"Augmentasi kelas {class_id}",
-            service.report_progress,
-            class_id=class_id,
-            class_idx=i,
-            total_classes=len(classes_to_augment)
+            service.report_progress
         )
         
         # Update tracking file dan progress
@@ -217,18 +177,6 @@ def execute_prioritized_class_augmentation(
         # Log hasil dengan string formatting
         service.logger.info(f"✅ Kelas {class_id}: {generated_for_class} variasi dibuat dari {len(files_for_class)} file " +
                           f"({current_class_counts.get(class_id, 0)}/{target_count})")
-        
-        # Report progres hasil
-        service.report_progress(
-            message=f"✅ Kelas {class_id}: {generated_for_class} variasi dibuat ({current_class_counts.get(class_id, 0)}/{target_count})",
-            status="success", step=1, 
-            progress=processed_file_count, 
-            total=total_files_all_classes,
-            current_progress=len(files_for_class), 
-            current_total=len(files_for_class),
-            split_step=class_step,
-            class_id=class_id
-        )
     
     # Tambahkan informasi count akhir
     result_stats['class_counts_after'] = current_class_counts
@@ -237,18 +185,71 @@ def execute_prioritized_class_augmentation(
     summary_message = f"✅ Augmentasi selesai: {result_stats['total_generated']} variasi dihasilkan"
     service.logger.info(summary_message)
     
-    # Progress final
-    service.report_progress(
-        message=summary_message, 
-        status="success", 
-        step=2,
-        progress=total_files_all_classes,
-        total=total_files_all_classes,
-        module_type="augmentation",
-        context="augmentation_only"
-    )
-    
     return result_stats
+
+def process_files_synchronously(
+    file_list: List[str], 
+    augmentation_params: Dict[str, Any], 
+    description: str = "Processing files",
+    progress_callback: Optional[Callable] = None,
+    **callback_params
+) -> List[Dict[str, Any]]:
+    """
+    Proses file secara synchronous (tanpa threading untuk Colab compatibility).
+    
+    Args:
+        file_list: List file yang akan diproses
+        augmentation_params: Parameter untuk augmentasi
+        description: Deskripsi untuk progress
+        progress_callback: Callback untuk melaporkan progress
+        **callback_params: Parameter tambahan untuk callback
+        
+    Returns:
+        List hasil proses per file
+    """
+    from smartcash.dataset.services.augmentor.augmentation_worker import process_single_file
+    from tqdm.auto import tqdm
+    
+    results = []
+    total_files = len(file_list)
+    
+    # Notifikasi awal dengan callback
+    if progress_callback and total_files > 0:
+        progress_callback(
+            message=f"🔄 Memproses {total_files} file secara synchronous",
+            status="info",
+            progress=0,
+            total=100
+        )
+    
+    # Proses synchronous dengan progress bar
+    with tqdm(total=total_files, desc=description, disable=total_files < 3, colour="green") as pbar:
+        for i, file_path in enumerate(file_list):
+            # Proses file tunggal secara synchronous
+            result = process_single_file(file_path, **augmentation_params)
+            results.append(result)
+            pbar.update(1)
+            
+            # Report progress dengan throttling
+            if progress_callback and i % max(1, total_files // 10) == 0:
+                progress_percent = int((i + 1) / total_files * 100)
+                progress_callback(
+                    message=f"Memproses file {i+1}/{total_files}",
+                    progress=progress_percent,
+                    total=100,
+                    silent=True  # Tidak terlalu verbose
+                )
+    
+    # Report finalisasi
+    if progress_callback:
+        progress_callback(
+            message=f"✅ Selesai memproses {total_files} file",
+            status="success",
+            progress=100,
+            total=100
+        )
+    
+    return results
 
 def execute_augmentation_with_tracking(
     service, 
@@ -263,9 +264,9 @@ def execute_augmentation_with_tracking(
     split: str, 
     target_count: int, 
     start_time: float,
-    create_symlinks: bool = True  # Parameter baru untuk symlink
+    create_symlinks: bool = True
 ) -> Dict[str, Any]:
-    """Eksekusi augmentasi dengan tracking dinamis kelas dan prioritisasi."""
+    """Eksekusi augmentasi dengan tracking dinamis kelas dan prioritisasi (synchronous)."""
     # Buat pipeline augmentasi
     try: 
         pipeline = service.pipeline_factory.create_pipeline(
@@ -305,32 +306,32 @@ def execute_augmentation_with_tracking(
     total_files_to_process = len(selected_files)
     service.report_progress(
         message=f"🚀 Memulai augmentasi {total_files_to_process} file dengan tracking dinamis",
-        status="info", step=1,
-        total_files_all=total_files_to_process,
-        module_type="augmentation",
-        context="augmentation_only"
+        status="info", 
+        progress=0,
+        total=100
     )
     
-    # Proses augmentasi dengan prioritas kelas
+    # Proses augmentasi dengan prioritas kelas (synchronous)
     augmentation_results = execute_prioritized_class_augmentation(
-        service, class_data, augmentation_params, n_workers, target_count, paths
+        service, class_data, augmentation_params, 1, target_count, paths  # n_workers = 1 untuk synchronous
     )
     
     # Durasi total dan hasil
     duration = time.time() - start_time
     
     # Jika diminta untuk membuat symlink ke direktori preprocessed, lakukan
-    preprocessed_dir = paths.get('preprocessed_dir')
-    if create_symlinks and preprocessed_dir:
-        service.logger.info(f"🔗 Membuat symlink hasil augmentasi ke {os.path.join(preprocessed_dir, split)}")
-        create_symlinks_to_preprocessed(
-            images_output_dir=paths['images_output_dir'],
-            labels_output_dir=paths['labels_output_dir'],
-            output_prefix=output_prefix,
-            final_output_dir=preprocessed_dir,
-            split=split,
-            logger=service.logger
-        )
+    if create_symlinks:
+        preprocessed_dir = paths.get('preprocessed_dir')
+        if preprocessed_dir:
+            service.logger.info(f"🔗 Membuat symlink hasil augmentasi ke {os.path.join(preprocessed_dir, split)}")
+            create_symlinks_to_preprocessed(
+                images_output_dir=paths['images_output_dir'],
+                labels_output_dir=paths['labels_output_dir'],
+                output_prefix=output_prefix,
+                final_output_dir=preprocessed_dir,
+                split=split,
+                logger=service.logger
+            )
     
     return {
         'original': sum(class_data.get('class_counts', {}).values()),

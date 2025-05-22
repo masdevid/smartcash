@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/validation_utils.py
-Deskripsi: Utilitas validasi untuk augmentasi dataset (lengkap dengan function yang hilang)
+Deskripsi: Utilitas validasi untuk augmentasi dataset dengan ekstraksi parameter yang diperbaiki
 """
 
 import os
@@ -18,60 +18,57 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
         Dict dengan 'valid' (bool), 'message' (str), dan 'params' (dict) jika valid
     """
     try:
-        # Extract parameters dari UI
+        # Extract parameters dari UI dengan multiple fallback
         params = {}
         
-        # Validasi jenis augmentasi
-        if 'augmentation_types' in ui_components:
-            aug_types = getattr(ui_components['augmentation_types'], 'value', [])
-            if not aug_types:
-                return {'valid': False, 'message': 'Jenis augmentasi tidak dipilih'}
-            params['types'] = list(aug_types)
-        else:
-            params['types'] = ['combined']  # default
+        # Validasi jenis augmentasi - cek beberapa kemungkinan nama
+        aug_types = None
+        for key in ['augmentation_types', 'aug_types', 'types']:
+            if key in ui_components and hasattr(ui_components[key], 'value'):
+                aug_types = ui_components[key].value
+                break
         
-        # Validasi num_variations
-        if 'num_variations' in ui_components:
-            num_variations = getattr(ui_components['num_variations'], 'value', 2)
-            if num_variations <= 0:
-                return {'valid': False, 'message': 'Jumlah variasi harus lebih dari 0'}
-            params['num_variations'] = num_variations
-        else:
-            params['num_variations'] = 2  # default
+        # Jika masih None, cari dalam nested components
+        if aug_types is None:
+            aug_types = _find_augmentation_types_in_components(ui_components)
         
-        # Validasi target_count
-        if 'target_count' in ui_components:
-            target_count = getattr(ui_components['target_count'], 'value', 1000)
-            if target_count <= 0:
-                return {'valid': False, 'message': 'Target count harus lebih dari 0'}
-            params['target_count'] = target_count
-        else:
-            params['target_count'] = 1000  # default
+        if not aug_types:
+            log_message(ui_components, "🔍 Debug: Mencari augmentation_types dalam UI components", "debug")
+            for key, value in ui_components.items():
+                if hasattr(value, 'value') and isinstance(value.value, (list, tuple)):
+                    log_message(ui_components, f"🔍 Found list/tuple in {key}: {value.value}", "debug")
+            return {'valid': False, 'message': 'Jenis augmentasi tidak ditemukan dalam UI'}
         
-        # Validasi output_prefix
-        if 'output_prefix' in ui_components:
-            output_prefix = getattr(ui_components['output_prefix'], 'value', 'aug')
-            if not output_prefix or not output_prefix.strip():
-                return {'valid': False, 'message': 'Output prefix tidak boleh kosong'}
-            params['output_prefix'] = output_prefix.strip()
-        else:
-            params['output_prefix'] = 'aug'  # default
+        params['types'] = list(aug_types) if isinstance(aug_types, (list, tuple)) else [aug_types]
+        log_message(ui_components, f"✅ Jenis augmentasi ditemukan: {params['types']}", "debug")
         
-        # Validasi split target
-        if 'split_target' in ui_components:
-            split_target = getattr(ui_components['split_target'], 'value', 'train')
-        elif 'target_split' in ui_components:
-            split_target = getattr(ui_components['target_split'], 'value', 'train')
-        else:
-            split_target = 'train'  # default
+        # Validasi num_variations dengan fallback
+        num_variations = _get_widget_value(ui_components, ['num_variations', 'variations', 'jumlah_variasi'], 2)
+        if num_variations <= 0:
+            return {'valid': False, 'message': 'Jumlah variasi harus lebih dari 0'}
+        params['num_variations'] = num_variations
         
+        # Validasi target_count dengan fallback
+        target_count = _get_widget_value(ui_components, ['target_count', 'count', 'target'], 1000)
+        if target_count <= 0:
+            return {'valid': False, 'message': 'Target count harus lebih dari 0'}
+        params['target_count'] = target_count
+        
+        # Validasi output_prefix dengan fallback
+        output_prefix = _get_widget_value(ui_components, ['output_prefix', 'prefix'], 'aug')
+        if not output_prefix or not str(output_prefix).strip():
+            return {'valid': False, 'message': 'Output prefix tidak boleh kosong'}
+        params['output_prefix'] = str(output_prefix).strip()
+        
+        # Validasi split target dengan fallback
+        split_target = _get_widget_value(ui_components, ['target_split', 'split_target', 'split'], 'train')
         if split_target not in ['train', 'valid', 'test']:
             return {'valid': False, 'message': f'Split target tidak valid: {split_target}'}
         params['split_target'] = split_target
         
-        # Validasi boolean options
-        params['balance_classes'] = getattr(ui_components.get('balance_classes', {}), 'value', False)
-        params['validate_results'] = getattr(ui_components.get('validate_results', {}), 'value', True)
+        # Boolean options dengan fallback
+        params['balance_classes'] = _get_widget_value(ui_components, ['balance_classes'], False)
+        params['validate_results'] = _get_widget_value(ui_components, ['validate_results'], True)
         params['process_bboxes'] = True  # Always true untuk augmentasi
         
         # Validasi dataset availability
@@ -91,6 +88,8 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
         params['data_dir'] = data_dir
         params['num_workers'] = 4  # Default workers
         
+        log_message(ui_components, f"✅ Parameter validasi berhasil: {params}", "debug")
+        
         return {
             'valid': True,
             'message': f'Parameter valid untuk augmentasi {split_target}',
@@ -101,6 +100,80 @@ def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str,
         error_msg = f"Error validasi parameter: {str(e)}"
         log_message(ui_components, error_msg, "error", "❌")
         return {'valid': False, 'message': error_msg}
+
+def _find_augmentation_types_in_components(ui_components: Dict[str, Any]) -> Any:
+    """
+    Cari augmentation_types dalam nested components.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Value dari augmentation_types jika ditemukan
+    """
+    # Cari dalam basic_options, advanced_options, atau augmentation_types container
+    containers = ['basic_options', 'advanced_options', 'augmentation_types']
+    
+    for container_name in containers:
+        if container_name in ui_components:
+            container = ui_components[container_name]
+            result = _search_widget_in_container(container, ['augmentation_types', 'types', 'jenis'])
+            if result is not None:
+                return result
+    
+    return None
+
+def _search_widget_in_container(container, target_descriptions: List[str]) -> Any:
+    """
+    Search widget dalam container berdasarkan description.
+    
+    Args:
+        container: Widget container
+        target_descriptions: List description yang dicari
+        
+    Returns:
+        Value widget jika ditemukan
+    """
+    if not hasattr(container, 'children'):
+        return None
+    
+    for child in container.children:
+        # Cek description
+        if hasattr(child, 'description') and hasattr(child, 'value'):
+            desc = child.description.lower().replace(':', '').replace(' ', '_')
+            if any(target in desc for target in target_descriptions):
+                return child.value
+        
+        # Cek tipe widget khusus
+        if hasattr(child, 'value'):
+            import ipywidgets as widgets
+            if isinstance(child, widgets.SelectMultiple):
+                return child.value
+        
+        # Rekursif search
+        result = _search_widget_in_container(child, target_descriptions)
+        if result is not None:
+            return result
+    
+    return None
+
+def _get_widget_value(ui_components: Dict[str, Any], possible_keys: List[str], default_value: Any) -> Any:
+    """
+    Dapatkan nilai widget dengan multiple fallback keys.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        possible_keys: List kemungkinan key
+        default_value: Nilai default
+        
+    Returns:
+        Nilai widget atau default
+    """
+    for key in possible_keys:
+        if key in ui_components and hasattr(ui_components[key], 'value'):
+            return ui_components[key].value
+    
+    return default_value
 
 def validate_augmentation_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Tuple[bool, str]:
     """

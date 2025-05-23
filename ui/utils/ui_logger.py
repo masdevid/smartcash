@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/ui_logger.py
-Deskripsi: Enhanced UI Logger dengan improved stdout suppression untuk prevent backend logs leak
+Deskripsi: Fixed UI Logger dengan clean message output tanpa duplicate formatting
 """
 
 import logging
@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Callable, Optional
 from IPython.display import display, HTML
 from datetime import datetime
-from smartcash.ui.utils.ui_logger_namespace import format_log_message
+from smartcash.ui.utils.ui_logger_namespace import format_log_message, _clean_message
 
 __all__ = [
     'UILogger', 
@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 class UILogger:
-    """Enhanced UI Logger dengan improved stdout suppression."""
+    """Fixed UI Logger dengan clean message output tanpa duplicate formatting."""
     
     def __init__(self, 
                 ui_components: Dict[str, Any], 
@@ -94,36 +94,13 @@ class UILogger:
                     'terdaftar', 'terinisialisasi', 'berhasil', 'dibuat', 'disalin',
                     'progress', 'Progress', 'PROGRESS', 'downloading', 'extracting',
                     'metadata', 'validation', 'step', 'Stage', 'Processing',
-                    '✅', '❌', '⚠️', 'ℹ️', '🔍', '📁', '🔗', '📋', '🚀', '📊',
-                    '📥', '📦', '🎉', '💾', '🧹', '🔄', '📍', '💡', '🌐',
+                    # '✅', '❌', '⚠️', 'ℹ️', '🔍', '📁', '🔗', '📋', '🚀', '📊',
+                    # '📥', '📦', '🎉', '💾', '🧹', '🔄', '📍', '💡', '🌐',
                     'requests.', 'urllib3.', 'http.client', 'connectionpool'
                 ]
             
             def write(self, message):
-                # Aggressive filtering
-                if not message or not message.strip():
-                    return
-                
-                msg_lower = message.lower().strip()
-                
-                # Skip semua pattern yang tidak diinginkan
-                if any(pattern.lower() in msg_lower for pattern in self.ignore_patterns):
-                    return
-                
-                # Skip short messages (likely debugging)
-                if len(msg_lower) < 5:
-                    return
-                
-                # Skip numeric-only messages (progress indicators)
-                if msg_lower.replace('%', '').replace('.', '').replace('/', '').replace('\\', '').replace('-', '').isdigit():
-                    return
-                
-                # Skip messages that look like progress bars
-                if any(char in message for char in ['█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '░', '▒', '▓']):
-                    return
-                
-                # If it passes all filters, suppress it anyway for UI cleanliness
-                # Backend logs should go through UI logger, not stdout
+                # Aggressive filtering - suppress everything by default
                 return
             
             def flush(self):
@@ -141,14 +118,17 @@ class UILogger:
         self.ui_components['stdout_suppressor'] = suppressor
     
     def _log_to_ui(self, message: str, level: str = "info") -> None:
-        """Log ke UI dengan improved formatting dan error handling."""
+        """Log ke UI dengan clean formatting tanpa duplicate."""
         if not message or not message.strip() or self._in_log_to_ui:
             return
             
         self._in_log_to_ui = True
         
         try:
-            formatted_message = format_log_message(self.ui_components, message)
+            # Clean message dari duplicate formatting
+            clean_message = _clean_message(message)
+            
+            # Format hanya timestamp dan emoji
             timestamp = datetime.now().strftime('%H:%M:%S')
             
             emoji_map = {
@@ -172,16 +152,24 @@ class UILogger:
             except ImportError:
                 color = "#212529"
             
-            # Enhanced HTML formatting
+            # Get namespace color untuk border
+            try:
+                from smartcash.ui.utils.ui_logger_namespace import get_namespace_id, get_namespace_color
+                namespace_id = get_namespace_id(self.ui_components)
+                border_color = get_namespace_color(namespace_id) if namespace_id else color
+            except ImportError:
+                border_color = color
+            
+            # Clean HTML formatting - hanya timestamp, emoji, dan message
             formatted_html = f"""
             <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
                        background-color:rgba(248,249,250,0.8);
-                       border-left:3px solid {color};
+                       border-left:3px solid {border_color};
                        font-family: 'Courier New', monospace;
                        font-size: 13px;">
                 <span style="color:#6c757d;font-size:11px;">[{timestamp}]</span> 
                 <span style="font-size:14px;">{emoji}</span> 
-                <span style="color:{color};margin-left:4px;">{formatted_message}</span>
+                <span style="color:{color};margin-left:4px;">{clean_message}</span>
             </div>
             """
             
@@ -232,7 +220,7 @@ def create_ui_logger(ui_components: Dict[str, Any],
                     redirect_stdout: bool = True,
                     log_dir: str = "logs",
                     log_level: int = logging.INFO) -> UILogger:
-    """Create enhanced UI logger dengan improved stdout suppression."""
+    """Create fixed UI logger dengan clean message output."""
     
     logger = UILogger(ui_components, name, log_to_file, log_dir, log_level)
     
@@ -285,17 +273,17 @@ def get_current_ui_logger() -> Optional[UILogger]:
     return _current_ui_logger
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
-    """Enhanced direct log ke UI tanpa stdout interference."""
+    """Fixed direct log ke UI dengan clean formatting."""
     if not ui_components or not message or not message.strip():
         return
         
+    # Clean message dari duplicate formatting
+    clean_message = _clean_message(message)
     timestamp = datetime.now().strftime('%H:%M:%S')
     
     if icon is None:
         emoji_map = {"debug": "🔍", "info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌", "critical": "🔥"}
         icon = emoji_map.get(level, "ℹ️")
-    
-    formatted_message = format_log_message(ui_components, message)
     
     try:
         from smartcash.ui.utils.constants import COLORS
@@ -308,15 +296,23 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
     except ImportError:
         color = "#212529"
     
+    # Get namespace color untuk border
+    try:
+        from smartcash.ui.utils.ui_logger_namespace import get_namespace_id, get_namespace_color
+        namespace_id = get_namespace_id(ui_components)
+        border_color = get_namespace_color(namespace_id) if namespace_id else color
+    except ImportError:
+        border_color = color
+    
     formatted_html = f"""
     <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
                background-color:rgba(248,249,250,0.8);
-               border-left:3px solid {color};
+               border-left:3px solid {border_color};
                font-family: 'Courier New', monospace;
                font-size: 13px;">
         <span style="color:#6c757d;font-size:11px;">[{timestamp}]</span> 
         <span style="font-size:14px;">{icon}</span> 
-        <span style="color:{color};margin-left:4px;">{formatted_message}</span>
+        <span style="color:{color};margin-left:4px;">{clean_message}</span>
     </div>
     """
     

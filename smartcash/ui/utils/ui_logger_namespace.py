@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/ui_logger_namespace.py
-Deskripsi: Utilitas namespace UI logger yang diperluas untuk semua modul UI dengan format pesan yang konsisten
+Deskripsi: Fixed UI logger namespace untuk prevent duplicate formatting dan clean message output
 """
 
 from typing import Dict, Any, Optional
@@ -126,40 +126,26 @@ def get_namespace_color(namespace_id: str) -> str:
     return NAMESPACE_COLORS.get(namespace_id, "#6c757d")
 
 def format_log_message(ui_components: Dict[str, Any], message: str, 
-                      level: str = "info", timestamp: bool = True) -> str:
+                      level: str = "info", timestamp: bool = False) -> str:
     """
-    Format pesan log dengan namespace ID, level, dan timestamp.
+    Format pesan log TANPA timestamp dan namespace untuk prevent duplicate.
     
     Args:
         ui_components: Dictionary komponen UI
-        message: Pesan yang akan diformat
+        message: Pesan yang akan diformat (raw message saja)
         level: Level log (debug, info, success, warning, error, critical)
-        timestamp: Apakah menyertakan timestamp
+        timestamp: Selalu False untuk prevent duplicate timestamp
         
     Returns:
-        Pesan yang diformat dengan namespace
+        Raw message tanpa formatting tambahan
     """
-    namespace_id = get_namespace_id(ui_components)
-    
-    # Buat prefix berdasarkan namespace
-    prefix_parts = []
-    
-    if timestamp:
-        from datetime import datetime
-        time_str = datetime.now().strftime('%H:%M:%S')
-        prefix_parts.append(f"[{time_str}]")
-    
-    if namespace_id:
-        prefix_parts.append(f"[{namespace_id}]")
-    
-    # Gabungkan prefix dengan message
-    prefix = " ".join(prefix_parts)
-    return f"{prefix} {message}" if prefix else message
+    # Return raw message saja - formatting akan dilakukan di UI layer
+    return message.strip()
 
 def format_log_message_html(ui_components: Dict[str, Any], message: str, 
                            level: str = "info", icon: str = None) -> str:
     """
-    Format pesan log sebagai HTML dengan styling namespace.
+    Format pesan log sebagai HTML dengan styling namespace yang clean.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -192,28 +178,50 @@ def format_log_message_html(ui_components: Dict[str, Any], message: str,
     emoji = icon or config["emoji"]
     color = config["color"]
     
-    # Format message dengan namespace
-    formatted_message = format_log_message(ui_components, message, level, timestamp=True)
+    # Clean message - remove any existing formatting
+    clean_message = _clean_message(message)
     
     # Dapatkan namespace untuk styling
     namespace_id = get_namespace_id(ui_components)
     namespace_color = get_namespace_color(namespace_id) if namespace_id else color
     
-    # HTML dengan styling yang diperbaiki
+    # HTML dengan styling yang clean
     html = f"""
     <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
                background-color:rgba(248,249,250,0.8);
                border-left:3px solid {namespace_color};">
-        <span style="color:{COLORS.get('muted', '#6c757d')};font-size:0.85em;">
-            {formatted_message.split('] ')[0]}]
-        </span>
-        <span style="margin-left:8px;">{emoji}</span>
         <span style="color:{color};margin-left:4px;">
-            {formatted_message.split('] ', 1)[-1] if '] ' in formatted_message else formatted_message}
+            {emoji} {clean_message}
         </span>
     </div>
     """
     return html.strip()
+
+def _clean_message(message: str) -> str:
+    """
+    Clean message dari duplicate formatting.
+    
+    Args:
+        message: Raw message yang mungkin sudah terformat
+        
+    Returns:
+        Clean message tanpa duplicate formatting
+    """
+    import re
+    
+    # Remove timestamp patterns [HH:MM:SS]
+    message = re.sub(r'\[(\d{2}:\d{2}:\d{2})\]\s*', '', message)
+    
+    # Remove namespace patterns [NAMESPACE]
+    message = re.sub(r'\[([A-Z]+)\]\s*', '', message)
+    
+    # Remove leading emoji + space jika ada
+    message = re.sub(r'^[🔍ℹ️✅⚠️❌🔥]\s*', '', message)
+    
+    # Clean multiple spaces
+    message = re.sub(r'\s+', ' ', message)
+    
+    return message.strip()
 
 def create_namespace_badge(namespace_id: str) -> str:
     """

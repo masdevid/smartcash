@@ -9,8 +9,8 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
 
 # Konstanta namespace
-DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
-
+from smartcash.ui.utils.ui_logger_namespace import DOWNLOAD_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DOWNLOAD_LOGGER_NAMESPACE]
 # Import handlers
 from smartcash.ui.dataset.download.handlers.button_handlers import setup_button_handlers
 from smartcash.ui.dataset.download.handlers.config_handlers import setup_config_handlers
@@ -25,7 +25,7 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
     Inisialisasi UI untuk dataset downloader dengan logger terintegrasi.
     
     Args:
-        env: Environment manager (opsional)
+        env: Environment manager (opsional)`
         config: Konfigurasi aplikasi (opsional)
         
     Returns:

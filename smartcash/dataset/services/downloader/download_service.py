@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/downloader/download_service.py
-Deskripsi: Updated download service dengan Drive integration dan progress callback
+Deskripsi: Updated download service dengan dataset organizer integration dan path consistency
 """
 
 import os, time, shutil
@@ -15,9 +15,10 @@ from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
 from smartcash.dataset.services.downloader.download_validator import DownloadValidator
 from smartcash.dataset.services.downloader.file_processor import DownloadFileProcessor
+from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 
 class DownloadService:
-    """Download service dengan Drive integration dan progress callback support."""
+    """Download service dengan dataset organizer integration."""
     
     def __init__(self, output_dir: str, config: Dict[str, Any], logger=None, num_workers: int = 4):
         self.config = config
@@ -25,28 +26,40 @@ class DownloadService:
         self.num_workers = num_workers
         self._progress_callback: Optional[Callable] = None
         
-        # Environment manager untuk Drive detection
+        # Environment manager untuk path management
         self.env_manager = get_environment_manager()
         
-        # Setup paths dengan Drive priority
-        self.output_dir, self.data_dir = self._setup_drive_paths(output_dir)
+        # Use downloads folder sebagai temporary location
+        from smartcash.common.constants.paths import get_paths_for_environment
+        self.paths = get_paths_for_environment(
+            is_colab=self.env_manager.is_colab,
+            is_drive_mounted=self.env_manager.is_drive_mounted
+        )
         
-        # Initialize components dengan Drive paths
+        # Setup download path (temporary) dan final data path
+        self.download_dir = Path(self.paths['downloads'])
+        self.data_dir = Path(self.paths['data_root'])
+        
+        # Initialize components
         self.downloader = RoboflowDownloader(logger=logger)
         self.validator = DownloadValidator(logger=logger, num_workers=num_workers)
         self.file_processor = DownloadFileProcessor(
-            output_dir=str(self.output_dir), config=config, 
+            output_dir=str(self.download_dir), config=config, 
             logger=logger, num_workers=num_workers
         )
+        
+        # Dataset organizer untuk move ke final structure
+        self.organizer = DatasetOrganizer(logger=logger)
         
         self._backup_service = None
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
         """Set callback untuk progress updates ke UI."""
         self._progress_callback = callback
-        # Propagate ke components
         if hasattr(self.downloader, 'set_progress_callback'):
             self.downloader.set_progress_callback(callback)
+        if hasattr(self.organizer, 'set_progress_callback'):
+            self.organizer.set_progress_callback(callback)
     
     def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
         """Notify progress via callback."""
@@ -54,63 +67,16 @@ class DownloadService:
             try:
                 self._progress_callback(step, current, total, message)
             except Exception:
-                pass  # Ignore callback errors
+                pass
     
-    def _setup_drive_paths(self, output_dir: str) -> Tuple[Path, Path]:
-        """Setup paths dengan Drive priority untuk Colab."""
-        if self.env_manager.is_colab and self.env_manager.is_drive_mounted:
-            # Drive paths
-            drive_base = self.env_manager.drive_path
-            drive_output = drive_base / 'downloads' / Path(output_dir).name
-            drive_data = drive_base / 'data'
-            
-            # Buat direktori di Drive
-            drive_output.mkdir(parents=True, exist_ok=True)
-            drive_data.mkdir(parents=True, exist_ok=True)
-            
-            # Setup symlinks di Colab ke Drive
-            colab_output = Path('/content') / Path(output_dir).name
-            colab_data = Path('/content/data')
-            
-            self._setup_symlink(colab_output, drive_output)
-            self._setup_symlink(colab_data, drive_data)
-            
-            self.logger.info(f"📁 Dataset akan disimpan di Drive: {drive_output}")
-            return drive_output, drive_data
-        else:
-            # Local paths untuk non-Colab atau Drive tidak mounted
-            output_path = Path(output_dir)
-            data_path = output_path.parent
-            output_path.mkdir(parents=True, exist_ok=True)
-            
-            self.logger.info(f"📁 Dataset akan disimpan lokal: {output_path}")
-            return output_path, data_path
-    
-    def _setup_symlink(self, local_path: Path, drive_path: Path) -> None:
-        """Setup symlink dari local ke Drive."""
-        try:
-            if local_path.exists():
-                if local_path.is_symlink():
-                    if local_path.resolve() == drive_path.resolve():
-                        return  # Symlink sudah benar
-                    local_path.unlink()
-                else:
-                    shutil.rmtree(local_path, ignore_errors=True)
-            
-            local_path.symlink_to(drive_path)
-            self.logger.debug(f"🔗 Symlink dibuat: {local_path} -> {drive_path}")
-        except Exception as e:
-            self.logger.warning(f"⚠️ Gagal buat symlink {local_path}: {str(e)}")
-
     def download_from_roboflow(self, api_key: Optional[str] = None, workspace: Optional[str] = None, 
                               project: Optional[str] = None, version: Optional[str] = None, 
                               format: str = "yolov5pytorch", output_dir: Optional[str] = None, 
                               show_progress: bool = True, verify_integrity: bool = True, 
-                              backup_existing: bool = False) -> Dict[str, Any]:
-        """Download dari Roboflow dengan Drive storage dan progress callback."""
+                              backup_existing: bool = False, organize_dataset: bool = True) -> Dict[str, Any]:
+        """Download dari Roboflow dengan organizer integration."""
         start_time = time.time()
         
-        # Notify start
         self._notify_progress("start", 0, 100, "Memulai download dataset")
         
         # Parameter handling
@@ -124,21 +90,18 @@ class DownloadService:
         if not all([workspace, project, version]):
             raise DatasetError("📋 Workspace, project, dan version diperlukan")
         
-        # Setup output path (Drive integrated)
-        if output_dir:
-            output_path = self._setup_custom_output(output_dir)
-        else:
-            output_path = self.output_dir / f"{workspace}_{project}_{version}"
-        
-        temp_download_path = output_path.with_name(f"{output_path.name}_temp")
+        # Setup temporary download path
+        temp_download_path = self.download_dir / f"{workspace}_{project}_{version}"
         
         try:
             self._notify_progress("prepare", 5, 100, "Mempersiapkan download")
             
-            # Backup handling
-            if backup_existing and output_path.exists() and any(output_path.iterdir()):
-                self._notify_progress("backup", 10, 100, "Membuat backup")
-                self._handle_backup(output_path, show_progress)
+            # Backup handling untuk final data structure jika ada
+            if backup_existing and organize_dataset:
+                existing_stats = self.organizer.check_organized_dataset()
+                if existing_stats['is_organized']:
+                    self._notify_progress("backup", 10, 100, "Membuat backup dataset lama")
+                    self._handle_backup_organized_dataset()
             
             # Clean temp directory
             if temp_download_path.exists():
@@ -167,32 +130,56 @@ class DownloadService:
             
             # Verify
             if verify_integrity:
-                self._notify_progress("verify", 80, 100, "Memverifikasi dataset")
+                self._notify_progress("verify", 70, 100, "Memverifikasi dataset")
                 valid = self.validator.verify_download(str(temp_download_path), metadata)
                 if not valid:
                     self.logger.warning("⚠️ Verifikasi gagal, melanjutkan proses")
             
-            # Finalize - Move to final location (Drive)
-            self._notify_progress("finalize", 90, 100, "Memindahkan ke lokasi final")
-            self._finalize_download(temp_download_path, output_path)
+            # Organize dataset ke final structure jika diminta
+            final_stats = {}
+            if organize_dataset:
+                self._notify_progress("organize", 80, 100, "Mengorganisir dataset ke struktur final")
+                
+                organize_result = self.organizer.organize_dataset(str(temp_download_path), remove_source=True)
+                if organize_result['status'] != 'success':
+                    self.logger.warning(f"⚠️ Gagal mengorganisir dataset: {organize_result.get('message')}")
+                    # Fallback ke stats dari temp directory
+                    final_stats = self.validator.get_dataset_stats(str(temp_download_path))
+                else:
+                    final_stats = organize_result
+                    final_output_dir = self.paths['data_root']
+            else:
+                # Tanpa organize, pindah ke output directory
+                if output_dir:
+                    final_output_path = Path(output_dir)
+                else:
+                    final_output_path = self.download_dir / f"{workspace}_{project}_{version}_final"
+                
+                self._notify_progress("finalize", 90, 100, "Memindahkan ke lokasi final")
+                self._finalize_download(temp_download_path, final_output_path)
+                final_stats = self.validator.get_dataset_stats(str(final_output_path))
+                final_output_dir = str(final_output_path)
             
             # Complete
-            stats = self.validator.get_dataset_stats(str(output_path))
             elapsed_time = time.time() - start_time
+            total_images = final_stats.get('total_images', 0)
             
-            self._notify_progress("complete", 100, 100, f"Download selesai: {stats.get('total_images', 0)} gambar")
+            self._notify_progress("complete", 100, 100, f"Download selesai: {total_images} gambar")
             
             self.logger.success(
                 f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ({elapsed_time:.1f}s)\n"
-                f"   • Lokasi: {output_path}\n"
+                f"   • Lokasi: {final_output_dir}\n"
                 f"   • Ukuran: {file_size_mb:.2f} MB\n"
-                f"   • Gambar: {stats.get('total_images', 0)} file"
+                f"   • Gambar: {total_images} file\n"
+                f"   • Organized: {'Ya' if organize_dataset else 'Tidak'}"
             )
             
             return {
                 "status": "success", "workspace": workspace, "project": project, 
-                "version": version, "format": format, "output_dir": str(output_path),
-                "stats": stats, "duration": elapsed_time, "drive_storage": self.env_manager.is_drive_mounted
+                "version": version, "format": format, "output_dir": final_output_dir,
+                "stats": final_stats, "duration": elapsed_time, 
+                "drive_storage": self.env_manager.is_drive_mounted,
+                "organized": organize_dataset
             }
             
         except Exception as e:
@@ -202,34 +189,31 @@ class DownloadService:
             self.logger.error(f"❌ Error download: {str(e)}")
             raise DatasetError(f"Error download: {str(e)}")
     
-    def _setup_custom_output(self, output_dir: str) -> Path:
-        """Setup custom output path dengan Drive integration."""
-        if self.env_manager.is_colab and self.env_manager.is_drive_mounted:
-            # Custom path di Drive
-            drive_output = self.env_manager.drive_path / 'downloads' / Path(output_dir).name
-            drive_output.mkdir(parents=True, exist_ok=True)
-            
-            # Setup symlink
-            colab_output = Path('/content') / Path(output_dir).name
-            self._setup_symlink(colab_output, drive_output)
-            
-            return drive_output
-        else:
-            # Local path
-            output_path = Path(output_dir)
-            output_path.mkdir(parents=True, exist_ok=True)
-            return output_path
+    def _handle_backup_organized_dataset(self) -> None:
+        """Handle backup untuk organized dataset."""
+        if self._backup_service is None:
+            from smartcash.dataset.services.downloader.backup_service import BackupService
+            self._backup_service = BackupService(self.config, self.logger)
+        
+        # Backup each split directory
+        for split in ['train', 'valid', 'test']:
+            split_path = Path(self.paths[split])
+            if split_path.exists():
+                backup_result = self._backup_service.backup_dataset(split_path, f"dataset_{split}", show_progress=False)
+                if backup_result.get("status") == "success":
+                    self.logger.info(f"💾 Backup {split} berhasil")
+        
+        # Cleanup old backups
+        self._backup_service.cleanup_old_backups(max_backups=3)
     
     def _finalize_download(self, temp_path: Path, final_path: Path) -> None:
-        """Finalize download ke Drive location."""
-        # Remove existing
+        """Finalize download ke final location."""
         if final_path.exists():
             if final_path.is_symlink():
                 final_path.unlink()
             else:
                 shutil.rmtree(final_path, ignore_errors=True)
         
-        # Move dengan progress notification
         final_path.mkdir(parents=True, exist_ok=True)
         
         # Copy dengan progress tracking
@@ -251,18 +235,32 @@ class DownloadService:
         # Cleanup temp
         shutil.rmtree(temp_path, ignore_errors=True)
     
-    def _handle_backup(self, output_path: Path, show_progress: bool) -> None:
-        """Handle backup dengan Drive storage."""
-        if self._backup_service is None:
-            from smartcash.dataset.services.downloader.backup_service import BackupService
-            self._backup_service = BackupService(self.config, self.logger)
-        
-        backup_result = self._backup_service.backup_dataset(output_path, show_progress=show_progress)
-        if backup_result.get("status") == "success":
-            self._backup_service.cleanup_old_backups(max_backups=3)
-    
     def get_dataset_info(self) -> Dict[str, Any]:
-        """Get dataset info dengan Drive storage info."""
+        """Get dataset info dengan organized dataset awareness."""
+        # Check organized dataset first
+        organized_stats = self.organizer.check_organized_dataset()
+        
+        if organized_stats['is_organized']:
+            info = {
+                'name': self.config.get('data', {}).get('roboflow', {}).get('project', 'Unnamed Project'),
+                'workspace': self.config.get('data', {}).get('roboflow', {}).get('workspace', 'Unnamed Workspace'),
+                'version': self.config.get('data', {}).get('roboflow', {}).get('version', 'Unknown Version'),
+                'is_available_locally': True,
+                'local_stats': organized_stats,
+                'data_dir': self.paths['data_root'],
+                'drive_storage': self.env_manager.is_drive_mounted,
+                'drive_path': str(self.env_manager.drive_path) if self.env_manager.drive_path else None,
+                'has_api_key': bool(self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.environ.get("ROBOFLOW_API_KEY")),
+                'organized': True
+            }
+            
+            total_images = organized_stats.get('total_images', 0)
+            storage_location = "Drive" if self.env_manager.is_drive_mounted else "Local"
+            self.logger.info(f"🔍 Dataset (Organized/{storage_location}): {info['name']} v{info['version']} | Total: {total_images} gambar")
+            
+            return info
+        
+        # Fallback ke check traditional dataset
         is_available = self.validator.is_dataset_available(self.data_dir)
         local_stats = self.validator.get_local_stats(self.data_dir) if is_available else {}
         
@@ -275,12 +273,13 @@ class DownloadService:
             'data_dir': str(self.data_dir),
             'drive_storage': self.env_manager.is_drive_mounted,
             'drive_path': str(self.env_manager.drive_path) if self.env_manager.drive_path else None,
-            'has_api_key': bool(self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.environ.get("ROBOFLOW_API_KEY"))
+            'has_api_key': bool(self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.environ.get("ROBOFLOW_API_KEY")),
+            'organized': False
         }
         
         if is_available:
             total_images = sum(local_stats.get(split, 0) for split in DEFAULT_SPLITS)
             storage_location = "Drive" if self.env_manager.is_drive_mounted else "Local"
-            self.logger.info(f"🔍 Dataset ({storage_location}): {info['name']} v{info['version']} | Total: {total_images} gambar")
+            self.logger.info(f"🔍 Dataset (Traditional/{storage_location}): {info['name']} v{info['version']} | Total: {total_images} gambar")
         
         return info

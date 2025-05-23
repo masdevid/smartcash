@@ -1,9 +1,11 @@
 """
 File: smartcash/ui/dataset/download/services/enhanced_ui_download_service.py
-Deskripsi: Enhanced download service dengan dual progress tracking, dataset organization, dan path management yang benar
+Deskripsi: Updated download service dengan log suppression dan organizer integration
 """
 
 import time
+import logging
+import sys
 from pathlib import Path
 from typing import Dict, Any
 from smartcash.dataset.services.downloader.ui_roboflow_downloader import UIRoboflowDownloader
@@ -13,11 +15,14 @@ from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
 class EnhancedUIDownloadService:
-    """Enhanced download service dengan dual progress tracking dan dataset organization."""
+    """Enhanced download service dengan log suppression dan dataset organization."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.logger = ui_components.get('logger')
+        
+        # Setup log suppression untuk backend services
+        self._setup_backend_log_suppression()
         
         # Environment manager untuk path resolution
         self.env_manager = get_environment_manager()
@@ -40,6 +45,27 @@ class EnhancedUIDownloadService:
         # Dataset organizer untuk memindahkan ke struktur final
         self.organizer = DatasetOrganizer(logger=self.logger)
         self.organizer.set_progress_callback(self._organizer_progress_callback)
+    
+    def _setup_backend_log_suppression(self):
+        """Suppress logs dari backend services agar tidak muncul di console."""
+        # List backend loggers yang perlu di-suppress
+        backend_loggers = [
+            'requests', 'urllib3', 'http.client', 'requests.packages.urllib3',
+            'smartcash.dataset.services', 'smartcash.common', 'tensorflow', 
+            'torch', 'PIL', 'matplotlib', 'zipfile'
+        ]
+        
+        # Suppress each logger
+        for logger_name in backend_loggers:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(logging.CRITICAL)
+            logger.propagate = False
+            # Remove handlers untuk prevent console output
+            logger.handlers.clear()
+        
+        # Redirect stdout untuk backend processes yang tidak menggunakan logging
+        if not hasattr(self, '_original_stdout'):
+            self._original_stdout = sys.stdout
     
     def download_dataset(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Download dengan enhanced dual progress tracking dan dataset organization."""
@@ -69,14 +95,19 @@ class EnhancedUIDownloadService:
             download_path.mkdir(parents=True, exist_ok=True)
             
             download_url = metadata['export']['link']
-            if not self.downloader.download_and_extract(download_url, download_path):
-                raise Exception("Download atau ekstraksi gagal")
+            
+            # Suppress console output selama download
+            with self._suppress_console_output():
+                if not self.downloader.download_and_extract(download_url, download_path):
+                    raise Exception("Download atau ekstraksi gagal")
             
             self.progress_bridge.notify_step_complete("Dataset berhasil didownload")
             
             # Step 4: Organize dataset (pindah ke struktur final)
             self.progress_bridge.notify_step_start("organize", "Mengorganisir dataset ke struktur final")
-            organize_result = self.organizer.organize_dataset(str(download_path), remove_source=True)
+            
+            with self._suppress_console_output():
+                organize_result = self.organizer.organize_dataset(str(download_path), remove_source=True)
             
             if organize_result['status'] != 'success':
                 raise Exception(f"Gagal mengorganisir dataset: {organize_result.get('message')}")
@@ -123,6 +154,29 @@ class EnhancedUIDownloadService:
             
             return {'status': 'error', 'message': error_msg, 'duration': duration}
     
+    def _suppress_console_output(self):
+        """Context manager untuk suppress console output dari backend."""
+        class SuppressOutput:
+            def __enter__(self):
+                self._original_stdout = sys.stdout
+                self._original_stderr = sys.stderr
+                sys.stdout = open('/dev/null', 'w') if hasattr(sys.stdout, 'fileno') else sys.stdout
+                sys.stderr = open('/dev/null', 'w') if hasattr(sys.stderr, 'fileno') else sys.stderr
+                return self
+            
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                try:
+                    if sys.stdout != self._original_stdout and hasattr(sys.stdout, 'close'):
+                        sys.stdout.close()
+                    if sys.stderr != self._original_stderr and hasattr(sys.stderr, 'close'):
+                        sys.stderr.close()
+                except:
+                    pass
+                sys.stdout = self._original_stdout
+                sys.stderr = self._original_stderr
+        
+        return SuppressOutput()
+    
     def _define_process_steps(self, params: Dict[str, Any]) -> list:
         """Define steps berdasarkan parameter dan opsi."""
         steps = [
@@ -132,7 +186,6 @@ class EnhancedUIDownloadService:
             {'name': 'organize', 'weight': 20, 'description': 'Organisir Dataset'}
         ]
         
-        # Tambah step verify jika diminta
         if params.get('validate_dataset', False):
             steps.append({'name': 'verify', 'weight': 5, 'description': 'Verifikasi Dataset'})
         
@@ -141,15 +194,13 @@ class EnhancedUIDownloadService:
     def _downloader_progress_callback(self, step: str, current: int, total: int, message: str) -> None:
         """Callback dari downloader untuk update step progress."""
         if step in ['download', 'extract']:
-            # Convert ke percentage untuk step progress
             step_progress = int((current / total) * 100) if total > 0 else 0
             self.progress_bridge.notify_step_progress(step_progress, message)
     
     def _organizer_progress_callback(self, step: str, current: int, total: int, message: str) -> None:
         """Callback dari organizer untuk update step progress."""
         if step == 'organize':
-            step_progress = current  # Organizer sudah mengirim percentage
-            self.progress_bridge.notify_step_progress(step_progress, message)
+            self.progress_bridge.notify_step_progress(current, message)
     
     def _validate_params(self, params: Dict[str, Any]) -> None:
         """Enhanced parameter validation."""
@@ -159,12 +210,10 @@ class EnhancedUIDownloadService:
         if missing:
             raise ValueError(f"Parameter tidak lengkap: {', '.join(missing)}")
         
-        # Validate API key format
         api_key = params['api_key']
         if len(api_key) < 10:
             raise ValueError("API key terlalu pendek, periksa kembali")
         
-        # Ensure directories exist
         downloads_path = Path(self.paths['downloads'])
         downloads_path.mkdir(parents=True, exist_ok=True)
         
@@ -187,14 +236,12 @@ class EnhancedUIDownloadService:
             response.raise_for_status()
             metadata = response.json()
             
-            # Enhanced metadata validation
             if 'export' not in metadata:
                 raise ValueError("Response tidak mengandung export data")
             
             if 'link' not in metadata['export']:
                 raise ValueError("Export link tidak ditemukan dalam response")
             
-            # Log dataset info
             if self.logger and 'project' in metadata:
                 project_info = metadata['project']
                 classes_count = len(project_info.get('classes', []))

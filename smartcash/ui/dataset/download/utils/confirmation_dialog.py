@@ -49,6 +49,39 @@ def show_download_confirmation(ui_components: Dict[str, Any], params: Dict[str, 
     ui_components['confirmation_area'].clear_output()
     with ui_components['confirmation_area']:
         display(dialog)
+        
+def show_cleanup_confirmation(ui_components: Dict[str, Any], output_dir: str, file_count: int) -> None:
+    """Tampilkan dialog konfirmasi cleanup."""
+    message = (
+        f"Anda akan menghapus {file_count} file dari:\n"
+        f"{output_dir}\n\n"
+        f"Tindakan ini tidak dapat dibatalkan.\n"
+        f"Lanjutkan cleanup?"
+    )
+    
+    def on_confirm(b):
+        ui_components['confirmation_area'].clear_output()
+        from smartcash.ui.dataset.download.handlers.cleanup_action import execute_cleanup_confirmed
+        execute_cleanup_confirmed(ui_components, output_dir)
+    
+    def on_cancel(b):
+        ui_components['confirmation_area'].clear_output()
+        from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
+        disable_download_buttons(ui_components, False)
+        logger = ui_components.get('logger')
+        if logger:
+            logger.info("❌ Cleanup dibatalkan")
+    
+    dialog = create_confirmation_dialog(
+        title="Konfirmasi Hapus Dataset",
+        message=message,
+        on_confirm=on_confirm,
+        on_cancel=on_cancel
+    )
+    
+    ui_components['confirmation_area'].clear_output()
+    with ui_components['confirmation_area']:
+        display(dialog)
 
 def _execute_confirmed_download(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
     """Execute download setelah konfirmasi."""

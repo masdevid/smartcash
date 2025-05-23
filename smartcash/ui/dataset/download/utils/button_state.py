@@ -2,7 +2,7 @@
 File: smartcash/ui/dataset/download/utils/button_state.py
 Deskripsi: Manajemen state tombol UI
 """
-
+from typing import Dict, Any
 def disable_download_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     """Enable/disable semua tombol download."""
     button_keys = ['download_button', 'check_button', 'reset_button', 'cleanup_button', 'save_button']

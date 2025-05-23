@@ -1,50 +1,51 @@
+"""
+File: smartcash/ui/dataset/download/components/main_ui.py
+Deskripsi: Updated main UI dengan Drive storage info dan progress observer
+"""
+
 import ipywidgets as widgets
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.components.status_panel import create_status_panel
+from smartcash.common.environment import get_environment_manager
 from .options_panel import create_options_panel
 from .action_section import create_action_section
 from .progress_section import create_progress_section
 from .log_section import create_log_section
 
 def create_download_ui(config=None):
-    """
-    Create download UI components.
-    
-    Args:
-        config: Optional configuration dictionary
-        
-    Returns:
-        Dictionary containing UI components
-    """
+    """Create download UI dengan Drive storage integration."""
     config = config or {}
-    # Ambil config roboflow dari path yang benar
     roboflow_config = config.get('roboflow', {})
     
-    # Header
-    header = create_header(f"{ICONS.get('download', '📥')} Dataset Download", "Download dataset untuk training model SmartCash")
+    # Environment info untuk Drive status
+    env_manager = get_environment_manager()
+    drive_status = "🔗 Drive terhubung" if env_manager.is_drive_mounted else "⚠️ Drive tidak terhubung"
+    storage_info = f" | Storage: {'Drive' if env_manager.is_drive_mounted else 'Local'}"
     
-    # Status panel
-    status_panel = create_status_panel("Konfigurasi download dataset", "info")
+    # Header dengan storage info
+    header = create_header(
+        f"{ICONS.get('download', '📥')} Dataset Download", 
+        f"Download dataset untuk SmartCash{storage_info}"
+    )
     
-    # Options panel (form fields)
-    options = create_options_panel(roboflow_config)
+    # Status panel dengan Drive info
+    initial_status = f"{drive_status} - Siap untuk download dataset"
+    status_panel = create_status_panel(initial_status, "info")
     
-    # Action section
+    # Components
+    options = create_options_panel(roboflow_config, env_manager)
     actions = create_action_section()
-    
-    # Progress section
     progress = create_progress_section()
-    
-    # Log section
     logs = create_log_section()
     
-    # Create main container with proper layout
+    # Main container
     main_container = widgets.VBox([
         header,
         status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Pengaturan Download</h4>"),
+        _create_storage_info_widget(env_manager),
+        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 10px;'>{ICONS.get('settings', '⚙️')} Pengaturan Download</h4>"),
         options['panel'],
         widgets.VBox([
             actions['save_reset_buttons']['container'],
@@ -57,50 +58,38 @@ def create_download_ui(config=None):
         logs['log_accordion'],
         logs['summary_container']
     ], layout=widgets.Layout(
-        width='100%',
-        display='flex',
-        flex_flow='column',
-        align_items='stretch',
-        padding='10px',
-        border='1px solid #ddd',
-        border_radius='5px',
-        background_color='#fff'
+        width='100%', display='flex', flex_flow='column',
+        align_items='stretch', padding='10px', border='1px solid #ddd',
+        border_radius='5px', background_color='#fff'
     ))
     
-    # Compose ui_components dict
-    ui_components = {
+    # Compose UI components
+    return {
         'ui': main_container,
         'main_container': main_container,
         'header': header,
         'status_panel': status_panel,
-        'workspace': options['workspace'],
-        'project': options['project'],
-        'version': options['version'],
-        'api_key': options['api_key'],
-        'output_dir': options['output_dir'],
-        'validate_dataset': options['validate_dataset'],
-        'backup_checkbox': options['backup_checkbox'],
-        'backup_dir': options['backup_dir'],
-        'input_options': options['panel'],
-        'download_button': actions['action_buttons']['primary_button'],
-        'check_button': actions['action_buttons']['secondary_buttons'][0] if 'secondary_buttons' in actions['action_buttons'] else None,
-        'save_button': actions['save_button'],
-        'reset_config_button': actions['reset_button'],
-        'save_reset_buttons': actions['save_reset_buttons'],
-        'sync_info': actions['sync_info'],
-        'cleanup_button': actions['action_buttons'].get('cleanup_button'),
-        'button_container': actions['action_buttons']['container'],
-        'summary_container': logs['summary_container'],
-        'confirmation_area': logs['confirmation_area'],
+        'drive_info': main_container.children[2],  # Storage info widget
+        **{k: v for k, v in options.items() if k != 'panel'},
+        **{k: v for k, v in actions.items()},
+        **{k: v for k, v in progress.items()},
+        **{k: v for k, v in logs.items()},
         'module_name': 'download',
-        'progress_bar': progress['progress_bar'],
-        'progress_container': progress['progress_container'],
-        'current_progress': progress.get('current_progress'),
-        'overall_label': progress.get('overall_label'),
-        'step_label': progress.get('step_label'),
-        'status': logs['log_output'],
-        'log_output': logs['log_output'],
-        'log_accordion': logs['log_accordion']
+        'env_manager': env_manager
     }
-    
-    return ui_components 
+
+def _create_storage_info_widget(env_manager):
+    """Create widget untuk info storage."""
+    if env_manager.is_drive_mounted:
+        info_html = f"""
+        <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 8px; margin: 5px 0;">
+            <span style="color: #2e7d32;">✅ Dataset akan disimpan di Google Drive: {env_manager.drive_path}</span>
+        </div>
+        """
+    else:
+        info_html = f"""
+        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px; margin: 5px 0;">
+            <span style="color: #856404;">⚠️ Drive tidak terhubung - dataset akan disimpan lokal (hilang saat restart)</span>
+        </div>
+        """
+    return widgets.HTML(info_html)

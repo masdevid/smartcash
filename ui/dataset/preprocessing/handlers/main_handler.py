@@ -1,236 +1,207 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/main_handler.py
-Deskripsi: Main handler untuk tombol preprocessing dengan integrasi service baru
+Deskripsi: Handler utama yang terintegrasi dengan stop functionality
 """
 
 from typing import Dict, Any
-from concurrent.futures import Future
-
+from concurrent.futures import ThreadPoolExecutor, Future
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.preprocessing.components.config_manager import get_config_from_ui
-from smartcash.ui.dataset.preprocessing.utils.dialog_utils import create_preprocessing_confirmation_dialog
-from smartcash.ui.dataset.preprocessing.services.service_runner import create_service_runner
 
 logger = get_logger(__name__)
 
-def handle_preprocessing_button_click(button: Any, ui_components: Dict[str, Any]) -> None:
-    """
-    Handler untuk tombol preprocessing utama.
+class PreprocessingHandler:
+    """Handler utama untuk operasi preprocessing dengan stop functionality."""
     
-    Args:
-        button: Tombol yang diklik
-        ui_components: Dictionary komponen UI
-    """
-    # Disable button untuk mencegah double click
-    if button and hasattr(button, 'disabled'):
+    def __init__(self, ui_components: Dict[str, Any]):
+        """Inisialisasi preprocessing handler."""
+        self.ui_components = ui_components
+        self.logger = ui_components.get('logger', logger)
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.current_future: Future = None
+        self.is_running = False
+        
+    def handle_button_click(self, button: Any) -> None:
+        """Handler untuk tombol preprocessing utama."""
+        if self.is_running:
+            self.stop_processing()
+            return
+            
         button.disabled = True
+        
+        try:
+            self.ui_components['stop_requested'] = False
+            config = get_config_from_ui(self.ui_components)
+            
+            self._log_config(config)
+            self._update_status("info", "⚙️ Mempersiapkan preprocessing...")
+            self._start_preprocessing(config)
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error persiapan: {str(e)}")
+            self._handle_error(str(e))
+        finally:
+            button.disabled = False
     
-    try:
-        # Reset stop flag
-        ui_components['stop_requested'] = False
+    def _start_preprocessing(self, config: Dict[str, Any]) -> None:
+        """Start preprocessing secara async."""
+        self.is_running = True
+        self._update_ui_for_start()
         
-        # Get konfigurasi dari UI
-        config = get_config_from_ui(ui_components)
-        preprocessing_config = config.get('preprocessing', {})
+        self.current_future = self.executor.submit(self._run_preprocessing, config)
+        self.current_future.add_done_callback(self._on_complete)
         
-        # Log konfigurasi
-        logger.info("🔧 Mempersiapkan preprocessing dengan konfigurasi:")
-        logger.info(f"  • Resolusi: {preprocessing_config.get('img_size', 'default')}")
-        logger.info(f"  • Normalisasi: {preprocessing_config.get('normalization', 'minmax')}")
-        logger.info(f"  • Split: {preprocessing_config.get('split', 'all')}")
-        
-        # Update status panel
-        from smartcash.ui.utils.alert_utils import update_status_panel
-        update_status_panel(ui_components['status_panel'], "⚙️ Mempersiapkan preprocessing...", "info")
-        
-        # Tampilkan dialog konfirmasi dengan existing data check
-        create_preprocessing_confirmation_dialog(
-            ui_components,
-            preprocessing_config,
-            lambda: _execute_preprocessing(ui_components, config),
-            lambda: _cancel_preprocessing(ui_components, button)
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Error persiapan preprocessing: {str(e)}")
-        _handle_preprocessing_error(ui_components, button, str(e))
-
-def _execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """
-    Eksekusi preprocessing setelah konfirmasi.
+        self.logger.info("🚀 Preprocessing dimulai")
     
-    Args:
-        ui_components: Dictionary komponen UI
-        config: Konfigurasi preprocessing
-    """
-    try:
-        # Create atau get service runner
-        if 'service_runner' not in ui_components:
-            service_runner = create_service_runner(ui_components)
-        else:
-            service_runner = ui_components['service_runner']
+    def _run_preprocessing(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Run preprocessing di background thread."""
+        try:
+            from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
+            
+            manager = PreprocessingManager(config, self.logger)
+            
+            if hasattr(manager, 'register_progress_callback'):
+                manager.register_progress_callback(self._progress_callback)
+            
+            result = manager.preprocess_dataset(
+                split=config.get('preprocessing', {}).get('split', 'all'),
+                force_reprocess=True,
+                show_progress=True
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error preprocessing: {str(e)}")
+            raise
+    
+    def _progress_callback(self, **kwargs) -> bool:
+        """Callback untuk progress updates dengan stop check."""
+        if self.ui_components.get('stop_requested', False):
+            return False
         
-        # Update UI state untuk running
-        _update_ui_for_processing_start(ui_components)
+        try:
+            progress = kwargs.get('progress', 0)
+            total = kwargs.get('total', 100)
+            message = kwargs.get('message', '')
+            
+            if 'progress_bar' in self.ui_components:
+                percentage = (progress / total * 100) if total > 0 else 0
+                self.ui_components['progress_bar'].value = percentage
+            
+            if 'overall_label' in self.ui_components and message:
+                self.ui_components['overall_label'].value = f"🔄 {message} ({progress}/{total})"
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error progress: {str(e)}")
+            return True
+    
+    def stop_processing(self) -> None:
+        """Stop preprocessing yang sedang berjalan."""
+        if not self.is_running:
+            return
+            
+        self.ui_components['stop_requested'] = True
         
-        # Setup storage (Drive atau lokal)
-        storage_success, storage_message = service_runner.setup_storage()
-        logger.info(f"💾 Storage setup: {storage_message}")
+        if self.current_future and not self.current_future.done():
+            self.current_future.cancel()
         
-        # Jalankan preprocessing async
-        future: Future = service_runner.run_preprocessing(config)
+        self.logger.warning("⏹️ Preprocessing dihentikan")
+        self._update_status("warning", "Preprocessing dihentikan")
+        self._reset_ui()
+    
+    def _on_complete(self, future: Future) -> None:
+        """Callback saat preprocessing selesai."""
+        try:
+            if not future.cancelled():
+                result = future.result()
+                self._handle_success(result)
+        except Exception as e:
+            if not future.cancelled():
+                self._handle_error(str(e))
+        finally:
+            self._reset_ui()
+    
+    def _handle_success(self, result: Dict[str, Any]) -> None:
+        """Handle preprocessing berhasil."""
+        total_processed = result.get('total_images', 0)
         
-        # Store future untuk tracking
-        ui_components['processing_future'] = future
+        self.logger.info(f"✅ Preprocessing berhasil: {total_processed} file")
+        self._update_status("success", f"✅ Selesai - {total_processed} file diproses")
+    
+    def _handle_error(self, error_message: str) -> None:
+        """Handle error preprocessing."""
+        self.logger.error(f"❌ Error: {error_message}")
+        self._update_status("error", f"❌ Error: {error_message}")
+    
+    def _update_ui_for_start(self) -> None:
+        """Update UI saat mulai preprocessing."""
+        # Change button text to "Stop"
+        if 'preprocess_button' in self.ui_components:
+            self.ui_components['preprocess_button'].description = "Stop Preprocessing"
+            self.ui_components['preprocess_button'].button_style = 'danger'
+            self.ui_components['preprocess_button'].icon = 'stop'
         
-        # Setup callback untuk completion
-        def on_complete(fut: Future):
+        # Disable other buttons
+        for btn in ['save_button', 'reset_button', 'cleanup_button']:
+            if btn in self.ui_components:
+                self.ui_components[btn].disabled = True
+        
+        # Show progress
+        if 'progress_container' in self.ui_components:
+            self.ui_components['progress_container'].layout.visibility = 'visible'
+    
+    def _reset_ui(self) -> None:
+        """Reset UI setelah selesai/stop."""
+        self.is_running = False
+        
+        # Reset button
+        if 'preprocess_button' in self.ui_components:
+            self.ui_components['preprocess_button'].description = "Mulai Preprocessing" 
+            self.ui_components['preprocess_button'].button_style = 'success'
+            self.ui_components['preprocess_button'].icon = 'play'
+            self.ui_components['preprocess_button'].disabled = False
+        
+        # Enable other buttons
+        for btn in ['save_button', 'reset_button', 'cleanup_button']:
+            if btn in self.ui_components:
+                self.ui_components[btn].disabled = False
+        
+        # Reset progress
+        if 'progress_bar' in self.ui_components:
+            self.ui_components['progress_bar'].value = 0
+        if 'overall_label' in self.ui_components:
+            self.ui_components['overall_label'].value = ""
+    
+    def _log_config(self, config: Dict[str, Any]) -> None:
+        """Log konfigurasi preprocessing."""
+        pc = config.get('preprocessing', {})
+        self.logger.info("🔧 Konfigurasi:")
+        self.logger.info(f"  • Resolusi: {pc.get('img_size')}")
+        self.logger.info(f"  • Normalisasi: {pc.get('normalization')}")
+        self.logger.info(f"  • Workers: {pc.get('num_workers')}")
+        self.logger.info(f"  • Split: {pc.get('split')}")
+    
+    def _update_status(self, status: str, message: str) -> None:
+        """Update status panel."""
+        if 'status_panel' in self.ui_components:
             try:
-                result = fut.result()  # Akan raise exception jika ada error
-                _handle_preprocessing_success(ui_components, result)
-            except Exception as e:
-                _handle_preprocessing_error(ui_components, None, str(e))
-        
-        # Add callback (non-blocking)
-        future.add_done_callback(on_complete)
-        
-        logger.info("🚀 Preprocessing dimulai secara asynchronous")
-        
-    except Exception as e:
-        logger.error(f"❌ Error eksekusi preprocessing: {str(e)}")
-        _handle_preprocessing_error(ui_components, None, str(e))
+                from smartcash.ui.components.status_panel import update_status_panel
+                update_status_panel(self.ui_components['status_panel'], message, status)
+            except ImportError:
+                self.ui_components['status_panel'].value = f"<div class='alert alert-{status}'>{message}</div>"
 
-def _cancel_preprocessing(ui_components: Dict[str, Any], button: Any) -> None:
-    """
-    Cancel preprocessing dan reset UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        button: Tombol yang perlu di-enable kembali
-    """
-    logger.info("ℹ️ Preprocessing dibatalkan oleh pengguna")
-    
-    # Update status panel
-    from smartcash.ui.utils.alert_utils import update_status_panel
-    update_status_panel(ui_components['status_panel'], "Preprocessing dibatalkan", "info")
-    
-    # Re-enable button
-    if button and hasattr(button, 'disabled'):
-        button.disabled = False
 
-def _update_ui_for_processing_start(ui_components: Dict[str, Any]) -> None:
-    """
-    Update UI saat preprocessing dimulai.
+def setup_main_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol preprocessing dengan stop functionality."""
+    if 'preprocess_button' not in ui_components:
+        return
     
-    Args:
-        ui_components: Dictionary komponen UI
-    """
-    # Disable main button
-    if 'preprocess_button' in ui_components:
-        ui_components['preprocess_button'].disabled = True
+    handler = PreprocessingHandler(ui_components)
+    ui_components['main_handler'] = handler
     
-    # Enable dan tampilkan stop button
-    if 'stop_button' in ui_components:
-        ui_components['stop_button'].disabled = False
-        ui_components['stop_button'].layout.display = 'inline-block'
-    
-    # Disable other buttons
-    buttons_to_disable = ['save_button', 'reset_button', 'cleanup_button']
-    for button_name in buttons_to_disable:
-        if button_name in ui_components and hasattr(ui_components[button_name], 'disabled'):
-            ui_components[button_name].disabled = True
-    
-    # Update status
-    from smartcash.ui.utils.alert_utils import update_status_panel
-    update_status_panel(ui_components['status_panel'], "🚀 Preprocessing sedang berjalan...", "info")
-    
-    # Set flags
-    ui_components['preprocessing_running'] = True
-
-def _handle_preprocessing_success(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
-    """
-    Handle preprocessing yang berhasil.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        result: Hasil preprocessing
-    """
-    # Log hasil
-    total_processed = result.get('processed', 0)
-    total_skipped = result.get('skipped', 0)
-    total_failed = result.get('failed', 0)
-    
-    logger.info(f"✅ Preprocessing berhasil diselesaikan:")
-    logger.info(f"  • Diproses: {total_processed}")
-    logger.info(f"  • Dilewati: {total_skipped}")
-    logger.info(f"  • Gagal: {total_failed}")
-    
-    # Update status panel
-    from smartcash.ui.utils.alert_utils import update_status_panel
-    update_status_panel(
-        ui_components['status_panel'], 
-        f"✅ Preprocessing selesai - {total_processed} file diproses", 
-        "success"
+    ui_components['preprocess_button'].on_click(
+        lambda b: handler.handle_button_click(b)
     )
-    
-    # Reset UI
-    _reset_ui_after_processing(ui_components)
-
-def _handle_preprocessing_error(ui_components: Dict[str, Any], button: Any, error_message: str) -> None:
-    """
-    Handle error saat preprocessing.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        button: Tombol yang perlu di-enable kembali
-        error_message: Pesan error
-    """
-    logger.error(f"❌ Error preprocessing: {error_message}")
-    
-    # Update status panel
-    from smartcash.ui.utils.alert_utils import update_status_panel
-    update_status_panel(ui_components['status_panel'], f"❌ Error: {error_message}", "error")
-    
-    # Re-enable buttons
-    if button and hasattr(button, 'disabled'):
-        button.disabled = False
-    
-    # Reset UI
-    _reset_ui_after_processing(ui_components)
-
-def _reset_ui_after_processing(ui_components: Dict[str, Any]) -> None:
-    """
-    Reset UI setelah preprocessing selesai atau error.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-    """
-    # Enable main button
-    if 'preprocess_button' in ui_components:
-        ui_components['preprocess_button'].disabled = False
-    
-    # Hide dan disable stop button
-    if 'stop_button' in ui_components:
-        ui_components['stop_button'].disabled = True
-        ui_components['stop_button'].layout.display = 'none'
-    
-    # Enable other buttons
-    buttons_to_enable = ['save_button', 'reset_button', 'cleanup_button']
-    for button_name in buttons_to_enable:
-        if button_name in ui_components and hasattr(ui_components[button_name], 'disabled'):
-            ui_components[button_name].disabled = False
-    
-    # Clear progress
-    if 'progress_tracker' in ui_components:
-        ui_components['progress_tracker'].reset()
-    
-    # Reset flags
-    ui_components['preprocessing_running'] = False
-    ui_components['stop_requested'] = False
-    
-    # Clear confirmation area
-    if 'confirmation_area' in ui_components:
-        ui_components['confirmation_area'].clear_output(wait=True)
-        ui_components['confirmation_area'].layout.display = 'none'
-    
-    logger.debug("🔄 UI berhasil direset setelah preprocessing")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Assembly komponen UI utama untuk preprocessing
+Deskripsi: Assembly komponen UI yang disederhanakan untuk preprocessing
 """
 
 import ipywidgets as widgets
@@ -21,12 +21,11 @@ from smartcash.ui.components.sync_info_message import create_sync_info_message
 
 # Import local components
 from .input_options import create_preprocessing_input_options
-from .advanced_options import create_preprocessing_advanced_options
 
 
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Buat komponen UI utama untuk preprocessing dengan integrasi baru.
+    Buat komponen UI yang disederhanakan untuk preprocessing.
     
     Args:
         config: Konfigurasi preprocessing
@@ -37,7 +36,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     # Header
     header = create_header(
         f"{ICONS['processing']} Dataset Preprocessing", 
-        "Preprocessing dataset untuk training model SmartCash dengan integrasi Drive"
+        "Preprocessing dataset untuk training model SmartCash"
     )
     
     # Status panel
@@ -45,61 +44,30 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         "Siap memulai preprocessing dataset", "info"
     )
     
-    # Input options (kolom kiri)
+    # Input options (simplified)
     input_options = create_preprocessing_input_options(config)
     
-    # Advanced options (kolom kanan)
-    advanced_options = create_preprocessing_advanced_options(config)
-    
-    # Layout 2 kolom
-    options_container = widgets.HBox([
-        input_options,
-        advanced_options
-    ], layout=widgets.Layout(width='100%', margin='10px 0'))
-    
-    # Action buttons dengan tombol stop
+    # Action buttons dengan cleanup
     action_buttons = create_action_buttons(
         primary_label="Mulai Preprocessing",
         primary_icon="play",
-        secondary_buttons=[
-            ("Stop", "stop", "warning")
-        ],
+        secondary_buttons=[],
         cleanup_enabled=True
     )
     
-    # Hide stop button initially
-    if 'stop_button' in action_buttons:
-        action_buttons['stop_button'].layout.display = 'none'
-    
     # Save & reset buttons
     save_reset_buttons = create_save_reset_buttons(
-        save_label="Simpan Konfigurasi",
-        reset_label="Reset",
-        save_tooltip="Simpan konfigurasi ke file dan sinkronkan dengan Drive",
-        reset_tooltip="Reset konfigurasi ke nilai default"
+        save_label="Simpan Config",
+        reset_label="Reset"
     )
     
     # Sync info message
     sync_info = create_sync_info_message(
-        message="Konfigurasi dan data preprocessing akan otomatis disinkronkan dengan Google Drive.",
-        icon="cloud",
-        color=COLORS['info']
+        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive.",
+        icon="cloud"
     )
     
-    # Confirmation area untuk dialog
-    confirmation_area = widgets.Output(
-        layout=widgets.Layout(
-            width='100%',
-            margin='15px 0',
-            min_height='30px',
-            display='none',  # Hidden by default
-            border='1px solid #ddd',
-            padding='10px',
-            border_radius='5px'
-        )
-    )
-    
-    # Progress tracking dengan 2-level
+    # Progress tracking
     progress_components = create_progress_tracking(
         module_name='preprocessing',
         show_step_progress=True,
@@ -121,15 +89,14 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     ui = widgets.VBox([
         header,
         status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Konfigurasi Preprocessing</h4>"),
-        options_container,
-        widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Konfigurasi</h4>"),
+        input_options,
+        widgets.HBox([
             save_reset_buttons['container'],
             sync_info['container']
-        ], layout=widgets.Layout(align_items='flex-end', width='100%')),
+        ], layout=widgets.Layout(justify_content='space-between', width='100%')),
         create_divider(),
         action_buttons['container'],
-        confirmation_area,
         progress_components['progress_container'],
         log_components['log_accordion'],
         help_panel
@@ -144,25 +111,14 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         
         # Input components
         'input_options': input_options,
-        'advanced_options': advanced_options,
-        'options_container': options_container,
-        
-        # Individual input widgets (untuk backward compatibility)
-        'preprocess_options': input_options,  # Alias
         'resolution_dropdown': input_options.resolution_dropdown,
-        'normalization_dropdown': input_options.normalization_dropdown,
-        'preserve_aspect_ratio_checkbox': input_options.preserve_aspect_ratio_checkbox,
-        'augmentation_checkbox': input_options.augmentation_checkbox,
-        'force_reprocess_checkbox': input_options.force_reprocess_checkbox,
-        'worker_slider': advanced_options.worker_slider,
-        'split_selector': advanced_options.split_selector,
-        'reverse_split_map': advanced_options.reverse_split_map,
+        'normalization_dropdown': input_options.normalization_dropdown, 
+        'worker_slider': input_options.worker_slider,
+        'split_dropdown': input_options.split_dropdown,
         
         # Action buttons
         'action_buttons': action_buttons,
         'preprocess_button': action_buttons['download_button'],  # Primary button
-        'preprocessing_button': action_buttons['download_button'],  # Alias
-        'stop_button': action_buttons.get('secondary_buttons', [{}])[0] if action_buttons.get('secondary_buttons') else None,
         'cleanup_button': action_buttons['cleanup_button'],
         
         # Save/reset buttons
@@ -171,22 +127,21 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'reset_button': save_reset_buttons['reset_button'],
         
         # UI areas
-        'confirmation_area': confirmation_area,
         'sync_info': sync_info,
         
         # Progress components
         'progress_components': progress_components,
         'progress_container': progress_components['progress_container'],
         'progress_bar': progress_components['progress_bar'],
+        'current_progress': progress_components.get('current_progress'),
         'overall_label': progress_components.get('overall_label'),
         'step_label': progress_components.get('step_label'),
-        'current_progress': progress_components.get('current_progress'),
         
         # Log components
         'log_components': log_components,
         'log_accordion': log_components['log_accordion'],
         'log_output': log_components['log_output'],
-        'status': log_components['log_output'],  # Alias untuk backward compatibility
+        'status': log_components['log_output'],  # Alias
         
         # Module info
         'module_name': 'preprocessing',

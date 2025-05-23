@@ -1,25 +1,26 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/config_manager.py
-Deskripsi: Manajemen konfigurasi untuk UI preprocessing
+Deskripsi: Manajemen konfigurasi untuk UI preprocessing dengan parameter sesuai backend
 """
 
 from typing import Dict, Any
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
-    Update UI components dari konfigurasi dengan integrasi SimpleConfigManager.
+    Update UI components dari konfigurasi dengan parameter sesuai backend.
     
     Args:
         ui_components: Dictionary komponen UI
-        config: Konfigurasi dari SimpleConfigManager
+        config: Konfigurasi dari config manager
     """
     try:
         # Extract preprocessing config
         preprocessing_config = config.get('preprocessing', {})
         
         # Update resolution
-        img_size = preprocessing_config.get('img_size', (640, 640))
+        img_size = preprocessing_config.get('img_size', DEFAULT_IMG_SIZE)
         if isinstance(img_size, (list, tuple)) and len(img_size) == 2:
             resolution_str = f"{img_size[0]}x{img_size[1]}"
             if 'resolution_dropdown' in ui_components:
@@ -34,31 +35,16 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
             if normalization in dropdown.options:
                 dropdown.value = normalization
         
-        # Update checkboxes
-        checkbox_mappings = {
-            'preserve_aspect_ratio_checkbox': preprocessing_config.get('preserve_aspect_ratio', True),
-            'augmentation_checkbox': preprocessing_config.get('augmentation', False),
-            'force_reprocess_checkbox': preprocessing_config.get('force_reprocess', False)
-        }
-        
-        for checkbox_name, value in checkbox_mappings.items():
-            if checkbox_name in ui_components:
-                ui_components[checkbox_name].value = value
-        
         # Update worker slider
         if 'worker_slider' in ui_components:
-            num_workers = preprocessing_config.get('num_workers', 1)
-            ui_components['worker_slider'].value = min(max(num_workers, 1), 4)  # Colab safe
+            num_workers = preprocessing_config.get('num_workers', 4)
+            ui_components['worker_slider'].value = min(max(num_workers, 1), 10)
         
-        # Update split selector
-        if 'split_selector' in ui_components and 'reverse_split_map' in ui_components:
+        # Update split dropdown
+        if 'split_dropdown' in ui_components:
             split = preprocessing_config.get('split', 'all')
-            split_map = {'all': 'Semua Split', 'train': 'Training', 'val': 'Validasi', 'test': 'Testing'}
-            display_value = split_map.get(split, 'Semua Split')
-            
-            dropdown = ui_components['split_selector']
-            if display_value in dropdown.options:
-                dropdown.value = display_value
+            if split in ui_components['split_dropdown'].options:
+                ui_components['split_dropdown'].value = split
         
     except Exception as e:
         from smartcash.common.logger import get_logger
@@ -68,16 +54,30 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
 
 def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extract konfigurasi dari UI components untuk SimpleConfigManager.
+    Extract konfigurasi dari UI components untuk backend preprocessing.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        Dict[str, Any]: Konfigurasi preprocessing
+        Dict[str, Any]: Konfigurasi preprocessing sesuai backend
     """
+    # Base config dengan default values sesuai backend
     config = {
-        'preprocessing': {}
+        'preprocessing': {
+            'img_size': DEFAULT_IMG_SIZE,
+            'normalization': 'minmax',
+            'normalize': True,
+            'preserve_aspect_ratio': True,  # Fixed True
+            'augmentation': False,  # Fixed False  
+            'force_reprocess': True,  # Fixed True
+            'num_workers': 4,
+            'split': 'all',
+            'output_dir': 'data/preprocessed'
+        },
+        'data': {
+            'dir': 'data'
+        }
     }
     
     try:
@@ -90,30 +90,23 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 width, height = map(int, resolution_str.split('x'))
                 preprocessing_config['img_size'] = (width, height)
         
-        # Extract other options
-        option_mappings = {
-            'normalization_dropdown': ('normalization', 'minmax'),
-            'preserve_aspect_ratio_checkbox': ('preserve_aspect_ratio', True),
-            'augmentation_checkbox': ('augmentation', False),
-            'force_reprocess_checkbox': ('force_reprocess', False),
-            'worker_slider': ('num_workers', 1)
-        }
+        # Extract normalization
+        if 'normalization_dropdown' in ui_components:
+            normalization = ui_components['normalization_dropdown'].value
+            preprocessing_config['normalization'] = normalization
+            preprocessing_config['normalize'] = normalization != 'none'
         
-        for ui_key, (config_key, default_value) in option_mappings.items():
-            if ui_key in ui_components:
-                preprocessing_config[config_key] = ui_components[ui_key].value
-            else:
-                preprocessing_config[config_key] = default_value
+        # Extract worker count
+        if 'worker_slider' in ui_components:
+            preprocessing_config['num_workers'] = ui_components['worker_slider'].value
         
         # Extract split
-        if 'split_selector' in ui_components and 'reverse_split_map' in ui_components:
-            display_value = ui_components['split_selector'].value
-            reverse_map = ui_components['reverse_split_map']
-            preprocessing_config['split'] = reverse_map.get(display_value, 'all')
+        if 'split_dropdown' in ui_components:
+            preprocessing_config['split'] = ui_components['split_dropdown'].value
         
-        # Add paths
+        # Update paths dari UI components
         preprocessing_config['output_dir'] = ui_components.get('preprocessed_dir', 'data/preprocessed')
-        config['data'] = {'dir': ui_components.get('data_dir', 'data')}
+        config['data']['dir'] = ui_components.get('data_dir', 'data')
         
     except Exception as e:
         from smartcash.common.logger import get_logger

@@ -1,190 +1,127 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_handler.py
-Deskripsi: Handler untuk operasi konfigurasi preprocessing yang disederhanakan
+Deskripsi: Handler untuk operasi konfigurasi preprocessing dengan save/reset dan sinkronisasi
 """
 
 from typing import Dict, Any
-from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import get_config_manager
-from smartcash.ui.dataset.preprocessing.components.config_manager import (
-    get_config_from_ui, update_ui_from_config
-)
-from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
+from smartcash.ui.components.status_panel import update_status_panel
 
-class ConfigHandler:
-    """Handler untuk operasi konfigurasi preprocessing."""
+
+def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Setup handlers untuk operasi konfigurasi preprocessing."""
+    logger = ui_components.get('logger')
+    config_manager = ui_components.get('config_manager')
     
-    def __init__(self, ui_components: Dict[str, Any]):
-        """Inisialisasi config handler."""
-        self.ui_components = ui_components
-        self.logger = get_logger('smartcash.ui.dataset.preprocessing.config')
-        self.config_manager = get_config_manager()
-    
-    def handle_save_click(self, button: Any) -> None:
-        """Handler untuk tombol save konfigurasi."""
-        button.disabled = True
+    def _get_current_config() -> Dict[str, Any]:
+        """Ambil konfigurasi saat ini dari UI components."""
+        resolution = ui_components['resolution_dropdown'].value.split('x')
         
-        try:
-            self.logger.info("💾 Menyimpan konfigurasi preprocessing...")
-            self._update_status("info", "Menyimpan konfigurasi...")
-            
-            # Extract dan save config
-            config = get_config_from_ui(self.ui_components)
-            success = self._save_config(config)
-            
-            if success:
-                self.logger.success("✅ Konfigurasi berhasil disimpan")
-                self._update_status("success", "Konfigurasi berhasil disimpan")
-            else:
-                raise Exception("Gagal menyimpan konfigurasi")
-                
-        except Exception as e:
-            error_msg = f"Error save konfigurasi: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self._update_status("error", error_msg)
-        finally:
-            button.disabled = False
-    
-    def handle_reset_click(self, button: Any) -> None:
-        """Handler untuk tombol reset konfigurasi."""
-        button.disabled = True
-        
-        try:
-            self.logger.info("🔄 Reset konfigurasi ke default...")
-            self._update_status("info", "Reset ke default...")
-            
-            # Reset UI ke default
-            self._reset_ui_to_defaults()
-            
-            # Save default config
-            default_config = self._get_default_config()
-            success = self._save_config(default_config)
-            
-            if success:
-                self.logger.success("✅ Konfigurasi direset ke default")
-                self._update_status("success", "Konfigurasi direset ke default")
-            else:
-                self.logger.warning("⚠️ UI direset tapi gagal simpan ke file")
-                
-        except Exception as e:
-            error_msg = f"Error reset konfigurasi: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self._update_status("error", error_msg)
-        finally:
-            button.disabled = False
-    
-    def load_config_to_ui(self) -> bool:
-        """Load konfigurasi dari file ke UI."""
-        try:
-            self.logger.info("📂 Memuat konfigurasi...")
-            
-            # Load config dari manager
-            full_config = self.config_manager.get_config()
-            
-            # Update UI
-            update_ui_from_config(self.ui_components, full_config)
-            
-            self.logger.success("✅ Konfigurasi berhasil dimuat")
-            return True
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Gagal load config: {str(e)}, gunakan default")
-            self._reset_ui_to_defaults()
-            return False
-    
-    def _save_config(self, config: Dict[str, Any]) -> bool:
-        """Simpan konfigurasi ke file."""
-        try:
-            # Load existing config
-            current_config = self.config_manager.get_config()
-            
-            # Update preprocessing section
-            if 'preprocessing' not in current_config:
-                current_config['preprocessing'] = {}
-            
-            current_config['preprocessing'].update(config.get('preprocessing', {}))
-            
-            # Update data section
-            if 'data' not in current_config:
-                current_config['data'] = {}
-            
-            current_config['data'].update(config.get('data', {}))
-            
-            # Save to manager
-            return self.config_manager.save_config(current_config)
-            
-        except Exception as e:
-            self.logger.error(f"❌ Error save config: {str(e)}")
-            return False
-    
-    def _get_default_config(self) -> Dict[str, Any]:
-        """Dapatkan konfigurasi default."""
         return {
             'preprocessing': {
-                'img_size': DEFAULT_IMG_SIZE,
-                'normalization': 'minmax',
-                'normalize': True,
-                'preserve_aspect_ratio': True,
-                'augmentation': False,
-                'force_reprocess': True,
-                'num_workers': 4,
-                'split': 'all',
-                'output_dir': 'data/preprocessed'
-            },
-            'data': {
-                'dir': 'data'
+                'img_size': [int(resolution[0]), int(resolution[1])],
+                'normalization': ui_components['normalization_dropdown'].value,
+                'num_workers': ui_components['worker_slider'].value,
+                'split': ui_components['split_dropdown'].value,
+                'normalize': ui_components['normalization_dropdown'].value != 'none',
+                'preserve_aspect_ratio': True
             }
         }
     
-    def _reset_ui_to_defaults(self) -> None:
-        """Reset UI ke nilai default."""
+    def _apply_config_to_ui(config: Dict[str, Any]):
+        """Terapkan konfigurasi ke UI components."""
+        preprocessing_config = config.get('preprocessing', {})
+        
+        # Resolution
+        img_size = preprocessing_config.get('img_size', [640, 640])
+        if isinstance(img_size, (list, tuple)) and len(img_size) == 2:
+            resolution_str = f"{img_size[0]}x{img_size[1]}"
+            if resolution_str in ui_components['resolution_dropdown'].options:
+                ui_components['resolution_dropdown'].value = resolution_str
+        
+        # Normalization
+        normalization = preprocessing_config.get('normalization', 'minmax')
+        if normalization in ui_components['normalization_dropdown'].options:
+            ui_components['normalization_dropdown'].value = normalization
+        
+        # Workers
+        num_workers = preprocessing_config.get('num_workers', 4)
+        ui_components['worker_slider'].value = max(1, min(num_workers, 10))
+        
+        # Split
+        split = preprocessing_config.get('split', 'all')
+        if split in ui_components['split_dropdown'].options:
+            ui_components['split_dropdown'].value = split
+    
+    def _on_save_click(b):
+        """Handler untuk tombol save konfigurasi."""
         try:
-            # Reset resolution dropdown
-            if 'resolution_dropdown' in self.ui_components:
-                self.ui_components['resolution_dropdown'].value = '640x640'
+            if not config_manager:
+                logger.error("❌ Config manager tidak tersedia")
+                return
             
-            # Reset normalization dropdown
-            if 'normalization_dropdown' in self.ui_components:
-                self.ui_components['normalization_dropdown'].value = 'minmax'
+            current_config = _get_current_config()
             
-            # Reset worker slider
-            if 'worker_slider' in self.ui_components:
-                self.ui_components['worker_slider'].value = 4
+            # Save ke config manager
+            success = config_manager.save_config(current_config, 'preprocessing')
             
-            # Reset split dropdown
-            if 'split_dropdown' in self.ui_components:
-                self.ui_components['split_dropdown'].value = 'all'
+            if success:
+                logger.success("💾 Konfigurasi preprocessing berhasil disimpan")
+                update_status_panel(ui_components['status_panel'], 
+                                  "Konfigurasi preprocessing berhasil disimpan", "success")
+            else:
+                logger.error("❌ Gagal menyimpan konfigurasi")
+                update_status_panel(ui_components['status_panel'], 
+                                  "Gagal menyimpan konfigurasi", "error")
                 
         except Exception as e:
-            self.logger.warning(f"⚠️ Error reset UI: {str(e)}")
+            logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+            update_status_panel(ui_components['status_panel'], 
+                              f"Error menyimpan konfigurasi: {str(e)}", "error")
     
-    def _update_status(self, status: str, message: str) -> None:
-        """Update status panel."""
-        if 'status_panel' in self.ui_components:
-            try:
-                from smartcash.ui.components.status_panel import update_status_panel
-                update_status_panel(self.ui_components['status_panel'], message, status)
-            except ImportError:
-                self.ui_components['status_panel'].value = f"<div class='alert alert-{status}'>{message}</div>"
-
-
-def setup_config_handlers(ui_components: Dict[str, Any]) -> None:
-    """Setup config handlers untuk save dan reset buttons."""
-    # Create config handler
-    config_handler = ConfigHandler(ui_components)
-    ui_components['config_handler'] = config_handler
+    def _on_reset_click(b):
+        """Handler untuk tombol reset konfigurasi."""
+        try:
+            if not config_manager:
+                logger.error("❌ Config manager tidak tersedia")
+                return
+            
+            # Load config dari file
+            saved_config = config_manager.load_config('preprocessing')
+            
+            if saved_config:
+                _apply_config_to_ui(saved_config)
+                logger.success("🔄 Konfigurasi berhasil direset")
+                update_status_panel(ui_components['status_panel'], 
+                                  "Konfigurasi berhasil direset", "success")
+            else:
+                # Reset ke default
+                default_config = {
+                    'preprocessing': {
+                        'img_size': [640, 640],
+                        'normalization': 'minmax',
+                        'num_workers': 4,
+                        'split': 'all'
+                    }
+                }
+                _apply_config_to_ui(default_config)
+                logger.info("🔄 Konfigurasi direset ke default")
+                update_status_panel(ui_components['status_panel'], 
+                                  "Konfigurasi direset ke default", "info")
+                
+        except Exception as e:
+            logger.error(f"❌ Error saat reset konfigurasi: {str(e)}")
+            update_status_panel(ui_components['status_panel'], 
+                              f"Error reset konfigurasi: {str(e)}", "error")
     
-    # Setup save button
-    if 'save_button' in ui_components:
-        ui_components['save_button'].on_click(
-            lambda b: config_handler.handle_save_click(b)
-        )
+    # Setup event handlers
+    ui_components['save_button'].on_click(_on_save_click)
+    ui_components['reset_button'].on_click(_on_reset_click)
     
-    # Setup reset button
-    if 'reset_button' in ui_components:
-        ui_components['reset_button'].on_click(
-            lambda b: config_handler.handle_reset_click(b)
-        )
+    # Apply initial config
+    if config:
+        _apply_config_to_ui(config)
     
-    # Load config awal
-    config_handler.load_config_to_ui()
+    if logger:
+        logger.debug("✅ Config handler preprocessing setup selesai")
+    
+    return ui_components

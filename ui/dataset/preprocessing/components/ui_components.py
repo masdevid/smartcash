@@ -91,10 +91,10 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Konfigurasi</h4>"),
         input_options,
-        widgets.HBox([
+        widgets.VBox([
             save_reset_buttons['container'],
             sync_info['container']
-        ], layout=widgets.Layout(justify_content='space-between', width='100%')),
+        ], layout=widgets.Layout(align_items='flex-end', width='100%')),
         create_divider(),
         action_buttons['container'],
         progress_components['progress_container'],

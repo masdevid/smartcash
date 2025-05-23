@@ -1,11 +1,12 @@
 """
 File: smartcash/dataset/services/preprocessor/preprocessing_service.py
-Deskripsi: Layanan preprocessing dataset dengan integrasi observer pattern
+Deskripsi: Layanan preprocessing dataset dengan integrasi observer pattern dan UI progress notifications
 """
 
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, Callable
+
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
 from smartcash.common.config import ConfigManager, get_config_manager
@@ -13,20 +14,20 @@ from smartcash.dataset.services.preprocessor.dataset_preprocessor import Dataset
 from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_PREPROCESSED_DIR
 
 class PreprocessingService:
-    """Layanan preprocessing dataset dengan integrasi observer pattern."""
+    """Layanan preprocessing dataset dengan integrasi UI progress notifications."""
     
-    def __init__(self, config: Dict[str, Any], logger=None, observer_manager=None):
+    def __init__(self, config: Dict[str, Any], logger=None, progress_callback=None):
         """
         Inisialisasi PreprocessingService.
         
         Args:
             config: Konfigurasi preprocessing
             logger: Logger untuk logging
-            observer_manager: Observer manager untuk UI notifications
+            progress_callback: Callback untuk UI progress notifications
         """
         self.config = config
         self.logger = logger or get_logger(__name__)
-        self.observer_manager = observer_manager
+        self.progress_callback = progress_callback
         self.config_manager = get_config_manager()
         
         # Validasi base directory
@@ -45,14 +46,29 @@ class PreprocessingService:
         # Initialize preprocessor
         self._preprocessor = None
         
-        # Log initialization
-        self.logger.info(f"✅ PreprocessingService diinisialisasi:")
-        self.logger.info(f"  - Base dir: {self.base_dir}")
-        self.logger.info(f"  - Preprocessed dir: {self.preprocessed_dir}")
+        # Setup suppressed logging untuk prevent console leaks
+        self._setup_suppressed_logging()
+    
+    def _setup_suppressed_logging(self):
+        """Setup logging yang disuppress untuk prevent console output."""
+        import logging
+        
+        # Suppress semua logging dari preprocessing ke console
+        preprocessing_loggers = [
+            'smartcash.dataset.services.preprocessor',
+            'smartcash.dataset.utils',
+            'cv2',
+            'PIL'
+        ]
+        
+        for logger_name in preprocessing_loggers:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(logging.CRITICAL)
+            logger.propagate = False
     
     @property
     def preprocessor(self) -> DatasetPreprocessor:
-        """Lazy initialization of preprocessor."""
+        """Lazy initialization of preprocessor dengan UI progress callback."""
         if self._preprocessor is None:
             # Get config from config manager
             config = self.config_manager.get_config()
@@ -78,29 +94,15 @@ class PreprocessingService:
                 logger=self.logger
             )
             
-            # Register progress callback if observer manager exists
-            if self.observer_manager:
-                self._preprocessor.register_progress_callback(
-                    lambda **kwargs: self._notify_progress(**kwargs)
-                )
+            # Register progress callback untuk UI notifications
+            if self.progress_callback:
+                self._preprocessor.register_progress_callback(self.progress_callback)
         
         return self._preprocessor
     
-    def _notify_progress(self, **kwargs):
-        """Notify progress through observer manager."""
-        if self.observer_manager:
-            from smartcash.dataset.services.downloader.notification_utils import notify_service_event
-            notify_service_event(
-                "preprocessing",
-                "progress",
-                self,
-                self.observer_manager,
-                **kwargs
-            )
-    
     def preprocess_dataset(self, split: str = 'all', force_reprocess: bool = False, **kwargs) -> Dict[str, Any]:
         """
-        Preprocess dataset dan simpan hasilnya.
+        Preprocess dataset dan simpan hasilnya dengan UI progress notifications.
         
         Args:
             split: Split dataset ('train', 'val', 'test', 'all')
@@ -111,15 +113,19 @@ class PreprocessingService:
             Dict: Statistik hasil preprocessing
         """
         try:
-            # Get latest config
-            config = self.config_manager.get_config()
-            
-            # Notify start
-            if self.observer_manager:
-                self._notify_progress(
+            # Notify start melalui progress callback
+            if self.progress_callback:
+                self.progress_callback(
+                    progress=0,
+                    total=100,
                     message=f"Memulai preprocessing dataset {split}",
-                    step="start"
+                    status="info",
+                    step=0,
+                    split_step="Persiapan"
                 )
+            
+            # Force disable show_progress untuk prevent tqdm
+            kwargs['show_progress'] = False
             
             # Get preprocessor and run preprocessing
             result = self.preprocessor.preprocess_dataset(
@@ -128,30 +134,47 @@ class PreprocessingService:
                 **kwargs
             )
             
-            # Notify completion
-            if self.observer_manager:
-                self._notify_progress(
-                    message=f"Preprocessing dataset {split} selesai",
-                    step="complete",
-                    result=result
+            # Notify completion melalui progress callback
+            if self.progress_callback and result:
+                total_images = result.get('total_images', 0)
+                processing_time = result.get('processing_time', 0)
+                
+                self.progress_callback(
+                    progress=100,
+                    total=100,
+                    message=f"Preprocessing selesai: {total_images} gambar dalam {processing_time:.1f} detik",
+                    status="success",
+                    step=3,
+                    split_step="Selesai"
                 )
             
             return result
             
         except Exception as e:
             error_msg = f"Error saat preprocessing dataset: {str(e)}"
-            self.logger.error(error_msg)
             
-            # Notify error
-            if self.observer_manager:
-                self._notify_progress(
+            # Notify error melalui progress callback
+            if self.progress_callback:
+                self.progress_callback(
+                    progress=0,
+                    total=100,
                     message=error_msg,
-                    step="error"
+                    status="error",
+                    step=0,
+                    split_step="Error"
                 )
             
             raise DatasetError(error_msg)
     
+    def register_progress_callback(self, callback: Callable):
+        """Register progress callback untuk UI notifications."""
+        self.progress_callback = callback
+        
+        # Register ke preprocessor jika sudah ada
+        if self._preprocessor:
+            self._preprocessor.register_progress_callback(callback)
+    
     def cleanup(self):
         """Cleanup resources."""
         self._preprocessor = None
-        self.observer_manager = None 
+        self.progress_callback = None

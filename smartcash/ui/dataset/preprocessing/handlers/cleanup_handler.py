@@ -1,196 +1,212 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/cleanup_handler.py
-Deskripsi: Handler untuk operasi cleanup data preprocessing yang disederhanakan
+Deskripsi: Handler untuk operasi cleanup preprocessing dengan safety checks dan confirmation
 """
 
-import shutil
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any
-from concurrent.futures import ThreadPoolExecutor, Future
-from smartcash.common.logger import get_logger
+from pathlib import Path
 
-class CleanupHandler:
-    """Handler untuk operasi cleanup preprocessing."""
+from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
+from smartcash.ui.components.status_panel import update_status_panel
+
+
+def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Setup handler untuk operasi cleanup preprocessing."""
+    logger = ui_components.get('logger')
     
-    def __init__(self, ui_components: Dict[str, Any]):
-        """Inisialisasi cleanup handler."""
-        self.ui_components = ui_components
-        self.logger = get_logger('smartcash.ui.dataset.preprocessing.cleanup')
-        self.executor = ThreadPoolExecutor(max_workers=1)
-        self.current_future: Future = None
-        
-    def handle_cleanup_click(self, button: Any) -> None:
-        """Handler untuk tombol cleanup."""
-        button.disabled = True
-        
-        try:
-            self.logger.info("🧹 Memulai cleanup data preprocessing")
-            
-            # Cek data yang akan dihapus
-            cleanup_info = self._get_cleanup_info()
-            
-            if cleanup_info['total_files'] == 0:
-                self._handle_no_data(button)
-                return
-            
-            # Konfirmasi cleanup
-            self._show_confirmation(cleanup_info, button)
-            
-        except Exception as e:
-            self._handle_error(f"Error persiapan cleanup: {str(e)}", button)
+    ui_components['cleanup_running'] = False
     
-    def _get_cleanup_info(self) -> Dict[str, Any]:
-        """Dapatkan info data yang akan dibersihkan."""
-        preprocessed_dir = Path(self.ui_components.get('preprocessed_dir', 'data/preprocessed'))
-        
-        info = {
-            'total_files': 0,
-            'total_size_mb': 0,
-            'directories': []
-        }
+    def _check_preprocessed_data() -> tuple[bool, list, str]:
+        """Check data preprocessing yang tersedia."""
+        preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
         
         if not preprocessed_dir.exists():
-            return info
+            return False, [], "Tidak ada data preprocessing yang ditemukan"
         
-        # Hitung files dan directories
-        for item in preprocessed_dir.rglob('*'):
-            if item.is_file():
-                info['total_files'] += 1
+        # Check splits
+        available_splits = []
+        total_files = 0
+        
+        for split in ['train', 'val', 'test']:
+            split_path = preprocessed_dir / split
+            if split_path.exists():
+                files = list(split_path.glob('**/*.jpg'))
+                if files:
+                    available_splits.append(f"{split} ({len(files)} files)")
+                    total_files += len(files)
+        
+        if not available_splits:
+            return False, [], "Tidak ada data preprocessing yang valid"
+        
+        return True, available_splits, f"Total {total_files} files"
+    
+    def _check_symlink_safety() -> tuple[bool, list]:
+        """Check apakah ada symlink yang berbahaya untuk dihapus."""
+        preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
+        dangerous_symlinks = []
+        
+        if preprocessed_dir.is_symlink():
+            dangerous_symlinks.append(str(preprocessed_dir))
+        
+        # Check subdirectories
+        if preprocessed_dir.exists():
+            for split in ['train', 'val', 'test']:
+                split_path = preprocessed_dir / split
+                if split_path.is_symlink():
+                    dangerous_symlinks.append(str(split_path))
+        
+        return len(dangerous_symlinks) == 0, dangerous_symlinks
+    
+    def _on_cleanup_click(b):
+        """Handler untuk tombol cleanup."""
+        if ui_components['cleanup_running']:
+            logger.warning("⚠️ Cleanup sedang berjalan")
+            return
+        
+        if ui_components.get('processing_running', False):
+            logger.warning("⚠️ Tidak dapat cleanup saat preprocessing berjalan")
+            return
+        
+        # Check data exists
+        has_data, splits_info, summary = _check_preprocessed_data()
+        if not has_data:
+            logger.info(f"ℹ️ {summary}")
+            update_status_panel(ui_components['status_panel'], summary, "info")
+            return
+        
+        # Check symlink safety
+        is_safe, dangerous_links = _check_symlink_safety()
+        if not is_safe:
+            logger.error(f"❌ Tidak dapat cleanup: symlink berbahaya ditemukan: {', '.join(dangerous_links)}")
+            return
+        
+        # Show confirmation dialog
+        splits_text = '\n'.join([f"• {split}" for split in splits_info])
+        confirmation_msg = f"""Akan menghapus data preprocessing berikut:
+
+{splits_text}
+
+{summary}
+
+⚠️ Aksi ini tidak dapat dibatalkan!"""
+        
+        dialog = create_destructive_confirmation(
+            title="Konfirmasi Cleanup Preprocessing",
+            message=confirmation_msg,
+            on_confirm=lambda b: _start_cleanup_confirmed(),
+            on_cancel=lambda b: _hide_dialog(),
+            item_name="Data Preprocessing"
+        )
+        
+        ui_components['cleanup_dialog'] = dialog
+        _show_dialog(dialog)
+    
+    def _start_cleanup_confirmed():
+        """Mulai cleanup setelah konfirmasi."""
+        if 'cleanup_dialog' in ui_components:
+            _hide_dialog()
+        
+        ui_components['cleanup_running'] = True
+        
+        # Disable button dan update status
+        ui_components['cleanup_button'].disabled = True
+        ui_components['cleanup_button'].description = "Cleaning..."
+        
+        logger.info("🧹 Memulai cleanup data preprocessing")
+        update_status_panel(ui_components['status_panel'], "Memulai cleanup data preprocessing...", "info")
+        
+        # Start cleanup dalam thread
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(_run_cleanup)
+        ui_components['cleanup_future'] = future
+        ui_components['cleanup_executor'] = executor
+        
+        # Monitor completion
+        def check_completion():
+            if future.done():
                 try:
-                    info['total_size_mb'] += item.stat().st_size / (1024 * 1024)
-                except:
-                    pass
-            elif item.is_dir():
-                info['directories'].append(str(item.relative_to(preprocessed_dir)))
+                    result = future.result()
+                    _on_cleanup_complete(result)
+                except Exception as e:
+                    _on_cleanup_error(e)
+                finally:
+                    executor.shutdown(wait=False)
+            else:
+                # Check again in 1 second
+                import threading
+                threading.Timer(1.0, check_completion).start()
         
-        return info
+        check_completion()
     
-    def _handle_no_data(self, button: Any) -> None:
-        """Handle tidak ada data untuk cleanup."""
-        self.logger.info("ℹ️ Tidak ada data preprocessing untuk dihapus")
-        self._update_status("info", "Tidak ada data preprocessing ditemukan")
-        button.disabled = False
-    
-    def _show_confirmation(self, cleanup_info: Dict[str, Any], button: Any) -> None:
-        """Tampilkan konfirmasi cleanup."""
-        message = self._format_confirmation_message(cleanup_info)
-        
-        def on_confirm():
-            self.logger.info("✅ Konfirmasi cleanup diterima")
-            self._execute_cleanup(cleanup_info)
-        
-        def on_cancel():
-            self.logger.info("❌ Cleanup dibatalkan")
-            self._update_status("info", "Cleanup dibatalkan")
-            button.disabled = False
-        
-        # Tampilkan dialog sederhana via log
-        self.logger.info(f"🗑️ KONFIRMASI CLEANUP:")
-        self.logger.info(message)
-        self.logger.info("Ketik 'y' untuk lanjut atau 'n' untuk batal di cell berikutnya")
-        
-        # Auto-execute untuk demo (dalam implementasi nyata bisa pakai dialog)
-        on_confirm()
-    
-    def _format_confirmation_message(self, cleanup_info: Dict[str, Any]) -> str:
-        """Format pesan konfirmasi."""
-        total_files = cleanup_info['total_files']
-        total_size = cleanup_info['total_size_mb']
-        
-        message = f"Data yang akan dihapus:\n"
-        message += f"• {total_files:,} file preprocessing\n"
-        message += f"• {total_size:.1f} MB total ukuran\n"
-        message += f"• {len(cleanup_info['directories'])} direktori"
-        
-        return message
-    
-    def _execute_cleanup(self, cleanup_info: Dict[str, Any]) -> None:
-        """Eksekusi cleanup secara async."""
-        self._update_status("warning", "Menghapus data preprocessing...")
-        
-        # Submit cleanup task
-        self.current_future = self.executor.submit(self._run_cleanup)
-        self.current_future.add_done_callback(self._on_cleanup_complete)
-    
-    def _run_cleanup(self) -> Dict[str, Any]:
-        """Run cleanup di background."""
+    def _run_cleanup():
+        """Jalankan cleanup dalam thread terpisah."""
         try:
-            preprocessed_dir = Path(self.ui_components.get('preprocessed_dir', 'data/preprocessed'))
+            # Get preprocessing manager
+            if not ui_components.get('preprocessing_manager'):
+                from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
+                config = {
+                    'preprocessing': {
+                        'preprocessed_dir': ui_components.get('preprocessed_dir', 'data/preprocessed')
+                    },
+                    'data': {'dir': ui_components.get('data_dir', 'data')}
+                }
+                ui_components['preprocessing_manager'] = PreprocessingManager(config, logger)
             
-            if not preprocessed_dir.exists():
-                return {'deleted_files': 0, 'success': True}
+            preprocessing_manager = ui_components['preprocessing_manager']
             
-            # Hitung files sebelum hapus
-            file_count = len(list(preprocessed_dir.rglob('*')))
+            # Clean all preprocessed data
+            preprocessing_manager.clean_preprocessed(split='all')
             
-            # Hapus direktori
-            shutil.rmtree(preprocessed_dir)
-            
-            self.logger.info(f"🗑️ Berhasil hapus {file_count} file/direktori")
-            
-            return {
-                'deleted_files': file_count,
-                'success': True
-            }
+            return {'success': True, 'message': 'Cleanup berhasil'}
             
         except Exception as e:
-            self.logger.error(f"❌ Error cleanup: {str(e)}")
+            logger.error(f"❌ Error cleanup: {str(e)}")
             raise
     
-    def _on_cleanup_complete(self, future: Future) -> None:
-        """Callback saat cleanup selesai."""
-        try:
-            result = future.result()
-            self._handle_cleanup_success(result)
-        except Exception as e:
-            self._handle_error(f"Error cleanup: {str(e)}")
-        finally:
-            self._reset_ui()
-    
-    def _handle_cleanup_success(self, result: Dict[str, Any]) -> None:
-        """Handle cleanup berhasil."""
-        deleted_count = result.get('deleted_files', 0)
+    def _on_cleanup_complete(result):
+        """Handler saat cleanup selesai."""
+        ui_components['cleanup_running'] = False
+        ui_components['cleanup_button'].disabled = False
+        ui_components['cleanup_button'].description = "Cleanup Dataset"
         
-        success_message = f"✅ Cleanup berhasil! {deleted_count} item telah dihapus"
+        if result and result.get('success', False):
+            success_msg = "✅ Cleanup data preprocessing berhasil"
+            logger.success(success_msg)
+            update_status_panel(ui_components['status_panel'], success_msg, "success")
+        else:
+            error_msg = "❌ Cleanup gagal"
+            logger.error(error_msg)
+            update_status_panel(ui_components['status_panel'], error_msg, "error")
+    
+    def _on_cleanup_error(error):
+        """Handler saat cleanup error."""
+        ui_components['cleanup_running'] = False
+        ui_components['cleanup_button'].disabled = False
+        ui_components['cleanup_button'].description = "Cleanup Dataset"
         
-        self.logger.success(success_message)
-        self._update_status("success", success_message)
+        error_msg = f"❌ Error cleanup: {str(error)}"
+        logger.error(error_msg)
+        update_status_panel(ui_components['status_panel'], error_msg, "error")
     
-    def _handle_error(self, error_message: str, button: Any = None) -> None:
-        """Handle error cleanup."""
-        self.logger.error(f"❌ {error_message}")
-        self._update_status("error", f"Error: {error_message}")
-        
-        if button:
-            button.disabled = False
+    def _show_dialog(dialog):
+        """Show confirmation dialog."""
+        from IPython.display import display
+        display(dialog)
     
-    def _reset_ui(self) -> None:
-        """Reset UI setelah cleanup."""
-        # Enable semua buttons
-        for button_name in ['preprocess_button', 'save_button', 'reset_button', 'cleanup_button']:
-            if button_name in self.ui_components:
-                self.ui_components[button_name].disabled = False
-    
-    def _update_status(self, status: str, message: str) -> None:
-        """Update status panel."""
-        if 'status_panel' in self.ui_components:
+    def _hide_dialog():
+        """Hide confirmation dialog."""
+        if 'cleanup_dialog' in ui_components:
             try:
-                from smartcash.ui.components.status_panel import update_status_panel
-                update_status_panel(self.ui_components['status_panel'], message, status)
-            except ImportError:
-                self.ui_components['status_panel'].value = f"<div class='alert alert-{status}'>{message}</div>"
-
-
-def setup_cleanup_handler(ui_components: Dict[str, Any]) -> None:
-    """Setup handler untuk cleanup button."""
-    if 'cleanup_button' not in ui_components:
-        return
+                ui_components['cleanup_dialog'].close()
+            except:
+                pass
+            del ui_components['cleanup_dialog']
     
-    # Create handler
-    handler = CleanupHandler(ui_components)
-    ui_components['cleanup_handler'] = handler
+    # Setup event handlers
+    ui_components['cleanup_button'].on_click(_on_cleanup_click)
     
-    # Setup button click
-    ui_components['cleanup_button'].on_click(
-        lambda b: handler.handle_cleanup_click(b)
-    )
+    if logger:
+        logger.debug("✅ Cleanup handler preprocessing setup selesai")
+    
+    return ui_components

@@ -109,11 +109,11 @@ def _initialize_core_services(env, config, logger) -> Dict[str, Any]:
 def _create_ui_components(ui_components: Dict[str, Any], logger) -> Dict[str, Any]:
     """Buat komponen UI menggunakan components yang sudah direfactor."""
     try:
-        from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_ui_components
+        from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
         
         # Buat UI components dengan config yang ada
         config = ui_components.get('config', {})
-        ui_components.update(create_preprocessing_ui_components(config))
+        ui_components.update(create_preprocessing_main_ui(config))
         
         logger.info(f"[{MODULE_LOGGER_NAME}] 🎨 UI components berhasil dibuat")
         

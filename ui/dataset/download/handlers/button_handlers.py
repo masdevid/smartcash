@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/button_handlers.py
-Deskripsi: Fixed button handlers dengan TypeError resolution dan progress callback yang proper
+Deskripsi: Fixed button handlers dengan TypeError resolution yang tepat
 """
 
 from typing import Dict, Any
@@ -130,13 +130,10 @@ def _setup_save_handler(ui_components: Dict[str, Any], env=None) -> None:
 def _safe_setup_handler(button, handler_func) -> None:
     """Safely setup handler dengan fixed TypeError resolution."""
     try:
-        # Clear existing handlers properly
+        # Clear existing handlers properly - FIXED: tidak memanggil list sebagai function
         if hasattr(button, '_click_handlers'):
-            # Fix: Handle list properly instead of calling it
             if isinstance(button._click_handlers, list):
-                button._click_handlers.clear()
-            elif hasattr(button._click_handlers, 'clear'):
-                button._click_handlers.clear()
+                button._click_handlers.clear()  # Method call, bukan function call
             else:
                 button._click_handlers = []
         
@@ -144,12 +141,12 @@ def _safe_setup_handler(button, handler_func) -> None:
         button.on_click(handler_func)
         
     except Exception:
-        # Ultimate fallback - create new list
+        # Fallback - create new list
         try:
             button._click_handlers = []
             button.on_click(handler_func)
         except Exception:
-            pass  # Give up gracefully
+            pass
 
 def _safe_enable_button(button) -> None:
     """Safely enable button dengan error handling."""
@@ -166,15 +163,3 @@ def _ensure_all_buttons_enabled(ui_components: Dict[str, Any]) -> None:
     for key in button_keys:
         if key in ui_components and ui_components[key] is not None:
             _safe_enable_button(ui_components[key])
-
-def debug_button_connections(ui_components: Dict[str, Any]) -> None:
-    """Minimal debug function untuk troubleshooting."""
-    logger = ui_components.get('logger')
-    if not logger:
-        return
-    
-    expected_buttons = ['download_button', 'check_button', 'reset_button', 'cleanup_button', 'save_button']
-    working_buttons = sum(1 for btn in expected_buttons if btn in ui_components and ui_components[btn] is not None)
-    
-    if working_buttons < len(expected_buttons):
-        logger.warning(f"⚠️ Button check: {working_buttons}/{len(expected_buttons)} buttons tersedia")

@@ -1,222 +1,211 @@
 """
 File: smartcash/ui/dataset/download/services/progress_bridge.py
-Deskripsi: Enhanced progress bridge untuk komunikasi yang lebih reliable antara service dan UI
+Deskripsi: Enhanced progress bridge dengan step-by-step progress tracking yang akurat dan reliable
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.components.observer import notify, EventTopics
 
 class ProgressBridge:
-    """Enhanced bridge untuk komunikasi progress dari service ke UI dengan robust error handling."""
+    """Enhanced bridge untuk step-by-step progress tracking yang akurat dengan robust error handling."""
     
     def __init__(self, observer_manager=None, namespace: str = "download"):
         self.observer_manager = observer_manager
         self.namespace = namespace
         self.current_progress = 0
         self.current_step = ""
-        self.total_steps = 1
-        self.step_progress = {}  # Track progress per step
+        self.total_steps = 5
+        self.step_weights = {
+            'validate': 5,    # 5%
+            'metadata': 15,   # 15% 
+            'download': 60,   # 60%
+            'extract': 15,    # 15%
+            'verify': 5       # 5%
+        }
+        self._ui_components_ref = None
+        
+    def set_ui_components_reference(self, ui_components: Dict[str, Any]) -> None:
+        """Set reference ke UI components untuk direct updates."""
+        self._ui_components_ref = ui_components
         
     def notify_start(self, message: str = "Memulai proses", total_steps: int = 5) -> None:
-        """Enhanced start notification dengan step tracking initialization."""
+        """Start notification dengan step initialization."""
         self.total_steps = total_steps
         self.current_progress = 0
-        self.step_progress = {}
         
-        event_data = {
-            'progress': 0,
-            'message': message,
-            'namespace': self.namespace,
-            'total_steps': total_steps,
-            'current_step': 0
-        }
-        
-        self._send_event('DOWNLOAD_START', event_data)
-        
-        # Also send initial progress
-        self.notify_progress(0, 100, message, current_step=0, total_steps=total_steps)
+        self._direct_ui_update(0, message, "Inisialisasi")
+        self._send_observer_event('DOWNLOAD_START', {
+            'progress': 0, 'message': message, 'namespace': self.namespace,
+            'total_steps': total_steps, 'current_step': 0
+        })
     
-    def notify_progress(self, progress: int, total: int = 100, message: str = "", 
-                       step: Optional[str] = None, current_step: int = 1, total_steps: int = 5) -> None:
-        """Enhanced progress notification dengan step awareness dan validation."""
-        
-        # Validate dan clamp progress values
-        progress = max(0, min(total, progress))
-        percentage = int((progress / total) * 100) if total > 0 else 0
-        
-        # Update internal state
-        self.current_progress = percentage
-        if step:
-            self.current_step = step
-            self.step_progress[step] = percentage
-        
-        # Main progress event
-        event_data = {
-            'progress': percentage,
-            'message': message,
-            'namespace': self.namespace,
-            'raw_progress': progress,
-            'raw_total': total
-        }
-        
-        self._send_event('DOWNLOAD_PROGRESS', event_data)
-        
-        # Step-specific progress jika ada step info
-        if step:
-            step_data = {
-                'step_progress': percentage,
-                'step_message': f"{step}: {message}",
-                'step_name': step,
-                'current_step': current_step,
-                'total_steps': total_steps,
+    def notify_step_progress(self, step_name: str, step_progress: int, message: str = "") -> None:
+        """Progress untuk step tertentu dengan weight calculation."""
+        try:
+            # Clamp step progress
+            step_progress = max(0, min(100, step_progress))
+            
+            # Calculate overall progress berdasarkan step weights
+            step_weight = self.step_weights.get(step_name, 20)  # Default 20% jika tidak ada
+            overall_progress = self._calculate_weighted_progress(step_name, step_progress)
+            
+            # Update internal state
+            self.current_progress = overall_progress
+            self.current_step = step_name
+            
+            # Direct UI update untuk immediate feedback
+            self._direct_ui_update(overall_progress, message, step_name)
+            
+            # Observer notification
+            self._send_observer_event('DOWNLOAD_PROGRESS', {
+                'progress': overall_progress,
+                'step_progress': step_progress,
+                'step_name': step_name,
+                'message': message,
                 'namespace': self.namespace
-            }
-            self._send_event('DOWNLOAD_STEP_PROGRESS', step_data)
+            })
+            
+        except Exception as e:
+            # Fallback ke basic progress jika calculation gagal
+            self._direct_ui_update(step_progress, f"Error: {str(e)}", step_name)
     
-    def notify_step_complete(self, step_name: str, message: str = None) -> None:
-        """Notify completion of a specific step."""
-        final_message = message or f"{step_name} selesai"
-        self.step_progress[step_name] = 100
+    def _calculate_weighted_progress(self, current_step: str, step_progress: int) -> int:
+        """Calculate overall progress berdasarkan step weights yang lebih akurat."""
+        total_progress = 0
+        step_order = ['validate', 'metadata', 'download', 'extract', 'verify']
         
-        step_data = {
-            'step_progress': 100,
-            'step_message': final_message,
-            'step_name': step_name,
-            'namespace': self.namespace,
-            'step_complete': True
-        }
-        
-        self._send_event('DOWNLOAD_STEP_PROGRESS', step_data)
+        try:
+            current_index = step_order.index(current_step) if current_step in step_order else 0
+            
+            # Add completed steps
+            for i, step in enumerate(step_order):
+                if i < current_index:
+                    total_progress += self.step_weights.get(step, 20)
+                elif i == current_index:
+                    # Current step contribution
+                    step_weight = self.step_weights.get(step, 20)
+                    total_progress += int((step_progress / 100) * step_weight)
+                    break
+            
+            return min(100, max(0, total_progress))
+            
+        except Exception:
+            # Fallback calculation
+            return min(100, step_progress)
     
     def notify_complete(self, message: str = "Proses selesai", duration: float = 0) -> None:
-        """Enhanced completion notification dengan summary information."""
+        """Complete notification dengan final UI update."""
         self.current_progress = 100
         
-        # Calculate average step completion
-        completed_steps = len([s for s, p in self.step_progress.items() if p >= 100])
+        # Final UI update
+        self._direct_ui_update(100, message, "Selesai")
         
-        event_data = {
-            'message': message,
-            'duration': duration,
-            'namespace': self.namespace,
-            'final_progress': 100,
-            'completed_steps': completed_steps,
-            'total_steps': self.total_steps,
-            'step_summary': self.step_progress.copy()
-        }
-        
-        self._send_event('DOWNLOAD_COMPLETE', event_data)
+        # Observer notification
+        self._send_observer_event('DOWNLOAD_COMPLETE', {
+            'message': message, 'duration': duration, 'namespace': self.namespace,
+            'final_progress': 100
+        })
     
     def notify_error(self, message: str = "Terjadi error", error_details: Dict = None) -> None:
-        """Enhanced error notification dengan detailed error information."""
-        event_data = {
-            'message': message,
-            'namespace': self.namespace,
-            'current_progress': self.current_progress,
-            'current_step': self.current_step,
+        """Error notification dengan UI reset."""
+        # Reset progress ke 0 untuk indicate error
+        self._direct_ui_update(0, f"❌ {message}", "Error")
+        
+        # Observer notification
+        self._send_observer_event('DOWNLOAD_ERROR', {
+            'message': message, 'namespace': self.namespace,
             'error_details': error_details or {}
-        }
-        
-        self._send_event('DOWNLOAD_ERROR', event_data)
+        })
     
-    def notify_substep_progress(self, substep_name: str, progress: int, 
-                              parent_step: str, message: str = "") -> None:
-        """Notify progress untuk substep dalam step utama (misal: download chunks)."""
-        substep_data = {
-            'substep_name': substep_name,
-            'substep_progress': progress,
-            'parent_step': parent_step,
-            'message': message,
-            'namespace': self.namespace
-        }
-        
-        self._send_event('DOWNLOAD_SUBSTEP_PROGRESS', substep_data)
+    def _direct_ui_update(self, progress: int, message: str, step_name: str = "") -> None:
+        """Direct UI update sebagai primary method untuk immediate feedback."""
+        if not self._ui_components_ref:
+            return
+            
+        try:
+            ui = self._ui_components_ref
+            
+            # Update main progress bar
+            if 'progress_bar' in ui and hasattr(ui['progress_bar'], 'value'):
+                ui['progress_bar'].value = progress
+                ui['progress_bar'].description = f"Progress: {progress}%"
+                if hasattr(ui['progress_bar'], 'layout'):
+                    ui['progress_bar'].layout.visibility = 'visible'
+            
+            # Update current progress (step progress)
+            if 'current_progress' in ui and hasattr(ui['current_progress'], 'value'):
+                # Show step progress untuk current step
+                if step_name and step_name != "Selesai":
+                    ui['current_progress'].value = progress
+                    ui['current_progress'].description = f"{step_name}: {progress}%"
+                else:
+                    ui['current_progress'].value = 100
+                    ui['current_progress'].description = "Selesai: 100%"
+                    
+                if hasattr(ui['current_progress'], 'layout'):
+                    ui['current_progress'].layout.visibility = 'visible'
+            
+            # Update labels
+            if 'overall_label' in ui and hasattr(ui['overall_label'], 'value'):
+                ui['overall_label'].value = message
+                if hasattr(ui['overall_label'], 'layout'):
+                    ui['overall_label'].layout.visibility = 'visible'
+            
+            if 'step_label' in ui and hasattr(ui['step_label'], 'value'):
+                step_message = f"{step_name}: {message}" if step_name else message
+                ui['step_label'].value = step_message
+                if hasattr(ui['step_label'], 'layout'):
+                    ui['step_label'].layout.visibility = 'visible'
+            
+            # Ensure progress container is visible
+            if 'progress_container' in ui and hasattr(ui['progress_container'], 'layout'):
+                ui['progress_container'].layout.display = 'block'
+                ui['progress_container'].layout.visibility = 'visible'
+                
+        except Exception:
+            # Ignore UI update errors
+            pass
     
-    def _send_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Enhanced event sending dengan multiple fallback methods dan error handling."""
-        
-        # Add timestamp untuk debugging
+    def _send_observer_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Send observer event dengan multiple fallback methods."""
         import time
         data['timestamp'] = time.time()
         data['event_type'] = event_type
         
-        success = False
-        
-        # Method 1: Observer manager jika tersedia
+        # Try observer manager first
         if self.observer_manager and hasattr(self.observer_manager, 'notify'):
             try:
                 self.observer_manager.notify(event_type, self, **data)
-                success = True
-            except Exception as e:
-                # Log error tapi lanjutkan ke fallback
+                return
+            except Exception:
                 pass
         
-        # Method 2: Direct EventDispatcher notification
-        if not success:
-            try:
-                from smartcash.components.observer import EventDispatcher
-                EventDispatcher.notify(event_type, self, **data)
-                success = True
-            except Exception as e:
-                pass
-        
-        # Method 3: Global notify function
-        if not success:
-            try:
-                notify(event_type, self, **data)
-                success = True
-            except Exception as e:
-                pass
-        
-        # Method 4: Direct UI update sebagai ultimate fallback
-        if not success:
-            self._direct_ui_update(event_type, data)
-    
-    def _direct_ui_update(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Direct UI update sebagai ultimate fallback ketika observer system gagal."""
+        # Try direct EventDispatcher
         try:
-            # Ini adalah fallback terakhir - update UI components secara langsung
-            # Hanya untuk kasus observer system benar-benar gagal
-            
-            if hasattr(self, '_ui_components_ref'):
-                ui_components = self._ui_components_ref
-                
-                if event_type.endswith('_PROGRESS'):
-                    progress = data.get('progress', 0)
-                    message = data.get('message', '')
-                    
-                    # Update progress bar langsung
-                    if 'progress_bar' in ui_components:
-                        ui_components['progress_bar'].value = progress
-                        ui_components['progress_bar'].description = f"Progress: {progress}%"
-                    
-                    # Update message label
-                    if 'overall_label' in ui_components:
-                        ui_components['overall_label'].value = message
-                        
+            from smartcash.components.observer import EventDispatcher
+            EventDispatcher.notify(event_type, self, **data)
+            return
         except Exception:
-            # Fallback gagal total - tidak ada yang bisa dilakukan
             pass
-    
-    def set_ui_components_reference(self, ui_components: Dict[str, Any]) -> None:
-        """Set reference ke UI components untuk direct fallback updates."""
-        self._ui_components_ref = ui_components
-    
-    def get_progress_status(self) -> Dict[str, Any]:
-        """Get current progress status untuk monitoring dan debugging."""
-        return {
-            'namespace': self.namespace,
-            'current_progress': self.current_progress,
-            'current_step': self.current_step,
-            'total_steps': self.total_steps,
-            'step_progress': self.step_progress.copy(),
-            'has_observer_manager': self.observer_manager is not None,
-            'completed_steps': len([s for s, p in self.step_progress.items() if p >= 100])
-        }
+        
+        # Try global notify
+        try:
+            notify(event_type, self, **data)
+        except Exception:
+            pass
+        
+        # If all fail, silent continue - UI update sudah dilakukan
     
     def reset(self) -> None:
         """Reset progress tracking state."""
         self.current_progress = 0
         self.current_step = ""
-        self.total_steps = 1
-        self.step_progress = {}
+        
+        # Reset UI jika ada reference
+        if self._ui_components_ref:
+            self._direct_ui_update(0, "Siap memulai", "")
+            
+            # Hide progress container
+            ui = self._ui_components_ref
+            if 'progress_container' in ui and hasattr(ui['progress_container'], 'layout'):
+                ui['progress_container'].layout.display = 'none'

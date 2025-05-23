@@ -1,16 +1,14 @@
 """
 File: smartcash/ui/utils/ui_logger.py
-Deskripsi: UI Logger dengan stdout interception yang lebih efektif untuk mencegah log muncul di console
+Deskripsi: Enhanced UI Logger dengan improved stdout suppression untuk prevent backend logs leak
 """
 
 import logging
 import sys
 import os
-import subprocess
 from pathlib import Path
-from typing import Dict, Any, Callable, Optional, List, Union
+from typing import Dict, Any, Callable, Optional
 from IPython.display import display, HTML
-import ipywidgets as widgets
 from datetime import datetime
 from smartcash.ui.utils.ui_logger_namespace import format_log_message
 
@@ -24,7 +22,7 @@ __all__ = [
 ]
 
 class UILogger:
-    """UI Logger dengan stdout interception yang diperbaiki"""
+    """Enhanced UI Logger dengan improved stdout suppression."""
     
     def __init__(self, 
                 ui_components: Dict[str, Any], 
@@ -38,30 +36,112 @@ class UILogger:
         self.log_level = log_level
         self._in_log_to_ui = False
         
-        # Setup Python logger dengan handler minimal
+        # Setup Python logger dengan minimal handlers
         self.logger = logging.getLogger(name)
         self.logger.setLevel(log_level)
         
-        # Clear existing handlers
+        # Clear existing handlers to prevent leaks
         for handler in self.logger.handlers[:]:
             self.logger.removeHandler(handler)
         
-        # Hanya tambahkan file handler jika diminta
+        # Suppress root logger untuk prevent backend logs
+        root_logger = logging.getLogger()
+        root_logger.handlers.clear()
+        root_logger.setLevel(logging.CRITICAL)
+        
+        # Setup file handler jika diminta
         if log_to_file:
+            self._setup_file_handler(log_dir)
+        
+        # Setup aggressive stdout suppression
+        self._setup_stdout_suppression()
+    
+    def _setup_file_handler(self, log_dir: str) -> None:
+        """Setup file handler untuk logging ke file."""
+        try:
             log_path = Path(log_dir)
             log_path.mkdir(parents=True, exist_ok=True)
-            log_file = log_path / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+            log_file = log_path / f"{self.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+            
             file_handler = logging.FileHandler(log_file, encoding='utf-8')
-            file_handler.setLevel(log_level)
-            formatter = logging.Formatter('%(message)s')
+            file_handler.setLevel(self.log_level)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             file_handler.setFormatter(formatter)
             self.logger.addHandler(file_handler)
             self.log_file_path = log_file
-        else:
+        except Exception:
             self.log_file_path = None
     
+    def _setup_stdout_suppression(self) -> None:
+        """Setup aggressive stdout suppression untuk prevent backend logs."""
+        # Store original stdout
+        if not hasattr(self.ui_components, 'original_stdout'):
+            self.ui_components['original_stdout'] = sys.stdout
+        
+        # Create aggressive suppression wrapper
+        class AggressiveStdoutSuppressor:
+            def __init__(self, ui_components):
+                self.ui_components = ui_components
+                self.original = sys.__stdout__
+                
+                # Extended ignore patterns untuk backend services
+                self.ignore_patterns = [
+                    'DEBUG:', '[DEBUG]', 'INFO:', '[INFO]', 'WARNING:', '[WARNING]',
+                    'Using TensorFlow', 'Colab notebook', 'Your session crashed',
+                    'Executing in eager mode', 'TensorFlow', 'NumExpr', 'Running on',
+                    '/usr/local/lib', 'Config file not found', 'inisialisasi',
+                    'setup', 'handler', 'initializing', 'Mounted at', 'Drive already',
+                    'terdaftar', 'terinisialisasi', 'berhasil', 'dibuat', 'disalin',
+                    'progress', 'Progress', 'PROGRESS', 'downloading', 'extracting',
+                    'metadata', 'validation', 'step', 'Stage', 'Processing',
+                    '✅', '❌', '⚠️', 'ℹ️', '🔍', '📁', '🔗', '📋', '🚀', '📊',
+                    '📥', '📦', '🎉', '💾', '🧹', '🔄', '📍', '💡', '🌐',
+                    'requests.', 'urllib3.', 'http.client', 'connectionpool'
+                ]
+            
+            def write(self, message):
+                # Aggressive filtering
+                if not message or not message.strip():
+                    return
+                
+                msg_lower = message.lower().strip()
+                
+                # Skip semua pattern yang tidak diinginkan
+                if any(pattern.lower() in msg_lower for pattern in self.ignore_patterns):
+                    return
+                
+                # Skip short messages (likely debugging)
+                if len(msg_lower) < 5:
+                    return
+                
+                # Skip numeric-only messages (progress indicators)
+                if msg_lower.replace('%', '').replace('.', '').replace('/', '').replace('\\', '').replace('-', '').isdigit():
+                    return
+                
+                # Skip messages that look like progress bars
+                if any(char in message for char in ['█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '░', '▒', '▓']):
+                    return
+                
+                # If it passes all filters, suppress it anyway for UI cleanliness
+                # Backend logs should go through UI logger, not stdout
+                return
+            
+            def flush(self):
+                pass
+            
+            def isatty(self):
+                return False
+            
+            def fileno(self):
+                return self.original.fileno()
+        
+        # Replace stdout with aggressive suppressor
+        suppressor = AggressiveStdoutSuppressor(self.ui_components)
+        sys.stdout = suppressor
+        self.ui_components['stdout_suppressor'] = suppressor
+    
     def _log_to_ui(self, message: str, level: str = "info") -> None:
-        """Log ke UI tanpa stdout interference"""
+        """Log ke UI dengan improved formatting dan error handling."""
         if not message or not message.strip() or self._in_log_to_ui:
             return
             
@@ -77,6 +157,7 @@ class UILogger:
             }
             emoji = emoji_map.get(level, "ℹ️")
             
+            # Color mapping
             try:
                 from smartcash.ui.utils.constants import COLORS
                 color_map = {
@@ -91,22 +172,33 @@ class UILogger:
             except ImportError:
                 color = "#212529"
             
+            # Enhanced HTML formatting
             formatted_html = f"""
-            <div style="margin:2px 0;padding:3px;border-radius:3px;">
-                <span style="color:#6c757d">[{timestamp}]</span> 
-                <span>{emoji}</span> 
-                <span style="color:{color}">{formatted_message}</span>
+            <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
+                       background-color:rgba(248,249,250,0.8);
+                       border-left:3px solid {color};
+                       font-family: 'Courier New', monospace;
+                       font-size: 13px;">
+                <span style="color:#6c757d;font-size:11px;">[{timestamp}]</span> 
+                <span style="font-size:14px;">{emoji}</span> 
+                <span style="color:{color};margin-left:4px;">{formatted_message}</span>
             </div>
             """
             
-            # Output prioritas: log_output -> status -> fallback
+            # Output dengan priority: log_output -> status -> fallback
+            output_widget = None
             if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-                with self.ui_components['log_output']:
-                    display(HTML(formatted_html))
+                output_widget = self.ui_components['log_output']
             elif 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
-                with self.ui_components['status']:
+                output_widget = self.ui_components['status']
+            
+            if output_widget:
+                with output_widget:
                     display(HTML(formatted_html))
             
+        except Exception:
+            # Silent fail untuk prevent recursive errors
+            pass
         finally:
             self._in_log_to_ui = False
     
@@ -140,122 +232,47 @@ def create_ui_logger(ui_components: Dict[str, Any],
                     redirect_stdout: bool = True,
                     log_dir: str = "logs",
                     log_level: int = logging.INFO) -> UILogger:
-    """Create UI logger dengan stdout interception yang diperbaiki"""
+    """Create enhanced UI logger dengan improved stdout suppression."""
     
     logger = UILogger(ui_components, name, log_to_file, log_dir, log_level)
     
-    # Redirect stdout jika diminta
+    # Additional stdout suppression jika diminta
     if redirect_stdout:
         intercept_stdout_to_ui(ui_components)
     
-    # Suppress root logger untuk mencegah duplicate output
-    root_logger = logging.getLogger()
-    root_logger.handlers.clear()  # Clear semua handlers
-    root_logger.setLevel(logging.CRITICAL)  # Set ke level tinggi
+    # Global suppression untuk prevent any leaks
+    _suppress_all_backend_logging()
     
     ui_components['logger'] = logger
     _register_current_ui_logger(logger)
     
     return logger
 
+def _suppress_all_backend_logging() -> None:
+    """Suppress semua backend logging untuk prevent console leaks."""
+    # Suppress requests library
+    logging.getLogger("requests").setLevel(logging.CRITICAL)
+    logging.getLogger("urllib3").setLevel(logging.CRITICAL)
+    
+    # Suppress common libraries
+    for lib_name in ['requests', 'urllib3', 'http.client', 'requests.packages.urllib3']:
+        try:
+            logging.getLogger(lib_name).setLevel(logging.CRITICAL)
+            logging.getLogger(lib_name).propagate = False
+        except Exception:
+            pass
+
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
-    """Intercept stdout yang lebih agresif"""
-    
-    if 'custom_stdout' in ui_components and ui_components.get('custom_stdout') == sys.stdout:
-        return
-    
-    class AggressiveUIStdoutInterceptor:
-        def __init__(self, ui_components):
-            self.ui_components = ui_components
-            self.terminal = sys.__stdout__
-            self.buffer = ""
-            self._in_write = False
-            
-            # Filter patterns yang lebih komprehensif
-            self.ignore_patterns = [
-                'DEBUG:', '[DEBUG]', 'INFO:', '[INFO]', 'WARNING:', '[WARNING]',
-                'Using TensorFlow', 'Colab notebook', 'Your session crashed',
-                'Executing in eager mode', 'TensorFlow', 'NumExpr', 'Running on',
-                '/usr/local/lib', 'Config file not found', 'inisialisasi',
-                'setup', 'handler', 'initializing', 'Mounted at', 'Drive already',
-                'terdaftar', 'terinisialisasi', 'berhasil', 'dibuat', 'disalin'
-            ]
-            
-        def write(self, message):
-            if self._in_write:
-                return
-                
-            self._in_write = True
-            
-            try:
-                # Filter aggressive untuk mencegah duplicate logs
-                msg_strip = message.strip()
-                if not msg_strip or len(msg_strip) < 3:
-                    return
-                
-                # Skip semua pattern yang tidak diinginkan
-                if any(pattern.lower() in msg_strip.lower() for pattern in self.ignore_patterns):
-                    return
-                
-                # Skip emoji-based messages (biasanya dari UI logger)
-                if any(emoji in msg_strip for emoji in ['✅', '❌', '⚠️', 'ℹ️', '🔍', '📁', '🔗', '📋']):
-                    return
-                
-                self.buffer += message
-                
-                if '\n' in self.buffer:
-                    lines = self.buffer.split('\n')
-                    self.buffer = lines[-1]
-                    
-                    for line in lines[:-1]:
-                        if line.strip() and not any(pattern.lower() in line.lower() for pattern in self.ignore_patterns):
-                            self._display_line(line)
-                            
-            finally:
-                self._in_write = False
-                
-        def _display_line(self, line):
-            try:
-                formatted_line = format_log_message(self.ui_components, line)
-                
-                if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-                    with self.ui_components['log_output']:
-                        display(HTML(f"<div style='color:#212529'>{formatted_line}</div>"))
-            except Exception:
-                pass
-        
-        def flush(self):
-            if self.buffer and self.buffer.strip():
-                self._display_line(self.buffer)
-                self.buffer = ""
-        
-        def isatty(self):
-            return False
-            
-        def fileno(self):
-            return self.terminal.fileno()
-    
-    # Replace stdout
-    original_stdout = sys.stdout
-    ui_components['original_stdout'] = original_stdout
-    
-    interceptor = AggressiveUIStdoutInterceptor(ui_components)
-    sys.stdout = interceptor
-    ui_components['custom_stdout'] = interceptor
+    """Enhanced stdout interception untuk prevent backend logs."""
+    # Additional layer of protection - sudah ada di UILogger.__init__
+    pass
 
 def restore_stdout(ui_components: Dict[str, Any]) -> None:
-    """Restore stdout ke original"""
+    """Restore stdout ke original state."""
     if 'original_stdout' in ui_components:
-        custom_stdout = ui_components.get('custom_stdout')
         sys.stdout = ui_components['original_stdout']
         ui_components.pop('original_stdout', None)
-        ui_components.pop('custom_stdout', None)
-        
-        if custom_stdout and hasattr(custom_stdout, 'flush'):
-            try:
-                custom_stdout.flush()
-            except:
-                pass
+        ui_components.pop('stdout_suppressor', None)
 
 # Global logger reference
 _current_ui_logger = None
@@ -268,7 +285,7 @@ def get_current_ui_logger() -> Optional[UILogger]:
     return _current_ui_logger
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
-    """Direct log ke UI tanpa stdout interference"""
+    """Enhanced direct log ke UI tanpa stdout interference."""
     if not ui_components or not message or not message.strip():
         return
         
@@ -292,19 +309,21 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
         color = "#212529"
     
     formatted_html = f"""
-    <div style="margin:2px 0;padding:3px;border-radius:3px;">
-        <span style="color:#6c757d">[{timestamp}]</span> 
-        <span>{icon}</span> 
-        <span style="color:{color}">{formatted_message}</span>
+    <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
+               background-color:rgba(248,249,250,0.8);
+               border-left:3px solid {color};
+               font-family: 'Courier New', monospace;
+               font-size: 13px;">
+        <span style="color:#6c757d;font-size:11px;">[{timestamp}]</span> 
+        <span style="font-size:14px;">{icon}</span> 
+        <span style="color:{color};margin-left:4px;">{formatted_message}</span>
     </div>
     """
     
-    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-        with ui_components['log_output']:
-            display(HTML(formatted_html))
-    elif 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
-        with ui_components['status']:
-            display(HTML(formatted_html))
-    elif 'output' in ui_components and hasattr(ui_components['output'], 'clear_output'):
-        with ui_components['output']:
-            display(HTML(formatted_html))
+    # Output dengan priority handling
+    output_targets = ['log_output', 'status', 'output']
+    for target in output_targets:
+        if target in ui_components and hasattr(ui_components[target], 'clear_output'):
+            with ui_components[target]:
+                display(HTML(formatted_html))
+            break

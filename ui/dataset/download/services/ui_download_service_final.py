@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/services/ui_download_service_final.py
-Deskripsi: Enhanced download service dengan progress integration yang lebih robust dan step tracking yang akurat
+Deskripsi: Enhanced download service dengan accurate step-by-step progress tracking dan robust error handling
 """
 
 import time
@@ -10,62 +10,71 @@ from smartcash.dataset.services.downloader.ui_roboflow_downloader import UIRobof
 from smartcash.ui.dataset.download.services.progress_bridge import ProgressBridge
 
 class UIDownloadServiceFinal:
-    """Enhanced download service dengan accurate progress tracking dan robust error handling."""
+    """Enhanced download service dengan accurate step-by-step progress tracking."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.logger = ui_components.get('logger')
         
-        # Enhanced progress bridge dengan step tracking
+        # Enhanced progress bridge dengan UI reference
         self.progress_bridge = ProgressBridge(
             observer_manager=ui_components.get('observer_manager'),
             namespace="download"
         )
+        self.progress_bridge.set_ui_components_reference(ui_components)
         
-        # Create downloader dengan enhanced progress callback
+        # Create downloader dengan step-aware progress callback
         self.downloader = UIRoboflowDownloader(logger=self.logger)
-        self.downloader.set_progress_callback(self._enhanced_progress_callback)
+        self.downloader.set_progress_callback(self._step_aware_progress_callback)
         
-        # Step tracking
-        self.total_steps = 4
-        self.current_step = 0
-        self.step_names = ['validate', 'metadata', 'download', 'verify']
+        # Step definitions yang lebih detail
+        self.step_definitions = {
+            'validate': {'weight': 5, 'name': 'Validasi'},
+            'metadata': {'weight': 15, 'name': 'Metadata'},
+            'download': {'weight': 60, 'name': 'Download'},
+            'extract': {'weight': 15, 'name': 'Ekstraksi'},
+            'verify': {'weight': 5, 'name': 'Verifikasi'}
+        }
     
     def download_dataset(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Download dengan enhanced progress tracking dan comprehensive error handling."""
+        """Download dengan enhanced step-by-step progress tracking."""
         start_time = time.time()
         
         try:
-            # 🚀 Initialize
-            self.progress_bridge.notify_start("Memulai download dataset", self.total_steps)
+            # 🚀 Initialize dengan clear messaging
+            self.progress_bridge.notify_start("Memulai download dataset", total_steps=5)
             
-            # Step 1: Validate parameters
-            self._next_step("validate", "Memvalidasi parameter")
-            self._validate_params(params)
-            self.progress_bridge.notify_progress(25, 100, "Parameter valid", "validate", 1, self.total_steps)
+            # Step 1: Validate parameters (5%)
+            self._execute_step('validate', "Memvalidasi parameter", 
+                             lambda: self._validate_params(params))
             
-            # Step 2: Get metadata
-            self._next_step("metadata", "Mendapatkan informasi dataset")
-            metadata = self._get_metadata(params)
-            self.progress_bridge.notify_progress(50, 100, "Metadata diperoleh", "metadata", 2, self.total_steps)
+            # Step 2: Get metadata (15%)
+            self._execute_step('metadata', "Mendapatkan informasi dataset",
+                             lambda: self._get_metadata(params))
+            metadata = self._last_step_result
             
-            # Step 3: Download & extract
-            self._next_step("download", "Mendownload dataset")
+            # Step 3: Download & extract (75% total - 60% download + 15% extract)
             output_path = Path(params['output_dir'])
             download_url = metadata['export']['link']
             
+            # Download akan menggunakan callback untuk progress yang smooth
             if not self.downloader.download_and_extract(download_url, output_path):
                 raise Exception("Download atau ekstraksi gagal")
             
-            # Step 4: Verify and finalize
-            self._next_step("verify", "Memverifikasi hasil download")
-            stats = self._get_stats(output_path)
-            self.progress_bridge.notify_progress(100, 100, "Verifikasi selesai", "verify", 4, self.total_steps)
+            # Step 4: Verify (5%)
+            self._execute_step('verify', "Memverifikasi hasil download",
+                             lambda: self._get_stats(output_path))
+            stats = self._last_step_result
             
             # 🎉 Complete
             duration = time.time() - start_time
             total_images = stats.get('total_images', 0)
-            self.progress_bridge.notify_complete(f"Download selesai: {total_images} gambar dalam {duration:.1f}s", duration)
+            success_message = f"Download selesai: {total_images} gambar dalam {duration:.1f}s"
+            
+            self.progress_bridge.notify_complete(success_message, duration)
+            
+            if self.logger:
+                self.logger.success(f"✅ {success_message}")
             
             return {
                 'status': 'success',
@@ -78,6 +87,7 @@ class UIDownloadServiceFinal:
         except Exception as e:
             duration = time.time() - start_time
             error_msg = str(e)
+            
             self.progress_bridge.notify_error(f"Download gagal: {error_msg}")
             
             if self.logger:
@@ -85,59 +95,58 @@ class UIDownloadServiceFinal:
             
             return {'status': 'error', 'message': error_msg, 'duration': duration}
     
-    def _next_step(self, step_name: str, description: str) -> None:
-        """Move to next step dengan logging."""
-        self.current_step += 1
-        if self.logger:
-            self.logger.info(f"📋 Step {self.current_step}/{self.total_steps}: {description}")
-    
-    def _enhanced_progress_callback(self, step: str, current: int, total: int, message: str) -> None:
-        """Enhanced callback dengan step-aware progress calculation."""
+    def _execute_step(self, step_name: str, description: str, step_function) -> None:
+        """Execute step dengan progress tracking yang akurat."""
         try:
-            # Map step ke overall progress ranges yang lebih akurat
-            step_ranges = {
-                'download': (50, 85),   # 50-85% untuk download 
-                'extract': (85, 95),    # 85-95% untuk extract
+            step_info = self.step_definitions.get(step_name, {'weight': 20, 'name': step_name})
+            
+            if self.logger:
+                self.logger.info(f"📋 {step_info['name']}: {description}")
+            
+            # Start step progress
+            self.progress_bridge.notify_step_progress(step_name, 0, f"Memulai {description.lower()}")
+            
+            # Execute step function
+            result = step_function()
+            self._last_step_result = result
+            
+            # Complete step
+            self.progress_bridge.notify_step_progress(step_name, 100, f"{step_info['name']} selesai")
+            
+        except Exception as e:
+            self.progress_bridge.notify_error(f"Error pada {description.lower()}: {str(e)}")
+            raise
+    
+    def _step_aware_progress_callback(self, step: str, current: int, total: int, message: str) -> None:
+        """Enhanced callback yang aware terhadap step dan weight distribution."""
+        try:
+            # Map downloader steps ke progress steps kita
+            step_mapping = {
+                'download': 'download',
+                'extract': 'extract'
             }
             
-            if step in step_ranges:
-                start_pct, end_pct = step_ranges[step]
+            mapped_step = step_mapping.get(step, step)
+            
+            if mapped_step in self.step_definitions:
+                # Calculate step progress
+                step_progress = int((current / total) * 100) if total > 0 else 0
                 
-                # Calculate progress dalam range
-                if total > 0:
-                    step_progress = (current / total)
-                    overall_progress = start_pct + (step_progress * (end_pct - start_pct))
-                else:
-                    overall_progress = start_pct
+                # Send step progress dengan proper weight
+                self.progress_bridge.notify_step_progress(mapped_step, step_progress, message)
                 
-                # Step info mapping
-                step_info_map = {
-                    'download': ('Mendownload dataset', 3, self.total_steps),
-                    'extract': ('Mengekstrak dataset', 3, self.total_steps)  # Same step visually
-                }
-                
-                step_display_name, current_step_display, total_steps = step_info_map.get(
-                    step, (message, self.current_step, self.total_steps)
-                )
-                
-                # Enhanced progress notification
-                self.progress_bridge.notify_progress(
-                    int(overall_progress), 100, message,
-                    step_display_name, current_step_display, total_steps
-                )
-                
-                # Log significant progress milestones
-                if self.logger and current % max(1, total // 4) == 0:
-                    percentage = int((current / total) * 100) if total > 0 else 0
-                    self.logger.debug(f"🔄 {step}: {percentage}% - {message}")
+                # Log significant milestones untuk feedback
+                if self.logger and step_progress % 25 == 0 and step_progress > 0:
+                    step_name = self.step_definitions[mapped_step]['name']
+                    self.logger.debug(f"🔄 {step_name}: {step_progress}% - {message}")
         
         except Exception as e:
-            # Fallback progress notification
+            # Fallback progress notification jika calculation gagal
             if self.logger:
                 self.logger.debug(f"Progress callback error: {str(e)}")
     
     def _validate_params(self, params: Dict[str, Any]) -> None:
-        """Enhanced parameter validation dengan detailed error messages."""
+        """Enhanced parameter validation dengan detailed feedback."""
         required = ['workspace', 'project', 'version', 'api_key', 'output_dir']
         missing = [p for p in required if not params.get(p)]
         
@@ -160,7 +169,7 @@ class UIDownloadServiceFinal:
             self.logger.debug("✅ Parameter validation berhasil")
     
     def _get_metadata(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Get dataset metadata dengan enhanced error handling."""
+        """Get dataset metadata dengan enhanced error handling dan logging."""
         import requests
         
         metadata_url = (f"https://api.roboflow.com/{params['workspace']}"
@@ -182,7 +191,7 @@ class UIDownloadServiceFinal:
             if 'link' not in metadata['export']:
                 raise ValueError("Export link tidak ditemukan dalam response")
             
-            # Log dataset info jika tersedia
+            # Log dataset info untuk user feedback
             if self.logger and 'project' in metadata:
                 project_info = metadata['project']
                 classes_count = len(project_info.get('classes', []))
@@ -204,12 +213,12 @@ class UIDownloadServiceFinal:
             raise Exception(f"Error mendapatkan metadata: {str(e)}")
     
     def _get_stats(self, output_path: Path) -> Dict[str, Any]:
-        """Get comprehensive dataset statistics."""
+        """Get comprehensive dataset statistics dengan progress feedback."""
         stats = {'total_images': 0, 'total_labels': 0}
         
         try:
-            # Count files per split
-            for split in ['train', 'valid', 'test']:
+            # Count files per split dengan mini progress updates
+            for i, split in enumerate(['train', 'valid', 'test']):
                 images_dir = output_path / split / 'images'
                 labels_dir = output_path / split / 'labels'
                 
@@ -222,6 +231,10 @@ class UIDownloadServiceFinal:
                     label_count = len(list(labels_dir.glob('*.txt')))
                     stats['total_labels'] += label_count
                     stats[f'{split}_labels'] = label_count
+                
+                # Mini progress update untuk step verify
+                mini_progress = int(((i + 1) / 3) * 100)
+                self.progress_bridge.notify_step_progress('verify', mini_progress, f"Memeriksa {split}")
             
             # Calculate dataset size
             try:

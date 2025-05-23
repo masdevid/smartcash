@@ -130,23 +130,12 @@ def _setup_save_handler(ui_components: Dict[str, Any], env=None) -> None:
 def _safe_setup_handler(button, handler_func) -> None:
     """Safely setup handler dengan fixed TypeError resolution."""
     try:
-        # Clear existing handlers properly - FIXED: tidak memanggil list sebagai function
-        if hasattr(button, '_click_handlers'):
-            if isinstance(button._click_handlers, list):
-                button._click_handlers.clear()  # Method call, bukan function call
-            else:
-                button._click_handlers = []
-        
-        # Register new handler
+        # Jangan manipulasi _click_handlers secara langsung
+        # Biarkan ipywidgets menangani internal state
         button.on_click(handler_func)
         
     except Exception:
-        # Fallback - create new list
-        try:
-            button._click_handlers = []
-            button.on_click(handler_func)
-        except Exception:
-            pass
+        pass
 
 def _safe_enable_button(button) -> None:
     """Safely enable button dengan error handling."""

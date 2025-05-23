@@ -8,6 +8,7 @@ from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.components.status_panel import create_status_panel
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.common.environment import get_environment_manager
 from .options_panel import create_options_panel
 from .action_section import create_action_section  # Import yang diperbaiki
@@ -40,6 +41,18 @@ def create_download_ui(config=None):
     progress = create_progress_section()
     logs = create_log_section()
     
+    # Create save/reset buttons using the shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan Konfigurasi",
+        reset_label="Reset",
+        save_tooltip="Simpan konfigurasi download saat ini",
+        reset_tooltip="Reset konfigurasi ke pengaturan default",
+        with_sync_info=True,
+        sync_message="Konfigurasi akan otomatis disinkronkan saat disimpan atau direset.",
+        button_width="120px",
+        container_width="100%"
+    )
+    
     # Main container
     main_container = widgets.VBox([
         header,
@@ -47,10 +60,7 @@ def create_download_ui(config=None):
         _create_storage_info_widget(env_manager),
         widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 10px;'>{ICONS.get('settings', '⚙️')} Pengaturan Download</h4>"),
         options['panel'],
-        widgets.VBox([
-            actions['save_reset_buttons']['container'],
-            actions['sync_info']['container']
-        ], layout=widgets.Layout(align_items='flex-end', width='100%')),
+        save_reset_buttons['container'],  # Use the shared component
         create_divider(),
         actions['action_buttons']['container'],
         logs['confirmation_area'], 
@@ -82,9 +92,14 @@ def create_download_ui(config=None):
     ui_components.update({
         'download_button': actions['download_button'],    # Handler expects this key
         'check_button': actions['check_button'],          # Handler expects this key  
-        'reset_button': actions['reset_button'],          # Handler expects this key
-        'save_button': actions['save_button'],            # Handler expects this key
         'cleanup_button': actions.get('cleanup_button'), # Handler expects this key (optional)
+    })
+    
+    # 🔗 Add save/reset buttons with original key references
+    # Handler expects these specific keys, so we maintain backward compatibility
+    ui_components.update({
+        'save_button': save_reset_buttons['save_button'],    # Handler expects this key
+        'reset_button': save_reset_buttons['reset_button'],  # Handler expects this key
     })
     
     # 🔗 Add progress components
@@ -93,10 +108,10 @@ def create_download_ui(config=None):
     # 🔗 Add log components
     ui_components.update({k: v for k, v in logs.items()})
     
-    # 🔗 Add action section references (untuk debugging)
+    # 🔗 Add references for debugging and additional functionality
     ui_components.update({
         'actions': actions,
-        'save_reset_buttons': actions['save_reset_buttons'],
+        'save_reset_buttons': save_reset_buttons,  # Reference to the shared component
         'action_buttons': actions['action_buttons']
     })
     

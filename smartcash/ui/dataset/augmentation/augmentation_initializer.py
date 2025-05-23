@@ -202,28 +202,92 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     return ui_components
 
 def _setup_button_handlers(ui_components: Dict[str, Any]) -> None:
-    """Setup handlers untuk tombol UI."""
+    """Setup handlers untuk tombol UI dengan safe checking."""
     
-    # Setup augmentation button
-    if 'augment_button' in ui_components:
-        ui_components['augment_button'].on_click(
+    logger = ui_components.get('logger')
+    
+    # Debug: Log available button keys
+    if logger:
+        available_buttons = [k for k in ui_components.keys() if 'button' in k and ui_components[k] is not None]
+        logger.debug(f"Available buttons: {available_buttons}")
+        
+        # Log action_buttons structure for debugging
+        if 'action_buttons' in ui_components:
+            action_buttons = ui_components['action_buttons']
+            if action_buttons:
+                logger.debug(f"Action buttons keys: {list(action_buttons.keys()) if hasattr(action_buttons, 'keys') else 'Not a dict'}")
+    
+    # Setup augmentation button - Safe checking
+    augment_button = ui_components.get('augment_button')
+    if augment_button is not None and hasattr(augment_button, 'on_click'):
+        augment_button.on_click(
             lambda b: handle_augmentation_button_click(ui_components, b)
         )
+        if logger:
+            logger.debug("✅ Augment button handler registered")
+    else:
+        if logger:
+            logger.warning("⚠️ Augment button not found or is None - checking action_buttons structure")
+            # Try to find the button in action_buttons
+            action_buttons = ui_components.get('action_buttons', {})
+            if action_buttons:
+                # Try common key names
+                for key in ['primary_button', 'main_button', 'action_button', 'augment_button']:
+                    button = action_buttons.get(key)
+                    if button is not None and hasattr(button, 'on_click'):
+                        button.on_click(lambda b: handle_augmentation_button_click(ui_components, b))
+                        ui_components['augment_button'] = button  # Update reference
+                        logger.success(f"✅ Found augment button as '{key}' and registered handler")
+                        break
     
-    # Setup cleanup button
-    if 'cleanup_button' in ui_components:
-        ui_components['cleanup_button'].on_click(
+    # Setup cleanup button - Safe checking
+    cleanup_button = ui_components.get('cleanup_button')
+    if cleanup_button is not None and hasattr(cleanup_button, 'on_click'):
+        cleanup_button.on_click(
             lambda b: handle_cleanup_button_click(ui_components, b)
         )
+        if logger:
+            logger.debug("✅ Cleanup button handler registered")
+    else:
+        if logger:
+            logger.warning("⚠️ Cleanup button not found or is None")
     
-    # Setup reset button
-    if 'reset_button' in ui_components:
-        ui_components['reset_button'].on_click(
+    # Setup reset button - Safe checking
+    reset_button = ui_components.get('reset_button')
+    if reset_button is not None and hasattr(reset_button, 'on_click'):
+        reset_button.on_click(
             lambda b: handle_reset_button_click(ui_components, b)
         )
+        if logger:
+            logger.debug("✅ Reset button handler registered")
+    else:
+        if logger:
+            logger.warning("⚠️ Reset button not found or is None")
     
-    # Setup save button
-    if 'save_button' in ui_components:
-        ui_components['save_button'].on_click(
+    # Setup save button - Safe checking
+    save_button = ui_components.get('save_button')
+    if save_button is not None and hasattr(save_button, 'on_click'):
+        save_button.on_click(
             lambda b: handle_save_button_click(ui_components, b)
         )
+        if logger:
+            logger.debug("✅ Save button handler registered")
+    else:
+        if logger:
+            logger.warning("⚠️ Save button not found or is None")
+    
+    # Setup stop button if available - Safe checking
+    stop_button = ui_components.get('stop_button')
+    if stop_button is not None and hasattr(stop_button, 'on_click'):
+        stop_button.on_click(
+            lambda b: _handle_stop_button_click(ui_components, b)
+        )
+        if logger:
+            logger.debug("✅ Stop button handler registered")
+
+def _handle_stop_button_click(ui_components: Dict[str, Any], button: Any = None) -> None:
+    """Handle stop button click."""
+    ui_components['stop_requested'] = True
+    logger = ui_components.get('logger')
+    if logger:
+        logger.warning("🛑 Stop requested by user")

@@ -1,16 +1,15 @@
 """
 File: smartcash/ui/dataset/download/handlers/cleanup_action.py
-Deskripsi: Fixed cleanup action dengan proper progress bar integration dan observer notifications
+Deskripsi: Fixed cleanup action dengan dataset organizer yang benar
 """
 
-import shutil
-from pathlib import Path
 from typing import Dict, Any
 from smartcash.ui.dataset.download.utils.confirmation_dialog import show_cleanup_confirmation
 from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
+from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 
 def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi cleanup dataset dengan proper progress tracking."""
+    """Eksekusi cleanup dataset dengan organizer yang benar."""
     logger = ui_components.get('logger')
     if logger:
         logger.info("🧹 Memulai cleanup dataset")
@@ -21,131 +20,69 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         # Clear outputs sebelum mulai
         _clear_ui_outputs(ui_components)
         
-        output_dir = ui_components.get('output_dir', {}).value or 'data'
-        output_path = Path(output_dir)
+        # Create organizer untuk check dan cleanup
+        organizer = DatasetOrganizer(logger=logger)
         
-        if not output_path.exists():
+        # Check existing dataset
+        dataset_stats = organizer.check_organized_dataset()
+        
+        if not dataset_stats['is_organized'] or dataset_stats['total_images'] == 0:
             if logger:
-                logger.warning(f"⚠️ Direktori tidak ditemukan: {output_dir}")
+                logger.info("ℹ️ Tidak ada dataset yang perlu dihapus")
             disable_download_buttons(ui_components, False)
             return
         
-        # Hitung file untuk konfirmasi
-        total_files = sum(1 for _ in output_path.rglob('*') if _.is_file())
-        
-        if total_files == 0:
-            if logger:
-                logger.info("ℹ️ Tidak ada file untuk dihapus")
-            disable_download_buttons(ui_components, False)
-            return
-        
-        # Tampilkan konfirmasi
-        show_cleanup_confirmation(ui_components, output_dir, total_files)
+        # Show confirmation dengan stats yang benar
+        total_files = dataset_stats['total_images'] + dataset_stats['total_labels']
+        show_cleanup_confirmation(ui_components, "Dataset Final Structure", total_files)
         
     except Exception as e:
         if logger:
             logger.error(f"❌ Error persiapan cleanup: {str(e)}")
         disable_download_buttons(ui_components, False)
 
-def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str) -> None:
-    """Eksekusi cleanup setelah konfirmasi dengan proper progress tracking."""
+def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = None) -> None:
+    """Eksekusi cleanup setelah konfirmasi."""
     logger = ui_components.get('logger')
-    output_path = Path(output_dir)
     
     try:
+        # Initialize organizer dengan progress tracking
+        organizer = DatasetOrganizer(logger=logger)
+        organizer.set_progress_callback(lambda step, curr, total, msg: _update_cleanup_progress(ui_components, curr, msg))
+        
         # Initialize progress tracking
         _start_cleanup_progress(ui_components, "Memulai cleanup dataset")
         
         if logger:
-            logger.info(f"🗑️ Menghapus dataset: {output_dir}")
+            logger.info("🗑️ Menghapus dataset dan downloads")
         
-        # Step 1: Count files untuk accurate progress (10%)
-        _update_cleanup_progress(ui_components, 10, "Menghitung file...")
-        total_files = sum(1 for _ in output_path.rglob('*') if _.is_file())
+        # Execute cleanup menggunakan organizer
+        result = organizer.cleanup_all_dataset_folders()
         
-        if total_files == 0:
-            _complete_cleanup_progress(ui_components, "Tidak ada file untuk dihapus")
+        if result['status'] == 'success':
+            _complete_cleanup_progress(ui_components, result['message'])
+            
             if logger:
-                logger.info("ℹ️ Direktori sudah kosong")
-            return
-        
-        # Step 2: Delete files dengan progress tracking (10% - 90%)
-        deleted_files = _delete_files_with_progress(ui_components, output_path, total_files)
-        
-        # Step 3: Remove directory structure (90% - 95%)
-        _update_cleanup_progress(ui_components, 90, "Menghapus direktori...")
-        if output_path.exists():
-            shutil.rmtree(output_path, ignore_errors=True)
-        
-        # Step 4: Verify deletion (95% - 100%)
-        _update_cleanup_progress(ui_components, 95, "Memverifikasi penghapusan...")
-        
-        if output_path.exists():
-            # Force removal jika masih ada
-            try:
-                shutil.rmtree(output_path, ignore_errors=True)
-                if output_path.exists():
-                    raise Exception("Direktori masih ada setelah penghapusan")
-            except Exception as e:
-                _error_cleanup_progress(ui_components, f"Gagal menghapus direktori: {str(e)}")
-                if logger:
-                    logger.error(f"❌ Error cleanup: {str(e)}")
-                return
-        
-        # Complete
-        _complete_cleanup_progress(ui_components, f"Cleanup berhasil: {deleted_files} file dihapus")
-        
-        if logger:
-            logger.success(f"✅ Dataset berhasil dihapus: {deleted_files} file")
+                logger.success(f"✅ {result['message']}")
+                stats = result['stats']
+                if stats['folders_cleaned']:
+                    for folder in stats['folders_cleaned']:
+                        logger.info(f"   • {folder}")
+        elif result['status'] == 'empty':
+            _complete_cleanup_progress(ui_components, result['message'])
+            if logger:
+                logger.info(f"ℹ️ {result['message']}")
+        else:
+            _error_cleanup_progress(ui_components, result.get('message', 'Cleanup gagal'))
+            if logger:
+                logger.error(f"❌ {result.get('message', 'Cleanup gagal')}")
         
     except Exception as e:
-        _error_cleanup_progress(ui_components, f"Cleanup gagal: {str(e)}")
+        _error_cleanup_progress(ui_components, f"Cleanup error: {str(e)}")
         if logger:
             logger.error(f"❌ Error cleanup: {str(e)}")
     finally:
         disable_download_buttons(ui_components, False)
-
-def _delete_files_with_progress(ui_components: Dict[str, Any], dataset_path: Path, total_files: int) -> int:
-    """Delete files dengan detailed progress tracking."""
-    deleted_count = 0
-    processed_count = 0
-    
-    try:
-        # Walk through directory dan delete files
-        for root, dirs, files in os.walk(str(dataset_path), topdown=False):
-            # Delete files first
-            for file in files:
-                file_path = os.path.join(root, file)
-                try:
-                    os.remove(file_path)
-                    deleted_count += 1
-                except Exception:
-                    pass  # Continue dengan file lainnya
-                
-                processed_count += 1
-                
-                # Update progress setiap 5% atau setiap 10 files
-                if processed_count % max(1, total_files // 20) == 0 or processed_count % 10 == 0:
-                    # Progress dari 10% sampai 90%
-                    progress = 10 + int((processed_count / total_files) * 80)
-                    _update_cleanup_progress(ui_components, progress, 
-                                           f"Menghapus file: {processed_count}/{total_files}")
-            
-            # Delete empty directories
-            for dir_name in dirs:
-                dir_path = os.path.join(root, dir_name)
-                try:
-                    if not os.listdir(dir_path):
-                        os.rmdir(dir_path)
-                except Exception:
-                    pass
-    
-    except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.warning(f"⚠️ Error saat delete files: {str(e)}")
-    
-    return deleted_count
 
 def _start_cleanup_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Start cleanup progress tracking."""
@@ -246,6 +183,3 @@ def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     # Clear confirmation area
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
         ui_components['confirmation_area'].clear_output()
-
-# Import os yang diperlukan
-import os

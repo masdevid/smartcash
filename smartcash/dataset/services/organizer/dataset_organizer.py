@@ -1,25 +1,20 @@
 """
 File: smartcash/dataset/services/organizer/dataset_organizer.py
-Deskripsi: Service untuk memindahkan dan mengorganisir dataset dari downloads folder ke struktur data final
+Deskripsi: Fixed dataset organizer dengan path handling yang benar dan move ke /data di Drive
 """
 
 import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 from smartcash.common.logger import get_logger
-from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
 class DatasetOrganizer:
-    """Service untuk memindahkan dataset dari downloads ke struktur final."""
+    """Service untuk memindahkan dataset dari downloads ke struktur final di /data."""
     
     def __init__(self, logger=None):
         self.logger = logger or get_logger()
         self.env_manager = get_environment_manager()
-        self.paths = get_paths_for_environment(
-            is_colab=self.env_manager.is_colab,
-            is_drive_mounted=self.env_manager.is_drive_mounted
-        )
         self._progress_callback: Optional[Callable] = None
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
@@ -34,17 +29,27 @@ class DatasetOrganizer:
             except Exception:
                 pass
     
-    def organize_dataset(self, source_dir: str, remove_source: bool = True) -> Dict[str, Any]:
-        """
-        Pindahkan dataset dari downloads folder ke struktur final.
+    def _get_target_paths(self) -> Dict[str, str]:
+        """Get target paths berdasarkan environment - selalu ke /data untuk consistency."""
+        if self.env_manager.is_colab and self.env_manager.is_drive_mounted:
+            # Target ke Drive /data bukan Colab /content/data
+            base_path = self.env_manager.drive_path / 'data'
+        elif self.env_manager.is_colab:
+            # Target ke Colab /content/data
+            base_path = Path('/content/data')
+        else:
+            # Local environment
+            base_path = Path('data')
         
-        Args:
-            source_dir: Source directory (biasanya downloads folder)
-            remove_source: Hapus source setelah copy
-            
-        Returns:
-            Dict hasil operasi
-        """
+        return {
+            'train': str(base_path / 'train'),
+            'valid': str(base_path / 'valid'), 
+            'test': str(base_path / 'test'),
+            'base': str(base_path)
+        }
+    
+    def organize_dataset(self, source_dir: str, remove_source: bool = True) -> Dict[str, Any]:
+        """Pindahkan dataset dari downloads ke /data structure."""
         source_path = Path(source_dir)
         
         if not source_path.exists():
@@ -54,15 +59,19 @@ class DatasetOrganizer:
         self._notify_progress("organize", 0, 100, "Memulai organisasi dataset")
         
         try:
+            # Get target paths
+            target_paths = self._get_target_paths()
+            
             # Check structure di source
             splits_found = self._detect_splits(source_path)
             if not splits_found:
                 return {'status': 'error', 'message': 'Tidak ada split dataset yang valid ditemukan'}
             
             self.logger.info(f"📊 Splits ditemukan: {', '.join(splits_found)}")
+            self.logger.info(f"🎯 Target base: {target_paths['base']}")
             
             # Prepare target directories
-            self._prepare_target_directories()
+            self._prepare_target_directories(target_paths)
             self._notify_progress("organize", 20, 100, "Menyiapkan direktori target")
             
             # Move each split
@@ -73,7 +82,7 @@ class DatasetOrganizer:
                 split_progress = 30 + (i * 60 // total_splits)
                 self._notify_progress("organize", split_progress, 100, f"Memindahkan split {split}")
                 
-                split_stats = self._move_split(source_path / split, split)
+                split_stats = self._move_split(source_path / split, target_paths[split], split)
                 moved_stats[split] = split_stats
                 
                 if split_stats['status'] != 'success':
@@ -91,7 +100,7 @@ class DatasetOrganizer:
             self._notify_progress("organize", 100, 100, f"Organisasi selesai: {total_images} gambar")
             
             self.logger.success(
-                f"✅ Dataset berhasil diorganisir\n"
+                f"✅ Dataset berhasil diorganisir ke {target_paths['base']}\n"
                 f"   • Total gambar: {total_images}\n"
                 f"   • Total label: {total_labels}\n"
                 f"   • Splits: {', '.join(splits_found)}"
@@ -103,11 +112,7 @@ class DatasetOrganizer:
                 'total_images': total_images,
                 'total_labels': total_labels,
                 'splits': moved_stats,
-                'target_paths': {
-                    'train': self.paths['train'],
-                    'valid': self.paths['valid'],
-                    'test': self.paths['test']
-                }
+                'target_paths': target_paths
             }
             
         except Exception as e:
@@ -126,19 +131,20 @@ class DatasetOrganizer:
                 splits.append(normalized_name)
         return splits
     
-    def _prepare_target_directories(self) -> None:
+    def _prepare_target_directories(self, target_paths: Dict[str, str]) -> None:
         """Siapkan direktori target."""
         for split in ['train', 'valid', 'test']:
-            target_path = Path(self.paths[split])
-            target_path.mkdir(parents=True, exist_ok=True)
-            
-            # Buat subdirectories
-            (target_path / 'images').mkdir(exist_ok=True)
-            (target_path / 'labels').mkdir(exist_ok=True)
+            if split in target_paths:
+                target_path = Path(target_paths[split])
+                target_path.mkdir(parents=True, exist_ok=True)
+                
+                # Buat subdirectories
+                (target_path / 'images').mkdir(exist_ok=True)
+                (target_path / 'labels').mkdir(exist_ok=True)
     
-    def _move_split(self, source_split_path: Path, split_name: str) -> Dict[str, Any]:
+    def _move_split(self, source_split_path: Path, target_path_str: str, split_name: str) -> Dict[str, Any]:
         """Pindahkan satu split ke target directory."""
-        target_path = Path(self.paths[split_name])
+        target_path = Path(target_path_str)
         
         try:
             # Handle val -> valid mapping
@@ -161,47 +167,36 @@ class DatasetOrganizer:
             # Move images
             if source_images.exists() and image_count > 0:
                 target_images = target_path / 'images'
-                self._copy_files(source_images, target_images, '*.{jpg,jpeg,png,bmp}')
+                self._copy_files(source_images, target_images, ['*.jpg', '*.jpeg', '*.png', '*.bmp'])
             
             # Move labels
             if source_labels.exists() and label_count > 0:
                 target_labels = target_path / 'labels'
-                self._copy_files(source_labels, target_labels, '*.txt')
+                self._copy_files(source_labels, target_labels, ['*.txt'])
             
             # Copy additional files (data.yaml, classes.txt, etc)
             self._copy_additional_files(actual_source, target_path)
             
-            self.logger.info(f"📁 Split {split_name}: {image_count} gambar, {label_count} label")
+            self.logger.info(f"📁 Split {split_name}: {image_count} gambar, {label_count} label → {target_path}")
             
             return {
                 'status': 'success',
                 'images': image_count,
                 'labels': label_count,
-                'target_path': str(target_path)
+                'path': str(target_path)
             }
             
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
     
-    def _copy_files(self, source_dir: Path, target_dir: Path, pattern: str) -> None:
-        """Copy files dengan pattern tertentu."""
+    def _copy_files(self, source_dir: Path, target_dir: Path, patterns: list) -> None:
+        """Copy files dengan multiple patterns."""
         if not source_dir.exists():
             return
             
         target_dir.mkdir(parents=True, exist_ok=True)
         
-        # Handle multiple extensions
-        if '{' in pattern and '}' in pattern:
-            # Pattern like *.{jpg,jpeg,png,bmp}
-            base_pattern = pattern.split('{')[0]
-            extensions = pattern.split('{')[1].split('}')[0].split(',')
-            
-            for ext in extensions:
-                for file_path in source_dir.glob(f"{base_pattern}{ext}"):
-                    if file_path.is_file():
-                        shutil.copy2(file_path, target_dir / file_path.name)
-        else:
-            # Simple pattern
+        for pattern in patterns:
             for file_path in source_dir.glob(pattern):
                 if file_path.is_file():
                     shutil.copy2(file_path, target_dir / file_path.name)
@@ -226,10 +221,11 @@ class DatasetOrganizer:
     
     def check_organized_dataset(self) -> Dict[str, Any]:
         """Check status dataset yang sudah diorganisir."""
+        target_paths = self._get_target_paths()
         stats = {'total_images': 0, 'total_labels': 0, 'splits': {}}
         
         for split in ['train', 'valid', 'test']:
-            split_path = Path(self.paths[split])
+            split_path = Path(target_paths[split])
             
             if split_path.exists():
                 images_dir = split_path / 'images'
@@ -249,3 +245,58 @@ class DatasetOrganizer:
         
         stats['is_organized'] = stats['total_images'] > 0
         return stats
+    
+    def cleanup_all_dataset_folders(self) -> Dict[str, Any]:
+        """Cleanup dataset folders (/data/train, /data/valid, /data/test) dan downloads."""
+        target_paths = self._get_target_paths()
+        
+        cleanup_stats = {
+            'total_files_removed': 0,
+            'folders_cleaned': [],
+            'errors': []
+        }
+        
+        # Cleanup splits folders
+        for split in ['train', 'valid', 'test']:
+            split_path = Path(target_paths[split])
+            if split_path.exists():
+                try:
+                    file_count = sum(1 for f in split_path.rglob('*') if f.is_file())
+                    if file_count > 0:
+                        shutil.rmtree(split_path, ignore_errors=True)
+                        cleanup_stats['total_files_removed'] += file_count
+                        cleanup_stats['folders_cleaned'].append(f"{split} ({file_count} files)")
+                        self.logger.info(f"🗑️ Cleaned {split}: {file_count} files")
+                except Exception as e:
+                    cleanup_stats['errors'].append(f"Error cleaning {split}: {str(e)}")
+        
+        # Cleanup downloads folder
+        downloads_paths = [
+            Path(target_paths['base']) / 'downloads',  # data/downloads
+            Path(target_paths['base']).parent / 'downloads'  # downloads at same level
+        ]
+        
+        for downloads_path in downloads_paths:
+            if downloads_path.exists():
+                try:
+                    file_count = sum(1 for f in downloads_path.rglob('*') if f.is_file())
+                    if file_count > 0:
+                        shutil.rmtree(downloads_path, ignore_errors=True)
+                        cleanup_stats['total_files_removed'] += file_count
+                        cleanup_stats['folders_cleaned'].append(f"downloads ({file_count} files)")
+                        self.logger.info(f"🗑️ Cleaned downloads: {file_count} files")
+                except Exception as e:
+                    cleanup_stats['errors'].append(f"Error cleaning downloads: {str(e)}")
+        
+        if cleanup_stats['total_files_removed'] == 0:
+            return {
+                'status': 'empty',
+                'message': 'Tidak ada file untuk dihapus di folder dataset',
+                'stats': cleanup_stats
+            }
+        
+        return {
+            'status': 'success', 
+            'message': f"Berhasil menghapus {cleanup_stats['total_files_removed']} file",
+            'stats': cleanup_stats
+        }

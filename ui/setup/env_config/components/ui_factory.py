@@ -147,11 +147,11 @@ class UIFactory:
 
         return {
             'header': header,
+            'status_panel': status_panel,
             'env_summary_panel': env_summary_panel,
             'requirements_panel': requirements_panel,
             'setup_button': setup_button,
             'button_container': button_container,
-            'status_panel': status_panel,
             'log_accordion': log_components['log_accordion'],
             'log_output': log_components['log_output'],
             'progress_bar': progress_components['progress_bar'],

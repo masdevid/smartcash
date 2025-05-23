@@ -1,11 +1,12 @@
 """
 File: smartcash/ui/dataset/download/components/form_fields.py
-Deskripsi: Fixed form fields dengan API key detection yang akurat dan Drive path defaults
+Deskripsi: Updated form fields dengan default path yang benar dan konsisten dengan struktur baru
 """
 
 import ipywidgets as widgets
 import os
 from smartcash.common.environment import get_environment_manager
+from smartcash.common.constants.paths import get_paths_for_environment
 
 def api_key_field():
     """API key field dengan comprehensive detection."""
@@ -72,42 +73,43 @@ def _detect_api_key_comprehensive() -> str:
     return ''
 
 def output_dir_field(config):
-    """Output directory field dengan Drive detection yang akurat."""
+    """Output directory field dengan default ke downloads folder yang benar."""
     env_manager = get_environment_manager()
+    paths = get_paths_for_environment(
+        is_colab=env_manager.is_colab,
+        is_drive_mounted=env_manager.is_drive_mounted
+    )
     
     print(f"🌍 Environment detection:")
     print(f"   • is_colab: {env_manager.is_colab}")
     print(f"   • is_drive_mounted: {env_manager.is_drive_mounted}")
-    print(f"   • drive_path: {env_manager.drive_path}")
+    print(f"   • downloads_path: {paths['downloads']}")
     
-    # Tentukan default path berdasarkan environment
-    if env_manager.is_colab and env_manager.is_drive_mounted:
-        default_value = str(env_manager.drive_path / 'downloads')
-        print(f"✅ Menggunakan Drive path: {default_value}")
-    else:
-        default_value = config.get('dir', 'data')
-        print(f"📁 Menggunakan local path: {default_value}")
+    # Gunakan downloads path sebagai default
+    default_value = paths['downloads']
+    print(f"📁 Output directory default: {default_value}")
     
     return widgets.Text(
         value=default_value,
-        placeholder='Path penyimpanan dataset',
-        description='Output Dir:',
+        placeholder='Path download sementara dataset (akan dipindah ke struktur final)',
+        description='Download Dir:',
         disabled=False,
         layout=widgets.Layout(width='100%')
     )
 
 def backup_dir_field(default_path=None):
-    """Backup directory field dengan Drive detection yang akurat."""
+    """Backup directory field dengan path yang konsisten."""
     env_manager = get_environment_manager()
+    paths = get_paths_for_environment(
+        is_colab=env_manager.is_colab,
+        is_drive_mounted=env_manager.is_drive_mounted
+    )
     
     if default_path:
         value = default_path
-    elif env_manager.is_colab and env_manager.is_drive_mounted:
-        value = str(env_manager.drive_path / 'backups')
-        print(f"✅ Backup akan disimpan di Drive: {value}")
     else:
-        value = 'data/backup'
-        print(f"📁 Backup akan disimpan lokal: {value}")
+        value = paths['backup']
+        print(f"💾 Backup akan disimpan di: {value}")
     
     return widgets.Text(
         value=value,
@@ -151,7 +153,7 @@ def validate_dataset_field():
     """Checkbox untuk validasi dataset."""
     return widgets.Checkbox(
         value=True,
-        description='Validasi dataset setelah download',
+        description='Validasi dataset setelah download dan organisasi',
         disabled=False,
         indent=False,
         layout=widgets.Layout(width='100%')
@@ -160,9 +162,40 @@ def validate_dataset_field():
 def backup_checkbox_field():
     """Checkbox untuk backup dataset."""
     return widgets.Checkbox(
-        value=True,
-        description='Backup dataset sebelum menghapus',
+        value=False,  # Default false untuk proses yang lebih cepat
+        description='Backup dataset lama sebelum replace (jika ada)',
         disabled=False,
         indent=False,
         layout=widgets.Layout(width='100%')
     )
+
+def organize_dataset_field():
+    """Checkbox untuk organisasi dataset (selalu aktif)."""
+    return widgets.Checkbox(
+        value=True,
+        description='Organisir dataset ke struktur final (train/valid/test)',
+        disabled=True,  # Always enabled untuk proses yang konsisten
+        indent=False,
+        layout=widgets.Layout(width='100%')
+    )
+
+def show_structure_info():
+    """Widget info untuk menjelaskan struktur dataset."""
+    info_html = """
+    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 12px; margin: 10px 0;">
+        <h4 style="margin-top: 0; color: #495057;">📁 Struktur Dataset</h4>
+        <p style="margin: 8px 0; color: #6c757d; font-size: 0.9em;">
+            Dataset akan didownload ke folder sementara, kemudian diorganisir ke struktur final:
+        </p>
+        <ul style="margin: 8px 0; color: #6c757d; font-size: 0.9em;">
+            <li><code>data/train/</code> - Dataset training</li>
+            <li><code>data/valid/</code> - Dataset validasi</li>
+            <li><code>data/test/</code> - Dataset testing</li>
+        </ul>
+        <p style="margin: 8px 0 0 0; color: #6c757d; font-size: 0.85em;">
+            💡 Setiap folder akan berisi subdirektori <code>images/</code> dan <code>labels/</code>
+        </p>
+    </div>
+    """
+    
+    return widgets.HTML(info_html)

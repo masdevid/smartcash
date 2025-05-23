@@ -1,23 +1,31 @@
 """
 File: smartcash/ui/dataset/download/handlers/config_handlers.py  
-Deskripsi: Enhanced config handlers dengan API key loading dan environment detection yang tepat
+Deskripsi: Updated config handlers dengan path defaults yang benar dan konsisten
 """
 
 import os
 from typing import Dict, Any
 from smartcash.common.config.manager import get_config_manager
 from smartcash.common.environment import get_environment_manager
+from smartcash.common.constants.paths import get_paths_for_environment
 
 def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup config handlers dengan integrasi yang lebih baik."""
+    """Setup config handlers dengan path management yang benar."""
     
     print("🔧 Setting up config handlers...")
     
     try:
         # Get environment manager dan refresh status
         env_manager = get_environment_manager()
-        env_manager.refresh_drive_status()  # Refresh status untuk akurasi
+        env_manager.refresh_drive_status()
         ui_components['env_manager'] = env_manager
+        
+        # Get paths berdasarkan environment
+        paths = get_paths_for_environment(
+            is_colab=env_manager.is_colab,
+            is_drive_mounted=env_manager.is_drive_mounted
+        )
+        ui_components['paths'] = paths
         
         # Update status panel dengan info yang akurat
         _update_status_panel_with_env_info(ui_components, env_manager)
@@ -27,7 +35,7 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         saved_config = _load_saved_config_safe(config_manager)
         
         # Merge dengan priority: saved_config > passed_config > defaults
-        merged_config = _merge_configs(config, saved_config, env_manager)
+        merged_config = _merge_configs(config, saved_config, paths)
         
         # CRITICAL: Load API key dari semua sumber dan update UI
         api_key = _detect_and_load_api_key(ui_components)
@@ -35,13 +43,13 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
             merged_config['api_key'] = api_key
         
         # Update semua UI components dari merged config
-        _update_all_ui_components(ui_components, merged_config, env_manager)
+        _update_all_ui_components(ui_components, merged_config, paths)
         
         # Update storage info widget
         _update_storage_info_widget(ui_components, env_manager)
         
         # Store defaults untuk reset function
-        ui_components['_defaults'] = _create_smart_defaults(env_manager, api_key)
+        ui_components['_defaults'] = _create_smart_defaults(paths, api_key)
         
         print("✅ Config handlers setup completed successfully")
         
@@ -125,7 +133,7 @@ def _update_status_panel_with_env_info(ui_components: Dict[str, Any], env_manage
             </div>
             <div style="color: #388e3c; font-size: 12px; margin-top: 4px;">
                 📁 Storage: {env_manager.drive_path}<br>
-                💾 Datasets akan tersimpan permanen di Google Drive
+                💾 Dataset akan tersimpan permanen di Google Drive
             </div>
         </div>
         """
@@ -156,8 +164,8 @@ def _update_status_panel_with_env_info(ui_components: Dict[str, Any], env_manage
     
     ui_components['status_panel'].value = status_html
 
-def _merge_configs(base_config: Dict[str, Any], saved_config: Dict[str, Any], env_manager) -> Dict[str, Any]:
-    """Merge configurations dengan priority yang benar."""
+def _merge_configs(base_config: Dict[str, Any], saved_config: Dict[str, Any], paths: Dict[str, str]) -> Dict[str, Any]:
+    """Merge configurations dengan path yang benar."""
     # Start dengan base config
     merged = base_config.copy()
     
@@ -165,26 +173,23 @@ def _merge_configs(base_config: Dict[str, Any], saved_config: Dict[str, Any], en
     if saved_config:
         merged.update(saved_config)
     
-    # Adjust paths untuk Drive jika diperlukan
-    if env_manager.is_colab and env_manager.is_drive_mounted:
-        if not merged.get('output_dir') or merged.get('output_dir') == 'data':
-            merged['output_dir'] = str(env_manager.drive_path / 'downloads')
-        if not merged.get('backup_dir') or merged.get('backup_dir') == 'data/backup':
-            merged['backup_dir'] = str(env_manager.drive_path / 'backups')
+    # Set paths dari environment-aware paths
+    merged['output_dir'] = paths['downloads']  # Download ke downloads folder
+    merged['backup_dir'] = paths['backup']     # Backup ke backup folder
     
     return merged
 
-def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, Any], env_manager) -> None:
-    """Update semua UI components dari config."""
+def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, Any], paths: Dict[str, str]) -> None:
+    """Update semua UI components dari config dengan path yang benar."""
     print("🔄 Updating UI components from config...")
     
-    # Field mapping
+    # Field mapping dengan path yang benar
     field_mapping = {
         'workspace': ('workspace', 'smartcash-wo2us'),
         'project': ('project', 'rupiah-emisi-2022'),
         'version': ('version', '3'),
-        'output_dir': ('output_dir', 'data'),
-        'backup_dir': ('backup_dir', 'data/backup'),
+        'output_dir': ('output_dir', paths['downloads']),      # Use downloads path
+        'backup_dir': ('backup_dir', paths['backup']),        # Use backup path
         'validate_dataset': ('validate_dataset', True),
         'backup_before_download': ('backup_checkbox', False)
     }
@@ -199,22 +204,15 @@ def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, A
     # API key sudah di-handle di _detect_and_load_api_key
     print("✅ UI components updated")
 
-def _create_smart_defaults(env_manager, api_key: str) -> Dict[str, Any]:
-    """Create smart defaults berdasarkan environment."""
-    if env_manager.is_colab and env_manager.is_drive_mounted:
-        output_dir = str(env_manager.drive_path / 'downloads')
-        backup_dir = str(env_manager.drive_path / 'backups')
-    else:
-        output_dir = 'data'
-        backup_dir = 'data/backup'
-    
+def _create_smart_defaults(paths: Dict[str, str], api_key: str) -> Dict[str, Any]:
+    """Create smart defaults berdasarkan environment paths."""
     return {
         'workspace': 'smartcash-wo2us',
         'project': 'rupiah-emisi-2022',
         'version': '3',
         'api_key': api_key,
-        'output_dir': output_dir,
-        'backup_dir': backup_dir,
+        'output_dir': paths['downloads'],    # Downloads folder
+        'backup_dir': paths['backup'],       # Backup folder
         'validate_dataset': True,
         'backup_checkbox': False
     }
@@ -238,8 +236,8 @@ def _set_minimal_fallback(ui_components: Dict[str, Any]) -> None:
         'workspace': 'smartcash-wo2us',
         'project': 'rupiah-emisi-2022',
         'version': '3',
-        'output_dir': 'data',
-        'backup_dir': 'data/backup'
+        'output_dir': 'data/downloads',  # Fallback ke downloads
+        'backup_dir': 'data/backup'      # Fallback ke backup
     }
     
     for key, value in minimal_values.items():
@@ -247,26 +245,30 @@ def _set_minimal_fallback(ui_components: Dict[str, Any]) -> None:
             ui_components[key].value = value
 
 def _update_storage_info_widget(ui_components: Dict[str, Any], env_manager) -> None:
-    """Update storage info widget."""
+    """Update storage info widget dengan path info."""
     if 'drive_info' not in ui_components:
         return
         
     if env_manager.is_colab and env_manager.is_drive_mounted:
         info_html = f"""
         <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 8px; margin: 5px 0;">
-            <span style="color: #2e7d32;">✅ Dataset akan disimpan di Google Drive: {env_manager.drive_path}</span>
+            <span style="color: #2e7d32;">✅ Dataset akan disimpan di Google Drive</span><br>
+            <small style="color: #388e3c;">Path: {env_manager.drive_path}/data/</small>
         </div>
         """
     elif env_manager.is_colab:
         info_html = """
         <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px; margin: 5px 0;">
-            <span style="color: #856404;">⚠️ Drive tidak terhubung - dataset akan disimpan lokal (hilang saat restart)</span>
+            <span style="color: #856404;">⚠️ Drive tidak terhubung - dataset akan disimpan lokal</span><br>
+            <small style="color: #856404;">Path: /content/data/ (hilang saat restart)</small>
         </div>
         """
     else:
         info_html = """
         <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 5px 0;">
-            <span style="color: #1565c0;">ℹ️ Environment lokal - dataset akan disimpan lokal</span>
+            <span style="color: #1565c0;">ℹ️ Environment lokal - dataset akan disimpan lokal</span><br>
+            <small style="color: #1976d2;">Path: ./data/</small>
         </div>
         """
+    
     ui_components['drive_info'].value = info_html

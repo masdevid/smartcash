@@ -59,7 +59,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     
     # Save & reset buttons
     save_reset_buttons = create_save_reset_buttons(
-        save_label="Simpan Config",
+        save_label="Simpan",
         reset_label="Reset"
     )
     

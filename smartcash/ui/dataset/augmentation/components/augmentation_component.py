@@ -146,31 +146,48 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         **advanced_options_widget['widgets'],
         **augmentation_types_widget['widgets'],
         
-        # Action buttons
-        'augment_button': action_buttons['primary_button'],
-        'stop_button': action_buttons['stop_button'],
-        'cleanup_button': action_buttons['cleanup_button'],
+        # Action buttons - Ensure handler compatibility
+        'augment_button': action_buttons.get('primary_button') or action_buttons.get('main_button') or action_buttons.get('action_button'),
+        'stop_button': action_buttons.get('stop_button'),
+        'cleanup_button': action_buttons.get('cleanup_button'),
+        
+        # Handler expects these specific keys for state management
+        'running_state': False,  # Handler uses this for tracking running state
+        'stop_signal': False,    # Handler uses this for stop signal
         
         # Config buttons
         'save_button': save_reset_buttons['save_button'],
         'reset_button': save_reset_buttons['reset_button'],
         
-        # Progress components
-        'progress_bar': progress_components['progress_bar'],
-        'progress_container': progress_components['progress_container'],
+        # Progress components - Handler expects these keys
+        'progress_bar': progress_components.get('progress_bar'),
+        'progress_container': progress_components.get('progress_container'),
         'current_progress': progress_components.get('current_progress'),
         'overall_label': progress_components.get('overall_label'),
         'step_label': progress_components.get('step_label'),
         
-        # Log components
-        'status': log_components['log_output'],
-        'log_output': log_components['log_output'],
-        'log_accordion': log_components['log_accordion'],
+        # Handler expects these progress-related keys
+        'progress_callback': None,  # Handler sets this during execution
         
-        # Module info (untuk managers)
+        # Log components - Handler expects these keys
+        'status': log_components.get('log_output'),
+        'log_output': log_components.get('log_output'),
+        'log_accordion': log_components.get('log_accordion'),
+        
+        # Module info (untuk managers) - Handler expects these paths
         'module_name': 'augmentation',
         'data_dir': 'data',
-        'augmented_dir': 'data/augmented'
+        'augmented_dir': 'data/augmented',
+        
+        # Handler compatibility - Additional keys the handler might expect
+        'env': env,  # Environment manager
+        'config': config,  # Configuration
+        
+        # Add reference to full components for debugging and handler access
+        'action_buttons': action_buttons,
+        'save_reset_buttons': save_reset_buttons,
+        'progress_components': progress_components,
+        'log_components': log_components
     }
 
     return ui_components

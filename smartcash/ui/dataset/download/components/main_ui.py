@@ -43,7 +43,7 @@ def create_download_ui(config=None):
     
     # Create save/reset buttons using the shared component
     save_reset_buttons = create_save_reset_buttons(
-        save_label="Simpan Konfigurasi",
+        save_label="Simpan",
         reset_label="Reset",
         save_tooltip="Simpan konfigurasi download saat ini",
         reset_tooltip="Reset konfigurasi ke pengaturan default",

@@ -1,181 +1,145 @@
 """
 File: smartcash/ui/components/action_buttons.py
-Deskripsi: Komponen tombol aksi reusable dengan tampilan standar
+Deskripsi: Komponen action buttons yang fixed dengan naming yang konsisten dan button creation yang proper
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, List, Tuple, Optional
+from smartcash.ui.utils.constants import COLORS, ICONS
 
-def create_action_buttons(
-    primary_label: str = "Run Process", 
-    primary_icon: str = "play",
-    secondary_buttons: List[Tuple[str, str, str]] = None, 
-    cleanup_enabled: bool = True,
-    layout: Optional[widgets.Layout] = None
-) -> Dict[str, widgets.Widget]:
+def create_action_buttons(primary_label: str = "Download Dataset",
+                         primary_icon: str = "download", 
+                         secondary_buttons: list = None,
+                         cleanup_enabled: bool = True,
+                         button_width: str = '140px',
+                         container_width: str = '100%') -> dict:
     """
-    Buat set tombol aksi standar dengan tampilan seragam.
+    Create action buttons dengan naming yang konsisten dan proper button creation.
     
     Args:
-        primary_label: Label untuk tombol aksi utama
-        primary_icon: Icon untuk tombol aksi utama
-        secondary_buttons: List tuple (label, icon, button_style) untuk tombol sekunder
-        cleanup_enabled: Flag untuk menampilkan tombol cleanup
-        layout: Layout untuk container
+        primary_label: Label untuk primary button
+        primary_icon: Icon untuk primary button  
+        secondary_buttons: List of (label, icon, style) untuk secondary buttons
+        cleanup_enabled: Apakah cleanup button ditampilkan
+        button_width: Lebar setiap button
+        container_width: Lebar container
         
     Returns:
-        Dictionary berisi tombol dan container widgets
+        Dictionary berisi semua button components dengan key yang konsisten
     """
-    # Tombol utama dengan gaya primary
-    primary_button = widgets.Button(
+    
+    # Default secondary buttons jika tidak disediakan
+    if secondary_buttons is None:
+        secondary_buttons = [
+            ("Check Dataset", "search", "info")
+        ]
+    
+    # 🔘 Primary download button
+    download_button = widgets.Button(
         description=primary_label,
-        button_style='primary',
-        icon=primary_icon,
-        tooltip=f"Mulai proses {primary_label.lower()}",
-        layout=widgets.Layout(margin='5px')
+        button_style='success',
+        tooltip=f'Klik untuk {primary_label.lower()}',
+        icon='download' if primary_icon == 'download' else '',
+        layout=widgets.Layout(width=button_width, height='35px')
     )
     
-    # Tombol stop (hidden by default)
-    stop_button = widgets.Button(
-        description='Stop',
-        button_style='danger',
-        icon='stop',
-        tooltip="Hentikan proses yang sedang berjalan",
-        layout=widgets.Layout(display='none', margin='5px')
+    # 🔍 Check button  
+    check_button = widgets.Button(
+        description="Check Dataset",
+        button_style='info',
+        tooltip='Periksa status dataset yang sudah ada',
+        icon='search',
+        layout=widgets.Layout(width=button_width, height='35px')
     )
     
-    # Tidak lagi menggunakan tombol reset dan save karena sudah ada di save_reset_buttons
-    
-    # Tombol cleanup (optional)
-    cleanup_button = widgets.Button(
-        description='Hapus Data',
-        button_style='danger',
-        icon='trash',
-        tooltip="Hapus data hasil proses",
-        layout=widgets.Layout(
-            display='none' if not cleanup_enabled else 'inline-block',
-            margin='5px'
-        )
-    )
-    
-    # List untuk menyimpan semua tombol
-    buttons = [primary_button, stop_button]
-    
-    # Tambahkan cleanup jika enabled
+    # 🧹 Cleanup button (conditional)
+    cleanup_button = None
     if cleanup_enabled:
-        buttons.append(cleanup_button)
-    
-    # Tambahkan tombol sekunder jika ada
-    secondary_widget_buttons = []
-    if secondary_buttons:
-        for label, icon, button_style in secondary_buttons:
-            button = widgets.Button(
-                description=label,
-                button_style=button_style,
-                icon=icon,
-                tooltip=f"{label}",
-                layout=widgets.Layout(margin='5px')
-            )
-            secondary_widget_buttons.append(button)
-            buttons.append(button)
-    
-    # Default layout
-    if not layout:
-        layout = widgets.Layout(
-            display='flex',
-            flex_flow='row wrap',
-            align_items='center',
-            width='100%',
-            margin='10px 0',
-            gap='5px'
+        cleanup_button = widgets.Button(
+            description="Cleanup Dataset",
+            button_style='warning',
+            tooltip='Hapus dataset yang sudah ada',
+            icon='trash',
+            layout=widgets.Layout(width=button_width, height='35px')
         )
     
-    # Container untuk tombol
-    button_container = widgets.HBox(buttons, layout=layout)
+    # 📋 Create button list untuk layout
+    button_list = [download_button, check_button]
+    if cleanup_button:
+        button_list.append(cleanup_button)
     
-    # Kembalikan dictionary dengan semua komponen
-    buttons_dict = {
-        'primary_button': primary_button,
-        'stop_button': stop_button,
-        'cleanup_button': cleanup_button,
-        'container': button_container
+    # 📦 Container dengan proper spacing
+    container = widgets.HBox(
+        button_list,
+        layout=widgets.Layout(
+            width=container_width,
+            justify_content='flex-start',
+            align_items='center',
+            margin='10px 0'
+        )
+    )
+    
+    # 📋 Return dictionary dengan key yang konsisten
+    result = {
+        'container': container,
+        'download_button': download_button,  # Key konsisten dengan handlers
+        'check_button': check_button,        # Key konsisten dengan handlers  
+        'buttons': button_list
     }
     
-    # Tambahkan tombol sekunder ke dictionary
-    if secondary_buttons:
-        buttons_dict['secondary_buttons'] = secondary_widget_buttons
+    # Add cleanup button jika ada
+    if cleanup_button:
+        result['cleanup_button'] = cleanup_button
     
-    return buttons_dict
+    return result
 
-def create_visualization_buttons(layout: Optional[widgets.Layout] = None, include_distribution: bool = True) -> Dict[str, Any]:
+def create_save_reset_action_buttons(save_label: str = "Simpan",
+                                   reset_label: str = "Reset", 
+                                   button_width: str = '100px',
+                                   container_width: str = '100%') -> dict:
     """
-    Buat tombol visualisasi standar untuk tampilan hasil.
+    Create save dan reset buttons dengan naming yang konsisten.
     
     Args:
-        layout: Layout untuk container
+        save_label: Label untuk save button
+        reset_label: Label untuk reset button
+        button_width: Lebar setiap button
+        container_width: Lebar container
         
     Returns:
-        Dictionary berisi tombol visualisasi dan container
+        Dictionary berisi save dan reset button components
     """
-    # Tombol visualisasi sampel
-    visualize_button = widgets.Button(
-        description='Tampilkan Sampel',
-        button_style='info',
-        icon='image',
-        tooltip="Tampilkan sampel hasil",
-        layout=widgets.Layout(margin='5px')
+    
+    # 💾 Save button
+    save_button = widgets.Button(
+        description=save_label,
+        button_style='primary',
+        tooltip='Simpan konfigurasi saat ini',
+        icon='save',
+        layout=widgets.Layout(width=button_width, height='32px')
     )
     
-    # Tombol komparasi
-    compare_button = widgets.Button(
-        description='Bandingkan Data',
-        button_style='info',
-        icon='columns',
-        tooltip="Bandingkan data asli dan hasil",
-        layout=widgets.Layout(margin='5px')
+    # 🔄 Reset button
+    reset_button = widgets.Button(
+        description=reset_label,
+        button_style='',
+        tooltip='Reset ke nilai default',
+        icon='refresh',
+        layout=widgets.Layout(width=button_width, height='32px')
     )
     
-    # Tombol distribusi (opsional)
-    distribution_button = None
-    if include_distribution:
-        distribution_button = widgets.Button(
-            description='Distribusi Kelas',
-            button_style='info',
-            icon='bar-chart',
-            tooltip="Tampilkan distribusi kelas dataset",
-            layout=widgets.Layout(margin='5px')
-        )
-    
-    # Default layout
-    if not layout:
-        layout = widgets.Layout(
-            display='none',  # Hidden by default
-            flex_flow='row wrap',
+    # 📦 Container
+    container = widgets.HBox(
+        [save_button, reset_button],
+        layout=widgets.Layout(
+            width=container_width,
+            justify_content='flex-end',
             align_items='center',
-            width='100%',
-            margin='10px 0',
-            gap='5px'
+            margin='5px 0'
         )
-    
-    # Container untuk tombol visualisasi
-    buttons = [visualize_button, compare_button]
-    if distribution_button:
-        buttons.append(distribution_button)
-        
-    button_container = widgets.HBox(
-        buttons,
-        layout=layout
     )
     
-    # Kembalikan dictionary berisi tombol dan container
-    result = {
-        'visualize_button': visualize_button,
-        'compare_button': compare_button,
-        'container': button_container
+    return {
+        'container': container,
+        'save_button': save_button,      # Key konsisten dengan handlers
+        'reset_button': reset_button     # Key konsisten dengan handlers
     }
-    
-    # Tambahkan distribution_button ke result jika ada
-    if distribution_button:
-        result['distribution_button'] = distribution_button
-        
-    return result

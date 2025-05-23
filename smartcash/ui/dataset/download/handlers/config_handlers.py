@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/dataset/download/handlers/config_handlers.py
-Deskripsi: Fixed config handlers dengan Drive integration, API key detection, dan status panel yang akurat
+File: smartcash/ui/dataset/download/handlers/config_handlers.py  
+Deskripsi: Enhanced config handlers dengan API key loading dan environment detection yang tepat
 """
 
 import os
@@ -9,162 +9,199 @@ from smartcash.common.config.manager import get_config_manager
 from smartcash.common.environment import get_environment_manager
 
 def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup config handlers dengan perbaikan lengkap."""
+    """Setup config handlers dengan integrasi yang lebih baik."""
+    
+    print("🔧 Setting up config handlers...")
     
     try:
-        # Environment manager untuk Drive detection
+        # Get environment manager dan refresh status
         env_manager = get_environment_manager()
+        env_manager.refresh_drive_status()  # Refresh status untuk akurasi
         ui_components['env_manager'] = env_manager
         
-        # Update status panel dengan Drive status yang akurat
-        _update_status_panel_accurate(ui_components, env_manager)
+        # Update status panel dengan info yang akurat
+        _update_status_panel_with_env_info(ui_components, env_manager)
         
-        # Get config manager
+        # Load saved config
         config_manager = get_config_manager()
-        
-        # Load saved config dengan error handling
         saved_config = _load_saved_config_safe(config_manager)
         
-        # Merge config dengan Drive path adjustments
-        merged_config = {**config, **saved_config}
+        # Merge dengan priority: saved_config > passed_config > defaults
+        merged_config = _merge_configs(config, saved_config, env_manager)
         
-        # Adjust paths untuk Drive jika perlu
-        if env_manager.is_colab and env_manager.is_drive_mounted:
-            merged_config = _adjust_paths_for_drive(merged_config, env_manager)
-        
-        # Setup API key detection dari semua sumber
-        api_key = _detect_api_key_comprehensive()
+        # CRITICAL: Load API key dari semua sumber dan update UI
+        api_key = _detect_and_load_api_key(ui_components)
         if api_key:
             merged_config['api_key'] = api_key
         
-        # Update UI dari config dengan defaults
-        _update_ui_from_config_with_defaults(ui_components, merged_config)
+        # Update semua UI components dari merged config
+        _update_all_ui_components(ui_components, merged_config, env_manager)
         
         # Update storage info widget
         _update_storage_info_widget(ui_components, env_manager)
         
-        # Set default values untuk components
-        _set_component_defaults(ui_components, env_manager)
+        # Store defaults untuk reset function
+        ui_components['_defaults'] = _create_smart_defaults(env_manager, api_key)
+        
+        print("✅ Config handlers setup completed successfully")
         
     except Exception as e:
         logger = ui_components.get('logger')
         if logger:
-            logger.warning(f"⚠️ Gagal load config: {str(e)}")
-        # Set minimal defaults jika error
-        _set_minimal_defaults(ui_components)
+            logger.warning(f"⚠️ Error setup config: {str(e)}")
+        print(f"❌ Config setup error: {str(e)}")
+        # Set minimal fallback
+        _set_minimal_fallback(ui_components)
     
     return ui_components
 
-def _update_status_panel_accurate(ui_components: Dict[str, Any], env_manager) -> None:
-    """Update status panel dengan informasi Drive yang akurat."""
-    if 'status_panel' in ui_components:
-        if env_manager.is_colab and env_manager.is_drive_mounted:
-            status_html = """
-            <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 10px; margin: 5px 0;">
-                <span style="color: #2e7d32; font-weight: bold;">✅ Drive terhubung - Siap download ke Google Drive</span>
-            </div>
-            """
-        elif env_manager.is_colab:
-            status_html = """
-            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin: 5px 0;">
-                <span style="color: #856404; font-weight: bold;">⚠️ Colab terdeteksi tapi Drive tidak terhubung - Dataset akan hilang saat restart</span>
-            </div>
-            """
-        else:
-            status_html = """
-            <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 10px; margin: 5px 0;">
-                <span style="color: #1565c0; font-weight: bold;">ℹ️ Environment lokal - Dataset akan disimpan lokal</span>
-            </div>
-            """
-        ui_components['status_panel'].value = status_html
-
-def _load_saved_config_safe(config_manager) -> Dict[str, Any]:
-    """Load config dengan error handling yang aman."""
-    try:
-        if hasattr(config_manager, 'get_config'):
-            return config_manager.get_config('dataset') or {}
-        elif hasattr(config_manager, 'config'):
-            return getattr(config_manager, 'config', {}).get('dataset', {})
-        else:
-            return {}
-    except Exception:
-        return {}
-
-def _detect_api_key_comprehensive() -> str:
-    """Deteksi API key dari semua sumber yang tersedia."""
+def _detect_and_load_api_key(ui_components: Dict[str, Any]) -> str:
+    """Deteksi dan load API key dengan logging detail."""
+    print("🔑 Detecting API key from all sources...")
+    
     # 1. Environment variable
     api_key = os.environ.get('ROBOFLOW_API_KEY', '')
     if api_key:
+        print(f"✅ API key found in environment variable: {'*' * (len(api_key)-4)}{api_key[-4:]}")
+        # Update UI field immediately
+        if 'api_key' in ui_components and hasattr(ui_components['api_key'], 'value'):
+            ui_components['api_key'].value = api_key
         return api_key
     
-    # 2. Google Colab userdata (Google Secrets)
+    # 2. Google Colab userdata
     try:
         from google.colab import userdata
-        api_key = userdata.get('ROBOFLOW_API_KEY', '')
-        if api_key:
-            return api_key
-    except Exception:
-        pass
-    
-    # 3. Check variants nama secret
-    secret_variants = ['ROBOFLOW_API_KEY', 'roboflow_api_key', 'ROBOFLOW_KEY', 'roboflow_key']
-    for variant in secret_variants:
+        print("🔍 Checking Google Colab secrets...")
+        
+        # Primary key
         try:
-            from google.colab import userdata
-            api_key = userdata.get(variant, '')
+            api_key = userdata.get('ROBOFLOW_API_KEY')
             if api_key:
+                print(f"✅ API key found in Colab secrets (ROBOFLOW_API_KEY): {'*' * (len(api_key)-4)}{api_key[-4:]}")
+                # Update UI field immediately
+                if 'api_key' in ui_components and hasattr(ui_components['api_key'], 'value'):
+                    ui_components['api_key'].value = api_key
                 return api_key
-        except Exception:
-            continue
+        except Exception as e:
+            print(f"⚠️ Error accessing ROBOFLOW_API_KEY: {str(e)}")
+        
+        # Alternative keys
+        alternative_keys = ['roboflow_api_key', 'ROBOFLOW_KEY', 'roboflow_key', 'API_KEY']
+        for key_name in alternative_keys:
+            try:
+                api_key = userdata.get(key_name)
+                if api_key:
+                    print(f"✅ API key found in Colab secrets ({key_name}): {'*' * (len(api_key)-4)}{api_key[-4:]}")
+                    # Update UI field immediately
+                    if 'api_key' in ui_components and hasattr(ui_components['api_key'], 'value'):
+                        ui_components['api_key'].value = api_key
+                    return api_key
+            except Exception:
+                continue
+                
+        print("❌ No API key found in Google Colab secrets")
+        
+    except ImportError:
+        print("ℹ️ Not in Google Colab environment - skipping secrets check")
+    except Exception as e:
+        print(f"⚠️ Error accessing Colab secrets: {str(e)}")
     
+    print("❌ API key not found from any source")
     return ''
 
-def _adjust_paths_for_drive(config: Dict[str, Any], env_manager) -> Dict[str, Any]:
-    """Adjust config paths untuk Drive storage."""
-    adjusted_config = config.copy()
+def _update_status_panel_with_env_info(ui_components: Dict[str, Any], env_manager) -> None:
+    """Update status panel dengan environment info yang detail."""
+    if 'status_panel' not in ui_components:
+        return
     
-    # Adjust output directory ke Drive
-    if 'output_dir' not in adjusted_config or not adjusted_config['output_dir'] or adjusted_config['output_dir'] == 'data':
-        adjusted_config['output_dir'] = str(env_manager.drive_path / 'downloads')
+    # Get system info untuk detail lebih lengkap  
+    sys_info = env_manager.get_system_info()
     
-    # Adjust backup directory ke Drive
-    if 'backup_dir' not in adjusted_config or not adjusted_config['backup_dir'] or adjusted_config['backup_dir'] == 'data/backup':
-        adjusted_config['backup_dir'] = str(env_manager.drive_path / 'backups')
+    if env_manager.is_colab and env_manager.is_drive_mounted:
+        status_html = f"""
+        <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 6px; padding: 12px; margin: 8px 0;">
+            <div style="color: #2e7d32; font-weight: bold; font-size: 14px;">
+                ✅ Google Colab + Drive Connected
+            </div>
+            <div style="color: #388e3c; font-size: 12px; margin-top: 4px;">
+                📁 Storage: {env_manager.drive_path}<br>
+                💾 Datasets akan tersimpan permanen di Google Drive
+            </div>
+        </div>
+        """
+    elif env_manager.is_colab:
+        status_html = f"""
+        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 12px; margin: 8px 0;">
+            <div style="color: #856404; font-weight: bold; font-size: 14px;">
+                ⚠️ Google Colab - Drive Not Connected
+            </div>
+            <div style="color: #856404; font-size: 12px; margin-top: 4px;">
+                📁 Storage: Local (temporary)<br>
+                ⏰ Dataset akan hilang saat runtime restart
+            </div>
+        </div>
+        """
+    else:
+        status_html = f"""
+        <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 6px; padding: 12px; margin: 8px 0;">
+            <div style="color: #1565c0; font-weight: bold; font-size: 14px;">
+                ℹ️ Local Environment
+            </div>
+            <div style="color: #1976d2; font-size: 12px; margin-top: 4px;">
+                📁 Storage: Local filesystem<br>
+                💻 Running on local machine
+            </div>
+        </div>
+        """
     
-    return adjusted_config
+    ui_components['status_panel'].value = status_html
 
-def _update_ui_from_config_with_defaults(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI components dari config dengan defaults yang benar."""
-    # Default values yang akan dipakai untuk reset
-    defaults = _get_default_values(ui_components.get('env_manager'))
+def _merge_configs(base_config: Dict[str, Any], saved_config: Dict[str, Any], env_manager) -> Dict[str, Any]:
+    """Merge configurations dengan priority yang benar."""
+    # Start dengan base config
+    merged = base_config.copy()
     
-    config_mapping = {
-        'workspace': ('workspace', defaults['workspace']),
-        'project': ('project', defaults['project']),
-        'version': ('version', defaults['version']),
-        'api_key': ('api_key', defaults['api_key']),
-        'output_dir': ('output_dir', defaults['output_dir']),
-        'backup_dir': ('backup_dir', defaults['backup_dir']),
-        'validate_dataset': ('validate_dataset', defaults['validate_dataset']),
-        'backup_before_download': ('backup_checkbox', defaults['backup_checkbox'])
+    # Override dengan saved config jika ada
+    if saved_config:
+        merged.update(saved_config)
+    
+    # Adjust paths untuk Drive jika diperlukan
+    if env_manager.is_colab and env_manager.is_drive_mounted:
+        if not merged.get('output_dir') or merged.get('output_dir') == 'data':
+            merged['output_dir'] = str(env_manager.drive_path / 'downloads')
+        if not merged.get('backup_dir') or merged.get('backup_dir') == 'data/backup':
+            merged['backup_dir'] = str(env_manager.drive_path / 'backups')
+    
+    return merged
+
+def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, Any], env_manager) -> None:
+    """Update semua UI components dari config."""
+    print("🔄 Updating UI components from config...")
+    
+    # Field mapping
+    field_mapping = {
+        'workspace': ('workspace', 'smartcash-wo2us'),
+        'project': ('project', 'rupiah-emisi-2022'),
+        'version': ('version', '3'),
+        'output_dir': ('output_dir', 'data'),
+        'backup_dir': ('backup_dir', 'data/backup'),
+        'validate_dataset': ('validate_dataset', True),
+        'backup_before_download': ('backup_checkbox', False)
     }
     
-    for config_key, (ui_key, default_value) in config_mapping.items():
+    # Update each field
+    for config_key, (ui_key, default_value) in field_mapping.items():
         if ui_key in ui_components and hasattr(ui_components[ui_key], 'value'):
-            # Gunakan nilai dari config, atau default jika tidak ada
             value = config.get(config_key, default_value)
             ui_components[ui_key].value = value
+            print(f"   • {ui_key}: {value}")
     
-    # Store defaults untuk fungsi reset
-    ui_components['_defaults'] = defaults
+    # API key sudah di-handle di _detect_and_load_api_key
+    print("✅ UI components updated")
 
-def _get_default_values(env_manager=None) -> Dict[str, Any]:
-    """Get default values berdasarkan environment."""
-    # Deteksi API key
-    api_key = _detect_api_key_comprehensive()
-    
-    # Default paths berdasarkan environment
-    if env_manager and env_manager.is_colab and env_manager.is_drive_mounted:
+def _create_smart_defaults(env_manager, api_key: str) -> Dict[str, Any]:
+    """Create smart defaults berdasarkan environment."""
+    if env_manager.is_colab and env_manager.is_drive_mounted:
         output_dir = str(env_manager.drive_path / 'downloads')
         backup_dir = str(env_manager.drive_path / 'backups')
     else:
@@ -182,54 +219,54 @@ def _get_default_values(env_manager=None) -> Dict[str, Any]:
         'backup_checkbox': False
     }
 
-def _set_component_defaults(ui_components: Dict[str, Any], env_manager) -> None:
-    """Set default values ke components jika belum ada."""
-    defaults = _get_default_values(env_manager)
-    
-    for key, default_value in defaults.items():
-        ui_key = 'backup_checkbox' if key == 'backup_checkbox' else key
-        if ui_key in ui_components and hasattr(ui_components[ui_key], 'value'):
-            if not ui_components[ui_key].value:  # Jika kosong, set default
-                ui_components[ui_key].value = default_value
+def _load_saved_config_safe(config_manager) -> Dict[str, Any]:
+    """Load saved config dengan error handling."""
+    try:
+        if hasattr(config_manager, 'get_config'):
+            return config_manager.get_config('dataset') or {}
+        elif hasattr(config_manager, 'config'):
+            return getattr(config_manager, 'config', {}).get('dataset', {})
+        else:
+            return {}
+    except Exception as e:
+        print(f"⚠️ Error loading saved config: {str(e)}")
+        return {}
 
-def _set_minimal_defaults(ui_components: Dict[str, Any]) -> None:
-    """Set minimal defaults jika terjadi error saat load config."""
-    minimal_defaults = {
+def _set_minimal_fallback(ui_components: Dict[str, Any]) -> None:
+    """Set minimal fallback jika terjadi error."""
+    minimal_values = {
         'workspace': 'smartcash-wo2us',
-        'project': 'rupiah-emisi-2022', 
+        'project': 'rupiah-emisi-2022',
         'version': '3',
         'output_dir': 'data',
-        'backup_dir': 'data/backup',
-        'validate_dataset': True,
-        'backup_checkbox': False
+        'backup_dir': 'data/backup'
     }
     
-    for key, value in minimal_defaults.items():
-        ui_key = 'backup_checkbox' if key == 'backup_checkbox' else key
-        if ui_key in ui_components and hasattr(ui_components[ui_key], 'value'):
-            ui_components[ui_key].value = value
-    
-    ui_components['_defaults'] = minimal_defaults
+    for key, value in minimal_values.items():
+        if key in ui_components and hasattr(ui_components[key], 'value'):
+            ui_components[key].value = value
 
 def _update_storage_info_widget(ui_components: Dict[str, Any], env_manager) -> None:
-    """Update storage info widget berdasarkan Drive status yang akurat."""
-    if 'drive_info' in ui_components:
-        if env_manager.is_colab and env_manager.is_drive_mounted:
-            info_html = f"""
-            <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 8px; margin: 5px 0;">
-                <span style="color: #2e7d32;">✅ Dataset akan disimpan di Google Drive: {env_manager.drive_path}</span>
-            </div>
-            """
-        elif env_manager.is_colab:
-            info_html = """
-            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px; margin: 5px 0;">
-                <span style="color: #856404;">⚠️ Drive tidak terhubung - dataset akan disimpan lokal (hilang saat restart)</span>
-            </div>
-            """
-        else:
-            info_html = """
-            <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 5px 0;">
-                <span style="color: #1565c0;">ℹ️ Environment lokal - dataset akan disimpan lokal</span>
-            </div>
-            """
-        ui_components['drive_info'].value = info_html
+    """Update storage info widget."""
+    if 'drive_info' not in ui_components:
+        return
+        
+    if env_manager.is_colab and env_manager.is_drive_mounted:
+        info_html = f"""
+        <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 4px; padding: 8px; margin: 5px 0;">
+            <span style="color: #2e7d32;">✅ Dataset akan disimpan di Google Drive: {env_manager.drive_path}</span>
+        </div>
+        """
+    elif env_manager.is_colab:
+        info_html = """
+        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 8px; margin: 5px 0;">
+            <span style="color: #856404;">⚠️ Drive tidak terhubung - dataset akan disimpan lokal (hilang saat restart)</span>
+        </div>
+        """
+    else:
+        info_html = """
+        <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 5px 0;">
+            <span style="color: #1565c0;">ℹ️ Environment lokal - dataset akan disimpan lokal</span>
+        </div>
+        """
+    ui_components['drive_info'].value = info_html

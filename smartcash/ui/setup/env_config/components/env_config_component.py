@@ -32,8 +32,8 @@ class EnvConfigComponent:
     def _init_environment_manager_silent(self):
         """Initialize environment manager tanpa logging untuk menghindari output sebelum UI"""
         try:
-            from smartcash.common.environment import get_environment_manager
-            self.env_manager = get_environment_manager()
+            from smartcash.ui.setup.env_config.helpers.silent_environment_manager import get_silent_environment_manager
+            self.env_manager = get_silent_environment_manager()
             self.ui_components['env_manager'] = self.env_manager
         except Exception:
             # Silent initialization, tidak ada log sebelum UI ready
@@ -53,18 +53,28 @@ class EnvConfigComponent:
             self.logger.warning(f"⚠️ Gagal inisialisasi environment manager: {str(e)}")
     
     def _display_environment_summary(self):
-        """Display comprehensive environment summary dengan informasi yang informatif dan rekomendasi"""
+        """Display comprehensive environment summary dengan silent system info gathering"""
         try:
             from smartcash.ui.setup.env_config.helpers.system_info_helper import SystemInfoHelper
+            from smartcash.ui.setup.env_config.helpers.silent_environment_manager import get_silent_environment_manager
             
-            # Get enhanced system info
+            # Use silent environment manager untuk prevent log leakage
+            silent_env_manager = get_silent_environment_manager()
+            
+            # Get enhanced system info dengan silent mode
             enhanced_info = SystemInfoHelper.get_enhanced_system_info()
             
+            # Get system info dari silent environment manager
+            env_system_info = silent_env_manager.get_system_info()
+            
+            # Merge information
+            merged_info = {**enhanced_info, **env_system_info}
+            
             # Format summary lines
-            summary_lines = SystemInfoHelper.format_system_summary(enhanced_info)
+            summary_lines = SystemInfoHelper.format_system_summary(merged_info)
             
             # Get recommendations
-            recommendations = SystemInfoHelper.get_system_recommendations(enhanced_info)
+            recommendations = SystemInfoHelper.get_system_recommendations(merged_info)
             
             # Build HTML content
             summary_html_parts = [
@@ -93,13 +103,39 @@ class EnvConfigComponent:
                 </div>
                 """
             
-            # Log summary info yang penting
-            self._log_summary_highlights(enhanced_info)
+            # Log summary info yang penting tanpa detail berlebihan
+            self._log_summary_highlights_minimal(merged_info)
             
         except Exception as e:
-            self.logger.error(f"❌ Error display environment summary: {str(e)}")
-            # Fallback ke basic summary
+            # Fallback ke basic summary jika enhanced gagal
             self._display_basic_environment_summary()
+    
+    def _log_summary_highlights_minimal(self, enhanced_info: Dict[str, Any]):
+        """Log highlight minimal dari system info"""
+        try:
+            if not hasattr(self, 'logger') or self.logger is None:
+                return
+            
+            # Hanya log info critical yang user perlu tahu
+            env_type = enhanced_info.get('environment', 'Unknown')
+            
+            # Single summary log
+            summary_parts = [env_type]
+            
+            if enhanced_info.get('cuda_available'):
+                summary_parts.append("GPU✅")
+            else:
+                summary_parts.append("CPU-only")
+            
+            if 'available_memory_gb' in enhanced_info:
+                memory_gb = enhanced_info['available_memory_gb']
+                summary_parts.append(f"{memory_gb:.1f}GB RAM")
+            
+            self.logger.info(f"📊 {' | '.join(summary_parts)}")
+            
+        except Exception:
+            # Completely silent jika error
+            pass
     
     def _display_basic_environment_summary(self):
         """Fallback basic environment summary jika enhanced gagal"""

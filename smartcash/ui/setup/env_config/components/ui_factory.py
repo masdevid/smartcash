@@ -64,17 +64,17 @@ class UIFactory:
     
     @staticmethod
     def create_requirements_info_panel() -> HTML:
-        """Panel informasi requirements dan tips"""
+        """Panel informasi requirements dan tips yang lebih compact"""
         return HTML(
             value="""
             <div style="padding: 10px; background-color: #fff3cd; color: #856404; 
                        border-left: 4px solid #ffc107; border-radius: 4px; margin: 10px 0;
                        font-size: 12px;">
-                <strong>💡 Tips:</strong>
+                <strong>💡 Tips Setup Environment:</strong>
                 <ul style="margin: 5px 0; padding-left: 20px; line-height: 1.4;">
-                    <li>Setup otomatis akan mount Google Drive jika belum</li>
-                    <li>Proses setup membutuhkan koneksi internet yang stabil</li>
-                    <li>Symlinks memungkinkan akses data persisten via Drive</li>
+                    <li>🔗 Setup otomatis akan mount Google Drive jika belum</li>
+                    <li>📁 Symlinks memungkinkan data tersimpan persisten di Drive</li>
+                    <li>⚡ Environment siap untuk development dan training model</li>
                 </ul>
             </div>
             """
@@ -128,16 +128,15 @@ class UIFactory:
             visibility='visible'  # Default visible
         ))
 
-        # Main layout dengan Environment Summary di bawah log output
+        # Main layout dengan urutan baru: Header → Button → Status → Progress → Log Output → Environment Summary → Tips
         ui_layout = VBox([
             header,
-            info_panel,
             button_container,
             status_panel,
-            log_components['log_accordion'],
             progress_container,
-            env_summary_panel,  # Environment Summary dipindah ke bawah
-            requirements_panel  # Tips dipindah ke bawah
+            log_components['log_accordion'],
+            env_summary_panel,  # Environment Summary setelah log
+            requirements_panel  # Tips di paling bawah
         ], layout=widgets.Layout(
             width='100%',
             padding='15px',
@@ -148,8 +147,7 @@ class UIFactory:
 
         return {
             'header': header,
-            'env_summary_panel': env_summary_panel,  # NEW component
-            'info_panel': info_panel,
+            'env_summary_panel': env_summary_panel,
             'requirements_panel': requirements_panel,
             'setup_button': setup_button,
             'button_container': button_container,

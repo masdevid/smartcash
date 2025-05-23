@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/handlers/environment_config_orchestrator.py
-Deskripsi: Orchestrator yang mengoordinasikan setup environment dengan logging informatif dan integrasi environment manager
+Deskripsi: Orchestrator yang mengoordinasikan setup environment dengan logging minimal dan state management
 """
 
 from typing import Dict, Any, Tuple
@@ -10,7 +10,7 @@ from smartcash.ui.setup.env_config.handlers.environment_status_checker import En
 from smartcash.ui.setup.env_config.handlers.drive_setup_handler import DriveSetupHandler
 
 class EnvironmentConfigOrchestrator:
-    """Orchestrator untuk mengoordinasikan setup environment dengan logging informatif"""
+    """Orchestrator untuk mengoordinasikan setup environment dengan logging minimal"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         """Inisialisasi orchestrator dengan silent environment manager integration"""
@@ -26,12 +26,12 @@ class EnvironmentConfigOrchestrator:
     def _init_environment_manager_silent(self):
         """Initialize environment manager tanpa logging untuk menghindari premature output"""
         try:
-            from smartcash.common.environment import get_environment_manager
-            self.env_manager = get_environment_manager()
+            from smartcash.ui.setup.env_config.helpers.silent_environment_manager import get_silent_environment_manager
+            self.env_manager = get_silent_environment_manager()
             self.ui_components['env_manager'] = self.env_manager
         except Exception:
             # Silent failure, akan di-handle saat logger ready
-            pass
+            self.env_manager = None
     
     def init_logger(self):
         """Initialize logger setelah UI ready"""
@@ -39,51 +39,19 @@ class EnvironmentConfigOrchestrator:
             self.logger = create_ui_logger_bridge(self.ui_components, "env_config")
             
             # Log environment details setelah logger ready
-            if hasattr(self, 'env_manager'):
+            if hasattr(self, 'env_manager') and self.env_manager:
                 self._log_environment_details()
     
-    def _log_environment_details(self):
-        """Log detail environment dari environment manager"""
-        try:
-            system_info = self.env_manager.get_system_info()
-            
-            # Log environment details dengan format yang rapi
-            self.logger.info(f"🌍 Platform: {system_info.get('environment', 'Unknown')}")
-            self.logger.info(f"📁 Base Directory: {system_info.get('base_directory', 'N/A')}")
-            
-            if self.env_manager.is_colab:
-                drive_status = "✅ Terhubung" if self.env_manager.is_drive_mounted else "❌ Belum Terhubung"
-                self.logger.info(f"💾 Google Drive: {drive_status}")
-                
-                if self.env_manager.drive_path:
-                    self.logger.info(f"🎯 Drive SmartCash Path: {self.env_manager.drive_path}")
-            
-            # Log GPU info
-            if system_info.get('cuda_available'):
-                gpu_info = f"Device: {system_info.get('cuda_device_name', 'Unknown')[:40]}"
-                self.logger.info(f"🎮 GPU Available: {gpu_info}")
-            else:
-                self.logger.info("🎮 GPU: CPU-only mode")
-            
-            # Log memory info jika tersedia
-            if 'available_memory_gb' in system_info:
-                memory_gb = system_info['available_memory_gb']
-                memory_status = "🟢" if memory_gb > 8 else "🟡" if memory_gb > 4 else "🔴"
-                self.logger.info(f"🧠 Memory: {memory_status} {memory_gb:.1f}GB available")
-            
-        except Exception as e:
-            self.logger.debug(f"🔍 Detail logging error: {str(e)}")
-    
     def check_environment_status(self) -> Dict[str, Any]:
-        """Check status environment dengan Drive state refresh dan retry mechanism"""
+        """Check status environment dengan silent Drive state refresh"""
         # Ensure logger is initialized
         if self.logger is None:
             self.init_logger()
         
-        # Refresh Drive state sebelum check jika ada environment manager
-        if hasattr(self, 'env_manager') and self.env_manager.is_colab:
+        # Refresh Drive state secara silent
+        if hasattr(self, 'env_manager') and self.env_manager:
             try:
-                # Force refresh Drive status
+                # Use silent refresh to prevent log leakage
                 self.env_manager.refresh_drive_status()
                 
                 # Small delay untuk memastikan state terupdate
@@ -102,7 +70,7 @@ class EnvironmentConfigOrchestrator:
                 len(status.get('missing_drive_configs', [])) +
                 len(status.get('invalid_symlinks', []))
             )
-            if missing_count > 0:
+            if missing_count > 0 and self.logger:
                 self.logger.info(f"🔧 Setup diperlukan: {missing_count} item perlu dikonfigurasi")
         
         return status
@@ -117,17 +85,21 @@ class EnvironmentConfigOrchestrator:
         self._update_progress(0.1, "Memulai setup...")
         
         try:
-            # Step 1: Pre-setup Drive state refresh
+            # Step 1: Pre-setup Drive state refresh (silent)
             self._update_progress(0.15, "🔄 Refreshing environment state...")
-            if hasattr(self, 'env_manager') and self.env_manager.is_colab:
-                self.env_manager.refresh_drive_status()
+            if hasattr(self, 'env_manager') and self.env_manager:
+                try:
+                    # Silent refresh to prevent log leakage
+                    self.env_manager.refresh_drive_status()
+                except Exception:
+                    pass
             
             # Step 2: Check current status dengan refreshed state
             self._update_progress(0.2, "🔍 Analyzing environment...")
             status = self.status_checker.get_comprehensive_status()
             
-            # Log current status dengan detail
-            self._log_current_status(status)
+            # Log current status dengan minimal detail
+            self._log_current_status_minimal(status)
             
             if status['ready']:
                 self.logger.success("✅ Environment sudah siap digunakan!")
@@ -141,13 +113,16 @@ class EnvironmentConfigOrchestrator:
                 if success:
                     self.logger.success(f"📱 Drive: {message}")
                     
-                    # Critical: Refresh state setelah mount dengan delay
+                    # Critical: Refresh state setelah mount dengan delay (silent)
                     import time
                     time.sleep(2)  # Wait untuk mount completion
                     
-                    if hasattr(self, 'env_manager'):
-                        self.env_manager.refresh_drive_status()
-                        self.logger.info("🔄 Drive state refreshed setelah mount")
+                    if hasattr(self, 'env_manager') and self.env_manager:
+                        try:
+                            self.env_manager.refresh_drive_status()
+                            self.logger.info("🔄 Drive state refreshed")
+                        except Exception:
+                            pass
                     
                     # Re-check status setelah mount
                     status = self.status_checker.get_comprehensive_status()
@@ -160,11 +135,15 @@ class EnvironmentConfigOrchestrator:
             # Step 4: Validate Drive path setelah refresh
             drive_path = status['drive']['path']
             if not drive_path:
-                # Retry get path setelah refresh
-                if hasattr(self, 'env_manager') and self.env_manager.drive_path:
-                    drive_path = str(self.env_manager.drive_path)
-                else:
-                    self.logger.error("❌ Drive path tidak dapat diakses setelah refresh")
+                # Retry get path setelah refresh (silent)
+                if hasattr(self, 'env_manager') and self.env_manager:
+                    try:
+                        drive_path = self.env_manager.get_drive_path()
+                    except Exception:
+                        pass
+                
+                if not drive_path:
+                    self.logger.error("❌ Drive path tidak dapat diakses")
                     self._reset_progress("Setup gagal")
                     return False
             
@@ -181,12 +160,15 @@ class EnvironmentConfigOrchestrator:
             self._update_progress(0.8, "🔧 Inisialisasi managers...")
             self._initialize_managers()
             
-            # Step 8: Final verification dengan comprehensive refresh
+            # Step 8: Final verification dengan comprehensive refresh (silent)
             self._update_progress(0.9, "✅ Verifikasi final...")
-            if hasattr(self, 'env_manager'):
-                self.env_manager.refresh_drive_status()
-                import time
-                time.sleep(1)  # Final settling time
+            if hasattr(self, 'env_manager') and self.env_manager:
+                try:
+                    self.env_manager.refresh_drive_status()
+                    import time
+                    time.sleep(1)  # Final settling time
+                except Exception:
+                    pass
             
             final_status = self.status_checker.get_comprehensive_status()
             
@@ -203,77 +185,105 @@ class EnvironmentConfigOrchestrator:
                 return True
             
         except Exception as e:
-            self.logger.error(f"❌ Error setup environment: {str(e)}")
+            if self.logger:
+                self.logger.error(f"❌ Error setup environment: {str(e)}")
             self._reset_progress("Setup gagal")
             return False
     
-    def _log_current_status(self, status: Dict[str, Any]):
-        """Log current status dengan format yang informatif"""
-        # Drive status
-        drive_info = status.get('drive', {})
-        if drive_info.get('type') == 'colab':
-            mount_status = "✅ Mounted" if drive_info.get('mounted') else "❌ Not Mounted"
-            self.logger.info(f"💾 Google Drive: {mount_status}")
-        
-        # Missing items summary
-        missing_folders = len(status.get('missing_drive_folders', []))
-        missing_configs = len(status.get('missing_drive_configs', []))
-        invalid_symlinks = len(status.get('invalid_symlinks', []))
-        
-        if missing_folders > 0:
-            self.logger.info(f"📁 Missing folders: {missing_folders} items")
-        if missing_configs > 0:
-            self.logger.info(f"📋 Missing configs: {missing_configs} files")
-        if invalid_symlinks > 0:
-            self.logger.info(f"🔗 Invalid symlinks: {invalid_symlinks} links")
+    def _log_current_status_minimal(self, status: Dict[str, Any]):
+        """Log current status dengan format minimal untuk mengurangi noise"""
+        try:
+            if not self.logger:
+                return
+                
+            # Hanya log info essential
+            drive_info = status.get('drive', {})
+            if drive_info.get('type') == 'colab':
+                mount_status = "✅" if drive_info.get('mounted') else "❌"
+                self.logger.info(f"💾 Drive: {mount_status}")
+            
+            # Summary missing items tanpa detail
+            missing_total = (
+                len(status.get('missing_drive_folders', [])) +
+                len(status.get('missing_drive_configs', [])) +
+                len(status.get('invalid_symlinks', []))
+            )
+            
+            if missing_total > 0:
+                self.logger.info(f"🔧 Missing items: {missing_total}")
+        except Exception:
+            pass
     
     def _log_setup_results(self, results: Dict[str, Any]):
         """Log hasil setup dengan detail yang informatif"""
-        if 'folders' in results:
-            success_folders = sum(results['folders'].values())
-            total_folders = len(results['folders'])
-            self.logger.info(f"📁 Folders: {success_folders}/{total_folders} berhasil dibuat")
-        
-        if 'configs' in results:
-            success_configs = sum(results['configs'].values())
-            total_configs = len(results['configs'])
-            self.logger.info(f"📋 Configs: {success_configs}/{total_configs} berhasil disalin")
-        
-        if 'symlinks' in results:
-            success_symlinks = sum(results['symlinks'].values())
-            total_symlinks = len(results['symlinks'])
-            self.logger.info(f"🔗 Symlinks: {success_symlinks}/{total_symlinks} berhasil dibuat")
-        
-        # Log overall success
-        if results.get('success'):
-            self.logger.success("🎯 Setup components berhasil dikonfigurasi")
-        else:
-            self.logger.warning("⚠️ Setup selesai dengan beberapa issue minor")
+        try:
+            if not self.logger:
+                return
+                
+            if 'folders' in results:
+                success_folders = sum(results['folders'].values())
+                total_folders = len(results['folders'])
+                self.logger.info(f"📁 Folders: {success_folders}/{total_folders} berhasil dibuat")
+            
+            if 'configs' in results:
+                success_configs = sum(results['configs'].values())
+                total_configs = len(results['configs'])
+                self.logger.info(f"📋 Configs: {success_configs}/{total_configs} berhasil disalin")
+            
+            if 'symlinks' in results:
+                success_symlinks = sum(results['symlinks'].values())
+                total_symlinks = len(results['symlinks'])
+                self.logger.info(f"🔗 Symlinks: {success_symlinks}/{total_symlinks} berhasil dibuat")
+            
+            # Log overall success
+            if results.get('success'):
+                self.logger.success("🎯 Setup components berhasil dikonfigurasi")
+            else:
+                self.logger.warning("⚠️ Setup selesai dengan beberapa issue minor")
+        except Exception:
+            pass
     
     def _initialize_managers(self):
-        """Initialize environment dan config managers dengan error handling"""
+        """Initialize environment dan config managers dengan minimal logging"""
         try:
-            # Initialize environment manager (refresh jika sudah ada)
-            from smartcash.common.environment import get_environment_manager
-            env_manager = get_environment_manager()
-            env_manager.refresh_drive_status()  # Refresh status setelah setup
-            self.ui_components['env_manager'] = env_manager
-            self.logger.info("🌍 Environment manager terinisialisasi")
-            
-            # Initialize config manager
+            # Initialize config manager (tidak perlu environment manager karena sudah ada silent version)
             from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
             self.ui_components['config_manager'] = config_manager
-            self.logger.info("⚙️ Config manager terinisialisasi")
-            
-            # Log updated system info
-            system_info = env_manager.get_system_info()
-            if env_manager.is_drive_mounted:
-                self.logger.success(f"💾 Drive terhubung: {system_info.get('drive_path', 'N/A')}")
+            if self.logger:
+                self.logger.info("⚙️ Config manager ready")
             
         except Exception as e:
-            self.logger.warning(f"⚠️ Manager initialization warning: {str(e)}")
-            self.logger.info("💡 Setup akan tetap dilanjutkan...")
+            if self.logger:
+                self.logger.warning(f"⚠️ Manager init warning: {str(e)}")
+                self.logger.info("💡 Setup akan tetap dilanjutkan...")
+    
+    def _log_environment_details(self):
+        """Log environment details dengan format minimal"""
+        try:
+            if not self.logger or not hasattr(self, 'env_manager') or not self.env_manager:
+                return
+                
+            system_info = self.env_manager.get_system_info()
+            
+            # Single line summary untuk mengurangi log noise
+            env_summary = []
+            env_summary.append(system_info.get('environment', 'Unknown'))
+            
+            if system_info.get('cuda_available'):
+                env_summary.append("GPU✅")
+            else:
+                env_summary.append("CPU")
+            
+            if 'available_memory_gb' in system_info:
+                memory_gb = system_info['available_memory_gb']
+                env_summary.append(f"{memory_gb:.1f}GB")
+            
+            self.logger.info(f"🌍 {' | '.join(env_summary)}")
+            
+        except Exception:
+            # Silent jika error untuk mencegah log noise
+            pass
     
     def _update_progress(self, value: float, message: str = ""):
         """Update progress dengan error handling"""

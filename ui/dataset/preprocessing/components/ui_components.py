@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Assembly komponen UI yang disederhanakan untuk preprocessing
+Deskripsi: Assembly komponen UI yang disederhanakan untuk preprocessing dengan input options terintegrasi
 """
 
 import ipywidgets as widgets
@@ -19,13 +19,13 @@ from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.sync_info_message import create_sync_info_message
 
-# Import local components
+# Import local components - integrated directly
 from .input_options import create_preprocessing_input_options
 
 
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Buat komponen UI yang disederhanakan untuk preprocessing.
+    Buat komponen UI yang disederhanakan untuk preprocessing dengan input options terintegrasi.
     
     Args:
         config: Konfigurasi preprocessing
@@ -44,14 +44,16 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         "Siap memulai preprocessing dataset", "info"
     )
     
-    # Input options (simplified)
+    # Input options (2-column layout)
     input_options = create_preprocessing_input_options(config)
     
-    # Action buttons dengan cleanup
+    # Action buttons dengan Check Dataset
     action_buttons = create_action_buttons(
         primary_label="Mulai Preprocessing",
         primary_icon="play",
-        secondary_buttons=[],
+        secondary_buttons=[
+            ("Check Dataset", "search", "info")
+        ],
         cleanup_enabled=True
     )
     
@@ -109,7 +111,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'header': header,
         'status_panel': status_panel,
         
-        # Input components
+        # Input components (directly from integrated input_options)
         'input_options': input_options,
         'resolution_dropdown': input_options.resolution_dropdown,
         'normalization_dropdown': input_options.normalization_dropdown, 
@@ -119,6 +121,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         # Action buttons
         'action_buttons': action_buttons,
         'preprocess_button': action_buttons['download_button'],  # Primary button
+        'check_button': action_buttons['check_button'],         # Check Dataset button
         'cleanup_button': action_buttons['cleanup_button'],
         
         # Save/reset buttons

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/input_options.py
-Deskripsi: Komponen input options yang disederhanakan untuk preprocessing dengan parameter sesuai backend
+Deskripsi: Komponen input options dalam layout 2 kolom untuk preprocessing dengan parameter sesuai backend
 """
 
 import ipywidgets as widgets
@@ -10,13 +10,13 @@ from smartcash.ui.utils.constants import COLORS, ICONS
 
 def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """
-    Buat komponen input options yang disederhanakan untuk preprocessing.
+    Buat komponen input options dalam layout 2 kolom untuk preprocessing.
     
     Args:
         config: Konfigurasi preprocessing
         
     Returns:
-        widgets.VBox: Container input options
+        widgets.VBox: Container input options dengan layout 2 kolom
     """
     # Default config
     if not config:
@@ -34,26 +34,38 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     # Normalization sesuai dengan backend
     normalization = preprocessing_config.get('normalization', 'minmax')
     
-    # Resolution dropdown (maksimal 640x640 untuk efisiensi)
+    # === KOLOM KIRI: Resolusi & Normalisasi ===
+    
+    # Resolution dropdown
     resolution_dropdown = widgets.Dropdown(
         options=['320x320', '416x416', '512x512', '640x640'],
         value=resolution_str if resolution_str in ['320x320', '416x416', '512x512', '640x640'] else '640x640',
         description='Resolusi:',
         style={'description_width': '80px'},
-        layout=widgets.Layout(width='95%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Normalization dropdown sesuai backend preprocessing
+    # Normalization dropdown
     normalization_options = ['minmax', 'standard', 'none']
     normalization_dropdown = widgets.Dropdown(
         options=normalization_options,
         value=normalization if normalization in normalization_options else 'minmax',
         description='Normalisasi:',
         style={'description_width': '80px'},
-        layout=widgets.Layout(width='95%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Worker slider (default 4, max 10 untuk Colab)
+    left_column = widgets.VBox([
+        widgets.HTML("<div style='margin-bottom: 8px; color: #666; font-weight: bold;'>🖼️ Data & Format</div>"),
+        widgets.HTML("<div style='margin-bottom: 5px; color: #888; font-size: 12px;'>Ukuran output preprocessing</div>"),
+        resolution_dropdown,
+        widgets.HTML("<div style='margin: 8px 0 5px 0; color: #888; font-size: 12px;'>Metode normalisasi pixel</div>"),
+        normalization_dropdown
+    ], layout=widgets.Layout(width='48%', padding='10px'))
+    
+    # === KOLOM KANAN: Worker & Split ===
+    
+    # Worker slider
     num_workers = preprocessing_config.get('num_workers', 4)
     worker_slider = widgets.IntSlider(
         value=min(max(num_workers, 1), 10),
@@ -62,7 +74,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
         step=1,
         description='Workers:',
         style={'description_width': '80px'},
-        layout=widgets.Layout(width='95%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
     # Split selector
@@ -73,21 +85,38 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
         value=split if split in split_options else 'all',
         description='Target Split:',
         style={'description_width': '80px'},
-        layout=widgets.Layout(width='95%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Container dengan header yang jelas
-    options_container = widgets.VBox([
-        widgets.HTML(f"<h5 style='margin-bottom: 10px; color: {COLORS['dark']};'>{ICONS['settings']} Opsi Preprocessing</h5>"),
-        widgets.HTML("<div style='margin-bottom: 8px; color: #666;'><b>Resolusi Gambar:</b> Ukuran output preprocessing</div>"),
-        resolution_dropdown,
-        widgets.HTML("<div style='margin: 8px 0; color: #666;'><b>Normalisasi Data:</b> Metode normalisasi pixel</div>"),
-        normalization_dropdown,
-        widgets.HTML("<div style='margin: 8px 0; color: #666;'><b>Worker Threads:</b> Jumlah thread untuk preprocessing paralel</div>"),
+    right_column = widgets.VBox([
+        widgets.HTML("<div style='margin-bottom: 8px; color: #666; font-weight: bold;'>⚙️ Performance & Scope</div>"),
+        widgets.HTML("<div style='margin-bottom: 5px; color: #888; font-size: 12px;'>Jumlah thread paralel</div>"),
         worker_slider,
-        widgets.HTML("<div style='margin: 8px 0; color: #666;'><b>Target Split:</b> Bagian dataset yang akan diproses</div>"),
+        widgets.HTML("<div style='margin: 8px 0 5px 0; color: #888; font-size: 12px;'>Bagian dataset yang diproses</div>"),
         split_dropdown
-    ], layout=widgets.Layout(padding='15px', width='100%'))
+    ], layout=widgets.Layout(width='48%', padding='10px'))
+    
+    # Container 2 kolom
+    columns_container = widgets.HBox([
+        left_column, 
+        right_column
+    ], layout=widgets.Layout(
+        width='100%',
+        justify_content='space-between',
+        align_items='flex-start'
+    ))
+    
+    # Container utama dengan header
+    options_container = widgets.VBox([
+        widgets.HTML(f"<h5 style='margin-bottom: 15px; color: {COLORS['dark']};'>{ICONS['settings']} Opsi Preprocessing</h5>"),
+        columns_container
+    ], layout=widgets.Layout(
+        padding='15px', 
+        width='100%',
+        border='1px solid #dee2e6',
+        border_radius='5px',
+        background_color='#f8f9fa'
+    ))
     
     # Tambahkan referensi untuk akses mudah
     options_container.resolution_dropdown = resolution_dropdown

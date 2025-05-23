@@ -17,6 +17,7 @@ from smartcash.ui.dataset.preprocessing.handlers.main_handler import setup_main_
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import setup_config_handlers
 from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import setup_cleanup_handler
 from smartcash.ui.dataset.preprocessing.handlers.progress_handler import setup_progress_handler
+from smartcash.ui.dataset.preprocessing.handlers.check_dataset_handler import setup_check_dataset_handler
 from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
 
 # Flag global untuk mencegah inisialisasi ulang
@@ -56,6 +57,7 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
         ui_components = setup_config_handlers(ui_components, preprocessing_config)
         ui_components = setup_progress_handler(ui_components)
         ui_components = setup_cleanup_handler(ui_components)
+        ui_components = setup_check_dataset_handler(ui_components)
         ui_components = setup_main_handler(ui_components, env)
         
         # Validation tanpa verbose logging

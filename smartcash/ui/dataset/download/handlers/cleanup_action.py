@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Any
 from smartcash.ui.dataset.download.utils.confirmation_dialog import show_cleanup_confirmation
 from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
-from smartcash.components.observer import notify
+from smartcash.components.observer import notify, EventTopics, EventDispatcher
 
 def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) -> None:
     """Eksekusi cleanup dataset dengan observer progress."""

@@ -1,128 +1,158 @@
 """
 File: smartcash/ui/dataset/download/handlers/progress_handlers.py
-Deskripsi: Setup progress tracking dengan komunikasi service-UI yang diperbaiki
+Deskripsi: Fixed progress handlers dengan observer pattern yang sederhana dan reliable
 """
 
-from typing import Dict, Any
-from smartcash.components.observer import ObserverManager
+from typing import Dict, Any, Callable
 
 def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup progress tracking dan observer untuk komunikasi service-UI."""
+    """Setup progress tracking dengan observer pattern yang disederhanakan."""
     
-    # Create observer untuk progress updates
-    observer_manager = ObserverManager()
-    
-    # Progress observer untuk overall progress
-    def overall_progress_observer(event_type: str, sender: Any, **kwargs):
-        progress = kwargs.get('progress', 0)
-        message = kwargs.get('message', 'Processing...')
+    try:
+        # Create simple observer manager replacement
+        ui_components['_observers'] = {}
         
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = min(100, max(0, progress))
-            ui_components['progress_bar'].description = f"Progress: {progress}%"
-            if hasattr(ui_components['progress_bar'], 'layout'):
-                ui_components['progress_bar'].layout.visibility = 'visible'
+        # Setup progress observers
+        _setup_progress_observers(ui_components)
         
-        if 'overall_label' in ui_components:
-            ui_components['overall_label'].value = message
-            if hasattr(ui_components['overall_label'], 'layout'):
-                ui_components['overall_label'].layout.visibility = 'visible'
-    
-    # Step progress observer untuk per-tahap progress  
-    def step_progress_observer(event_type: str, sender: Any, **kwargs):
-        step_progress = kwargs.get('step_progress', kwargs.get('progress', 0))
-        step_message = kwargs.get('step_message', kwargs.get('message', ''))
-        current_step = kwargs.get('current_step', 1)
-        total_steps = kwargs.get('total_steps', 5)
+        # Mark progress as setup
+        ui_components['progress_setup'] = True
         
-        if 'current_progress' in ui_components:
-            ui_components['current_progress'].value = min(100, max(0, step_progress))
-            ui_components['current_progress'].description = f"Step {current_step}/{total_steps}"
-            if hasattr(ui_components['current_progress'], 'layout'):
-                ui_components['current_progress'].layout.visibility = 'visible'
-        
-        if 'step_label' in ui_components:
-            ui_components['step_label'].value = step_message
-            if hasattr(ui_components['step_label'], 'layout'):
-                ui_components['step_label'].layout.visibility = 'visible'
-    
-    # Register observers untuk berbagai event
-    progress_events = [
-        'DOWNLOAD_PROGRESS', 'EXPORT_PROGRESS', 'BACKUP_PROGRESS', 
-        'ZIP_PROCESSING_PROGRESS', 'PULL_DATASET_PROGRESS'
-    ]
-    
-    step_events = [
-        'DOWNLOAD_STEP_PROGRESS', 'EXPORT_STEP_PROGRESS', 'BACKUP_STEP_PROGRESS'
-    ]
-    
-    observer_manager.create_simple_observer(progress_events, overall_progress_observer, name="overall_progress")
-    observer_manager.create_simple_observer(step_events, step_progress_observer, name="step_progress")
-    
-    # Simpan observer manager
-    ui_components['observer_manager'] = observer_manager
-    ui_components['progress_setup'] = True
+    except Exception as e:
+        logger = ui_components.get('logger')
+        if logger:
+            logger.error(f"❌ Error setup progress handlers: {str(e)}")
     
     return ui_components
 
-"""
-File: smartcash/ui/dataset/download/utils/progress_updater.py
-Deskripsi: Utilitas untuk update progress yang konsisten dengan service layer
-"""
+def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
+    """Setup progress observers dengan implementasi sederhana."""
+    
+    # Progress callback function yang akan dipanggil dari service layer
+    def progress_callback(step: str, current: int, total: int, message: str) -> None:
+        """Callback untuk update progress dari service layer."""
+        try:
+            # Update overall progress
+            _update_overall_progress(ui_components, current, message)
+            
+            # Update step progress jika ada info step
+            if step:
+                _update_step_progress(ui_components, step, current, total, message)
+                
+        except Exception as e:
+            logger = ui_components.get('logger')
+            if logger:
+                logger.debug(f"Progress callback error: {str(e)}")
+    
+    # Store callback untuk digunakan service layer
+    ui_components['_progress_callback'] = progress_callback
+    
+    # Simple event handlers untuk compatibility
+    ui_components['_observers']['progress'] = {
+        'overall_progress': _create_overall_progress_handler(ui_components),
+        'step_progress': _create_step_progress_handler(ui_components),
+        'start_handler': _create_start_handler(ui_components),
+        'complete_handler': _create_complete_handler(ui_components),
+        'error_handler': _create_error_handler(ui_components)
+    }
 
+def _create_overall_progress_handler(ui_components: Dict[str, Any]) -> Callable:
+    """Create handler untuk overall progress."""
+    def handler(progress: int, message: str = "Processing...") -> None:
+        _update_overall_progress(ui_components, progress, message)
+    return handler
+
+def _create_step_progress_handler(ui_components: Dict[str, Any]) -> Callable:
+    """Create handler untuk step progress."""
+    def handler(step: str, progress: int, total: int, message: str) -> None:
+        _update_step_progress(ui_components, step, progress, total, message)
+    return handler
+
+def _create_start_handler(ui_components: Dict[str, Any]) -> Callable:
+    """Create handler untuk start event."""
+    def handler(message: str = "Memulai proses...") -> None:
+        # Show progress container
+        if 'progress_container' in ui_components:
+            ui_components['progress_container'].layout.display = 'block'
+            ui_components['progress_container'].layout.visibility = 'visible'
+        
+        _update_overall_progress(ui_components, 0, message)
+        
+        logger = ui_components.get('logger')
+        if logger:
+            logger.info(f"🚀 {message}")
+    return handler
+
+def _create_complete_handler(ui_components: Dict[str, Any]) -> Callable:
+    """Create handler untuk complete event.""" 
+    def handler(message: str = "Proses selesai", duration: float = 0) -> None:
+        _update_overall_progress(ui_components, 100, message)
+        
+        logger = ui_components.get('logger')
+        if logger:
+            duration_str = f" ({duration:.1f}s)" if duration > 0 else ""
+            logger.success(f"✅ {message}{duration_str}")
+    return handler
+
+def _create_error_handler(ui_components: Dict[str, Any]) -> Callable:
+    """Create handler untuk error event."""
+    def handler(message: str = "Terjadi error") -> None:
+        logger = ui_components.get('logger')
+        if logger:
+            logger.error(f"❌ {message}")
+    return handler
+
+def _update_overall_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
+    """Update overall progress bar."""
+    progress = max(0, min(100, progress))
+    
+    if 'progress_bar' in ui_components:
+        ui_components['progress_bar'].value = progress
+        ui_components['progress_bar'].description = f"Progress: {progress}%"
+        if hasattr(ui_components['progress_bar'], 'layout'):
+            ui_components['progress_bar'].layout.visibility = 'visible'
+    
+    if 'overall_label' in ui_components and message:
+        ui_components['overall_label'].value = message
+        if hasattr(ui_components['overall_label'], 'layout'):
+            ui_components['overall_label'].layout.visibility = 'visible'
+
+def _update_step_progress(ui_components: Dict[str, Any], step: str, progress: int, total: int, message: str) -> None:
+    """Update step progress bar."""
+    step_progress = int((progress / total) * 100) if total > 0 else progress
+    step_progress = max(0, min(100, step_progress))
+    
+    if 'current_progress' in ui_components:
+        ui_components['current_progress'].value = step_progress
+        ui_components['current_progress'].description = f"Step: {step}"
+        if hasattr(ui_components['current_progress'], 'layout'):
+            ui_components['current_progress'].layout.visibility = 'visible'
+    
+    if 'step_label' in ui_components and message:
+        ui_components['step_label'].value = f"{step}: {message}"
+        if hasattr(ui_components['step_label'], 'layout'):
+            ui_components['step_label'].layout.visibility = 'visible'
+
+# Helper functions untuk manual progress control
 def show_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Tampilkan progress container dan set pesan awal."""
-    if 'progress_container' in ui_components:
-        ui_components['progress_container'].layout.display = 'block'
-        ui_components['progress_container'].layout.visibility = 'visible'
-    
-    update_progress(ui_components, 0, message)
+    if '_observers' in ui_components and 'progress' in ui_components['_observers']:
+        ui_components['_observers']['progress']['start_handler'](message)
 
 def update_progress(ui_components: Dict[str, Any], value: int, message: str = None) -> None:
-    """Update progress bar dengan notifikasi ke observer."""
-    value = max(0, min(100, value))
-    
-    # Update UI langsung
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].value = value
-        ui_components['progress_bar'].description = f"Progress: {value}%"
-        ui_components['progress_bar'].layout.visibility = 'visible'
-    
-    if message and 'overall_label' in ui_components:
-        ui_components['overall_label'].value = message
-        ui_components['overall_label'].layout.visibility = 'visible'
-    
-    # Notifikasi via observer untuk service layer
-    if 'observer_manager' in ui_components:
-        ui_components['observer_manager'].notify(
-            'DOWNLOAD_PROGRESS', 
-            ui_components, 
-            progress=value, 
-            message=message or f"Progress: {value}%"
-        )
+    """Update progress bar secara manual."""
+    if '_observers' in ui_components and 'progress' in ui_components['_observers']:
+        ui_components['_observers']['progress']['overall_progress'](value, message or f"Progress: {value}%")
 
-def update_step_progress(ui_components: Dict[str, Any], step: int, total_steps: int, 
-                        step_progress: int, step_message: str) -> None:
-    """Update step progress."""
-    if 'current_progress' in ui_components:
-        ui_components['current_progress'].value = max(0, min(100, step_progress))
-        ui_components['current_progress'].description = f"Step {step}/{total_steps}"
-        ui_components['current_progress'].layout.visibility = 'visible'
-    
-    if 'step_label' in ui_components:
-        ui_components['step_label'].value = step_message
-        ui_components['step_label'].layout.visibility = 'visible'
-    
-    # Notifikasi via observer
-    if 'observer_manager' in ui_components:
-        ui_components['observer_manager'].notify(
-            'DOWNLOAD_STEP_PROGRESS',
-            ui_components,
-            current_step=step,
-            total_steps=total_steps,
-            step_progress=step_progress,
-            step_message=step_message
-        )
+def complete_progress(ui_components: Dict[str, Any], message: str = "Selesai", duration: float = 0) -> None:
+    """Complete progress dengan pesan."""
+    if '_observers' in ui_components and 'progress' in ui_components['_observers']:
+        ui_components['_observers']['progress']['complete_handler'](message, duration)
+
+def error_progress(ui_components: Dict[str, Any], message: str = "Terjadi error") -> None:
+    """Show error state."""
+    if '_observers' in ui_components and 'progress' in ui_components['_observers']:
+        ui_components['_observers']['progress']['error_handler'](message)
 
 def reset_progress(ui_components: Dict[str, Any]) -> None:
     """Reset semua progress indicator."""

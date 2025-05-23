@@ -13,27 +13,34 @@ class EnvironmentConfigOrchestrator:
     """Orchestrator untuk mengoordinasikan setup environment dengan logging informatif"""
     
     def __init__(self, ui_components: Dict[str, Any]):
-        """Inisialisasi orchestrator dengan environment manager integration"""
+        """Inisialisasi orchestrator dengan silent environment manager integration"""
         self.ui_components = ui_components
-        self.logger = create_ui_logger_bridge(ui_components, "env_config")
+        # Logger akan diinit setelah UI ready
+        self.logger = None
         self.status_checker = EnvironmentStatusChecker()
         self.drive_handler = DriveSetupHandler(ui_components)
         
-        # Initialize environment manager untuk detailed info
-        self._init_environment_manager()
+        # Initialize environment manager secara silent
+        self._init_environment_manager_silent()
     
-    def _init_environment_manager(self):
-        """Initialize environment manager untuk informasi detail"""
+    def _init_environment_manager_silent(self):
+        """Initialize environment manager tanpa logging untuk menghindari premature output"""
         try:
             from smartcash.common.environment import get_environment_manager
             self.env_manager = get_environment_manager()
             self.ui_components['env_manager'] = self.env_manager
+        except Exception:
+            # Silent failure, akan di-handle saat logger ready
+            pass
+    
+    def init_logger(self):
+        """Initialize logger setelah UI ready"""
+        if self.logger is None:
+            self.logger = create_ui_logger_bridge(self.ui_components, "env_config")
             
-            # Log environment info dari manager
-            self._log_environment_details()
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Environment manager init warning: {str(e)}")
+            # Log environment details setelah logger ready
+            if hasattr(self, 'env_manager'):
+                self._log_environment_details()
     
     def _log_environment_details(self):
         """Log detail environment dari environment manager"""
@@ -68,7 +75,24 @@ class EnvironmentConfigOrchestrator:
             self.logger.debug(f"🔍 Detail logging error: {str(e)}")
     
     def check_environment_status(self) -> Dict[str, Any]:
-        """Check status environment dengan logging minimal"""
+        """Check status environment dengan Drive state refresh dan retry mechanism"""
+        # Ensure logger is initialized
+        if self.logger is None:
+            self.init_logger()
+        
+        # Refresh Drive state sebelum check jika ada environment manager
+        if hasattr(self, 'env_manager') and self.env_manager.is_colab:
+            try:
+                # Force refresh Drive status
+                self.env_manager.refresh_drive_status()
+                
+                # Small delay untuk memastikan state terupdate
+                import time
+                time.sleep(0.5)
+            except Exception:
+                pass
+        
+        # Get status dengan refreshed state
         status = self.status_checker.get_comprehensive_status()
         
         # Log hanya status penting tanpa detail berlebihan
@@ -84,13 +108,22 @@ class EnvironmentConfigOrchestrator:
         return status
     
     def perform_environment_setup(self) -> bool:
-        """Lakukan setup environment dengan logging yang informatif dan detail"""
+        """Lakukan setup environment dengan Drive state management yang proper"""
+        # Ensure logger is initialized
+        if self.logger is None:
+            self.init_logger()
+            
         self.logger.info("🚀 Memulai konfigurasi environment SmartCash...")
         self._update_progress(0.1, "Memulai setup...")
         
         try:
-            # Step 1: Check current status dengan detail
-            self._update_progress(0.15, "🔍 Analyzing environment...")
+            # Step 1: Pre-setup Drive state refresh
+            self._update_progress(0.15, "🔄 Refreshing environment state...")
+            if hasattr(self, 'env_manager') and self.env_manager.is_colab:
+                self.env_manager.refresh_drive_status()
+            
+            # Step 2: Check current status dengan refreshed state
+            self._update_progress(0.2, "🔍 Analyzing environment...")
             status = self.status_checker.get_comprehensive_status()
             
             # Log current status dengan detail
@@ -101,46 +134,59 @@ class EnvironmentConfigOrchestrator:
                 self._hide_progress()
                 return True
             
-            # Step 2: Environment manager refresh
-            self._update_progress(0.2, "🔄 Refreshing environment status...")
-            if hasattr(self, 'env_manager') and self.env_manager.is_colab:
-                self.env_manager.refresh_drive_status()
-            
-            # Step 3: Ensure Drive mounted dengan detail
-            self._update_progress(0.25, "📱 Menghubungkan Google Drive...")
+            # Step 3: Ensure Drive mounted dengan state management
+            self._update_progress(0.3, "📱 Menghubungkan Google Drive...")
             if status['drive']['type'] == 'colab':
                 success, message = self.drive_handler.ensure_drive_mounted()
                 if success:
                     self.logger.success(f"📱 Drive: {message}")
+                    
+                    # Critical: Refresh state setelah mount dengan delay
+                    import time
+                    time.sleep(2)  # Wait untuk mount completion
+                    
+                    if hasattr(self, 'env_manager'):
+                        self.env_manager.refresh_drive_status()
+                        self.logger.info("🔄 Drive state refreshed setelah mount")
+                    
+                    # Re-check status setelah mount
+                    status = self.status_checker.get_comprehensive_status()
+                    
                 else:
                     self.logger.error(f"❌ Drive Error: {message}")
                     self._reset_progress("Drive connection failed")
                     return False
             
-            # Step 4: Get Drive path dan validate
+            # Step 4: Validate Drive path setelah refresh
             drive_path = status['drive']['path']
             if not drive_path:
-                self.logger.error("❌ Drive path tidak dapat diakses")
-                self._reset_progress("Setup gagal")
-                return False
+                # Retry get path setelah refresh
+                if hasattr(self, 'env_manager') and self.env_manager.drive_path:
+                    drive_path = str(self.env_manager.drive_path)
+                else:
+                    self.logger.error("❌ Drive path tidak dapat diakses setelah refresh")
+                    self._reset_progress("Setup gagal")
+                    return False
             
             self.logger.info(f"🎯 Target setup path: {drive_path}")
             
-            # Step 5: Perform complete setup dengan progress detail
+            # Step 5: Perform complete setup
             self.logger.info("🔧 Melakukan setup lengkap...")
             setup_results = self.drive_handler.perform_complete_setup(drive_path)
             
             # Step 6: Log setup results dengan detail
             self._log_setup_results(setup_results)
             
-            # Step 7: Initialize managers
+            # Step 7: Initialize managers dengan state refresh
             self._update_progress(0.8, "🔧 Inisialisasi managers...")
             self._initialize_managers()
             
-            # Step 8: Final verification dengan refresh environment
+            # Step 8: Final verification dengan comprehensive refresh
             self._update_progress(0.9, "✅ Verifikasi final...")
             if hasattr(self, 'env_manager'):
                 self.env_manager.refresh_drive_status()
+                import time
+                time.sleep(1)  # Final settling time
             
             final_status = self.status_checker.get_comprehensive_status()
             

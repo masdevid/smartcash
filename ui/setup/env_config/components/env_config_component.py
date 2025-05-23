@@ -16,23 +16,28 @@ class EnvConfigComponent:
     
     def __init__(self):
         """Inisialisasi component dengan UI yang stabile dan Environment Summary"""
+        # Setup UI components first tanpa logging
         self.ui_components = UIFactory.create_ui_components()
         self.ui_components['logger_namespace'] = ENV_CONFIG_LOGGER_NAMESPACE
         self.ui_components['env_config_initialized'] = True
         
-        # Setup logging tanpa redirect berlebihan
-        self.logger = setup_ipython_logging(
-            self.ui_components,
-            ENV_CONFIG_LOGGER_NAMESPACE,
-            redirect_all_logs=False
-        )
-        
+        # Initialize orchestrator tanpa logging dulu
         self.orchestrator = EnvironmentConfigOrchestrator(self.ui_components)
         self.ui_components['setup_button'].on_click(self._handle_setup_click)
         self.setup_completed = False
         
-        # Initialize environment manager untuk summary
-        self._init_environment_manager()
+        # Initialize environment manager untuk summary (silent mode)
+        self._init_environment_manager_silent()
+    
+    def _init_environment_manager_silent(self):
+        """Initialize environment manager tanpa logging untuk menghindari output sebelum UI"""
+        try:
+            from smartcash.common.environment import get_environment_manager
+            self.env_manager = get_environment_manager()
+            self.ui_components['env_manager'] = self.env_manager
+        except Exception:
+            # Silent initialization, tidak ada log sebelum UI ready
+            pass
     
     def _init_environment_manager(self):
         """Initialize environment manager dan tampilkan summary"""
@@ -212,18 +217,26 @@ class EnvConfigComponent:
         return status_parts
     
     def _handle_setup_click(self, button):
-        """Handle setup button dengan UI state management yang proper"""
+        """Handle setup button dengan proper state management dan Drive refresh"""
         button.disabled = True
         
         try:
             self._reset_ui_state()
+            
+            # Initialize orchestrator logger jika belum
+            if hasattr(self.orchestrator, 'init_logger'):
+                self.orchestrator.init_logger()
+            
+            # Perform setup dengan proper state management
             success = self.orchestrator.perform_environment_setup()
             
             if success:
                 self.setup_completed = True
                 self._update_status("✅ Environment siap digunakan", "success")
-                # Refresh environment summary setelah setup
+                
+                # Refresh environment summary setelah setup berhasil
                 self._display_environment_summary()
+                
                 # Button tetap disabled, progress tersembunyi
             else:
                 button.disabled = False
@@ -257,13 +270,23 @@ class EnvConfigComponent:
                 pass
     
     def display(self):
-        """Display UI dengan auto-check minimal dan environment summary"""
-        # Display UI terlebih dahulu untuk menghindari bug tidak muncul
+        """Display UI dengan delayed initialization untuk menghindari premature logs"""
+        # Display UI terlebih dahulu tanpa logging
         display(self.ui_components['ui_layout'])
         
+        # Setup logger SETELAH UI displayed
+        self.logger = setup_ipython_logging(
+            self.ui_components,
+            ENV_CONFIG_LOGGER_NAMESPACE,
+            redirect_all_logs=False
+        )
+        
+        # Display environment summary setelah UI ready
+        self._display_environment_summary()
+        
         try:
-            # Check status tanpa logging berlebihan
-            env_status = self.orchestrator.check_environment_status()
+            # Check status dengan retry mechanism untuk Drive state
+            env_status = self._check_environment_status_with_retry()
             
             if env_status.get('ready', False):
                 self.setup_completed = True
@@ -287,10 +310,43 @@ class EnvConfigComponent:
             
         except Exception as e:
             # Jangan crash UI, tapi beri info
-            self.logger.warning(f"⚠️ Status check error: {str(e)}")
             self._update_status("⚠️ Status check error - Silakan setup", "warning")
             self.ui_components['setup_button'].disabled = False
             self._show_progress()
+    
+    def _check_environment_status_with_retry(self, max_retries: int = 3) -> Dict[str, Any]:
+        """Check environment status dengan retry untuk memastikan Drive state accuracy"""
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                # Refresh environment manager state sebelum check
+                if hasattr(self, 'env_manager'):
+                    self.env_manager.refresh_drive_status()
+                
+                # Small delay untuk memastikan state terupdate
+                if attempt > 0:
+                    time.sleep(1)
+                
+                # Check status dari orchestrator
+                env_status = self.orchestrator.check_environment_status()
+                
+                # Jika Drive mounted tapi status checker belum detect, retry
+                if (hasattr(self, 'env_manager') and 
+                    self.env_manager.is_drive_mounted and 
+                    not env_status.get('drive', {}).get('mounted', False) and 
+                    attempt < max_retries - 1):
+                    continue
+                
+                return env_status
+                
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    # Last attempt, return basic status
+                    return {'ready': False, 'error': str(e)}
+                continue
+        
+        return {'ready': False, 'error': 'Status check failed after retries'}
     
     def _get_prioritized_missing_items(self, env_status: Dict[str, Any]) -> list:
         """Get missing items dengan prioritas untuk display yang informatif"""

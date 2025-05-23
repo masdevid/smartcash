@@ -128,16 +128,16 @@ class UIFactory:
             visibility='visible'  # Default visible
         ))
 
-        # Main layout dengan Environment Summary di posisi yang strategis
+        # Main layout dengan Environment Summary di bawah log output
         ui_layout = VBox([
             header,
-            env_summary_panel,  # Environment Summary setelah header
             info_panel,
-            requirements_panel,
             button_container,
             status_panel,
             log_components['log_accordion'],
-            progress_container
+            progress_container,
+            env_summary_panel,  # Environment Summary dipindah ke bawah
+            requirements_panel  # Tips dipindah ke bawah
         ], layout=widgets.Layout(
             width='100%',
             padding='15px',

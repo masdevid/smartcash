@@ -46,7 +46,7 @@ def create_progress_tracking(
             max=100,
             bar_style='info',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width=width, height='25px')
+            layout=widgets.Layout(width=width, height='20px')
         )
         
         components.extend([overall_label, overall_progress])
@@ -57,7 +57,7 @@ def create_progress_tracking(
     
     if show_step_progress:
         step_label = widgets.HTML(
-            value="<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 14px;'>🔄 Step: Menunggu</div>",
+            value="<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 12px;'>🔄 Step: Menunggu</div>",
             layout=widgets.Layout(width=width)
         )
         
@@ -67,7 +67,7 @@ def create_progress_tracking(
             max=100,
             bar_style='',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width=width, height='20px')
+            layout=widgets.Layout(width=width, height='15px')
         )
         
         components.extend([step_label, step_progress])
@@ -91,7 +91,7 @@ def create_progress_tracking(
             layout=widgets.Layout(width=width, height='15px')
         )
         
-        components.extend([current_label, current_progress])
+        components.extend([current_progress, current_label])
     
     # Container dengan visibility control
     progress_container = widgets.VBox(

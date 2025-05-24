@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracking.py
-Deskripsi: Fixed progress tracking dengan overall dan step progress yang konsisten
+Deskripsi: Fixed progress tracking dengan visible progress bars
 """
 
 import ipywidgets as widgets
@@ -14,19 +14,7 @@ def create_progress_tracking(
     show_current_progress: bool = True,
     width: str = '100%'
 ) -> Dict[str, Any]:
-    """
-    Buat komponen progress tracking dengan 3-level hierarchy yang konsisten.
-    
-    Args:
-        module_name: Nama modul untuk identifikasi
-        show_step_progress: Tampilkan step progress (preprocessing steps)
-        show_overall_progress: Tampilkan overall progress (keseluruhan proses)
-        show_current_progress: Tampilkan current progress (per split/batch)
-        width: Lebar container
-        
-    Returns:
-        Dict komponen progress tracking
-    """
+    """Buat komponen progress tracking dengan visible progress bars."""
     
     components = []
     
@@ -45,8 +33,8 @@ def create_progress_tracking(
             min=0,
             max=100,
             bar_style='info',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width=width, height='20px')
+            style={'description_width': 'initial', 'bar_width': '100%'},
+            layout=widgets.Layout(width=width, height='25px', visibility='visible')
         )
         
         components.extend([overall_label, overall_progress])
@@ -65,9 +53,9 @@ def create_progress_tracking(
             value=0,
             min=0,
             max=100,
-            bar_style='info',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width=width, height='15px')
+            bar_style='',
+            style={'description_width': 'initial', 'bar_width': '100%'},
+            layout=widgets.Layout(width=width, height='20px', visibility='visible')
         )
         
         components.extend([step_label, step_progress])
@@ -86,12 +74,12 @@ def create_progress_tracking(
             value=0,
             min=0,
             max=100,
-            bar_style='info',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width=width, height='15px')
+            bar_style='success',
+            style={'description_width': 'initial', 'bar_width': '100%'},
+            layout=widgets.Layout(width=width, height='15px', visibility='visible')
         )
         
-        components.extend([current_progress, current_label])
+        components.extend([current_label, current_progress])
     
     # Container dengan visibility control
     progress_container = widgets.VBox(
@@ -104,8 +92,7 @@ def create_progress_tracking(
             border_radius='5px',
             background_color='#f8f9fa',
             visibility='hidden',  # Hidden by default
-            display='none',
-            overflow='hidden'
+            display='none'
         )
     )
     
@@ -138,9 +125,16 @@ def create_progress_tracking(
 
 
 def _show_progress_container(container):
-    """Show progress container."""
+    """Show progress container dan ensure semua progress bars visible."""
     container.layout.visibility = 'visible'
     container.layout.display = 'block'
+    
+    # Ensure semua child widgets juga visible
+    for child in container.children:
+        if hasattr(child, 'layout'):
+            child.layout.visibility = 'visible'
+            if hasattr(child, 'value'):  # Progress widget
+                child.layout.display = 'block'
 
 
 def _hide_progress_container(container):
@@ -155,14 +149,17 @@ def _reset_all_progress(overall_progress, step_progress, current_progress,
     if overall_progress:
         overall_progress.value = 0
         overall_progress.bar_style = 'info'
+        overall_progress.layout.visibility = 'visible'
     
     if step_progress:
         step_progress.value = 0
         step_progress.bar_style = ''
+        step_progress.layout.visibility = 'visible'
     
     if current_progress:
         current_progress.value = 0
         current_progress.bar_style = 'success'
+        current_progress.layout.visibility = 'visible'
     
     if overall_label:
         overall_label.value = "<div style='margin-bottom: 5px; color: #495057; font-weight: bold;'>📊 Overall Progress: Siap memulai</div>"
@@ -177,16 +174,28 @@ def _reset_all_progress(overall_progress, step_progress, current_progress,
 def update_overall_progress(components: Dict[str, Any], progress: int, total: int, message: str = ""):
     """Update overall progress (keseluruhan proses)."""
     if 'overall_progress' in components and components['overall_progress']:
+        widget = components['overall_progress']
         percentage = min((progress / max(total, 1)) * 100, 100)
-        components['overall_progress'].value = percentage
+        
+        widget.value = percentage
+        widget.layout.visibility = 'visible'
+        widget.layout.display = 'block'
         
         # Update bar style based on progress
         if percentage >= 100:
-            components['overall_progress'].bar_style = 'success'
+            widget.bar_style = 'success'
         elif percentage >= 50:
-            components['overall_progress'].bar_style = 'info'
+            widget.bar_style = 'info'
         else:
-            components['overall_progress'].bar_style = ''
+            widget.bar_style = ''
+    
+    # Update alias juga
+    if 'progress_bar' in components and components['progress_bar']:
+        widget = components['progress_bar']
+        percentage = min((progress / max(total, 1)) * 100, 100)
+        widget.value = percentage
+        widget.layout.visibility = 'visible'
+        widget.layout.display = 'block'
     
     if 'overall_label' in components and components['overall_label'] and message:
         components['overall_label'].value = f"<div style='margin-bottom: 5px; color: #495057; font-weight: bold;'>📊 Overall: {message} ({progress}/{total})</div>"
@@ -195,14 +204,18 @@ def update_overall_progress(components: Dict[str, Any], progress: int, total: in
 def update_step_progress(components: Dict[str, Any], step: int, total_steps: int, step_name: str = ""):
     """Update step progress (per split)."""
     if 'step_progress' in components and components['step_progress']:
+        widget = components['step_progress']
         percentage = min((step / max(total_steps, 1)) * 100, 100)
-        components['step_progress'].value = percentage
+        
+        widget.value = percentage
+        widget.layout.visibility = 'visible'
+        widget.layout.display = 'block'
         
         # Update bar style
         if percentage >= 100:
-            components['step_progress'].bar_style = 'success'
+            widget.bar_style = 'success'
         else:
-            components['step_progress'].bar_style = 'info'
+            widget.bar_style = 'info'
     
     if 'step_label' in components and components['step_label']:
         step_text = f"Step {step}/{total_steps}"
@@ -214,8 +227,12 @@ def update_step_progress(components: Dict[str, Any], step: int, total_steps: int
 def update_current_progress(components: Dict[str, Any], current: int, total: int, message: str = ""):
     """Update current progress (per file/batch)."""
     if 'current_progress' in components and components['current_progress']:
+        widget = components['current_progress']
         percentage = min((current / max(total, 1)) * 100, 100)
-        components['current_progress'].value = percentage
+        
+        widget.value = percentage
+        widget.layout.visibility = 'visible'
+        widget.layout.display = 'block'
     
     if 'current_label' in components and components['current_label']:
         if message:

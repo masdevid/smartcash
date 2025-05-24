@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/cleanup_executor.py
-Deskripsi: Handler khusus untuk execute cleanup dengan 3-level progress tracking
+Deskripsi: Fixed cleanup executor dengan proper button state management dan progress tracking
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -22,9 +22,13 @@ def setup_cleanup_executor(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     ui_state = get_ui_state_manager(ui_components)
     progress_bridge = get_progress_bridge(ui_components, logger)
     
+    # State management
+    ui_components['cleanup_executor'] = None
+    ui_components['cleanup_future'] = None
+    
     def _on_cleanup_click(b):
-        """Handler untuk tombol cleanup dengan comprehensive validation."""
-        # Check operation state
+        """Handler untuk tombol cleanup dengan proper state management."""
+        # Check operation state - exclude validation karena bisa concurrent
         can_start, message = ui_state.can_start_operation('cleanup', exclude_operations=['validation'])
         if not can_start:
             logger and logger.warning(f"⚠️ {message}")
@@ -57,61 +61,45 @@ Data yang dihapus tidak dapat dikembalikan."""
         )
     
     def _start_cleanup_confirmed(total_files: int):
-        """Start cleanup setelah konfirmasi."""
-        # Setup progress
-        progress_bridge.setup_for_operation('cleanup')
-        
-        # Set UI state
+        """Start cleanup setelah konfirmasi dengan proper state management."""
+        # Set UI states
         ui_state.set_button_processing('cleanup_button', True, "Cleaning...")
+        
+        # Disable other action buttons during cleanup
+        for button_key in ['preprocess_button', 'check_button']:
+            if button_key in ui_components and ui_components[button_key]:
+                ui_components[button_key].disabled = True
+        
+        # Setup progress tracking
+        progress_bridge.setup_for_operation('cleanup')
         
         logger and logger.info("🧹 Memulai cleanup data preprocessing")
         update_status_panel(ui_components['status_panel'], "Memulai cleanup preprocessing...", "info")
         
-        # Start cleanup dalam thread
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(_run_cleanup, total_files)
-        ui_components['cleanup_future'] = future
-        ui_components['cleanup_executor'] = executor
+        # Start cleanup dalam thread dengan proper executor management
+        if ui_components['cleanup_executor']:
+            ui_components['cleanup_executor'].shutdown(wait=False)
+        
+        ui_components['cleanup_executor'] = ThreadPoolExecutor(max_workers=1)
+        ui_components['cleanup_future'] = ui_components['cleanup_executor'].submit(_run_cleanup, total_files)
         
         # Monitor completion
-        def check_completion():
-            if future.done():
-                try:
-                    result = future.result()
-                    _on_cleanup_complete(result)
-                except Exception as e:
-                    _on_cleanup_error(e)
-                finally:
-                    executor.shutdown(wait=False)
-            else:
-                import threading
-                threading.Timer(1.0, check_completion).start()
-        
-        check_completion()
+        _monitor_cleanup_completion()
     
     def _run_cleanup(total_files: int):
         """Execute cleanup dengan 3-level progress tracking."""
         try:
             preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
             
-            def progress_update(overall_pct: int, step_pct: int, current_pct: int, 
-                              overall_msg: str, step_msg: str, current_msg: str):
-                """Helper untuk update 3-level progress."""
-                try:
-                    progress_bridge.update_progress(
-                        overall_progress=overall_pct,
-                        step=int(step_pct/33.33) + 1 if step_pct > 0 else 1,
-                        current_progress=current_pct,
-                        current_total=100,
-                        message=overall_msg,
-                        split_step=step_msg,
-                        status='info'
-                    )
-                except Exception:
-                    pass
-            
             # Phase 1: Scan dan persiapan (0-20%)
-            progress_update(5, 25, 0, "Memulai cleanup...", "📋 Persiapan", "Scanning directories")
+            progress_bridge.update_progress(
+                overall_progress=5,
+                step=1,
+                current_progress=0,
+                message="Memulai cleanup...",
+                split_step="Scanning directories",
+                status='info'
+            )
             
             splits_to_clean = ['train', 'valid', 'test']
             files_removed = 0
@@ -130,63 +118,90 @@ Data yang dihapus tidak dapat dikembalikan."""
                 else:
                     split_file_counts[split] = 0
             
-            progress_update(20, 100, 100, f"Scan selesai: {total_actual_files} files ditemukan", 
-                          "✅ Persiapan Selesai", "Ready to clean")
+            progress_bridge.update_progress(
+                overall_progress=20,
+                step=1,
+                current_progress=100,
+                message=f"Scan selesai: {total_actual_files} files ditemukan",
+                split_step="Ready to clean",
+                status='info'
+            )
             
             # Phase 2: Cleanup per split (20-90%)
             current_overall = 20
+            active_splits = [s for s in splits_to_clean if split_file_counts[s] > 0]
             
-            for i, split in enumerate(splits_to_clean):
-                split_path = preprocessed_dir / split
-                file_count = split_file_counts[split]
+            if active_splits:
+                split_progress_range = 70 / len(active_splits)
                 
-                if file_count == 0:
-                    continue
-                
-                # Progress range untuk split ini
-                split_progress_range = 70 / len([s for s in splits_to_clean if split_file_counts[s] > 0])
-                split_start = current_overall
-                
-                progress_update(int(split_start), 0, 0, 
-                              f"Membersihkan split {split}...", f"🗑️ Cleanup {split.title()}", 
-                              f"Starting {split}")
-                
-                # Delete files dalam split
-                files_in_split = [f for f in split_path.rglob('*') if f.is_file()]
-                
-                for j, file_path in enumerate(files_in_split):
-                    try:
-                        file_path.unlink()
-                        files_removed += 1
-                        
-                        # Update progress setiap 10 files atau di akhir
-                        if j % 10 == 0 or j == len(files_in_split) - 1:
-                            current_file_pct = int(((j + 1) / len(files_in_split)) * 100)
-                            current_split_pct = int(((j + 1) / len(files_in_split)) * 100)
-                            overall_pct = int(split_start + ((j + 1) / len(files_in_split)) * split_progress_range)
+                for i, split in enumerate(active_splits):
+                    split_path = preprocessed_dir / split
+                    file_count = split_file_counts[split]
+                    
+                    # Progress range untuk split ini
+                    split_start = current_overall
+                    
+                    progress_bridge.update_progress(
+                        overall_progress=int(split_start),
+                        step=2,
+                        current_progress=0,
+                        message=f"Membersihkan split {split}...",
+                        split_step=f"Cleanup {split.title()}",
+                        status='info'
+                    )
+                    
+                    # Delete files dalam split
+                    files_in_split = [f for f in split_path.rglob('*') if f.is_file()]
+                    
+                    for j, file_path in enumerate(files_in_split):
+                        try:
+                            file_path.unlink()
+                            files_removed += 1
                             
-                            progress_update(overall_pct, current_split_pct, current_file_pct,
-                                          f"Cleanup {split}: {j+1}/{len(files_in_split)}", 
-                                          f"🗑️ {split.title()}: {current_split_pct}%",
-                                          f"File {j+1}/{len(files_in_split)}")
+                            # Update progress setiap 10 files atau di akhir
+                            if j % 10 == 0 or j == len(files_in_split) - 1:
+                                current_file_pct = int(((j + 1) / len(files_in_split)) * 100)
+                                overall_pct = int(split_start + ((j + 1) / len(files_in_split)) * split_progress_range)
+                                
+                                progress_bridge.update_progress(
+                                    overall_progress=overall_pct,
+                                    step=2,
+                                    current_progress=current_file_pct,
+                                    message=f"Cleanup {split}: {j+1}/{len(files_in_split)}",
+                                    split_step=f"{split.title()}: {current_file_pct}%",
+                                    status='info'
+                                )
+                        except Exception:
+                            pass
+                    
+                    # Remove empty directories
+                    try:
+                        if split_path.exists():
+                            import shutil
+                            shutil.rmtree(split_path, ignore_errors=True)
+                            splits_cleaned += 1
                     except Exception:
                         pass
-                
-                # Remove empty directories
-                try:
-                    if split_path.exists():
-                        import shutil
-                        shutil.rmtree(split_path, ignore_errors=True)
-                        splits_cleaned += 1
-                except Exception:
-                    pass
-                
-                current_overall += split_progress_range
-                progress_update(int(current_overall), 100, 100, 
-                              f"Split {split} selesai dibersihkan", f"✅ {split.title()} Done", "Complete")
+                    
+                    current_overall += split_progress_range
+                    progress_bridge.update_progress(
+                        overall_progress=int(current_overall),
+                        step=2,
+                        current_progress=100,
+                        message=f"Split {split} selesai dibersihkan",
+                        split_step=f"{split.title()} Done",
+                        status='success'
+                    )
             
             # Phase 3: Finalisasi (90-100%)
-            progress_update(95, 0, 0, "Finalisasi cleanup...", "🔄 Finalisasi", "Cleaning metadata")
+            progress_bridge.update_progress(
+                overall_progress=95,
+                step=3,
+                current_progress=0,
+                message="Finalisasi cleanup...",
+                split_step="Cleaning metadata",
+                status='info'
+            )
             
             # Clean metadata if exists
             metadata_dir = preprocessed_dir / 'metadata'
@@ -197,8 +212,14 @@ Data yang dihapus tidak dapat dikembalikan."""
                 except Exception:
                     pass
             
-            progress_update(100, 100, 100, f"Cleanup selesai: {files_removed} files dihapus", 
-                          "✅ Finalisasi Selesai", "All clean")
+            progress_bridge.update_progress(
+                overall_progress=100,
+                step=3,
+                current_progress=100,
+                message=f"Cleanup selesai: {files_removed} files dihapus",
+                split_step="All clean",
+                status='success'
+            )
             
             return {
                 'success': True,
@@ -211,11 +232,41 @@ Data yang dihapus tidak dapat dikembalikan."""
             logger and logger.error(f"❌ Error cleanup: {str(e)}")
             raise
     
+    def _monitor_cleanup_completion():
+        """Monitor cleanup completion dengan proper error handling."""
+        future = ui_components['cleanup_future']
+        
+        if not future:
+            return
+        
+        if future.done():
+            try:
+                result = future.result()
+                _on_cleanup_complete(result)
+            except Exception as e:
+                _on_cleanup_error(e)
+            finally:
+                # Cleanup executor
+                if ui_components['cleanup_executor']:
+                    ui_components['cleanup_executor'].shutdown(wait=False)
+                    ui_components['cleanup_executor'] = None
+                ui_components['cleanup_future'] = None
+        else:
+            # Colab-safe monitoring dengan simple approach
+            import time
+            time.sleep(1)
+            _monitor_cleanup_completion()
+    
     def _on_cleanup_complete(result):
-        """Handler saat cleanup selesai."""
-        # Reset UI state
+        """Handler saat cleanup selesai dengan proper cleanup."""
+        # Reset UI states
         ui_state.set_button_processing('cleanup_button', False, 
                                      success_text="Cleanup Dataset")
+        
+        # Re-enable other action buttons
+        for button_key in ['preprocess_button', 'check_button']:
+            if button_key in ui_components and ui_components[button_key]:
+                ui_components[button_key].disabled = False
         
         if result and result.get('success', False):
             files_removed = result.get('files_removed', 0)
@@ -232,9 +283,14 @@ Data yang dihapus tidak dapat dikembalikan."""
             update_status_panel(ui_components['status_panel'], error_msg, "error")
     
     def _on_cleanup_error(error):
-        """Handler saat cleanup error."""
-        # Reset UI state
+        """Handler saat cleanup error dengan proper cleanup."""
+        # Reset UI states
         ui_state.set_button_processing('cleanup_button', False)
+        
+        # Re-enable other action buttons
+        for button_key in ['preprocess_button', 'check_button']:
+            if button_key in ui_components and ui_components[button_key]:
+                ui_components[button_key].disabled = False
         
         error_msg = f"❌ Error cleanup: {str(error)}"
         logger and logger.error(error_msg)
@@ -244,6 +300,6 @@ Data yang dihapus tidak dapat dikembalikan."""
     # Setup event handler
     ui_components['cleanup_button'].on_click(_on_cleanup_click)
     
-    logger and logger.debug("✅ Cleanup executor setup selesai")
+    logger and logger.debug("✅ Fixed cleanup executor setup selesai")
     
     return ui_components

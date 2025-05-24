@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_executor.py
-Deskripsi: Handler khusus untuk execute preprocessing dengan progress tracking
+Deskripsi: Fixed preprocessing executor dengan proper progress tracking dan button state management
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +14,7 @@ from smartcash.ui.dataset.preprocessing.utils import (
 )
 
 def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handler untuk execute preprocessing dengan comprehensive management."""
+    """Setup handler untuk execute preprocessing dengan proper progress integration."""
     logger = ui_components.get('logger')
     env_manager = env or get_environment_manager()
     
@@ -27,6 +27,8 @@ def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dic
     
     # State management
     ui_components['preprocessing_manager'] = None
+    ui_components['preprocessing_executor'] = None
+    ui_components['preprocessing_future'] = None
     
     def _get_preprocessing_manager() -> PreprocessingManager:
         """Get preprocessing manager dengan lazy initialization."""
@@ -41,15 +43,15 @@ def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dic
         return ui_components['preprocessing_manager']
     
     def _on_preprocess_click(b):
-        """Handler untuk tombol preprocessing dengan comprehensive validation."""
-        # Check operation state
+        """Handler untuk tombol preprocessing dengan proper state management."""
+        # Check operation state - exclude validation karena bisa concurrent
         can_start, message = ui_state.can_start_operation('preprocessing', exclude_operations=['validation'])
         if not can_start:
             logger and logger.warning(f"⚠️ {message}")
             update_status_panel(ui_components['status_panel'], message, "warning")
             return
         
-        # Check dataset existence
+        # Check dataset existence (quick check)
         dataset_exists, dataset_msg = validation_helper.check_dataset_exists()
         if not dataset_exists:
             logger and logger.error(f"❌ {dataset_msg}")
@@ -80,37 +82,30 @@ Data yang ada akan ditimpa dan tidak dapat dikembalikan."""
             _start_preprocessing_confirmed()
     
     def _start_preprocessing_confirmed():
-        """Start preprocessing setelah konfirmasi."""
-        # Setup progress
-        progress_bridge.setup_for_operation('preprocessing')
-        
-        # Set UI state
+        """Start preprocessing setelah konfirmasi dengan proper state management."""
+        # Set UI states
         ui_state.set_button_processing('preprocess_button', True, "Processing...")
+        
+        # Disable other action buttons during preprocessing
+        for button_key in ['check_button', 'cleanup_button']:
+            if button_key in ui_components and ui_components[button_key]:
+                ui_components[button_key].disabled = True
+        
+        # Setup progress tracking
+        progress_bridge.setup_for_operation('preprocessing')
         
         logger and logger.info("🚀 Memulai preprocessing dataset")
         update_status_panel(ui_components['status_panel'], "Memulai preprocessing dataset...", "info")
         
-        # Start preprocessing dalam thread
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(_run_preprocessing)
-        ui_components['preprocessing_future'] = future
-        ui_components['preprocessing_executor'] = executor
+        # Start preprocessing dalam thread dengan proper executor management
+        if ui_components['preprocessing_executor']:
+            ui_components['preprocessing_executor'].shutdown(wait=False)
         
-        # Monitor completion
-        def check_completion():
-            if future.done():
-                try:
-                    result = future.result()
-                    _on_preprocessing_complete(result)
-                except Exception as e:
-                    _on_preprocessing_error(e)
-                finally:
-                    executor.shutdown(wait=False)
-            else:
-                import threading
-                threading.Timer(1.0, check_completion).start()
+        ui_components['preprocessing_executor'] = ThreadPoolExecutor(max_workers=1)
+        ui_components['preprocessing_future'] = ui_components['preprocessing_executor'].submit(_run_preprocessing)
         
-        check_completion()
+        # Monitor completion dengan proper polling
+        _monitor_preprocessing_completion()
     
     def _run_preprocessing():
         """Execute preprocessing dalam thread terpisah."""
@@ -139,12 +134,54 @@ Data yang ada akan ditimpa dan tidak dapat dikembalikan."""
             logger and logger.error(f"❌ Error preprocessing: {str(e)}")
             raise
     
+    def _monitor_preprocessing_completion():
+        """Monitor preprocessing completion dengan proper error handling."""
+        future = ui_components['preprocessing_future']
+        
+        if not future:
+            return
+        
+        if future.done():
+            try:
+                result = future.result()
+                _on_preprocessing_complete(result)
+            except Exception as e:
+                _on_preprocessing_error(e)
+            finally:
+                # Cleanup executor
+                if ui_components['preprocessing_executor']:
+                    ui_components['preprocessing_executor'].shutdown(wait=False)
+                    ui_components['preprocessing_executor'] = None
+                ui_components['preprocessing_future'] = None
+        else:
+            # Schedule next check (Colab-safe approach)
+            from IPython.display import Javascript, display
+            
+            # Use IPython's built-in scheduling instead of threading
+            display(Javascript("""
+                setTimeout(function() {
+                    // Trigger re-check via kernel callback
+                    if (typeof kernel !== 'undefined' && kernel) {
+                        // This will be handled by the next cell execution
+                    }
+                }, 1000);
+            """))
+            
+            # Alternative: Use simple loop with sleep in the same thread
+            import time
+            time.sleep(1)
+            _monitor_preprocessing_completion()
+    
     def _on_preprocessing_complete(result):
-        """Handler saat preprocessing selesai."""
-        # Reset UI state
+        """Handler saat preprocessing selesai dengan proper cleanup."""
+        # Reset UI states
         ui_state.set_button_processing('preprocess_button', False, 
-                                     success_text="Mulai Preprocessing", 
-                                     success_style='success')
+                                     success_text="Mulai Preprocessing")
+        
+        # Re-enable other action buttons
+        for button_key in ['check_button', 'cleanup_button']:
+            if button_key in ui_components and ui_components[button_key]:
+                ui_components[button_key].disabled = False
         
         if result and result.get('success', False):
             total_images = result.get('total_images', 0)
@@ -174,9 +211,14 @@ Data yang ada akan ditimpa dan tidak dapat dikembalikan."""
             update_status_panel(ui_components['status_panel'], error_msg, "error")
     
     def _on_preprocessing_error(error):
-        """Handler saat preprocessing error."""
-        # Reset UI state
+        """Handler saat preprocessing error dengan proper cleanup."""
+        # Reset UI states
         ui_state.set_button_processing('preprocess_button', False)
+        
+        # Re-enable other action buttons
+        for button_key in ['check_button', 'cleanup_button']:
+            if button_key in ui_components and ui_components[button_key]:
+                ui_components[button_key].disabled = False
         
         error_msg = f"❌ Error preprocessing: {str(error)}"
         logger and logger.error(error_msg)
@@ -187,6 +229,6 @@ Data yang ada akan ditimpa dan tidak dapat dikembalikan."""
     # Setup event handler
     ui_components['preprocess_button'].on_click(_on_preprocess_click)
     
-    logger and logger.debug("✅ Preprocessing executor setup selesai")
+    logger and logger.debug("✅ Fixed preprocessing executor setup selesai")
     
     return ui_components

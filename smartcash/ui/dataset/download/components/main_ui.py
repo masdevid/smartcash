@@ -10,7 +10,7 @@ from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.components.progress_tracking import create_progress_tracking
+from smartcash.ui.components.progress_tracking import create_progress_tracking_container
 
 from .options_panel import create_options_panel
 from .action_section import create_action_section  # Import yang diperbaiki
@@ -39,13 +39,7 @@ def create_download_ui(config=None):
     # Components (mempertahankan struktur yang sudah ada)
     options = create_options_panel(roboflow_config, env_manager)
     actions = create_action_section()  # Menggunakan yang sudah diperbaiki
-    progress = create_progress_tracking(
-        module_name='download',
-        show_step_progress=True,
-        show_overall_progress=True,
-        show_current_progress=True,
-        width='100%'
-    ) 
+    progress = create_progress_tracking_container()
     logs = create_log_section()
     
     # Create save/reset buttons using the shared component

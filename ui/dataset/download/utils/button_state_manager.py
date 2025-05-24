@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/dataset/download/utils/button_state_manager.py
-Deskripsi: Enhanced button state manager dengan context-aware disable/enable dan progress control
+Deskripsi: Fixed button state manager dengan proper progress_tracking integration
 """
 
 from typing import Dict, Any, List, Optional, Callable
 from contextlib import contextmanager
 
 class ButtonStateManager:
-    """Manager untuk mengontrol state button dan progress secara konsisten."""
+    """Manager untuk mengontrol state button dan progress dengan proper integration."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -60,35 +60,66 @@ class ButtonStateManager:
                 self.logger.debug(f"🔘 Error setting {button_key} state: {str(e)}")
     
     def setup_progress_for_operation(self, operation: str) -> None:
-        """Setup progress bars sesuai konfigurasi operasi."""
+        """Setup progress bars sesuai konfigurasi operasi dengan proper progress_tracking integration."""
         config = self.progress_configs.get(operation, {'overall': True, 'step': False, 'current': False})
         
-        # Show/hide progress bars sesuai config
+        # Show progress container menggunakan method dari progress_tracking
+        self._show_progress_container()
+        
+        # Configure visibility berdasarkan operation
         self._configure_progress_visibility(config)
         
-        # Show progress container jika ada progress yang aktif
-        if any(config.values()):
-            self._show_progress_container()
-            self._reset_progress_values()
+        # Reset progress values
+        self._reset_progress_values()
+    
+    def _show_progress_container(self) -> None:
+        """Show progress container menggunakan method dari progress_tracking."""
+        try:
+            # Method 1: Direct progress_container dengan show_container method
+            if 'progress_container' in self.ui_components:
+                container_or_dict = self.ui_components['progress_container']
+                
+                # Jika container adalah dict dengan method show_container
+                if isinstance(container_or_dict, dict) and 'show_container' in container_or_dict:
+                    container_or_dict['show_container']()
+                    return
+                
+                # Jika container adalah widget langsung
+                if hasattr(container_or_dict, 'layout'):
+                    container_or_dict.layout.visibility = 'visible'
+                    container_or_dict.layout.display = 'block'
+                    return
+            
+            # Method 2: Import dan gunakan progress_tracking functions
+            try:
+                from smartcash.ui.components.progress_tracking import _show_progress_container
+                _show_progress_container(self.ui_components.get('progress_container'))
+            except ImportError:
+                pass
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.debug(f"📦 Error showing progress container: {str(e)}")
     
     def _configure_progress_visibility(self, config: Dict[str, bool]) -> None:
-        """Configure visibility progress bars sesuai config."""
+        """Configure visibility progress bars dengan mapping yang tepat."""
+        # Mapping widget keys berdasarkan progress_tracking structure
         progress_mapping = {
-            'overall': ['overall_progress', 'progress_bar', 'overall_label'],
+            'overall': ['overall_progress', 'progress_bar', 'overall_label'],  # progress_bar = alias
             'step': ['step_progress', 'step_label'], 
             'current': ['current_progress', 'current_label']
         }
         
-        for progress_type, show in config.items():
+        for progress_type, should_show in config.items():
             widgets = progress_mapping.get(progress_type, [])
-            visibility = 'visible' if show else 'hidden'
-            display = 'block' if show else 'none'
+            visibility = 'visible' if should_show else 'hidden'
+            display = 'block' if should_show else 'none'
             
             for widget_key in widgets:
                 self._safe_set_widget_visibility(widget_key, visibility, display)
     
     def _safe_set_widget_visibility(self, widget_key: str, visibility: str, display: str) -> None:
-        """Safely set widget visibility."""
+        """Safely set widget visibility dengan proper error handling."""
         try:
             if widget_key in self.ui_components and self.ui_components[widget_key]:
                 widget = self.ui_components[widget_key]
@@ -99,78 +130,104 @@ class ButtonStateManager:
             if self.logger:
                 self.logger.debug(f"📊 Error setting {widget_key} visibility: {str(e)}")
     
-    def _show_progress_container(self) -> None:
-        """Show progress container."""
-        try:
-            if 'progress_container' in self.ui_components:
-                container = self.ui_components['progress_container']
-                if hasattr(container, 'layout'):
-                    container.layout.visibility = 'visible'
-                    container.layout.display = 'block'
-                # Handle jika progress_container adalah dict dengan method
-                elif isinstance(container, dict) and 'show_container' in container:
-                    container['show_container']()
-        except Exception as e:
-            if self.logger:
-                self.logger.debug(f"📦 Error showing progress container: {str(e)}")
-    
     def _hide_progress_container(self) -> None:
-        """Hide progress container."""
+        """Hide progress container menggunakan method dari progress_tracking."""
         try:
+            # Method 1: Direct progress_container dengan hide_container method
             if 'progress_container' in self.ui_components:
-                container = self.ui_components['progress_container']
-                if hasattr(container, 'layout'):
-                    container.layout.visibility = 'hidden' 
-                    container.layout.display = 'none'
-                elif isinstance(container, dict) and 'hide_container' in container:
-                    container['hide_container']()
+                container_or_dict = self.ui_components['progress_container']
+                
+                # Jika container adalah dict dengan method hide_container
+                if isinstance(container_or_dict, dict) and 'hide_container' in container_or_dict:
+                    container_or_dict['hide_container']()
+                    return
+                
+                # Jika container adalah widget langsung
+                if hasattr(container_or_dict, 'layout'):
+                    container_or_dict.layout.visibility = 'hidden' 
+                    container_or_dict.layout.display = 'none'
+                    return
+            
+            # Method 2: Import dan gunakan progress_tracking functions
+            try:
+                from smartcash.ui.components.progress_tracking import _hide_progress_container
+                _hide_progress_container(self.ui_components.get('progress_container'))
+            except ImportError:
+                pass
+                
         except Exception as e:
             if self.logger:
                 self.logger.debug(f"📦 Error hiding progress container: {str(e)}")
     
     def _reset_progress_values(self) -> None:
-        """Reset semua progress values ke 0."""
-        progress_widgets = ['overall_progress', 'progress_bar', 'step_progress', 'current_progress']
+        """Reset semua progress values ke 0 dengan proper widget mapping."""
+        # Widget mapping berdasarkan progress_tracking structure
+        progress_widgets = [
+            'overall_progress',  # Main overall progress
+            'progress_bar',      # Alias untuk overall_progress 
+            'step_progress',     # Step progress
+            'current_progress'   # Current progress
+        ]
         
         for widget_key in progress_widgets:
-            try:
-                if widget_key in self.ui_components and self.ui_components[widget_key]:
-                    widget = self.ui_components[widget_key]
-                    if hasattr(widget, 'value'):
-                        widget.value = 0
-                    if hasattr(widget, 'description'):
-                        widget.description = "Progress: 0%"
-            except Exception:
-                pass
+            self._safe_reset_progress_widget(widget_key)
+        
+        # Reset labels juga
+        label_widgets = ['overall_label', 'step_label', 'current_label']
+        for label_key in label_widgets:
+            self._safe_reset_label_widget(label_key)
+    
+    def _safe_reset_progress_widget(self, widget_key: str) -> None:
+        """Safely reset progress widget."""
+        try:
+            if widget_key in self.ui_components and self.ui_components[widget_key]:
+                widget = self.ui_components[widget_key]
+                if hasattr(widget, 'value'):
+                    widget.value = 0
+                if hasattr(widget, 'description'):
+                    widget.description = "Progress: 0%"
+        except Exception:
+            pass
+    
+    def _safe_reset_label_widget(self, label_key: str) -> None:
+        """Safely reset label widget."""
+        try:
+            if label_key in self.ui_components and self.ui_components[label_key]:
+                widget = self.ui_components[label_key]
+                if hasattr(widget, 'value'):
+                    widget.value = ""
+        except Exception:
+            pass
     
     def complete_operation(self, operation: str, message: str = "Selesai") -> None:
-        """Complete operation dengan cleanup state."""
-        # Enable buttons kembali
-        self.enable_buttons('all')
-        
-        # Update progress ke 100% jika ada yang aktif
+        """Complete operation dengan cleanup state dan progress update."""
+        # Update progress ke 100% untuk operation ini
         config = self.progress_configs.get(operation, {})
         if config.get('overall', False):
             self._safe_update_progress('overall_progress', 100, message)
+            self._safe_update_progress('progress_bar', 100, message)  # Update alias juga
         if config.get('step', False):
             self._safe_update_progress('step_progress', 100, message)
         if config.get('current', False):
             self._safe_update_progress('current_progress', 100, message)
+        
+        # Enable buttons kembali
+        self.enable_buttons('all')
     
     def error_operation(self, operation: str, message: str = "Error") -> None:
         """Handle error state untuk operation."""
-        # Enable buttons kembali
-        self.enable_buttons('all')
-        
         # Reset progress dengan error message
         config = self.progress_configs.get(operation, {})
-        if any(config.values()):
+        if config.get('overall', False):
             self._safe_update_progress('overall_progress', 0, f"❌ {message}")
+            self._safe_update_progress('progress_bar', 0, f"❌ {message}")
+        
+        # Enable buttons kembali
+        self.enable_buttons('all')
     
     def _safe_update_progress(self, widget_key: str, value: int, description: str) -> None:
-        """Safely update progress widget."""
+        """Safely update progress widget dengan proper handling."""
         try:
-            # Handle direct widget access
             if widget_key in self.ui_components and self.ui_components[widget_key]:
                 widget = self.ui_components[widget_key]
                 if hasattr(widget, 'value'):
@@ -216,7 +273,7 @@ def get_button_state_manager(ui_components: Dict[str, Any]) -> ButtonStateManage
     return ButtonStateManager(ui_components)
 
 
-# Backward compatibility functions
+# Backward compatibility functions (deprecated)
 def disable_download_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     """Legacy function untuk backward compatibility.""" 
     manager = get_button_state_manager(ui_components)

@@ -3,6 +3,7 @@ File: smartcash/ui/setup/dependency_installer/components/dependency_installer_co
 Deskripsi: Komponen UI untuk instalasi dependencies
 """
 
+from IPython.display import display
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
@@ -206,6 +207,8 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             [checkbox, status_widget],
             layout=widgets.Layout(
                 width='100%',
+                display='flex',
+                flex_flow='row',
                 align_items='center',
                 justify_content='space-between'
             )
@@ -222,7 +225,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
         package_rows,
         layout=widgets.Layout(
             margin='5px 0 10px',  # Memberikan indentasi
-            width='100%'
+            width='100%',
         )
     )
     

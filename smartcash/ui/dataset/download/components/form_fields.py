@@ -70,7 +70,7 @@ def output_dir_field(config):
         placeholder='Path download sementara dataset (akan dipindah ke struktur final)',
         description='Download Dir:',
         disabled=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='100%', display='flex', flex_flow='row wrap', justify_content='space-between')
     )
 
 def backup_dir_field(default_path=None):
@@ -91,7 +91,7 @@ def backup_dir_field(default_path=None):
         placeholder='Path backup dataset',
         description='Backup Dir:',
         disabled=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='100%', display='flex', flex_flow='row wrap', justify_content='space-between')
     )
 
 def workspace_field(config):

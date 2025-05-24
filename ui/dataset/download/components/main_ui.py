@@ -43,7 +43,7 @@ def create_download_ui(config=None):
         module_name='download',
         show_step_progress=True,
         show_overall_progress=True,
-        show_current_progress=False,
+        show_current_progress=True,
         width='100%'
     ) 
     logs = create_log_section()

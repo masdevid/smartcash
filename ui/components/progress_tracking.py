@@ -104,7 +104,8 @@ def create_progress_tracking(
             border_radius='5px',
             background_color='#f8f9fa',
             visibility='hidden',  # Hidden by default
-            display='none'
+            display='none',
+            overflow='hidden'
         )
     )
     

@@ -33,7 +33,7 @@ def create_progress_tracking_container() -> Dict[str, Any]:
         widgets.HTML("<h4>📊 Progress</h4>"),
         status_widget,
         tqdm_container
-    ], layout=widgets.Layout(margin='10px 0', padding='20px', display='none', overflow='hidden'))
+    ], layout=widgets.Layout(margin='10px 0', padding='10px', display='none'))
     
     # Progress state management
     progress_state = {
@@ -82,11 +82,11 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         # Clear existing bars
         _cleanup_all_bars(state)
         
-        # Configuration per operation
+        # Configuration per operation dengan current bar untuk organize/cleanup detail
         operation_configs = {
-            'download': {'overall': True, 'step': True, 'current': False},
+            'download': {'overall': True, 'step': True, 'current': True},  # Enable current untuk organize splits
             'check': {'overall': True, 'step': False, 'current': False},
-            'cleanup': {'overall': True, 'step': True, 'current': False},
+            'cleanup': {'overall': True, 'step': True, 'current': True},  # Enable step untuk cleanup phases
             'save': {'overall': False, 'step': False, 'current': False},
             'all': {'overall': True, 'step': True, 'current': True}
         }
@@ -149,7 +149,7 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
             _update_status_message(state, message, color_style)
     
     def complete_operation(message: str = "Selesai"):
-        """Complete operation dengan success state."""
+        """Complete operation dengan success state yang persisten."""
         # Set semua active bars ke 100%
         for bar_type in state['active_bars']:
             bar_key = f'{bar_type}_bar'
@@ -164,10 +164,11 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         
         _update_status_message(state, f"✅ {message}", 'success')
         
-        # Auto cleanup setelah delay
+        # Delay cleanup untuk mempertahankan visual success state
         def delayed_cleanup():
-            time.sleep(2)
-            _cleanup_all_bars(state)
+            time.sleep(3)  # Increase delay untuk better visual feedback
+            if state['active_bars']:  # Only cleanup if still active
+                _cleanup_all_bars(state)
         
         threading.Thread(target=delayed_cleanup, daemon=True).start()
     

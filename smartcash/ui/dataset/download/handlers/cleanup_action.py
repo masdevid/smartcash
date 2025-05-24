@@ -34,7 +34,7 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         button_manager.enable_buttons('all')
 
 def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = None) -> None:
-    """Execute cleanup dengan tqdm progress tracking."""
+    """Execute cleanup dengan tqdm progress tracking per split."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
@@ -42,13 +42,45 @@ def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = N
         try:
             logger and logger.info("🗑️ Menghapus dataset")
             
+            # Setup progress untuk cleanup dengan current bar untuk detail per folder
+            if 'show_for_operation' in ui_components:
+                ui_components['show_for_operation']('cleanup')
+            
             _update_cleanup_progress(ui_components, 10, "Memulai cleanup...")
             
             organizer = DatasetOrganizer(logger=logger)
-            organizer.set_progress_callback(lambda step, curr, total, msg: _cleanup_progress_callback(ui_components, curr, total, msg))
             
-            _update_cleanup_progress(ui_components, 20, "Menghapus file dataset...")
+            # Enhanced progress callback dengan step tracking
+            def enhanced_cleanup_callback(step: str, current: int, total: int, message: str):
+                _cleanup_progress_callback(ui_components, current, total, message)
+                
+                # Update step progress berdasarkan step
+                if step == 'cleanup':
+                    step_progress = int((current / max(total, 1)) * 100)
+                    if 'update_progress' in ui_components:
+                        ui_components['update_progress']('step', step_progress, f"Membersihkan: {message}")
+            
+            organizer.set_progress_callback(enhanced_cleanup_callback)
+            
+            _update_cleanup_progress(ui_components, 20, "Menghitung file yang akan dihapus...")
+            
+            # Simulate step progress untuk tahapan cleanup
+            splits_to_clean = ['train', 'valid', 'test', 'downloads']
+            total_steps = len(splits_to_clean)
+            
+            for i, split_name in enumerate(splits_to_clean):
+                step_progress = int(((i + 1) / total_steps) * 100)
+                overall_progress = 20 + int((step_progress / 100) * 60)  # 20-80%
+                
+                if 'update_progress' in ui_components:
+                    ui_components['update_progress']('step', step_progress, f"Tahap {i+1}/{total_steps}: Menyiapkan cleanup {split_name}")
+                
+                _update_cleanup_progress(ui_components, overall_progress, f"Menyiapkan cleanup {split_name}...")
+                
+            _update_cleanup_progress(ui_components, 80, "Menjalankan cleanup...")
             result = organizer.cleanup_all_dataset_folders()
+            
+            _update_cleanup_progress(ui_components, 95, "Menyelesaikan cleanup...")
             
             if result['status'] == 'success':
                 if logger:

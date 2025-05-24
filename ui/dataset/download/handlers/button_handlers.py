@@ -1,142 +1,262 @@
 """
 File: smartcash/ui/dataset/download/handlers/button_handlers.py
-Deskripsi: Updated button handlers dengan proper error handling dan state management
+Deskripsi: Refactored button handlers dengan delegation ke specialized handlers yang lebih kecil
 """
 
 from typing import Dict, Any
 
+# Import specialized handlers
+from smartcash.ui.dataset.download.handlers.download_action import execute_download_action
+from smartcash.ui.dataset.download.handlers.check_action import execute_check_action
+from smartcash.ui.dataset.download.handlers.cleanup_action import execute_cleanup_action
+from smartcash.ui.dataset.download.handlers.reset_action import execute_reset_action
+from smartcash.ui.dataset.download.handlers.save_action import execute_save_action
+
 def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup button handlers dengan improved error handling dan state management."""
+    """
+    Setup semua button handlers dengan delegation ke specialized handlers.
     
+    Args:
+        ui_components: Dictionary komponen UI
+        env: Environment context (optional)
+        
+    Returns:
+        Updated ui_components dictionary
+    """
     logger = ui_components.get('logger')
     
     try:
-        # Setup handlers dengan improved error handling
-        handlers_setup = [
-            ('download_button', 'download', _setup_download_handler),
-            ('check_button', 'check', _setup_check_handler),
-            ('reset_button', 'reset', _setup_reset_handler),
-            ('cleanup_button', 'cleanup', _setup_cleanup_handler),
-            ('save_button', 'save', _setup_save_handler)
+        # Handler mapping untuk cleaner setup
+        handler_configs = [
+            ('download_button', 'Download', _create_download_handler),
+            ('check_button', 'Check', _create_check_handler),
+            ('cleanup_button', 'Cleanup', _create_cleanup_handler),
+            ('reset_button', 'Reset', _create_reset_handler),
+            ('save_button', 'Save', _create_save_handler)
         ]
         
         success_count = 0
-        for button_key, action_name, setup_func in handlers_setup:
+        
+        # Setup each handler dengan error isolation
+        for button_key, action_name, handler_factory in handler_configs:
             try:
-                if button_key in ui_components and ui_components[button_key] is not None:
-                    setup_func(ui_components, env)
+                if _is_button_available(ui_components, button_key):
+                    handler_func = handler_factory(ui_components, env)
+                    _attach_handler_safely(ui_components[button_key], handler_func)
                     success_count += 1
             except Exception as e:
-                if logger:
-                    logger.error(f"❌ Error setup {action_name} handler: {str(e)}")
+                logger and logger.warning(f"⚠️ Error setup {action_name} handler: {str(e)}")
         
+        # Log success summary
         if logger and success_count > 0:
-            logger.info(f"🔘 Button handlers ready: {success_count} handlers active")
+            logger.info(f"🔘 Button handlers aktif: {success_count} dari {len(handler_configs)}")
         
-        # Ensure all buttons enabled
-        _ensure_all_buttons_enabled(ui_components)
+        # Ensure semua buttons enabled setelah setup
+        _ensure_buttons_enabled(ui_components)
         
     except Exception as e:
-        if logger:
-            logger.error(f"❌ Critical error in button handler setup: {str(e)}")
+        logger and logger.error(f"❌ Critical error dalam button handler setup: {str(e)}")
     
     return ui_components
 
-def _setup_download_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup download button dengan context manager support."""
+def _create_download_handler(ui_components: Dict[str, Any], env=None):
+    """Create download button handler dengan comprehensive error handling."""
     def download_handler(button):
         try:
-            from smartcash.ui.dataset.download.handlers.download_action import execute_download_action
+            # Disable button sementara
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+            
+            # Execute download action
             execute_download_action(ui_components, button)
+            
         except Exception as e:
             logger = ui_components.get('logger')
-            if logger:
-                logger.error(f"❌ Download handler error: {str(e)}")
+            logger and logger.error(f"💥 Download handler error: {str(e)}")
+            
+            # Error state untuk UI
+            if 'error_operation' in ui_components:
+                ui_components['error_operation'](f"Download error: {str(e)}")
+        
+        finally:
+            # Always re-enable button
+            if hasattr(button, 'disabled'):
+                button.disabled = False
     
-    button = ui_components['download_button']
-    _safe_setup_handler(button, download_handler)
+    return download_handler
 
-def _setup_check_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup check button dengan context manager support."""
+def _create_check_handler(ui_components: Dict[str, Any], env=None):
+    """Create check button handler."""
     def check_handler(button):
         try:
-            from smartcash.ui.dataset.download.handlers.check_action import execute_check_action
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+            
             execute_check_action(ui_components, button)
+            
         except Exception as e:
             logger = ui_components.get('logger')
-            if logger:
-                logger.error(f"❌ Check handler error: {str(e)}")
-    
-    button = ui_components['check_button']
-    _safe_setup_handler(button, check_handler)
-
-def _setup_reset_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup reset button handler."""
-    def reset_handler(button):
-        try:
-            button.disabled = True
-            from smartcash.ui.dataset.download.handlers.reset_action import execute_reset_action
-            execute_reset_action(ui_components, button)
-        except Exception as e:
-            logger = ui_components.get('logger')
-            if logger:
-                logger.error(f"❌ Reset handler error: {str(e)}")
+            logger and logger.error(f"💥 Check handler error: {str(e)}")
+        
         finally:
-            _safe_enable_button(button)
+            if hasattr(button, 'disabled'):
+                button.disabled = False
     
-    button = ui_components['reset_button']
-    _safe_setup_handler(button, reset_handler)
+    return check_handler
 
-def _setup_cleanup_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup cleanup button dengan context manager support."""
+def _create_cleanup_handler(ui_components: Dict[str, Any], env=None):
+    """Create cleanup button handler."""
     def cleanup_handler(button):
         try:
-            from smartcash.ui.dataset.download.handlers.cleanup_action import execute_cleanup_action
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+            
             execute_cleanup_action(ui_components, button)
+            
         except Exception as e:
             logger = ui_components.get('logger')
-            if logger:
-                logger.error(f"❌ Cleanup handler error: {str(e)}")
+            logger and logger.error(f"💥 Cleanup handler error: {str(e)}")
+        
+        finally:
+            if hasattr(button, 'disabled'):
+                button.disabled = False
     
-    button = ui_components['cleanup_button']
-    _safe_setup_handler(button, cleanup_handler)
+    return cleanup_handler
 
-def _setup_save_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup save button handler."""
+def _create_reset_handler(ui_components: Dict[str, Any], env=None):
+    """Create reset button handler."""
+    def reset_handler(button):
+        try:
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+            
+            execute_reset_action(ui_components, button)
+            
+        except Exception as e:
+            logger = ui_components.get('logger')
+            logger and logger.error(f"💥 Reset handler error: {str(e)}")
+        
+        finally:
+            if hasattr(button, 'disabled'):
+                button.disabled = False
+    
+    return reset_handler
+
+def _create_save_handler(ui_components: Dict[str, Any], env=None):
+    """Create save button handler."""
     def save_handler(button):
         try:
-            button.disabled = True
-            from smartcash.ui.dataset.download.handlers.save_action import execute_save_action
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+            
             execute_save_action(ui_components, button)
+            
         except Exception as e:
             logger = ui_components.get('logger')
-            if logger:
-                logger.error(f"❌ Save handler error: {str(e)}")
+            logger and logger.error(f"💥 Save handler error: {str(e)}")
+        
         finally:
-            _safe_enable_button(button)
+            if hasattr(button, 'disabled'):
+                button.disabled = False
     
-    button = ui_components['save_button']
-    _safe_setup_handler(button, save_handler)
+    return save_handler
 
-def _safe_setup_handler(button, handler_func) -> None:
-    """Safely setup handler dengan proper error handling."""
+def _is_button_available(ui_components: Dict[str, Any], button_key: str) -> bool:
+    """Check apakah button tersedia dan valid."""
+    return (button_key in ui_components and 
+            ui_components[button_key] is not None and
+            hasattr(ui_components[button_key], 'on_click'))
+
+def _attach_handler_safely(button, handler_func) -> bool:
+    """Attach handler ke button dengan error handling."""
     try:
         button.on_click(handler_func)
+        return True
     except Exception:
-        pass
+        return False
 
-def _safe_enable_button(button) -> None:
-    """Safely enable button dengan error handling."""
-    try:
-        if hasattr(button, 'disabled'):
-            button.disabled = False
-    except Exception:
-        pass
-
-def _ensure_all_buttons_enabled(ui_components: Dict[str, Any]) -> None:
+def _ensure_buttons_enabled(ui_components: Dict[str, Any]) -> None:
     """Ensure semua button dalam keadaan enabled setelah setup."""
-    button_keys = ['download_button', 'check_button', 'reset_button', 'cleanup_button', 'save_button']
+    button_keys = ['download_button', 'check_button', 'cleanup_button', 'reset_button', 'save_button']
     
-    for key in button_keys:
-        if key in ui_components and ui_components[key] is not None:
-            _safe_enable_button(ui_components[key])
+    for button_key in button_keys:
+        if _is_button_available(ui_components, button_key):
+            try:
+                ui_components[button_key].disabled = False
+            except Exception:
+                pass
+
+def register_additional_handler(ui_components: Dict[str, Any], 
+                              button_key: str, 
+                              handler_func, 
+                              replace_existing: bool = False) -> bool:
+    """
+    Register additional handler untuk button tertentu.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        button_key: Key untuk button
+        handler_func: Handler function
+        replace_existing: Apakah replace existing handler
+        
+    Returns:
+        True jika berhasil register
+    """
+    try:
+        if not _is_button_available(ui_components, button_key):
+            return False
+        
+        button = ui_components[button_key]
+        
+        if replace_existing:
+            # Clear existing handlers (jika mungkin)
+            # Note: ipywidgets tidak menyediakan cara untuk clear handlers,
+            # jadi kita hanya bisa add handler baru
+            pass
+        
+        return _attach_handler_safely(button, handler_func)
+        
+    except Exception:
+        return False
+
+def get_handler_status(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get status semua button handlers untuk debugging.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary berisi status handlers
+    """
+    button_keys = ['download_button', 'check_button', 'cleanup_button', 'reset_button', 'save_button']
+    
+    status = {
+        'total_buttons': len(button_keys),
+        'available_buttons': 0,
+        'enabled_buttons': 0,
+        'button_details': {}
+    }
+    
+    for button_key in button_keys:
+        button_status = {
+            'exists': button_key in ui_components,
+            'not_none': ui_components.get(button_key) is not None,
+            'has_onclick': False,
+            'enabled': False
+        }
+        
+        if _is_button_available(ui_components, button_key):
+            status['available_buttons'] += 1
+            button_status['has_onclick'] = True
+            
+            try:
+                button_status['enabled'] = not ui_components[button_key].disabled
+                if button_status['enabled']:
+                    status['enabled_buttons'] += 1
+            except Exception:
+                pass
+        
+        status['button_details'][button_key] = button_status
+    
+    return status

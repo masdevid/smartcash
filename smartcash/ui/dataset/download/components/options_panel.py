@@ -95,13 +95,13 @@ def create_options_panel(config, env_manager=None):
                 widgets.HTML('<label style="font-weight: bold; color: #495057; margin-bottom: 5px; display: block;">📥 Download Directory</label>'),
                 output_dir,
                 widgets.HTML('<small style="color: #6c757d; margin-top: 5px; display: block;">Lokasi sementara untuk download dataset sebelum diorganisir</small>')
-            ], layout=widgets.Layout(width='100%', margin='0', overflow='hidden')),
+            ], layout=widgets.Layout(width='calc(50% - 8px)', margin='0 4px 0 0', overflow='hidden')),
             widgets.VBox([
                 widgets.HTML('<label style="font-weight: bold; color: #495057; margin-bottom: 5px; display: block;">💾 Backup Directory</label>'),
                 backup_dir,
                 widgets.HTML('<small style="color: #6c757d; margin-top: 5px; display: block;">Lokasi penyimpanan backup dataset lama (jika diperlukan)</small>')
-            ], layout=widgets.Layout(width='100%', margin='0', overflow='hidden'))
-        ], layout=widgets.Layout(width='100%', overflow='hidden', flex_flow='row wrap', justify_content='space-between')),
+            ], layout=widgets.Layout(width='calc(50% - 8px)', margin='0 0 0 4px', overflow='hidden'))
+        ], layout=widgets.Layout(width='100%', overflow='hidden', flex_flow='row', justify_content='space-between', gap='8px')),
         structure_info
     ], layout=widgets.Layout(
         width='100%',

@@ -69,7 +69,6 @@ def output_dir_field(config):
         value=default_value,
         placeholder='Path download sementara dataset (akan dipindah ke struktur final)',
         disabled=False,
-        description='Download:',
         layout=widgets.Layout(width='100%')
     )
 
@@ -90,7 +89,6 @@ def backup_dir_field(default_path=None):
         value=value,
         placeholder='Path backup dataset',
         disabled=False,
-        description='Backup:',
         layout=widgets.Layout(width='100%')
     )
 
@@ -141,7 +139,7 @@ def backup_checkbox_field():
         description='Backup dataset lama sebelum replace (jika ada)',
         disabled=False,
         indent=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='90%', display='inline-block')
     )
 
 def organize_dataset_field():
@@ -151,7 +149,7 @@ def organize_dataset_field():
         description='Organisir dataset ke struktur final (train/valid/test)',
         disabled=True,
         indent=False,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='90%', display='inline-block')
     )
 
 def show_structure_info():

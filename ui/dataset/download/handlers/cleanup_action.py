@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/cleanup_action.py
-Deskripsi: Fixed cleanup action dengan progress tracking yang terintegrasi dengan dual progress system
+Deskripsi: Updated cleanup action dengan progress tracking yang match progress_tracking.py
 """
 
 from typing import Dict, Any
@@ -9,7 +9,7 @@ from smartcash.ui.dataset.download.utils.button_state import disable_download_bu
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 
 def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi cleanup dataset dengan progress tracking yang benar."""
+    """Eksekusi cleanup dataset dengan progress tracking yang match progress_tracking.py."""
     logger = ui_components.get('logger')
     if logger:
         logger.info("🧹 Memulai cleanup dataset")
@@ -37,14 +37,12 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         disable_download_buttons(ui_components, False)
 
 def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = None) -> None:
-    """Eksekusi cleanup dengan dual progress tracking yang benar."""
+    """Eksekusi cleanup dengan progress tracking yang match progress_tracking.py."""
     logger = ui_components.get('logger')
     
     try:
-        # Initialize progress tracking
-        from smartcash.ui.dataset.download.handlers.progress_handlers import start_progress, update_step_progress, complete_progress, error_progress
-        
-        start_progress(ui_components, "Memulai cleanup dataset")
+        # Start progress tracking
+        _start_cleanup_progress(ui_components, "Memulai cleanup dataset")
         
         organizer = DatasetOrganizer(logger=logger)
         organizer.set_progress_callback(lambda step, curr, total, msg: _cleanup_progress_callback(ui_components, curr, msg))
@@ -55,7 +53,7 @@ def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = N
         result = organizer.cleanup_all_dataset_folders()
         
         if result['status'] == 'success':
-            complete_progress(ui_components, result['message'])
+            _complete_cleanup_progress(ui_components, result['message'])
             
             if logger:
                 logger.success(f"✅ {result['message']}")
@@ -64,27 +62,66 @@ def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = N
                     for folder in stats['folders_cleaned']:
                         logger.info(f"   • {folder}")
         elif result['status'] == 'empty':
-            complete_progress(ui_components, result['message'])
+            _complete_cleanup_progress(ui_components, result['message'])
             if logger:
                 logger.info(f"ℹ️ {result['message']}")
         else:
-            error_progress(ui_components, result.get('message', 'Cleanup gagal'))
+            _error_cleanup_progress(ui_components, result.get('message', 'Cleanup gagal'))
             if logger:
                 logger.error(f"❌ {result.get('message', 'Cleanup gagal')}")
         
     except Exception as e:
-        error_progress(ui_components, f"Cleanup error: {str(e)}")
+        _error_cleanup_progress(ui_components, f"Cleanup error: {str(e)}")
         if logger:
             logger.error(f"❌ Error cleanup: {str(e)}")
     finally:
         disable_download_buttons(ui_components, False)
 
 def _cleanup_progress_callback(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Callback untuk update step progress saja selama cleanup."""
-    from smartcash.ui.dataset.download.handlers.progress_handlers import update_step_progress
+    """Callback untuk update current progress selama cleanup."""
+    # Update current progress menggunakan progress_tracking.py functions
+    from smartcash.ui.components.progress_tracking import update_current_progress
+    update_current_progress(ui_components, progress, 100, message)
+
+def _start_cleanup_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Start cleanup progress menggunakan progress_tracking.py."""
+    from smartcash.ui.components.progress_tracking import update_overall_progress, update_step_progress
     
-    # Update step progress dengan pesan cleanup
-    update_step_progress(ui_components, progress, message, "Cleanup")
+    # Show progress container
+    if 'progress_container' in ui_components:
+        ui_components['progress_container']['show_container']()
+    
+    # Initialize progress
+    update_overall_progress(ui_components, 0, 100, message)
+    update_step_progress(ui_components, 1, 1, "Cleanup")
+
+def _complete_cleanup_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Complete cleanup progress menggunakan progress_tracking.py."""
+    from smartcash.ui.components.progress_tracking import update_overall_progress, update_current_progress
+    
+    # Set semua progress ke 100%
+    update_overall_progress(ui_components, 100, 100, message)
+    update_current_progress(ui_components, 100, 100, "Selesai")
+    
+    # Set success bar style
+    if 'overall_progress' in ui_components and ui_components['overall_progress']:
+        ui_components['overall_progress'].bar_style = 'success'
+    if 'current_progress' in ui_components and ui_components['current_progress']:
+        ui_components['current_progress'].bar_style = 'success'
+
+def _error_cleanup_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Error cleanup progress menggunakan progress_tracking.py."""
+    from smartcash.ui.components.progress_tracking import update_overall_progress, update_current_progress
+    
+    # Reset progress dan set error messages
+    update_overall_progress(ui_components, 0, 100, f"❌ {message}")
+    update_current_progress(ui_components, 0, 100, "Error")
+    
+    # Set danger bar style
+    if 'overall_progress' in ui_components and ui_components['overall_progress']:
+        ui_components['overall_progress'].bar_style = 'danger'
+    if 'current_progress' in ui_components and ui_components['current_progress']:
+        ui_components['current_progress'].bar_style = 'danger'
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs sebelum cleanup."""

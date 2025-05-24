@@ -86,7 +86,7 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         operation_configs = {
             'download': {'overall': True, 'step': True, 'current': False},
             'check': {'overall': True, 'step': False, 'current': False},
-            'cleanup': {'overall': True, 'step': False, 'current': True},
+            'cleanup': {'overall': True, 'step': True, 'current': False},
             'save': {'overall': False, 'step': False, 'current': False},
             'all': {'overall': True, 'step': True, 'current': True}
         }

@@ -1,96 +1,90 @@
 """
 File: smartcash/dataset/services/downloader/ui_progress_mixin.py
-Deskripsi: Mixin class untuk progress callback integration yang konsisten di semua downloader services
+Deskripsi: Progress mixin untuk UI downloader dengan callback management yang robust
 """
 
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any
 
 class UIProgressMixin:
-    """Mixin untuk standardisasi progress callback di semua downloader services."""
+    """Mixin untuk progress tracking dalam UI downloader dengan callback management."""
     
     def __init__(self):
+        """Initialize progress tracking state."""
         self._progress_callback: Optional[Callable] = None
-        self._current_step = ""
-        self._step_total = 100
+        self._current_step = "idle"
+        self._step_progress = 0
+        self._overall_progress = 0
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
         """
-        Set progress callback function.
+        Set callback untuk progress updates.
         
         Args:
             callback: Function dengan signature (step, current, total, message)
         """
         self._progress_callback = callback
     
-    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
+    def _notify_progress(self, step: str, current: int, total: int, message: str = "") -> None:
         """
-        Notify progress via callback dengan error handling.
+        Notify progress update via callback.
         
         Args:
-            step: Nama step (download, extract, validate, etc)
-            current: Progress saat ini
-            total: Total progress
-            message: Pesan progress
+            step: Step name ('download', 'extract', etc.)
+            current: Current progress value
+            total: Total progress value  
+            message: Optional progress message
         """
         if self._progress_callback:
             try:
-                # Clamp values untuk safety
-                current = max(0, min(total, current))
-                total = max(1, total)
-                
-                # Store current step untuk reference
-                self._current_step = step
-                self._step_total = total
-                
-                # Call callback
                 self._progress_callback(step, current, total, message)
+                self._step_progress = current
             except Exception:
-                # Ignore callback errors agar tidak mengganggu proses utama
+                # Silent fail untuk prevent callback errors dari mengganggu proses
                 pass
     
     def _notify_step_start(self, step: str, message: str = "") -> None:
-        """Notify step start."""
-        self._notify_progress(step, 0, 100, message or f"Memulai {step}")
-    
-    def _notify_step_complete(self, step: str, message: str = "") -> None:
-        """Notify step completion."""
-        self._notify_progress(step, 100, 100, message or f"{step} selesai")
-    
-    def _notify_step_error(self, step: str, message: str = "") -> None:
-        """Notify step error."""
-        self._notify_progress(step, 0, 100, f"Error: {message}")
-    
-    def _calculate_overall_progress(self, step_name: str, step_progress: int, 
-                                   total_steps: int, current_step: int) -> int:
         """
-        Calculate overall progress dari step progress.
+        Notify step start.
         
         Args:
-            step_name: Nama step saat ini
-            step_progress: Progress dalam step (0-100)
-            total_steps: Total jumlah steps
-            current_step: Step ke berapa saat ini (1-based)
-            
-        Returns:
-            Overall progress (0-100)
+            step: Step name
+            message: Step start message
         """
-        if total_steps <= 0:
-            return step_progress
-            
-        # Calculate base progress from completed steps
-        completed_steps = max(0, current_step - 1)
-        base_progress = (completed_steps / total_steps) * 100
-        
-        # Add current step progress
-        current_step_contribution = (step_progress / 100) * (100 / total_steps)
-        
-        overall = int(base_progress + current_step_contribution)
-        return max(0, min(100, overall))
+        self._current_step = step
+        self._step_progress = 0
+        self._notify_progress(step, 0, 100, message or f"Starting {step}")
     
-    def get_progress_status(self) -> dict:
-        """Get current progress status untuk debugging."""
+    def _notify_step_complete(self, step: str, message: str = "") -> None:
+        """
+        Notify step completion.
+        
+        Args:
+            step: Step name
+            message: Step completion message
+        """
+        self._step_progress = 100
+        self._notify_progress(step, 100, 100, message or f"{step} completed")
+    
+    def _notify_step_error(self, step: str, error_message: str) -> None:
+        """
+        Notify step error.
+        
+        Args:
+            step: Step name
+            error_message: Error message
+        """
+        self._notify_progress(step, 0, 100, f"Error: {error_message}")
+    
+    def get_current_progress(self) -> Dict[str, Any]:
+        """
+        Get current progress state.
+        
+        Returns:
+            Dictionary dengan progress information
+        """
         return {
-            'has_callback': self._progress_callback is not None,
             'current_step': self._current_step,
-            'step_total': self._step_total
+            'step_progress': self._step_progress,
+            'overall_progress': self._overall_progress,
+            'has_callback': self._progress_callback is not None
         }

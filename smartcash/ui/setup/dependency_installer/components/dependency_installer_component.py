@@ -221,7 +221,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     group_checkboxes = widgets.VBox(
         package_rows,
         layout=widgets.Layout(
-            margin='5px 0 10px 15px',  # Memberikan indentasi
+            margin='5px 0 10px',  # Memberikan indentasi
             width='100%'
         )
     )
@@ -235,7 +235,8 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             border=f'1px solid {COLORS["border"]}',
             border_radius='5px',
             width='31%',  # Atur lebar untuk 3 kolom
-            min_width='250px'  # Min width untuk responsive
+            min_width='250px',  # Min width untuk responsive
+            overflow='hidden'
         )
     )
     
@@ -273,7 +274,8 @@ def create_custom_package_section() -> widgets.VBox:
             padding='10px',
             border=f'1px solid {COLORS["border"]}',
             border_radius='5px',
-            width='100%'
+            width='100%',
+            overflow='hidden'
         )
     )
     

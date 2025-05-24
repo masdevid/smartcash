@@ -69,7 +69,7 @@ def output_dir_field(config):
         value=default_value,
         placeholder='Path download sementara dataset (akan dipindah ke struktur final)',
         disabled=False,
-        layout=widgets.Layout(width='100%', display='inline-block')
+        layout=widgets.Layout(width='90%')
     )
 
 def backup_dir_field(default_path=None):
@@ -89,7 +89,7 @@ def backup_dir_field(default_path=None):
         value=value,
         placeholder='Path backup dataset',
         disabled=False,
-        layout=widgets.Layout(width='100%', display='inline-block')
+        layout=widgets.Layout(width='90%')
     )
 
 def workspace_field(config):

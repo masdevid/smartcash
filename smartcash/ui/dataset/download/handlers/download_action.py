@@ -310,37 +310,13 @@ def _execute_enhanced_download_with_progress(ui_components: Dict[str, Any], para
         _update_download_progress(ui_components, 50, "Mengunduh dataset...")
         _update_step_progress(ui_components, 20, "Memulai download dari Roboflow")
         
-        def progress_callback(stage: str, progress: int, message: str):
-            """Enhanced progress callback dengan proper stage handling."""
-            try:
-                if stage == 'download':
-                    # Overall progress: 50-80% untuk download
-                    base_progress = 50 + int((progress / 100) * 30)
-                    _update_download_progress(ui_components, base_progress, f"Download: {message}")
-                    
-                    # Step progress: sesuai dengan progress download
-                    _update_step_progress(ui_components, progress, f"📥 {message}")
-                    
-                elif stage == 'organize':
-                    # Overall progress: 80-95% untuk organize
-                    base_progress = 80 + int((progress / 100) * 15)
-                    _update_download_progress(ui_components, base_progress, f"Organisir: {message}")
-                    
-                    # Step progress: sesuai dengan progress organize
-                    _update_step_progress(ui_components, progress, f"📁 {message}")
-                    
-                elif stage == 'complete':
-                    # Final progress: 95-100%
-                    _update_download_progress(ui_components, 95 + int((progress / 100) * 5), f"Finalisasi: {message}")
-                    _update_step_progress(ui_components, progress, f"✅ {message}")
-                    
-            except Exception as e:
-                print(f"Progress callback error: {e}")
+        # Setup progress monitoring melalui observer pattern yang sudah ada di UIDownloadService
+        _setup_progress_monitoring(ui_components, download_service)
         
-        # Jalankan download dengan progress callback
-        result = download_service.download_dataset(params, progress_callback=progress_callback)
+        # Jalankan download tanpa progress_callback parameter
+        result = download_service.download_dataset(params)
         
-        # Update final progress
+        # Update final progress berdasarkan hasil
         if result.get('status') == 'success':
             _update_download_progress(ui_components, 100, "Download selesai!")
             _update_step_progress(ui_components, 100, "Download completed")
@@ -349,6 +325,90 @@ def _execute_enhanced_download_with_progress(ui_components: Dict[str, Any], para
         
     except Exception as e:
         return {'status': 'error', 'message': f'Download service error: {str(e)}'}
+
+def _setup_progress_monitoring(ui_components: Dict[str, Any], download_service) -> None:
+    """Setup progress monitoring melalui observer pattern atau direct callback."""
+    try:
+        # Cek apakah ada progress_bridge di download_service
+        if hasattr(download_service, 'progress_bridge') and download_service.progress_bridge:
+            bridge = download_service.progress_bridge
+            
+            # Override progress_bridge notifications untuk update UI
+            original_notify_step_progress = bridge.notify_step_progress
+            original_notify_step_start = bridge.notify_step_start
+            original_notify_step_complete = bridge.notify_step_complete
+            
+            def enhanced_step_progress(progress: int, message: str):
+                # Call original method
+                original_notify_step_progress(progress, message)
+                
+                # Update UI progress berdasarkan current step
+                current_step = getattr(bridge, '_current_step', 'unknown')
+                
+                if current_step == 'download':
+                    # Overall progress: 50-80% untuk download
+                    base_progress = 50 + int((progress / 100) * 30)
+                    _update_download_progress(ui_components, base_progress, f"Download: {message}")
+                    _update_step_progress(ui_components, progress, f"📥 {message}")
+                    
+                elif current_step == 'organize':
+                    # Overall progress: 80-95% untuk organize
+                    base_progress = 80 + int((progress / 100) * 15)
+                    _update_download_progress(ui_components, base_progress, f"Organisir: {message}")
+                    _update_step_progress(ui_components, progress, f"📁 {message}")
+                    
+                elif current_step in ['validate', 'metadata']:
+                    # Early stages: 50% base progress
+                    base_progress = 30 + int((progress / 100) * 20)
+                    _update_download_progress(ui_components, base_progress, message)
+                    _update_step_progress(ui_components, progress, message)
+                    
+                elif current_step == 'verify':
+                    # Final verification: 95-100%
+                    base_progress = 95 + int((progress / 100) * 5)
+                    _update_download_progress(ui_components, base_progress, f"Verifikasi: {message}")
+                    _update_step_progress(ui_components, progress, f"✅ {message}")
+            
+            def enhanced_step_start(step_name: str, message: str):
+                # Store current step untuk progress mapping
+                bridge._current_step = step_name
+                
+                # Call original method
+                original_notify_step_start(step_name, message)
+                
+                # Update UI berdasarkan step yang dimulai
+                if step_name == 'validate':
+                    _update_download_progress(ui_components, 30, message)
+                    _update_step_progress(ui_components, 0, "🔍 Validasi parameter")
+                elif step_name == 'metadata':
+                    _update_download_progress(ui_components, 35, message)
+                    _update_step_progress(ui_components, 0, "📊 Mengambil metadata")
+                elif step_name == 'download':
+                    _update_download_progress(ui_components, 50, message)
+                    _update_step_progress(ui_components, 0, "📥 Memulai download")
+                elif step_name == 'organize':
+                    _update_download_progress(ui_components, 80, message)
+                    _update_step_progress(ui_components, 0, "📁 Mengorganisir dataset")
+                elif step_name == 'verify':
+                    _update_download_progress(ui_components, 95, message)
+                    _update_step_progress(ui_components, 0, "✅ Verifikasi hasil")
+            
+            def enhanced_step_complete(message: str):
+                # Call original method
+                original_notify_step_complete(message)
+                
+                # Update step progress ke 100% untuk step yang selesai
+                current_step = getattr(bridge, '_current_step', 'unknown')
+                _update_step_progress(ui_components, 100, f"✅ {message}")
+            
+            # Replace methods dengan enhanced versions
+            bridge.notify_step_progress = enhanced_step_progress
+            bridge.notify_step_start = enhanced_step_start
+            bridge.notify_step_complete = enhanced_step_complete
+            
+    except Exception as e:
+        print(f"Warning: Could not setup progress monitoring: {e}")
+        # Fallback: Update progress secara manual tanpa monitoring detail
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs."""

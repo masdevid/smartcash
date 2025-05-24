@@ -1,37 +1,37 @@
 """
 File: smartcash/ui/dataset/download/handlers/check_action.py
-Deskripsi: Fixed check action dengan progress tracking yang sederhana dan reliable
+Deskripsi: Fixed check action yang memeriksa struktur final /data/{train,valid,test}
 """
 
 from typing import Dict, Any
 from pathlib import Path
+from smartcash.common.constants.paths import get_paths_for_environment
+from smartcash.common.environment import get_environment_manager
 
 def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi pengecekan dataset dengan progress tracking sederhana."""
+    """Eksekusi pengecekan dataset dengan focus pada struktur final."""
     logger = ui_components.get('logger')
     if logger:
-        logger.info("🔍 Memeriksa status dataset")
+        logger.info("🔍 Memeriksa status dataset di struktur final")
     
     _disable_buttons(ui_components, True)
     
     try:
-        # Reset log output
         if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
             ui_components['log_output'].clear_output(wait=True)
         
-        # Start progress
         _start_progress(ui_components, "Memeriksa dataset...")
         
-        # Dapatkan output directory
-        output_dir = _get_output_dir(ui_components)
-        _update_progress(ui_components, 20, "Memeriksa direktori...")
+        # Check struktur final dataset di /data/
+        final_stats = _check_final_dataset_structure(ui_components)
+        _update_progress(ui_components, 60, "Menganalisis hasil...")
         
-        # Check dataset
-        stats = _check_dataset_status(ui_components, output_dir)
-        _update_progress(ui_components, 80, "Menganalisis hasil...")
+        # Check downloads folder sebagai info tambahan
+        downloads_stats = _check_downloads_folder(ui_components)
+        _update_progress(ui_components, 80, "Menyelesaikan pengecekan...")
         
-        # Display results
-        _display_check_results(ui_components, stats)
+        # Display comprehensive results
+        _display_comprehensive_results(ui_components, final_stats, downloads_stats)
         _complete_progress(ui_components, "Pengecekan selesai")
         
     except Exception as e:
@@ -41,73 +41,148 @@ def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> N
     finally:
         _disable_buttons(ui_components, False)
 
-def _get_output_dir(ui_components: Dict[str, Any]) -> str:
-    """Get output directory dengan fallback."""
-    try:
-        if 'output_dir' in ui_components and hasattr(ui_components['output_dir'], 'value'):
-            output_dir = ui_components['output_dir'].value
-            if output_dir:
-                return output_dir
-    except Exception:
-        pass
+def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Periksa struktur final dataset di /data/{train,valid,test}."""
+    env_manager = get_environment_manager()
+    paths = get_paths_for_environment(
+        is_colab=env_manager.is_colab,
+        is_drive_mounted=env_manager.is_drive_mounted
+    )
     
-    # Fallback ke default
-    env_manager = ui_components.get('env_manager')
-    if env_manager and env_manager.is_colab and env_manager.is_drive_mounted:
-        return str(env_manager.drive_path / 'downloads')
-    return 'data'
-
-def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Dict[str, Any]:
-    """Periksa status dataset dengan progress updates."""
-    base_dir = Path(output_dir)
-    
-    stats = {
+    final_stats = {
         'total_images': 0,
-        'splits': {'train': 0, 'valid': 0, 'test': 0},
+        'total_labels': 0,
+        'splits': {'train': {}, 'valid': {}, 'test': {}},
         'valid': False,
-        'base_dir': str(base_dir)
+        'base_dir': paths['data_root'],
+        'storage_type': 'Drive' if env_manager.is_drive_mounted else 'Local'
     }
     
-    if not base_dir.exists():
-        return stats
-    
-    # Check splits dengan progress updates
+    # Check setiap split dengan progress updates
     for i, split in enumerate(['train', 'valid', 'test']):
-        progress = 30 + (i * 15)
+        progress = 20 + (i * 15)
         _update_progress(ui_components, progress, f"Memeriksa {split}...")
         
-        split_dir = base_dir / split / 'images'
-        if split_dir.exists():
-            try:
-                img_files = list(split_dir.glob('*.*'))
-                img_count = len(img_files)
-                stats['splits'][split] = img_count
-                stats['total_images'] += img_count
-            except Exception:
-                stats['splits'][split] = 0
+        split_path = Path(paths[split])
+        split_info = {
+            'exists': False,
+            'images': 0,
+            'labels': 0,
+            'path': str(split_path),
+            'images_path': str(split_path / 'images'),
+            'labels_path': str(split_path / 'labels')
+        }
+        
+        if split_path.exists():
+            images_dir = split_path / 'images'
+            labels_dir = split_path / 'labels'
+            
+            if images_dir.exists():
+                try:
+                    img_files = list(images_dir.glob('*.*'))
+                    split_info['images'] = len(img_files)
+                    split_info['exists'] = True
+                except Exception:
+                    split_info['images'] = 0
+            
+            if labels_dir.exists():
+                try:
+                    label_files = list(labels_dir.glob('*.txt'))
+                    split_info['labels'] = len(label_files)
+                except Exception:
+                    split_info['labels'] = 0
+        
+        final_stats['splits'][split] = split_info
+        final_stats['total_images'] += split_info['images']
+        final_stats['total_labels'] += split_info['labels']
     
-    stats['valid'] = stats['total_images'] > 0
-    return stats
+    final_stats['valid'] = final_stats['total_images'] > 0
+    return final_stats
 
-def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any]) -> None:
-    """Tampilkan hasil pengecekan."""
+def _check_downloads_folder(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Check downloads folder sebagai info tambahan."""
+    env_manager = get_environment_manager()
+    paths = get_paths_for_environment(
+        is_colab=env_manager.is_colab,
+        is_drive_mounted=env_manager.is_drive_mounted
+    )
+    
+    downloads_stats = {
+        'exists': False,
+        'total_files': 0,
+        'path': paths['downloads']
+    }
+    
+    downloads_path = Path(paths['downloads'])
+    if downloads_path.exists():
+        try:
+            files = list(downloads_path.rglob('*.*'))
+            downloads_stats['total_files'] = len(files)
+            downloads_stats['exists'] = len(files) > 0
+        except Exception:
+            downloads_stats['total_files'] = 0
+    
+    return downloads_stats
+
+def _display_comprehensive_results(ui_components: Dict[str, Any], 
+                                 final_stats: Dict[str, Any], 
+                                 downloads_stats: Dict[str, Any]) -> None:
+    """Tampilkan hasil pengecekan yang comprehensive."""
     logger = ui_components.get('logger')
     
-    if stats['valid']:
-        message = f"✅ Dataset ditemukan: {stats['total_images']} gambar"
-        if logger:
-            logger.success(message)
-            logger.info(f"📁 Lokasi: {stats['base_dir']}")
-            for split, count in stats['splits'].items():
-                if count > 0:
-                    logger.info(f"   • {split}: {count} gambar")
+    if not logger:
+        return
+    
+    # Header info
+    storage_info = f"📁 Storage: {final_stats['storage_type']}"
+    if final_stats['storage_type'] == 'Drive':
+        env_manager = get_environment_manager()
+        storage_info += f" ({env_manager.drive_path})"
+    
+    logger.info(f"🔍 Hasil Pengecekan Dataset - {storage_info}")
+    
+    # Final dataset structure results
+    if final_stats['valid']:
+        logger.success(f"✅ Dataset ditemukan di struktur final: {final_stats['total_images']} gambar")
+        logger.info(f"📊 Base directory: {final_stats['base_dir']}")
+        
+        # Detail per split
+        for split, split_info in final_stats['splits'].items():
+            if split_info['exists'] and split_info['images'] > 0:
+                logger.info(f"   📁 {split}:")
+                logger.info(f"      • Gambar: {split_info['images']} file")
+                logger.info(f"      • Label: {split_info['labels']} file")
+                logger.info(f"      • Path: {split_info['path']}")
+        
+        # Dataset ready message
+        logger.success("🎉 Dataset siap untuk training!")
+        
     else:
-        message = f"⚠️ Dataset tidak ditemukan di: {stats['base_dir']}"
-        if logger:
-            logger.warning(message)
-            logger.info("💡 Gunakan tombol Download untuk mengunduh dataset")
+        logger.warning(f"⚠️ Dataset tidak ditemukan di struktur final: {final_stats['base_dir']}")
+        
+        # Check individual splits
+        for split, split_info in final_stats['splits'].items():
+            if Path(split_info['path']).exists():
+                if split_info['images'] == 0:
+                    logger.info(f"   📁 {split}: folder ada tapi kosong")
+                else:
+                    logger.info(f"   📁 {split}: {split_info['images']} gambar")
+            else:
+                logger.info(f"   📁 {split}: folder tidak ada")
+    
+    # Downloads folder info
+    if downloads_stats['exists']:
+        logger.info(f"📥 Downloads folder: {downloads_stats['total_files']} file di {downloads_stats['path']}")
+    else:
+        logger.info(f"📥 Downloads folder: kosong atau tidak ada")
+    
+    # Guidance
+    if not final_stats['valid']:
+        logger.info("💡 Gunakan tombol 'Download Dataset' untuk mengunduh dan mengorganisir dataset")
+        if downloads_stats['exists']:
+            logger.info("💡 Ada file di downloads folder - mungkin perlu diorganisir ulang")
 
-# Progress helper functions
+# Progress helper functions (tidak berubah)
 def _start_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Start progress tracking."""
     try:
@@ -146,7 +221,6 @@ def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
         from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
         disable_download_buttons(ui_components, disabled)
     except Exception:
-        # Fallback manual
         button_keys = ['download_button', 'check_button', 'reset_button', 'cleanup_button', 'save_button']
         for key in button_keys:
             if key in ui_components and hasattr(ui_components[key], 'disabled'):

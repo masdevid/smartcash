@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/components/options_panel.py
-Deskripsi: Refactored options panel dengan layout 2 kolom + 1 full width row
+Deskripsi: Fixed layout tanpa horizontal scrollbar dan responsive
 """
 
 import ipywidgets as widgets
@@ -14,7 +14,7 @@ from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
 def create_options_panel(config, env_manager=None):
-    """Create options panel dengan layout: Row 1 (2 kolom), Row 2 (1 full width)."""
+    """Create options panel dengan layout responsive tanpa horizontal scroll."""
     
     if env_manager is None:
         env_manager = get_environment_manager()
@@ -49,12 +49,13 @@ def create_options_panel(config, env_manager=None):
         version, 
         api_key
     ], layout=widgets.Layout(
-        width='48%',
-        margin='0 1% 0 0',
+        width='calc(50% - 8px)',
+        margin='0 4px 0 0',
         padding='15px',
         border=f'1px solid {COLORS.get("border", "#ddd")}',
         border_radius='5px',
-        background_color='#f8f9fa'
+        background_color='#f8f9fa',
+        overflow='hidden'
     ))
     
     # ⚙️ Right Column: Process Options  
@@ -65,12 +66,13 @@ def create_options_panel(config, env_manager=None):
         backup_checkbox,
         widgets.HTML('<div style="margin-top: 15px; padding: 10px; background: #e8f5e8; border-radius: 4px; border-left: 4px solid #28a745;"><small style="color: #155724;"><strong>💡 Tips:</strong> Organisasi otomatis akan memindahkan dataset ke struktur final /data/train, /data/valid, /data/test</small></div>')
     ], layout=widgets.Layout(
-        width='48%',
-        margin='0 0 0 1%',
+        width='calc(50% - 8px)',
+        margin='0 0 0 4px',
         padding='15px',
         border=f'1px solid {COLORS.get("border", "#ddd")}',
         border_radius='5px',
-        background_color='#f8f9fa'
+        background_color='#f8f9fa',
+        overflow='hidden'
     ))
     
     # 📁 Row 1: Two Columns Layout
@@ -81,26 +83,25 @@ def create_options_panel(config, env_manager=None):
         width='100%',
         justify_content='space-between',
         align_items='flex-start',
-        margin='0 0 15px 0'
+        margin='0 0 15px 0',
+        overflow='hidden'
     ))
     
     # 📁 Row 2: Directory Settings (Full Width)
     directory_settings_section = widgets.VBox([
         widgets.HTML('<h4 style="margin: 0 0 15px 0; color: #495057; border-bottom: 2px solid #ffc107; padding-bottom: 8px;">📁 Directory Settings</h4>'),
-        widgets.HTML('<div style="display: flex; gap: 15px; align-items: flex-start;">'),
         widgets.HBox([
             widgets.VBox([
-                widgets.HTML('<label style="font-weight: bold; color: #495057; margin-bottom: 5px;">📥 Download Directory</label>'),
+                widgets.HTML('<label style="font-weight: bold; color: #495057; margin-bottom: 5px; display: block;">📥 Download Directory</label>'),
                 output_dir,
-                widgets.HTML('<small style="color: #6c757d; margin-top: 5px;">Lokasi sementara untuk download dataset sebelum diorganisir</small>')
-            ], layout=widgets.Layout(width='48%', margin='0 1% 0 0')),
+                widgets.HTML('<small style="color: #6c757d; margin-top: 5px; display: block;">Lokasi sementara untuk download dataset sebelum diorganisir</small>')
+            ], layout=widgets.Layout(width='calc(50% - 8px)', margin='0 4px 0 0')),
             widgets.VBox([
-                widgets.HTML('<label style="font-weight: bold; color: #495057; margin-bottom: 5px;">💾 Backup Directory</label>'),
+                widgets.HTML('<label style="font-weight: bold; color: #495057; margin-bottom: 5px; display: block;">💾 Backup Directory</label>'),
                 backup_dir,
-                widgets.HTML('<small style="color: #6c757d; margin-top: 5px;">Lokasi penyimpanan backup dataset lama (jika diperlukan)</small>')
-            ], layout=widgets.Layout(width='48%', margin='0 0 0 1%'))
-        ], layout=widgets.Layout(width='100%')),
-        widgets.HTML('</div>'),
+                widgets.HTML('<small style="color: #6c757d; margin-top: 5px; display: block;">Lokasi penyimpanan backup dataset lama (jika diperlukan)</small>')
+            ], layout=widgets.Layout(width='calc(50% - 8px)', margin='0 0 0 4px'))
+        ], layout=widgets.Layout(width='100%', overflow='hidden')),
         structure_info
     ], layout=widgets.Layout(
         width='100%',
@@ -108,7 +109,8 @@ def create_options_panel(config, env_manager=None):
         padding='15px',
         border=f'1px solid {COLORS.get("border", "#ddd")}',
         border_radius='5px',
-        background_color='#f8f9fa'
+        background_color='#f8f9fa',
+        overflow='hidden'
     ))
     
     # 📦 Main Panel Container
@@ -117,7 +119,8 @@ def create_options_panel(config, env_manager=None):
         directory_settings_section
     ], layout=widgets.Layout(
         width='100%',
-        margin='10px 0'
+        margin='10px 0',
+        overflow='hidden'
     ))
     
     return {

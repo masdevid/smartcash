@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/components/form_fields.py
-Deskripsi: Updated form fields dengan default path yang benar dan konsisten dengan struktur baru
+Deskripsi: Silent form fields tanpa verbose logging
 """
 
 import ipywidgets as widgets
@@ -9,9 +9,8 @@ from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
 
 def api_key_field():
-    """API key field dengan comprehensive detection."""
-    # Deteksi API key dari semua sumber
-    api_key = _detect_api_key_comprehensive()
+    """API key field dengan silent detection."""
+    api_key = _detect_api_key_silent()
     
     field = widgets.Password(
         value=api_key,
@@ -20,35 +19,23 @@ def api_key_field():
         layout=widgets.Layout(width='100%')
     )
     
-    # Log status API key untuk debugging
-    if api_key:
-        print(f"🔑 API key ditemukan: {'*' * (len(api_key) - 4)}{api_key[-4:]}")
-    else:
-        print("⚠️ API key tidak ditemukan. Silakan isi manual atau set di Google Secrets.")
-    
     return field
 
-def _detect_api_key_comprehensive() -> str:
-    """Deteksi API key dari semua sumber yang tersedia dengan logging."""
-    print("🔍 Mencari API key...")
+def _detect_api_key_silent() -> str:
+    """Deteksi API key tanpa logging."""
     
     # 1. Environment variable
     api_key = os.environ.get('ROBOFLOW_API_KEY', '')
     if api_key:
-        print("✅ API key ditemukan dari environment variable")
         return api_key
-    else:
-        print("❌ API key tidak ditemukan di environment variable")
     
-    # 2. Google Colab userdata (Google Secrets)
+    # 2. Google Colab userdata
     try:
         from google.colab import userdata
-        print("🔍 Checking Google Colab secrets...")
         
         # Check primary key
         api_key = userdata.get('ROBOFLOW_API_KEY')
         if api_key:
-            print("✅ API key ditemukan dari Google Colab secrets (ROBOFLOW_API_KEY)")
             return api_key
         
         # Check alternative names
@@ -57,37 +44,26 @@ def _detect_api_key_comprehensive() -> str:
             try:
                 api_key = userdata.get(key_name)
                 if api_key:
-                    print(f"✅ API key ditemukan dari Google Colab secrets ({key_name})")
                     return api_key
             except Exception:
                 continue
                 
-        print("❌ API key tidak ditemukan di Google Colab secrets")
-        
     except ImportError:
-        print("ℹ️ Tidak di lingkungan Google Colab")
-    except Exception as e:
-        print(f"⚠️ Error accessing Google Colab secrets: {str(e)}")
+        pass
+    except Exception:
+        pass
     
-    print("❌ API key tidak ditemukan dari semua sumber")
     return ''
 
 def output_dir_field(config):
-    """Output directory field dengan default ke downloads folder yang benar."""
+    """Output directory field dengan default ke downloads folder."""
     env_manager = get_environment_manager()
     paths = get_paths_for_environment(
         is_colab=env_manager.is_colab,
         is_drive_mounted=env_manager.is_drive_mounted
     )
     
-    print(f"🌍 Environment detection:")
-    print(f"   • is_colab: {env_manager.is_colab}")
-    print(f"   • is_drive_mounted: {env_manager.is_drive_mounted}")
-    print(f"   • downloads_path: {paths['downloads']}")
-    
-    # Gunakan downloads path sebagai default
     default_value = paths['downloads']
-    print(f"📁 Output directory default: {default_value}")
     
     return widgets.Text(
         value=default_value,
@@ -109,7 +85,6 @@ def backup_dir_field(default_path=None):
         value = default_path
     else:
         value = paths['backup']
-        print(f"💾 Backup akan disimpan di: {value}")
     
     return widgets.Text(
         value=value,
@@ -162,7 +137,7 @@ def validate_dataset_field():
 def backup_checkbox_field():
     """Checkbox untuk backup dataset."""
     return widgets.Checkbox(
-        value=False,  # Default false untuk proses yang lebih cepat
+        value=False,
         description='Backup dataset lama sebelum replace (jika ada)',
         disabled=False,
         indent=False,
@@ -174,7 +149,7 @@ def organize_dataset_field():
     return widgets.Checkbox(
         value=True,
         description='Organisir dataset ke struktur final (train/valid/test)',
-        disabled=True,  # Always enabled untuk proses yang konsisten
+        disabled=True,
         indent=False,
         layout=widgets.Layout(width='100%')
     )

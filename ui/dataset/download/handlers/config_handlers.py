@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/config_handlers.py  
-Deskripsi: Updated config handlers dengan path defaults yang benar dan konsisten
+Deskripsi: Silent config handlers tanpa log inisialisasi yang mengganggu
 """
 
 import os
@@ -10,12 +10,10 @@ from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
 
 def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup config handlers dengan path management yang benar."""
-    
-    print("🔧 Setting up config handlers...")
+    """Setup config handlers dengan silent initialization."""
     
     try:
-        # Get environment manager dan refresh status
+        # Get environment manager dan refresh status (silent)
         env_manager = get_environment_manager()
         env_manager.refresh_drive_status()
         ui_components['env_manager'] = env_manager
@@ -30,68 +28,54 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         # Update status panel dengan info yang akurat
         _update_status_panel_with_env_info(ui_components, env_manager)
         
-        # Load saved config
+        # Load saved config (silent)
         config_manager = get_config_manager()
         saved_config = _load_saved_config_safe(config_manager)
         
-        # Merge dengan priority: saved_config > passed_config > defaults
+        # Merge configs
         merged_config = _merge_configs(config, saved_config, paths)
         
-        # CRITICAL: Load API key dari semua sumber dan update UI
-        api_key = _detect_and_load_api_key(ui_components)
+        # Load API key dan update UI (silent)
+        api_key = _detect_and_load_api_key_silent()
         if api_key:
             merged_config['api_key'] = api_key
         
-        # Update semua UI components dari merged config
+        # Update UI components
         _update_all_ui_components(ui_components, merged_config, paths)
         
         # Update storage info widget
         _update_storage_info_widget(ui_components, env_manager)
         
-        # Store defaults untuk reset function
+        # Store defaults
         ui_components['_defaults'] = _create_smart_defaults(paths, api_key)
-        
-        print("✅ Config handlers setup completed successfully")
         
     except Exception as e:
         logger = ui_components.get('logger')
         if logger:
             logger.warning(f"⚠️ Error setup config: {str(e)}")
-        print(f"❌ Config setup error: {str(e)}")
-        # Set minimal fallback
         _set_minimal_fallback(ui_components)
     
     return ui_components
 
-def _detect_and_load_api_key(ui_components: Dict[str, Any]) -> str:
-    """Deteksi dan load API key dengan logging detail."""
-    print("🔑 Detecting API key from all sources...")
+def _detect_and_load_api_key_silent() -> str:
+    """Deteksi API key tanpa logging verbose."""
     
     # 1. Environment variable
     api_key = os.environ.get('ROBOFLOW_API_KEY', '')
     if api_key:
-        print(f"✅ API key found in environment variable: {'*' * (len(api_key)-4)}{api_key[-4:]}")
-        # Update UI field immediately
-        if 'api_key' in ui_components and hasattr(ui_components['api_key'], 'value'):
-            ui_components['api_key'].value = api_key
         return api_key
     
     # 2. Google Colab userdata
     try:
         from google.colab import userdata
-        print("🔍 Checking Google Colab secrets...")
         
         # Primary key
         try:
             api_key = userdata.get('ROBOFLOW_API_KEY')
             if api_key:
-                print(f"✅ API key found in Colab secrets (ROBOFLOW_API_KEY): {'*' * (len(api_key)-4)}{api_key[-4:]}")
-                # Update UI field immediately
-                if 'api_key' in ui_components and hasattr(ui_components['api_key'], 'value'):
-                    ui_components['api_key'].value = api_key
                 return api_key
-        except Exception as e:
-            print(f"⚠️ Error accessing ROBOFLOW_API_KEY: {str(e)}")
+        except Exception:
+            pass
         
         # Alternative keys
         alternative_keys = ['roboflow_api_key', 'ROBOFLOW_KEY', 'roboflow_key', 'API_KEY']
@@ -99,31 +83,21 @@ def _detect_and_load_api_key(ui_components: Dict[str, Any]) -> str:
             try:
                 api_key = userdata.get(key_name)
                 if api_key:
-                    print(f"✅ API key found in Colab secrets ({key_name}): {'*' * (len(api_key)-4)}{api_key[-4:]}")
-                    # Update UI field immediately
-                    if 'api_key' in ui_components and hasattr(ui_components['api_key'], 'value'):
-                        ui_components['api_key'].value = api_key
                     return api_key
             except Exception:
                 continue
                 
-        print("❌ No API key found in Google Colab secrets")
-        
     except ImportError:
-        print("ℹ️ Not in Google Colab environment - skipping secrets check")
-    except Exception as e:
-        print(f"⚠️ Error accessing Colab secrets: {str(e)}")
+        pass
+    except Exception:
+        pass
     
-    print("❌ API key not found from any source")
     return ''
 
 def _update_status_panel_with_env_info(ui_components: Dict[str, Any], env_manager) -> None:
-    """Update status panel dengan environment info yang detail."""
+    """Update status panel dengan environment info."""
     if 'status_panel' not in ui_components:
         return
-    
-    # Get system info untuk detail lebih lengkap  
-    sys_info = env_manager.get_system_info()
     
     if env_manager.is_colab and env_manager.is_drive_mounted:
         status_html = f"""
@@ -166,43 +140,33 @@ def _update_status_panel_with_env_info(ui_components: Dict[str, Any], env_manage
 
 def _merge_configs(base_config: Dict[str, Any], saved_config: Dict[str, Any], paths: Dict[str, str]) -> Dict[str, Any]:
     """Merge configurations dengan path yang benar."""
-    # Start dengan base config
     merged = base_config.copy()
     
-    # Override dengan saved config jika ada
     if saved_config:
         merged.update(saved_config)
     
-    # Set paths dari environment-aware paths
-    merged['output_dir'] = paths['downloads']  # Download ke downloads folder
-    merged['backup_dir'] = paths['backup']     # Backup ke backup folder
+    merged['output_dir'] = paths['downloads']
+    merged['backup_dir'] = paths['backup']
     
     return merged
 
 def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, Any], paths: Dict[str, str]) -> None:
-    """Update semua UI components dari config dengan path yang benar."""
-    print("🔄 Updating UI components from config...")
+    """Update UI components dari config (silent)."""
     
-    # Field mapping dengan path yang benar
     field_mapping = {
         'workspace': ('workspace', 'smartcash-wo2us'),
         'project': ('project', 'rupiah-emisi-2022'),
         'version': ('version', '3'),
-        'output_dir': ('output_dir', paths['downloads']),      # Use downloads path
-        'backup_dir': ('backup_dir', paths['backup']),        # Use backup path
+        'output_dir': ('output_dir', paths['downloads']),
+        'backup_dir': ('backup_dir', paths['backup']),
         'validate_dataset': ('validate_dataset', True),
         'backup_before_download': ('backup_checkbox', False)
     }
     
-    # Update each field
     for config_key, (ui_key, default_value) in field_mapping.items():
         if ui_key in ui_components and hasattr(ui_components[ui_key], 'value'):
             value = config.get(config_key, default_value)
             ui_components[ui_key].value = value
-            print(f"   • {ui_key}: {value}")
-    
-    # API key sudah di-handle di _detect_and_load_api_key
-    print("✅ UI components updated")
 
 def _create_smart_defaults(paths: Dict[str, str], api_key: str) -> Dict[str, Any]:
     """Create smart defaults berdasarkan environment paths."""
@@ -211,8 +175,8 @@ def _create_smart_defaults(paths: Dict[str, str], api_key: str) -> Dict[str, Any
         'project': 'rupiah-emisi-2022',
         'version': '3',
         'api_key': api_key,
-        'output_dir': paths['downloads'],    # Downloads folder
-        'backup_dir': paths['backup'],       # Backup folder
+        'output_dir': paths['downloads'],
+        'backup_dir': paths['backup'],
         'validate_dataset': True,
         'backup_checkbox': False
     }
@@ -226,8 +190,7 @@ def _load_saved_config_safe(config_manager) -> Dict[str, Any]:
             return getattr(config_manager, 'config', {}).get('dataset', {})
         else:
             return {}
-    except Exception as e:
-        print(f"⚠️ Error loading saved config: {str(e)}")
+    except Exception:
         return {}
 
 def _set_minimal_fallback(ui_components: Dict[str, Any]) -> None:
@@ -236,8 +199,8 @@ def _set_minimal_fallback(ui_components: Dict[str, Any]) -> None:
         'workspace': 'smartcash-wo2us',
         'project': 'rupiah-emisi-2022',
         'version': '3',
-        'output_dir': 'data/downloads',  # Fallback ke downloads
-        'backup_dir': 'data/backup'      # Fallback ke backup
+        'output_dir': 'data/downloads',
+        'backup_dir': 'data/backup'
     }
     
     for key, value in minimal_values.items():

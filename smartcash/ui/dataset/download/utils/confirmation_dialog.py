@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/utils/confirmation_dialog.py
-Deskripsi: Updated confirmation dengan Drive storage info
+Deskripsi: Updated confirmation dengan button_state_manager integration
 """
 
 from typing import Dict, Any
@@ -8,7 +8,7 @@ from IPython.display import display
 from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
 
 def show_download_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
-    """Show download confirmation dengan storage info."""
+    """Show download confirmation dengan storage info dan proper state management."""
     
     # Determine storage type
     env_manager = ui_components.get('env_manager')
@@ -33,11 +33,7 @@ def show_download_confirmation(ui_components: Dict[str, Any], params: Dict[str, 
     
     def on_cancel(b):
         ui_components['confirmation_area'].clear_output()
-        from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
-        disable_download_buttons(ui_components, False)
-        logger = ui_components.get('logger')
-        if logger:
-            logger.info("❌ Download dibatalkan")
+        _handle_cancel_download(ui_components)
     
     dialog = create_confirmation_dialog(
         title="Konfirmasi Download Dataset",
@@ -51,7 +47,7 @@ def show_download_confirmation(ui_components: Dict[str, Any], params: Dict[str, 
         display(dialog)
         
 def show_cleanup_confirmation(ui_components: Dict[str, Any], output_dir: str, file_count: int) -> None:
-    """Tampilkan dialog konfirmasi cleanup."""
+    """Tampilkan dialog konfirmasi cleanup dengan proper state management."""
     message = (
         f"Anda akan menghapus {file_count} file dari:\n"
         f"{output_dir}\n\n"
@@ -66,11 +62,7 @@ def show_cleanup_confirmation(ui_components: Dict[str, Any], output_dir: str, fi
     
     def on_cancel(b):
         ui_components['confirmation_area'].clear_output()
-        from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
-        disable_download_buttons(ui_components, False)
-        logger = ui_components.get('logger')
-        if logger:
-            logger.info("❌ Cleanup dibatalkan")
+        _handle_cancel_cleanup(ui_components)
     
     dialog = create_confirmation_dialog(
         title="Konfirmasi Hapus Dataset",
@@ -84,28 +76,55 @@ def show_cleanup_confirmation(ui_components: Dict[str, Any], output_dir: str, fi
         display(dialog)
 
 def _execute_confirmed_download(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
-    """Execute download setelah konfirmasi."""
+    """Execute download setelah konfirmasi dengan proper state management."""
     from smartcash.ui.dataset.download.utils.download_executor import execute_roboflow_download
-    from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
+    from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
     
     logger = ui_components.get('logger')
+    button_manager = get_button_state_manager(ui_components)
+    
     if logger:
-        logger.info("🚀 Memulai download ke Drive")
+        logger.info("🚀 Memulai download dataset")
     
     try:
-        result = execute_roboflow_download(ui_components, params)
-        
-        if result.get('status') == 'success':
-            if logger:
-                storage_type = result.get('drive_storage', False)
-                storage_msg = "Drive" if storage_type else "Local"
-                logger.success(f"✅ Download berhasil ke {storage_msg}")
-        else:
-            if logger:
-                logger.error(f"❌ Download gagal: {result.get('message', 'Unknown error')}")
-                
+        # Use context manager untuk proper state handling
+        with button_manager.operation_context('download'):
+            result = execute_roboflow_download(ui_components, params)
+            
+            if result.get('status') == 'success':
+                if logger:
+                    storage_type = "Drive" if result.get('drive_storage', False) else "Local"
+                    logger.success(f"✅ Download berhasil ke {storage_type}")
+            else:
+                if logger:
+                    logger.error(f"❌ Download gagal: {result.get('message', 'Unknown error')}")
+                    
     except Exception as e:
         if logger:
             logger.error(f"❌ Error: {str(e)}")
-    finally:
-        disable_download_buttons(ui_components, False)
+
+def _handle_cancel_download(ui_components: Dict[str, Any]) -> None:
+    """Handle cancel download dengan proper state reset."""
+    from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
+    
+    logger = ui_components.get('logger')
+    button_manager = get_button_state_manager(ui_components)
+    
+    # Enable semua buttons kembali
+    button_manager.enable_buttons('all')
+    
+    if logger:
+        logger.info("❌ Download dibatalkan")
+
+def _handle_cancel_cleanup(ui_components: Dict[str, Any]) -> None:
+    """Handle cancel cleanup dengan proper state reset."""
+    from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
+    
+    logger = ui_components.get('logger')
+    button_manager = get_button_state_manager(ui_components)
+    
+    # Enable semua buttons kembali
+    button_manager.enable_buttons('all')
+    
+    if logger:
+        logger.info("❌ Cleanup dibatalkan")

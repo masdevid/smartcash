@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/services/progress_bridge.py
-Deskripsi: Fixed progress bridge dengan step progress bar yang benar dan log suppression
+Deskripsi: Fixed progress bridge dengan proper widget handling dan dual progress support
 """
 
 from typing import Dict, Any, Optional, Callable, List
@@ -9,7 +9,7 @@ import logging
 import sys
 
 class ProgressBridge:
-    """Enhanced bridge dengan dual progress tracking yang benar."""
+    """Enhanced bridge dengan dual progress tracking yang diperbaiki."""
     
     def __init__(self, observer_manager=None, namespace: str = "download"):
         self.observer_manager = observer_manager
@@ -36,7 +36,6 @@ class ProgressBridge:
         
     def _setup_log_suppression(self):
         """Suppress backend service logs dari console."""
-        # Suppress common backend loggers
         backend_loggers = [
             'requests', 'urllib3', 'http.client', 'requests.packages.urllib3',
             'smartcash.dataset.services', 'tensorflow', 'torch'
@@ -66,7 +65,8 @@ class ProgressBridge:
         self.completed_steps = 0
         self.current_step_progress = 0
         
-        # Reset UI
+        # Reset UI dan setup untuk download (overall + step)
+        self._setup_download_progress()
         self._direct_ui_update(
             overall_progress=0,
             step_progress=0,
@@ -205,6 +205,57 @@ class ProgressBridge:
         overall = int(completed_contribution + current_step_contribution)
         return min(100, max(0, overall))
     
+    def _setup_download_progress(self) -> None:
+        """Setup progress bars untuk download operation (overall + step)."""
+        try:
+            if not self._ui_components_ref:
+                return
+            
+            ui = self._ui_components_ref
+            
+            # Show overall progress
+            self._safe_set_visibility(ui, 'overall_progress', True)
+            self._safe_set_visibility(ui, 'progress_bar', True)  # Alias
+            self._safe_set_visibility(ui, 'overall_label', True)
+            
+            # Show step progress untuk download
+            self._safe_set_visibility(ui, 'step_progress', True)
+            self._safe_set_visibility(ui, 'step_label', True)
+            
+            # Hide current progress untuk download (tidak diperlukan)
+            self._safe_set_visibility(ui, 'current_progress', False)
+            self._safe_set_visibility(ui, 'current_label', False)
+            
+            # Show progress container
+            self._safe_show_container(ui)
+            
+        except Exception:
+            pass
+    
+    def _safe_set_visibility(self, ui: Dict[str, Any], key: str, visible: bool) -> None:
+        """Safely set widget visibility."""
+        try:
+            if key in ui and ui[key]:
+                widget = ui[key]
+                if hasattr(widget, 'layout'):
+                    widget.layout.visibility = 'visible' if visible else 'hidden'
+                    widget.layout.display = 'block' if visible else 'none'
+        except Exception:
+            pass
+    
+    def _safe_show_container(self, ui: Dict[str, Any]) -> None:
+        """Safely show progress container."""
+        try:
+            if 'progress_container' in ui:
+                container = ui['progress_container']
+                if hasattr(container, 'layout'):
+                    container.layout.visibility = 'visible'
+                    container.layout.display = 'block'
+                elif isinstance(container, dict) and 'show_container' in container:
+                    container['show_container']()
+        except Exception:
+            pass
+    
     def _direct_ui_update(self, overall_progress: int, step_progress: int, 
                          overall_message: str, step_message: str) -> None:
         """Direct UI update untuk immediate feedback."""
@@ -214,36 +265,43 @@ class ProgressBridge:
         try:
             ui = self._ui_components_ref
             
-            # Update main progress bar (overall progress)
-            if 'progress_bar' in ui and hasattr(ui['progress_bar'], 'value'):
-                ui['progress_bar'].value = overall_progress
-                ui['progress_bar'].description = f"Overall: {overall_progress}%"
-                if hasattr(ui['progress_bar'], 'layout'):
-                    ui['progress_bar'].layout.visibility = 'visible'
+            # Update overall progress bar
+            self._safe_update_widget(ui, 'overall_progress', overall_progress, f"Overall: {overall_progress}%")
+            self._safe_update_widget(ui, 'progress_bar', overall_progress, f"Overall: {overall_progress}%")  # Alias
             
-            # Update current progress (step progress) - FIX: Use actual step_progress
-            if 'current_progress' in ui and hasattr(ui['current_progress'], 'value'):
-                ui['current_progress'].value = step_progress  # Use actual step progress
-                ui['current_progress'].description = f"Step: {step_progress}%"
-                if hasattr(ui['current_progress'], 'layout'):
-                    ui['current_progress'].layout.visibility = 'visible'
+            # Update step progress bar
+            self._safe_update_widget(ui, 'step_progress', step_progress, f"Step: {step_progress}%")
             
             # Update labels
-            if 'overall_label' in ui and hasattr(ui['overall_label'], 'value'):
-                ui['overall_label'].value = overall_message
-                if hasattr(ui['overall_label'], 'layout'):
-                    ui['overall_label'].layout.visibility = 'visible'
-            
-            if 'step_label' in ui and hasattr(ui['step_label'], 'value'):
-                ui['step_label'].value = step_message
-                if hasattr(ui['step_label'], 'layout'):
-                    ui['step_label'].layout.visibility = 'visible'
-            
-            # Ensure progress container is visible
-            if 'progress_container' in ui and hasattr(ui['progress_container'], 'layout'):
-                ui['progress_container'].layout.display = 'block'
-                ui['progress_container'].layout.visibility = 'visible'
+            self._safe_update_label(ui, 'overall_label', overall_message)
+            self._safe_update_label(ui, 'step_label', step_message)
                 
+        except Exception:
+            pass
+    
+    def _safe_update_widget(self, ui: Dict[str, Any], key: str, value: int, description: str) -> None:
+        """Safely update progress widget."""
+        try:
+            if key in ui and ui[key]:
+                widget = ui[key]
+                if hasattr(widget, 'value'):
+                    widget.value = value
+                if hasattr(widget, 'description'):
+                    widget.description = description
+                if hasattr(widget, 'layout'):
+                    widget.layout.visibility = 'visible'
+        except Exception:
+            pass
+    
+    def _safe_update_label(self, ui: Dict[str, Any], key: str, message: str) -> None:
+        """Safely update label widget."""
+        try:
+            if key in ui and ui[key]:
+                widget = ui[key]
+                if hasattr(widget, 'value'):
+                    widget.value = message
+                if hasattr(widget, 'layout'):
+                    widget.layout.visibility = 'visible'
         except Exception:
             pass
     
@@ -299,5 +357,12 @@ class ProgressBridge:
             self._direct_ui_update(0, 0, "Siap memulai", "")
             
             ui = self._ui_components_ref
-            if 'progress_container' in ui and hasattr(ui['progress_container'], 'layout'):
-                ui['progress_container'].layout.display = 'none'
+            try:
+                if 'progress_container' in ui:
+                    container = ui['progress_container']
+                    if hasattr(container, 'layout'):
+                        container.layout.display = 'none'
+                    elif isinstance(container, dict) and 'hide_container' in container:
+                        container['hide_container']()
+            except Exception:
+                pass

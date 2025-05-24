@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/download/handlers/button_handlers.py
-Deskripsi: Fixed button handlers dengan TypeError resolution yang tepat
+Deskripsi: Updated button handlers dengan proper error handling dan state management
 """
 
 from typing import Dict, Any
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup button handlers dengan error handling yang diperbaiki."""
+    """Setup button handlers dengan improved error handling dan state management."""
     
     logger = ui_components.get('logger')
     
@@ -43,41 +43,35 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, 
     return ui_components
 
 def _setup_download_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup download button dengan fixed error handling."""
+    """Setup download button dengan context manager support."""
     def download_handler(button):
         try:
-            button.disabled = True
             from smartcash.ui.dataset.download.handlers.download_action import execute_download_action
             execute_download_action(ui_components, button)
         except Exception as e:
             logger = ui_components.get('logger')
             if logger:
                 logger.error(f"❌ Download handler error: {str(e)}")
-        finally:
-            _safe_enable_button(button)
     
     button = ui_components['download_button']
     _safe_setup_handler(button, download_handler)
 
 def _setup_check_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup check button dengan fixed error handling."""
+    """Setup check button dengan context manager support."""
     def check_handler(button):
         try:
-            button.disabled = True
             from smartcash.ui.dataset.download.handlers.check_action import execute_check_action
             execute_check_action(ui_components, button)
         except Exception as e:
             logger = ui_components.get('logger')
             if logger:
                 logger.error(f"❌ Check handler error: {str(e)}")
-        finally:
-            _safe_enable_button(button)
     
     button = ui_components['check_button']
     _safe_setup_handler(button, check_handler)
 
 def _setup_reset_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup reset button dengan fixed error handling."""
+    """Setup reset button handler."""
     def reset_handler(button):
         try:
             button.disabled = True
@@ -94,24 +88,21 @@ def _setup_reset_handler(ui_components: Dict[str, Any], env=None) -> None:
     _safe_setup_handler(button, reset_handler)
 
 def _setup_cleanup_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup cleanup button dengan fixed error handling."""
+    """Setup cleanup button dengan context manager support."""
     def cleanup_handler(button):
         try:
-            button.disabled = True
             from smartcash.ui.dataset.download.handlers.cleanup_action import execute_cleanup_action
             execute_cleanup_action(ui_components, button)
         except Exception as e:
             logger = ui_components.get('logger')
             if logger:
                 logger.error(f"❌ Cleanup handler error: {str(e)}")
-        finally:
-            _safe_enable_button(button)
     
     button = ui_components['cleanup_button']
     _safe_setup_handler(button, cleanup_handler)
 
 def _setup_save_handler(ui_components: Dict[str, Any], env=None) -> None:
-    """Setup save button dengan fixed error handling."""
+    """Setup save button handler."""
     def save_handler(button):
         try:
             button.disabled = True
@@ -128,12 +119,9 @@ def _setup_save_handler(ui_components: Dict[str, Any], env=None) -> None:
     _safe_setup_handler(button, save_handler)
 
 def _safe_setup_handler(button, handler_func) -> None:
-    """Safely setup handler dengan fixed TypeError resolution."""
+    """Safely setup handler dengan proper error handling."""
     try:
-        # Jangan manipulasi _click_handlers secara langsung
-        # Biarkan ipywidgets menangani internal state
         button.on_click(handler_func)
-        
     except Exception:
         pass
 

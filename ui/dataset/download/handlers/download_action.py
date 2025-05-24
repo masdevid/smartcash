@@ -1,64 +1,58 @@
 """
 File: smartcash/ui/dataset/download/handlers/download_action.py
-Deskripsi: Robust download handler dengan comprehensive error tracking
+Deskripsi: Fixed download action dengan proper button state management dan dual progress tracking
 """
 
 from typing import Dict, Any
 import traceback
 from pathlib import Path
 from smartcash.ui.dataset.download.utils.ui_validator import validate_download_params
-from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
+from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
 from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 from IPython.display import display
 
 def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi download dengan robust error handling dan detailed tracking."""
+    """Eksekusi download dengan proper state management dan dual progress tracking."""
     logger = ui_components.get('logger')
+    button_manager = get_button_state_manager(ui_components)
     
-    if logger:
-        logger.info("🚀 Memulai proses download dan organisasi dataset")
-    
-    disable_download_buttons(ui_components, True)
-    
-    try:
-        _clear_ui_outputs(ui_components)
-        
-        if logger:
-            logger.info("📋 Memvalidasi parameter download...")
-        
-        # Robust validation dengan detailed error tracking
-        validation_result = _robust_validate_params(ui_components, logger)
-        if not validation_result['valid']:
+    # Use context manager untuk download operation
+    with button_manager.operation_context('download'):
+        try:
             if logger:
-                logger.error(f"❌ Validasi gagal: {validation_result['message']}")
-            return
-        
-        params = validation_result['params']
-        existing_check = _safe_check_existing_dataset(ui_components)
-        
-        if existing_check['exists']:
-            _show_organized_dataset_confirmation(ui_components, params, existing_check)
-        else:
-            _execute_download_confirmed(ui_components, params)
-        
-    except Exception as e:
-        error_msg = f"Error persiapan download: {str(e)}"
-        if logger:
-            logger.error(f"❌ {error_msg}")
-            logger.debug(f"🔧 Full traceback: {traceback.format_exc()}")
-            _comprehensive_ui_debug(ui_components, logger)
-        
-    finally:
-        disable_download_buttons(ui_components, False)
+                logger.info("🚀 Memulai proses download dan organisasi dataset")
+            
+            _clear_ui_outputs(ui_components)
+            
+            if logger:
+                logger.info("📋 Memvalidasi parameter download...")
+            
+            # Validation
+            validation_result = _robust_validate_params(ui_components, logger)
+            if not validation_result['valid']:
+                if logger:
+                    logger.error(f"❌ Validasi gagal: {validation_result['message']}")
+                raise Exception(validation_result['message'])
+            
+            params = validation_result['params']
+            existing_check = _safe_check_existing_dataset(ui_components)
+            
+            if existing_check['exists']:
+                _show_organized_dataset_confirmation(ui_components, params, existing_check, button_manager)
+            else:
+                _execute_download_confirmed(ui_components, params)
+            
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Error persiapan download: {str(e)}")
+                logger.debug(f"🔧 Full traceback: {traceback.format_exc()}")
+            raise
 
 def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, Any]:
     """Robust parameter validation dengan detailed error tracking."""
     try:
-        # Track semua field access
-        field_access_log = {}
-        
         params = {}
         required_fields = ['workspace', 'project', 'version', 'api_key', 'output_dir']
         
@@ -66,23 +60,15 @@ def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, 
             try:
                 value = _ultra_safe_get_value(ui_components, field, logger)
                 params[field] = value
-                field_access_log[field] = 'SUCCESS' if value else 'EMPTY'
             except Exception as e:
-                field_access_log[field] = f'ERROR: {str(e)}'
                 params[field] = ''
-        
-        if logger:
-            logger.debug(f"🔍 Field access log: {field_access_log}")
         
         # Get API key dari sources jika kosong
         if not params['api_key']:
             try:
                 params['api_key'] = _get_api_key_from_sources()
-                if logger and params['api_key']:
-                    logger.debug("🔑 API key loaded from environment")
-            except Exception as e:
-                if logger:
-                    logger.debug(f"⚠️ API key source error: {str(e)}")
+            except Exception:
+                pass
         
         # Validasi field wajib
         missing_fields = [field for field in required_fields if not params[field]]
@@ -91,8 +77,7 @@ def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, 
             return {
                 'valid': False,
                 'message': f"Parameter tidak lengkap: {', '.join(missing_fields)}",
-                'params': params,
-                'field_log': field_access_log
+                'params': params
             }
         
         # Validasi output directory
@@ -101,8 +86,7 @@ def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, 
             return {
                 'valid': False,
                 'message': output_validation['message'],
-                'params': params,
-                'field_log': field_access_log
+                'params': params
             }
         
         params['output_dir'] = output_validation['path']
@@ -110,8 +94,7 @@ def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, 
         return {
             'valid': True,
             'message': f"Parameter valid - Storage: {output_validation['storage_type']}",
-            'params': params,
-            'field_log': field_access_log
+            'params': params
         }
         
     except Exception as e:
@@ -123,68 +106,24 @@ def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, 
         }
 
 def _ultra_safe_get_value(ui_components: Dict[str, Any], key: str, logger, default: str = '') -> str:
-    """Ultra safe value extraction dengan detailed logging."""
+    """Ultra safe value extraction."""
     try:
-        # Step 1: Check component exists
-        if key not in ui_components:
-            if logger:
-                logger.debug(f"🔍 {key}: Component not found in ui_components")
+        if key not in ui_components or ui_components[key] is None:
             return default
         
-        # Step 2: Get component
         component = ui_components[key]
-        if logger:
-            logger.debug(f"🔍 {key}: Component type = {type(component)}")
         
-        # Step 3: Check if None
-        if component is None:
-            if logger:
-                logger.debug(f"🔍 {key}: Component is None")
-            return default
-        
-        # Step 4: Check value attribute
         if not hasattr(component, 'value'):
-            if logger:
-                logger.debug(f"🔍 {key}: Component has no 'value' attribute, available: {dir(component)}")
             return default
         
-        # Step 5: Get value
         value = getattr(component, 'value', default)
-        if logger:
-            display_value = "***" if key == 'api_key' and value else str(value)[:50]
-            logger.debug(f"🔍 {key}: Value = '{display_value}'")
-        
-        # Step 6: Ensure string
         if value is None:
             return default
         
         return str(value).strip()
         
-    except Exception as e:
-        if logger:
-            logger.debug(f"🔍 {key}: Exception during access - {str(e)}")
+    except Exception:
         return default
-
-def _comprehensive_ui_debug(ui_components: Dict[str, Any], logger) -> None:
-    """Comprehensive UI debugging information."""
-    if not logger:
-        return
-        
-    logger.debug("🔧 Comprehensive UI Debug:")
-    logger.debug(f"   • ui_components type: {type(ui_components)}")
-    logger.debug(f"   • ui_components keys: {list(ui_components.keys())}")
-    
-    # Check semua components
-    for key, component in ui_components.items():
-        try:
-            component_info = f"type={type(component)}"
-            if hasattr(component, 'value'):
-                component_info += f", has_value=True"
-            else:
-                component_info += f", has_value=False, attrs={[attr for attr in dir(component) if not attr.startswith('_')][:5]}"
-            logger.debug(f"   • {key}: {component_info}")
-        except Exception as e:
-            logger.debug(f"   • {key}: ERROR analyzing - {str(e)}")
 
 def _safe_check_existing_dataset(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Safe check existing dataset dengan error handling."""
@@ -256,7 +195,8 @@ def _get_api_key_from_sources() -> str:
     except:
         return ''
 
-def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any], existing_info: Dict[str, Any]) -> None:
+def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any], 
+                                       existing_info: Dict[str, Any], button_manager) -> None:
     """Show confirmation untuk overwrite existing organized dataset."""
     env_manager = ui_components.get('env_manager')
     storage_info = f"📁 Storage: Google Drive ({env_manager.drive_path})" if env_manager and env_manager.is_drive_mounted else "📁 Storage: Local (akan hilang saat restart)"
@@ -274,14 +214,23 @@ def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: 
     
     def on_confirm(b):
         ui_components['confirmation_area'].clear_output()
-        _execute_download_confirmed(ui_components, params)
+        # Continue dengan context manager yang sudah ada
+        try:
+            _execute_download_confirmed(ui_components, params)
+        except Exception as e:
+            logger = ui_components.get('logger')
+            if logger:
+                logger.error(f"❌ Download error: {str(e)}")
+            # Re-raise untuk ditangkap context manager
+            raise
     
     def on_cancel(b):
         ui_components['confirmation_area'].clear_output()
-        disable_download_buttons(ui_components, False)
         logger = ui_components.get('logger')
         if logger:
             logger.info("❌ Download dibatalkan - dataset yang ada tidak akan diganti")
+        # Raise exception untuk exit dari context manager
+        raise Exception("Download dibatalkan oleh user")
     
     dialog = create_confirmation_dialog(
         title="⚠️ Konfirmasi Replace Dataset",
@@ -300,41 +249,35 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
     """Execute download dengan error handling."""
     logger = ui_components.get('logger')
     
-    try:
+    if logger:
+        logger.info("✅ Parameter valid - memulai download dan organisasi:")
+        for key, value in params.items():
+            if key != 'api_key':
+                logger.info(f"   • {key}: {value}")
+        logger.info("🚀 Memulai download dengan organisasi otomatis...")
+    
+    result = _execute_enhanced_download(ui_components, params)
+    
+    if result.get('status') == 'success':
         if logger:
-            logger.info("✅ Parameter valid - memulai download dan organisasi:")
-            for key, value in params.items():
-                if key != 'api_key':
-                    logger.info(f"   • {key}: {value}")
-            logger.info("🚀 Memulai download dengan organisasi otomatis...")
-        
-        result = _execute_enhanced_download(ui_components, params)
-        
-        if result.get('status') == 'success':
-            if logger:
-                stats = result.get('stats', {})
-                duration = result.get('duration', 0)
-                storage_type = "Drive" if result.get('drive_storage', False) else "Local"
-                
-                logger.success(f"✅ Download dan organisasi berhasil ({duration:.1f}s)")
-                logger.info(f"📁 Storage: {storage_type}")
-                logger.info(f"📊 Total gambar: {stats.get('total_images', 0)}")
-                
-                if 'splits' in stats:
-                    logger.info("📁 Struktur dataset:")
-                    for split, split_stats in stats['splits'].items():
-                        if split_stats.get('images', 0) > 0:
-                            logger.info(f"   • {split}: {split_stats['images']} gambar")
-        else:
-            error_msg = result.get('message', 'Unknown error')
-            if logger:
-                logger.error(f"❌ Download gagal: {error_msg}")
-                
-    except Exception as e:
+            stats = result.get('stats', {})
+            duration = result.get('duration', 0)
+            storage_type = "Drive" if result.get('drive_storage', False) else "Local"
+            
+            logger.success(f"✅ Download dan organisasi berhasil ({duration:.1f}s)")
+            logger.info(f"📁 Storage: {storage_type}")
+            logger.info(f"📊 Total gambar: {stats.get('total_images', 0)}")
+            
+            if 'splits' in stats:
+                logger.info("📁 Struktur dataset:")
+                for split, split_stats in stats['splits'].items():
+                    if split_stats.get('images', 0) > 0:
+                        logger.info(f"   • {split}: {split_stats['images']} gambar")
+    else:
+        error_msg = result.get('message', 'Unknown error')
         if logger:
-            logger.error(f"❌ Error download: {str(e)}")
-    finally:
-        disable_download_buttons(ui_components, False)
+            logger.error(f"❌ Download gagal: {error_msg}")
+        raise Exception(error_msg)
 
 def _execute_enhanced_download(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
     """Execute download dengan enhanced service."""
@@ -352,27 +295,5 @@ def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
             ui_components['log_output'].clear_output(wait=True)
         if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
             ui_components['confirmation_area'].clear_output()
-        _reset_progress_indicators(ui_components)
-    except Exception:
-        pass
-
-def _reset_progress_indicators(ui_components: Dict[str, Any]) -> None:
-    """Reset dual progress indicators ke state awal."""
-    try:
-        for widget_key in ['progress_bar', 'step_progress']:
-            if widget_key in ui_components and ui_components[widget_key]:
-                ui_components[widget_key].value = 0
-                ui_components[widget_key].description = f"{'Overall' if widget_key == 'progress_bar' else 'Step'}: 0%"
-                if hasattr(ui_components[widget_key], 'layout'):
-                    ui_components[widget_key].layout.visibility = 'visible'
-        
-        for label_key in ['overall_label', 'step_label']:
-            if label_key in ui_components and ui_components[label_key]:
-                ui_components[label_key].value = "Siap memulai"
-                if hasattr(ui_components[label_key], 'layout'):
-                    ui_components[label_key].layout.visibility = 'visible'
-        
-        if 'progress_container' in ui_components and ui_components['progress_container']:
-            ui_components['progress_container'].layout.display = 'block'
     except Exception:
         pass

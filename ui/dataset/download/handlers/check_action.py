@@ -1,45 +1,63 @@
 """
 File: smartcash/ui/dataset/download/handlers/check_action.py
-Deskripsi: Fixed check action yang memeriksa struktur final /data/{train,valid,test}
+Deskripsi: Fixed check action dengan proper button state management dan progress tracking
 """
 
 from typing import Dict, Any
 from pathlib import Path
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
+from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
 
 def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi pengecekan dataset dengan focus pada struktur final."""
+    """Eksekusi pengecekan dataset dengan proper state management."""
     logger = ui_components.get('logger')
-    if logger:
-        logger.info("🔍 Memeriksa status dataset di struktur final")
+    button_manager = get_button_state_manager(ui_components)
     
-    _disable_buttons(ui_components, True)
-    
+    # Use context manager untuk proper state management
+    with button_manager.operation_context('check'):
+        try:
+            if logger:
+                logger.info("🔍 Memeriksa status dataset di struktur final")
+            
+            _clear_ui_outputs(ui_components)
+            
+            # Single progress bar untuk check operation
+            _update_check_progress(ui_components, 20, "Memeriksa struktur dataset...")
+            
+            # Check struktur final dataset
+            final_stats = _check_final_dataset_structure(ui_components)
+            _update_check_progress(ui_components, 60, "Menganalisis hasil...")
+            
+            # Check downloads folder
+            downloads_stats = _check_downloads_folder(ui_components)
+            _update_check_progress(ui_components, 80, "Menyelesaikan pengecekan...")
+            
+            # Display results
+            _display_comprehensive_results(ui_components, final_stats, downloads_stats)
+            _update_check_progress(ui_components, 100, "Pengecekan selesai")
+            
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Error saat memeriksa dataset: {str(e)}")
+            raise
+
+def _update_check_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
+    """Update progress untuk check operation - hanya overall progress."""
     try:
-        if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-            ui_components['log_output'].clear_output(wait=True)
+        # Update overall progress (single progress bar untuk check)
+        if 'overall_progress' in ui_components and ui_components['overall_progress']:
+            ui_components['overall_progress'].value = progress
+            ui_components['overall_progress'].description = f"Progress: {progress}%"
+        elif 'progress_bar' in ui_components and ui_components['progress_bar']:
+            ui_components['progress_bar'].value = progress
+            ui_components['progress_bar'].description = f"Progress: {progress}%"
         
-        _start_progress(ui_components, "Memeriksa dataset...")
-        
-        # Check struktur final dataset di /data/
-        final_stats = _check_final_dataset_structure(ui_components)
-        _update_progress(ui_components, 60, "Menganalisis hasil...")
-        
-        # Check downloads folder sebagai info tambahan
-        downloads_stats = _check_downloads_folder(ui_components)
-        _update_progress(ui_components, 80, "Menyelesaikan pengecekan...")
-        
-        # Display comprehensive results
-        _display_comprehensive_results(ui_components, final_stats, downloads_stats)
-        _complete_progress(ui_components, "Pengecekan selesai")
-        
-    except Exception as e:
-        _error_progress(ui_components, f"Error pengecekan: {str(e)}")
-        if logger:
-            logger.error(f"❌ Error saat memeriksa dataset: {str(e)}")
-    finally:
-        _disable_buttons(ui_components, False)
+        # Update label
+        if 'overall_label' in ui_components and ui_components['overall_label']:
+            ui_components['overall_label'].value = f"<div style='color: #495057; font-weight: bold;'>🔍 {message}</div>"
+    except Exception:
+        pass
 
 def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Periksa struktur final dataset di /data/{train,valid,test}."""
@@ -58,11 +76,8 @@ def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, A
         'storage_type': 'Drive' if env_manager.is_drive_mounted else 'Local'
     }
     
-    # Check setiap split dengan progress updates
-    for i, split in enumerate(['train', 'valid', 'test']):
-        progress = 20 + (i * 15)
-        _update_progress(ui_components, progress, f"Memeriksa {split}...")
-        
+    # Check setiap split
+    for split in ['train', 'valid', 'test']:
         split_path = Path(paths[split])
         split_info = {
             'exists': False,
@@ -182,46 +197,10 @@ def _display_comprehensive_results(ui_components: Dict[str, Any],
         if downloads_stats['exists']:
             logger.info("💡 Ada file di downloads folder - mungkin perlu diorganisir ulang")
 
-# Progress helper functions (tidak berubah)
-def _start_progress(ui_components: Dict[str, Any], message: str) -> None:
-    """Start progress tracking."""
+def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
+    """Clear UI outputs sebelum check."""
     try:
-        if '_observers' in ui_components and 'progress' in ui_components['_observers']:
-            ui_components['_observers']['progress']['start_handler'](message)
+        if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+            ui_components['log_output'].clear_output(wait=True)
     except Exception:
         pass
-
-def _update_progress(ui_components: Dict[str, Any], value: int, message: str) -> None:
-    """Update progress."""
-    try:
-        if '_observers' in ui_components and 'progress' in ui_components['_observers']:
-            ui_components['_observers']['progress']['overall_progress'](value, message)
-    except Exception:
-        pass
-
-def _complete_progress(ui_components: Dict[str, Any], message: str) -> None:
-    """Complete progress."""
-    try:
-        if '_observers' in ui_components and 'progress' in ui_components['_observers']:
-            ui_components['_observers']['progress']['complete_handler'](message)
-    except Exception:
-        pass
-
-def _error_progress(ui_components: Dict[str, Any], message: str) -> None:
-    """Error progress."""
-    try:
-        if '_observers' in ui_components and 'progress' in ui_components['_observers']:
-            ui_components['_observers']['progress']['error_handler'](message)
-    except Exception:
-        pass
-
-def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
-    """Disable/enable buttons dengan error handling."""
-    try:
-        from smartcash.ui.dataset.download.utils.button_state import disable_download_buttons
-        disable_download_buttons(ui_components, disabled)
-    except Exception:
-        button_keys = ['download_button', 'check_button', 'reset_button', 'cleanup_button', 'save_button']
-        for key in button_keys:
-            if key in ui_components and hasattr(ui_components[key], 'disabled'):
-                ui_components[key].disabled = disabled

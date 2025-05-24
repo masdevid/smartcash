@@ -1,10 +1,9 @@
 """
 File: smartcash/ui/dataset/download/handlers/download_action.py
-Deskripsi: Enhanced download action dengan dynamic progress control
+Deskripsi: Download action dengan tqdm progress tracking
 """
 
 from typing import Dict, Any
-import traceback
 from pathlib import Path
 from smartcash.ui.dataset.download.utils.ui_validator import validate_download_params
 from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
@@ -14,7 +13,7 @@ from smartcash.common.environment import get_environment_manager
 from IPython.display import display
 
 def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi download dengan enhanced progress control."""
+    """Eksekusi download dengan tqdm progress."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
@@ -23,9 +22,6 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
             logger and logger.info("🚀 Memulai proses download")
             
             _clear_ui_outputs(ui_components)
-            _setup_download_progress(ui_components)
-            
-            # Progress: 10% - Validation
             _update_download_progress(ui_components, 10, "Memvalidasi parameter...")
             
             validation_result = _robust_validate_params(ui_components, logger)
@@ -33,7 +29,6 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
                 logger and logger.error(f"❌ Validasi gagal: {validation_result['message']}")
                 raise Exception(validation_result['message'])
             
-            # Progress: 20% - Check existing
             _update_download_progress(ui_components, 20, "Memeriksa dataset yang ada...")
             
             params = validation_result['params']
@@ -45,34 +40,16 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
                 _execute_download_confirmed(ui_components, params)
             
         except Exception as e:
-            _error_download_progress(ui_components, f"Error: {str(e)}")
             logger and logger.error(f"❌ Error download: {str(e)}")
             raise
 
-def _setup_download_progress(ui_components: Dict[str, Any]) -> None:
-    """Setup progress untuk download operation."""
-    if 'show_for_operation' in ui_components:
-        ui_components['show_for_operation']('download')
-
 def _update_download_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update download progress dengan enhanced control."""
+    """Update download progress dengan tqdm."""
     if 'update_progress' in ui_components:
-        # Update overall progress dengan auto color
-        color = 'success' if progress >= 100 else 'info' if progress > 0 else ''
-        ui_components['update_progress']('overall', progress, f"📊 {message} ({progress}%)", color)
-
-def _error_download_progress(ui_components: Dict[str, Any], message: str) -> None:
-    """Set error state untuk download progress."""
-    if 'error_operation' in ui_components:
-        ui_components['error_operation'](message)
-
-def _complete_download_progress(ui_components: Dict[str, Any], message: str = "Download selesai!") -> None:
-    """Complete download progress."""
-    if 'complete_operation' in ui_components:
-        ui_components['complete_operation'](message)
+        ui_components['update_progress']('overall', progress, message)
 
 def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, Any]:
-    """Robust parameter validation dengan progress update."""
+    """Robust parameter validation."""
     try:
         params = {}
         required_fields = ['workspace', 'project', 'version', 'api_key', 'output_dir']
@@ -87,34 +64,18 @@ def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, 
         missing_fields = [field for field in required_fields if not params[field]]
         
         if missing_fields:
-            return {
-                'valid': False,
-                'message': f"Parameter tidak lengkap: {', '.join(missing_fields)}",
-                'params': params
-            }
+            return {'valid': False, 'message': f"Parameter tidak lengkap: {', '.join(missing_fields)}", 'params': params}
         
         output_validation = _safe_validate_output_directory(params['output_dir'], logger)
         if not output_validation['valid']:
-            return {
-                'valid': False,
-                'message': output_validation['message'],
-                'params': params
-            }
+            return {'valid': False, 'message': output_validation['message'], 'params': params}
         
         params['output_dir'] = output_validation['path']
         
-        return {
-            'valid': True,
-            'message': f"Parameter valid - Storage: {output_validation['storage_type']}",
-            'params': params
-        }
+        return {'valid': True, 'message': f"Parameter valid - Storage: {output_validation['storage_type']}", 'params': params}
         
     except Exception as e:
-        return {
-            'valid': False,
-            'message': f"Validation error: {str(e)}",
-            'params': {},
-        }
+        return {'valid': False, 'message': f"Validation error: {str(e)}", 'params': {}}
 
 def _ultra_safe_get_value(ui_components: Dict[str, Any], key: str, logger, default: str = '') -> str:
     """Ultra safe value extraction."""
@@ -136,10 +97,7 @@ def _safe_check_existing_dataset(ui_components: Dict[str, Any]) -> Dict[str, Any
     """Safe check existing dataset."""
     try:
         env_manager = get_environment_manager()
-        paths = get_paths_for_environment(
-            is_colab=env_manager.is_colab,
-            is_drive_mounted=env_manager.is_drive_mounted
-        )
+        paths = get_paths_for_environment(is_colab=env_manager.is_colab, is_drive_mounted=env_manager.is_drive_mounted)
         
         result = {'exists': False, 'total_images': 0, 'splits': {}, 'paths': paths}
         
@@ -238,11 +196,8 @@ def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: 
     
     dialog = create_confirmation_dialog(
         title="⚠️ Konfirmasi Replace Dataset",
-        message=message,
-        on_confirm=on_confirm,
-        on_cancel=on_cancel,
-        confirm_text="Ya, Replace Dataset",
-        cancel_text="Batal"
+        message=message, on_confirm=on_confirm, on_cancel=on_cancel,
+        confirm_text="Ya, Replace Dataset", cancel_text="Batal"
     )
     
     ui_components['confirmation_area'].clear_output()
@@ -250,7 +205,7 @@ def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: 
         display(dialog)
 
 def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
-    """Execute download dengan enhanced progress tracking."""
+    """Execute download dengan tqdm progress tracking."""
     logger = ui_components.get('logger')
     
     _update_download_progress(ui_components, 30, "Memulai download...")
@@ -261,11 +216,9 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
             if key != 'api_key':
                 logger.info(f"   • {key}: {value}")
     
-    # Execute download dengan progress callback
     result = _execute_enhanced_download_with_progress(ui_components, params)
     
     if result.get('status') == 'success':
-        _complete_download_progress(ui_components, "Download selesai!")
         if logger:
             stats = result.get('stats', {})
             duration = result.get('duration', 0)
@@ -276,13 +229,12 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
             logger.info(f"📊 Total gambar: {stats.get('total_images', 0)}")
     else:
         error_msg = result.get('message', 'Unknown error')
-        _error_download_progress(ui_components, f"Error: {error_msg}")
         if logger:
             logger.error(f"❌ Download gagal: {error_msg}")
         raise Exception(error_msg)
 
 def _execute_enhanced_download_with_progress(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute download dengan enhanced progress updates."""
+    """Execute download dengan tqdm progress updates."""
     try:
         _update_download_progress(ui_components, 40, "Menginisialisasi service...")
         
@@ -291,23 +243,19 @@ def _execute_enhanced_download_with_progress(ui_components: Dict[str, Any], para
         
         _update_download_progress(ui_components, 50, "Mengunduh dataset...")
         
-        # Setup progress callback untuk service
         def progress_callback(stage: str, progress: int, message: str):
             if stage == 'download':
                 base_progress = 50 + int((progress / 100) * 30)  # 50-80%
                 _update_download_progress(ui_components, base_progress, f"Download: {message}")
-                # Update step progress untuk detail
                 if 'update_progress' in ui_components:
-                    ui_components['update_progress']('step', progress, message, 'info')
+                    ui_components['update_progress']('step', progress, message)
             elif stage == 'organize':
                 base_progress = 80 + int((progress / 100) * 15)  # 80-95%
                 _update_download_progress(ui_components, base_progress, f"Organisir: {message}")
                 if 'update_progress' in ui_components:
-                    ui_components['update_progress']('step', progress, message, 'info')
+                    ui_components['update_progress']('step', progress, message)
         
-        # Execute dengan callback
         result = download_service.download_dataset(params)
-        
         return result
         
     except Exception as e:

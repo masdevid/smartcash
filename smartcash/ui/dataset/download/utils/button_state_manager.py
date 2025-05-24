@@ -1,19 +1,18 @@
 """
 File: smartcash/ui/dataset/download/utils/button_state_manager.py
-Deskripsi: Enhanced button state manager dengan integration ke progress tracking
+Deskripsi: Enhanced button state manager dengan tqdm progress integration
 """
 
 from typing import Dict, Any, List, Optional
 from contextlib import contextmanager
 
 class ButtonStateManager:
-    """Enhanced manager untuk mengontrol button state dan progress dengan dynamic controls."""
+    """Enhanced manager untuk mengontrol button state dan tqdm progress."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.logger = ui_components.get('logger')
         
-        # Button groups untuk berbagai konteks
         self.button_groups = {
             'all': ['download_button', 'check_button', 'reset_button', 'cleanup_button', 'save_button'],
             'download': ['download_button', 'check_button', 'cleanup_button'],
@@ -32,10 +31,7 @@ class ButtonStateManager:
     
     def enable_buttons(self, group: str = 'all', only: List[str] = None) -> None:
         """Enable button group atau hanya button tertentu."""
-        if only:
-            buttons = only
-        else:
-            buttons = self.button_groups.get(group, [])
+        buttons = only if only else self.button_groups.get(group, [])
         
         for button_key in buttons:
             self._safe_set_button_state(button_key, disabled=False)
@@ -51,35 +47,32 @@ class ButtonStateManager:
             self.logger and self.logger.debug(f"🔘 Error setting {button_key} state: {str(e)}")
     
     def setup_progress_for_operation(self, operation: str) -> None:
-        """Setup progress bars menggunakan enhanced progress tracking."""
+        """Setup tqdm progress bars untuk operation."""
         if 'show_for_operation' in self.ui_components:
             self.ui_components['show_for_operation'](operation)
         else:
-            self.logger and self.logger.warning("⚠️ Enhanced progress tracking tidak tersedia")
+            self.logger and self.logger.warning("⚠️ tqdm progress tracking tidak tersedia")
     
     def complete_operation(self, operation: str, message: str = "Selesai") -> None:
-        """Complete operation dengan enhanced progress update."""
+        """Complete operation dengan tqdm progress update."""
         if 'complete_operation' in self.ui_components:
             self.ui_components['complete_operation'](message)
         
-        # Enable buttons kembali
         self.enable_buttons('all')
     
     def error_operation(self, operation: str, message: str = "Error") -> None:
-        """Handle error state untuk operation."""
+        """Handle error state untuk operation dengan tqdm."""
         if 'error_operation' in self.ui_components:
             self.ui_components['error_operation'](message)
         
-        # Enable buttons kembali
         self.enable_buttons('all')
     
     @contextmanager
     def operation_context(self, operation: str, button_group: str = None):
-        """Context manager dengan enhanced progress tracking integration."""
+        """Context manager dengan tqdm progress integration."""
         button_group = button_group or operation
         
         try:
-            # Setup untuk operasi
             self.disable_buttons(button_group)
             self.setup_progress_for_operation(operation)
             
@@ -87,18 +80,14 @@ class ButtonStateManager:
             
             yield self
             
-            # Success cleanup
             self.complete_operation(operation, f"{operation.title()} selesai")
             
         except Exception as e:
-            # Error cleanup
             self.error_operation(operation, str(e))
             raise
         
         finally:
-            # Always enable buttons back
             self.enable_buttons('all')
-            
             self.logger and self.logger.debug(f"🏁 Finished {operation} operation")
 
 
@@ -107,7 +96,6 @@ def get_button_state_manager(ui_components: Dict[str, Any]) -> ButtonStateManage
     return ButtonStateManager(ui_components)
 
 
-# Backward compatibility functions (deprecated)
 def disable_download_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     """Legacy function untuk backward compatibility.""" 
     manager = get_button_state_manager(ui_components)

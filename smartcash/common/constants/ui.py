@@ -1,60 +1,173 @@
 """
 File: smartcash/common/constants/ui.py
-Deskripsi: Konstanta untuk UI, ikon, dan pesan yang digunakan dalam antarmuka pengguna
+Deskripsi: Common UI constants yang digunakan di seluruh aplikasi SmartCash
 """
 
-# Status icons
+# Status icons untuk berbagai kondisi aplikasi
 STATUS_ICONS = {
     'success': '✅',
     'warning': '⚠️',
     'error': '❌',
     'info': 'ℹ️',
-    'debug': '🐞',
-    'processing': '🔄',
+    'debug': '🔍',
+    'processing': '🔧',
     'waiting': '⏳',
-    'complete': '🏁'
+    'complete': '✅',
+    'loading': '⏳',
+    'idle': '🏁',
+    'running': '🚀'
 }
 
-# Action icons
+# Action icons untuk berbagai operasi
 ACTION_ICONS = {
-    'save': '💾',
-    'load': '📂',
+    'config': '⚙️',
+    'start': '▶️',
+    'stop': '⏹️',
+    'pause': '⏸️',
+    'resume': '▶️',
+    'refresh': '🔄',
+    'reset': '🔄',
     'download': '📥',
     'upload': '📤',
-    'config': '⚙️',
-    'refresh': '🔄',
-    'start': '🚀',
-    'stop': '🛑',
-    'edit': '✏️',
-    'delete': '🗑️',
+    'save': '💾',
+    'load': '📂',
     'add': '➕',
     'remove': '➖',
+    'edit': '✏️',
+    'delete': '🗑️',
     'search': '🔍',
-    'filter': '🧮'
+    'filter': '🔽',
+    'sort': '🔀',
+    'copy': '📋',
+    'move': '🔄',
+    'link': '🔗',
+    'validate': '✅',
+    'fix': '🔧',
+    'clean': '🧹',
+    'cleanup': '🧹'
 }
 
-# Domain icons
+# Domain specific icons
 DOMAIN_ICONS = {
     'dataset': '📊',
     'model': '🧠',
-    'training': '🏋️',
-    'evaluation': '🔍',
-    'detection': '👁️',
+    'training': '🚀',
+    'evaluation': '📊',
+    'prediction': '🎯',
+    'augmentation': '🔄',
     'preprocessing': '🔧',
-    'augmentation': '🎨',
-    'export': '📦',
-    'report': '📝'
+    'postprocessing': '⚡',
+    'visualization': '👁️',
+    'analysis': '📈',
+    'export': '📤',
+    'import': '📥'
 }
 
-# UI color palette
+# UI colors sesuai dengan theme Bootstrap
 UI_COLORS = {
-    'primary': '#3498db',
-    'secondary': '#2c3e50',
+    'primary': '#007bff',
+    'secondary': '#6c757d',
     'success': '#28a745',
-    'warning': '#ffc107',
     'danger': '#dc3545',
+    'warning': '#ffc107',
     'info': '#17a2b8',
     'light': '#f8f9fa',
     'dark': '#343a40',
     'muted': '#6c757d'
+}
+
+# Navigation icons
+NAVIGATION_ICONS = {
+    'home': '🏠',
+    'back': '⬅️',
+    'forward': '➡️',
+    'up': '⬆️',
+    'down': '⬇️',
+    'menu': '☰',
+    'close': '✕',
+    'expand': '🔽',
+    'collapse': '🔼',
+    'fullscreen': '⛶',
+    'minimize': '➖'
+}
+
+# File and data icons
+FILE_ICONS = {
+    'folder': '📁',
+    'file': '📄',
+    'image': '🖼️',
+    'video': '🎥',
+    'audio': '🎵',
+    'document': '📄',
+    'code': '💻',
+    'data': '💾',
+    'archive': '📦',
+    'config': '⚙️'
+}
+
+# Progress and time icons
+PROGRESS_ICONS = {
+    'clock': '🕐',
+    'timer': '⏱️',
+    'calendar': '📅',
+    'schedule': '📋',
+    'deadline': '⏰',
+    'duration': '⏳',
+    'speed': '⚡',
+    'progress': '📊'
+}
+
+# System and hardware icons
+SYSTEM_ICONS = {
+    'cpu': '🖥️',
+    'gpu': '🎮',
+    'memory': '💾',
+    'storage': '💽',
+    'network': '🌐',
+    'cloud': '☁️',
+    'server': '🖥️',
+    'device': '📱',
+    'system': '💻'
+}
+
+# Communication and social icons
+COMMUNICATION_ICONS = {
+    'email': '✉️',
+    'message': '💬',
+    'notification': '🔔',
+    'alert': '🚨',
+    'announcement': '📢',
+    'feedback': '💭',
+    'comment': '💬',
+    'share': '🔗',
+    'like': '👍',
+    'dislike': '👎'
+}
+
+# Security and access icons
+SECURITY_ICONS = {
+    'lock': '🔒',
+    'unlock': '🔓',
+    'key': '🔑',
+    'shield': '🛡️',
+    'secure': '🔐',
+    'private': '🔒',
+    'public': '🌐',
+    'admin': '👑',
+    'user': '👤',
+    'group': '👥'
+}
+
+# Quality and rating icons
+QUALITY_ICONS = {
+    'star': '⭐',
+    'medal': '🏆',
+    'trophy': '🏆',
+    'award': '🥇',
+    'badge': '🏅',
+    'rank': '📊',
+    'score': '💯',
+    'rating': '⭐',
+    'grade': '📝',
+    'level': '📈'
 }

@@ -1,261 +1,265 @@
 """
 File: smartcash/ui/utils/constants.py
-Deskripsi: Utilitas UI yang digunakan di seluruh aplikasi dengan penggunaan konstanta yang konsisten
+Deskripsi: Updated constants dengan missing icons untuk preprocessing UI - merged dengan existing
 """
 
-from typing import Dict, Any
-
-# Import konstanta UI dari common/constants
-from smartcash.common.constants.ui import (
-    STATUS_ICONS, ACTION_ICONS, DOMAIN_ICONS, UI_COLORS
-)
-
-# Color palette
-COLORS = {
-    'primary': UI_COLORS['primary'],
-    'secondary': UI_COLORS['secondary'],
-    'success': UI_COLORS['success'],
-    'warning': UI_COLORS['warning'],
-    'danger': UI_COLORS['danger'],
-    'info': UI_COLORS['info'],
-    'light': UI_COLORS['light'],
-    'dark': UI_COLORS['dark'],
-    'muted': UI_COLORS['muted'],
-    'highlight': '#e65100',
-    'background': '#ffffff',
-    'card': '#f8f9fa',
-    'border': '#dee2e6',
-    'header_bg': '#f0f8ff',
-    'header_border': '#3498db',
+# Import existing constants untuk merge
+try:
+    from smartcash.common.constants.ui import (
+        STATUS_ICONS, ACTION_ICONS, DOMAIN_ICONS, UI_COLORS
+    )
     
-    # Alert colors
-    'alert_info_bg': '#d1ecf1',
-    'alert_info_text': '#0c5460',
-    'alert_success_bg': '#d4edda',
-    'alert_success_text': '#155724',
-    'alert_warning_bg': '#fff3cd',
-    'alert_warning_text': '#856404',
-    'alert_danger_bg': '#f8d7da',
-    'alert_danger_text': '#721c24',
-}
-
-# Tema
-THEMES = {
-    'default': {
-        **COLORS
-    },
-    'dark': {
-        'primary': '#0d6efd',
-        'secondary': '#6c757d',
-        'success': '#198754',
-        'warning': '#ffc107',
-        'danger': '#dc3545',
-        'info': '#0dcaf0',
-        'light': '#212529',
-        'dark': '#f8f9fa',
-        'muted': '#adb5bd',
-        'highlight': '#fd7e14',
-        'background': '#212529',
-        'card': '#343a40',
-        'border': '#495057',
-        'header_bg': '#343a40',
-        'header_border': '#0d6efd',
-        'alert_info_bg': '#1a3a42',
-        'alert_info_text': '#8edaec',
-        'alert_success_bg': '#0e3a1d',
-        'alert_success_text': '#8eda99',
-        'alert_warning_bg': '#3a3000',
-        'alert_warning_text': '#ffe066',
-        'alert_danger_bg': '#3a0a0d',
-        'alert_danger_text': '#ea868f',
+    # Use existing color structure
+    COLORS = {
+        'primary': UI_COLORS.get('primary', '#007bff'),
+        'secondary': UI_COLORS.get('secondary', '#6c757d'),
+        'success': UI_COLORS.get('success', '#28a745'),
+        'warning': UI_COLORS.get('warning', '#ffc107'),
+        'danger': UI_COLORS.get('danger', '#dc3545'),
+        'info': UI_COLORS.get('info', '#17a2b8'),
+        'light': UI_COLORS.get('light', '#f8f9fa'),
+        'dark': UI_COLORS.get('dark', '#343a40'),
+        'muted': UI_COLORS.get('muted', '#6c757d'),
+        'highlight': '#e65100',
+        'background': '#ffffff',
+        'card': '#f8f9fa',
+        'border': '#dee2e6',
+        'header_bg': '#f0f8ff',
+        'header_border': '#3498db',
+        
+        # Alert colors
+        'alert_info_bg': '#d1ecf1',
+        'alert_info_text': '#0c5460',
+        'alert_success_bg': '#d4edda',
+        'alert_success_text': '#155724',
+        'alert_warning_bg': '#fff3cd',
+        'alert_warning_text': '#856404',
+        'alert_danger_bg': '#f8d7da',
+        'alert_danger_text': '#721c24',
+        
+        # Text colors
+        "text": "#212529",
+        "text_muted": "#6c757d",
+        
+        # Background colors
+        "bg_light": "#f8f9fa",
+        "bg_white": "#ffffff",
+        "bg_dark": "#343a40"
     }
-}
-
-# Active theme (can be changed at runtime)
-ACTIVE_THEME = 'default'
-
-# Font Awesome icon mapping for ipywidgets
-FA_ICONS = {
-    'check': 'check',
-    'times': 'times',
-    'warning': 'exclamation-triangle',
-    'info': 'info-circle',
-    'error': 'exclamation-circle',
-    'success': 'check-circle',
-    'refresh': 'sync',
-    'save': 'save',
-    'upload': 'upload',
-    'download': 'download',
-    'folder': 'folder',
-    'file': 'file',
-    'plus': 'plus',
-    'minus': 'minus',
-    'edit': 'edit',
-    'delete': 'trash',
-    'search': 'search',
-    'settings': 'cog',
-    'link': 'link',
-    'folder-plus': 'folder-plus',
-    'folder-open': 'folder-open',
-    'chart': 'chart-bar',
-    'camera': 'camera',
-    'play': 'play',
-    'pause': 'pause',
-    'stop': 'stop',
-    'code': 'code',
-    'home': 'home',
-    'cog': 'cog',
-    'arrow-up': 'arrow-up',
-    'arrow-down': 'arrow-down',
-    'arrow-left': 'arrow-left',
-    'arrow-right': 'arrow-right',
-}
-
-# Emoji icons - Menggunakan konstanta dari common/constants/ui
-ICONS = {
-    # Status icons
-    'success': STATUS_ICONS['success'],
-    'warning': STATUS_ICONS['warning'],
-    'error': STATUS_ICONS['error'],
-    'info': STATUS_ICONS['info'],
-    'debug': STATUS_ICONS['debug'],
-    'processing': STATUS_ICONS['processing'],
-    'waiting': STATUS_ICONS['waiting'],
-    'complete': STATUS_ICONS['complete'],
     
-    # Action icons
-    'config': ACTION_ICONS['config'],
-    'data': DOMAIN_ICONS['dataset'],
-    'processing': ACTION_ICONS['refresh'],
-    'start': ACTION_ICONS['start'],
-    'download': ACTION_ICONS['download'],
-    'upload': ACTION_ICONS['upload'],
-    'save': ACTION_ICONS['save'],
-    'add': ACTION_ICONS['add'],
-    'remove': ACTION_ICONS['remove'],
-    'edit': ACTION_ICONS['edit'],
-    'delete': ACTION_ICONS['delete'],
-    'search': ACTION_ICONS['search'],
-    'refresh': ACTION_ICONS['refresh'],
-    
-    # Object icons
-    'folder': '📁',
-    'file': '📄',
-    'model': DOMAIN_ICONS['model'],
-    'time': '⏱️',
-    'calendar': '📅',
-    'metric': '📈',
-    'stats': '📊',
-    'chart': '📊',
-    'link': '🔗',
-    'compare': '🔄',
-    'idle': '🏁',
-    'running': '🚀',
-    
-    # Domain-specific icons
-    'settings': '🔧',
-    'tools': '🛠️',
-    'split': '✂️',
-    'augmentation': DOMAIN_ICONS['augmentation'],
-    'training': DOMAIN_ICONS['training'],
-    'evaluation': DOMAIN_ICONS['evaluation'],
-    'cleanup': '🧹',
-    'dataset': DOMAIN_ICONS['dataset'],
-    'cache': '💽',
-    'reset': '🔄',
-    'visualize': '👁️',
-    
-    # Control icons
-    'stop': '🛑',
-    'pause': '⏸️',
-    'resume': '▶️',
-    'play': '▶️',
-    'next': '⏭️',
-    'prev': '⏮️',
-    'medal': '🏆',
-    'check': '✓',
-    'times': '✗',
-}
+    # Merge existing icons dengan missing icons
+    ICONS = {
+        # From existing constants
+        'success': STATUS_ICONS.get('success', '✅'),
+        'warning': STATUS_ICONS.get('warning', '⚠️'),
+        'error': STATUS_ICONS.get('error', '❌'),
+        'info': STATUS_ICONS.get('info', 'ℹ️'),
+        'debug': STATUS_ICONS.get('debug', '🔍'),
+        'processing': STATUS_ICONS.get('processing', '🔧'),
+        'waiting': STATUS_ICONS.get('waiting', '⏳'),
+        'complete': STATUS_ICONS.get('complete', '✅'),
+        
+        # Action icons from existing
+        'config': ACTION_ICONS.get('config', '⚙️'),
+        'start': ACTION_ICONS.get('start', '▶️'),
+        'download': ACTION_ICONS.get('download', '📥'),
+        'upload': ACTION_ICONS.get('upload', '📤'),
+        'save': ACTION_ICONS.get('save', '💾'),
+        'add': ACTION_ICONS.get('add', '➕'),
+        'remove': ACTION_ICONS.get('remove', '➖'),
+        'edit': ACTION_ICONS.get('edit', '✏️'),
+        'delete': ACTION_ICONS.get('delete', '🗑️'),
+        'search': ACTION_ICONS.get('search', '🔍'),
+        'refresh': ACTION_ICONS.get('refresh', '🔄'),
+        
+        # Domain icons from existing
+        'model': DOMAIN_ICONS.get('model', '🧠'),
+        'dataset': DOMAIN_ICONS.get('dataset', '📊'),
+        'augmentation': DOMAIN_ICONS.get('augmentation', '🔄'),
+        'training': DOMAIN_ICONS.get('training', '🚀'),
+        'evaluation': DOMAIN_ICONS.get('evaluation', '📊'),
+        
+        # Missing icons yang dibutuhkan preprocessing UI
+        "action": "▶️",  # Fixed: added missing 'action' icon
+        "play": "▶️",
+        "stop": "⏹️",
+        "pause": "⏸️",
+        "reset": "🔄",
+        
+        # Settings & Configuration
+        "settings": "⚙️",
+        "gear": "⚙️",
+        
+        # Data & Files
+        "folder": "📁",
+        "file": "📄",
+        "image": "🖼️",
+        "data": "💾",
+        
+        # Status & Feedback
+        "question": "❓",
+        "check": "✅",
+        "cross": "❌",
+        
+        # Search & Analysis
+        "analyze": "📊",
+        "stats": "📊",
+        "chart": "📈",
+        "graph": "📉",
+        
+        # Navigation & UI
+        "arrow_right": "➡️",
+        "arrow_left": "⬅️",
+        "arrow_up": "⬆️",
+        "arrow_down": "⬇️",
+        "expand": "🔽",
+        "collapse": "🔼",
+        
+        # Tools & Utilities
+        "clean": "🧹",
+        "cleanup": "🧹",
+        "trash": "🗑️",
+        "copy": "📋",
+        "link": "🔗",
+        
+        # Progress & Status
+        "progress": "📊",
+        "loading": "⏳",
+        "clock": "🕐",
+        "timer": "⏱️",
+        
+        # Validation & Testing
+        "validate": "✅",
+        "test": "🧪",
+        "debug": "🐛",
+        "fix": "🔧",
+        
+        # AI & Model
+        "ai": "🤖",
+        "train": "🚀",
+        "predict": "🎯",
+        
+        # Dataset & Preprocessing
+        "preprocess": "🔧",
+        "augment": "🔄",
+        "split": "✂️",
+        
+        # System & Environment
+        "system": "💻",
+        "cloud": "☁️",
+        "drive": "💽",
+        "sync": "🔄",
+        
+        # Additional missing icons
+        'time': '⏱️',
+        'calendar': '📅',
+        'metric': '📈',
+        'compare': '🔄',
+        'idle': '🏁',
+        'running': '🚀',
+        'tools': '🛠️',
+        'cache': '💽',
+        'visualize': '👁️',
+        'next': '⏭️',
+        'prev': '⏮️',
+        'medal': '🏆',
+        'times': '✗',
+        'resume': '▶️'
+    }
 
-# Alert styles
+except ImportError:
+    # Fallback jika common.constants.ui tidak tersedia
+    COLORS = {
+        "primary": "#007bff",
+        "secondary": "#6c757d", 
+        "success": "#28a745",
+        "danger": "#dc3545",
+        "warning": "#ffc107",
+        "info": "#17a2b8",
+        "light": "#f8f9fa",
+        "dark": "#343a40",
+        "muted": "#6c757d",
+        "text": "#212529",
+        "text_muted": "#6c757d",
+        "bg_light": "#f8f9fa",
+        "bg_white": "#ffffff",
+        "bg_dark": "#343a40"
+    }
+    
+    # Fallback icons
+    ICONS = {
+        "action": "▶️",
+        "processing": "🔧",
+        "settings": "⚙️",
+        "success": "✅",
+        "error": "❌",
+        "warning": "⚠️",
+        "info": "ℹ️",
+        "play": "▶️",
+        "stop": "⏹️",
+        "pause": "⏸️",
+        "refresh": "🔄",
+        "reset": "🔄",
+        "download": "📥",
+        "upload": "📤",
+        "save": "💾",
+        "search": "🔍",
+        "cleanup": "🧹",
+        "dataset": "📊",
+        "model": "🧠"
+    }
+
+# Alert styles untuk berbagai tipe status
 ALERT_STYLES = {
     'info': {
-        'bg_color': COLORS['alert_info_bg'],
-        'text_color': COLORS['alert_info_text'],
-        'border_color': COLORS['alert_info_text'],
+        'bg_color': '#d1ecf1',
+        'text_color': '#0c5460',
+        'border_color': '#17a2b8',
         'icon': ICONS['info']
     },
     'success': {
-        'bg_color': COLORS['alert_success_bg'],
-        'text_color': COLORS['alert_success_text'],
-        'border_color': COLORS['alert_success_text'],
+        'bg_color': '#d4edda',
+        'text_color': '#155724',
+        'border_color': '#28a745',
         'icon': ICONS['success']
     },
     'warning': {
-        'bg_color': COLORS['alert_warning_bg'],
-        'text_color': COLORS['alert_warning_text'],
-        'border_color': COLORS['alert_warning_text'],
+        'bg_color': '#fff3cd',
+        'text_color': '#856404',
+        'border_color': '#ffc107',
         'icon': ICONS['warning']
     },
     'error': {
-        'bg_color': COLORS['alert_danger_bg'],
-        'text_color': COLORS['alert_danger_text'],
-        'border_color': COLORS['alert_danger_text'],
+        'bg_color': '#f8d7da',
+        'text_color': '#721c24',
+        'border_color': '#dc3545',
         'icon': ICONS['error']
+    },
+    'debug': {
+        'bg_color': '#e2e3e5',
+        'text_color': '#383d41',
+        'border_color': '#6c757d',
+        'icon': '🔍'
     }
 }
 
-# Button styles
+# Button styles mapping
 BUTTON_STYLES = {
     'primary': 'primary',
+    'secondary': '',
     'success': 'success',
-    'info': 'info',
-    'warning': 'warning',
     'danger': 'danger',
-    'default': ''
-}
-
-# Font Config
-FONTS = {
-    'default': '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-    'monospace': 'Consolas, Menlo, Monaco, "Courier New", monospace',
-    'header': '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-}
-
-# Size Config
-SIZES = {
-    'xs': '0.75rem',   # 12px
-    'sm': '0.875rem',  # 14px
-    'md': '1rem',      # 16px
-    'lg': '1.25rem',   # 20px
-    'xl': '1.5rem',    # 24px
-    '2xl': '2rem',     # 32px
+    'warning': 'warning',
+    'info': 'info'
 }
 
 # Layout constants
-PADDINGS = {
-    'none': '0',
-    'small': '5px',
-    'medium': '10px',
-    'large': '15px',
-    'xl': '20px'
+LAYOUT = {
+    'default_width': '100%',
+    'default_padding': '10px',
+    'default_margin': '5px 0',
+    'container_padding': '15px',
+    'section_margin': '20px 0',
+    'button_height': '35px',
+    'input_height': '32px'
 }
-
-MARGINS = {
-    'none': '0',
-    'small': '5px',
-    'medium': '10px',
-    'large': '15px',
-    'xl': '20px'
-}
-
-# Ekstensi file untuk UI
-FILE_EXTENSIONS = {
-    'image': ['.jpg', '.jpeg', '.png', '.bmp', '.tiff'],
-    'video': ['.mp4', '.avi', '.mov', '.mkv', '.webm'],
-    'document': ['.pdf', '.doc', '.docx', '.txt', '.csv', '.xls', '.xlsx', '.ppt', '.pptx'],
-    'code': ['.py', '.js', '.java', '.cpp', '.c', '.h', '.html', '.css', '.json', '.xml']
-}
-
-# For file size formatting
-FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']

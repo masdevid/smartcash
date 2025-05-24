@@ -239,8 +239,11 @@ Data yang ada akan ditimpa."""
             preprocessing_manager = _get_preprocessing_manager()
             config = get_preprocessing_config()
             
+            # Extract split to avoid duplicate keyword argument
+            split_value = config.pop('split', 'all')
+            
             result = preprocessing_manager.preprocess_dataset(
-                split=config['split'],
+                split=split_value,
                 force_reprocess=True,
                 show_progress=True,
                 **config

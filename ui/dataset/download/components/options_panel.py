@@ -1,20 +1,20 @@
 """
 File: smartcash/ui/dataset/download/components/options_panel.py
-Deskripsi: Fixed layout tanpa horizontal scrollbar dan responsive
+Deskripsi: Options panel tanpa opsi validasi dataset - gunakan check button
 """
 
 import ipywidgets as widgets
 from .form_fields import (
     workspace_field, project_field, version_field, api_key_field,
-    output_dir_field, validate_dataset_field, backup_checkbox_field, 
-    backup_dir_field, organize_dataset_field, show_structure_info
+    output_dir_field, backup_checkbox_field, backup_dir_field, 
+    organize_dataset_field, show_structure_info
 )
 from smartcash.ui.utils.constants import COLORS
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
 def create_options_panel(config, env_manager=None):
-    """Create options panel dengan layout responsive tanpa horizontal scroll."""
+    """Create options panel dengan layout responsive tanpa opsi validasi."""
     
     if env_manager is None:
         env_manager = get_environment_manager()
@@ -33,8 +33,7 @@ def create_options_panel(config, env_manager=None):
     )
     backup_dir = backup_dir_field(paths['backup'])
     
-    # Options checkboxes
-    validate_dataset = validate_dataset_field()
+    # Options checkboxes (tanpa validate_dataset)
     backup_checkbox = backup_checkbox_field()
     organize_dataset = organize_dataset_field()
     
@@ -58,13 +57,13 @@ def create_options_panel(config, env_manager=None):
         overflow='hidden'
     ))
     
-    # ⚙️ Right Column: Process Options  
+    # ⚙️ Right Column: Process Options (tanpa validate_dataset)
     process_options_section = widgets.VBox([
         widgets.HTML('<h4 style="margin: 0 0 15px 0; color: #495057; border-bottom: 2px solid #28a745; padding-bottom: 8px;">⚙️ Process Options</h4>'),
         organize_dataset,
-        validate_dataset,
         backup_checkbox,
-        widgets.HTML('<div style="margin-top: 15px; padding: 10px; background: #e8f5e8; border-radius: 4px; border-left: 4px solid #28a745;"><small style="color: #155724;"><strong>💡 Tips:</strong> Organisasi otomatis akan memindahkan dataset ke struktur final /data/train, /data/valid, /data/test</small></div>')
+        widgets.HTML('<div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 4px; border-left: 4px solid #2196f3;"><small style="color: #0d47a1;"><strong>🔍 Verifikasi:</strong> Setelah download selesai, gunakan tombol <strong>"Check Dataset"</strong> untuk memverifikasi hasil.</small></div>'),
+        widgets.HTML('<div style="margin-top: 8px; padding: 10px; background: #e8f5e8; border-radius: 4px; border-left: 4px solid #28a745;"><small style="color: #155724;"><strong>💡 Organisasi:</strong> Dataset akan otomatis dipindah ke struktur final /data/train, /data/valid, /data/test</small></div>')
     ], layout=widgets.Layout(
         width='calc(50% - 8px)',
         margin='0 0 0 4px',
@@ -131,7 +130,6 @@ def create_options_panel(config, env_manager=None):
         'api_key': api_key,
         'output_dir': output_dir,
         'backup_dir': backup_dir,
-        'validate_dataset': validate_dataset,
         'backup_checkbox': backup_checkbox,
         'organize_dataset': organize_dataset,
         'structure_info': structure_info,

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/services/ui_download_service.py
-Deskripsi: Updated download service dengan log suppression dan organizer integration
+Deskripsi: Download service tanpa step validasi dataset setelah download
 """
 
 import time
@@ -15,7 +15,7 @@ from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
 class UIDownloadService:
-    """Enhanced download service dengan log suppression dan dataset organization."""
+    """Download service tanpa validasi dataset otomatis - gunakan check button."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -47,31 +47,27 @@ class UIDownloadService:
         self.organizer.set_progress_callback(self._organizer_progress_callback)
     
     def _setup_backend_log_suppression(self):
-        """Suppress logs dari backend services agar tidak muncul di console."""
-        # List backend loggers yang perlu di-suppress
+        """Suppress logs dari backend services."""
         backend_loggers = [
             'requests', 'urllib3', 'http.client', 'requests.packages.urllib3',
             'smartcash.dataset.services', 'smartcash.common', 'tensorflow', 
             'torch', 'PIL', 'matplotlib', 'zipfile'
         ]
         
-        # Suppress each logger
         for logger_name in backend_loggers:
             logger = logging.getLogger(logger_name)
             logger.setLevel(logging.CRITICAL)
             logger.propagate = False
-            # Remove handlers untuk prevent console output
             logger.handlers.clear()
         
-        # Redirect stdout untuk backend processes yang tidak menggunakan logging
         if not hasattr(self, '_original_stdout'):
             self._original_stdout = sys.stdout
     
     def download_dataset(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Download dengan enhanced dual progress tracking dan dataset organization."""
+        """Download tanpa step validasi otomatis."""
         start_time = time.time()
         
-        # Define steps berdasarkan opsi
+        # Define steps tanpa validasi
         steps = self._define_process_steps(params)
         self.progress_bridge.define_steps(steps)
         
@@ -114,33 +110,27 @@ class UIDownloadService:
             
             self.progress_bridge.notify_step_complete("Dataset berhasil diorganisir")
             
-            # Step 5: Verify hasil final (optional)
-            if len(steps) > 4:  # Ada step verify
-                self.progress_bridge.notify_step_start("verify", "Memverifikasi hasil akhir")
-                final_stats = self._get_final_stats()
-                self.progress_bridge.notify_step_complete("Verifikasi selesai")
-            else:
-                final_stats = organize_result
-            
-            # 🎉 Complete
+            # 🎉 Complete (tanpa step validasi)
             duration = time.time() - start_time
-            total_images = final_stats.get('total_images', 0)
+            total_images = organize_result.get('total_images', 0)
             success_message = f"Download dan organisasi selesai: {total_images} gambar dalam {duration:.1f}s"
             
             self.progress_bridge.notify_complete(success_message, duration)
             
             if self.logger:
                 self.logger.success(f"✅ {success_message}")
-                self._log_final_structure(final_stats)
+                self.logger.info("🔍 Gunakan tombol 'Check Dataset' untuk memverifikasi hasil")
+                self._log_final_structure(organize_result)
             
             return {
                 'status': 'success',
                 'output_dir': self.paths['data_root'],
                 'download_path': str(download_path),
-                'stats': final_stats,
+                'stats': organize_result,
                 'duration': duration,
                 'drive_storage': self.env_manager.is_drive_mounted,
-                'organized': True
+                'organized': True,
+                'verification_note': 'Gunakan Check Dataset untuk verifikasi hasil'
             }
             
         except Exception as e:
@@ -178,16 +168,13 @@ class UIDownloadService:
         return SuppressOutput()
     
     def _define_process_steps(self, params: Dict[str, Any]) -> list:
-        """Define steps berdasarkan parameter dan opsi."""
+        """Define steps tanpa validasi dataset."""
         steps = [
-            {'name': 'validate', 'weight': 5, 'description': 'Validasi Parameter'},
-            {'name': 'metadata', 'weight': 10, 'description': 'Ambil Metadata'},
-            {'name': 'download', 'weight': 60, 'description': 'Download Dataset'},
-            {'name': 'organize', 'weight': 20, 'description': 'Organisir Dataset'}
+            {'name': 'validate', 'weight': 10, 'description': 'Validasi Parameter'},
+            {'name': 'metadata', 'weight': 15, 'description': 'Ambil Metadata'},
+            {'name': 'download', 'weight': 50, 'description': 'Download Dataset'},
+            {'name': 'organize', 'weight': 25, 'description': 'Organisir Dataset'}
         ]
-        
-        if params.get('validate_dataset', False):
-            steps.append({'name': 'verify', 'weight': 5, 'description': 'Verifikasi Dataset'})
         
         return steps
     
@@ -261,10 +248,6 @@ class UIDownloadService:
                 raise Exception(f"Error koneksi ke Roboflow: {str(e)}")
         except Exception as e:
             raise Exception(f"Error mendapatkan metadata: {str(e)}")
-    
-    def _get_final_stats(self) -> Dict[str, Any]:
-        """Get statistik dataset yang sudah diorganisir."""
-        return self.organizer.check_organized_dataset()
     
     def _log_final_structure(self, stats: Dict[str, Any]) -> None:
         """Log struktur final dataset."""

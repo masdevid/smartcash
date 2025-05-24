@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/components/form_fields.py
-Deskripsi: Silent form fields tanpa verbose logging
+Deskripsi: Form fields tanpa opsi validasi dataset - gunakan check_dataset button
 """
 
 import ipywidgets as widgets
@@ -23,7 +23,6 @@ def api_key_field():
 
 def _detect_api_key_silent() -> str:
     """Deteksi API key tanpa logging."""
-    
     # 1. Environment variable
     api_key = os.environ.get('ROBOFLOW_API_KEY', '')
     if api_key:
@@ -32,8 +31,6 @@ def _detect_api_key_silent() -> str:
     # 2. Google Colab userdata
     try:
         from google.colab import userdata
-        
-        # Check primary key
         api_key = userdata.get('ROBOFLOW_API_KEY')
         if api_key:
             return api_key
@@ -122,16 +119,6 @@ def version_field(config):
         layout=widgets.Layout(width='100%')
     )
 
-def validate_dataset_field():
-    """Checkbox untuk validasi dataset."""
-    return widgets.Checkbox(
-        value=True,
-        description='Validasi dataset setelah download dan organisasi',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(width='100%')
-    )
-
 def backup_checkbox_field():
     """Checkbox untuk backup dataset."""
     return widgets.Checkbox(
@@ -153,20 +140,23 @@ def organize_dataset_field():
     )
 
 def show_structure_info():
-    """Widget info untuk menjelaskan struktur dataset."""
+    """Widget info untuk menjelaskan struktur dataset dan check button."""
     info_html = """
     <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 12px; margin: 10px 0;">
-        <h4 style="margin-top: 0; color: #495057;">📁 Struktur Dataset</h4>
+        <h4 style="margin-top: 0; color: #495057;">📁 Alur Download & Verifikasi</h4>
         <p style="margin: 8px 0; color: #6c757d; font-size: 0.9em;">
-            Dataset akan didownload ke folder sementara, kemudian diorganisir ke struktur final:
+            <strong>1. Download:</strong> Dataset akan didownload dan diorganisir ke struktur final:
         </p>
         <ul style="margin: 8px 0; color: #6c757d; font-size: 0.9em;">
             <li><code>data/train/</code> - Dataset training</li>
             <li><code>data/valid/</code> - Dataset validasi</li>
             <li><code>data/test/</code> - Dataset testing</li>
         </ul>
+        <p style="margin: 8px 0; color: #6c757d; font-size: 0.9em;">
+            <strong>2. Verifikasi:</strong> Gunakan tombol <strong>"Check Dataset"</strong> untuk memverifikasi hasil download.
+        </p>
         <p style="margin: 8px 0 0 0; color: #6c757d; font-size: 0.85em;">
-            💡 Setiap folder akan berisi subdirektori <code>images/</code> dan <code>labels/</code>
+            💡 Setiap folder berisi subdirektori <code>images/</code> dan <code>labels/</code>
         </p>
     </div>
     """

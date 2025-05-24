@@ -1,21 +1,14 @@
 """
 File: smartcash/ui/dataset/download/utils/parameter_extractor.py
-Deskripsi: Utility untuk extract dan clean parameter dari UI components dengan robust error handling
+Deskripsi: Parameter extractor tanpa opsi validasi dataset
 """
 
 from typing import Dict, Any, Optional, Union
 import os
 
 def extract_download_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract parameter download dari UI components dengan comprehensive cleaning.
+    """Extract parameter download dari UI components tanpa validate_dataset."""
     
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Dictionary parameter yang sudah dibersihkan dan divalidasi
-    """
     # Basic parameter extraction
     params = {
         'workspace': safe_extract_text(ui_components, 'workspace'),
@@ -26,9 +19,8 @@ def extract_download_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]
         'backup_dir': safe_extract_text(ui_components, 'backup_dir'),
     }
     
-    # Boolean parameters
+    # Boolean parameters (tanpa validate_dataset)
     params.update({
-        'validate_dataset': safe_extract_boolean(ui_components, 'validate_dataset', True),
         'backup_before_download': safe_extract_boolean(ui_components, 'backup_checkbox', False),
         'organize_dataset': safe_extract_boolean(ui_components, 'organize_dataset', True),
     })
@@ -43,40 +35,19 @@ def extract_download_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]
     return params
 
 def safe_extract_text(ui_components: Dict[str, Any], key: str, default: str = '') -> str:
-    """
-    Safely extract text value dari UI component dengan comprehensive error handling.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        key: Key untuk component
-        default: Default value jika extraction gagal
-        
-    Returns:
-        String value yang sudah dibersihkan
-    """
+    """Safely extract text value dari UI component."""
     try:
-        # Check component existence
         if key not in ui_components:
             return default
         
         component = ui_components[key]
-        
-        # Check component validity
-        if component is None:
+        if component is None or not hasattr(component, 'value'):
             return default
         
-        # Check value attribute
-        if not hasattr(component, 'value'):
-            return default
-        
-        # Extract value
         raw_value = getattr(component, 'value', default)
-        
-        # Handle None value
         if raw_value is None:
             return default
         
-        # Convert to string and clean
         cleaned_value = str(raw_value).strip()
         
         # Additional cleaning untuk specific fields
@@ -93,29 +64,17 @@ def safe_extract_text(ui_components: Dict[str, Any], key: str, default: str = ''
         return default
 
 def safe_extract_boolean(ui_components: Dict[str, Any], key: str, default: bool = False) -> bool:
-    """
-    Safely extract boolean value dari UI component.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        key: Key untuk component
-        default: Default value jika extraction gagal
-        
-    Returns:
-        Boolean value
-    """
+    """Safely extract boolean value dari UI component."""
     try:
         if key not in ui_components or ui_components[key] is None:
             return default
         
         component = ui_components[key]
-        
         if not hasattr(component, 'value'):
             return default
         
         raw_value = getattr(component, 'value', default)
         
-        # Handle different boolean representations
         if isinstance(raw_value, bool):
             return raw_value
         elif isinstance(raw_value, str):
@@ -129,15 +88,7 @@ def safe_extract_boolean(ui_components: Dict[str, Any], key: str, default: bool 
         return default
 
 def clean_parameters(params: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Clean dan normalize parameter values.
-    
-    Args:
-        params: Raw parameter dictionary
-        
-    Returns:
-        Cleaned parameter dictionary
-    """
+    """Clean dan normalize parameter values."""
     cleaned = params.copy()
     
     # Clean workspace dan project (lowercase, no spaces)
@@ -165,13 +116,9 @@ def clean_identifier(value: str) -> str:
     if not value:
         return ''
     
-    # Remove invalid characters, keep alphanumeric, dash, underscore
     import re
     cleaned = re.sub(r'[^a-zA-Z0-9\-_]', '', value)
-    
-    # Remove leading/trailing dashes
     cleaned = cleaned.strip('-_')
-    
     return cleaned.lower()
 
 def clean_version(value: str) -> str:
@@ -179,7 +126,6 @@ def clean_version(value: str) -> str:
     if not value:
         return ''
     
-    # Extract numeric part dari version string
     import re
     numeric_match = re.search(r'\d+', value)
     return numeric_match.group() if numeric_match else value
@@ -187,11 +133,9 @@ def clean_version(value: str) -> str:
 def clean_version_number(value: str) -> str:
     """Ensure version is in proper numeric format."""
     try:
-        # Try to parse as integer
         version_int = int(float(value))
         return str(version_int)
     except (ValueError, TypeError):
-        # Return original jika tidak bisa diparse
         return str(value)
 
 def clean_path(value: str) -> str:
@@ -199,14 +143,10 @@ def clean_path(value: str) -> str:
     if not value:
         return ''
     
-    # Normalize path separators
     import os
     normalized = os.path.normpath(value.replace('\\', '/'))
-    
-    # Remove multiple slashes
     while '//' in normalized:
         normalized = normalized.replace('//', '/')
-    
     return normalized
 
 def normalize_path(path: str) -> str:
@@ -218,11 +158,9 @@ def normalize_path(path: str) -> str:
     from pathlib import Path
     
     try:
-        # Convert to Path object dan back to string untuk normalization
         normalized = str(Path(path).resolve())
         return normalized
     except Exception:
-        # Fallback to basic cleaning
         return clean_path(path)
 
 def clean_api_key(api_key: str) -> str:
@@ -230,24 +168,16 @@ def clean_api_key(api_key: str) -> str:
     if not api_key:
         return ''
     
-    # Remove whitespace
     cleaned = api_key.strip()
     
-    # Basic validation: should be alphanumeric with possible dashes/underscores
     import re
     if not re.match(r'^[a-zA-Z0-9\-_]+$', cleaned):
-        # Return original jika format tidak standar (mungkin ada karakter khusus yang valid)
         return cleaned
     
     return cleaned
 
 def detect_api_key_from_environment() -> str:
-    """
-    Detect API key dari berbagai sumber environment.
-    
-    Returns:
-        API key string atau empty string jika tidak ditemukan
-    """
+    """Detect API key dari berbagai sumber environment."""
     # Primary environment variable
     api_key = os.environ.get('ROBOFLOW_API_KEY', '')
     if api_key:
@@ -295,24 +225,14 @@ def detect_api_key_from_environment() -> str:
                 continue
                 
     except ImportError:
-        # Not in Colab environment
         pass
     except Exception:
-        # Other errors accessing userdata
         pass
     
     return ''
 
 def validate_extracted_parameters(params: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Validate extracted parameters dan return validation result.
-    
-    Args:
-        params: Extracted parameters
-        
-    Returns:
-        Validation result dictionary
-    """
+    """Validate extracted parameters dan return validation result."""
     errors = []
     warnings = []
     
@@ -342,7 +262,7 @@ def validate_extracted_parameters(params: Dict[str, Any]) -> Dict[str, Any]:
     if params.get('output_dir'):
         try:
             from pathlib import Path
-            Path(params['output_dir'])  # Test path validity
+            Path(params['output_dir'])
         except Exception:
             errors.append("Output directory path tidak valid")
     

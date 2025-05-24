@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/config_handlers.py  
-Deskripsi: Silent config handlers tanpa log inisialisasi yang mengganggu
+Deskripsi: Config handlers tanpa field validasi dataset
 """
 
 import os
@@ -32,7 +32,7 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         config_manager = get_config_manager()
         saved_config = _load_saved_config_safe(config_manager)
         
-        # Merge configs
+        # Merge configs (tanpa validate_dataset)
         merged_config = _merge_configs(config, saved_config, paths)
         
         # Load API key dan update UI (silent)
@@ -40,13 +40,13 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         if api_key:
             merged_config['api_key'] = api_key
         
-        # Update UI components
+        # Update UI components (tanpa validate_dataset)
         _update_all_ui_components(ui_components, merged_config, paths)
         
         # Update storage info widget
         _update_storage_info_widget(ui_components, env_manager)
         
-        # Store defaults
+        # Store defaults (tanpa validate_dataset)
         ui_components['_defaults'] = _create_smart_defaults(paths, api_key)
         
     except Exception as e:
@@ -151,7 +151,7 @@ def _merge_configs(base_config: Dict[str, Any], saved_config: Dict[str, Any], pa
     return merged
 
 def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, Any], paths: Dict[str, str]) -> None:
-    """Update UI components dari config (silent)."""
+    """Update UI components dari config tanpa validate_dataset."""
     
     field_mapping = {
         'workspace': ('workspace', 'smartcash-wo2us'),
@@ -159,7 +159,6 @@ def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, A
         'version': ('version', '3'),
         'output_dir': ('output_dir', paths['downloads']),
         'backup_dir': ('backup_dir', paths['backup']),
-        'validate_dataset': ('validate_dataset', True),
         'backup_before_download': ('backup_checkbox', False)
     }
     
@@ -169,7 +168,7 @@ def _update_all_ui_components(ui_components: Dict[str, Any], config: Dict[str, A
             ui_components[ui_key].value = value
 
 def _create_smart_defaults(paths: Dict[str, str], api_key: str) -> Dict[str, Any]:
-    """Create smart defaults berdasarkan environment paths."""
+    """Create smart defaults berdasarkan environment paths tanpa validate_dataset."""
     return {
         'workspace': 'smartcash-wo2us',
         'project': 'rupiah-emisi-2022',
@@ -177,7 +176,6 @@ def _create_smart_defaults(paths: Dict[str, str], api_key: str) -> Dict[str, Any
         'api_key': api_key,
         'output_dir': paths['downloads'],
         'backup_dir': paths['backup'],
-        'validate_dataset': True,
         'backup_checkbox': False
     }
 

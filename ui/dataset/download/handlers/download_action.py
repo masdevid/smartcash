@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/download_action.py
-Deskripsi: Updated download handler dengan enhanced service dan path management yang benar
+Deskripsi: Fixed download handler dengan dual progress integration yang benar
 """
 
 from typing import Dict, Any
@@ -13,21 +13,17 @@ from smartcash.common.environment import get_environment_manager
 from IPython.display import display
 
 def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi download dengan enhanced service dan dataset organization."""
+    """Eksekusi download dengan dual progress integration."""
     logger = ui_components.get('logger')
     
-    # 🚀 Start download process
     if logger:
         logger.info("🚀 Memulai proses download dan organisasi dataset")
     
-    # Disable semua buttons untuk mencegah double click
     disable_download_buttons(ui_components, True)
     
     try:
-        # 🧹 Clear outputs sebelum mulai
         _clear_ui_outputs(ui_components)
         
-        # ✅ Validasi parameter
         if logger:
             logger.info("📋 Memvalidasi parameter download...")
         
@@ -38,25 +34,20 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
             return
         
         params = validation_result['params']
-        
-        # 🔍 Check existing dataset di struktur final
         existing_check = _check_existing_organized_dataset(ui_components)
         
         if existing_check['exists']:
-            # Show confirmation untuk overwrite
             _show_organized_dataset_confirmation(ui_components, params, existing_check)
         else:
-            # Langsung execute download
             _execute_download_confirmed(ui_components, params)
         
     except Exception as e:
         if logger:
             logger.error(f"❌ Error persiapan download: {str(e)}")
-        # Re-enable buttons jika error
         disable_download_buttons(ui_components, False)
 
 def _check_existing_organized_dataset(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Check apakah dataset sudah ada di struktur final (train/valid/test)."""
+    """Check existing organized dataset."""
     logger = ui_components.get('logger')
     env_manager = get_environment_manager()
     paths = get_paths_for_environment(
@@ -64,15 +55,9 @@ def _check_existing_organized_dataset(ui_components: Dict[str, Any]) -> Dict[str
         is_drive_mounted=env_manager.is_drive_mounted
     )
     
-    result = {
-        'exists': False,
-        'total_images': 0,
-        'splits': {},
-        'paths': paths
-    }
+    result = {'exists': False, 'total_images': 0, 'splits': {}, 'paths': paths}
     
     try:
-        # Check setiap split
         for split in ['train', 'valid', 'test']:
             split_path = Path(paths[split])
             if split_path.exists():
@@ -80,13 +65,9 @@ def _check_existing_organized_dataset(ui_components: Dict[str, Any]) -> Dict[str
                 if images_dir.exists():
                     img_files = list(images_dir.glob('*.*'))
                     if img_files:
-                        result['splits'][split] = {
-                            'images': len(img_files),
-                            'path': str(split_path)
-                        }
+                        result['splits'][split] = {'images': len(img_files), 'path': str(split_path)}
                         result['total_images'] += len(img_files)
         
-        # Dataset exists jika ada minimal 1 split dengan gambar
         result['exists'] = result['total_images'] > 0
         
         if result['exists'] and logger:
@@ -103,14 +84,12 @@ def _check_existing_organized_dataset(ui_components: Dict[str, Any]) -> Dict[str
 def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any], existing_info: Dict[str, Any]) -> None:
     """Show confirmation untuk overwrite existing organized dataset."""
     
-    # Determine storage type
     env_manager = ui_components.get('env_manager')
     if env_manager and env_manager.is_drive_mounted:
         storage_info = f"📁 Storage: Google Drive ({env_manager.drive_path})"
     else:
         storage_info = "📁 Storage: Local (akan hilang saat restart)"
     
-    # Build split info
     split_info = []
     for split, stats in existing_info['splits'].items():
         split_info.append(f"• {split}: {stats['images']} gambar")
@@ -156,11 +135,10 @@ def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: 
         display(dialog)
 
 def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
-    """Execute download dengan enhanced service setelah confirmation."""
+    """Execute download dengan dual progress integration yang benar."""
     logger = ui_components.get('logger')
     
     try:
-        # 📊 Log parameter yang akan digunakan
         if logger:
             logger.info("✅ Parameter valid - memulai download dan organisasi:")
             logger.info(f"   • Workspace: {params['workspace']}")
@@ -168,10 +146,8 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
             logger.info(f"   • Version: {params['version']}")
             logger.info("🚀 Memulai download dengan organisasi otomatis...")
         
-        # Execute download dengan enhanced service
         result = _execute_enhanced_download(ui_components, params)
         
-        # Handle hasil download
         if result.get('status') == 'success':
             if logger:
                 stats = result.get('stats', {})
@@ -182,7 +158,6 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
                 logger.info(f"📁 Storage: {storage_type}")
                 logger.info(f"📊 Total gambar: {stats.get('total_images', 0)}")
                 
-                # Log struktur final
                 if 'splits' in stats:
                     logger.info("📁 Struktur dataset:")
                     for split, split_stats in stats['splits'].items():
@@ -197,54 +172,46 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
         if logger:
             logger.error(f"❌ Error download: {str(e)}")
     finally:
-        # Re-enable buttons setelah selesai
         disable_download_buttons(ui_components, False)
 
 def _execute_enhanced_download(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute download menggunakan enhanced service."""
+    """Execute download dengan enhanced service dan dual progress."""
     try:
-        from smartcash.ui.dataset.download.services.enhanced_ui_download_service import EnhancedUIDownloadService
+        from smartcash.ui.dataset.download.services.ui_download_service import UIDownloadService
         
-        # Create enhanced service
-        download_service = EnhancedUIDownloadService(ui_components)
-        
-        # Execute download dengan dual progress tracking
+        download_service = UIDownloadService(ui_components)
         result = download_service.download_dataset(params)
         
         return result
         
     except Exception as e:
-        return {
-            'status': 'error',
-            'message': f'Enhanced download service error: {str(e)}'
-        }
+        return {'status': 'error', 'message': f'Enhanced download service error: {str(e)}'}
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear semua UI output sebelum mulai download."""
-    # Clear log output
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         ui_components['log_output'].clear_output(wait=True)
     
-    # Clear confirmation area
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
         ui_components['confirmation_area'].clear_output()
     
-    # Reset progress indicators
     _reset_progress_indicators(ui_components)
 
 def _reset_progress_indicators(ui_components: Dict[str, Any]) -> None:
-    """Reset semua progress indicators ke state awal."""
-    progress_widgets = ['progress_bar', 'current_progress']
-    for widget_key in progress_widgets:
+    """Reset dual progress indicators ke state awal."""
+    # Reset both progress bars
+    for widget_key in ['progress_bar', 'current_progress']:
         if widget_key in ui_components:
             ui_components[widget_key].value = 0
-            ui_components[widget_key].description = "Progress: 0%"
+            if widget_key == 'progress_bar':
+                ui_components[widget_key].description = "Overall: 0%"
+            else:
+                ui_components[widget_key].description = "Step: 0%"
             if hasattr(ui_components[widget_key], 'layout'):
                 ui_components[widget_key].layout.visibility = 'visible'
     
     # Reset labels
-    label_widgets = ['overall_label', 'step_label']
-    for label_key in label_widgets:
+    for label_key in ['overall_label', 'step_label']:
         if label_key in ui_components:
             ui_components[label_key].value = "Siap memulai"
             if hasattr(ui_components[label_key], 'layout'):

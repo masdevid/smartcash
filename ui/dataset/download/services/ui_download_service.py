@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/download/services/enhanced_ui_download_service.py
+File: smartcash/ui/dataset/download/services/ui_download_service.py
 Deskripsi: Updated download service dengan log suppression dan organizer integration
 """
 
@@ -9,12 +9,12 @@ import sys
 from pathlib import Path
 from typing import Dict, Any
 from smartcash.dataset.services.downloader.ui_roboflow_downloader import UIRoboflowDownloader
-from smartcash.ui.dataset.download.services.enhanced_progress_bridge import EnhancedProgressBridge
+from smartcash.ui.dataset.download.services.progress_bridge import ProgressBridge
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
-class EnhancedUIDownloadService:
+class UIDownloadService:
     """Enhanced download service dengan log suppression dan dataset organization."""
     
     def __init__(self, ui_components: Dict[str, Any]):
@@ -32,7 +32,7 @@ class EnhancedUIDownloadService:
         )
         
         # Enhanced progress bridge dengan dual tracking
-        self.progress_bridge = EnhancedProgressBridge(
+        self.progress_bridge = ProgressBridge(
             observer_manager=ui_components.get('observer_manager'),
             namespace="download"
         )

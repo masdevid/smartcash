@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/organizer/dataset_organizer.py
-Deskripsi: Fixed dataset organizer dengan gradual progress callbacks
+Deskripsi: Fixed dataset organizer dengan path validator dan val->valid mapping
 """
 
 import shutil
@@ -8,13 +8,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
+from smartcash.dataset.utils.path_validator import get_path_validator
 
 class DatasetOrganizer:
-    """Service untuk memindahkan dataset dengan gradual progress tracking."""
+    """Service untuk organize dataset dengan fixed path validation."""
     
     def __init__(self, logger=None):
         self.logger = logger or get_logger()
         self.env_manager = get_environment_manager()
+        self.path_validator = get_path_validator(logger)
         self._progress_callback: Optional[Callable] = None
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
@@ -29,24 +31,8 @@ class DatasetOrganizer:
             except Exception:
                 pass
     
-    def _get_target_paths(self) -> Dict[str, str]:
-        """Get target paths berdasarkan environment."""
-        if self.env_manager.is_colab and self.env_manager.is_drive_mounted:
-            base_path = self.env_manager.drive_path / 'data'
-        elif self.env_manager.is_colab:
-            base_path = Path('/content/data')
-        else:
-            base_path = Path('data')
-        
-        return {
-            'train': str(base_path / 'train'),
-            'valid': str(base_path / 'valid'), 
-            'test': str(base_path / 'test'),
-            'base': str(base_path)
-        }
-    
     def organize_dataset(self, source_dir: str, remove_source: bool = True) -> Dict[str, Any]:
-        """Pindahkan dataset dengan gradual progress."""
+        """Organize dataset dengan fixed path validation."""
         source_path = Path(source_dir)
         
         if not source_path.exists():
@@ -56,14 +42,16 @@ class DatasetOrganizer:
         self._notify_progress("organize", 0, 100, "Memulai organisasi dataset")
         
         try:
-            target_paths = self._get_target_paths()
+            # Get target paths dari path validator
+            target_paths = self.path_validator.get_dataset_paths()
             
-            splits_found = self._detect_splits(source_path)
+            # Detect splits dengan path validator
+            splits_found = self.path_validator.detect_available_splits(str(source_path))
             if not splits_found:
                 return {'status': 'error', 'message': 'Tidak ada split dataset yang valid ditemukan'}
             
             self.logger.info(f"📊 Splits ditemukan: {', '.join(splits_found)}")
-            self.logger.info(f"🎯 Target base: {target_paths['base']}")
+            self.logger.info(f"🎯 Target base: {target_paths['data_root']}")
             
             self._prepare_target_directories(target_paths)
             self._notify_progress("organize", 20, 100, "Menyiapkan direktori target")
@@ -72,14 +60,13 @@ class DatasetOrganizer:
             total_splits = len(splits_found)
             
             for i, split in enumerate(splits_found):
-                # Progress per split: 20% + (i * 60/total_splits) hingga 20% + ((i+1) * 60/total_splits)
                 start_progress = 20 + (i * 60 // total_splits)
                 end_progress = 20 + ((i + 1) * 60 // total_splits)
                 
                 self._notify_progress("organize", start_progress, 100, f"Memindahkan split {split}")
                 
                 split_stats = self._move_split_with_progress(
-                    source_path / split, target_paths[split], split, 
+                    source_path, split, target_paths[split], 
                     start_progress, end_progress
                 )
                 moved_stats[split] = split_stats
@@ -97,7 +84,7 @@ class DatasetOrganizer:
             self._notify_progress("organize", 100, 100, f"Organisasi selesai: {total_images} gambar")
             
             self.logger.success(
-                f"✅ Dataset berhasil diorganisir ke {target_paths['base']}\n"
+                f"✅ Dataset berhasil diorganisir ke {target_paths['data_root']}\n"
                 f"   • Total gambar: {total_images}\n"
                 f"   • Total label: {total_labels}\n"
                 f"   • Splits: {', '.join(splits_found)}"
@@ -117,23 +104,20 @@ class DatasetOrganizer:
             self.logger.error(f"❌ {error_msg}")
             return {'status': 'error', 'message': error_msg}
     
-    def _move_split_with_progress(self, source_split_path: Path, target_path_str: str, 
-                                 split_name: str, start_progress: int, end_progress: int) -> Dict[str, Any]:
-        """Move split dengan progress tracking gradual."""
+    def _move_split_with_progress(self, source_path: Path, split_name: str, 
+                                 target_path_str: str, start_progress: int, end_progress: int) -> Dict[str, Any]:
+        """Move split dengan fixed path detection."""
         target_path = Path(target_path_str)
         
         try:
-            actual_source = source_split_path
-            if not actual_source.exists() and split_name == 'valid':
-                val_path = source_split_path.parent / 'val'
-                if val_path.exists():
-                    actual_source = val_path
+            # Get actual source path menggunakan path validator
+            source_split_path = self.path_validator.get_split_path(str(source_path), split_name)
             
-            if not actual_source.exists():
-                return {'status': 'error', 'message': f'Split directory tidak ditemukan: {actual_source}'}
+            if not source_split_path.exists():
+                return {'status': 'error', 'message': f'Split directory tidak ditemukan: {source_split_path}'}
             
-            source_images = actual_source / 'images'
-            source_labels = actual_source / 'labels'
+            source_images = source_split_path / 'images'
+            source_labels = source_split_path / 'labels'
             
             image_count = len(list(source_images.glob('*.*'))) if source_images.exists() else 0
             label_count = len(list(source_labels.glob('*.txt'))) if source_labels.exists() else 0
@@ -173,7 +157,7 @@ class DatasetOrganizer:
                         self._notify_progress("organize", current_progress, 100, 
                                             f"Menyalin {split_name}: {current_file}/{total_files}")
             
-            self._copy_additional_files(actual_source, target_path)
+            self._copy_additional_files(source_split_path, target_path)
             
             self.logger.info(f"📁 Split {split_name}: {image_count} gambar, {label_count} label → {target_path}")
             
@@ -186,16 +170,6 @@ class DatasetOrganizer:
             
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
-    
-    def _detect_splits(self, source_path: Path) -> list:
-        """Deteksi splits yang tersedia di source."""
-        splits = []
-        for split_name in ['train', 'valid', 'test', 'val']:
-            split_dir = source_path / split_name
-            if split_dir.exists() and (split_dir / 'images').exists():
-                normalized_name = 'valid' if split_name == 'val' else split_name
-                splits.append(normalized_name)
-        return splits
     
     def _prepare_target_directories(self, target_paths: Dict[str, str]) -> None:
         """Siapkan direktori target."""
@@ -226,34 +200,20 @@ class DatasetOrganizer:
     
     def check_organized_dataset(self) -> Dict[str, Any]:
         """Check status dataset yang sudah diorganisir."""
-        target_paths = self._get_target_paths()
-        stats = {'total_images': 0, 'total_labels': 0, 'splits': {}}
+        target_paths = self.path_validator.get_dataset_paths()
+        validation_result = self.path_validator.validate_dataset_structure(target_paths['data_root'])
         
-        for split in ['train', 'valid', 'test']:
-            split_path = Path(target_paths[split])
-            
-            if split_path.exists():
-                images_dir = split_path / 'images'
-                labels_dir = split_path / 'labels'
-                
-                image_count = len(list(images_dir.glob('*.*'))) if images_dir.exists() else 0
-                label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
-                
-                stats['splits'][split] = {
-                    'images': image_count,
-                    'labels': label_count,
-                    'path': str(split_path)
-                }
-                
-                stats['total_images'] += image_count
-                stats['total_labels'] += label_count
-        
-        stats['is_organized'] = stats['total_images'] > 0
-        return stats
+        return {
+            'is_organized': validation_result['valid'] and validation_result['total_images'] > 0,
+            'total_images': validation_result['total_images'],
+            'total_labels': validation_result['total_labels'],
+            'splits': validation_result['splits'],
+            'issues': validation_result['issues']
+        }
     
     def cleanup_all_dataset_folders(self) -> Dict[str, Any]:
         """Cleanup dengan gradual progress tracking."""
-        target_paths = self._get_target_paths()
+        target_paths = self.path_validator.get_dataset_paths()
         
         cleanup_stats = {
             'total_files_removed': 0,
@@ -280,20 +240,15 @@ class DatasetOrganizer:
                     cleanup_stats['errors'].append(f"Error counting {split}: {str(e)}")
         
         # Count downloads folder
-        downloads_paths = [
-            Path(target_paths['base']) / 'downloads',
-            Path(target_paths['base']).parent / 'downloads'
-        ]
-        
-        for downloads_path in downloads_paths:
-            if downloads_path.exists():
-                try:
-                    file_count = sum(1 for f in downloads_path.rglob('*') if f.is_file())
-                    if file_count > 0:
-                        total_files_to_remove += file_count
-                        folders_to_clean.append(('downloads', downloads_path, file_count))
-                except Exception as e:
-                    cleanup_stats['errors'].append(f"Error counting downloads: {str(e)}")
+        downloads_path = Path(target_paths.get('downloads', f"{target_paths['data_root']}/downloads"))
+        if downloads_path.exists():
+            try:
+                file_count = sum(1 for f in downloads_path.rglob('*') if f.is_file())
+                if file_count > 0:
+                    total_files_to_remove += file_count
+                    folders_to_clean.append(('downloads', downloads_path, file_count))
+            except Exception as e:
+                cleanup_stats['errors'].append(f"Error counting downloads: {str(e)}")
         
         if total_files_to_remove == 0:
             self._notify_progress("cleanup", 100, 100, "Tidak ada file untuk dihapus")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/main_handler.py
-Deskripsi: Handler utama untuk operasi preprocessing dengan integrasi backend service dan confirmation dialog
+Deskripsi: Fixed handler utama dengan progress tracking 3-level yang konsisten
 """
 
 import asyncio
@@ -10,21 +10,25 @@ from pathlib import Path
 
 from smartcash.common.environment import get_environment_manager
 from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
+from smartcash.dataset.utils.path_validator import get_path_validator
 from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
+from smartcash.ui.components.progress_tracking import (
+    update_overall_progress, update_step_progress, update_current_progress
+)
 
 
 def setup_main_handler(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handler untuk operasi preprocessing utama."""
+    """Setup handler utama dengan fixed progress tracking."""
     logger = ui_components.get('logger')
     env_manager = env or get_environment_manager()
+    path_validator = get_path_validator(logger)
     
-    # Initialize preprocessing manager
     ui_components['preprocessing_manager'] = None
     ui_components['processing_running'] = False
     ui_components['stop_requested'] = False
     
     def get_preprocessing_config() -> Dict[str, Any]:
-        """Ambil konfigurasi preprocessing dari UI components."""
+        """Ambil konfigurasi preprocessing dari UI."""
         return {
             'img_size': _parse_resolution(ui_components['resolution_dropdown'].value),
             'normalization': ui_components['normalization_dropdown'].value,
@@ -44,49 +48,57 @@ def setup_main_handler(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
                 'data': {'dir': ui_components.get('data_dir', 'data')}
             }
             ui_components['preprocessing_manager'] = PreprocessingManager(config, logger)
-            
-            # Register progress callback
-            def progress_callback(**kwargs):
-                _update_progress_ui(**kwargs)
-            
-            ui_components['preprocessing_manager'].register_progress_callback(progress_callback)
+            ui_components['preprocessing_manager'].register_progress_callback(_update_progress_ui)
         
         return ui_components['preprocessing_manager']
     
     def _update_progress_ui(**kwargs):
-        """Update progress UI berdasarkan callback dari preprocessing manager."""
+        """Update progress UI dengan 3-level hierarchy yang konsisten."""
         try:
-            progress = kwargs.get('progress', 0)
-            total = kwargs.get('total', 100)
-            message = kwargs.get('message', 'Processing...')
-            status = kwargs.get('status', 'info')
-            step = kwargs.get('step', 0)
-            
             # Show progress container
-            if 'progress_helpers' in ui_components:
-                ui_components['progress_helpers']['show_container']()
+            if 'progress_components' in ui_components:
+                ui_components['progress_components']['show_container']()
             
-            # Update overall progress
-            if 'progress_bar' in ui_components and total > 0:
-                ui_components['progress_bar'].value = min((progress / total) * 100, 100)
+            # Extract progress data
+            split_name = kwargs.get('split', kwargs.get('step_name', ''))
+            split_step = kwargs.get('split_step', 0)
+            total_splits = kwargs.get('total_splits', 3)  # train, valid, test
             
-            # Update overall label
-            if 'overall_label' in ui_components:
-                ui_components['overall_label'].value = f"Progress: {progress}/{total} - {message}"
+            # File progress dalam split
+            file_progress = kwargs.get('current_progress', kwargs.get('progress', 0))
+            file_total = kwargs.get('current_total', kwargs.get('total', 0))
             
-            # Update step progress
-            step_name = kwargs.get('split_step', kwargs.get('step_name', ''))
-            if 'step_label' in ui_components and step_name:
-                ui_components['step_label'].value = f"Langkah: {step_name}"
+            # Overall progress calculation
+            overall_progress = kwargs.get('overall_progress', 0)
+            overall_total = kwargs.get('overall_total', 100)
+            message = kwargs.get('message', 'Processing...')
             
-            # Update current split progress
-            current_progress = kwargs.get('current_progress', 0)
-            current_total = kwargs.get('current_total', 0)
-            if current_total > 0 and 'current_progress' in ui_components:
-                ui_components['current_progress'].value = min((current_progress / current_total) * 100, 100)
+            # === UPDATE OVERALL PROGRESS (Keseluruhan preprocessing) ===
+            if overall_progress > 0 or overall_total > 0:
+                update_overall_progress(
+                    ui_components['progress_components'],
+                    overall_progress, overall_total, message
+                )
             
-            # Log ke UI output saja (tidak ke console)
+            # === UPDATE STEP PROGRESS (Per split: train, valid, test) ===
+            if split_step > 0 or total_splits > 0:
+                step_message = f"Processing {split_name}" if split_name else "Processing"
+                update_step_progress(
+                    ui_components['progress_components'],
+                    split_step, total_splits, step_message
+                )
+            
+            # === UPDATE CURRENT PROGRESS (Per file dalam split) ===
+            if file_total > 0:
+                current_message = f"{split_name} files" if split_name else "Files"
+                update_current_progress(
+                    ui_components['progress_components'],
+                    file_progress, file_total, current_message
+                )
+            
+            # Log ke UI (tanpa console spam)
             if logger and message.strip():
+                status = kwargs.get('status', 'info')
                 if status == 'success':
                     logger.success(message)
                 elif status == 'error':
@@ -97,7 +109,7 @@ def setup_main_handler(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
                     logger.info(message)
                     
         except Exception:
-            # Silent fail untuk prevent console logs
+            # Silent fail untuk prevent recursive errors
             pass
     
     def _parse_resolution(resolution_str: str) -> tuple:
@@ -109,32 +121,22 @@ def setup_main_handler(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             return (640, 640)
     
     def _check_dataset_exists() -> tuple[bool, str]:
-        """Check apakah dataset mentah exists."""
-        data_dir = Path(ui_components.get('data_dir', 'data'))
+        """Check dataset dengan path validator."""
+        data_dir = ui_components.get('data_dir', 'data')
+        validation_result = path_validator.validate_dataset_structure(data_dir)
         
-        if not data_dir.exists():
-            return False, f"Direktori dataset tidak ditemukan: {data_dir}"
+        if not validation_result['valid']:
+            return False, f"Dataset tidak ditemukan: {data_dir}"
         
-        # Check splits
-        splits = ['train', 'val', 'test']
-        missing_splits = []
+        # Check critical issues
+        critical_issues = [i for i in validation_result['issues'] if '❌' in i]
+        if critical_issues:
+            return False, f"Critical issues: {', '.join(critical_issues)}"
         
-        for split in splits:
-            split_dir = data_dir / split
-            if not split_dir.exists():
-                missing_splits.append(split)
-                continue
-            
-            images_dir = split_dir / 'images'
-            labels_dir = split_dir / 'labels'
-            
-            if not images_dir.exists() or not labels_dir.exists():
-                missing_splits.append(f"{split} (missing images/labels)")
+        if validation_result['total_images'] == 0:
+            return False, "Dataset kosong, tidak ada gambar ditemukan"
         
-        if missing_splits:
-            return False, f"Split tidak lengkap: {', '.join(missing_splits)}"
-        
-        return True, "Dataset tersedia"
+        return True, f"Dataset valid: {validation_result['total_images']} gambar"
     
     def _on_preprocess_click(b):
         """Handler untuk tombol preprocessing."""
@@ -142,32 +144,32 @@ def setup_main_handler(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             logger.warning("⚠️ Preprocessing sedang berjalan")
             return
         
-        # Check dataset exists
+        # Check dataset dengan path validator
         dataset_exists, dataset_msg = _check_dataset_exists()
         if not dataset_exists:
             logger.error(f"❌ {dataset_msg}")
             return
         
-        # Check preprocessed exists
+        # Check existing preprocessed data
         preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
         split_config = ui_components['split_dropdown'].value
         
+        # Get preprocessed validation
+        preprocessed_validation = path_validator.validate_preprocessed_structure(str(preprocessed_dir))
         existing_data = []
+        
         if split_config == 'all':
-            for split in ['train', 'val', 'test']:
-                split_path = preprocessed_dir / split
-                if split_path.exists() and len(list(split_path.glob('**/*.jpg'))) > 0:
+            for split in ['train', 'valid', 'test']:
+                if (preprocessed_validation['splits'].get(split, {}).get('processed', 0) > 0):
                     existing_data.append(split)
         else:
-            split_path = preprocessed_dir / split_config
-            if split_path.exists() and len(list(split_path.glob('**/*.jpg'))) > 0:
+            if (preprocessed_validation['splits'].get(split_config, {}).get('processed', 0) > 0):
                 existing_data.append(split_config)
         
         if existing_data:
-            # Show confirmation dialog
             existing_str = ', '.join(existing_data)
             confirmation_msg = f"""Data preprocessing sudah ada untuk: {existing_str}
-            
+
 Apakah Anda ingin memproses ulang?
 Data yang ada akan ditimpa."""
             
@@ -193,7 +195,7 @@ Data yang ada akan ditimpa."""
         ui_components['processing_running'] = True
         ui_components['stop_requested'] = False
         
-        # Disable button dan update status
+        # Update UI state
         ui_components['preprocess_button'].disabled = True
         ui_components['preprocess_button'].description = "Processing..."
         
@@ -203,6 +205,11 @@ Data yang ada akan ditimpa."""
         # Update status panel
         from smartcash.ui.components.status_panel import update_status_panel
         update_status_panel(ui_components['status_panel'], "Memulai preprocessing dataset...", "info")
+        
+        # Show progress container
+        if 'progress_components' in ui_components:
+            ui_components['progress_components']['show_container']()
+            ui_components['progress_components']['reset_all']()
         
         # Start preprocessing dalam thread
         executor = ThreadPoolExecutor(max_workers=1)
@@ -221,7 +228,6 @@ Data yang ada akan ditimpa."""
                 finally:
                     executor.shutdown(wait=False)
             else:
-                # Check again in 1 second
                 import threading
                 threading.Timer(1.0, check_completion).start()
         
@@ -259,17 +265,26 @@ Data yang ada akan ditimpa."""
             success_msg = f"✅ Preprocessing selesai: {total_images} gambar dalam {processing_time:.1f} detik"
             logger.success(success_msg)
             
+            # Update overall progress to 100%
+            if 'progress_components' in ui_components:
+                update_overall_progress(
+                    ui_components['progress_components'],
+                    100, 100, "Preprocessing selesai"
+                )
+            
+            from smartcash.ui.components.status_panel import update_status_panel
             update_status_panel(ui_components['status_panel'], success_msg, "success")
         else:
             error_msg = "❌ Preprocessing gagal"
             logger.error(error_msg)
             update_status_panel(ui_components['status_panel'], error_msg, "error")
         
-        # Reset progress
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 0
-        if 'overall_label' in ui_components:
-            ui_components['overall_label'].value = "Siap memulai preprocessing"
+        # Hide progress setelah delay
+        import threading
+        def hide_progress():
+            if 'progress_components' in ui_components:
+                ui_components['progress_components']['hide_container']()
+        threading.Timer(3.0, hide_progress).start()
     
     def _on_preprocessing_error(error):
         """Handler saat preprocessing error."""
@@ -279,11 +294,14 @@ Data yang ada akan ditimpa."""
         
         error_msg = f"❌ Error preprocessing: {str(error)}"
         logger.error(error_msg)
+        
+        from smartcash.ui.components.status_panel import update_status_panel
         update_status_panel(ui_components['status_panel'], error_msg, "error")
         
         # Reset progress
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 0
+        if 'progress_components' in ui_components:
+            ui_components['progress_components']['reset_all']()
+            ui_components['progress_components']['hide_container']()
     
     def _show_dialog(dialog):
         """Show confirmation dialog."""

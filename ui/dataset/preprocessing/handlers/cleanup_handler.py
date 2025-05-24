@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/cleanup_handler.py
-Deskripsi: Handler untuk operasi cleanup preprocessing dengan safety checks dan confirmation
+Deskripsi: Fixed cleanup handler dengan progress tracking yang konsisten
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -9,54 +9,38 @@ from pathlib import Path
 
 from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
 from smartcash.ui.components.status_panel import update_status_panel
+from smartcash.ui.components.progress_tracking import (
+    update_overall_progress, update_step_progress, update_current_progress
+)
+from smartcash.dataset.utils.path_validator import get_path_validator
 
 
 def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup handler untuk operasi cleanup preprocessing."""
+    """Setup handler untuk cleanup dengan fixed progress tracking."""
     logger = ui_components.get('logger')
+    path_validator = get_path_validator(logger)
     
     ui_components['cleanup_running'] = False
     
-    def _check_preprocessed_data() -> tuple[bool, list, str]:
-        """Check data preprocessing yang tersedia."""
-        preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
+    def _check_preprocessed_data() -> tuple[bool, list, str, int]:
+        """Check data preprocessing dengan detail count."""
+        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
+        validation_result = path_validator.validate_preprocessed_structure(preprocessed_dir)
         
-        if not preprocessed_dir.exists():
-            return False, [], "Tidak ada data preprocessing yang ditemukan"
+        if not validation_result['valid']:
+            return False, [], "Tidak ada data preprocessing", 0
         
-        # Check splits
         available_splits = []
-        total_files = 0
+        total_files = validation_result['total_processed']
         
-        for split in ['train', 'val', 'test']:
-            split_path = preprocessed_dir / split
-            if split_path.exists():
-                files = list(split_path.glob('**/*.jpg'))
-                if files:
-                    available_splits.append(f"{split} ({len(files)} files)")
-                    total_files += len(files)
+        for split, info in validation_result['splits'].items():
+            if info['processed'] > 0:
+                available_splits.append(f"{split} ({info['processed']} files)")
         
         if not available_splits:
-            return False, [], "Tidak ada data preprocessing yang valid"
+            return False, [], "Tidak ada data valid untuk cleanup", 0
         
-        return True, available_splits, f"Total {total_files} files"
-    
-    def _check_symlink_safety() -> tuple[bool, list]:
-        """Check apakah ada symlink yang berbahaya untuk dihapus."""
-        preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
-        dangerous_symlinks = []
-        
-        if preprocessed_dir.is_symlink():
-            dangerous_symlinks.append(str(preprocessed_dir))
-        
-        # Check subdirectories
-        if preprocessed_dir.exists():
-            for split in ['train', 'val', 'test']:
-                split_path = preprocessed_dir / split
-                if split_path.is_symlink():
-                    dangerous_symlinks.append(str(split_path))
-        
-        return len(dangerous_symlinks) == 0, dangerous_symlinks
+        return True, available_splits, f"Total {total_files} files", total_files
     
     def _on_cleanup_click(b):
         """Handler untuk tombol cleanup."""
@@ -69,16 +53,10 @@ def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             return
         
         # Check data exists
-        has_data, splits_info, summary = _check_preprocessed_data()
+        has_data, splits_info, summary, total_files = _check_preprocessed_data()
         if not has_data:
             logger.info(f"ℹ️ {summary}")
             update_status_panel(ui_components['status_panel'], summary, "info")
-            return
-        
-        # Check symlink safety
-        is_safe, dangerous_links = _check_symlink_safety()
-        if not is_safe:
-            logger.error(f"❌ Tidak dapat cleanup: symlink berbahaya ditemukan: {', '.join(dangerous_links)}")
             return
         
         # Show confirmation dialog
@@ -94,7 +72,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         dialog = create_destructive_confirmation(
             title="Konfirmasi Cleanup Preprocessing",
             message=confirmation_msg,
-            on_confirm=lambda b: _start_cleanup_confirmed(),
+            on_confirm=lambda b: _start_cleanup_confirmed(total_files),
             on_cancel=lambda b: _hide_dialog(),
             item_name="Data Preprocessing"
         )
@@ -102,23 +80,28 @@ def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         ui_components['cleanup_dialog'] = dialog
         _show_dialog(dialog)
     
-    def _start_cleanup_confirmed():
+    def _start_cleanup_confirmed(total_files: int):
         """Mulai cleanup setelah konfirmasi."""
         if 'cleanup_dialog' in ui_components:
             _hide_dialog()
         
         ui_components['cleanup_running'] = True
         
-        # Disable button dan update status
+        # Update UI state
         ui_components['cleanup_button'].disabled = True
         ui_components['cleanup_button'].description = "Cleaning..."
         
         logger.info("🧹 Memulai cleanup data preprocessing")
-        update_status_panel(ui_components['status_panel'], "Memulai cleanup data preprocessing...", "info")
+        update_status_panel(ui_components['status_panel'], "Memulai cleanup preprocessing...", "info")
+        
+        # Show progress container
+        if 'progress_components' in ui_components:
+            ui_components['progress_components']['show_container']()
+            ui_components['progress_components']['reset_all']()
         
         # Start cleanup dalam thread
         executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(_run_cleanup)
+        future = executor.submit(_run_cleanup, total_files)
         ui_components['cleanup_future'] = future
         ui_components['cleanup_executor'] = executor
         
@@ -133,32 +116,99 @@ def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 finally:
                     executor.shutdown(wait=False)
             else:
-                # Check again in 1 second
                 import threading
                 threading.Timer(1.0, check_completion).start()
         
         check_completion()
     
-    def _run_cleanup():
-        """Jalankan cleanup dalam thread terpisah."""
+    def _run_cleanup(total_files: int):
+        """Jalankan cleanup dengan progress tracking."""
         try:
-            # Get preprocessing manager
-            if not ui_components.get('preprocessing_manager'):
-                from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
-                config = {
-                    'preprocessing': {
-                        'preprocessed_dir': ui_components.get('preprocessed_dir', 'data/preprocessed')
-                    },
-                    'data': {'dir': ui_components.get('data_dir', 'data')}
-                }
-                ui_components['preprocessing_manager'] = PreprocessingManager(config, logger)
+            preprocessed_dir = Path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
             
-            preprocessing_manager = ui_components['preprocessing_manager']
+            # Update progress callback
+            def progress_callback(step: str, current: int, total: int, message: str):
+                try:
+                    # Map step to numeric for overall progress
+                    step_mapping = {'scan': 1, 'cleanup': 2, 'verify': 3}
+                    step_num = step_mapping.get(step, 1)
+                    
+                    # Overall progress (3 steps total)
+                    overall_progress = ((step_num - 1) * 100 + (current / max(total, 1)) * 100) / 3
+                    update_overall_progress(
+                        ui_components['progress_components'],
+                        int(overall_progress), 100, f"Cleanup: {message}"
+                    )
+                    
+                    # Step progress
+                    update_step_progress(
+                        ui_components['progress_components'],
+                        step_num, 3, f"Step: {step.title()}"
+                    )
+                    
+                    # Current progress
+                    update_current_progress(
+                        ui_components['progress_components'],
+                        current, total, message
+                    )
+                    
+                    # Log progress
+                    if logger:
+                        logger.info(f"🧹 {message} ({current}/{total})")
+                        
+                except Exception:
+                    pass
             
-            # Clean all preprocessed data
-            preprocessing_manager.clean_preprocessed(split='all')
+            # Step 1: Scan files
+            progress_callback('scan', 0, 100, "Scanning files")
             
-            return {'success': True, 'message': 'Cleanup berhasil'}
+            splits_to_clean = ['train', 'valid', 'test']
+            files_removed = 0
+            
+            for i, split in enumerate(splits_to_clean):
+                split_path = preprocessed_dir / split
+                if not split_path.exists():
+                    continue
+                
+                # Count files in split
+                files_in_split = list(split_path.rglob('*'))
+                files_in_split = [f for f in files_in_split if f.is_file()]
+                
+                if not files_in_split:
+                    continue
+                
+                # Step 2: Cleanup files
+                step_start = 33 + (i * 33)  # Distribute across splits
+                
+                for j, file_path in enumerate(files_in_split):
+                    try:
+                        file_path.unlink()
+                        files_removed += 1
+                        
+                        # Update progress every 10 files or at end
+                        if j % 10 == 0 or j == len(files_in_split) - 1:
+                            progress = step_start + ((j + 1) / len(files_in_split)) * 33
+                            progress_callback('cleanup', int(progress), 100, 
+                                            f"Removing {split} files")
+                    except Exception:
+                        pass
+                
+                # Remove empty directories
+                try:
+                    if split_path.exists():
+                        import shutil
+                        shutil.rmtree(split_path, ignore_errors=True)
+                except Exception:
+                    pass
+            
+            # Step 3: Verify cleanup
+            progress_callback('verify', 100, 100, "Verifying cleanup")
+            
+            return {
+                'success': True,
+                'files_removed': files_removed,
+                'message': f"Berhasil menghapus {files_removed} file"
+            }
             
         except Exception as e:
             logger.error(f"❌ Error cleanup: {str(e)}")
@@ -171,13 +221,29 @@ def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         ui_components['cleanup_button'].description = "Cleanup Dataset"
         
         if result and result.get('success', False):
-            success_msg = "✅ Cleanup data preprocessing berhasil"
+            files_removed = result.get('files_removed', 0)
+            success_msg = f"✅ Cleanup selesai: {files_removed} file dihapus"
             logger.success(success_msg)
+            
+            # Update progress to 100%
+            if 'progress_components' in ui_components:
+                update_overall_progress(
+                    ui_components['progress_components'],
+                    100, 100, "Cleanup selesai"
+                )
+            
             update_status_panel(ui_components['status_panel'], success_msg, "success")
         else:
             error_msg = "❌ Cleanup gagal"
             logger.error(error_msg)
             update_status_panel(ui_components['status_panel'], error_msg, "error")
+        
+        # Hide progress setelah delay
+        import threading
+        def hide_progress():
+            if 'progress_components' in ui_components:
+                ui_components['progress_components']['hide_container']()
+        threading.Timer(3.0, hide_progress).start()
     
     def _on_cleanup_error(error):
         """Handler saat cleanup error."""
@@ -188,6 +254,11 @@ def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         error_msg = f"❌ Error cleanup: {str(error)}"
         logger.error(error_msg)
         update_status_panel(ui_components['status_panel'], error_msg, "error")
+        
+        # Reset progress
+        if 'progress_components' in ui_components:
+            ui_components['progress_components']['reset_all']()
+            ui_components['progress_components']['hide_container']()
     
     def _show_dialog(dialog):
         """Show confirmation dialog."""

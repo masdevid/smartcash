@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/download_action.py
-Deskripsi: Fixed download action dengan explicit progress bar updates
+Deskripsi: Enhanced download action dengan dynamic progress control
 """
 
 from typing import Dict, Any
@@ -14,25 +14,23 @@ from smartcash.common.environment import get_environment_manager
 from IPython.display import display
 
 def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi download dengan explicit progress updates."""
+    """Eksekusi download dengan enhanced progress control."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
     with button_manager.operation_context('download'):
         try:
-            if logger:
-                logger.info("🚀 Memulai proses download")
+            logger and logger.info("🚀 Memulai proses download")
             
             _clear_ui_outputs(ui_components)
-            _force_show_progress_bars(ui_components)  # Force show progress bars
+            _setup_download_progress(ui_components)
             
             # Progress: 10% - Validation
             _update_download_progress(ui_components, 10, "Memvalidasi parameter...")
             
             validation_result = _robust_validate_params(ui_components, logger)
             if not validation_result['valid']:
-                if logger:
-                    logger.error(f"❌ Validasi gagal: {validation_result['message']}")
+                logger and logger.error(f"❌ Validasi gagal: {validation_result['message']}")
                 raise Exception(validation_result['message'])
             
             # Progress: 20% - Check existing
@@ -47,99 +45,44 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
                 _execute_download_confirmed(ui_components, params)
             
         except Exception as e:
-            _update_download_progress(ui_components, 0, f"❌ Error: {str(e)}")
-            if logger:
-                logger.error(f"❌ Error download: {str(e)}")
+            _error_download_progress(ui_components, f"Error: {str(e)}")
+            logger and logger.error(f"❌ Error download: {str(e)}")
             raise
 
-def _force_show_progress_bars(ui_components: Dict[str, Any]) -> None:
-    """Force show semua progress bars dengan explicit updates."""
-    try:
-        # Show container
-        if 'progress_container' in ui_components:
-            container = ui_components['progress_container']
-            if isinstance(container, dict) and 'show_container' in container:
-                container['show_container']()
-            elif hasattr(container, 'layout'):
-                container.layout.visibility = 'visible'
-                container.layout.display = 'block'
-        
-        # Force show progress widgets
-        progress_widgets = ['overall_progress', 'progress_bar', 'step_progress']
-        for widget_key in progress_widgets:
-            if widget_key in ui_components and ui_components[widget_key]:
-                widget = ui_components[widget_key]
-                if hasattr(widget, 'layout'):
-                    widget.layout.visibility = 'visible'
-                    widget.layout.display = 'block'
-                    widget.layout.width = '100%'
-                    widget.layout.height = '25px' if 'overall' in widget_key or widget_key == 'progress_bar' else '20px'
-                
-                if hasattr(widget, 'value'):
-                    widget.value = 0
-                
-                if hasattr(widget, 'bar_style'):
-                    widget.bar_style = 'info'
-                    
-    except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"📊 Error showing progress bars: {str(e)}")
+def _setup_download_progress(ui_components: Dict[str, Any]) -> None:
+    """Setup progress untuk download operation."""
+    if 'show_for_operation' in ui_components:
+        ui_components['show_for_operation']('download')
 
 def _update_download_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update download progress dengan explicit widget updates."""
-    try:
-        # Update overall progress bar
-        if 'overall_progress' in ui_components and ui_components['overall_progress']:
-            widget = ui_components['overall_progress']
-            widget.value = progress
-            widget.layout.visibility = 'visible'
-            widget.layout.display = 'block'
-            if hasattr(widget, 'bar_style'):
-                if progress >= 100:
-                    widget.bar_style = 'success'
-                elif progress > 0:
-                    widget.bar_style = 'info'
-        
-        # Update progress_bar alias
-        if 'progress_bar' in ui_components and ui_components['progress_bar']:
-            widget = ui_components['progress_bar']
-            widget.value = progress
-            widget.layout.visibility = 'visible'
-            widget.layout.display = 'block'
-            if hasattr(widget, 'bar_style'):
-                if progress >= 100:
-                    widget.bar_style = 'success'
-                elif progress > 0:
-                    widget.bar_style = 'info'
-        
-        # Update label
-        if 'overall_label' in ui_components and ui_components['overall_label']:
-            ui_components['overall_label'].value = f"<div style='color: #495057; font-weight: bold;'>📊 {message} ({progress}%)</div>"
-            
-    except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"📊 Error updating progress: {str(e)}")
+    """Update download progress dengan enhanced control."""
+    if 'update_progress' in ui_components:
+        # Update overall progress dengan auto color
+        color = 'success' if progress >= 100 else 'info' if progress > 0 else ''
+        ui_components['update_progress']('overall', progress, f"📊 {message} ({progress}%)", color)
+
+def _error_download_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Set error state untuk download progress."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](message)
+
+def _complete_download_progress(ui_components: Dict[str, Any], message: str = "Download selesai!") -> None:
+    """Complete download progress."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](message)
 
 def _robust_validate_params(ui_components: Dict[str, Any], logger) -> Dict[str, Any]:
-    """Robust parameter validation."""
+    """Robust parameter validation dengan progress update."""
     try:
         params = {}
         required_fields = ['workspace', 'project', 'version', 'api_key', 'output_dir']
         
         for field in required_fields:
-            try:
-                value = _ultra_safe_get_value(ui_components, field, logger)
-                params[field] = value
-            except Exception as e:
-                params[field] = ''
+            value = _ultra_safe_get_value(ui_components, field, logger)
+            params[field] = value
         
         if not params['api_key']:
-            try:
-                params['api_key'] = _get_api_key_from_sources()
-            except Exception:
-                pass
+            params['api_key'] = _get_api_key_from_sources()
         
         missing_fields = [field for field in required_fields if not params[field]]
         
@@ -184,10 +127,7 @@ def _ultra_safe_get_value(ui_components: Dict[str, Any], key: str, logger, defau
             return default
         
         value = getattr(component, 'value', default)
-        if value is None:
-            return default
-        
-        return str(value).strip()
+        return str(value).strip() if value is not None else default
         
     except Exception:
         return default
@@ -265,7 +205,6 @@ def _get_api_key_from_sources() -> str:
 def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any], 
                                        existing_info: Dict[str, Any], button_manager) -> None:
     """Show confirmation dengan progress reset."""
-    # Reset progress untuk confirmation
     _update_download_progress(ui_components, 0, "Menunggu konfirmasi...")
     
     env_manager = ui_components.get('env_manager')
@@ -287,16 +226,14 @@ def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: 
             _execute_download_confirmed(ui_components, params)
         except Exception as e:
             logger = ui_components.get('logger')
-            if logger:
-                logger.error(f"❌ Download error: {str(e)}")
+            logger and logger.error(f"❌ Download error: {str(e)}")
             raise
     
     def on_cancel(b):
         ui_components['confirmation_area'].clear_output()
         _update_download_progress(ui_components, 0, "Download dibatalkan")
         logger = ui_components.get('logger')
-        if logger:
-            logger.info("❌ Download dibatalkan")
+        logger and logger.info("❌ Download dibatalkan")
         raise Exception("Download dibatalkan oleh user")
     
     dialog = create_confirmation_dialog(
@@ -313,10 +250,9 @@ def _show_organized_dataset_confirmation(ui_components: Dict[str, Any], params: 
         display(dialog)
 
 def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
-    """Execute download dengan progress tracking."""
+    """Execute download dengan enhanced progress tracking."""
     logger = ui_components.get('logger')
     
-    # Progress: 30% - Starting download
     _update_download_progress(ui_components, 30, "Memulai download...")
     
     if logger:
@@ -329,7 +265,7 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
     result = _execute_enhanced_download_with_progress(ui_components, params)
     
     if result.get('status') == 'success':
-        _update_download_progress(ui_components, 100, "Download selesai!")
+        _complete_download_progress(ui_components, "Download selesai!")
         if logger:
             stats = result.get('stats', {})
             duration = result.get('duration', 0)
@@ -340,21 +276,19 @@ def _execute_download_confirmed(ui_components: Dict[str, Any], params: Dict[str,
             logger.info(f"📊 Total gambar: {stats.get('total_images', 0)}")
     else:
         error_msg = result.get('message', 'Unknown error')
-        _update_download_progress(ui_components, 0, f"❌ Error: {error_msg}")
+        _error_download_progress(ui_components, f"Error: {error_msg}")
         if logger:
             logger.error(f"❌ Download gagal: {error_msg}")
         raise Exception(error_msg)
 
 def _execute_enhanced_download_with_progress(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute download dengan progress updates."""
+    """Execute download dengan enhanced progress updates."""
     try:
-        # Progress: 40% - Initialize service
         _update_download_progress(ui_components, 40, "Menginisialisasi service...")
         
         from smartcash.ui.dataset.download.services.ui_download_service import UIDownloadService
         download_service = UIDownloadService(ui_components)
         
-        # Progress: 50% - Start download
         _update_download_progress(ui_components, 50, "Mengunduh dataset...")
         
         # Setup progress callback untuk service
@@ -362,9 +296,14 @@ def _execute_enhanced_download_with_progress(ui_components: Dict[str, Any], para
             if stage == 'download':
                 base_progress = 50 + int((progress / 100) * 30)  # 50-80%
                 _update_download_progress(ui_components, base_progress, f"Download: {message}")
+                # Update step progress untuk detail
+                if 'update_progress' in ui_components:
+                    ui_components['update_progress']('step', progress, message, 'info')
             elif stage == 'organize':
                 base_progress = 80 + int((progress / 100) * 15)  # 80-95%
                 _update_download_progress(ui_components, base_progress, f"Organisir: {message}")
+                if 'update_progress' in ui_components:
+                    ui_components['update_progress']('step', progress, message, 'info')
         
         # Execute dengan callback
         result = download_service.download_dataset(params)

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/check_action.py
-Deskripsi: Fixed check action dengan explicit progress bar updates
+Deskripsi: Enhanced check action dengan dynamic progress control
 """
 
 from typing import Dict, Any
@@ -10,114 +10,53 @@ from smartcash.common.environment import get_environment_manager
 from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
 
 def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Check dataset dengan explicit progress bar updates."""
+    """Check dataset dengan enhanced progress control."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
     with button_manager.operation_context('check'):
         try:
-            if logger:
-                logger.info("🔍 Memeriksa status dataset")
+            logger and logger.info("🔍 Memeriksa status dataset")
             
             _clear_ui_outputs(ui_components)
-            _force_show_check_progress(ui_components)
+            _setup_check_progress(ui_components)
             
-            # Progress updates dengan explicit widget updates
-            _update_check_progress_bar(ui_components, 20, "Memeriksa struktur dataset...")
-            
+            _update_check_progress(ui_components, 20, "Memeriksa struktur dataset...")
             final_stats = _check_final_dataset_structure(ui_components)
-            _update_check_progress_bar(ui_components, 60, "Menganalisis hasil...")
             
+            _update_check_progress(ui_components, 60, "Menganalisis hasil...")
             downloads_stats = _check_downloads_folder(ui_components)
-            _update_check_progress_bar(ui_components, 80, "Menyelesaikan pengecekan...")
             
+            _update_check_progress(ui_components, 80, "Menyelesaikan pengecekan...")
             _display_comprehensive_results(ui_components, final_stats, downloads_stats)
-            _update_check_progress_bar(ui_components, 100, "Pengecekan selesai")
+            
+            _complete_check_progress(ui_components, "Pengecekan selesai")
             
         except Exception as e:
-            _update_check_progress_bar(ui_components, 0, f"❌ Error: {str(e)}")
-            if logger:
-                logger.error(f"❌ Error check: {str(e)}")
+            _error_check_progress(ui_components, f"Error: {str(e)}")
+            logger and logger.error(f"❌ Error check: {str(e)}")
             raise
 
-def _force_show_check_progress(ui_components: Dict[str, Any]) -> None:
-    """Force show progress bar untuk check operation."""
-    try:
-        # Show container
-        if 'progress_container' in ui_components:
-            container = ui_components['progress_container']
-            if isinstance(container, dict) and 'show_container' in container:
-                container['show_container']()
-            elif hasattr(container, 'layout'):
-                container.layout.visibility = 'visible'
-                container.layout.display = 'block'
-        
-        # Show only overall progress untuk check
-        progress_widgets = ['overall_progress', 'progress_bar']
-        for widget_key in progress_widgets:
-            if widget_key in ui_components and ui_components[widget_key]:
-                widget = ui_components[widget_key]
-                if hasattr(widget, 'layout'):
-                    widget.layout.visibility = 'visible'
-                    widget.layout.display = 'block'
-                    widget.layout.width = '100%'
-                    widget.layout.height = '25px'
-                
-                if hasattr(widget, 'value'):
-                    widget.value = 0
-                
-                if hasattr(widget, 'bar_style'):
-                    widget.bar_style = 'info'
-        
-        # Hide step dan current progress untuk check
-        hide_widgets = ['step_progress', 'step_label', 'current_progress', 'current_label']
-        for widget_key in hide_widgets:
-            if widget_key in ui_components and ui_components[widget_key]:
-                widget = ui_components[widget_key]
-                if hasattr(widget, 'layout'):
-                    widget.layout.visibility = 'hidden'
-                    widget.layout.display = 'none'
-                    
-    except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"📊 Error showing check progress: {str(e)}")
+def _setup_check_progress(ui_components: Dict[str, Any]) -> None:
+    """Setup progress untuk check operation."""
+    if 'show_for_operation' in ui_components:
+        ui_components['show_for_operation']('check')
 
-def _update_check_progress_bar(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update progress bar dengan explicit widget updates."""
-    try:
-        # Update overall progress bar
-        if 'overall_progress' in ui_components and ui_components['overall_progress']:
-            widget = ui_components['overall_progress']
-            widget.value = progress
-            widget.layout.visibility = 'visible'
-            widget.layout.display = 'block'
-            if hasattr(widget, 'bar_style'):
-                if progress >= 100:
-                    widget.bar_style = 'success'
-                elif progress > 0:
-                    widget.bar_style = 'info'
-        
-        # Update progress_bar alias
-        if 'progress_bar' in ui_components and ui_components['progress_bar']:
-            widget = ui_components['progress_bar']
-            widget.value = progress
-            widget.layout.visibility = 'visible'
-            widget.layout.display = 'block'
-            if hasattr(widget, 'bar_style'):
-                if progress >= 100:
-                    widget.bar_style = 'success'
-                elif progress > 0:
-                    widget.bar_style = 'info'
-        
-        # Update label
-        if 'overall_label' in ui_components and ui_components['overall_label']:
-            ui_components['overall_label'].value = f"<div style='color: #495057; font-weight: bold;'>🔍 {message} ({progress}%)</div>"
-            
-    except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"📊 Error updating check progress: {str(e)}")
+def _update_check_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
+    """Update check progress dengan enhanced control."""
+    if 'update_progress' in ui_components:
+        color = 'success' if progress >= 100 else 'info' if progress > 0 else ''
+        ui_components['update_progress']('overall', progress, f"🔍 {message} ({progress}%)", color)
+
+def _complete_check_progress(ui_components: Dict[str, Any], message: str = "Pengecekan selesai") -> None:
+    """Complete check progress."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](message)
+
+def _error_check_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Set error state untuk check progress."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](message)
 
 def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Check struktur final dataset."""

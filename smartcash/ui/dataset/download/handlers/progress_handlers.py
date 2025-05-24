@@ -1,81 +1,53 @@
 """
 File: smartcash/ui/dataset/download/handlers/progress_handlers.py
-Deskripsi: Fixed progress handlers dengan proper progress_tracking integration
+Deskripsi: Enhanced progress handlers dengan integration ke progress_tracking yang sudah diperbaiki
 """
 
-from typing import Dict, Any, Callable
+from typing import Dict, Any
 
 def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup progress tracking handlers dengan proper integration ke progress_tracking."""
+    """Setup enhanced progress tracking handlers dengan dynamic controls."""
     
     logger = ui_components.get('logger')
     
     try:
-        # Ensure progress_container exists dan visible untuk testing
-        _ensure_progress_container_ready(ui_components)
+        # Import dan setup enhanced progress tracking
+        from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+        
+        # Jika belum ada progress container, buat yang baru
+        if 'progress_container' not in ui_components:
+            progress_components = create_progress_tracking_container()
+            ui_components.update(progress_components)
+            logger and logger.info("📊 Enhanced progress tracking container created")
         
         # Setup observer system untuk progress events
         _setup_progress_observers(ui_components)
         
-        # Register manual control functions yang sesuai dengan progress_tracking
+        # Register enhanced control functions
         ui_components['_progress_controls'] = {
-            'start': lambda msg: start_progress(ui_components, msg),
-            'update_overall': lambda prog, total, msg: update_overall_progress(ui_components, prog, total, msg),
-            'update_step': lambda step, total, name: update_step_progress(ui_components, step, total, name),
-            'update_current': lambda curr, total, msg: update_current_progress(ui_components, curr, total, msg),
-            'complete': lambda msg: complete_progress(ui_components, msg),
-            'error': lambda msg: error_progress(ui_components, msg)
+            'start': lambda msg: start_enhanced_progress(ui_components, msg),
+            'update_overall': lambda prog, total, msg: update_overall_progress_enhanced(ui_components, prog, total, msg),
+            'update_step': lambda step, total, name: update_step_progress_enhanced(ui_components, step, total, name),
+            'update_current': lambda curr, total, msg: update_current_progress_enhanced(ui_components, curr, total, msg),
+            'complete': lambda msg: complete_enhanced_progress(ui_components, msg),
+            'error': lambda msg: error_enhanced_progress(ui_components, msg)
         }
         
         ui_components['progress_setup'] = True
         
-        if logger:
-            logger.info("📊 Progress handlers ready")
+        logger and logger.info("📊 Enhanced progress handlers ready")
         
     except Exception as e:
-        if logger:
-            logger.error(f"❌ Error setup progress: {str(e)}")
+        logger and logger.error(f"❌ Error setup enhanced progress: {str(e)}")
     
     return ui_components
 
-def _ensure_progress_container_ready(ui_components: Dict[str, Any]) -> None:
-    """Ensure progress container exists dan dalam state yang tepat."""
-    try:
-        # Check apakah progress_container ada
-        if 'progress_container' not in ui_components:
-            if ui_components.get('logger'):
-                ui_components['logger'].warning("⚠️ progress_container tidak ditemukan")
-            return
-        
-        container = ui_components['progress_container']
-        
-        # Jika container adalah dict dengan method show_container
-        if isinstance(container, dict):
-            if 'show_container' in container and 'hide_container' in container:
-                # Ready - ini dari progress_tracking.py
-                pass
-            else:
-                if ui_components.get('logger'):
-                    ui_components['logger'].warning("⚠️ progress_container dict tidak memiliki show/hide methods")
-        
-        # Jika container adalah widget
-        elif hasattr(container, 'layout'):
-            # Ready - widget biasa
-            pass
-        else:
-            if ui_components.get('logger'):
-                ui_components['logger'].warning("⚠️ progress_container format tidak dikenali")
-                
-    except Exception as e:
-        if ui_components.get('logger'):
-            ui_components['logger'].debug(f"📦 Error checking progress container: {str(e)}")
-
 def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
-    """Setup observers untuk progress events."""
+    """Setup observers untuk progress events dengan enhanced controls."""
     try:
         from smartcash.components.observer import EventDispatcher
         
-        progress_observer = _create_progress_observer(ui_components)
+        progress_observer = _create_enhanced_progress_observer(ui_components)
         
         download_events = [
             'DOWNLOAD_START', 'DOWNLOAD_PROGRESS', 'DOWNLOAD_COMPLETE', 'DOWNLOAD_ERROR'
@@ -91,18 +63,17 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
         
     except Exception as e:
         logger = ui_components.get('logger')
-        if logger:
-            logger.warning(f"⚠️ Observer setup error: {str(e)}")
+        logger and logger.warning(f"⚠️ Enhanced observer setup error: {str(e)}")
 
-def _create_progress_observer(ui_components: Dict[str, Any]):
-    """Create observer untuk progress events."""
+def _create_enhanced_progress_observer(ui_components: Dict[str, Any]):
+    """Create enhanced observer untuk progress events."""
     
-    class ProgressObserver:
+    class EnhancedProgressObserver:
         def __init__(self, ui_components):
             self.ui_components = ui_components
         
         def update(self, event_type: str, sender, **kwargs):
-            """Handle progress events."""
+            """Handle progress events dengan enhanced controls."""
             try:
                 if event_type == 'DOWNLOAD_START':
                     message = kwargs.get('message', 'Memulai proses')
@@ -115,7 +86,7 @@ def _create_progress_observer(ui_components: Dict[str, Any]):
                         step_name = kwargs.get('step_name', 'Processing')
                         current_step = kwargs.get('current_step', 1)
                         total_steps = kwargs.get('total_steps', 3)
-                        self.update_step_progress(current_step, total_steps, step_name)
+                        self.update_step_progress(current_step, total_steps, step_name, step_progress, step_message)
                     elif 'current_progress' in kwargs:
                         current_progress = kwargs.get('current_progress', 0)
                         current_message = kwargs.get('message', '')
@@ -137,132 +108,88 @@ def _create_progress_observer(ui_components: Dict[str, Any]):
                 pass
         
         def start_progress(self, message: str) -> None:
-            start_progress(self.ui_components, message)
+            start_enhanced_progress(self.ui_components, message)
         
         def update_overall_progress(self, progress: int, total: int, message: str) -> None:
-            update_overall_progress(self.ui_components, progress, total, message)
+            update_overall_progress_enhanced(self.ui_components, progress, total, message)
         
-        def update_step_progress(self, step: int, total_steps: int, step_name: str = "Step") -> None:
-            update_step_progress(self.ui_components, step, total_steps, step_name)
+        def update_step_progress(self, step: int, total_steps: int, step_name: str, progress: int = None, message: str = None) -> None:
+            update_step_progress_enhanced(self.ui_components, step, total_steps, step_name, progress, message)
             
         def update_current_progress(self, current: int, total: int, message: str) -> None:
-            update_current_progress(self.ui_components, current, total, message)
+            update_current_progress_enhanced(self.ui_components, current, total, message)
         
         def complete_progress(self, message: str) -> None:
-            complete_progress(self.ui_components, message)
+            complete_enhanced_progress(self.ui_components, message)
         
         def error_progress(self, message: str) -> None:
-            error_progress(self.ui_components, message)
+            error_enhanced_progress(self.ui_components, message)
     
-    return ProgressObserver(ui_components)
+    return EnhancedProgressObserver(ui_components)
 
-# Manual control functions yang match dengan progress_tracking.py structure
-def start_progress(ui_components: Dict[str, Any], message: str) -> None:
-    """Start progress tracking dengan proper container showing."""
-    # Show progress container menggunakan method dari progress_tracking
-    if 'progress_container' in ui_components:
-        container = ui_components['progress_container']
-        if isinstance(container, dict) and 'show_container' in container:
-            container['show_container']()
-        elif hasattr(container, 'layout'):
-            container.layout.visibility = 'visible'
-            container.layout.display = 'block'
+# Enhanced control functions yang menggunakan dynamic progress controls
+def start_enhanced_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Start progress dengan enhanced controls."""
+    if 'show_container' in ui_components:
+        ui_components['show_container']()
     
-    # Reset semua progress menggunakan progress_tracking functions
-    try:
-        from smartcash.ui.components.progress_tracking import (
-            update_overall_progress, update_step_progress, update_current_progress
-        )
-        
-        # Start dengan progress 0 dan message
-        update_overall_progress(ui_components, 0, 100, message)
-        update_step_progress(ui_components, 0, 3, "Siap memulai")  
-        update_current_progress(ui_components, 0, 100, "")
-        
-    except ImportError:
-        # Fallback manual update
-        _update_progress_widgets(ui_components, overall=0, step=0, current=0,
-                               overall_msg=message, step_msg="Siap memulai", current_msg="-")
+    if 'reset_all' in ui_components:
+        ui_components['reset_all']()
+    
+    if 'update_progress' in ui_components:
+        ui_components['update_progress']('overall', 0, message, 'info')
 
-def update_overall_progress(ui_components: Dict[str, Any], progress: int, total: int, message: str) -> None:
-    """Update overall progress menggunakan progress_tracking functions."""
-    try:
-        from smartcash.ui.components.progress_tracking import update_overall_progress as update_overall
-        update_overall(ui_components, progress, total, message)
-    except ImportError:
-        # Fallback manual update
-        _safe_update_widget(ui_components, 'overall_progress', progress, f"Overall: {progress}%")
-        _safe_update_widget(ui_components, 'progress_bar', progress, f"Overall: {progress}%")  # Alias
-        _safe_update_label(ui_components, 'overall_label', message)
+def update_overall_progress_enhanced(ui_components: Dict[str, Any], progress: int, total: int, message: str):
+    """Update overall progress dengan enhanced controls."""
+    if 'update_progress' in ui_components:
+        percentage = int((progress / max(total, 1)) * 100)
+        color = 'success' if percentage >= 100 else 'info' if percentage > 0 else ''
+        ui_components['update_progress']('overall', percentage, message, color)
 
-def update_step_progress(ui_components: Dict[str, Any], step: int, total_steps: int, step_name: str = "Step") -> None:
-    """Update step progress menggunakan progress_tracking functions."""
-    try:
-        from smartcash.ui.components.progress_tracking import update_step_progress as update_step
-        update_step(ui_components, step, total_steps, step_name)
-    except ImportError:
-        # Fallback manual update
-        percentage = int((step / max(total_steps, 1)) * 100)
-        _safe_update_widget(ui_components, 'step_progress', percentage, f"Step: {step}/{total_steps}")
-        _safe_update_label(ui_components, 'step_label', f"Step {step}/{total_steps}: {step_name}")
+def update_step_progress_enhanced(ui_components: Dict[str, Any], step: int, total_steps: int, step_name: str, progress: int = None, message: str = None):
+    """Update step progress dengan enhanced controls."""
+    if 'update_progress' in ui_components:
+        if progress is not None:
+            # Update dengan progress percentage langsung
+            color = 'success' if progress >= 100 else 'info' if progress > 0 else ''
+            step_message = message or f"Step {step}/{total_steps}: {step_name} ({progress}%)"
+            ui_components['update_progress']('step', progress, step_message, color)
+        else:
+            # Update berdasarkan step completion
+            percentage = int((step / max(total_steps, 1)) * 100)
+            color = 'success' if percentage >= 100 else 'info' if percentage > 0 else ''
+            step_message = message or f"Step {step}/{total_steps}: {step_name}"
+            ui_components['update_progress']('step', percentage, step_message, color)
 
-def update_current_progress(ui_components: Dict[str, Any], current: int, total: int, message: str) -> None:
-    """Update current progress menggunakan progress_tracking functions."""
-    try:
-        from smartcash.ui.components.progress_tracking import update_current_progress as update_current
-        update_current(ui_components, current, total, message)
-    except ImportError:
-        # Fallback manual update
+def update_current_progress_enhanced(ui_components: Dict[str, Any], current: int, total: int, message: str):
+    """Update current progress dengan enhanced controls."""
+    if 'update_progress' in ui_components:
         percentage = int((current / max(total, 1)) * 100)
-        _safe_update_widget(ui_components, 'current_progress', percentage, f"Current: {percentage}%")
-        _safe_update_label(ui_components, 'current_label', message)
+        color = 'success' if percentage >= 100 else 'warning' if percentage > 0 else ''
+        ui_components['update_progress']('current', percentage, message, color)
 
-def complete_progress(ui_components: Dict[str, Any], message: str = "Selesai") -> None:
-    """Complete progress tracking."""
-    _update_progress_widgets(ui_components,
-                           overall=100, step=100, current=100,
-                           overall_msg=message, step_msg="Semua tahap selesai", current_msg="Selesai")
+def complete_enhanced_progress(ui_components: Dict[str, Any], message: str = "Selesai"):
+    """Complete progress dengan enhanced controls."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](message)
 
-def error_progress(ui_components: Dict[str, Any], message: str = "Terjadi error") -> None:
-    """Set error state."""
-    _update_progress_widgets(ui_components,
-                           overall=0, step=0, current=0,
-                           overall_msg=f"❌ {message}", step_msg="Error", current_msg="Error")
+def error_enhanced_progress(ui_components: Dict[str, Any], message: str = "Error"):
+    """Set error state dengan enhanced controls."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](message)
 
-def _update_progress_widgets(ui_components: Dict[str, Any], overall: int, step: int, current: int,
-                           overall_msg: str, step_msg: str, current_msg: str) -> None:
-    """Update semua progress widgets dengan mapping yang tepat."""
-    # Update overall progress (dan alias)
-    _safe_update_widget(ui_components, 'overall_progress', overall, f"Overall: {overall}%")
-    _safe_update_widget(ui_components, 'progress_bar', overall, f"Overall: {overall}%")  # Alias
-    _safe_update_label(ui_components, 'overall_label', overall_msg)
-    
-    # Update step progress
-    _safe_update_widget(ui_components, 'step_progress', step, f"Step: {step}%")
-    _safe_update_label(ui_components, 'step_label', step_msg)
-    
-    # Update current progress  
-    _safe_update_widget(ui_components, 'current_progress', current, f"Current: {current}%")
-    _safe_update_label(ui_components, 'current_label', current_msg)
+# Legacy compatibility functions
+def show_progress_for_operation(ui_components: Dict[str, Any], operation: str):
+    """Show progress sesuai operation type."""
+    if 'show_for_operation' in ui_components:
+        ui_components['show_for_operation'](operation)
 
-def _safe_update_widget(ui_components: Dict[str, Any], key: str, value: int, description: str) -> None:
-    """Safely update progress widget."""
-    try:
-        if key in ui_components and ui_components[key]:
-            widget = ui_components[key]
-            if hasattr(widget, 'value'):
-                widget.value = value
-            if hasattr(widget, 'description'):
-                widget.description = description
-    except Exception:
-        pass
+def complete_progress_operation(ui_components: Dict[str, Any], message: str = "Selesai"):
+    """Complete progress operation."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](message)
 
-def _safe_update_label(ui_components: Dict[str, Any], key: str, value: str) -> None:
-    """Safely update label widget."""
-    try:
-        if key in ui_components and ui_components[key]:
-            widget = ui_components[key]
-            if hasattr(widget, 'value'):
-                widget.value = value
-    except Exception:
-        pass
+def error_progress_operation(ui_components: Dict[str, Any], message: str = "Error"):
+    """Set error state untuk progress."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](message)

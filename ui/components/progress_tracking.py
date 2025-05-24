@@ -1,241 +1,226 @@
 """
 File: smartcash/ui/components/progress_tracking.py
-Deskripsi: Fixed progress tracking dengan visible progress bars
+Deskripsi: Enhanced progress tracking dengan dynamic color dan visibility controls
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
-
-def create_progress_tracking(
-    module_name: str = "processing",
-    show_step_progress: bool = True,
-    show_overall_progress: bool = True,
-    show_current_progress: bool = True,
-    width: str = '100%'
-) -> Dict[str, Any]:
-    """Buat komponen progress tracking dengan visible progress bars."""
+def create_progress_tracking_container() -> Dict[str, Any]:
+    """
+    Buat progress tracking container dengan kontrol dinamis.
     
-    components = []
-    
-    # === OVERALL PROGRESS (Keseluruhan proses) ===
-    overall_progress = None
-    overall_label = None
-    
-    if show_overall_progress:
-        overall_label = widgets.HTML(
-            value="<div style='margin-bottom: 5px; color: #495057; font-weight: bold;'>📊 Overall Progress: Siap memulai</div>",
-            layout=widgets.Layout(width=width)
-        )
-        
-        overall_progress = widgets.FloatProgress(
-            value=0,
-            min=0,
-            max=100,
-            bar_style='info',
-            style={'description_width': 'initial', 'bar_width': '100%'},
-            layout=widgets.Layout(width=width, height='25px', visibility='visible')
-        )
-        
-        components.extend([overall_label, overall_progress])
-    
-    # === STEP PROGRESS (Per tahap: train, valid, test) ===
-    step_progress = None
-    step_label = None
-    
-    if show_step_progress:
-        step_label = widgets.HTML(
-            value="<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 12px;'>🔄 Step: Menunggu</div>",
-            layout=widgets.Layout(width=width)
-        )
-        
-        step_progress = widgets.FloatProgress(
-            value=0,
-            min=0,
-            max=100,
-            bar_style='',
-            style={'description_width': 'initial', 'bar_width': '100%'},
-            layout=widgets.Layout(width=width, height='20px', visibility='visible')
-        )
-        
-        components.extend([step_label, step_progress])
-    
-    # === CURRENT PROGRESS (Per file/batch dalam step) ===
-    current_progress = None
-    current_label = None
-    
-    if show_current_progress:
-        current_label = widgets.HTML(
-            value="<div style='margin: 4px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Current: -</div>",
-            layout=widgets.Layout(width=width)
-        )
-        
-        current_progress = widgets.FloatProgress(
-            value=0,
-            min=0,
-            max=100,
-            bar_style='success',
-            style={'description_width': 'initial', 'bar_width': '100%'},
-            layout=widgets.Layout(width=width, height='15px', visibility='visible')
-        )
-        
-        components.extend([current_label, current_progress])
-    
-    # Container dengan visibility control
-    progress_container = widgets.VBox(
-        components,
-        layout=widgets.Layout(
-            width=width,
-            padding='15px',
-            margin='10px 0',
-            border='1px solid #dee2e6',
-            border_radius='5px',
-            background_color='#f8f9fa',
-            visibility='hidden',  # Hidden by default
-            display='none'
-        )
+    Returns:
+        Dictionary berisi semua komponen progress dengan control methods
+    """
+    # Overall progress (primary)
+    overall_progress = widgets.IntProgress(
+        value=0, min=0, max=100,
+        description='Overall:',
+        bar_style='info',
+        layout=widgets.Layout(width='100%', height='20px', visibility='hidden')
     )
     
-    return {
-        # Main container
-        'progress_container': progress_container,
-        
-        # Overall progress (keseluruhan proses)
+    overall_label = widgets.HTML(
+        value="",
+        layout=widgets.Layout(margin='2px 0', visibility='hidden')
+    )
+    
+    # Step progress
+    step_progress = widgets.IntProgress(
+        value=0, min=0, max=100,
+        description='Step:',
+        bar_style='info',
+        layout=widgets.Layout(width='100%', height='20px', visibility='hidden')
+    )
+    
+    step_label = widgets.HTML(
+        value="",
+        layout=widgets.Layout(margin='2px 0', visibility='hidden')
+    )
+    
+    # Current progress (detailed)
+    current_progress = widgets.IntProgress(
+        value=0, min=0, max=100,
+        description='Current:',
+        bar_style='info',
+        layout=widgets.Layout(width='100%', height='20px', visibility='hidden')
+    )
+    
+    current_label = widgets.HTML(
+        value="",
+        layout=widgets.Layout(margin='2px 0', visibility='hidden')
+    )
+    
+    # Container
+    container = widgets.VBox([
+        widgets.HTML("<h4>📊 Progress</h4>"),
+        overall_progress, overall_label,
+        step_progress, step_label,
+        current_progress, current_label
+    ], layout=widgets.Layout(margin='10px 0', padding='10px', display='none'))
+    
+    components = {
+        'container': container,
         'overall_progress': overall_progress,
         'overall_label': overall_label,
-        'progress_bar': overall_progress,  # Alias untuk backward compatibility
-        
-        # Step progress (per split: train, valid, test)
         'step_progress': step_progress,
         'step_label': step_label,
-        
-        # Current progress (per file dalam split)
         'current_progress': current_progress,
         'current_label': current_label,
+        'progress_bar': overall_progress,  # Alias untuk backward compatibility
+    }
+    
+    # Add control methods
+    components.update(_create_control_methods(components))
+    
+    return components
+
+def _create_control_methods(components: Dict[str, Any]) -> Dict[str, Any]:
+    """Buat control methods untuk dynamic management."""
+    
+    def show_container():
+        """Show progress container."""
+        components['container'].layout.display = 'block'
+        components['container'].layout.visibility = 'visible'
+    
+    def hide_container():
+        """Hide progress container."""
+        components['container'].layout.display = 'none'
+        components['container'].layout.visibility = 'hidden'
+    
+    def set_visibility(progress_type: str, visible: bool):
+        """Set visibility untuk specific progress type."""
+        if progress_type not in ['overall', 'step', 'current']:
+            return
+            
+        progress_key = f'{progress_type}_progress'
+        label_key = f'{progress_type}_label'
         
-        # Helper methods
-        'show_container': lambda: _show_progress_container(progress_container),
-        'hide_container': lambda: _hide_progress_container(progress_container),
-        'reset_all': lambda: _reset_all_progress(overall_progress, step_progress, current_progress,
-                                               overall_label, step_label, current_label),
+        visibility = 'visible' if visible else 'hidden'
+        display = 'block' if visible else 'none'
         
-        # Module info
-        'module_name': module_name
+        if progress_key in components:
+            components[progress_key].layout.visibility = visibility
+            components[progress_key].layout.display = display
+        if label_key in components:
+            components[label_key].layout.visibility = visibility
+            components[label_key].layout.display = display
+    
+    def set_color(progress_type: str, color_style: str):
+        """Set color untuk specific progress type."""
+        if progress_type not in ['overall', 'step', 'current']:
+            return
+            
+        progress_key = f'{progress_type}_progress'
+        valid_styles = ['info', 'success', 'warning', 'danger', '']
+        
+        if progress_key in components and color_style in valid_styles:
+            components[progress_key].bar_style = color_style
+    
+    def update_progress(progress_type: str, value: int, message: str = "", color_style: str = None):
+        """Update progress dengan optional color dan message."""
+        if progress_type not in ['overall', 'step', 'current']:
+            return
+            
+        progress_key = f'{progress_type}_progress'
+        label_key = f'{progress_type}_label'
+        
+        # Update value
+        if progress_key in components:
+            components[progress_key].value = max(0, min(100, value))
+            
+            # Update color jika disediakan
+            if color_style:
+                set_color(progress_type, color_style)
+        
+        # Update label
+        if label_key in components and message:
+            components[label_key].value = f"<div style='color: #495057; font-size: 13px;'>{message}</div>"
+    
+    def reset_all():
+        """Reset semua progress bars."""
+        for progress_type in ['overall', 'step', 'current']:
+            update_progress(progress_type, 0, "", 'info')
+            set_visibility(progress_type, False)
+        hide_container()
+    
+    def show_for_operation(operation: str):
+        """Show progress bars sesuai operation type."""
+        operation_configs = {
+            'download': {'overall': True, 'step': True, 'current': False},
+            'check': {'overall': True, 'step': False, 'current': False},
+            'cleanup': {'overall': True, 'step': False, 'current': True},
+            'save': {'overall': False, 'step': False, 'current': False},
+            'all': {'overall': True, 'step': True, 'current': True}
+        }
+        
+        config = operation_configs.get(operation, operation_configs['all'])
+        
+        show_container()
+        for progress_type, should_show in config.items():
+            set_visibility(progress_type, should_show)
+            if should_show:
+                set_color(progress_type, 'info')
+    
+    def complete_operation(message: str = "Selesai"):
+        """Complete operation dengan success state."""
+        for progress_type in ['overall', 'step', 'current']:
+            progress_key = f'{progress_type}_progress'
+            if (progress_key in components and 
+                components[progress_key].layout.visibility == 'visible'):
+                update_progress(progress_type, 100, message, 'success')
+    
+    def error_operation(message: str = "Error"):
+        """Set error state untuk visible progress bars."""
+        for progress_type in ['overall', 'step', 'current']:
+            progress_key = f'{progress_type}_progress'
+            if (progress_key in components and 
+                components[progress_key].layout.visibility == 'visible'):
+                update_progress(progress_type, 0, f"❌ {message}", 'danger')
+    
+    return {
+        'show_container': show_container,
+        'hide_container': hide_container,
+        'set_visibility': set_visibility,
+        'set_color': set_color,
+        'update_progress': update_progress,
+        'reset_all': reset_all,
+        'show_for_operation': show_for_operation,
+        'complete_operation': complete_operation,
+        'error_operation': error_operation
     }
 
+# Legacy compatibility functions
+def update_overall_progress(ui_components: Dict[str, Any], progress: int, total: int, message: str):
+    """Legacy function untuk backward compatibility."""
+    if 'update_progress' in ui_components:
+        percentage = int((progress / max(total, 1)) * 100)
+        ui_components['update_progress']('overall', percentage, message)
 
-def _show_progress_container(container):
-    """Show progress container dan ensure semua progress bars visible."""
-    container.layout.visibility = 'visible'
-    container.layout.display = 'block'
-    
-    # Ensure semua child widgets juga visible
-    for child in container.children:
-        if hasattr(child, 'layout'):
-            child.layout.visibility = 'visible'
-            if hasattr(child, 'value'):  # Progress widget
-                child.layout.display = 'block'
+def update_step_progress(ui_components: Dict[str, Any], step: int, total_steps: int, step_name: str):
+    """Legacy function untuk backward compatibility."""
+    if 'update_progress' in ui_components:
+        percentage = int((step / max(total_steps, 1)) * 100)
+        ui_components['update_progress']('step', percentage, f"Step {step}/{total_steps}: {step_name}")
 
+def update_current_progress(ui_components: Dict[str, Any], current: int, total: int, message: str):
+    """Legacy function untuk backward compatibility."""
+    if 'update_progress' in ui_components:
+        percentage = int((current / max(total, 1)) * 100)
+        ui_components['update_progress']('current', percentage, message)
 
-def _hide_progress_container(container):
-    """Hide progress container."""
-    container.layout.visibility = 'hidden'
-    container.layout.display = 'none'
+def show_progress_for_operation(ui_components: Dict[str, Any], operation: str):
+    """Show progress sesuai operation type."""
+    if 'show_for_operation' in ui_components:
+        ui_components['show_for_operation'](operation)
 
+def complete_progress_operation(ui_components: Dict[str, Any], message: str = "Selesai"):
+    """Complete progress operation."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](message)
 
-def _reset_all_progress(overall_progress, step_progress, current_progress,
-                       overall_label, step_label, current_label):
-    """Reset semua progress indicators."""
-    if overall_progress:
-        overall_progress.value = 0
-        overall_progress.bar_style = 'info'
-        overall_progress.layout.visibility = 'visible'
-    
-    if step_progress:
-        step_progress.value = 0
-        step_progress.bar_style = ''
-        step_progress.layout.visibility = 'visible'
-    
-    if current_progress:
-        current_progress.value = 0
-        current_progress.bar_style = 'success'
-        current_progress.layout.visibility = 'visible'
-    
-    if overall_label:
-        overall_label.value = "<div style='margin-bottom: 5px; color: #495057; font-weight: bold;'>📊 Overall Progress: Siap memulai</div>"
-    
-    if step_label:
-        step_label.value = "<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 12px;'>🔄 Step: Menunggu</div>"
-    
-    if current_label:
-        current_label.value = "<div style='margin: 4px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Current: -</div>"
-
-
-def update_overall_progress(components: Dict[str, Any], progress: int, total: int, message: str = ""):
-    """Update overall progress (keseluruhan proses)."""
-    if 'overall_progress' in components and components['overall_progress']:
-        widget = components['overall_progress']
-        percentage = min((progress / max(total, 1)) * 100, 100)
-        
-        widget.value = percentage
-        widget.layout.visibility = 'visible'
-        widget.layout.display = 'block'
-        
-        # Update bar style based on progress
-        if percentage >= 100:
-            widget.bar_style = 'success'
-        elif percentage >= 50:
-            widget.bar_style = 'info'
-        else:
-            widget.bar_style = ''
-    
-    # Update alias juga
-    if 'progress_bar' in components and components['progress_bar']:
-        widget = components['progress_bar']
-        percentage = min((progress / max(total, 1)) * 100, 100)
-        widget.value = percentage
-        widget.layout.visibility = 'visible'
-        widget.layout.display = 'block'
-    
-    if 'overall_label' in components and components['overall_label'] and message:
-        components['overall_label'].value = f"<div style='margin-bottom: 5px; color: #495057; font-weight: bold;'>📊 Overall: {message} ({progress}/{total})</div>"
-
-
-def update_step_progress(components: Dict[str, Any], step: int, total_steps: int, step_name: str = ""):
-    """Update step progress (per split)."""
-    if 'step_progress' in components and components['step_progress']:
-        widget = components['step_progress']
-        percentage = min((step / max(total_steps, 1)) * 100, 100)
-        
-        widget.value = percentage
-        widget.layout.visibility = 'visible'
-        widget.layout.display = 'block'
-        
-        # Update bar style
-        if percentage >= 100:
-            widget.bar_style = 'success'
-        else:
-            widget.bar_style = 'info'
-    
-    if 'step_label' in components and components['step_label']:
-        step_text = f"Step {step}/{total_steps}"
-        if step_name:
-            step_text += f": {step_name}"
-        components['step_label'].value = f"<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 12px;'>🔄 {step_text}</div>"
-
-
-def update_current_progress(components: Dict[str, Any], current: int, total: int, message: str = ""):
-    """Update current progress (per file/batch)."""
-    if 'current_progress' in components and components['current_progress']:
-        widget = components['current_progress']
-        percentage = min((current / max(total, 1)) * 100, 100)
-        
-        widget.value = percentage
-        widget.layout.visibility = 'visible'
-        widget.layout.display = 'block'
-    
-    if 'current_label' in components and components['current_label']:
-        if message:
-            components['current_label'].value = f"<div style='margin: 8px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ {message} ({current}/{total})</div>"
-        else:
-            components['current_label'].value = f"<div style='margin: 8px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Progress: {current}/{total}</div>"
+def error_progress_operation(ui_components: Dict[str, Any], message: str = "Error"):
+    """Set error state untuk progress."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](message)

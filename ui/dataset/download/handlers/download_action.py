@@ -359,7 +359,7 @@ def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
 def _reset_progress_indicators(ui_components: Dict[str, Any]) -> None:
     """Reset dual progress indicators ke state awal."""
     try:
-        for widget_key in ['progress_bar', 'current_progress']:
+        for widget_key in ['progress_bar', 'step_progress']:
             if widget_key in ui_components and ui_components[widget_key]:
                 ui_components[widget_key].value = 0
                 ui_components[widget_key].description = f"{'Overall' if widget_key == 'progress_bar' else 'Step'}: 0%"

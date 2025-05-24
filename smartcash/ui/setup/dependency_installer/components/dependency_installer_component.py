@@ -210,7 +210,8 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                 display='flex',
                 flex_flow='row',
                 align_items='center',
-                justify_content='space-between'
+                justify_content='space-between',
+                gap='5px'
             )
         )
         

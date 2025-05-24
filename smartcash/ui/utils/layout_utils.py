@@ -1,30 +1,157 @@
 """
 File: smartcash/ui/utils/layout_utils.py
-Deskripsi: Responsive layout utilities untuk prevent horizontal scroll dan improve UX
+Deskripsi: Layout utilities dengan backward compatibility dan fitur responsive baru
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
-def create_divider(margin: str = "10px 0", color: str = "#dee2e6", height: str = "1px") -> widgets.HTML:
+# =============================================================================
+# BACKWARD COMPATIBILITY - Existing Layout Constants
+# =============================================================================
+
+# Standard layouts (existing - unchanged)
+STANDARD_LAYOUTS = {
+    'header': widgets.Layout(margin='0 0 15px 0'),
+    'section': widgets.Layout(margin='15px 0 10px 0'),
+    'container': widgets.Layout(width='100%', padding='10px'),
+    'output': widgets.Layout(
+        width='100%',
+        border='1px solid #ddd',
+        min_height='100px',
+        max_height='300px',
+        margin='10px 0',
+        overflow='auto'
+    ),
+    'button': widgets.Layout(margin='10px 0'),
+    'button_small': widgets.Layout(margin='5px'),
+    'hbox': widgets.Layout(
+        display='flex',
+        flex_flow='row wrap',
+        align_items='center',
+        width='100%'
+    ),
+    'vbox': widgets.Layout(
+        display='flex',
+        flex_flow='column',
+        align_items='stretch',
+        width='100%'
+    )
+}
+
+# Layout untuk container utama (existing - unchanged)
+MAIN_CONTAINER = widgets.Layout(
+    width='100%',
+    padding='10px'
+)
+
+# Layout untuk output widget (existing - unchanged)
+OUTPUT_WIDGET = widgets.Layout(
+    width='100%',
+    border='1px solid #ddd',
+    min_height='100px',
+    margin='10px 0',
+    padding='8px 4px'
+)
+
+# Layout untuk tombol (existing - unchanged)
+BUTTON = widgets.Layout(
+    margin='10px 0'
+)
+
+# Layout untuk tombol yang disembunyikan (existing - unchanged)
+HIDDEN_BUTTON = widgets.Layout(
+    margin='10px 0',
+    display='none'
+)
+
+# Layout untuk input text (existing - unchanged)
+TEXT_INPUT = widgets.Layout(
+    width='60%',
+    margin='10px 0'
+)
+
+# Layout untuk textarea (existing - unchanged)
+TEXT_AREA = widgets.Layout(
+    width='60%',
+    height='150px',
+    margin='10px 0'
+)
+
+# Layout untuk radio dan checkbox (existing - unchanged)
+SELECTION = widgets.Layout(
+    margin='10px 0'
+)
+
+# Layout untuk grup widget horizontal (existing - unchanged)
+HORIZONTAL_GROUP = widgets.Layout(
+    display='flex',
+    flex_flow='row wrap',
+    align_items='center',
+    width='100%'
+)
+
+# Layout untuk grup widget vertikal (existing - unchanged)
+VERTICAL_GROUP = widgets.Layout(
+    display='flex',
+    flex_flow='column',
+    align_items='stretch',
+    width='100%'
+)
+
+# Layout untuk divider (existing - unchanged)
+DIVIDER = widgets.Layout(
+    height='1px',
+    border='0',
+    border_top='1px solid #eee',
+    margin='15px 0'
+)
+
+# Layout untuk kartu/card (existing - unchanged)
+CARD = widgets.Layout(
+    border='1px solid #ddd',
+    border_radius='4px',
+    padding='15px',
+    margin='10px 0',
+    width='100%'
+)
+
+# Layout untuk tab container (existing - unchanged)
+TABS = widgets.Layout(
+    width='100%',
+    margin='10px 0'
+)
+
+# Layout untuk accordion (existing - unchanged)
+ACCORDION = widgets.Layout(
+    width='100%',
+    margin='10px 0'
+)
+
+# =============================================================================
+# BACKWARD COMPATIBILITY - Existing Functions
+# =============================================================================
+
+def create_divider(margin: str = "15px 0", color: str = "#eee", height: str = "1px") -> widgets.HTML:
     """
-    Create responsive divider dengan consistent styling.
+    Create divider horizontal (backward compatible + enhanced).
     
     Args:
-        margin: CSS margin untuk divider
-        color: Warna divider
+        margin: CSS margin untuk divider (default sesuai existing)
+        color: Warna divider (default sesuai existing)
         height: Tinggi divider
         
     Returns:
-        HTML widget divider yang responsive
+        HTML widget divider
     """
     return widgets.HTML(
-        value=f"""
-        <div style="width: 100%; height: {height}; background-color: {color}; 
-                   margin: {margin}; border: none; overflow: hidden;"></div>
-        """,
+        value=f"<hr style='margin: {margin}; border: 0; border-top: {height} solid {color};'>",
         layout=widgets.Layout(width='100%', margin='0', padding='0')
     )
+
+# =============================================================================
+# NEW RESPONSIVE UTILITIES
+# =============================================================================
 
 def create_responsive_container(
     children: list,
@@ -117,70 +244,6 @@ def create_responsive_two_column(
             max_width='100%',
             justify_content='space-between',
             align_items=vertical_align,
-            margin='0',
-            padding='0',
-            overflow='hidden'
-        )
-    )
-
-def create_responsive_grid(
-    items: list,
-    columns: int = 2,
-    gap: str = "8px",
-    item_min_width: str = "200px"
-) -> widgets.Widget:
-    """
-    Create responsive grid layout.
-    
-    Args:
-        items: List widget items
-        columns: Jumlah kolom
-        gap: Gap antara items
-        item_min_width: Minimum width per item
-        
-    Returns:
-        Grid container yang responsive
-    """
-    rows = []
-    
-    # Split items ke dalam rows
-    for i in range(0, len(items), columns):
-        row_items = items[i:i+columns]
-        
-        # Wrap setiap item dengan responsive container
-        wrapped_items = []
-        for item in row_items:
-            wrapper = widgets.VBox(
-                [item],
-                layout=widgets.Layout(
-                    width=f"{100/columns:.1f}%",
-                    min_width=item_min_width,
-                    margin='2px',
-                    padding='2px',
-                    overflow='hidden'
-                )
-            )
-            wrapped_items.append(wrapper)
-        
-        # Create row
-        row = widgets.HBox(
-            wrapped_items,
-            layout=widgets.Layout(
-                width='100%',
-                justify_content='space-between',
-                align_items='flex-start',
-                margin='0',
-                padding='0',
-                overflow='hidden'
-            )
-        )
-        rows.append(row)
-    
-    return widgets.VBox(
-        rows,
-        layout=widgets.Layout(
-            width='100%',
-            max_width='100%',
             margin='0',
             padding='0',
             overflow='hidden'
@@ -291,3 +354,17 @@ def create_section_header(
         """,
         layout=widgets.Layout(width='100%', margin='0', padding='0')
     )
+
+# =============================================================================
+# ENHANCED RESPONSIVE LAYOUTS (New constants dengan responsive features)
+# =============================================================================
+
+# Responsive versions of existing layouts
+RESPONSIVE_LAYOUTS = {
+    'container': widgets.Layout(width='100%', max_width='100%', padding='10px', overflow='hidden'),
+    'two_column_left': widgets.Layout(width='47%', margin='0', padding='4px', overflow='hidden'),
+    'two_column_right': widgets.Layout(width='47%', margin='0', padding='4px', overflow='hidden'),
+    'button_responsive': widgets.Layout(width='auto', max_width='150px', height='32px', margin='2px'),
+    'dropdown_responsive': widgets.Layout(width='100%', max_width='100%', margin='3px 0', overflow='hidden'),
+    'no_scroll': widgets.Layout(overflow='hidden', max_width='100%')
+}

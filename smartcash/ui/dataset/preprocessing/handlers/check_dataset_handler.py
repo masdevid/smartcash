@@ -1,207 +1,193 @@
 """
-File: smartcash/dataset/utils/path_validator.py
-Deskripsi: Fixed path validator untuk dataset dengan mapping val->valid yang konsisten
+File: smartcash/ui/dataset/preprocessing/handlers/check_dataset_handler.py
+Deskripsi: Fixed handler untuk check dataset dengan path validator dan val->valid mapping
 """
 
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from smartcash.common.constants.paths import get_paths_for_environment
-from smartcash.common.environment import get_environment_manager
+from typing import Dict, Any
+from smartcash.ui.components.status_panel import update_status_panel
+from smartcash.dataset.utils.path_validator import get_path_validator
+
+__all__ = ['setup_check_dataset_handler']
 
 
-class DatasetPathValidator:
-    """Validator untuk path dataset dengan mapping val->valid yang konsisten."""
+def setup_check_dataset_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Setup handler untuk check dataset dengan fixed path validation."""
+    logger = ui_components.get('logger')
+    path_validator = get_path_validator(logger)
     
-    def __init__(self, logger=None):
-        self.logger = logger
-        self.env_manager = get_environment_manager()
+    def _check_dataset_structure() -> Dict[str, Any]:
+        """Check struktur dataset menggunakan path validator."""
+        data_dir = ui_components.get('data_dir', 'data')
+        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
         
-        # Split mapping untuk konsistensi
-        self.split_mapping = {
-            'val': 'valid',
-            'validation': 'valid'
-        }
-    
-    def normalize_split_name(self, split: str) -> str:
-        """Normalize split name untuk konsistensi."""
-        return self.split_mapping.get(split.lower(), split.lower())
-    
-    def get_dataset_paths(self, base_dir: Optional[str] = None) -> Dict[str, str]:
-        """Get dataset paths berdasarkan environment."""
-        if base_dir:
-            return {
-                'data_root': base_dir,
-                'train': f"{base_dir}/train",
-                'valid': f"{base_dir}/valid", 
-                'test': f"{base_dir}/test",
-                'downloads': f"{base_dir}/downloads"
-            }
+        # Validate raw dataset
+        raw_validation = path_validator.validate_dataset_structure(data_dir)
         
-        paths = get_paths_for_environment(
-            self.env_manager.is_colab,
-            self.env_manager.is_drive_mounted
-        )
-        return paths
-    
-    def detect_available_splits(self, data_dir: str) -> List[str]:
-        """Deteksi splits yang tersedia dengan mapping val->valid."""
-        data_path = Path(data_dir)
-        available_splits = []
+        # Validate preprocessed dataset  
+        preprocessed_validation = path_validator.validate_preprocessed_structure(preprocessed_dir)
         
-        # Check standard splits
-        for split in ['train', 'valid', 'test']:
-            split_dir = data_path / split
-            if self._is_valid_split_dir(split_dir):
-                available_splits.append(split)
-        
-        # Check legacy 'val' directory
-        val_dir = data_path / 'val'
-        if self._is_valid_split_dir(val_dir) and 'valid' not in available_splits:
-            available_splits.append('valid')  # Normalize ke 'valid'
-        
-        return available_splits
-    
-    def _is_valid_split_dir(self, split_dir: Path) -> bool:
-        """Check apakah split directory valid."""
-        if not split_dir.exists():
-            return False
-            
-        images_dir = split_dir / 'images'
-        labels_dir = split_dir / 'labels'
-        
-        return (images_dir.exists() and labels_dir.exists() and
-                len(list(images_dir.glob('*.*'))) > 0)
-    
-    def get_split_path(self, data_dir: str, split: str) -> Path:
-        """Get path untuk split dengan mapping val->valid."""
-        data_path = Path(data_dir)
-        normalized_split = self.normalize_split_name(split)
-        
-        # Check normalized path first
-        split_path = data_path / normalized_split
-        if split_path.exists():
-            return split_path
-        
-        # Check legacy 'val' jika split adalah 'valid'
-        if normalized_split == 'valid':
-            val_path = data_path / 'val'
-            if val_path.exists():
-                return val_path
-        
-        return split_path
-    
-    def validate_dataset_structure(self, data_dir: str) -> Dict[str, any]:
-        """Validate struktur dataset dengan detail info."""
-        data_path = Path(data_dir)
-        
-        result = {
-            'valid': data_path.exists(),
-            'data_dir': str(data_path),
-            'splits': {},
-            'issues': [],
-            'total_images': 0,
-            'total_labels': 0
-        }
-        
-        if not result['valid']:
-            result['issues'].append(f"❌ Dataset directory tidak ditemukan: {data_dir}")
-            return result
-        
-        # Check each split
-        available_splits = self.detect_available_splits(data_dir)
-        
-        for split in ['train', 'valid', 'test']:
-            split_path = self.get_split_path(data_dir, split)
-            images_dir = split_path / 'images'
-            labels_dir = split_path / 'labels'
-            
-            if split in available_splits:
-                image_count = len(list(images_dir.glob('*.*'))) if images_dir.exists() else 0
-                label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
-                
-                result['splits'][split] = {
-                    'exists': True,
-                    'path': str(split_path),
-                    'images': image_count,
-                    'labels': label_count,
-                    'images_dir': str(images_dir),
-                    'labels_dir': str(labels_dir)
-                }
-                
-                result['total_images'] += image_count
-                result['total_labels'] += label_count
-                
-                # Check issues
-                if image_count == 0:
-                    result['issues'].append(f"⚠️ Split {split}: Tidak ada gambar")
-                if label_count == 0:
-                    result['issues'].append(f"⚠️ Split {split}: Tidak ada label")
-                if image_count != label_count:
-                    result['issues'].append(f"⚠️ Split {split}: Gambar ({image_count}) ≠ Label ({label_count})")
-            else:
-                result['splits'][split] = {
-                    'exists': False,
-                    'path': str(split_path),
-                    'images': 0,
-                    'labels': 0
-                }
-                result['issues'].append(f"❌ Split {split}: Directory tidak ditemukan")
-        
-        return result
-    
-    def get_preprocessed_paths(self, base_dir: Optional[str] = None) -> Dict[str, str]:
-        """Get preprocessed dataset paths."""
-        paths = self.get_dataset_paths(base_dir)
+        # Analisis kelas jika ada data valid
+        class_analysis = {}
+        if raw_validation['total_images'] > 0:
+            class_analysis = _analyze_class_distribution(data_dir)
         
         return {
-            'preprocessed_root': f"{paths['data_root']}/preprocessed",
-            'train': f"{paths['data_root']}/preprocessed/train",
-            'valid': f"{paths['data_root']}/preprocessed/valid",
-            'test': f"{paths['data_root']}/preprocessed/test"
+            'raw': raw_validation,
+            'preprocessed': preprocessed_validation,
+            'class_analysis': class_analysis,
+            'available_splits': path_validator.detect_available_splits(data_dir)
         }
     
-    def validate_preprocessed_structure(self, preprocessed_dir: str) -> Dict[str, any]:
-        """Validate struktur preprocessed dataset."""
-        preprocessed_path = Path(preprocessed_dir)
-        
-        result = {
-            'valid': preprocessed_path.exists(),
-            'preprocessed_dir': str(preprocessed_path),
-            'splits': {},
-            'total_processed': 0
-        }
-        
-        if not result['valid']:
-            return result
-        
-        # Check preprocessed splits
-        for split in ['train', 'valid', 'test']:
-            split_path = preprocessed_path / split
+    def _analyze_class_distribution(data_dir: str) -> Dict[str, Any]:
+        """Analisis distribusi kelas menggunakan explorer service."""
+        try:
+            from smartcash.dataset.services.explorer.explorer_service import ExplorerService
             
-            if split_path.exists():
-                processed_count = len(list(split_path.glob('**/*.jpg')))
-                result['splits'][split] = {
-                    'exists': True,
-                    'path': str(split_path),
-                    'processed': processed_count
+            config = {
+                'data': {'dir': data_dir},
+                'classes': {}
+            }
+            
+            explorer = ExplorerService(config, data_dir, logger)
+            class_result = explorer.analyze_class_distribution('train')
+            
+            if class_result.get('status') == 'success':
+                return {
+                    'total_classes': class_result.get('class_count', 0),
+                    'class_counts': class_result.get('counts', {}),
+                    'imbalance_score': class_result.get('imbalance_score', 0)
                 }
-                result['total_processed'] += processed_count
-            else:
-                result['splits'][split] = {
-                    'exists': False,
-                    'path': str(split_path),
-                    'processed': 0
-                }
+        except Exception as e:
+            if logger:
+                logger.debug(f"🔍 Error analisis kelas: {str(e)}")
         
-        return result
-
-
-# Singleton instance
-_path_validator = None
-
-def get_path_validator(logger=None) -> DatasetPathValidator:
-    """Get singleton path validator."""
-    global _path_validator
-    if _path_validator is None:
-        _path_validator = DatasetPathValidator(logger)
-    return _path_validator
+        return {}
+    
+    def _format_dataset_summary(check_result: Dict[str, Any]) -> str:
+        """Format hasil check menjadi summary yang informatif."""
+        lines = ["📊 Dataset Check Summary", "=" * 50]
+        
+        # Raw dataset info
+        raw = check_result['raw']
+        lines.append(f"\n📁 Raw Dataset: {raw['data_dir']}")
+        
+        if raw['valid']:
+            lines.append(f"   📊 Total: {raw['total_images']:,} gambar, {raw['total_labels']:,} label")
+            lines.append(f"   📂 Splits tersedia: {', '.join(check_result['available_splits'])}")
+            
+            # Per split breakdown
+            for split in ['train', 'valid', 'test']:
+                split_info = raw['splits'][split]
+                if split_info['exists']:
+                    status = "✅" if split_info['images'] > 0 else "⚪"
+                    percentage = (split_info['images'] / max(raw['total_images'], 1)) * 100
+                    lines.append(f"   {status} {split}: {split_info['images']:,} gambar ({percentage:.1f}%)")
+                else:
+                    lines.append(f"   ❌ {split}: Tidak ditemukan")
+            
+            # Class analysis
+            class_analysis = check_result.get('class_analysis', {})
+            if class_analysis:
+                total_classes = class_analysis.get('total_classes', 0)
+                imbalance_score = class_analysis.get('imbalance_score', 0)
+                lines.append(f"   🏷️ Kelas: {total_classes} jenis")
+                
+                if imbalance_score > 5:
+                    lines.append(f"   ⚠️ Ketidakseimbangan: {imbalance_score:.1f}/10 (tinggi)")
+                else:
+                    lines.append(f"   ✅ Keseimbangan: {imbalance_score:.1f}/10 (baik)")
+        else:
+            lines.append("   ❌ Dataset tidak ditemukan")
+        
+        # Preprocessed dataset info
+        preprocessed = check_result['preprocessed']
+        lines.append(f"\n🔧 Preprocessed Dataset: {preprocessed['preprocessed_dir']}")
+        
+        if preprocessed['valid']:
+            lines.append(f"   📊 Total: {preprocessed['total_processed']:,} gambar terproses")
+            
+            for split in ['train', 'valid', 'test']:
+                split_info = preprocessed['splits'][split]
+                if split_info['exists'] and split_info['processed'] > 0:
+                    status = "✅"
+                    percentage = (split_info['processed'] / max(preprocessed['total_processed'], 1)) * 100
+                    lines.append(f"   {status} {split}: {split_info['processed']:,} gambar ({percentage:.1f}%)")
+                else:
+                    lines.append(f"   ⚪ {split}: Belum diproses")
+        else:
+            lines.append("   ⚪ Belum ada data preprocessed")
+        
+        # Issues
+        if raw['issues']:
+            lines.append(f"\n⚠️ Issues ({len(raw['issues'])}):")
+            for issue in raw['issues']:
+                lines.append(f"   • {issue}")
+        else:
+            lines.append("\n✅ Tidak ada issues ditemukan")
+        
+        # Recommendations
+        lines.append("\n💡 Rekomendasi:")
+        if not raw['valid']:
+            lines.append("   • 📥 Download dataset terlebih dahulu")
+        elif raw['issues']:
+            critical_issues = [i for i in raw['issues'] if '❌' in i]
+            if critical_issues:
+                lines.append("   • 🔧 Perbaiki critical issues sebelum preprocessing")
+            else:
+                lines.append("   • ⚠️ Dataset masih bisa diproses meski ada warnings")
+        elif preprocessed['total_processed'] == 0:
+            lines.append("   • 🚀 Dataset siap untuk preprocessing")
+        else:
+            lines.append("   • 🔄 Gunakan force reprocess jika perlu update")
+        
+        # Performance recommendations
+        if raw['total_images'] > 10000:
+            recommended_workers = min(8, max(4, raw['total_images'] // 2500))
+            lines.append(f"   • ⚡ Dataset besar, gunakan {recommended_workers} workers optimal")
+        
+        return "\n".join(lines)
+    
+    def _on_check_dataset_click(b):
+        """Handler untuk tombol check dataset."""
+        if logger:
+            logger.info("🔍 Memulai pengecekan dataset...")
+        
+        update_status_panel(ui_components['status_panel'], "Memeriksa struktur dataset...", "info")
+        
+        try:
+            # Comprehensive dataset check
+            check_result = _check_dataset_structure()
+            summary = _format_dataset_summary(check_result)
+            
+            if logger:
+                logger.info(summary)
+            
+            # Smart status update
+            raw = check_result['raw']
+            critical_issues = [i for i in raw['issues'] if '❌' in i]
+            
+            if critical_issues:
+                status_msg = f"Dataset ditemukan dengan {len(critical_issues)} critical issues"
+                update_status_panel(ui_components['status_panel'], status_msg, "error")
+            elif raw['issues']:
+                status_msg = f"Dataset valid dengan {len(raw['issues'])} warnings"
+                update_status_panel(ui_components['status_panel'], status_msg, "warning")
+            elif raw['valid'] and raw['total_images'] > 0:
+                status_msg = f"Dataset siap: {raw['total_images']:,} gambar tersedia"
+                update_status_panel(ui_components['status_panel'], status_msg, "success")
+            else:
+                update_status_panel(ui_components['status_panel'], "Dataset tidak ditemukan", "error")
+                
+        except Exception as e:
+            error_msg = f"Error check dataset: {str(e)}"
+            if logger:
+                logger.error(f"❌ {error_msg}")
+            update_status_panel(ui_components['status_panel'], error_msg, "error")
+    
+    # Setup event handler
+    ui_components['check_button'].on_click(_on_check_dataset_click)
+    
+    if logger:
+        logger.debug("✅ Check dataset handler setup selesai")
+    
+    return ui_components

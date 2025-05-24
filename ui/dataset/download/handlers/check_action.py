@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/check_action.py
-Deskripsi: Fixed check action dengan proper button state management dan progress tracking
+Deskripsi: Fixed check action dengan explicit progress bar updates
 """
 
 from typing import Dict, Any
@@ -10,57 +10,117 @@ from smartcash.common.environment import get_environment_manager
 from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
 
 def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Eksekusi pengecekan dataset dengan proper state management."""
+    """Check dataset dengan explicit progress bar updates."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
-    # Use context manager untuk proper state management
     with button_manager.operation_context('check'):
         try:
             if logger:
-                logger.info("🔍 Memeriksa status dataset di struktur final")
+                logger.info("🔍 Memeriksa status dataset")
             
             _clear_ui_outputs(ui_components)
+            _force_show_check_progress(ui_components)
             
-            # Single progress bar untuk check operation
-            _update_check_progress(ui_components, 20, "Memeriksa struktur dataset...")
+            # Progress updates dengan explicit widget updates
+            _update_check_progress_bar(ui_components, 20, "Memeriksa struktur dataset...")
             
-            # Check struktur final dataset
             final_stats = _check_final_dataset_structure(ui_components)
-            _update_check_progress(ui_components, 60, "Menganalisis hasil...")
+            _update_check_progress_bar(ui_components, 60, "Menganalisis hasil...")
             
-            # Check downloads folder
             downloads_stats = _check_downloads_folder(ui_components)
-            _update_check_progress(ui_components, 80, "Menyelesaikan pengecekan...")
+            _update_check_progress_bar(ui_components, 80, "Menyelesaikan pengecekan...")
             
-            # Display results
             _display_comprehensive_results(ui_components, final_stats, downloads_stats)
-            _update_check_progress(ui_components, 100, "Pengecekan selesai")
+            _update_check_progress_bar(ui_components, 100, "Pengecekan selesai")
             
         except Exception as e:
+            _update_check_progress_bar(ui_components, 0, f"❌ Error: {str(e)}")
             if logger:
-                logger.error(f"❌ Error saat memeriksa dataset: {str(e)}")
+                logger.error(f"❌ Error check: {str(e)}")
             raise
 
-def _update_check_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update progress untuk check operation - hanya overall progress."""
+def _force_show_check_progress(ui_components: Dict[str, Any]) -> None:
+    """Force show progress bar untuk check operation."""
     try:
-        # Update overall progress (single progress bar untuk check)
+        # Show container
+        if 'progress_container' in ui_components:
+            container = ui_components['progress_container']
+            if isinstance(container, dict) and 'show_container' in container:
+                container['show_container']()
+            elif hasattr(container, 'layout'):
+                container.layout.visibility = 'visible'
+                container.layout.display = 'block'
+        
+        # Show only overall progress untuk check
+        progress_widgets = ['overall_progress', 'progress_bar']
+        for widget_key in progress_widgets:
+            if widget_key in ui_components and ui_components[widget_key]:
+                widget = ui_components[widget_key]
+                if hasattr(widget, 'layout'):
+                    widget.layout.visibility = 'visible'
+                    widget.layout.display = 'block'
+                    widget.layout.width = '100%'
+                    widget.layout.height = '25px'
+                
+                if hasattr(widget, 'value'):
+                    widget.value = 0
+                
+                if hasattr(widget, 'bar_style'):
+                    widget.bar_style = 'info'
+        
+        # Hide step dan current progress untuk check
+        hide_widgets = ['step_progress', 'step_label', 'current_progress', 'current_label']
+        for widget_key in hide_widgets:
+            if widget_key in ui_components and ui_components[widget_key]:
+                widget = ui_components[widget_key]
+                if hasattr(widget, 'layout'):
+                    widget.layout.visibility = 'hidden'
+                    widget.layout.display = 'none'
+                    
+    except Exception as e:
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"📊 Error showing check progress: {str(e)}")
+
+def _update_check_progress_bar(ui_components: Dict[str, Any], progress: int, message: str) -> None:
+    """Update progress bar dengan explicit widget updates."""
+    try:
+        # Update overall progress bar
         if 'overall_progress' in ui_components and ui_components['overall_progress']:
-            ui_components['overall_progress'].value = progress
-            ui_components['overall_progress'].description = f"Progress: {progress}%"
-        elif 'progress_bar' in ui_components and ui_components['progress_bar']:
-            ui_components['progress_bar'].value = progress
-            ui_components['progress_bar'].description = f"Progress: {progress}%"
+            widget = ui_components['overall_progress']
+            widget.value = progress
+            widget.layout.visibility = 'visible'
+            widget.layout.display = 'block'
+            if hasattr(widget, 'bar_style'):
+                if progress >= 100:
+                    widget.bar_style = 'success'
+                elif progress > 0:
+                    widget.bar_style = 'info'
+        
+        # Update progress_bar alias
+        if 'progress_bar' in ui_components and ui_components['progress_bar']:
+            widget = ui_components['progress_bar']
+            widget.value = progress
+            widget.layout.visibility = 'visible'
+            widget.layout.display = 'block'
+            if hasattr(widget, 'bar_style'):
+                if progress >= 100:
+                    widget.bar_style = 'success'
+                elif progress > 0:
+                    widget.bar_style = 'info'
         
         # Update label
         if 'overall_label' in ui_components and ui_components['overall_label']:
-            ui_components['overall_label'].value = f"<div style='color: #495057; font-weight: bold;'>🔍 {message}</div>"
-    except Exception:
-        pass
+            ui_components['overall_label'].value = f"<div style='color: #495057; font-weight: bold;'>🔍 {message} ({progress}%)</div>"
+            
+    except Exception as e:
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"📊 Error updating check progress: {str(e)}")
 
 def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Periksa struktur final dataset di /data/{train,valid,test}."""
+    """Check struktur final dataset."""
     env_manager = get_environment_manager()
     paths = get_paths_for_environment(
         is_colab=env_manager.is_colab,
@@ -76,7 +136,6 @@ def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, A
         'storage_type': 'Drive' if env_manager.is_drive_mounted else 'Local'
     }
     
-    # Check setiap split
     for split in ['train', 'valid', 'test']:
         split_path = Path(paths[split])
         split_info = {
@@ -115,7 +174,7 @@ def _check_final_dataset_structure(ui_components: Dict[str, Any]) -> Dict[str, A
     return final_stats
 
 def _check_downloads_folder(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Check downloads folder sebagai info tambahan."""
+    """Check downloads folder."""
     env_manager = get_environment_manager()
     paths = get_paths_for_environment(
         is_colab=env_manager.is_colab,
@@ -142,13 +201,12 @@ def _check_downloads_folder(ui_components: Dict[str, Any]) -> Dict[str, Any]:
 def _display_comprehensive_results(ui_components: Dict[str, Any], 
                                  final_stats: Dict[str, Any], 
                                  downloads_stats: Dict[str, Any]) -> None:
-    """Tampilkan hasil pengecekan yang comprehensive."""
+    """Display hasil pengecekan."""
     logger = ui_components.get('logger')
     
     if not logger:
         return
     
-    # Header info
     storage_info = f"📁 Storage: {final_stats['storage_type']}"
     if final_stats['storage_type'] == 'Drive':
         env_manager = get_environment_manager()
@@ -156,49 +214,38 @@ def _display_comprehensive_results(ui_components: Dict[str, Any],
     
     logger.info(f"🔍 Hasil Pengecekan Dataset - {storage_info}")
     
-    # Final dataset structure results
     if final_stats['valid']:
-        logger.success(f"✅ Dataset ditemukan di struktur final: {final_stats['total_images']} gambar")
+        logger.success(f"✅ Dataset ditemukan: {final_stats['total_images']} gambar")
         logger.info(f"📊 Base directory: {final_stats['base_dir']}")
         
-        # Detail per split
         for split, split_info in final_stats['splits'].items():
             if split_info['exists'] and split_info['images'] > 0:
-                logger.info(f"   📁 {split}:")
-                logger.info(f"      • Gambar: {split_info['images']} file")
-                logger.info(f"      • Label: {split_info['labels']} file")
-                logger.info(f"      • Path: {split_info['path']}")
+                logger.info(f"   📁 {split}: {split_info['images']} gambar, {split_info['labels']} label")
         
-        # Dataset ready message
         logger.success("🎉 Dataset siap untuk training!")
         
     else:
-        logger.warning(f"⚠️ Dataset tidak ditemukan di struktur final: {final_stats['base_dir']}")
+        logger.warning(f"⚠️ Dataset tidak ditemukan di: {final_stats['base_dir']}")
         
-        # Check individual splits
         for split, split_info in final_stats['splits'].items():
             if Path(split_info['path']).exists():
                 if split_info['images'] == 0:
-                    logger.info(f"   📁 {split}: folder ada tapi kosong")
+                    logger.info(f"   📁 {split}: folder kosong")
                 else:
                     logger.info(f"   📁 {split}: {split_info['images']} gambar")
             else:
-                logger.info(f"   📁 {split}: folder tidak ada")
+                logger.info(f"   📁 {split}: tidak ada")
     
-    # Downloads folder info
     if downloads_stats['exists']:
-        logger.info(f"📥 Downloads folder: {downloads_stats['total_files']} file di {downloads_stats['path']}")
+        logger.info(f"📥 Downloads: {downloads_stats['total_files']} file")
     else:
-        logger.info(f"📥 Downloads folder: kosong atau tidak ada")
+        logger.info("📥 Downloads: kosong")
     
-    # Guidance
     if not final_stats['valid']:
-        logger.info("💡 Gunakan tombol 'Download Dataset' untuk mengunduh dan mengorganisir dataset")
-        if downloads_stats['exists']:
-            logger.info("💡 Ada file di downloads folder - mungkin perlu diorganisir ulang")
+        logger.info("💡 Gunakan 'Download Dataset' untuk mengunduh dataset")
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
-    """Clear UI outputs sebelum check."""
+    """Clear UI outputs."""
     try:
         if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
             ui_components['log_output'].clear_output(wait=True)

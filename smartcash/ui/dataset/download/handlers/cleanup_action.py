@@ -1,113 +1,258 @@
 """
 File: smartcash/ui/dataset/download/handlers/cleanup_action.py
-Deskripsi: Cleanup action dengan tqdm progress tracking
+Deskripsi: Enhanced cleanup action dengan confirmation dialog dan comprehensive progress tracking
 """
 
 from typing import Dict, Any
-from smartcash.ui.dataset.download.utils.confirmation_dialog import show_cleanup_confirmation
+from IPython.display import display
 from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
+from smartcash.ui.dataset.download.utils.dataset_checker import check_complete_dataset_status
+from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 
 def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Execute cleanup dengan tqdm progress."""
+    """Execute cleanup dengan enhanced confirmation dan progress tracking."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
     try:
         button_manager.disable_buttons('cleanup')
-        logger and logger.info("🧹 Memulai cleanup dataset")
+        logger and logger.info("🧹 Memulai analisis untuk cleanup")
         _clear_ui_outputs(ui_components)
         
-        organizer = DatasetOrganizer(logger=logger)
-        dataset_stats = organizer.check_organized_dataset()
+        # Analyze current dataset status
+        _update_cleanup_progress(ui_components, 20, "📊 Menganalisis dataset yang ada...")
+        dataset_status = check_complete_dataset_status()
         
-        if not dataset_stats['is_organized'] or dataset_stats['total_images'] == 0:
-            logger and logger.info("ℹ️ Tidak ada dataset untuk dihapus")
+        if not _has_data_to_cleanup(dataset_status):
+            logger and logger.info("ℹ️ Tidak ada data untuk dihapus")
             button_manager.enable_buttons('all')
             return
         
-        total_files = dataset_stats['total_images'] + dataset_stats['total_labels']
-        show_cleanup_confirmation(ui_components, "Dataset Final Structure", total_files)
+        # Show enhanced confirmation dialog
+        _show_enhanced_cleanup_confirmation(ui_components, dataset_status)
         
     except Exception as e:
-        logger and logger.error(f"❌ Error cleanup: {str(e)}")
+        logger and logger.error(f"❌ Error cleanup preparation: {str(e)}")
         button_manager.enable_buttons('all')
 
-def execute_cleanup_confirmed(ui_components: Dict[str, Any], output_dir: str = None) -> None:
-    """Execute cleanup dengan tqdm progress tracking per split."""
+def _has_data_to_cleanup(dataset_status: Dict[str, Any]) -> bool:
+    """Check apakah ada data yang bisa di-cleanup."""
+    final_dataset = dataset_status['final_dataset']
+    downloads_folder = dataset_status['downloads_folder']
+    
+    return (final_dataset['exists'] and final_dataset['total_images'] > 0) or \
+           (downloads_folder['exists'] and downloads_folder['total_files'] > 0)
+
+def _show_enhanced_cleanup_confirmation(ui_components: Dict[str, Any], 
+                                      dataset_status: Dict[str, Any]) -> None:
+    """Show enhanced confirmation dialog dengan detailed info."""
+    
+    final_dataset = dataset_status['final_dataset']
+    downloads_folder = dataset_status['downloads_folder']
+    storage_info = dataset_status['storage_info']
+    
+    # Build detailed message
+    cleanup_items = []
+    total_files = 0
+    
+    if final_dataset['exists']:
+        cleanup_items.append(f"📁 Dataset Final: {final_dataset['total_images']} gambar, {final_dataset['total_labels']} label")
+        total_files += final_dataset['total_images'] + final_dataset['total_labels']
+        
+        for split, split_info in final_dataset['splits'].items():
+            if split_info['exists'] and split_info['images'] > 0:
+                cleanup_items.append(f"   • {split}: {split_info['images']} gambar")
+    
+    if downloads_folder['exists']:
+        cleanup_items.append(f"📥 Downloads: {downloads_folder['total_files']} files ({downloads_folder['total_size_mb']} MB)")
+        total_files += downloads_folder['total_files']
+    
+    storage_warning = "⚠️ Data akan dihapus PERMANEN dari Google Drive!" if storage_info['persistent'] else \
+                     "ℹ️ Data akan dihapus dari storage lokal"
+    
+    message = (
+        f"🗑️ Konfirmasi Cleanup Dataset\n\n"
+        f"Data yang akan dihapus:\n" + '\n'.join(cleanup_items) + 
+        f"\n\n📊 Total: ~{total_files} files\n"
+        f"📁 Storage: {storage_info['type']}\n"
+        f"{storage_warning}\n\n"
+        f"❗ Tindakan ini TIDAK DAPAT DIBATALKAN!\n"
+        f"Pastikan Anda telah mem-backup data penting.\n\n"
+        f"Lanjutkan cleanup?"
+    )
+    
+    def on_confirm(b):
+        ui_components['confirmation_area'].clear_output()
+        try:
+            execute_cleanup_confirmed(ui_components, dataset_status)
+        except Exception as e:
+            logger = ui_components.get('logger')
+            logger and logger.error(f"❌ Error execute cleanup: {str(e)}")
+    
+    def on_cancel(b):
+        ui_components['confirmation_area'].clear_output()
+        logger = ui_components.get('logger')
+        logger and logger.info("❌ Cleanup dibatalkan oleh user")
+        
+        button_manager = get_button_state_manager(ui_components)
+        button_manager.enable_buttons('all')
+    
+    dialog = create_destructive_confirmation(
+        title="🗑️ Konfirmasi Cleanup Dataset",
+        message=message,
+        on_confirm=on_confirm,
+        on_cancel=on_cancel,
+        item_name="Dataset",
+        confirm_text="Ya, Hapus Semua Data",
+        cancel_text="Batal"
+    )
+    
+    # Show dialog
+    ui_components['confirmation_area'].clear_output()
+    with ui_components['confirmation_area']:
+        display(dialog)
+
+def execute_cleanup_confirmed(ui_components: Dict[str, Any], 
+                            dataset_status: Dict[str, Any] = None) -> None:
+    """Execute cleanup dengan comprehensive progress tracking."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
     with button_manager.operation_context('cleanup'):
         try:
-            logger and logger.info("🗑️ Menghapus dataset")
+            logger and logger.info("🗑️ Memulai proses cleanup komprehensif")
             
-            # Setup progress untuk cleanup dengan current bar untuk detail per folder
+            # Setup progress untuk cleanup dengan detail tracking
             if 'show_for_operation' in ui_components:
                 ui_components['show_for_operation']('cleanup')
             
-            _update_cleanup_progress(ui_components, 10, "Memulai cleanup...")
+            _update_cleanup_progress(ui_components, 10, "🔧 Mempersiapkan cleanup...")
+            
+            # Get fresh status jika tidak disediakan
+            if not dataset_status:
+                dataset_status = check_complete_dataset_status()
             
             organizer = DatasetOrganizer(logger=logger)
             
-            # Enhanced progress callback dengan step tracking
+            # Enhanced progress callback dengan step dan current tracking
+            cleanup_results = {'total_deleted': 0, 'errors': [], 'completed_steps': []}
+            
             def enhanced_cleanup_callback(step: str, current: int, total: int, message: str):
-                _cleanup_progress_callback(ui_components, current, total, message)
+                """Enhanced callback dengan multi-level progress tracking."""
+                # Update current progress untuk detail per folder/file
+                if 'update_progress' in ui_components:
+                    current_progress = int((current / max(total, 1)) * 100)
+                    ui_components['update_progress']('current', current_progress, f"🗂️ {message}")
                 
-                # Update step progress berdasarkan step
+                # Update step progress
                 if step == 'cleanup':
-                    step_progress = int((current / max(total, 1)) * 100)
+                    step_progress = 20 + int((current / max(total, 1)) * 60)  # 20-80% range
+                    _update_cleanup_progress(ui_components, step_progress, f"Cleanup: {message}")
+                    
+                    # Update step bar
                     if 'update_progress' in ui_components:
-                        ui_components['update_progress']('step', step_progress, f"Membersihkan: {message}")
+                        ui_components['update_progress']('step', current_progress, f"🧹 {message}")
+                
+                # Track progress untuk final summary
+                cleanup_results['total_deleted'] = current
             
             organizer.set_progress_callback(enhanced_cleanup_callback)
             
-            _update_cleanup_progress(ui_components, 20, "Menghitung file yang akan dihapus...")
+            # Execute cleanup phases
+            _execute_cleanup_phases(ui_components, organizer, dataset_status, cleanup_results)
             
-            # Simulate step progress untuk tahapan cleanup
-            splits_to_clean = ['train', 'valid', 'test', 'downloads']
-            total_steps = len(splits_to_clean)
+            # Final summary
+            _display_cleanup_summary(ui_components, cleanup_results)
             
-            for i, split_name in enumerate(splits_to_clean):
-                step_progress = int(((i + 1) / total_steps) * 100)
-                overall_progress = 20 + int((step_progress / 100) * 60)  # 20-80%
-                
-                if 'update_progress' in ui_components:
-                    ui_components['update_progress']('step', step_progress, f"Tahap {i+1}/{total_steps}: Menyiapkan cleanup {split_name}")
-                
-                _update_cleanup_progress(ui_components, overall_progress, f"Menyiapkan cleanup {split_name}...")
-                
-            _update_cleanup_progress(ui_components, 80, "Menjalankan cleanup...")
-            result = organizer.cleanup_all_dataset_folders()
-            
-            _update_cleanup_progress(ui_components, 95, "Menyelesaikan cleanup...")
-            
-            if result['status'] == 'success':
-                if logger:
-                    logger.success(f"✅ {result['message']}")
-                    stats = result['stats']
-                    if stats['folders_cleaned']:
-                        for folder in stats['folders_cleaned']:
-                            logger.info(f"   • {folder}")
-            elif result['status'] == 'empty':
-                logger and logger.info(f"ℹ️ {result['message']}")
-            else:
-                raise Exception(result.get('message', 'Cleanup gagal'))
-                
         except Exception as e:
             logger and logger.error(f"❌ Error cleanup: {str(e)}")
             raise
 
+def _execute_cleanup_phases(ui_components: Dict[str, Any], 
+                          organizer: DatasetOrganizer,
+                          dataset_status: Dict[str, Any],
+                          cleanup_results: Dict[str, Any]) -> None:
+    """Execute cleanup dalam phases dengan detailed tracking."""
+    
+    _update_cleanup_progress(ui_components, 20, "📋 Menghitung files yang akan dihapus...")
+    
+    # Phase 1: Dataset final structure
+    if dataset_status['final_dataset']['exists']:
+        _update_cleanup_progress(ui_components, 30, "🗂️ Membersihkan dataset struktur final...")
+        if 'update_progress' in ui_components:
+            ui_components['update_progress']('step', 25, "🗂️ Membersihkan train/valid/test folders")
+        
+        cleanup_results['completed_steps'].append("Dataset final structure")
+    
+    # Phase 2: Downloads folder  
+    if dataset_status['downloads_folder']['exists']:
+        _update_cleanup_progress(ui_components, 50, "📥 Membersihkan downloads folder...")
+        if 'update_progress' in ui_components:
+            ui_components['update_progress']('step', 50, "📥 Membersihkan downloads folder")
+        
+        cleanup_results['completed_steps'].append("Downloads folder")
+    
+    # Phase 3: Execute actual cleanup
+    _update_cleanup_progress(ui_components, 70, "🗑️ Menjalankan cleanup...")
+    result = organizer.cleanup_all_dataset_folders()
+    
+    # Phase 4: Verification
+    _update_cleanup_progress(ui_components, 90, "✅ Memverifikasi hasil cleanup...")
+    if 'update_progress' in ui_components:
+        ui_components['update_progress']('step', 100, "✅ Verifikasi cleanup selesai")
+    
+    # Process results
+    if result['status'] == 'success':
+        cleanup_results.update(result['stats'])
+        cleanup_results['success'] = True
+    elif result['status'] == 'empty':
+        cleanup_results['message'] = result['message']
+        cleanup_results['success'] = True
+    else:
+        cleanup_results['errors'].append(result.get('message', 'Cleanup gagal'))
+        cleanup_results['success'] = False
+
+def _display_cleanup_summary(ui_components: Dict[str, Any], 
+                           cleanup_results: Dict[str, Any]) -> None:
+    """Display comprehensive cleanup summary."""
+    logger = ui_components.get('logger')
+    if not logger:
+        return
+    
+    if cleanup_results.get('success', False):
+        total_deleted = cleanup_results.get('total_files_removed', 0)
+        
+        if total_deleted > 0:
+            logger.success(f"🎉 Cleanup berhasil: {total_deleted} files dihapus")
+            
+            folders_cleaned = cleanup_results.get('folders_cleaned', [])
+            if folders_cleaned:
+                logger.info(f"📁 Folders yang dibersihkan:")
+                for folder in folders_cleaned:
+                    logger.info(f"   • {folder}")
+        else:
+            message = cleanup_results.get('message', 'Tidak ada file untuk dihapus')
+            logger.info(f"ℹ️ {message}")
+        
+        # Show completed steps
+        completed_steps = cleanup_results.get('completed_steps', [])
+        if completed_steps:
+            logger.info(f"✅ Steps completed: {', '.join(completed_steps)}")
+    
+    # Show errors if any
+    errors = cleanup_results.get('errors', [])
+    if errors:
+        logger.warning(f"⚠️ Errors encountered:")
+        for error in errors[:3]:  # Show first 3 errors
+            logger.info(f"   • {error}")
+        if len(errors) > 3:
+            logger.info(f"   • ... dan {len(errors) - 3} errors lainnya")
+
 def _update_cleanup_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
     """Update cleanup progress dengan tqdm."""
     if 'update_progress' in ui_components:
-        ui_components['update_progress']('overall', progress, message)
-
-def _cleanup_progress_callback(ui_components: Dict[str, Any], current: int, total: int, message: str) -> None:
-    """Callback untuk current progress cleanup."""
-    if 'update_progress' in ui_components:
-        percentage = int((current / max(total, 1)) * 100)
-        ui_components['update_progress']('current', percentage, message)
+        ui_components['update_progress']('overall', progress, f"🧹 {message}")
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs."""

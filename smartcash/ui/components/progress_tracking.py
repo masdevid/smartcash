@@ -33,7 +33,7 @@ def create_progress_tracking_container() -> Dict[str, Any]:
         widgets.HTML("<h4>📊 Progress</h4>"),
         status_widget,
         tqdm_container
-    ], layout=widgets.Layout(margin='10px 0', padding='10px', display='none'))
+    ], layout=widgets.Layout(margin='10px 0', padding='20px', display='none', overflow='hidden'))
     
     # Progress state management
     progress_state = {

@@ -62,7 +62,8 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
             justify_content='space-between',
             width='100%',
             margin='10px 0',
-            gap='10px'  # Spacing antar kolom
+            gap='10px',
+            overflow='hidden'
         )
     )
     

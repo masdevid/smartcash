@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/execution_handler.py
-Deskripsi: Handler untuk eksekusi download dengan progress tracking yang detail dan persistent
+Deskripsi: Handler untuk eksekusi download dengan progress tracking tanpa redundant validation
 """
 
 import time
@@ -35,6 +35,14 @@ def execute_download_process(ui_components: Dict[str, Any], params: Dict[str, An
         
         # Add execution time
         result['duration'] = time.time() - start_time
+        
+        # Log hasil tanpa additional validation (organizer sudah handle verification)
+        if result.get('status') == 'success' and logger:
+            logger.info("🎯 Download service menyelesaikan proses dengan sukses")
+            
+            stats = result.get('stats', {})
+            if stats.get('total_images', 0) > 0:
+                logger.info(f"📊 Berhasil mengorganisir {stats['total_images']} gambar")
         
         return result
         
@@ -92,14 +100,6 @@ def _create_progress_callback(ui_components: Dict[str, Any]) -> Callable:
                         ui_components['update_progress']('current', split_progress, 
                                                        f"📂 Memindahkan {split_name}")
             
-            elif stage == 'verify':
-                # Verify progress: 95-99% overall
-                base_progress = 95 + int((progress / 100) * 4)
-                _update_execution_progress(ui_components, base_progress, f"✅ Verifikasi: {message}")
-                
-                if 'update_progress' in ui_components:
-                    ui_components['update_progress']('step', progress, f"✅ {message}")
-            
         except Exception:
             # Silent fail untuk progress callback agar tidak mengganggu proses utama
             pass
@@ -116,17 +116,8 @@ def _execute_with_progress_tracking(download_service: UIDownloadService,
         if hasattr(download_service, 'set_progress_callback'):
             download_service.set_progress_callback(progress_callback)
         
-        # Execute download dengan enhanced monitoring
+        # Execute download - organizer sudah handle verification internal
         result = download_service.download_dataset(params)
-        
-        if result.get('status') == 'success':
-            # Validate hasil download
-            validation_result = _validate_download_result(result)
-            if not validation_result['valid']:
-                return {
-                    'status': 'error',
-                    'message': f"Validasi hasil gagal: {validation_result['message']}"
-                }
         
         return result
         
@@ -134,50 +125,6 @@ def _execute_with_progress_tracking(download_service: UIDownloadService,
         return {
             'status': 'error',
             'message': f'Execution error: {str(e)}'
-        }
-
-def _validate_download_result(result: Dict[str, Any]) -> Dict[str, Any]:
-    """Validasi hasil download untuk memastikan integritas."""
-    try:
-        stats = result.get('stats', {})
-        
-        # Check basic stats
-        total_images = stats.get('total_images', 0)
-        if total_images == 0:
-            return {
-                'valid': False,
-                'message': "Tidak ada gambar yang berhasil didownload"
-            }
-        
-        # Check splits
-        splits_with_images = []
-        for split in ['train', 'valid', 'test']:
-            split_key = f'{split}_images'
-            if stats.get(split_key, 0) > 0:
-                splits_with_images.append(split)
-        
-        if not splits_with_images:
-            return {
-                'valid': False,
-                'message': "Tidak ada split yang berhasil didownload"
-            }
-        
-        # Minimal requirement: harus ada train split
-        if 'train' not in splits_with_images:
-            return {
-                'valid': False,
-                'message': "Split training tidak ditemukan atau kosong"
-            }
-        
-        return {
-            'valid': True,
-            'message': f"Validasi berhasil: {total_images} gambar dalam {len(splits_with_images)} split"
-        }
-        
-    except Exception as e:
-        return {
-            'valid': False,
-            'message': f"Error validasi: {str(e)}"
         }
 
 def _update_execution_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:

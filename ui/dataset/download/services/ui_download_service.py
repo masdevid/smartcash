@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/services/ui_download_service.py
-Deskripsi: Download service tanpa step validasi dataset setelah download
+Deskripsi: Download service dengan organizer integration tanpa redundant validation
 """
 
 import time
@@ -15,7 +15,7 @@ from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
 
 class UIDownloadService:
-    """Download service tanpa validasi dataset otomatis - gunakan check button."""
+    """Download service dengan organizer integration tanpa redundant validation."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -64,10 +64,10 @@ class UIDownloadService:
             self._original_stdout = sys.stdout
     
     def download_dataset(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Download tanpa step validasi otomatis."""
+        """Download dengan organizer integration tanpa redundant validation."""
         start_time = time.time()
         
-        # Define steps tanpa validasi
+        # Define steps tanpa validation post-download
         steps = self._define_process_steps(params)
         self.progress_bridge.define_steps(steps)
         
@@ -110,7 +110,7 @@ class UIDownloadService:
             
             self.progress_bridge.notify_step_complete("Dataset berhasil diorganisir")
             
-            # 🎉 Complete (tanpa step validasi)
+            # 🎉 Complete - organizer sudah melakukan internal validation
             duration = time.time() - start_time
             total_images = organize_result.get('total_images', 0)
             success_message = f"Download dan organisasi selesai: {total_images} gambar dalam {duration:.1f}s"
@@ -119,7 +119,7 @@ class UIDownloadService:
             
             if self.logger:
                 self.logger.success(f"✅ {success_message}")
-                self.logger.info("🔍 Gunakan tombol 'Check Dataset' untuk memverifikasi hasil")
+                self.logger.info("🎯 Dataset sudah siap untuk digunakan")
                 self._log_final_structure(organize_result)
             
             return {
@@ -130,7 +130,7 @@ class UIDownloadService:
                 'duration': duration,
                 'drive_storage': self.env_manager.is_drive_mounted,
                 'organized': True,
-                'verification_note': 'Gunakan Check Dataset untuk verifikasi hasil'
+                'message': f'Dataset berhasil diorganisir: {total_images} gambar'
             }
             
         except Exception as e:
@@ -168,7 +168,7 @@ class UIDownloadService:
         return SuppressOutput()
     
     def _define_process_steps(self, params: Dict[str, Any]) -> list:
-        """Define steps tanpa validasi dataset."""
+        """Define steps tanpa redundant validation."""
         steps = [
             {'name': 'validate', 'weight': 10, 'description': 'Validasi Parameter'},
             {'name': 'metadata', 'weight': 15, 'description': 'Ambil Metadata'},
@@ -250,7 +250,7 @@ class UIDownloadService:
             raise Exception(f"Error mendapatkan metadata: {str(e)}")
     
     def _log_final_structure(self, stats: Dict[str, Any]) -> None:
-        """Log struktur final dataset."""
+        """Log struktur final dataset dengan detail split."""
         if not self.logger:
             return
         
@@ -262,3 +262,12 @@ class UIDownloadService:
         
         storage_type = "Google Drive" if self.env_manager.is_drive_mounted else "Local Storage"
         self.logger.info(f"💾 Storage: {storage_type}")
+        
+        # Tambahan info kesiapan dataset
+        train_images = stats.get('splits', {}).get('train', {}).get('images', 0)
+        if train_images > 100:
+            self.logger.success(f"🚀 Dataset siap untuk training dengan {train_images} gambar training")
+        elif train_images > 0:
+            self.logger.info(f"📊 Dataset tersedia dengan {train_images} gambar training")
+        
+        self.logger.info("💡 Gunakan 'Check Dataset' untuk analisis detail struktur dan kesiapan training")

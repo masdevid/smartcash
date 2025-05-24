@@ -65,7 +65,7 @@ def create_progress_tracking(
             value=0,
             min=0,
             max=100,
-            bar_style='',
+            bar_style='info',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width=width, height='15px')
         )
@@ -86,7 +86,7 @@ def create_progress_tracking(
             value=0,
             min=0,
             max=100,
-            bar_style='success',
+            bar_style='info',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width=width, height='15px')
         )
@@ -207,7 +207,7 @@ def update_step_progress(components: Dict[str, Any], step: int, total_steps: int
         step_text = f"Step {step}/{total_steps}"
         if step_name:
             step_text += f": {step_name}"
-        components['step_label'].value = f"<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 14px;'>🔄 {step_text}</div>"
+        components['step_label'].value = f"<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 12px;'>🔄 {step_text}</div>"
 
 
 def update_current_progress(components: Dict[str, Any], current: int, total: int, message: str = ""):

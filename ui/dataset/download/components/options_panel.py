@@ -82,7 +82,6 @@ def create_options_panel(config, env_manager=None):
     ], layout=widgets.Layout(
         width='100%',
         justify_content='space-between',
-        justify_items='stretch',
         align_items='flex-start',
         margin='0 0 15px 0',
         overflow='hidden'

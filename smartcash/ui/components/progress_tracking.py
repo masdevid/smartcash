@@ -78,7 +78,7 @@ def create_progress_tracking(
     
     if show_current_progress:
         current_label = widgets.HTML(
-            value="<div style='margin: 8px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Current: -</div>",
+            value="<div style='margin: 4px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Current: -</div>",
             layout=widgets.Layout(width=width)
         )
         
@@ -167,10 +167,10 @@ def _reset_all_progress(overall_progress, step_progress, current_progress,
         overall_label.value = "<div style='margin-bottom: 5px; color: #495057; font-weight: bold;'>📊 Overall Progress: Siap memulai</div>"
     
     if step_label:
-        step_label.value = "<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 14px;'>🔄 Step: Menunggu</div>"
+        step_label.value = "<div style='margin: 10px 0 5px 0; color: #6c757d; font-size: 12px;'>🔄 Step: Menunggu</div>"
     
     if current_label:
-        current_label.value = "<div style='margin: 8px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Current: -</div>"
+        current_label.value = "<div style='margin: 4px 0 5px 0; color: #868e96; font-size: 12px;'>⚡ Current: -</div>"
 
 
 def update_overall_progress(components: Dict[str, Any], progress: int, total: int, message: str = ""):

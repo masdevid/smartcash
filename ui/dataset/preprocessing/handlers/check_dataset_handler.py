@@ -41,15 +41,16 @@ def setup_check_dataset_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]
     def _analyze_class_distribution(data_dir: str) -> Dict[str, Any]:
         """Analisis distribusi kelas menggunakan explorer service."""
         try:
-            from smartcash.dataset.services.explorer.explorer_service import ExplorerService
+            from smartcash.dataset.services.explorer.class_explorer import ClassExplorer
             
             config = {
                 'data': {'dir': data_dir},
                 'classes': {}
             }
             
-            explorer = ExplorerService(config, data_dir, logger)
-            class_result = explorer.analyze_class_distribution('train')
+            # Fixed constructor call - 4 parameters only
+            explorer = ClassExplorer(config, data_dir, logger, 4)  # num_workers=4
+            class_result = explorer.analyze_distribution('train')
             
             if class_result.get('status') == 'success':
                 return {

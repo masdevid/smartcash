@@ -6,10 +6,12 @@ def create_progress_section():
         module_name='download',
         show_step_progress=True,
         show_overall_progress=True,
+        show_current_progress=False,
         width='100%'
     )
     progress_components['progress_container'].layout.margin = '5px 0'
     progress_components['progress_container'].layout.padding = '5px 0'
     progress_components['progress_container'].layout.border_radius = '5px'
     progress_components['progress_container'].layout.display = 'none'
+    progress_components['progress_container'].layout.overflow = 'hidden'  
     return progress_components 

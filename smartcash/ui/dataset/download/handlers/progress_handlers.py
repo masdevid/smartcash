@@ -196,10 +196,10 @@ def _create_step_update_handler(ui_components: Dict[str, Any]) -> Callable:
         progress = max(0, min(100, progress))
         
         # Update hanya step progress bar
-        if 'current_progress' in ui_components:
-            ui_components['current_progress'].value = progress
-            ui_components['current_progress'].description = f"Step: {progress}%"
-            ui_components['current_progress'].layout.visibility = 'visible'
+        if 'step_progress' in ui_components:
+            ui_components['step_progress'].value = progress
+            ui_components['step_progress'].description = f"Step: {progress}%"
+            ui_components['step_progress'].layout.visibility = 'visible'
         
         if 'step_label' in ui_components:
             ui_components['step_label'].value = f"{step_name}: {message}"
@@ -261,10 +261,10 @@ def _update_dual_progress_widgets(ui_components: Dict[str, Any], overall: int, s
         ui_components['progress_bar'].layout.visibility = 'visible'
     
     # Update step progress bar
-    if 'current_progress' in ui_components:
-        ui_components['current_progress'].value = step
-        ui_components['current_progress'].description = "Error" if error else f"Step: {step}%"
-        ui_components['current_progress'].layout.visibility = 'visible'
+    if 'step_progress' in ui_components:
+        ui_components['step_progress'].value = step
+        ui_components['step_progress'].description = "Error" if error else f"Step: {step}%"
+        ui_components['step_progress'].layout.visibility = 'visible'
     
     # Update labels
     if 'overall_label' in ui_components:

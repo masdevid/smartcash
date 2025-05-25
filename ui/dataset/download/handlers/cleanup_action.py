@@ -22,6 +22,8 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         return
     
     try:
+        # Disable buttons during preparation phase
+        button_manager._disable_all_buttons()
         logger and logger.info("🧹 Memulai analisis untuk cleanup")
         _clear_ui_outputs(ui_components)
         
@@ -36,14 +38,16 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         if not _has_data_to_cleanup(dataset_status):
             logger and logger.info("ℹ️ Tidak ada data untuk dihapus")
             _complete_cleanup_progress(ui_components, "Tidak ada data untuk dihapus")
+            button_manager._enable_all_buttons()
             return
         
-        # Show enhanced confirmation dialog
+        # Show enhanced confirmation dialog (buttons remain disabled during confirmation)
         _show_enhanced_cleanup_confirmation(ui_components, dataset_status)
         
     except Exception as e:
         logger and logger.error(f"❌ Error cleanup preparation: {str(e)}")
         _error_cleanup_progress(ui_components, f"Error preparation: {str(e)}")
+        button_manager._enable_all_buttons()
 
 def _has_data_to_cleanup(dataset_status: Dict[str, Any]) -> bool:
     """Check apakah ada data yang bisa di-cleanup."""
@@ -109,7 +113,9 @@ def _show_enhanced_cleanup_confirmation(ui_components: Dict[str, Any],
         if 'hide_container' in ui_components:
             ui_components['hide_container']()
         
-        # No need to manually enable buttons as operation_context will handle it
+        # Re-enable buttons when user cancels
+        button_manager = get_button_state_manager(ui_components)
+        button_manager._enable_all_buttons()
     
     dialog = create_destructive_confirmation(
         title="🗑️ Konfirmasi Cleanup Dataset",

@@ -5,7 +5,7 @@ Deskripsi: Enhanced cleanup action dengan confirmation dialog dan comprehensive 
 
 from typing import Dict, Any
 from IPython.display import display
-from smartcash.ui.utils.button_state_manager import get_button_state_manager
+from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
 from smartcash.ui.dataset.download.utils.dataset_checker import check_complete_dataset_status
 from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
@@ -15,8 +15,13 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
+    # Check if operation can start
+    can_start, message = button_manager.can_start_operation('cleanup')
+    if not can_start:
+        logger and logger.warning(f"⚠️ {message}")
+        return
+    
     try:
-        button_manager.disable_buttons('cleanup')
         logger and logger.info("🧹 Memulai analisis untuk cleanup")
         _clear_ui_outputs(ui_components)
         
@@ -31,7 +36,6 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         if not _has_data_to_cleanup(dataset_status):
             logger and logger.info("ℹ️ Tidak ada data untuk dihapus")
             _complete_cleanup_progress(ui_components, "Tidak ada data untuk dihapus")
-            button_manager.enable_buttons('all')
             return
         
         # Show enhanced confirmation dialog
@@ -40,7 +44,6 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
     except Exception as e:
         logger and logger.error(f"❌ Error cleanup preparation: {str(e)}")
         _error_cleanup_progress(ui_components, f"Error preparation: {str(e)}")
-        button_manager.enable_buttons('all')
 
 def _has_data_to_cleanup(dataset_status: Dict[str, Any]) -> bool:
     """Check apakah ada data yang bisa di-cleanup."""
@@ -106,8 +109,7 @@ def _show_enhanced_cleanup_confirmation(ui_components: Dict[str, Any],
         if 'hide_container' in ui_components:
             ui_components['hide_container']()
         
-        button_manager = get_button_state_manager(ui_components)
-        button_manager.enable_buttons('all')
+        # No need to manually enable buttons as operation_context will handle it
     
     dialog = create_destructive_confirmation(
         title="🗑️ Konfirmasi Cleanup Dataset",

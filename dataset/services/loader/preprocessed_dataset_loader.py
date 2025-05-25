@@ -1,22 +1,22 @@
 """
 File: smartcash/dataset/services/loader/preprocessed_dataset_loader.py
-Deskripsi: Loader untuk dataset yang sudah dipreprocessing sebelumnya
+Deskripsi: Updated loader untuk dataset yang sudah dipreprocessing dengan integrasi service layer baru
 """
 
 import os
 import torch
 import numpy as np
+import cv2
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Tuple, Any, Callable
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.components.datasets.multilayer_dataset import MultilayerDataset
-from smartcash.dataset.preprocessor.core.preprocessing_manager import PreprocessingManager
+from smartcash.dataset.preprocessor.utils.preprocessing_factory import PreprocessingFactory
 
 
 class PreprocessedDatasetLoader:
     """
-    Loader untuk dataset yang sudah dipreprocessing sebelumnya.
+    Updated loader untuk dataset yang sudah dipreprocessing dengan service layer integration.
     Meningkatkan kecepatan loading untuk training dan evaluasi.
     """
     
@@ -29,7 +29,7 @@ class PreprocessedDatasetLoader:
         logger: Optional[Any] = None
     ):
         """
-        Inisialisasi loader dataset preprocessed.
+        Inisialisasi loader dataset preprocessed dengan service layer baru.
         
         Args:
             preprocessed_dir: Direktori dataset preprocessed
@@ -43,12 +43,16 @@ class PreprocessedDatasetLoader:
         self.fallback_to_raw = fallback_to_raw
         self.auto_preprocess = auto_preprocess
         
-        # Default config
+        # Default config untuk compatibility dengan service layer baru
         self.default_config = {
-            'raw_dataset_dir': 'data/dataset',
-            'img_size': (640, 640),
+            'data': {'dir': 'data'},
+            'preprocessing': {
+                'img_size': [640, 640],
+                'normalize': True,
+                'output_dir': str(self.preprocessed_dir),
+                'num_workers': 4
+            },
             'batch_size': 16,
-            'num_workers': 4,
             'pin_memory': True,
             'multilayer': True
         }
@@ -56,20 +60,20 @@ class PreprocessedDatasetLoader:
         # Merge konfigurasi
         self.config = self.default_config.copy()
         if config:
-            self.config.update(config)
-            
-        # Inisialisasi preprocessor untuk keperluan fallback
-        if self.fallback_to_raw or self.auto_preprocess:
-            self.preprocessor = PreprocessingManager(
-                config={
-                    'img_size': self.config['img_size'],
-                    'preprocessed_dir': str(self.preprocessed_dir),
-                    'dataset_dir': self.config['raw_dataset_dir']
-                },
-                logger=self.logger
-            )
-            
-        self.logger.info(f"📦 PreprocessedDatasetLoader diinisialisasi (preprocessed_dir: {self.preprocessed_dir})")
+            # Update preprocessing config properly
+            if 'preprocessing' in config:
+                self.config['preprocessing'].update(config['preprocessing'])
+            if 'data' in config:
+                self.config['data'].update(config['data'])
+            # Direct config updates
+            for key in ['batch_size', 'pin_memory', 'multilayer']:
+                if key in config:
+                    self.config[key] = config[key]
+        
+        # Initialize service layer components untuk auto preprocessing
+        self._preprocessing_manager = None
+        
+        self.logger.info(f"📦 PreprocessedDatasetLoader initialized dengan service layer (dir: {self.preprocessed_dir})")
     
     def get_dataset(
         self,
@@ -78,43 +82,40 @@ class PreprocessedDatasetLoader:
         transform: Optional[Callable] = None
     ) -> torch.utils.data.Dataset:
         """
-        Dapatkan dataset untuk split tertentu.
+        Dapatkan dataset untuk split tertentu dengan fallback mechanism.
         
         Args:
-            split: Split dataset ('train', 'val', 'test')
+            split: Split dataset ('train', 'valid', 'test')
             require_all_layers: Membutuhkan semua layer dalam dataset
             transform: Transformasi tambahan setelah loading
             
         Returns:
             Dataset yang sudah dimuat
-            
-        Raises:
-            ValueError: Jika dataset tidak tersedia dan fallback dinonaktifkan
         """
-        # Cek apakah dataset preprocessed tersedia
-        split_dir = self.preprocessed_dir / split
+        # Normalize split name (val -> valid)
+        normalized_split = 'valid' if split == 'val' else split
         
-        # Trigger preprocessing jika perlu
-        if not self._is_split_available(split):
+        # Check apakah dataset preprocessed tersedia
+        if not self._is_split_available(normalized_split):
             if self.auto_preprocess:
-                self.logger.info(f"🔄 Otomatis melakukan preprocessing untuk {split}")
-                self.preprocessor.preprocess_dataset(split=split)
+                self.logger.info(f"🔄 Auto preprocessing untuk {normalized_split}")
+                self._ensure_preprocessing(normalized_split)
             elif self.fallback_to_raw:
                 self.logger.warning(
-                    f"⚠️ Dataset preprocessed untuk {split} tidak tersedia. "
+                    f"⚠️ Dataset preprocessed untuk {normalized_split} tidak tersedia. "
                     f"Menggunakan dataset asli."
                 )
-                return self._get_raw_dataset(split, require_all_layers, transform)
+                return self._get_raw_dataset(normalized_split, require_all_layers, transform)
             else:
                 raise ValueError(
-                    f"Dataset preprocessed untuk {split} tidak tersedia dan "
+                    f"Dataset preprocessed untuk {normalized_split} tidak tersedia dan "
                     f"fallback_to_raw=False"
                 )
         
-        # Buat dataset dari data preprocessed
-        return PreprocessedMultilayerDataset(
-            root_dir=split_dir,
-            img_size=self.config['img_size'],
+        # Load dataset dari preprocessed data
+        return PreprocessedDataset(
+            root_dir=self.preprocessed_dir / normalized_split,
+            img_size=tuple(self.config['preprocessing']['img_size']),
             require_all_layers=require_all_layers,
             transform=transform,
             logger=self.logger
@@ -133,7 +134,7 @@ class PreprocessedDatasetLoader:
         Dapatkan dataloader untuk split tertentu.
         
         Args:
-            split: Split dataset ('train', 'val', 'test')
+            split: Split dataset ('train', 'valid', 'test')
             batch_size: Ukuran batch
             num_workers: Jumlah worker untuk loading
             shuffle: Acak urutan data
@@ -143,34 +144,33 @@ class PreprocessedDatasetLoader:
         Returns:
             DataLoader yang sudah dikonfigurasi
         """
-        # Gunakan default jika tidak disediakan
+        # Use defaults dari config
         batch_size = batch_size or self.config['batch_size']
-        num_workers = num_workers or self.config['num_workers']
+        num_workers = num_workers or self.config['preprocessing']['num_workers']
         
-        # Shuffle default ke True untuk training, False untuk lainnya
+        # Shuffle default: True untuk training, False untuk lainnya
         if shuffle is None:
-            shuffle = (split == 'train')
+            shuffle = (split in ['train', 'training'])
         
-        # Dapatkan dataset
+        # Get dataset
         dataset = self.get_dataset(
             split=split,
             require_all_layers=require_all_layers,
             transform=transform
         )
         
-        # Buat dataloader
+        # Create dataloader
         dataloader = torch.utils.data.DataLoader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=num_workers,
             pin_memory=self.config['pin_memory'],
-            drop_last=(split == 'train')  # Drop incomplete batch hanya saat training
+            drop_last=(split in ['train', 'training'])
         )
         
         self.logger.info(
-            f"🔄 Dataloader untuk {split} siap: "
-            f"{len(dataset)} sampel, {batch_size} batch_size, {num_workers} workers"
+            f"🔄 Dataloader {split}: {len(dataset)} samples, batch={batch_size}, workers={num_workers}"
         )
         
         return dataloader
@@ -185,18 +185,12 @@ class PreprocessedDatasetLoader:
         """
         Dapatkan dataloader untuk semua split.
         
-        Args:
-            batch_size: Ukuran batch
-            num_workers: Jumlah worker untuk loading
-            require_all_layers: Membutuhkan semua layer dalam dataset
-            transform: Transformasi tambahan setelah loading
-            
         Returns:
             Dictionary dengan semua dataloader
         """
         dataloaders = {}
         
-        for split in ['train', 'val', 'test']:
+        for split in ['train', 'valid', 'test']:
             try:
                 dataloader = self.get_dataloader(
                     split=split,
@@ -207,48 +201,70 @@ class PreprocessedDatasetLoader:
                 )
                 dataloaders[split] = dataloader
             except Exception as e:
-                self.logger.error(f"❌ Gagal membuat dataloader untuk {split}: {str(e)}")
+                self.logger.warning(f"⚠️ Skip dataloader {split}: {str(e)}")
         
         return dataloaders
     
     def ensure_preprocessed(
         self,
-        splits: List[str] = ['train', 'val', 'test'],
+        splits: List[str] = ['train', 'valid', 'test'],
         force_reprocess: bool = False
-    ) -> Dict[str, Dict[str, int]]:
+    ) -> Dict[str, Dict[str, Any]]:
         """
-        Pastikan dataset sudah dipreprocessing.
+        Pastikan dataset sudah dipreprocessing menggunakan service layer baru.
         
         Args:
             splits: List split yang akan diproses
             force_reprocess: Paksa proses ulang meskipun sudah ada
             
         Returns:
-            Statistik hasil preprocessing
+            Hasil preprocessing per split
         """
-        if not hasattr(self, 'preprocessor'):
-            self.preprocessor = DatasetPreprocessor(
-                config={
-                    'img_size': self.config['img_size'],
-                    'preprocessed_dir': str(self.preprocessed_dir),
-                    'dataset_dir': self.config['raw_dataset_dir']
-                },
-                logger=self.logger
-            )
-        
         results = {}
+        
         for split in splits:
-            if force_reprocess or not self._is_split_available(split):
-                result = self.preprocessor.preprocess_dataset(split=split, force_reprocess=force_reprocess)
-                results[split] = result
-            else:
-                self.logger.info(f"✓ Dataset preprocessed untuk {split} sudah tersedia")
-                
+            try:
+                if force_reprocess or not self._is_split_available(split):
+                    result = self._ensure_preprocessing(split, force_reprocess)
+                    results[split] = result
+                else:
+                    self.logger.info(f"✅ Dataset preprocessed {split} sudah tersedia")
+                    results[split] = {'success': True, 'message': 'Already available'}
+            except Exception as e:
+                self.logger.error(f"❌ Error preprocessing {split}: {str(e)}")
+                results[split] = {'success': False, 'error': str(e)}
+        
         return results
+    
+    def _ensure_preprocessing(self, split: str, force_reprocess: bool = False) -> Dict[str, Any]:
+        """Ensure preprocessing menggunakan service layer baru."""
+        try:
+            # Create preprocessing manager jika belum ada
+            if not self._preprocessing_manager:
+                self._preprocessing_manager = PreprocessingFactory.create_preprocessing_manager(
+                    self.config, self.logger
+                )
+            
+            # Coordinate preprocessing untuk split
+            result = self._preprocessing_manager.coordinate_preprocessing(
+                split=split,
+                force_reprocess=force_reprocess
+            )
+            
+            if result['success']:
+                self.logger.success(f"✅ Preprocessing {split} berhasil: {result.get('total_images', 0)} gambar")
+            else:
+                self.logger.error(f"❌ Preprocessing {split} gagal: {result.get('message')}")
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error dalam preprocessing {split}: {str(e)}")
+            return {'success': False, 'error': str(e)}
     
     def _is_split_available(self, split: str) -> bool:
         """
-        Cek apakah split dataset preprocessed tersedia.
+        Check apakah split dataset preprocessed tersedia.
         
         Args:
             split: Split dataset
@@ -259,13 +275,18 @@ class PreprocessedDatasetLoader:
         split_dir = self.preprocessed_dir / split
         if not split_dir.exists():
             return False
-            
+        
         images_dir = split_dir / 'images'
         if not images_dir.exists():
             return False
-            
-        # Cek apakah ada minimal 1 file
-        return len(list(images_dir.glob('*.npy'))) > 0 or len(list(images_dir.glob('*.jpg'))) > 0
+        
+        # Check minimal ada 1 file gambar
+        image_extensions = ['.jpg', '.jpeg', '.png', '.npy']
+        for ext in image_extensions:
+            if list(images_dir.glob(f'*{ext}')):
+                return True
+        
+        return False
     
     def _get_raw_dataset(
         self,
@@ -274,7 +295,7 @@ class PreprocessedDatasetLoader:
         transform: Optional[Callable] = None
     ) -> torch.utils.data.Dataset:
         """
-        Gunakan dataset asli (fallback).
+        Fallback ke dataset asli (raw).
         
         Args:
             split: Split dataset
@@ -284,22 +305,33 @@ class PreprocessedDatasetLoader:
         Returns:
             Dataset asli
         """
-        # Perlu import di sini untuk menghindari circular import
-        from smartcash.dataset.services.loader.multilayer_loader import MultilayerDataset
-        
-        raw_dir = Path(self.config['raw_dataset_dir']) / split
-        
-        return MultilayerDataset(
-            root_dir=raw_dir,
-            img_size=self.config['img_size'],
-            require_all_layers=require_all_layers,
-            transform=transform
-        )
-    
+        # Import here untuk avoid circular import
+        try:
+            from smartcash.dataset.services.loader.multilayer_loader import MultilayerDataset
+            
+            raw_dir = Path(self.config['data']['dir']) / split
+            
+            return MultilayerDataset(
+                root_dir=raw_dir,
+                img_size=tuple(self.config['preprocessing']['img_size']),
+                require_all_layers=require_all_layers,
+                transform=transform
+            )
+        except ImportError:
+            # Fallback ke basic dataset jika MultilayerDataset tidak tersedia
+            return PreprocessedDataset(
+                root_dir=Path(self.config['data']['dir']) / split,
+                img_size=tuple(self.config['preprocessing']['img_size']),
+                require_all_layers=require_all_layers,
+                transform=transform,
+                logger=self.logger
+            )
 
-class PreprocessedMultilayerDataset(torch.utils.data.Dataset):
+
+class PreprocessedDataset(torch.utils.data.Dataset):
     """
-    Dataset untuk data yang sudah dipreprocessing dengan dukungan multilayer.
+    Updated dataset untuk data yang sudah dipreprocessing dengan dukungan multilayer.
+    Compatible dengan output preprocessor service layer baru.
     """
     
     def __init__(
@@ -326,33 +358,40 @@ class PreprocessedMultilayerDataset(torch.utils.data.Dataset):
         self.transform = transform
         self.logger = logger or get_logger()
         
-        # Verifikasi direktori
+        # Verify directories
         self.images_dir = self.root_dir / 'images'
         self.labels_dir = self.root_dir / 'labels'
         
         if not self.images_dir.exists():
-            raise ValueError(f"Direktori gambar tidak ditemukan: {self.images_dir}")
-            
+            raise ValueError(f"Images directory tidak ditemukan: {self.images_dir}")
+        
         if not self.labels_dir.exists():
-            raise ValueError(f"Direktori label tidak ditemukan: {self.labels_dir}")
+            self.logger.warning(f"⚠️ Labels directory tidak ditemukan: {self.labels_dir}")
+            self.labels_dir = None
         
-        # Daftar semua file gambar
-        self.image_files = sorted(list(self.images_dir.glob('*.npy')))
+        # Get all image files (support multiple formats)
+        self.image_files = []
+        for ext in ['.jpg', '.jpeg', '.png', '.npy']:
+            self.image_files.extend(sorted(self.images_dir.glob(f'*{ext}')))
         
-        # Tambahkan format gambar lain jika tidak ada .npy
-        if not self.image_files:
-            self.image_files = sorted(list(self.images_dir.glob('*.jpg')) + 
-                                    list(self.images_dir.glob('*.jpeg')) + 
-                                    list(self.images_dir.glob('*.png')))
-        
-        # Filter gambar yang memiliki label
+        # Filter gambar yang memiliki label (jika ada labels_dir)
         self.valid_items = []
         for img_path in self.image_files:
-            label_path = self.labels_dir / img_path.with_suffix('.txt').name
-            if label_path.exists():
-                self.valid_items.append((img_path, label_path))
+            if self.labels_dir:
+                label_path = self.labels_dir / img_path.with_suffix('.txt').name
+                if label_path.exists():
+                    self.valid_items.append((img_path, label_path))
+                elif not self.require_all_layers:
+                    # Allow image without label untuk inference
+                    self.valid_items.append((img_path, None))
+            else:
+                # No labels directory, use image only
+                self.valid_items.append((img_path, None))
         
-        self.logger.info(f"📦 Loaded {len(self.valid_items)} valid items from {root_dir}")
+        if not self.valid_items:
+            raise ValueError(f"Tidak ada valid items ditemukan di {root_dir}")
+        
+        self.logger.info(f"📦 Loaded {len(self.valid_items)} items dari {root_dir}")
     
     def __len__(self) -> int:
         """Dapatkan jumlah item dalam dataset."""
@@ -370,40 +409,65 @@ class PreprocessedMultilayerDataset(torch.utils.data.Dataset):
         """
         img_path, label_path = self.valid_items[idx]
         
-        # Load preprocessed image (npy format)
-        if img_path.suffix == '.npy':
-            # Load gambar yang sudah dipreprocessing
-            try:
+        # Load image
+        img_tensor = self._load_image(img_path)
+        
+        # Load label jika ada
+        targets = self._load_label(label_path) if label_path else torch.zeros((0, 5))
+        
+        # Apply transform jika ada
+        if self.transform:
+            img_tensor, targets = self.transform(img_tensor, targets)
+        
+        return {
+            'image': img_tensor,
+            'targets': targets,
+            'img_path': str(img_path),
+            'label_path': str(label_path) if label_path else None
+        }
+    
+    def _load_image(self, img_path: Path) -> torch.Tensor:
+        """Load gambar dengan support multiple formats."""
+        try:
+            if img_path.suffix == '.npy':
+                # Load preprocessed numpy array
                 img = np.load(str(img_path))
-                
-                # Convert to tensor
                 img_tensor = torch.from_numpy(img).float()
                 
-                # Ubah format ke channel first jika perlu
-                if img_tensor.shape[-1] == 3:  # Jika format HWC
+                # Ensure channel first format
+                if len(img_tensor.shape) == 3 and img_tensor.shape[-1] == 3:
                     img_tensor = img_tensor.permute(2, 0, 1)
-            except Exception as e:
-                self.logger.error(f"❌ Error saat loading {img_path}: {str(e)}")
-                # Fallback ke gambar kosong
-                img_tensor = torch.zeros((3, *self.img_size))
-        else:
-            # Load gambar normal dan lakukan preprocessing on-the-fly
-            img = cv2.imread(str(img_path))
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = cv2.resize(img, self.img_size)
+            else:
+                # Load regular image dan preprocess on-the-fly
+                img = cv2.imread(str(img_path))
+                if img is None:
+                    raise ValueError(f"Cannot load image: {img_path}")
+                
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img = cv2.resize(img, self.img_size)
+                
+                # Normalize
+                img = img.astype(np.float32) / 255.0
+                
+                # Convert to tensor (HWC -> CHW)
+                img_tensor = torch.from_numpy(img).permute(2, 0, 1).float()
             
-            # Normalisasi
-            img = img.astype(np.float32) / 255.0
+            return img_tensor
             
-            # Convert to tensor dan ubah ke channel first
-            img_tensor = torch.from_numpy(img).permute(2, 0, 1).float()
-        
-        # Load label
+        except Exception as e:
+            self.logger.error(f"❌ Error loading {img_path}: {str(e)}")
+            # Return zero tensor sebagai fallback
+            return torch.zeros((3, *self.img_size))
+    
+    def _load_label(self, label_path: Path) -> torch.Tensor:
+        """Load label dalam format YOLO."""
         try:
+            if not label_path.exists():
+                return torch.zeros((0, 5))
+            
             with open(label_path, 'r') as f:
                 lines = f.readlines()
-                
-            # Parse label YOLO format
+            
             targets = []
             for line in lines:
                 values = line.strip().split()
@@ -412,20 +476,8 @@ class PreprocessedMultilayerDataset(torch.utils.data.Dataset):
                     x, y, w, h = map(float, values[1:5])
                     targets.append([class_id, x, y, w, h])
             
-            # Convert targets ke tensor
-            targets = torch.tensor(targets)
+            return torch.tensor(targets, dtype=torch.float32)
+            
         except Exception as e:
-            self.logger.error(f"❌ Error saat loading label {label_path}: {str(e)}")
-            # Fallback ke tensor kosong
-            targets = torch.zeros((0, 5))
-        
-        # Terapkan transformasi tambahan jika ada
-        if self.transform:
-            img_tensor, targets = self.transform(img_tensor, targets)
-        
-        return {
-            'image': img_tensor,
-            'targets': targets,
-            'img_path': str(img_path),
-            'label_path': str(label_path)
-        }
+            self.logger.error(f"❌ Error loading label {label_path}: {str(e)}")
+            return torch.zeros((0, 5))

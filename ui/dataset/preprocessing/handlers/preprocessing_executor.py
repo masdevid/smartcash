@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_executor.py
-Deskripsi: Fixed preprocessing executor dengan proper button state management
+Deskripsi: Fixed preprocessing executor dengan proper parameter separation dan no duplicate 'split'
 """
 
 from typing import Dict, Any
@@ -10,10 +10,10 @@ from smartcash.ui.dataset.preprocessing.utils.progress_bridge import create_prep
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup preprocessing executor dengan fixed button state management."""
+    """Setup preprocessing executor dengan fixed parameter handling."""
     
     def execute_preprocessing_action(button=None) -> None:
-        """Execute preprocessing dengan fixed button state management."""
+        """Execute preprocessing dengan proper parameter separation."""
         logger = ui_components.get('logger')
         button_manager = get_button_state_manager(ui_components)
         
@@ -42,16 +42,20 @@ def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dic
                     config, logger, progress_bridge.notify_progress
                 )
                 
-                # Fixed: Extract parameters properly untuk avoid duplicate 'split' keyword
+                # FIXED: Separate parameters properly untuk avoid duplicate 'split'
                 split_param = processing_params['split']
-                config_params = processing_params['config'].copy()
                 force_reprocess = processing_params.get('force_reprocess', False)
                 
-                # Execute preprocessing dengan separated parameters
+                # Extract config parameters EXCLUDING 'split' to avoid duplication
+                config_params = {k: v for k, v in processing_params['config'].items() if k != 'split'}
+                
+                logger and logger.debug(f"🔧 Separated params - split: {split_param}, force: {force_reprocess}, config: {list(config_params.keys())}")
+                
+                # Execute preprocessing dengan clearly separated parameters
                 result = preprocessing_service.coordinate_preprocessing(
-                    split=split_param,
-                    force_reprocess=force_reprocess,
-                    **config_params
+                    split=split_param,           # Explicit split parameter
+                    force_reprocess=force_reprocess,  # Explicit force parameter
+                    **config_params              # Other config parameters (NO split here)
                 )
                 
                 # Handle results

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracking.py
-Deskripsi: Fixed progress tracking dengan visible progress bars dan tqdm compatibility
+Deskripsi: Unified progress tracking component dengan consistent styling across all modules
 """
 
 import ipywidgets as widgets
@@ -12,32 +12,34 @@ from IPython.display import HTML, display
 
 def create_progress_tracking_container() -> Dict[str, Any]:
     """
-    Buat progress tracking container dengan visible progress bars.
+    Create unified progress tracking container dengan consistent styling untuk semua modules.
     
     Returns:
         Dictionary berisi semua komponen progress dengan control methods
     """
-    # Progress status HTML widget
+    # Progress status HTML widget dengan consistent styling
     status_widget = widgets.HTML(
         value="",
-        layout=widgets.Layout(margin='5px 0', visibility='visible')
+        layout=widgets.Layout(margin='5px 0', visibility='visible')  # Always visible untuk consistency
     )
     
-    # Container untuk tqdm bars
+    # Container untuk tqdm bars dengan consistent styling  
     tqdm_container = widgets.Output(
-        layout=widgets.Layout(margin='5px 0', visibility='visible')
+        layout=widgets.Layout(margin='5px 0', visibility='visible')  # Always visible
     )
     
-    # Main container yang ALWAYS visible
+    # Main container dengan consistent header styling
     container = widgets.VBox([
-        widgets.HTML("<h4>📊 Progress</h4>"),
+        widgets.HTML("<h4 style='color: #333; margin: 10px 0 5px 0;'>📊 Progress</h4>"),
         status_widget,
         tqdm_container
     ], layout=widgets.Layout(
         margin='10px 0', 
-        padding='20px', 
-        display='block',  # Always block display
-        visibility='visible',  # Always visible
+        padding='15px', 
+        display='block',  # Always visible untuk consistency dengan download
+        border='1px solid #dee2e6',
+        border_radius='5px',
+        background_color='#f8f9fa',
         overflow='hidden'
     ))
     
@@ -53,28 +55,26 @@ def create_progress_tracking_container() -> Dict[str, Any]:
         'tqdm_container': tqdm_container
     }
     
-    # Create control methods
+    # Create control methods dengan consistent behavior
     components = {
         'container': container,
-        'progress_container': container,
+        'progress_container': container,  # Alias untuk compatibility
         'status_widget': status_widget,
         'tqdm_container': tqdm_container,
         '_progress_state': progress_state
     }
     
-    components.update(_create_tqdm_control_methods(progress_state))
+    components.update(_create_unified_control_methods(progress_state))
     
     return components
 
-def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Buat control methods untuk tqdm progress management."""
+def _create_unified_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Create unified control methods dengan consistent behavior across modules."""
     
     def show_container():
-        """Show progress container - always visible."""
+        """Show progress container dengan consistent styling."""
         state['container'].layout.display = 'block'
         state['container'].layout.visibility = 'visible'
-        state['status_widget'].layout.visibility = 'visible'
-        state['tqdm_container'].layout.visibility = 'visible'
     
     def hide_container():
         """Hide progress container."""
@@ -83,114 +83,109 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         _cleanup_all_bars(state)
     
     def show_for_operation(operation: str):
-        """Show progress untuk operation dengan visible tqdm bars."""
+        """Show progress sesuai operation type dengan unified tqdm bars."""
         show_container()
         state['operation_type'] = operation
         
         # Clear existing bars
         _cleanup_all_bars(state)
         
-        # Configuration per operation
+        # Unified configuration untuk all operations (consistent dengan download)
         operation_configs = {
             'download': {'overall': True, 'step': True, 'current': True},
+            'preprocessing': {'overall': True, 'step': True, 'current': True},  # Same as download
+            'augmentation': {'overall': True, 'step': True, 'current': True},   # Same as download  
             'check': {'overall': True, 'step': False, 'current': False},
-            'cleanup': {'overall': True, 'step': True, 'current': False},
-            'save': {'overall': False, 'step': False, 'current': False},
+            'cleanup': {'overall': True, 'step': True, 'current': True},
+            'training': {'overall': True, 'step': True, 'current': True},
+            'evaluation': {'overall': True, 'step': True, 'current': True},
             'all': {'overall': True, 'step': True, 'current': True}
         }
         
         config = operation_configs.get(operation, operation_configs['all'])
         
-        # Create bars dengan proper visibility
+        # Create bars sesuai config dengan unified styling
         with state['tqdm_container']:
             if config['overall']:
                 state['overall_bar'] = tqdm(
-                    total=100, 
-                    desc="📊 Overall", 
+                    total=100, desc="📊 Overall", 
                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour='blue', 
-                    position=0,
-                    leave=True  # Keep bar visible
+                    colour='blue', position=0
                 )
                 state['active_bars'].add('overall')
             
             if config['step']:
                 state['step_bar'] = tqdm(
-                    total=100, 
-                    desc="🔄 Step", 
+                    total=100, desc="🔄 Step", 
                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour='green', 
-                    position=1,
-                    leave=True  # Keep bar visible
+                    colour='green', position=1
                 )
                 state['active_bars'].add('step')
             
             if config['current']:
                 state['current_bar'] = tqdm(
-                    total=100, 
-                    desc="⚡ Current", 
+                    total=100, desc="⚡ Current", 
                     bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour='orange', 
-                    position=2,
-                    leave=True  # Keep bar visible
+                    colour='orange', position=2
                 )
                 state['active_bars'].add('current')
     
     def update_progress(progress_type: str, value: int, message: str = "", color_style: str = None):
-        """Update progress dengan visible tqdm bars dan bounds checking."""
+        """Update progress dengan unified tqdm bars dan consistent behavior."""
         if progress_type not in ['overall', 'step', 'current']:
             return
             
-        value = max(0, min(100, int(value))) if value is not None else 0
+        value = max(0, min(100, value))
         bar_key = f'{progress_type}_bar'
         
         if bar_key in state and state[bar_key] is not None:
             bar = state[bar_key]
             
-            # Reset dan update bar value
-            bar.reset(total=100)
-            bar.update(value)
+            # Update bar value dengan smooth progress
+            diff = value - bar.n
+            if diff > 0:
+                bar.update(diff)
+            elif diff < 0:
+                bar.reset(total=100)
+                bar.update(value)
             
-            # Update description dengan message
+            # Update description dengan message dan unified emoji
             if message:
                 emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
                 emoji = emoji_map.get(progress_type, '📊')
                 bar.set_description(f"{emoji} {message}")
-            
-            # Force refresh
-            bar.refresh()
         
-        # Update status widget jika ada message
+        # Update status widget jika ada dengan unified styling
         if message:
             _update_status_message(state, message, color_style)
     
     def complete_operation(message: str = "Selesai"):
-        """Complete operation dengan persistent success state."""
-        # Set semua active bars ke 100%
+        """Complete operation dengan unified success state."""
+        # Set semua active bars ke 100% dengan success styling
         for bar_type in state['active_bars']:
             bar_key = f'{bar_type}_bar'
             if state.get(bar_key):
                 bar = state[bar_key]
-                bar.reset(total=100)
-                bar.update(100)
+                bar.n = 100
+                bar.refresh()
                 
                 emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
                 emoji = emoji_map.get(bar_type, '📊')
                 bar.set_description(f"✅ {emoji} {message}")
-                bar.refresh()
         
         _update_status_message(state, f"✅ {message}", 'success')
         
-        # Delayed cleanup untuk visual feedback
+        # Unified cleanup delay
         def delayed_cleanup():
-            time.sleep(4)
+            time.sleep(3)
             if state['active_bars']:
                 _cleanup_all_bars(state)
         
         threading.Thread(target=delayed_cleanup, daemon=True).start()
     
     def error_operation(message: str = "Error"):
-        """Set error state untuk progress."""
+        """Set unified error state untuk progress."""
+        # Set semua active bars ke error state dengan consistent styling
         for bar_type in state['active_bars']:
             bar_key = f'{bar_type}_bar'
             if state.get(bar_key):
@@ -205,10 +200,10 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         _update_status_message(state, f"❌ {message}", 'error')
     
     def reset_all():
-        """Reset semua progress bars."""
+        """Reset semua progress bars dan hide container."""
         _cleanup_all_bars(state)
+        hide_container()
         state['operation_type'] = None
-        # Don't hide container, keep it visible
     
     return {
         'show_container': show_container,
@@ -221,7 +216,7 @@ def _create_tqdm_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 def _cleanup_all_bars(state: Dict[str, Any]) -> None:
-    """Cleanup semua tqdm bars dengan proper closing."""
+    """Cleanup semua tqdm bars dengan unified behavior."""
     bars_to_close = ['overall_bar', 'step_bar', 'current_bar']
     
     for bar_key in bars_to_close:
@@ -234,15 +229,16 @@ def _cleanup_all_bars(state: Dict[str, Any]) -> None:
     
     state['active_bars'].clear()
     
-    # Clear tqdm container output
+    # Clear tqdm container output dengan consistent behavior
     if 'tqdm_container' in state:
         state['tqdm_container'].clear_output(wait=True)
 
 def _update_status_message(state: Dict[str, Any], message: str, style: str = None) -> None:
-    """Update status message widget dengan colors."""
+    """Update status message widget dengan unified styling."""
     if 'status_widget' not in state:
         return
     
+    # Unified color mapping dengan download module
     color_map = {
         'success': '#28a745',
         'info': '#007bff', 
@@ -253,6 +249,7 @@ def _update_status_message(state: Dict[str, Any], message: str, style: str = Non
     
     color = color_map.get(style, '#495057')
     
+    # Unified HTML styling
     html_content = f"""
     <div style="color: {color}; font-size: 14px; font-weight: 500; margin: 5px 0;">
         {message}
@@ -262,7 +259,7 @@ def _update_status_message(state: Dict[str, Any], message: str, style: str = Non
     state['status_widget'].value = html_content
     state['status_widget'].layout.visibility = 'visible'
 
-# Legacy compatibility functions
+# Legacy compatibility functions dengan unified behavior
 def update_overall_progress(ui_components: Dict[str, Any], progress: int, total: int, message: str):
     """Legacy function untuk backward compatibility."""
     if 'update_progress' in ui_components:
@@ -282,7 +279,7 @@ def update_current_progress(ui_components: Dict[str, Any], current: int, total: 
         ui_components['update_progress']('current', percentage, message)
 
 def show_progress_for_operation(ui_components: Dict[str, Any], operation: str):
-    """Show progress untuk operation type."""
+    """Show progress sesuai operation type."""
     if 'show_for_operation' in ui_components:
         ui_components['show_for_operation'](operation)
 

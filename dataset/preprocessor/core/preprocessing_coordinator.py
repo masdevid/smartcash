@@ -81,11 +81,11 @@ class SplitCoordinator:
     def coordinate_parallel_splits(self, target_splits: List[str], processing_config: Dict[str, Any], 
                                  force_reprocess: bool = False) -> Dict[str, Any]:
         """
-        Koordinasi pemrosesan parallel untuk multiple splits.
+        Koordinasi pemrosesan parallel untuk multiple splits dengan fixed parameter handling.
         
         Args:
             target_splits: List splits untuk diproses
-            processing_config: Konfigurasi preprocessing
+            processing_config: Konfigurasi preprocessing (TIDAK termasuk split parameter)
             force_reprocess: Paksa pemrosesan ulang
             
         Returns:
@@ -100,6 +100,11 @@ class SplitCoordinator:
         
         split_results = {}
         max_workers = min(3, len(processing_order))  # Max 3 parallel splits
+        
+        # Log parameter info untuk debugging
+        self.logger.info(f"🔧 Processing config keys: {list(processing_config.keys())}")
+        self.logger.info(f"📂 Target splits: {target_splits}")
+        self.logger.info(f"🔄 Force reprocess: {force_reprocess}")
         
         try:
             with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="SplitCoord") as executor:
@@ -117,10 +122,12 @@ class SplitCoordinator:
                     
                     self.active_processors[split_name] = processor
                     
-                    # Submit processing task
+                    # Submit processing task dengan clean parameters
                     future = executor.submit(
                         processor.process_split_dataset,
-                        split_name, processing_config, force_reprocess
+                        split_name,           # split parameter
+                        processing_config,    # config tanpa split
+                        force_reprocess       # force parameter
                     )
                     future_to_split[future] = split_name
                 

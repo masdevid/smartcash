@@ -14,7 +14,7 @@ class UIConfigExtractor:
         self.logger = ui_components.get('logger')
     
     def extract_processing_parameters(self) -> Dict[str, Any]:
-        """Extract parameters dari UI untuk processing."""
+        """Extract parameters dari UI untuk processing dengan proper separation."""
         try:
             # Extract dari UI widgets
             ui_values = self._extract_ui_values()
@@ -30,10 +30,20 @@ class UIConfigExtractor:
             if not validation_result['valid']:
                 self.logger and self.logger.warning(f"⚠️ Config issues: {validation_result['errors']}")
             
+            # FIXED: Separate split dan force_reprocess dari config untuk avoid duplication
+            normalized_config = validation_result['normalized_config'].copy()
+            
+            # Extract split dan force_reprocess sebagai separate parameters
+            split_param = extracted_config.get('split', 'all')
+            force_reprocess_param = extracted_config.get('force_reprocess', False)
+            
+            # Remove split dari normalized_config untuk avoid duplicate keyword argument
+            normalized_config.pop('split', None)
+            
             return {
-                'config': validation_result['normalized_config'],
-                'split': extracted_config.get('split', 'all'),
-                'force_reprocess': extracted_config.get('force_reprocess', False),
+                'config': normalized_config,  # Config WITHOUT split parameter
+                'split': split_param,         # Split as separate parameter
+                'force_reprocess': force_reprocess_param,  # Force as separate parameter
                 'summary': config_manager.get_config_summary(validation_result['normalized_config']),
                 'valid': validation_result['valid']
             }

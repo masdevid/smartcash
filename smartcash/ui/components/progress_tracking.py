@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracking.py
-Deskripsi: Enhanced progress tracking dengan full width green bars dan optimized styling
+Deskripsi: Enhanced progress tracking dengan full width bars (100% width, 20px height) dan context-aware display
 """
 
 import ipywidgets as widgets
@@ -11,12 +11,12 @@ import threading
 from IPython.display import HTML, display
 
 def create_progress_tracking_container() -> Dict[str, Any]:
-    """Create enhanced progress tracking dengan full width green bars."""
+    """Create enhanced progress tracking dengan full width bars dan context-aware display."""
     
     # Progress status dengan enhanced styling
     status_widget = widgets.HTML(
         value="",
-        layout=widgets.Layout(margin='5px 0', visibility='visible')
+        layout=widgets.Layout(margin='8px 0', visibility='visible', width='100%')
     )
     
     # Container untuk tqdm bars dengan full width
@@ -72,7 +72,7 @@ def create_progress_tracking_container() -> Dict[str, Any]:
     return components
 
 def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Create enhanced control methods dengan full width green bars."""
+    """Create enhanced control methods dengan context-aware progress bars."""
     
     def show_container():
         """Show progress container."""
@@ -86,60 +86,74 @@ def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         _cleanup_all_bars(state)
     
     def show_for_operation(operation: str):
-        """Show progress dengan full width green tqdm bars."""
+        """Show progress dengan context-aware bars (1 bar untuk cleanup/check, 2-3 untuk preprocessing)."""
         show_container()
         state['operation_type'] = operation
         
         # Clear existing bars
         _cleanup_all_bars(state)
         
-        # Operation configurations
+        # Context-aware operation configurations
         operation_configs = {
-            'download': {'overall': True, 'step': True, 'current': True},
-            'preprocessing': {'overall': True, 'step': True, 'current': True},
-            'augmentation': {'overall': True, 'step': True, 'current': True},
-            'check': {'overall': True, 'step': False, 'current': False},
-            'cleanup': {'overall': True, 'step': True, 'current': True},
-            'training': {'overall': True, 'step': True, 'current': True},
-            'all': {'overall': True, 'step': True, 'current': True}
+            'check': {'bars': ['overall']},  # Single bar untuk check
+            'cleanup': {'bars': ['overall']},  # Single bar untuk cleanup
+            'preprocessing': {'bars': ['overall', 'step']},  # 2 bars untuk preprocessing
+            'download': {'bars': ['overall', 'step', 'current']},  # 3 bars untuk download (kompleks)
+            'augmentation': {'bars': ['overall', 'step']},  # 2 bars untuk augmentation
+            'training': {'bars': ['overall', 'step', 'current']},  # 3 bars untuk training
         }
         
-        config = operation_configs.get(operation, operation_configs['all'])
+        config = operation_configs.get(operation, {'bars': ['overall']})
         
-        # Create full width green bars
+        # Create context-aware bars dengan full width styling
         with state['tqdm_container']:
-            if config['overall']:
+            if 'overall' in config['bars']:
                 state['overall_bar'] = tqdm(
-                    total=100, desc="📊 Overall", 
-                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour='green', position=0,
-                    ncols=None, ascii=False, mininterval=0.05,
-                    maxinterval=0.1, smoothing=0.3
+                    total=100, 
+                    desc="📊 Overall Progress",
+                    bar_format='{desc}\n{percentage:3.0f}%|{bar}| {n}/{total}',
+                    colour='#28a745', 
+                    position=0,
+                    ncols=80,  # Full width
+                    ascii=False, 
+                    mininterval=0.05,
+                    maxinterval=0.1, 
+                    smoothing=0.3
                 )
                 state['active_bars'].add('overall')
             
-            if config['step']:
+            if 'step' in config['bars']:
                 state['step_bar'] = tqdm(
-                    total=100, desc="🔄 Step", 
-                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour='green', position=1,
-                    ncols=None, ascii=False, mininterval=0.05,
-                    maxinterval=0.1, smoothing=0.3
+                    total=100, 
+                    desc="🔄 Step Progress",
+                    bar_format='{desc}\n{percentage:3.0f}%|{bar}| {n}/{total}',
+                    colour='#17a2b8', 
+                    position=1,
+                    ncols=80,  # Full width
+                    ascii=False, 
+                    mininterval=0.05,
+                    maxinterval=0.1, 
+                    smoothing=0.3
                 )
                 state['active_bars'].add('step')
             
-            if config['current']:
+            if 'current' in config['bars']:
                 state['current_bar'] = tqdm(
-                    total=100, desc="⚡ Current", 
-                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour='green', position=2,
-                    ncols=None, ascii=False, mininterval=0.05,
-                    maxinterval=0.1, smoothing=0.3
+                    total=100, 
+                    desc="⚡ Current Operation",
+                    bar_format='{desc}\n{percentage:3.0f}%|{bar}| {n}/{total}',
+                    colour='#ffc107', 
+                    position=2,
+                    ncols=80,  # Full width
+                    ascii=False, 
+                    mininterval=0.05,
+                    maxinterval=0.1, 
+                    smoothing=0.3
                 )
                 state['active_bars'].add('current')
     
     def update_progress(progress_type: str, value: int, message: str = "", color_style: str = None):
-        """Update progress dengan enhanced green bars."""
+        """Update progress dengan enhanced full width bars."""
         if progress_type not in ['overall', 'step', 'current']:
             return
             
@@ -159,7 +173,11 @@ def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
             
             # Update description dengan message
             if message:
-                emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
+                emoji_map = {
+                    'overall': '📊', 
+                    'step': '🔄', 
+                    'current': '⚡'
+                }
                 emoji = emoji_map.get(progress_type, '📊')
                 bar.set_description(f"{emoji} {message}")
         
@@ -175,7 +193,7 @@ def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
             if state.get(bar_key):
                 bar = state[bar_key]
                 bar.n = 100
-                bar.colour = 'green'
+                bar.colour = '#28a745'  # Green
                 bar.refresh()
                 
                 emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
@@ -184,7 +202,7 @@ def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
         
         _update_status_message(state, f"✅ {message}", 'success')
         
-        # Delayed cleanup
+        # Delayed cleanup dengan longer delay untuk better visual feedback
         def delayed_cleanup():
             time.sleep(4)
             if state['active_bars']:
@@ -202,13 +220,13 @@ def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
                 emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
                 emoji = emoji_map.get(bar_type, '📊')
                 bar.set_description(f"❌ {emoji} {message}")
-                bar.colour = 'red'
+                bar.colour = '#dc3545'  # Red
                 bar.refresh()
         
         _update_status_message(state, f"❌ {message}", 'error')
     
     def reset_all():
-        """Reset all progress."""
+        """Reset all progress dan hide container."""
         _cleanup_all_bars(state)
         hide_container()
         state['operation_type'] = None
@@ -224,7 +242,7 @@ def _create_enhanced_control_methods(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 def _cleanup_all_bars(state: Dict[str, Any]) -> None:
-    """Cleanup all tqdm bars."""
+    """Cleanup all tqdm bars dengan proper error handling."""
     bars_to_close = ['overall_bar', 'step_bar', 'current_bar']
     
     for bar_key in bars_to_close:
@@ -255,9 +273,10 @@ def _update_status_message(state: Dict[str, Any], message: str, style: str = Non
     color = color_map.get(style, '#495057')
     
     html_content = f"""
-    <div style="color: {color}; font-size: 14px; font-weight: 500; margin: 5px 0; 
-                padding: 8px; background: rgba(40, 167, 69, 0.1); 
-                border-radius: 4px; border-left: 3px solid {color};">
+    <div style="color: {color}; font-size: 14px; font-weight: 500; margin: 8px 0; 
+                padding: 10px; background: rgba(40, 167, 69, 0.1); 
+                border-radius: 6px; border-left: 4px solid {color};
+                width: 100%; box-sizing: border-box;">
         {message}
     </div>
     """

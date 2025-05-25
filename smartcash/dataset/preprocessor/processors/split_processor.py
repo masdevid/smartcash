@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/processors/split_processor.py
-Deskripsi: Processor untuk single split dataset dengan comprehensive processing dan error handling
+Deskripsi: Fixed processor dengan clean callback parameter handling - no conflicts
 """
 
 import time
@@ -14,7 +14,7 @@ from smartcash.dataset.preprocessor.storage.preprocessed_storage_manager import 
 
 
 class SplitProcessor:
-    """Processor untuk single split dataset dengan batch processing dan comprehensive tracking."""
+    """Fixed processor untuk single split dataset - clean callback handling."""
     
     def __init__(self, config: Dict[str, Any], logger=None):
         """Initialize split processor dengan dependencies."""
@@ -33,21 +33,12 @@ class SplitProcessor:
     def register_progress_callback(self, callback: Callable) -> None:
         """Register progress callback untuk split processing updates."""
         self._progress_callback = callback
-        self.batch_processor.register_progress_callback(self._create_batch_progress_callback())
+        # FIXED: Create clean batch callback tanpa parameter conflicts
+        self.batch_processor.register_progress_callback(self._create_clean_batch_callback())
     
     def process_split_dataset(self, split: str, processing_config: Dict[str, Any], 
                             force_reprocess: bool = False) -> Dict[str, Any]:
-        """
-        Process single split dataset dengan comprehensive handling.
-        
-        Args:
-            split: Split name untuk diproses
-            processing_config: Configuration preprocessing
-            force_reprocess: Force reprocessing flag
-            
-        Returns:
-            Dictionary hasil processing dengan statistik
-        """
+        """Process single split dataset dengan comprehensive handling."""
         start_time = time.time()
         
         try:
@@ -197,26 +188,30 @@ class SplitProcessor:
         self._progress_callback = None
         self.logger.debug("🧹 Split processor state cleaned up")
     
-    def _create_batch_progress_callback(self) -> Callable:
-        """Create progress callback untuk batch processor."""
-        def batch_progress_callback(**kwargs):
+    def _create_clean_batch_callback(self) -> Callable:
+        """FIXED: Create clean batch callback tanpa parameter conflicts."""
+        def clean_batch_callback(batch_progress, batch_message):
+            """Clean callback dengan explicit positional parameters."""
             if self._progress_callback:
-                # Map batch progress ke split progress (15-85% range)
-                batch_progress = kwargs.get('progress', 0)
-                mapped_progress = 15 + (batch_progress / 100) * 70  # 70% range untuk batch processing
-                
-                self._progress_callback(
-                    progress=int(mapped_progress),
-                    message=kwargs.get('message', 'Processing batch'),
-                    **{k: v for k, v in kwargs.items() if k != 'progress'}
-                )
+                try:
+                    # Map batch progress ke split progress (15-85% range)
+                    mapped_progress = 15 + (batch_progress / 100) * 70
+                    
+                    # FIXED: Call dengan clean parameters
+                    self._progress_callback(
+                        progress=int(mapped_progress),
+                        message=batch_message or 'Processing batch'
+                    )
+                except Exception as e:
+                    self.logger.debug(f"🔧 Batch callback error: {str(e)}")
         
-        return batch_progress_callback
+        return clean_batch_callback
     
     def _notify_split_progress(self, progress: int, message: str, **kwargs):
         """Internal progress notification untuk split processing."""
         if self._progress_callback:
             try:
-                self._progress_callback(progress=progress, message=message, **kwargs)
+                # FIXED: Clean parameter passing
+                self._progress_callback(progress=progress, message=message)
             except Exception as e:
                 self.logger.debug(f"🔧 Split progress callback error: {str(e)}")

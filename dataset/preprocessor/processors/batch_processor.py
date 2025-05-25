@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/processors/batch_processor.py
-Deskripsi: Batch processor untuk parallel image processing dengan optimized threading
+Deskripsi: Fixed batch processor dengan debug untuk zero processing issue
 """
 
 import time
@@ -14,7 +14,7 @@ from smartcash.dataset.preprocessor.processors.image_processor import ImageProce
 
 
 class BatchProcessor:
-    """Batch processor untuk parallel processing images dengan optimized performance."""
+    """Fixed batch processor dengan debug logging untuk zero processing issue."""
     
     def __init__(self, config: Dict[str, Any], logger=None):
         """Initialize batch processor dengan threading optimization."""
@@ -38,32 +38,33 @@ class BatchProcessor:
     def process_image_batch(self, source_images_dir: Path, source_labels_dir: Path,
                           target_images_dir: Path, target_labels_dir: Path,
                           processing_config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process batch images dengan parallel execution dan progress tracking.
-        
-        Args:
-            source_images_dir: Source directory images
-            source_labels_dir: Source directory labels  
-            target_images_dir: Target directory images
-            target_labels_dir: Target directory labels
-            processing_config: Configuration preprocessing
-            
-        Returns:
-            Dictionary hasil batch processing
-        """
+        """Fixed process batch dengan comprehensive debugging."""
         start_time = time.time()
         
         try:
+            # DEBUG: Log paths untuk validation
+            self.logger.info(f"🔍 Source images: {source_images_dir} (exists: {source_images_dir.exists()})")
+            self.logger.info(f"🔍 Source labels: {source_labels_dir} (exists: {source_labels_dir.exists()})")
+            self.logger.info(f"🔍 Target images: {target_images_dir}")
+            self.logger.info(f"🔍 Target labels: {target_labels_dir}")
+            
             # Get image files untuk processing
             image_files = self._get_image_files(source_images_dir)
             if not image_files:
+                self.logger.warning(f"⚠️ No image files found in {source_images_dir}")
                 return {'success': True, 'processed': 0, 'skipped': 0, 'failed': 0, 'message': 'No images found'}
             
             total_images = len(image_files)
+            self.logger.info(f"📊 Found {total_images} image files to process")
             self._notify_batch_progress(0, f"Starting batch processing: {total_images} images")
+            
+            # DEBUG: Check existing files untuk force_reprocess logic
+            force_reprocess = processing_config.get('force_reprocess', False)
+            self.logger.info(f"🔄 Force reprocess: {force_reprocess}")
             
             # Create batches untuk optimized processing
             batches = self._create_processing_batches(image_files, batch_size=50)
+            self.logger.info(f"📦 Created {len(batches)} batches for processing")
             batch_results = []
             
             # Process batches dengan parallel execution
@@ -71,6 +72,7 @@ class BatchProcessor:
                 # Submit batch processing tasks
                 future_to_batch = {}
                 for i, batch in enumerate(batches):
+                    self.logger.debug(f"📤 Submitting batch {i+1}/{len(batches)} with {len(batch)} images")
                     future = executor.submit(
                         self._process_single_batch,
                         batch, i, len(batches), source_labels_dir, 
@@ -88,6 +90,9 @@ class BatchProcessor:
                         batch_results.append(batch_result)
                         completed_batches += 1
                         
+                        # DEBUG: Log batch results
+                        self.logger.info(f"✅ Batch {completed_batches}/{len(batches)} completed: {batch_result}")
+                        
                         # Update progress
                         progress = int((completed_batches / len(batches)) * 100)
                         processed_count = sum(r.get('processed', 0) for r in batch_results)
@@ -104,6 +109,9 @@ class BatchProcessor:
             # Aggregate final results
             final_result = self._aggregate_batch_results(batch_results, time.time() - start_time)
             
+            # DEBUG: Log final aggregated results
+            self.logger.info(f"📊 Final batch results: {final_result}")
+            
             self.logger.success(
                 f"✅ Batch processing selesai: {final_result['processed']}/{total_images} images, "
                 f"{final_result['processing_time']:.1f}s"
@@ -117,12 +125,21 @@ class BatchProcessor:
             return {'success': False, 'message': error_msg, 'processed': 0, 'failed': 1}
     
     def _get_image_files(self, images_dir: Path) -> List[Path]:
-        """Get list image files dari directory."""
+        """Get list image files dari directory dengan debug logging."""
         if not images_dir.exists():
+            self.logger.warning(f"⚠️ Images directory does not exist: {images_dir}")
             return []
         
         image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp']
-        return [f for f in images_dir.glob('*.*') if f.suffix.lower() in image_extensions]
+        image_files = [f for f in images_dir.glob('*.*') if f.suffix.lower() in image_extensions]
+        
+        self.logger.debug(f"🔍 Scanning {images_dir}: found {len(image_files)} image files")
+        if len(image_files) == 0:
+            # DEBUG: List all files untuk diagnosis
+            all_files = list(images_dir.glob('*.*'))
+            self.logger.debug(f"🔍 All files in directory: {[f.name for f in all_files[:10]]}")
+        
+        return image_files
     
     def _create_processing_batches(self, image_files: List[Path], batch_size: int = 50) -> List[List[Path]]:
         """Create batches untuk optimized parallel processing."""
@@ -136,26 +153,39 @@ class BatchProcessor:
     def _process_single_batch(self, batch: List[Path], batch_index: int, total_batches: int,
                             source_labels_dir: Path, target_images_dir: Path, 
                             target_labels_dir: Path, processing_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Process single batch images dengan error handling per image."""
+        """Fixed process single batch dengan detailed logging."""
         batch_stats = {'processed': 0, 'skipped': 0, 'failed': 0}
+        
+        self.logger.debug(f"🔧 Processing batch {batch_index+1}/{total_batches} with {len(batch)} images")
         
         for image_path in batch:
             try:
+                # DEBUG: Log individual image processing
+                self.logger.debug(f"🖼️ Processing image: {image_path.name}")
+                
                 # Process single image menggunakan image processor
                 result = self.image_processor.process_single_image(
                     image_path, source_labels_dir, target_images_dir, 
                     target_labels_dir, processing_config
                 )
                 
+                # DEBUG: Log individual result
+                self.logger.debug(f"🖼️ Image {image_path.name} result: {result}")
+                
                 if result['success']:
-                    batch_stats['processed'] += 1
+                    if result.get('status') == 'processed':
+                        batch_stats['processed'] += 1
+                    else:
+                        batch_stats['skipped'] += 1
                 else:
-                    batch_stats['skipped'] += 1
+                    batch_stats['failed'] += 1
+                    self.logger.warning(f"⚠️ Failed to process {image_path.name}: {result.get('message')}")
                     
             except Exception as e:
-                self.logger.debug(f"🔧 Image processing error {image_path.name}: {str(e)}")
+                self.logger.error(f"💥 Image processing error {image_path.name}: {str(e)}")
                 batch_stats['failed'] += 1
         
+        self.logger.info(f"📊 Batch {batch_index+1} stats: {batch_stats}")
         return batch_stats
     
     def _aggregate_batch_results(self, batch_results: List[Dict[str, Any]], 
@@ -198,6 +228,7 @@ class BatchProcessor:
         """Internal progress notification untuk batch processing."""
         if self._progress_callback:
             try:
-                self._progress_callback(progress=progress, message=message, **kwargs)
+                # FIXED: Call dengan positional args untuk avoid keyword conflicts
+                self._progress_callback(progress, message)
             except Exception as e:
                 self.logger.debug(f"🔧 Batch progress callback error: {str(e)}")

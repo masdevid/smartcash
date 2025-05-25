@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_executor.py
-Deskripsi: Fixed preprocessing executor dengan proper parameter separation dan no duplicate 'split'
+Deskripsi: Enhanced preprocessing executor dengan proper button management dan dialog cleanup
 """
 
 from typing import Dict, Any
@@ -10,55 +10,48 @@ from smartcash.ui.dataset.preprocessing.utils.progress_bridge import create_prep
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup preprocessing executor dengan fixed parameter handling."""
+    """Setup preprocessing executor dengan enhanced button & dialog management."""
     
     def execute_preprocessing_action(button=None) -> None:
-        """Execute preprocessing dengan proper parameter separation."""
+        """Execute preprocessing dengan proper state management."""
         logger = ui_components.get('logger')
         button_manager = get_button_state_manager(ui_components)
         
-        # Clear outputs first
+        # Clear outputs dan dialogs
         _clear_ui_outputs_and_confirmations(ui_components)
         
         with button_manager.operation_context('preprocessing'):
             try:
                 logger and logger.info("🚀 Memulai preprocessing dataset")
                 
-                # Setup progress tracking
-                ui_components.get('show_for_operation', lambda x: None)('download')
+                # Setup progress (2 bars untuk preprocessing)
+                ui_components.get('show_for_operation', lambda x: None)('preprocessing')
                 
-                # Extract config dari UI
+                # Extract config
                 config_extractor = get_config_extractor(ui_components)
                 processing_params = config_extractor.extract_processing_parameters()
                 config = config_extractor.get_full_config()
                 
                 logger and logger.info(f"🔧 Config: {processing_params['summary']}")
                 
-                # Create progress bridge
+                # Create services
                 progress_bridge = create_preprocessing_progress_bridge(ui_components)
-                
-                # Create preprocessing service
                 preprocessing_service = PreprocessingFactory.create_preprocessing_manager(
                     config, logger, progress_bridge.notify_progress
                 )
                 
-                # FIXED: Separate parameters properly untuk avoid duplicate 'split'
+                # Separate parameters
                 split_param = processing_params['split']
                 force_reprocess = processing_params.get('force_reprocess', False)
-                
-                # Extract config parameters EXCLUDING 'split' to avoid duplication
                 config_params = {k: v for k, v in processing_params['config'].items() if k != 'split'}
                 
-                logger and logger.debug(f"🔧 Separated params - split: {split_param}, force: {force_reprocess}, config: {list(config_params.keys())}")
-                
-                # Execute preprocessing dengan clearly separated parameters
+                # Execute preprocessing
                 result = preprocessing_service.coordinate_preprocessing(
-                    split=split_param,           # Explicit split parameter
-                    force_reprocess=force_reprocess,  # Explicit force parameter
-                    **config_params              # Other config parameters (NO split here)
+                    split=split_param,
+                    force_reprocess=force_reprocess,
+                    **config_params
                 )
                 
-                # Handle results
                 if result['success']:
                     _handle_preprocessing_success(ui_components, result, logger)
                 else:
@@ -78,25 +71,31 @@ def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dic
     return ui_components
 
 def _clear_ui_outputs_and_confirmations(ui_components: Dict[str, Any]) -> None:
-    """Clear UI outputs dan confirmation area untuk fresh start."""
+    """Clear UI outputs dan cleanup dialogs."""
+    # Clear outputs
     for output_key in ['log_output', 'status', 'confirmation_area']:
         if output_key in ui_components and hasattr(ui_components[output_key], 'clear_output'):
             ui_components[output_key].clear_output(wait=True)
+    
+    # Cleanup dialogs
+    dialog_manager = ui_components.get('dialog_manager')
+    if dialog_manager:
+        dialog_manager.cleanup()
 
 def _handle_preprocessing_success(ui_components: Dict[str, Any], result: Dict[str, Any], logger) -> None:
-    """Handle successful preprocessing completion dengan status panel update."""
+    """Handle successful preprocessing completion."""
     total_images = result.get('total_images', 0)
     processing_time = result.get('processing_time', 0)
     
-    # Update progress completion
+    # Complete progress
     ui_components.get('complete_operation', lambda x: None)(
         f"Preprocessing selesai: {total_images:,} gambar dalam {processing_time:.1f}s"
     )
     
-    # Update status panel
+    # Update status
     _update_status_panel_success(ui_components, f"✅ Preprocessing berhasil: {total_images:,} gambar diproses")
     
-    # Log detailed stats
+    # Log details
     if logger:
         stats = result.get('split_stats', {})
         for split, split_stats in stats.items():

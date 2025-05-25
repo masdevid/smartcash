@@ -1,14 +1,18 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/dialog_manager.py
-Deskripsi: Fixed dialog manager dengan auto-clear confirmation area dan unlimited height
+Deskripsi: Enhanced dialog manager dengan persistent state handling dan auto-cleanup
 """
 
 from typing import Dict, Any, Callable
-from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog, create_destructive_confirmation
+from smartcash.ui.components.confirmation_dialog import (
+    create_confirmation_dialog, 
+    create_destructive_confirmation,
+    cleanup_all_dialogs
+)
 from IPython.display import display, clear_output
 
 class DialogManager:
-    """Fixed dialog manager dengan auto-clear confirmation area."""
+    """Enhanced dialog manager dengan persistent state management dan auto-cleanup."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -16,24 +20,40 @@ class DialogManager:
         self.confirmation_area = ui_components.get('confirmation_area')
         self.logger = ui_components.get('logger')
         
+        # Auto cleanup existing dialogs saat initialization
+        cleanup_all_dialogs()
+        
         if self.logger:
-            self.logger.debug("🔧 DialogManager initialized")
+            self.logger.debug("🔧 DialogManager initialized dengan auto-cleanup")
     
     def show_confirmation_dialog(self, title: str, message: str, 
                                 on_confirm: Callable, confirm_text: str = "Ya", 
                                 cancel_text: str = "Batal", danger_mode: bool = False):
-        """Show confirmation dialog dengan auto-clear functionality."""
+        """Show confirmation dialog dengan enhanced auto-cleanup."""
+        # Cleanup existing dialog first
         self._cleanup_existing_dialog()
+        
+        # Create wrapped callbacks dengan auto-cleanup
+        def wrapped_confirm():
+            self._cleanup_existing_dialog()
+            try:
+                on_confirm()
+            except Exception as e:
+                self.logger and self.logger.error(f"❌ Confirm callback error: {str(e)}")
+        
+        def wrapped_cancel():
+            self._cleanup_existing_dialog()
+            self.logger and self.logger.debug("❌ User cancelled dialog action")
         
         dialog = create_confirmation_dialog(
             title=title,
             message=message,
-            on_confirm=lambda b: self._handle_confirm(on_confirm),
-            on_cancel=lambda b: self._handle_cancel(),
+            on_confirm=lambda b: wrapped_confirm(),
+            on_cancel=lambda b: wrapped_cancel(),
             confirm_text=confirm_text,
             cancel_text=cancel_text,
             danger_mode=danger_mode,
-            dialog_width="600px"  # Fixed width to prevent overflow
+            dialog_width="600px"
         )
         
         self.active_dialog = dialog
@@ -45,14 +65,27 @@ class DialogManager:
     def show_destructive_confirmation(self, title: str, message: str,
                                     on_confirm: Callable, item_name: str = "item",
                                     confirm_text: str = None, cancel_text: str = "Batal"):
-        """Show destructive confirmation dengan auto-clear."""
+        """Show destructive confirmation dengan auto-cleanup."""
+        # Cleanup existing dialog first
         self._cleanup_existing_dialog()
+        
+        # Create wrapped callbacks
+        def wrapped_confirm():
+            self._cleanup_existing_dialog()
+            try:
+                on_confirm()
+            except Exception as e:
+                self.logger and self.logger.error(f"❌ Destructive confirm error: {str(e)}")
+        
+        def wrapped_cancel():
+            self._cleanup_existing_dialog()
+            self.logger and self.logger.debug("❌ User cancelled destructive action")
         
         dialog = create_destructive_confirmation(
             title=title,
             message=message,
-            on_confirm=lambda b: self._handle_confirm(on_confirm),
-            on_cancel=lambda b: self._handle_cancel(),
+            on_confirm=lambda b: wrapped_confirm(),
+            on_cancel=lambda b: wrapped_cancel(),
             item_name=item_name,
             confirm_text=confirm_text,
             cancel_text=cancel_text
@@ -65,76 +98,12 @@ class DialogManager:
             self.logger.debug(f"⚠️ Destructive confirmation shown: {title}")
     
     def _display_in_confirmation_area(self, dialog):
-        """Display dialog di confirmation area dengan unlimited height."""
+        """Display dialog di confirmation area dengan proper layout."""
         if self.confirmation_area:
-            # Update confirmation area layout untuk unlimited height
-            self.confirmation_area.layout.max_height = None  # Remove height limit
+            # Update confirmation area layout
+            self.confirmation_area.layout.max_height = None
             self.confirmation_area.layout.height = 'auto'
             
             with self.confirmation_area:
                 clear_output(wait=True)
                 display(dialog)
-            
-            if self.logger:
-                self.logger.debug("🎯 Dialog displayed in confirmation area")
-        else:
-            display(dialog)
-            if self.logger:
-                self.logger.warning("⚠️ Confirmation area tidak tersedia")
-    
-    def _handle_confirm(self, callback: Callable):
-        """Handle confirm dengan auto-clear confirmation area."""
-        if self.logger:
-            self.logger.debug("✅ User confirmed dialog action")
-        
-        # Clear confirmation area BEFORE executing callback
-        self._cleanup_existing_dialog()
-        
-        if callback:
-            try:
-                callback()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"❌ Error executing confirm callback: {str(e)}")
-    
-    def _handle_cancel(self):
-        """Handle cancel dengan auto-clear confirmation area."""
-        if self.logger:
-            self.logger.debug("❌ User cancelled dialog action")
-        
-        # Clear confirmation area
-        self._cleanup_existing_dialog()
-    
-    def _cleanup_existing_dialog(self):
-        """Cleanup dialog yang aktif dari confirmation area."""
-        if self.active_dialog:
-            try:
-                if self.confirmation_area:
-                    with self.confirmation_area:
-                        clear_output(wait=True)
-                
-                if hasattr(self.active_dialog, 'close'):
-                    self.active_dialog.close()
-                    
-            except Exception as e:
-                if self.logger:
-                    self.logger.debug(f"🧹 Dialog cleanup warning: {str(e)}")
-            finally:
-                self.active_dialog = None
-                
-                if self.logger:
-                    self.logger.debug("🧹 Dialog cleanup completed")
-    
-    def cleanup(self):
-        """Public cleanup method."""
-        self._cleanup_existing_dialog()
-    
-    def is_dialog_active(self) -> bool:
-        """Check apakah ada dialog yang sedang aktif."""
-        return self.active_dialog is not None
-
-def get_dialog_manager(ui_components: Dict[str, Any]) -> DialogManager:
-    """Factory function untuk mendapatkan dialog manager."""
-    if 'dialog_manager' not in ui_components:
-        ui_components['dialog_manager'] = DialogManager(ui_components)
-    return ui_components['dialog_manager']

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/action_buttons.py
-Deskripsi: Komponen action buttons yang fixed dengan naming yang konsisten dan button creation yang proper
+Deskripsi: Fixed action buttons dengan preserved original styling dan proper button creation
 """
 
 import ipywidgets as widgets
@@ -11,9 +11,10 @@ def create_action_buttons(primary_label: str = "Download Dataset",
                          secondary_buttons: list = None,
                          cleanup_enabled: bool = True,
                          button_width: str = '140px',
-                         container_width: str = '100%') -> dict:
+                         container_width: str = '100%',
+                         primary_style: str = '') -> dict:
     """
-    Create action buttons dengan naming yang konsisten dan proper button creation.
+    Create action buttons dengan preserved original styling dan naming yang konsisten.
     
     Args:
         primary_label: Label untuk primary button
@@ -22,6 +23,7 @@ def create_action_buttons(primary_label: str = "Download Dataset",
         cleanup_enabled: Apakah cleanup button ditampilkan
         button_width: Lebar setiap button
         container_width: Lebar container
+        primary_style: Style untuk primary button ('' untuk default, 'success', 'primary', dll)
         
     Returns:
         Dictionary berisi semua button components dengan key yang konsisten
@@ -33,16 +35,20 @@ def create_action_buttons(primary_label: str = "Download Dataset",
             ("Check Dataset", "search", "info")
         ]
     
-    # 🔘 Primary download button
+    # 🔘 Primary button dengan preserved styling
     download_button = widgets.Button(
         description=primary_label,
-        button_style='success',
+        button_style=primary_style,  # Use provided style, empty string for default
         tooltip=f'Klik untuk {primary_label.lower()}',
         icon='download' if primary_icon == 'download' else '',
         layout=widgets.Layout(width=button_width, height='35px')
     )
     
-    # 🔍 Check button  
+    # Store original styling untuk restoration
+    download_button._original_style = primary_style
+    download_button._original_description = primary_label
+    
+    # 🔍 Check button dengan preserved styling
     check_button = widgets.Button(
         description="Check Dataset",
         button_style='info',
@@ -51,7 +57,11 @@ def create_action_buttons(primary_label: str = "Download Dataset",
         layout=widgets.Layout(width=button_width, height='35px')
     )
     
-    # 🧹 Cleanup button (conditional)
+    # Store original styling
+    check_button._original_style = 'info'
+    check_button._original_description = "Check Dataset"
+    
+    # 🧹 Cleanup button (conditional) dengan preserved styling
     cleanup_button = None
     if cleanup_enabled:
         cleanup_button = widgets.Button(
@@ -61,6 +71,10 @@ def create_action_buttons(primary_label: str = "Download Dataset",
             icon='trash',
             layout=widgets.Layout(width=button_width, height='35px')
         )
+        
+        # Store original styling
+        cleanup_button._original_style = 'warning'
+        cleanup_button._original_description = "Cleanup Dataset"
     
     # 📋 Create button list untuk layout
     button_list = [download_button, check_button]
@@ -97,7 +111,7 @@ def create_save_reset_action_buttons(save_label: str = "Simpan",
                                    button_width: str = '100px',
                                    container_width: str = '100%') -> dict:
     """
-    Create save dan reset buttons dengan naming yang konsisten.
+    Create save dan reset buttons dengan preserved styling dan naming yang konsisten.
     
     Args:
         save_label: Label untuk save button
@@ -109,7 +123,7 @@ def create_save_reset_action_buttons(save_label: str = "Simpan",
         Dictionary berisi save dan reset button components
     """
     
-    # 💾 Save button
+    # 💾 Save button dengan preserved styling
     save_button = widgets.Button(
         description=save_label,
         button_style='primary',
@@ -118,14 +132,22 @@ def create_save_reset_action_buttons(save_label: str = "Simpan",
         layout=widgets.Layout(width=button_width, height='32px')
     )
     
-    # 🔄 Reset button
+    # Store original styling
+    save_button._original_style = 'primary'
+    save_button._original_description = save_label
+    
+    # 🔄 Reset button dengan preserved styling
     reset_button = widgets.Button(
         description=reset_label,
-        button_style='',
+        button_style='',  # Default style
         tooltip='Reset ke nilai default',
         icon='refresh',
         layout=widgets.Layout(width=button_width, height='32px')
     )
+    
+    # Store original styling
+    reset_button._original_style = ''
+    reset_button._original_description = reset_label
     
     # 📦 Container
     container = widgets.HBox(
@@ -143,3 +165,37 @@ def create_save_reset_action_buttons(save_label: str = "Simpan",
         'save_button': save_button,      # Key konsisten dengan handlers
         'reset_button': reset_button     # Key konsisten dengan handlers
     }
+
+def restore_button_original_style(button):
+    """
+    Restore button ke original styling-nya.
+    
+    Args:
+        button: Widget button yang akan di-restore
+    """
+    if hasattr(button, '_original_style'):
+        button.button_style = button._original_style
+    if hasattr(button, '_original_description'):
+        button.description = button._original_description
+    button.disabled = False
+
+def set_button_processing_style(button, processing_text: str = "Processing...", 
+                              processing_style: str = 'warning'):
+    """
+    Set button ke processing style dengan preserve original.
+    
+    Args:
+        button: Widget button
+        processing_text: Text saat processing
+        processing_style: Style saat processing
+    """
+    # Store original jika belum ada
+    if not hasattr(button, '_original_style'):
+        button._original_style = button.button_style
+    if not hasattr(button, '_original_description'):
+        button._original_description = button.description
+    
+    # Set processing state
+    button.disabled = True
+    button.description = processing_text
+    button.button_style = processing_style

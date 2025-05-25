@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Fixed UI components dengan responsive layout tanpa horizontal scroll
+Deskripsi: Enhanced UI components dengan confirmation area di bawah action buttons untuk better UX
 """
 
 import ipywidgets as widgets
@@ -16,14 +16,12 @@ from smartcash.ui.components.progress_tracking import create_progress_tracking_c
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
-
 # Import local component
 from .input_options import create_preprocessing_input_options
 
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Create comprehensive preprocessing UI dengan responsive layout tanpa horizontal scroll.
+    Create comprehensive preprocessing UI dengan confirmation area di bawah action buttons.
     
     Args:
         config: Konfigurasi preprocessing
@@ -68,6 +66,17 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         cleanup_enabled=True,
         button_width='130px',  # Consistent button width
         container_width='100%'
+    )
+    
+    # === NEW: Confirmation Area di bawah Action Buttons ===
+    confirmation_area = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            max_height='200px',
+            margin='8px 0',
+            padding='0px',
+            overflow='auto'
+        )
     )
     
     # Save & reset buttons dengan responsive layout
@@ -142,7 +151,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         </h4>
     """)
     
-    # Main UI assembly dengan responsive layout (NO HORIZONTAL SCROLL)
+    # === ENHANCED: Main UI assembly dengan confirmation area positioning ===
     ui = widgets.VBox([
         header,
         status_panel,
@@ -152,6 +161,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         create_divider(),
         action_header,
         action_buttons['container'],
+        confirmation_area,  # 🆕 Confirmation area di bawah action buttons
         progress_components['container'],
         log_components['log_accordion'],
         create_divider(),
@@ -183,6 +193,9 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'preprocess_button': action_buttons['download_button'],  # Primary button mapped
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
+        
+        # 🆕 Confirmation area (untuk dialog positioning)
+        'confirmation_area': confirmation_area,
         
         # Save/reset buttons (consistent dengan handler expectations)
         'save_reset_buttons': save_reset_buttons,

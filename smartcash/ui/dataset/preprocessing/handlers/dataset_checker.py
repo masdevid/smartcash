@@ -1,147 +1,116 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/dataset_checker.py
-Deskripsi: Fixed lightweight dataset checker tanpa class analysis yang berat
+Deskripsi: SRP handler untuk dataset checking dengan service layer integration
 """
 
 from typing import Dict, Any
-from smartcash.ui.components.status_panel import update_status_panel
-from smartcash.ui.dataset.preprocessing.utils import get_validation_helper, get_ui_state_manager
-from smartcash.dataset.utils.path_validator import get_path_validator
+from smartcash.dataset.preprocessor.utils.preprocessing_factory import PreprocessingFactory
+from smartcash.ui.dataset.preprocessing.utils.config_extractor import get_config_extractor
+from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup handler untuk check dataset dengan lightweight validation."""
-    logger = ui_components.get('logger')
-    validation_helper = get_validation_helper(ui_components, logger)
-    ui_state = get_ui_state_manager(ui_components)
-    path_validator = get_path_validator(logger)
+    """Setup dataset checker dengan service integration."""
     
-    def _lightweight_dataset_check() -> Dict[str, Any]:
-        """Lightweight dataset structure check tanpa class analysis."""
-        data_dir = ui_components.get('data_dir', 'data')
-        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
+    def execute_check_action(button=None) -> None:
+        """Execute dataset checking dengan comprehensive analysis."""
+        logger = ui_components.get('logger')
+        button_manager = get_button_state_manager(ui_components)
         
-        # Validate raw dataset (fast)
-        raw_validation = path_validator.validate_dataset_structure(data_dir)
-        
-        # Validate preprocessed dataset (fast)
-        preprocessed_validation = path_validator.validate_preprocessed_structure(preprocessed_dir)
-        
-        # Skip class analysis - terlalu lambat untuk quick check
-        
-        # Check preprocessing readiness (fast)
-        compatibility_check = validation_helper.check_preprocessing_compatibility(raw_validation)
-        
-        return {
-            'raw': raw_validation,
-            'preprocessed': preprocessed_validation,
-            'compatibility': compatibility_check,
-            'available_splits': path_validator.detect_available_splits(data_dir)
-        }
-    
-    def _format_quick_summary(check_result: Dict[str, Any]) -> str:
-        """Format quick dataset summary untuk fast reporting."""
-        lines = ["📊 Quick Dataset Check", "=" * 40]
-        
-        # Raw dataset section (essential info only)
-        raw = check_result['raw']
-        lines.append(f"\n📁 Raw Dataset: {raw['data_dir']}")
-        
-        if raw['valid']:
-            lines.append(f"   ✅ Total: {raw['total_images']:,} gambar, {raw['total_labels']:,} label")
-            lines.append(f"   📂 Splits: {', '.join(check_result['available_splits'])}")
-            
-            # Quick split status
-            for split in ['train', 'valid', 'test']:
-                split_info = raw['splits'][split]
-                if split_info['exists'] and split_info['images'] > 0:
-                    lines.append(f"   ✅ {split}: {split_info['images']:,} gambar")
-        else:
-            lines.append("   ❌ Dataset tidak ditemukan - silakan download terlebih dahulu")
-        
-        # Preprocessed status (quick check)
-        preprocessed = check_result['preprocessed']
-        lines.append(f"\n🔧 Preprocessed Status:")
-        
-        if preprocessed['valid'] and preprocessed['total_processed'] > 0:
-            lines.append(f"   ✅ Tersedia: {preprocessed['total_processed']:,} gambar terproses")
-        else:
-            lines.append("   ⚪ Belum ada - siap untuk preprocessing")
-        
-        # Next steps recommendation
-        compatibility = check_result.get('compatibility', {})
-        lines.append(f"\n🎯 Status & Next Steps:")
-        
-        if not raw['valid']:
-            lines.append("   📥 Download dataset terlebih dahulu")
-        elif not compatibility.get('ready_for_preprocessing', False):
-            blocking_issues = compatibility.get('blocking_issues', [])
-            lines.append(f"   ⚠️ {len(blocking_issues)} blocking issues ditemukan")
-        elif preprocessed['total_processed'] == 0:
-            lines.append("   🚀 Siap untuk preprocessing - klik 'Mulai Preprocessing'")
-        else:
-            lines.append("   ✅ Dataset dan preprocessing lengkap - siap untuk augmentasi")
-        
-        return "\n".join(lines)
-    
-    def _on_check_dataset_click(b):
-        """Handler untuk tombol check dataset dengan lightweight approach."""
-        # Check operation state
-        can_start, message = ui_state.can_start_operation('validation')
-        if not can_start:
-            logger and logger.warning(f"⚠️ {message}")
-            update_status_panel(ui_components['status_panel'], message, "warning")
-            return
-        
-        # Set button processing state
-        ui_state.set_button_processing('check_button', True, "Checking...")
-        
-        logger and logger.info("🔍 Memulai quick dataset check...")
-        update_status_panel(ui_components['status_panel'], "Checking dataset struktur...", "info")
-        
-        try:
-            # Quick lightweight check
-            check_result = _lightweight_dataset_check()
-            summary = _format_quick_summary(check_result)
-            
-            logger and logger.info(summary)
-            
-            # Smart status update berdasarkan hasil
-            raw = check_result['raw']
-            compatibility = check_result.get('compatibility', {})
-            preprocessed = check_result['preprocessed']
-            
-            if not raw['valid']:
-                status_msg = "Dataset tidak ditemukan - silakan download terlebih dahulu"
-                panel_type = "error"
-            elif not compatibility.get('ready_for_preprocessing', False):
-                blocking_count = len(compatibility.get('blocking_issues', []))
-                status_msg = f"Dataset ditemukan dengan {blocking_count} issues yang perlu diperbaiki"
-                panel_type = "warning"
-            elif preprocessed['total_processed'] == 0:
-                total_images = raw['total_images']
-                status_msg = f"Dataset siap untuk preprocessing: {total_images:,} gambar terdeteksi"
-                panel_type = "success"
-            else:
-                processed_count = preprocessed['total_processed']
-                raw_count = raw['total_images']
-                status_msg = f"Dataset lengkap: {raw_count:,} raw, {processed_count:,} preprocessed"
-                panel_type = "info"
-            
-            update_status_panel(ui_components['status_panel'], status_msg, panel_type)
+        with button_manager.operation_context('check'):
+            try:
+                logger and logger.info("🔍 Memeriksa dataset untuk preprocessing")
                 
-        except Exception as e:
-            error_msg = f"Error checking dataset: {str(e)}"
-            logger and logger.error(f"❌ {error_msg}")
-            update_status_panel(ui_components['status_panel'], error_msg, "error")
-        
-        finally:
-            # Reset button state
-            ui_state.set_button_processing('check_button', False, 
-                                         success_text="Check Dataset")
+                # Clear UI outputs
+                _clear_ui_outputs(ui_components)
+                
+                # Get config
+                config_extractor = get_config_extractor(ui_components)
+                config = config_extractor.get_full_config()
+                
+                # Create checker service
+                checker = PreprocessingFactory.create_dataset_checker(config, logger)
+                
+                # Check source dataset
+                source_result = checker.check_source_dataset(detailed=True)
+                
+                # Check preprocessed dataset
+                preprocessed_result = checker.check_preprocessed_dataset(detailed=True)
+                
+                # Display results
+                _display_check_results(ui_components, source_result, preprocessed_result, logger)
+                
+            except Exception as e:
+                logger and logger.error(f"💥 Error checking dataset: {str(e)}")
+                raise
     
-    # Setup event handler
-    ui_components['check_button'].on_click(_on_check_dataset_click)
+    # Register handler
+    if 'check_button' in ui_components:
+        ui_components['check_button'].on_click(execute_check_action)
     
-    logger and logger.debug("✅ Lightweight dataset checker setup selesai")
-    
+    ui_components['execute_check'] = execute_check_action
     return ui_components
+
+def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
+    """Clear UI outputs untuk fresh display."""
+    for output_key in ['log_output', 'status']:
+        if output_key in ui_components and hasattr(ui_components[output_key], 'clear_output'):
+            ui_components[output_key].clear_output(wait=True)
+
+def _display_check_results(ui_components: Dict[str, Any], source_result: Dict[str, Any], 
+                          preprocessed_result: Dict[str, Any], logger) -> None:
+    """Display comprehensive check results."""
+    from IPython.display import display, HTML
+    
+    # Source dataset results
+    if source_result['valid']:
+        logger and logger.success(f"✅ Source dataset: {source_result['total_images']:,} gambar valid")
+        _log_split_details(source_result['splits'], logger, "Source")
+    else:
+        logger and logger.error(f"❌ Source dataset invalid: {source_result['message']}")
+        return
+    
+    # Preprocessed dataset results
+    if preprocessed_result['valid']:
+        logger and logger.success(f"💾 Preprocessed dataset: {preprocessed_result['total_processed']:,} gambar")
+        _log_split_details(preprocessed_result['splits'], logger, "Preprocessed")
+    else:
+        logger and logger.info(f"ℹ️ Preprocessed: {preprocessed_result['message']}")
+    
+    # Display detailed report
+    if 'log_output' in ui_components:
+        with ui_components['log_output']:
+            # Source report
+            if 'report' in source_result:
+                display(HTML(f"<pre style='background:#f8f9fa;padding:10px;border-radius:5px;'>{source_result['report']}</pre>"))
+            
+            # Preprocessed report jika ada
+            if preprocessed_result['valid'] and 'report' in preprocessed_result:
+                display(HTML(f"<pre style='background:#f0f8ff;padding:10px;border-radius:5px;margin-top:10px;'>{preprocessed_result['report']}</pre>"))
+    
+    # Update status panel
+    from smartcash.ui.components.status_panel import update_status_panel
+    if 'status_panel' in ui_components:
+        if source_result['valid']:
+            message = f"Dataset siap: {source_result['total_images']:,} gambar tersedia"
+            status_type = "success"
+        else:
+            message = "Dataset tidak valid untuk preprocessing"
+            status_type = "error"
+        
+        update_status_panel(ui_components['status_panel'], message, status_type)
+
+def _log_split_details(splits: Dict[str, Any], logger, dataset_type: str) -> None:
+    """Log split details dengan format yang rapi."""
+    if not logger:
+        return
+    
+    for split in ['train', 'valid', 'test']:
+        split_data = splits.get(split, {})
+        if split_data.get('exists', False):
+            if dataset_type == "Source":
+                count = split_data.get('images', 0)
+                labels = split_data.get('labels', 0)
+                logger.info(f"📂 {split}: {count:,} gambar, {labels:,} label")
+            else:
+                count = split_data.get('processed', 0)
+                logger.info(f"💾 {split}: {count:,} preprocessed")

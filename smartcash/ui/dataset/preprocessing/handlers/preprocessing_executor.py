@@ -1,234 +1,102 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_executor.py
-Deskripsi: Fixed preprocessing executor dengan proper progress tracking dan button state management
+Deskripsi: SRP handler untuk eksekusi preprocessing dengan integrasi service layer baru
 """
 
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any
-from smartcash.common.environment import get_environment_manager
-from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
-from smartcash.ui.components.status_panel import update_status_panel
-from smartcash.ui.dataset.preprocessing.utils import (
-    get_config_extractor, get_validation_helper, 
-    get_dialog_manager, get_ui_state_manager, get_progress_bridge
-)
+from typing import Dict, Any, Callable
+from smartcash.dataset.preprocessor.utils.preprocessing_factory import PreprocessingFactory
+from smartcash.ui.dataset.preprocessing.utils.config_extractor import get_config_extractor
+from smartcash.ui.dataset.preprocessing.utils.progress_bridge import create_preprocessing_progress_bridge
+from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handler untuk execute preprocessing dengan proper progress integration."""
-    logger = ui_components.get('logger')
-    env_manager = env or get_environment_manager()
+    """Setup preprocessing executor dengan service layer integration."""
     
-    # Get utilities
-    config_extractor = get_config_extractor(ui_components)
-    validation_helper = get_validation_helper(ui_components, logger)
-    dialog_manager = get_dialog_manager(ui_components)
-    ui_state = get_ui_state_manager(ui_components)
-    progress_bridge = get_progress_bridge(ui_components, logger)
-    
-    # State management
-    ui_components['preprocessing_manager'] = None
-    ui_components['preprocessing_executor'] = None
-    ui_components['preprocessing_future'] = None
-    
-    def _get_preprocessing_manager() -> PreprocessingManager:
-        """Get preprocessing manager dengan lazy initialization."""
-        if not ui_components['preprocessing_manager']:
-            config = {
-                'preprocessing': config_extractor.get_preprocessing_config(),
-                'data': {'dir': ui_components.get('data_dir', 'data')}
-            }
-            ui_components['preprocessing_manager'] = PreprocessingManager(config, logger)
-            ui_components['preprocessing_manager'].register_progress_callback(progress_bridge.update_progress)
+    def execute_preprocessing_action(button=None) -> None:
+        """Execute preprocessing dengan comprehensive service integration."""
+        logger = ui_components.get('logger')
+        button_manager = get_button_state_manager(ui_components)
         
-        return ui_components['preprocessing_manager']
-    
-    def _on_preprocess_click(b):
-        """Handler untuk tombol preprocessing dengan proper state management."""
-        # Check operation state - exclude validation karena bisa concurrent
-        can_start, message = ui_state.can_start_operation('preprocessing', exclude_operations=['validation'])
-        if not can_start:
-            logger and logger.warning(f"⚠️ {message}")
-            update_status_panel(ui_components['status_panel'], message, "warning")
-            return
-        
-        # Check dataset existence (quick check)
-        dataset_exists, dataset_msg = validation_helper.check_dataset_exists()
-        if not dataset_exists:
-            logger and logger.error(f"❌ {dataset_msg}")
-            update_status_panel(ui_components['status_panel'], dataset_msg, "error")
-            return
-        
-        # Check existing preprocessed data
-        split_config = ui_components['split_dropdown'].value
-        existing_data = validation_helper.check_existing_preprocessed_for_split(split_config)
-        
-        # Show confirmation jika ada data existing
-        if existing_data:
-            existing_str = ', '.join(existing_data)
-            confirmation_msg = f"""Data preprocessing sudah ada untuk: {existing_str}
-
-Apakah Anda ingin memproses ulang?
-Data yang ada akan ditimpa dan tidak dapat dikembalikan."""
-            
-            dialog_manager.show_confirmation_dialog(
-                title="Konfirmasi Preprocessing Ulang",
-                message=confirmation_msg,
-                on_confirm=_start_preprocessing_confirmed,
-                confirm_text="Ya, Proses Ulang",
-                cancel_text="Batal",
-                danger_mode=True
-            )
-        else:
-            _start_preprocessing_confirmed()
-    
-    def _start_preprocessing_confirmed():
-        """Start preprocessing setelah konfirmasi dengan proper state management."""
-        # Set UI states
-        ui_state.set_button_processing('preprocess_button', True, "Processing...")
-        
-        # Disable other action buttons during preprocessing
-        for button_key in ['check_button', 'cleanup_button']:
-            if button_key in ui_components and ui_components[button_key]:
-                ui_components[button_key].disabled = True
-        
-        # Setup progress tracking
-        progress_bridge.setup_for_operation('preprocessing')
-        
-        logger and logger.info("🚀 Memulai preprocessing dataset")
-        update_status_panel(ui_components['status_panel'], "Memulai preprocessing dataset...", "info")
-        
-        # Start preprocessing dalam thread dengan proper executor management
-        if ui_components['preprocessing_executor']:
-            ui_components['preprocessing_executor'].shutdown(wait=False)
-        
-        ui_components['preprocessing_executor'] = ThreadPoolExecutor(max_workers=1)
-        ui_components['preprocessing_future'] = ui_components['preprocessing_executor'].submit(_run_preprocessing)
-        
-        # Monitor completion dengan proper polling
-        _monitor_preprocessing_completion()
-    
-    def _run_preprocessing():
-        """Execute preprocessing dalam thread terpisah."""
-        try:
-            preprocessing_manager = _get_preprocessing_manager()
-            config = config_extractor.get_preprocessing_config()
-            
-            # Extract split untuk avoid duplicate keyword argument
-            split_value = config.pop('split', 'all')
-            
-            # Map 'val' ke 'valid' untuk consistency
-            if split_value == 'val':
-                split_value = 'valid'
-            
-            # Execute preprocessing dengan full config
-            result = preprocessing_manager.preprocess_dataset(
-                split=split_value,
-                force_reprocess=True,
-                show_progress=False,  # Disable tqdm, use UI progress
-                **config
-            )
-            
-            return result
-            
-        except Exception as e:
-            logger and logger.error(f"❌ Error preprocessing: {str(e)}")
-            raise
-    
-    def _monitor_preprocessing_completion():
-        """Monitor preprocessing completion dengan proper error handling."""
-        future = ui_components['preprocessing_future']
-        
-        if not future:
-            return
-        
-        if future.done():
+        with button_manager.operation_context('preprocessing'):
             try:
-                result = future.result()
-                _on_preprocessing_complete(result)
-            except Exception as e:
-                _on_preprocessing_error(e)
-            finally:
-                # Cleanup executor
-                if ui_components['preprocessing_executor']:
-                    ui_components['preprocessing_executor'].shutdown(wait=False)
-                    ui_components['preprocessing_executor'] = None
-                ui_components['preprocessing_future'] = None
-        else:
-            # Schedule next check (Colab-safe approach)
-            from IPython.display import Javascript, display
-            
-            # Use IPython's built-in scheduling instead of threading
-            display(Javascript("""
-                setTimeout(function() {
-                    // Trigger re-check via kernel callback
-                    if (typeof kernel !== 'undefined' && kernel) {
-                        // This will be handled by the next cell execution
-                    }
-                }, 1000);
-            """))
-            
-            # Alternative: Use simple loop with sleep in the same thread
-            import time
-            time.sleep(1)
-            _monitor_preprocessing_completion()
-    
-    def _on_preprocessing_complete(result):
-        """Handler saat preprocessing selesai dengan proper cleanup."""
-        # Reset UI states
-        ui_state.set_button_processing('preprocess_button', False, 
-                                     success_text="Mulai Preprocessing")
-        
-        # Re-enable other action buttons
-        for button_key in ['check_button', 'cleanup_button']:
-            if button_key in ui_components and ui_components[button_key]:
-                ui_components[button_key].disabled = False
-        
-        if result and result.get('success', False):
-            total_images = result.get('total_images', 0)
-            processing_time = result.get('processing_time', 0)
-            
-            success_msg = f"✅ Preprocessing selesai: {total_images:,} gambar dalam {processing_time:.1f} detik"
-            logger and logger.success(success_msg)
-            
-            progress_bridge.complete_operation("Preprocessing selesai")
-            update_status_panel(ui_components['status_panel'], success_msg, "success")
-            
-            # Log detail statistics
-            if 'split_stats' in result:
-                stats_detail = []
-                for split, stats in result['split_stats'].items():
-                    images = stats.get('images', 0)
-                    if images > 0:
-                        stats_detail.append(f"{split}: {images:,} gambar")
+                logger and logger.info("🚀 Memulai preprocessing dataset")
                 
-                if stats_detail and logger:
-                    logger.info(f"📊 Detail hasil: {', '.join(stats_detail)}")
-        else:
-            error_msg = result.get('message', 'Preprocessing gagal') if result else "Preprocessing gagal"
-            logger and logger.error(f"❌ {error_msg}")
-            
-            progress_bridge.error_operation("Preprocessing gagal")
-            update_status_panel(ui_components['status_panel'], error_msg, "error")
+                # Clear UI outputs
+                _clear_ui_outputs(ui_components)
+                
+                # Setup progress tracking
+                ui_components.get('show_for_operation', lambda x: None)('download')
+                
+                # Extract config dari UI
+                config_extractor = get_config_extractor(ui_components)
+                processing_params = config_extractor.extract_processing_parameters()
+                config = config_extractor.get_full_config()
+                
+                logger and logger.info(f"🔧 Config: {processing_params['summary']}")
+                
+                # Create progress bridge
+                progress_bridge = create_preprocessing_progress_bridge(ui_components)
+                
+                # Create preprocessing service
+                preprocessing_service = PreprocessingFactory.create_preprocessing_manager(
+                    config, logger, progress_bridge.notify_progress
+                )
+                
+                # Execute preprocessing
+                result = preprocessing_service.coordinate_preprocessing(
+                    split=processing_params['split'],
+                    force_reprocess=processing_params.get('force_reprocess', False),
+                    **processing_params['config']
+                )
+                
+                # Handle results
+                if result['success']:
+                    _handle_preprocessing_success(ui_components, result, logger)
+                else:
+                    raise Exception(result['message'])
+                    
+            except Exception as e:
+                logger and logger.error(f"💥 Error preprocessing: {str(e)}")
+                ui_components.get('error_operation', lambda x: None)(f"Preprocessing gagal: {str(e)}")
+                raise
     
-    def _on_preprocessing_error(error):
-        """Handler saat preprocessing error dengan proper cleanup."""
-        # Reset UI states
-        ui_state.set_button_processing('preprocess_button', False)
-        
-        # Re-enable other action buttons
-        for button_key in ['check_button', 'cleanup_button']:
-            if button_key in ui_components and ui_components[button_key]:
-                ui_components[button_key].disabled = False
-        
-        error_msg = f"❌ Error preprocessing: {str(error)}"
-        logger and logger.error(error_msg)
-        
-        progress_bridge.error_operation("Error preprocessing")
-        update_status_panel(ui_components['status_panel'], error_msg, "error")
+    # Register handler
+    if 'preprocess_button' in ui_components:
+        ui_components['preprocess_button'].on_click(execute_preprocessing_action)
     
-    # Setup event handler
-    ui_components['preprocess_button'].on_click(_on_preprocess_click)
-    
-    logger and logger.debug("✅ Fixed preprocessing executor setup selesai")
+    # Add action reference
+    ui_components['execute_preprocessing'] = execute_preprocessing_action
     
     return ui_components
+
+def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
+    """Clear UI outputs untuk fresh start."""
+    for output_key in ['log_output', 'status', 'confirmation_area']:
+        if output_key in ui_components and hasattr(ui_components[output_key], 'clear_output'):
+            ui_components[output_key].clear_output(wait=True)
+
+def _handle_preprocessing_success(ui_components: Dict[str, Any], result: Dict[str, Any], logger) -> None:
+    """Handle successful preprocessing completion."""
+    total_images = result.get('total_images', 0)
+    processing_time = result.get('processing_time', 0)
+    
+    # Update progress completion
+    ui_components.get('complete_operation', lambda x: None)(
+        f"Preprocessing selesai: {total_images:,} gambar dalam {processing_time:.1f}s"
+    )
+    
+    # Update status panel
+    from smartcash.ui.components.status_panel import update_status_panel
+    if 'status_panel' in ui_components:
+        update_status_panel(
+            ui_components['status_panel'],
+            f"✅ Preprocessing berhasil: {total_images:,} gambar diproses",
+            "success"
+        )
+    
+    # Log detailed stats
+    if logger:
+        stats = result.get('split_stats', {})
+        for split, split_stats in stats.items():
+            if split_stats.get('complete', False):
+                logger.success(f"📊 {split}: {split_stats['images']:,} gambar berhasil diproses")

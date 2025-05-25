@@ -4,6 +4,8 @@ Deskripsi: Fixed main UI dengan integrasi latest progress_tracking dan button_st
 """
 
 import ipywidgets as widgets
+
+from typing import Dict, Any
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider

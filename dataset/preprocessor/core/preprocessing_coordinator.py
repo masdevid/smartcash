@@ -143,30 +143,27 @@ class SplitCoordinator:
     
     def _create_split_progress_callback_fixed(self, split_name: str, split_index: int, 
                                             total_splits: int, total_images: int) -> Callable:
-        """FIXED: Create progress callback dengan resolved parameter handling."""
-        def split_progress_callback_fixed(**callback_kwargs):
+        """FIXED: Create progress callback dengan no parameter conflicts."""
+        def split_progress_callback_fixed(progress=0, message="", **other_kwargs):
+            """FIXED: Explicit parameter names untuk avoid conflicts."""
             if self._progress_callback:
-                # FIXED: Extract parameters safely untuk avoid conflicts
-                callback_progress = callback_kwargs.get('progress', 0)
-                callback_message = callback_kwargs.get('message', f'Processing {split_name}')
-                
-                # Map split progress ke coordination progress
-                base_progress = 15 + (split_index / total_splits) * 75
-                mapped_progress = base_progress + (callback_progress / 100) * (75 / total_splits)
-                
-                # FIXED: Create clean parameters untuk callback
-                clean_params = {
-                    'progress': int(mapped_progress),
-                    'message': callback_message,
-                    'split': split_name,
-                    'step': 2,
-                    'split_step': f'{split_name} ({split_index+1}/{total_splits})',
-                    'total_files_all': total_images
-                }
-                
-                # FIXED: Pass clean parameters untuk avoid 'message' duplication
                 try:
-                    self._progress_callback(**clean_params)
+                    # Map split progress ke coordination progress
+                    base_progress = 15 + (split_index / total_splits) * 75
+                    mapped_progress = base_progress + (progress / 100) * (75 / total_splits)
+                    
+                    # Build message dengan fallback
+                    display_message = message or f'Processing {split_name}'
+                    
+                    # FIXED: Call dengan explicit keyword mapping
+                    self._progress_callback(
+                        progress=int(mapped_progress),
+                        message=display_message,
+                        split=split_name,
+                        step=2,
+                        split_step=f'{split_name} ({split_index+1}/{total_splits})',
+                        total_files_all=total_images
+                    )
                 except Exception as e:
                     self.logger.debug(f"🔧 Split callback error: {str(e)}")
         

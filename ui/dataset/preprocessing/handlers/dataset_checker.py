@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/dataset_checker.py
-Deskripsi: SRP handler untuk dataset checking dengan service layer integration
+Deskripsi: Fixed dataset checker dengan progress bar untuk reporting dan clear outputs
 """
 
 from typing import Dict, Any
@@ -9,19 +9,28 @@ from smartcash.ui.dataset.preprocessing.utils.config_extractor import get_config
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup dataset checker dengan service integration."""
+    """Setup dataset checker dengan progress integration."""
     
     def execute_check_action(button=None) -> None:
-        """Execute dataset checking dengan comprehensive analysis."""
+        """Execute dataset checking dengan comprehensive analysis dan progress."""
         logger = ui_components.get('logger')
         button_manager = get_button_state_manager(ui_components)
+        
+        # Clear outputs first
+        _clear_ui_outputs(ui_components)
         
         with button_manager.operation_context('check'):
             try:
                 logger and logger.info("🔍 Memeriksa dataset untuk preprocessing")
                 
-                # Clear UI outputs
-                _clear_ui_outputs(ui_components)
+                # Disable other buttons
+                button_manager.disable_other_buttons('check')
+                
+                # Show progress untuk check operation
+                ui_components.get('show_for_operation', lambda x: None)('check')
+                
+                # Phase 1: Setup (0-20%)
+                _update_progress(ui_components, 10, "Memulai analisis dataset")
                 
                 # Get config
                 config_extractor = get_config_extractor(ui_components)
@@ -30,18 +39,33 @@ def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 # Create checker service
                 checker = PreprocessingFactory.create_dataset_checker(config, logger)
                 
-                # Check source dataset
+                # Phase 2: Check source (20-60%)
+                _update_progress(ui_components, 30, "Menganalisis source dataset")
                 source_result = checker.check_source_dataset(detailed=True)
                 
-                # Check preprocessed dataset
+                _update_progress(ui_components, 50, "Validasi struktur dataset")
+                
+                # Phase 3: Check preprocessed (60-80%)
+                _update_progress(ui_components, 70, "Menganalisis preprocessed dataset")
                 preprocessed_result = checker.check_preprocessed_dataset(detailed=True)
+                
+                # Phase 4: Generate reports (80-100%)
+                _update_progress(ui_components, 90, "Membuat laporan analisis")
                 
                 # Display results
                 _display_check_results(ui_components, source_result, preprocessed_result, logger)
                 
+                _update_progress(ui_components, 100, "Analisis dataset selesai")
+                ui_components.get('complete_operation', lambda x: None)("Analisis dataset selesai")
+                
             except Exception as e:
                 logger and logger.error(f"💥 Error checking dataset: {str(e)}")
+                ui_components.get('error_operation', lambda x: None)(f"Check dataset gagal: {str(e)}")
+                _update_status_panel_error(ui_components, f"Check dataset gagal: {str(e)}")
                 raise
+            finally:
+                # Always re-enable buttons
+                button_manager.enable_other_buttons('check')
     
     # Register handler
     if 'check_button' in ui_components:
@@ -52,9 +76,14 @@ def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs untuk fresh display."""
-    for output_key in ['log_output', 'status']:
+    for output_key in ['log_output', 'status', 'confirmation_area']:
         if output_key in ui_components and hasattr(ui_components[output_key], 'clear_output'):
             ui_components[output_key].clear_output(wait=True)
+
+def _update_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
+    """Update progress dengan bounds checking."""
+    progress = max(0, min(100, progress))
+    ui_components.get('update_progress', lambda *args: None)('overall', progress, message)
 
 def _display_check_results(ui_components: Dict[str, Any], source_result: Dict[str, Any], 
                           preprocessed_result: Dict[str, Any], logger) -> None:
@@ -65,8 +94,10 @@ def _display_check_results(ui_components: Dict[str, Any], source_result: Dict[st
     if source_result['valid']:
         logger and logger.success(f"✅ Source dataset: {source_result['total_images']:,} gambar valid")
         _log_split_details(source_result['splits'], logger, "Source")
+        _update_status_panel_success(ui_components, f"Dataset siap: {source_result['total_images']:,} gambar tersedia")
     else:
         logger and logger.error(f"❌ Source dataset invalid: {source_result['message']}")
+        _update_status_panel_error(ui_components, "Dataset tidak valid untuk preprocessing")
         return
     
     # Preprocessed dataset results
@@ -81,23 +112,11 @@ def _display_check_results(ui_components: Dict[str, Any], source_result: Dict[st
         with ui_components['log_output']:
             # Source report
             if 'report' in source_result:
-                display(HTML(f"<pre style='background:#f8f9fa;padding:10px;border-radius:5px;'>{source_result['report']}</pre>"))
+                display(HTML(f"<pre style='background:#f8f9fa;padding:10px;border-radius:5px;font-size:12px;'>{source_result['report']}</pre>"))
             
             # Preprocessed report jika ada
             if preprocessed_result['valid'] and 'report' in preprocessed_result:
-                display(HTML(f"<pre style='background:#f0f8ff;padding:10px;border-radius:5px;margin-top:10px;'>{preprocessed_result['report']}</pre>"))
-    
-    # Update status panel
-    from smartcash.ui.components.status_panel import update_status_panel
-    if 'status_panel' in ui_components:
-        if source_result['valid']:
-            message = f"Dataset siap: {source_result['total_images']:,} gambar tersedia"
-            status_type = "success"
-        else:
-            message = "Dataset tidak valid untuk preprocessing"
-            status_type = "error"
-        
-        update_status_panel(ui_components['status_panel'], message, status_type)
+                display(HTML(f"<pre style='background:#f0f8ff;padding:10px;border-radius:5px;margin-top:10px;font-size:12px;'>{preprocessed_result['report']}</pre>"))
 
 def _log_split_details(splits: Dict[str, Any], logger, dataset_type: str) -> None:
     """Log split details dengan format yang rapi."""
@@ -114,3 +133,15 @@ def _log_split_details(splits: Dict[str, Any], logger, dataset_type: str) -> Non
             else:
                 count = split_data.get('processed', 0)
                 logger.info(f"💾 {split}: {count:,} preprocessed")
+
+def _update_status_panel_success(ui_components: Dict[str, Any], message: str) -> None:
+    """Update status panel dengan success state."""
+    from smartcash.ui.components.status_panel import update_status_panel
+    if 'status_panel' in ui_components:
+        update_status_panel(ui_components['status_panel'], message, "success")
+
+def _update_status_panel_error(ui_components: Dict[str, Any], message: str) -> None:
+    """Update status panel dengan error state."""
+    from smartcash.ui.components.status_panel import update_status_panel
+    if 'status_panel' in ui_components:
+        update_status_panel(ui_components['status_panel'], message, "error")

@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Union, Tuple, Any, Callable
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.components.datasets.multilayer_dataset import MultilayerDataset
-from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
+from smartcash.dataset.preprocessor.core.preprocessing_manager import PreprocessingManager
 
 
 class PreprocessedDatasetLoader:
@@ -60,7 +60,7 @@ class PreprocessedDatasetLoader:
             
         # Inisialisasi preprocessor untuk keperluan fallback
         if self.fallback_to_raw or self.auto_preprocess:
-            self.preprocessor = DatasetPreprocessor(
+            self.preprocessor = PreprocessingManager(
                 config={
                     'img_size': self.config['img_size'],
                     'preprocessed_dir': str(self.preprocessed_dir),

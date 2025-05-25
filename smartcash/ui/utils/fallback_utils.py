@@ -189,29 +189,6 @@ def load_config_safely(config_path: str, logger=None) -> Dict[str, Any]:
     # Return empty dict sebagai fallback terakhir
     return {}
 
-def get_dataset_manager(config=None, logger=None) -> Any:
-    """
-    Dapatkan dataset manager dengan fallback jika tidak tersedia.
-    
-    Args:
-        config: Konfigurasi untuk dataset manager
-        logger: Logger untuk mencatat error
-        
-    Returns:
-        Dataset manager atau None jika tidak tersedia
-    """
-    try:
-        from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
-        
-        # Buat konfigurasi default jika tidak ada
-        if not config:
-            config = {'preprocessing': {'output_dir': 'data/preprocessed'}, 'dataset_dir': 'data'}
-        
-        return DatasetPreprocessor(config, logger)
-    except ImportError as e:
-        if logger:
-            logger.warning(f"⚠️ DatasetManager tidak tersedia: {e}")
-        return None
 
 def get_augmentation_manager(config=None, logger=None) -> Any:
     """

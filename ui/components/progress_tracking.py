@@ -39,7 +39,11 @@ class ProgressTracker:
         # Progress bars container
         self.tqdm_container = widgets.Output(
             layout=widgets.Layout(
-                margin='0', width='100%', flex='1 1 auto', overflow='hidden', align_items='stretch'
+                margin='0', 
+                width='100%', 
+                max_width='100%',
+                flex='1 1 auto', 
+                overflow='hidden'
             )
         )
         
@@ -58,6 +62,7 @@ class ProgressTracker:
             border_radius='8px',
             background_color='#f8fff8',
             width='100%',
+            max_width='100%',
             min_height='120px',
             max_height='300px',
             overflow='hidden',
@@ -144,7 +149,7 @@ class ProgressTracker:
                     self._create_bar(bar_type, desc, color, position, optimal_width)
     
     def _create_bar(self, bar_type: str, desc: str, color: str, position: int, width: int):
-        """Create single progress bar."""
+        """Create single progress bar dengan full width."""
         bar = tqdm(
             total=100,
             desc=desc,
@@ -156,7 +161,8 @@ class ProgressTracker:
             mininterval=0.1,
             maxinterval=0.5,
             smoothing=0.3,
-            dynamic_ncols=False
+            dynamic_ncols=True,  # Enable dynamic width
+            leave=True
         )
         
         setattr(self, f'{bar_type}_bar', bar)
@@ -245,15 +251,16 @@ class ProgressTracker:
     
     @staticmethod
     def _calculate_optimal_width(num_bars: int) -> int:
-        """Calculate optimal width untuk progress bars."""
-        base_width = 70
+        """Calculate optimal width untuk progress bars - use larger values for full width."""
+        # Increased base width for better container utilization
+        base_width = 100
         
         if num_bars == 1:
-            return base_width + 10
+            return base_width + 20  # Single bar gets more space
         elif num_bars == 2:
-            return base_width
+            return base_width + 10
         else:
-            return base_width - 5
+            return base_width  # 3+ bars use base width
     
     @staticmethod
     def _truncate_message(message: str, max_length: int) -> str:

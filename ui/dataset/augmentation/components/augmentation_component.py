@@ -25,7 +25,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
 
     # Import shared components
     from smartcash.ui.components.action_buttons import create_action_buttons
-    from smartcash.ui.components.progress_tracking import create_progress_tracking
+    from smartcash.ui.components.progress_tracking import create_progress_tracking_container
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
@@ -68,12 +68,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     )
 
     # Progress tracking dengan shared component
-    progress_components = create_progress_tracking(
-        module_name='augmentation',
-        show_step_progress=True,
-        show_overall_progress=True,
-        width='100%'
-    )
+    progress_components = create_progress_tracking_container()
 
     # Log accordion dengan shared component
     log_components = create_log_accordion(

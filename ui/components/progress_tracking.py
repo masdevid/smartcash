@@ -39,7 +39,7 @@ class ProgressTracker:
         # Progress bars container
         self.tqdm_container = widgets.Output(
             layout=widgets.Layout(
-                margin='0', width='100%', flex='1 1 auto', overflow='hidden'
+                margin='0', width='100%', flex='1 1 auto', overflow='hidden', align_items='stretch'
             )
         )
         

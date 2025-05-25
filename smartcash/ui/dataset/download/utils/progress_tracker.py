@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/utils/progress_tracker.py
-Deskripsi: Updated to use enhanced ProgressTracker while maintaining existing business logic
+Deskripsi: Simplified progress tracker dengan direct ProgressTracker integration
 """
 
 import time
@@ -35,31 +35,25 @@ class ProgressStep:
     end_time: Optional[float] = None
 
 class DownloadProgressTracker:
-    """Enhanced progress tracker untuk download process dengan new ProgressTracker integration."""
+    """Progress tracker untuk download process dengan ProgressTracker integration."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.logger = ui_components.get('logger')
-        
-        # Get enhanced progress tracker instance
         self.progress_tracker = ui_components.get('tracker')
         
-        # Progress state
         self.steps: List[ProgressStep] = []
         self.current_step_index = 0
         self.overall_progress = 0
         self.start_time = None
         self.is_active = False
-        
-        # Progress callbacks
         self._progress_callbacks: List[Callable] = []
         
-        # Initialize default steps
         self._setup_default_steps()
     
     def _setup_default_steps(self) -> None:
         """Setup default steps untuk download process."""
-        default_steps = [
+        self.steps = [
             ProgressStep("validation", ProgressStage.VALIDATION, 5, "Validasi parameter"),
             ProgressStep("metadata", ProgressStage.METADATA, 10, "Ambil metadata dataset"),
             ProgressStep("download", ProgressStage.DOWNLOAD, 50, "Download dataset"),
@@ -67,20 +61,14 @@ class DownloadProgressTracker:
             ProgressStep("organize", ProgressStage.ORGANIZE, 15, "Organisir dataset"),
             ProgressStep("verify", ProgressStage.VERIFY, 5, "Verifikasi hasil")
         ]
-        self.steps = default_steps
     
     def add_progress_callback(self, callback: Callable[[str, int, str], None]) -> None:
         """Add callback untuk progress updates."""
         if callback not in self._progress_callbacks:
             self._progress_callbacks.append(callback)
     
-    def remove_progress_callback(self, callback: Callable) -> None:
-        """Remove progress callback."""
-        if callback in self._progress_callbacks:
-            self._progress_callbacks.remove(callback)
-    
     def start_tracking(self, custom_steps: Optional[List[ProgressStep]] = None) -> None:
-        """Start progress tracking dengan optional custom steps."""
+        """Start progress tracking."""
         if custom_steps:
             self.steps = custom_steps
         
@@ -89,7 +77,6 @@ class DownloadProgressTracker:
         self.current_step_index = 0
         self.overall_progress = 0
         
-        # Reset all steps
         for step in self.steps:
             step.started = False
             step.completed = False
@@ -98,10 +85,7 @@ class DownloadProgressTracker:
             step.start_time = None
             step.end_time = None
         
-        # Setup UI progress using enhanced tracker
         self._setup_ui_progress()
-        
-        # Notify callbacks
         self._notify_callbacks("start", 0, "Memulai proses download")
         
         self.logger and self.logger.info(f"🚀 Progress tracking dimulai dengan {len(self.steps)} tahap")
@@ -118,13 +102,8 @@ class DownloadProgressTracker:
         step.message = message or step.description
         step.progress = 0
         
-        # Update current step index
         self.current_step_index = self.steps.index(step)
-        
-        # Update UI using enhanced tracker
         self._update_ui_progress()
-        
-        # Notify callbacks
         self._notify_callbacks("step_start", step.progress, step.message)
         
         self.logger and self.logger.info(f"🔄 {step.description}: {step.message}")
@@ -139,13 +118,8 @@ class DownloadProgressTracker:
         if message:
             step.message = message
         
-        # Calculate overall progress
         self._calculate_overall_progress()
-        
-        # Update UI dengan throttling
-        self._update_ui_progress_throttled()
-        
-        # Notify callbacks
+        self._update_ui_progress()
         self._notify_callbacks("step_progress", step.progress, step.message)
     
     def complete_step(self, step_name: str, message: str = "") -> None:
@@ -160,13 +134,8 @@ class DownloadProgressTracker:
         if message:
             step.message = message
         
-        # Calculate overall progress
         self._calculate_overall_progress()
-        
-        # Update UI using enhanced tracker
         self._update_ui_progress()
-        
-        # Notify callbacks
         self._notify_callbacks("step_complete", 100, step.message)
         
         duration = step.end_time - step.start_time if step.start_time else 0
@@ -177,7 +146,6 @@ class DownloadProgressTracker:
         self.is_active = False
         total_duration = time.time() - self.start_time if self.start_time else 0
         
-        # Complete semua steps yang belum selesai
         for step in self.steps:
             if not step.completed:
                 step.completed = True
@@ -186,11 +154,7 @@ class DownloadProgressTracker:
                     step.end_time = time.time()
         
         self.overall_progress = 100
-        
-        # Update UI final using enhanced tracker
         self._complete_ui_progress(message)
-        
-        # Notify callbacks
         self._notify_callbacks("complete", 100, message)
         
         self.logger and self.logger.success(f"🎉 {message} ({total_duration:.1f}s)")
@@ -198,21 +162,14 @@ class DownloadProgressTracker:
     def error_tracking(self, error_message: str) -> None:
         """Handle error dalam tracking."""
         self.is_active = False
-        
-        # Update UI error state using enhanced tracker
         self._error_ui_progress(error_message)
-        
-        # Notify callbacks
         self._notify_callbacks("error", 0, error_message)
         
         self.logger and self.logger.error(f"❌ Progress error: {error_message}")
     
     def _find_step(self, step_name: str) -> Optional[ProgressStep]:
         """Find step by name."""
-        for step in self.steps:
-            if step.name == step_name:
-                return step
-        return None
+        return next((step for step in self.steps if step.name == step_name), None)
     
     def _calculate_overall_progress(self) -> None:
         """Calculate overall progress berdasarkan step weights."""
@@ -232,80 +189,58 @@ class DownloadProgressTracker:
         self.overall_progress = int((total_weighted_progress / total_weight) * 100) if total_weight > 0 else 0
     
     def _setup_ui_progress(self) -> None:
-        """Setup UI progress untuk tracking using enhanced tracker."""
+        """Setup UI progress untuk tracking."""
         if self.progress_tracker:
-            # Use enhanced tracker's show method with download operation
             self.progress_tracker.show('download')
         elif 'show_for_operation' in self.ui_components:
-            # Fallback to legacy method
             self.ui_components['show_for_operation']('download')
     
     def _update_ui_progress(self) -> None:
-        """Update UI progress bars using enhanced tracker."""
+        """Update UI progress bars."""
         if not self.is_active:
             return
         
         current_step = self._get_current_step()
         
         if self.progress_tracker:
-            # Use enhanced tracker methods
             self.progress_tracker.update(
                 'overall', 
                 self.overall_progress, 
                 f"Progress keseluruhan ({self.overall_progress}%)"
             )
             
-            # Update step progress
             if current_step:
                 self.progress_tracker.update(
                     'step', 
                     current_step.progress, 
                     f"{current_step.description}: {current_step.message}"
                 )
-        else:
-            # Fallback to legacy method
-            if 'update_progress' in self.ui_components:
+        elif 'update_progress' in self.ui_components:
+            self.ui_components['update_progress'](
+                'overall', 
+                self.overall_progress, 
+                f"📊 Progress keseluruhan ({self.overall_progress}%)"
+            )
+            
+            if current_step:
                 self.ui_components['update_progress'](
-                    'overall', 
-                    self.overall_progress, 
-                    f"📊 Progress keseluruhan ({self.overall_progress}%)"
+                    'step', 
+                    current_step.progress, 
+                    f"🔄 {current_step.description}: {current_step.message}"
                 )
-                
-                # Update step progress
-                if current_step:
-                    self.ui_components['update_progress'](
-                        'step', 
-                        current_step.progress, 
-                        f"🔄 {current_step.description}: {current_step.message}"
-                    )
-    
-    def _update_ui_progress_throttled(self) -> None:
-        """Update UI progress dengan throttling untuk prevent spam."""
-        # Simple throttling - hanya update setiap 0.5 detik
-        if not hasattr(self, '_last_ui_update'):
-            self._last_ui_update = 0
-        
-        current_time = time.time()
-        if current_time - self._last_ui_update > 0.5:
-            self._update_ui_progress()
-            self._last_ui_update = current_time
     
     def _complete_ui_progress(self, message: str) -> None:
-        """Complete UI progress dengan success state using enhanced tracker."""
+        """Complete UI progress dengan success state."""
         if self.progress_tracker:
-            # Use enhanced tracker's complete method
             self.progress_tracker.complete(message)
         elif 'complete_operation' in self.ui_components:
-            # Fallback to legacy method
             self.ui_components['complete_operation'](message)
     
     def _error_ui_progress(self, error_message: str) -> None:
-        """Set UI error state using enhanced tracker."""
+        """Set UI error state."""
         if self.progress_tracker:
-            # Use enhanced tracker's error method
             self.progress_tracker.error(error_message)
         elif 'error_operation' in self.ui_components:
-            # Fallback to legacy method
             self.ui_components['error_operation'](error_message)
     
     def _get_current_step(self) -> Optional[ProgressStep]:
@@ -320,7 +255,6 @@ class DownloadProgressTracker:
             try:
                 callback(event_type, progress, message)
             except Exception:
-                # Silent fail untuk callbacks agar tidak mengganggu proses utama
                 pass
     
     def get_progress_summary(self) -> Dict[str, Any]:
@@ -353,29 +287,12 @@ class DownloadProgressTracker:
         }
 
 def create_download_progress_tracker(ui_components: Dict[str, Any]) -> DownloadProgressTracker:
-    """
-    Factory function untuk create download progress tracker.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        DownloadProgressTracker instance
-    """
+    """Factory function untuk create download progress tracker."""
     return DownloadProgressTracker(ui_components)
 
 def create_custom_progress_steps(include_validation: bool = True, 
                                 include_verification: bool = True) -> List[ProgressStep]:
-    """
-    Create custom progress steps berdasarkan kebutuhan.
-    
-    Args:
-        include_validation: Include validation step
-        include_verification: Include verification step
-        
-    Returns:
-        List of ProgressStep
-    """
+    """Create custom progress steps berdasarkan kebutuhan."""
     steps = []
     
     if include_validation:
@@ -391,14 +308,12 @@ def create_custom_progress_steps(include_validation: bool = True,
     if include_verification:
         steps.append(ProgressStep("verify", ProgressStage.VERIFY, 5, "Verifikasi hasil"))
     
-    # Recalculate weights untuk ensure total = 100%
+    # Adjust weights untuk ensure total = 100%
     total_weight = sum(step.weight for step in steps)
     if total_weight != 100:
-        # Adjust weights proportionally
         for step in steps:
             step.weight = int((step.weight / total_weight) * 100)
         
-        # Handle rounding errors dengan memberikan sisa ke step terbesar
         current_total = sum(step.weight for step in steps)
         if current_total != 100:
             largest_step = max(steps, key=lambda s: s.weight)

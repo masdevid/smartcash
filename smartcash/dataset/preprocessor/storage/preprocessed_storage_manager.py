@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/storage/preprocessed_storage_manager.py
-Deskripsi: Enhanced storage manager untuk hasil preprocessing dengan metadata management
+Deskripsi: Fixed storage manager dengan complete method implementation - added missing update_stats
 """
 
 import json
@@ -12,7 +12,7 @@ from smartcash.common.logger import get_logger
 
 
 class PreprocessedStorageManager:
-    """Enhanced storage manager untuk preprocessing results dengan comprehensive metadata."""
+    """Fixed storage manager dengan complete method set - no missing methods."""
     
     def __init__(self, output_dir: str, logger=None):
         """Initialize storage manager dengan output directory."""
@@ -76,6 +76,21 @@ class PreprocessedStorageManager:
             self.logger.error(f"❌ Error loading stats: {str(e)}")
         
         return {}
+    
+    def update_stats(self, split: str, stats: Dict[str, Any]) -> None:
+        """FIXED: Missing method - alias untuk update_split_stats untuk backward compatibility."""
+        self.update_split_stats(split, stats)
+        
+        # Also save as processing metadata untuk comprehensive tracking
+        try:
+            processing_metadata = {
+                'split': split,
+                'stats': stats,
+                'last_updated': self._get_current_timestamp()
+            }
+            self.save_processing_metadata(split, processing_metadata)
+        except Exception as e:
+            self.logger.debug(f"🔧 Additional metadata save warning: {str(e)}")
     
     def cleanup_split_storage(self, split: Optional[str] = None) -> Dict[str, Any]:
         """Cleanup storage untuk split atau semua splits."""
@@ -172,3 +187,8 @@ class PreprocessedStorageManager:
                     metadata_file.unlink()
                 except Exception:
                     pass
+    
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp untuk metadata."""
+        import datetime
+        return datetime.datetime.now().isoformat()

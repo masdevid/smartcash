@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/dataset_checker.py
-Deskripsi: Fixed dataset checker handler dengan proper setup function
+Deskripsi: Fixed dataset checker dengan safe key access dan proper error handling
 """
 
 from typing import Dict, Any
@@ -9,56 +9,53 @@ from smartcash.ui.dataset.preprocessing.utils.config_extractor import get_config
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup dataset checker dengan proper button state management."""
+    """Setup dataset checker dengan safe error handling dan comprehensive analysis."""
     
     def execute_check_action(button=None) -> None:
-        """Execute dataset checking dengan comprehensive analysis dan progress."""
+        """Execute dataset checking dengan safe key access."""
         logger = ui_components.get('logger')
         button_manager = get_button_state_manager(ui_components)
         
-        # Clear outputs first
         _clear_ui_outputs(ui_components)
         
         with button_manager.operation_context('check'):
             try:
                 logger and logger.info("🔍 Memeriksa dataset untuk preprocessing")
                 
-                # Show progress untuk check operation
                 ui_components.get('show_for_operation', lambda x: None)('check')
-                
-                # Phase 1: Setup (0-20%)
                 _update_progress(ui_components, 10, "Memulai analisis dataset")
                 
-                # Get config
+                # Get config dengan fallback
                 config_extractor = get_config_extractor(ui_components)
                 config = config_extractor.get_full_config()
                 
                 # Create checker service
                 checker = PreprocessingFactory.create_dataset_checker(config, logger)
                 
-                # Phase 2: Check source (20-60%)
+                # Phase 1: Check source dataset (20-60%)
                 _update_progress(ui_components, 30, "Menganalisis source dataset")
-                source_result = checker.check_source_dataset(detailed=True)
+                source_result = _safe_check_dataset(checker, 'source', detailed=True)
                 
                 _update_progress(ui_components, 50, "Validasi struktur dataset")
                 
-                # Phase 3: Check preprocessed (60-80%)
+                # Phase 2: Check preprocessed dataset (60-80%) 
                 _update_progress(ui_components, 70, "Menganalisis preprocessed dataset")
-                preprocessed_result = checker.check_preprocessed_dataset(detailed=True)
+                preprocessed_result = _safe_check_dataset(checker, 'preprocessed', detailed=True)
                 
-                # Phase 4: Generate reports (80-100%)
+                # Phase 3: Generate reports (80-100%)
                 _update_progress(ui_components, 90, "Membuat laporan analisis")
                 
-                # Display results
-                _display_check_results(ui_components, source_result, preprocessed_result, logger)
+                # Display results dengan safe key access
+                _display_check_results_safe(ui_components, source_result, preprocessed_result, logger)
                 
                 _update_progress(ui_components, 100, "Analisis dataset selesai")
                 ui_components.get('complete_operation', lambda x: None)("Analisis dataset selesai")
                 
             except Exception as e:
-                logger and logger.error(f"💥 Error checking dataset: {str(e)}")
-                ui_components.get('error_operation', lambda x: None)(f"Check dataset gagal: {str(e)}")
-                _update_status_panel_error(ui_components, f"Check dataset gagal: {str(e)}")
+                error_msg = f"Check dataset gagal: {str(e)}"
+                logger and logger.error(f"💥 {error_msg}")
+                ui_components.get('error_operation', lambda x: None)(error_msg)
+                _update_status_panel_error(ui_components, error_msg)
                 raise
     
     # Register handler
@@ -67,6 +64,97 @@ def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     
     ui_components['execute_check'] = execute_check_action
     return ui_components
+
+def _safe_check_dataset(checker, dataset_type: str, detailed: bool = True) -> Dict[str, Any]:
+    """Safe wrapper untuk dataset checking dengan proper error handling."""
+    try:
+        if dataset_type == 'source':
+            return checker.check_source_dataset(detailed=detailed)
+        elif dataset_type == 'preprocessed':
+            return checker.check_preprocessed_dataset(detailed=detailed)
+        else:
+            return {'valid': False, 'message': f'Unknown dataset type: {dataset_type}'}
+    except Exception as e:
+        return {
+            'valid': False,
+            'message': f'Error checking {dataset_type} dataset: {str(e)}',
+            'total_images': 0,
+            'splits': {},
+            'error': True
+        }
+
+def _display_check_results_safe(ui_components: Dict[str, Any], source_result: Dict[str, Any], 
+                               preprocessed_result: Dict[str, Any], logger) -> None:
+    """Display check results dengan safe key access untuk mencegah KeyError."""
+    from IPython.display import display, HTML
+    
+    # Safe access untuk source dataset
+    source_valid = source_result.get('valid', False)
+    source_total = source_result.get('total_images', 0)
+    
+    if source_valid and source_total > 0:
+        logger and logger.success(f"✅ Source dataset: {source_total:,} gambar valid")
+        _log_split_details_safe(source_result.get('splits', {}), logger, "Source")
+        _update_status_panel_success(ui_components, f"Dataset siap: {source_total:,} gambar tersedia")
+    else:
+        source_msg = source_result.get('message', 'Dataset tidak valid')
+        logger and logger.error(f"❌ Source dataset invalid: {source_msg}")
+        _update_status_panel_error(ui_components, "Dataset tidak valid untuk preprocessing")
+        return
+    
+    # Safe access untuk preprocessed dataset
+    preprocessed_valid = preprocessed_result.get('valid', False)
+    
+    if preprocessed_valid:
+        preprocessed_total = preprocessed_result.get('total_processed', 0)
+        logger and logger.success(f"💾 Preprocessed dataset: {preprocessed_total:,} gambar")
+        _log_split_details_safe(preprocessed_result.get('splits', {}), logger, "Preprocessed")
+    else:
+        preprocessed_msg = preprocessed_result.get('message', 'Belum ada preprocessed dataset')
+        logger and logger.info(f"ℹ️ Preprocessed: {preprocessed_msg}")
+    
+    # Display detailed report dengan safe HTML generation
+    if 'log_output' in ui_components:
+        with ui_components['log_output']:
+            # Source report
+            source_report = source_result.get('report', 'Tidak ada detail laporan tersedia')
+            if source_report and source_report != 'Tidak ada detail laporan tersedia':
+                display(HTML(f"<pre style='background:#f8f9fa;padding:10px;border-radius:5px;font-size:12px;'>{source_report}</pre>"))
+            
+            # Preprocessed report
+            if preprocessed_valid:
+                preprocessed_report = preprocessed_result.get('report', 'Tidak ada detail laporan tersedia')
+                if preprocessed_report and preprocessed_report != 'Tidak ada detail laporan tersedia':
+                    display(HTML(f"<pre style='background:#f0f8ff;padding:10px;border-radius:5px;margin-top:10px;font-size:12px;'>{preprocessed_report}</pre>"))
+
+def _log_split_details_safe(splits: Dict[str, Any], logger, dataset_type: str) -> None:
+    """Log split details dengan safe key access untuk mencegah KeyError."""
+    if not logger or not splits:
+        return
+    
+    for split_name in ['train', 'valid', 'test']:
+        split_data = splits.get(split_name, {})
+        
+        if not split_data or not split_data.get('exists', False):
+            continue
+            
+        try:
+            if dataset_type == "Source":
+                # Safe access untuk source dataset
+                images_count = split_data.get('images', 0)
+                labels_count = split_data.get('labels', 0)
+                
+                if images_count > 0:
+                    logger.info(f"📂 {split_name}: {images_count:,} gambar, {labels_count:,} label")
+            else:
+                # Safe access untuk preprocessed dataset
+                processed_count = split_data.get('processed', split_data.get('images', 0))
+                
+                if processed_count > 0:
+                    logger.info(f"💾 {split_name}: {processed_count:,} preprocessed")
+                    
+        except Exception as e:
+            logger.debug(f"🔧 Error logging {split_name} details: {str(e)}")
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs untuk fresh display."""
@@ -78,55 +166,6 @@ def _update_progress(ui_components: Dict[str, Any], progress: int, message: str)
     """Update progress dengan bounds checking."""
     progress = max(0, min(100, progress))
     ui_components.get('update_progress', lambda *args: None)('overall', progress, message)
-
-def _display_check_results(ui_components: Dict[str, Any], source_result: Dict[str, Any], 
-                          preprocessed_result: Dict[str, Any], logger) -> None:
-    """Display comprehensive check results."""
-    from IPython.display import display, HTML
-    
-    # Source dataset results
-    if source_result['valid']:
-        logger and logger.success(f"✅ Source dataset: {source_result['total_images']:,} gambar valid")
-        _log_split_details(source_result['splits'], logger, "Source")
-        _update_status_panel_success(ui_components, f"Dataset siap: {source_result['total_images']:,} gambar tersedia")
-    else:
-        logger and logger.error(f"❌ Source dataset invalid: {source_result['message']}")
-        _update_status_panel_error(ui_components, "Dataset tidak valid untuk preprocessing")
-        return
-    
-    # Preprocessed dataset results
-    if preprocessed_result['valid']:
-        logger and logger.success(f"💾 Preprocessed dataset: {preprocessed_result['total_processed']:,} gambar")
-        _log_split_details(preprocessed_result['splits'], logger, "Preprocessed")
-    else:
-        logger and logger.info(f"ℹ️ Preprocessed: {preprocessed_result['message']}")
-    
-    # Display detailed report
-    if 'log_output' in ui_components:
-        with ui_components['log_output']:
-            # Source report
-            if 'report' in source_result:
-                display(HTML(f"<pre style='background:#f8f9fa;padding:10px;border-radius:5px;font-size:12px;'>{source_result['report']}</pre>"))
-            
-            # Preprocessed report jika ada
-            if preprocessed_result['valid'] and 'report' in preprocessed_result:
-                display(HTML(f"<pre style='background:#f0f8ff;padding:10px;border-radius:5px;margin-top:10px;font-size:12px;'>{preprocessed_result['report']}</pre>"))
-
-def _log_split_details(splits: Dict[str, Any], logger, dataset_type: str) -> None:
-    """Log split details dengan format yang rapi."""
-    if not logger:
-        return
-    
-    for split in ['train', 'valid', 'test']:
-        split_data = splits.get(split, {})
-        if split_data.get('exists', False):
-            if dataset_type == "Source":
-                count = split_data.get('images', 0)
-                labels = split_data.get('labels', 0)
-                logger.info(f"📂 {split}: {count:,} gambar, {labels:,} label")
-            else:
-                count = split_data.get('processed', 0)
-                logger.info(f"💾 {split}: {count:,} preprocessed")
 
 def _update_status_panel_success(ui_components: Dict[str, Any], message: str) -> None:
     """Update status panel dengan success state."""

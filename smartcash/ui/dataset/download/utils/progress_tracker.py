@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/utils/progress_tracker.py
-Deskripsi: Utility untuk track progress download dengan tqdm integration dan stage management
+Deskripsi: Updated to use enhanced ProgressTracker while maintaining existing business logic
 """
 
 import time
@@ -35,11 +35,14 @@ class ProgressStep:
     end_time: Optional[float] = None
 
 class DownloadProgressTracker:
-    """Enhanced progress tracker untuk download process dengan tqdm integration."""
+    """Enhanced progress tracker untuk download process dengan new ProgressTracker integration."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.logger = ui_components.get('logger')
+        
+        # Get enhanced progress tracker instance
+        self.progress_tracker = ui_components.get('tracker')
         
         # Progress state
         self.steps: List[ProgressStep] = []
@@ -95,7 +98,7 @@ class DownloadProgressTracker:
             step.start_time = None
             step.end_time = None
         
-        # Setup UI progress
+        # Setup UI progress using enhanced tracker
         self._setup_ui_progress()
         
         # Notify callbacks
@@ -118,7 +121,7 @@ class DownloadProgressTracker:
         # Update current step index
         self.current_step_index = self.steps.index(step)
         
-        # Update UI
+        # Update UI using enhanced tracker
         self._update_ui_progress()
         
         # Notify callbacks
@@ -160,7 +163,7 @@ class DownloadProgressTracker:
         # Calculate overall progress
         self._calculate_overall_progress()
         
-        # Update UI
+        # Update UI using enhanced tracker
         self._update_ui_progress()
         
         # Notify callbacks
@@ -184,7 +187,7 @@ class DownloadProgressTracker:
         
         self.overall_progress = 100
         
-        # Update UI final
+        # Update UI final using enhanced tracker
         self._complete_ui_progress(message)
         
         # Notify callbacks
@@ -196,7 +199,7 @@ class DownloadProgressTracker:
         """Handle error dalam tracking."""
         self.is_active = False
         
-        # Update UI error state
+        # Update UI error state using enhanced tracker
         self._error_ui_progress(error_message)
         
         # Notify callbacks
@@ -229,32 +232,52 @@ class DownloadProgressTracker:
         self.overall_progress = int((total_weighted_progress / total_weight) * 100) if total_weight > 0 else 0
     
     def _setup_ui_progress(self) -> None:
-        """Setup UI progress untuk tracking."""
-        if 'show_for_operation' in self.ui_components:
+        """Setup UI progress untuk tracking using enhanced tracker."""
+        if self.progress_tracker:
+            # Use enhanced tracker's show method with download operation
+            self.progress_tracker.show('download')
+        elif 'show_for_operation' in self.ui_components:
+            # Fallback to legacy method
             self.ui_components['show_for_operation']('download')
     
     def _update_ui_progress(self) -> None:
-        """Update UI progress bars."""
+        """Update UI progress bars using enhanced tracker."""
         if not self.is_active:
             return
         
         current_step = self._get_current_step()
         
-        # Update overall progress
-        if 'update_progress' in self.ui_components:
-            self.ui_components['update_progress'](
+        if self.progress_tracker:
+            # Use enhanced tracker methods
+            self.progress_tracker.update(
                 'overall', 
                 self.overall_progress, 
-                f"📊 Progress keseluruhan ({self.overall_progress}%)"
+                f"Progress keseluruhan ({self.overall_progress}%)"
             )
             
             # Update step progress
             if current_step:
-                self.ui_components['update_progress'](
+                self.progress_tracker.update(
                     'step', 
                     current_step.progress, 
-                    f"🔄 {current_step.description}: {current_step.message}"
+                    f"{current_step.description}: {current_step.message}"
                 )
+        else:
+            # Fallback to legacy method
+            if 'update_progress' in self.ui_components:
+                self.ui_components['update_progress'](
+                    'overall', 
+                    self.overall_progress, 
+                    f"📊 Progress keseluruhan ({self.overall_progress}%)"
+                )
+                
+                # Update step progress
+                if current_step:
+                    self.ui_components['update_progress'](
+                        'step', 
+                        current_step.progress, 
+                        f"🔄 {current_step.description}: {current_step.message}"
+                    )
     
     def _update_ui_progress_throttled(self) -> None:
         """Update UI progress dengan throttling untuk prevent spam."""
@@ -268,13 +291,21 @@ class DownloadProgressTracker:
             self._last_ui_update = current_time
     
     def _complete_ui_progress(self, message: str) -> None:
-        """Complete UI progress dengan success state."""
-        if 'complete_operation' in self.ui_components:
+        """Complete UI progress dengan success state using enhanced tracker."""
+        if self.progress_tracker:
+            # Use enhanced tracker's complete method
+            self.progress_tracker.complete(message)
+        elif 'complete_operation' in self.ui_components:
+            # Fallback to legacy method
             self.ui_components['complete_operation'](message)
     
     def _error_ui_progress(self, error_message: str) -> None:
-        """Set UI error state."""
-        if 'error_operation' in self.ui_components:
+        """Set UI error state using enhanced tracker."""
+        if self.progress_tracker:
+            # Use enhanced tracker's error method
+            self.progress_tracker.error(error_message)
+        elif 'error_operation' in self.ui_components:
+            # Fallback to legacy method
             self.ui_components['error_operation'](error_message)
     
     def _get_current_step(self) -> Optional[ProgressStep]:

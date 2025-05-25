@@ -60,19 +60,6 @@ def initialize_module_ui(
             'reset_progress_bar': reset_func
         })
         
-        # Setup multi-progress tracking jika dikonfigurasi
-        if multi_progress_config:
-            from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
-            setup_multi_progress_tracking(
-                ui_components, 
-                multi_progress_config.get("module_name", module_name),
-                multi_progress_config.get("step_key", f"{module_name}_step"),
-                multi_progress_config.get("progress_bar_key", "progress_bar"),
-                multi_progress_config.get("current_progress_key", "current_progress"),
-                multi_progress_config.get("overall_label_key", "overall_label"),
-                multi_progress_config.get("step_label_key", "step_label")
-            )
-        
         # Setup button dan cleanup handler spesifik untuk setiap modul
         if module_name == 'preprocessing':
             # Handler untuk preprocessing

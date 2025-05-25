@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/components/main_ui.py  
-Deskripsi: Fixed progress container dengan visibility controls yang proper
+Deskripsi: Updated to use enhanced progress tracking with ProgressTracker class
 """
 
 import ipywidgets as widgets
@@ -9,6 +9,7 @@ from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from smartcash.ui.components.progress_tracking import create_progress_tracking_container
 from smartcash.common.environment import get_environment_manager
 
 from .options_panel import create_options_panel
@@ -16,7 +17,7 @@ from .action_section import create_action_section
 from .log_section import create_log_section
 
 def create_download_ui(config=None):
-    """Create download UI dengan progress container dan controls yang bekerja."""
+    """Create download UI dengan enhanced progress tracking."""
     config = config or {}
     roboflow_config = config.get('roboflow', {})
     
@@ -49,8 +50,8 @@ def create_download_ui(config=None):
         container_width="100%"
     )
     
-    # Progress container dengan controls
-    progress_components = _create_progress_with_controls()
+    # Enhanced progress tracking
+    progress_components = create_progress_tracking_container()
     
     # Main container
     main_container = widgets.VBox([
@@ -72,7 +73,7 @@ def create_download_ui(config=None):
         border_radius='5px', background_color='#fff'
     ))
     
-    # UI components dengan progress controls
+    # UI components with enhanced progress tracking
     ui_components = {
         'ui': main_container,
         'main_container': main_container,
@@ -83,7 +84,7 @@ def create_download_ui(config=None):
         'env_manager': env_manager,
     }
     
-    # Add progress components dan controls
+    # Add enhanced progress components
     ui_components.update(progress_components)
     
     # Add options, actions, save/reset, logs
@@ -98,127 +99,6 @@ def create_download_ui(config=None):
     ui_components.update({k: v for k, v in logs.items()})
     
     return ui_components
-
-def _create_progress_with_controls():
-    """Create progress container dengan visibility controls yang dibutuhkan handlers."""
-    
-    # Progress widgets
-    progress_bar = widgets.IntProgress(
-        value=0, min=0, max=100,
-        description='Overall:',
-        bar_style='info',
-        layout=widgets.Layout(width='100%', height='20px', visibility='hidden')
-    )
-    
-    overall_label = widgets.HTML(
-        value="",
-        layout=widgets.Layout(margin='2px 0', visibility='hidden')
-    )
-    
-    current_progress = widgets.IntProgress(
-        value=0, min=0, max=100,
-        description='Step:',
-        bar_style='info',
-        layout=widgets.Layout(width='100%', height='20px', visibility='hidden')
-    )
-    
-    step_label = widgets.HTML(
-        value="",
-        layout=widgets.Layout(margin='2px 0', visibility='hidden')
-    )
-    
-    # Container
-    container = widgets.VBox([
-        widgets.HTML("<h4>📊 Progress</h4>"),
-        progress_bar, 
-        overall_label,
-        current_progress, 
-        step_label
-    ], layout=widgets.Layout(
-        margin='10px 0', 
-        padding='15px', 
-        display='none',  # Hidden by default
-        border='1px solid #ddd',
-        border_radius='5px',
-        overflow='hidden'
-    ))
-    
-    # Control functions
-    def show_container():
-        container.layout.display = 'block'
-        container.layout.visibility = 'visible'
-    
-    def hide_container():
-        container.layout.display = 'none'
-        container.layout.visibility = 'hidden'
-    
-    def show_for_operation(operation):
-        """Show progress sesuai operation type."""
-        show_container()
-        if operation in ['download', 'check', 'cleanup']:
-            progress_bar.layout.visibility = 'visible'
-            overall_label.layout.visibility = 'visible'
-            if operation == 'download':
-                current_progress.layout.visibility = 'visible'
-                step_label.layout.visibility = 'visible'
-    
-    def update_progress(progress_type, value, message="", color_style=None):
-        """Update progress dengan type dan message."""
-        value = max(0, min(100, value))
-        
-        if progress_type == 'overall':
-            progress_bar.value = value
-            progress_bar.description = f'Overall: {value}%'
-            if color_style:
-                progress_bar.bar_style = color_style
-            if message:
-                overall_label.value = f"<div style='color: #495057; font-size: 13px;'>{message}</div>"
-        
-        elif progress_type == 'current' or progress_type == 'step':
-            current_progress.value = value
-            current_progress.description = f'Step: {value}%'
-            if color_style:
-                current_progress.bar_style = color_style
-            if message:
-                step_label.value = f"<div style='color: #495057; font-size: 13px;'>{message}</div>"
-    
-    def complete_operation(message="Selesai"):
-        """Complete operation dengan success state."""
-        update_progress('overall', 100, f"✅ {message}", 'success')
-        update_progress('step', 100, f"✅ {message}", 'success')
-    
-    def error_operation(message="Error"):
-        """Set error state."""
-        update_progress('overall', 0, f"❌ {message}", 'danger')
-        update_progress('step', 0, f"❌ {message}", 'danger')
-    
-    def reset_all():
-        """Reset semua progress."""
-        progress_bar.value = 0
-        current_progress.value = 0
-        progress_bar.bar_style = 'info'
-        current_progress.bar_style = 'info'
-        overall_label.value = ""
-        step_label.value = ""
-        hide_container()
-    
-    return {
-        'container': container,
-        'progress_container': container,  # Alias
-        'progress_bar': progress_bar,
-        'overall_label': overall_label,
-        'current_progress': current_progress,
-        'step_label': step_label,
-        
-        # Control functions yang dibutuhkan handlers
-        'show_container': show_container,
-        'hide_container': hide_container,
-        'show_for_operation': show_for_operation,
-        'update_progress': update_progress,
-        'complete_operation': complete_operation,
-        'error_operation': error_operation,
-        'reset_all': reset_all
-    }
 
 def _create_storage_info_widget(env_manager):
     """Create widget untuk info storage."""

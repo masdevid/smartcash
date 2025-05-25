@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/dialog_manager.py
-Deskripsi: Enhanced dialog manager dengan persistent state handling dan auto-cleanup
+Deskripsi: Fixed dialog manager dengan complete implementation dan factory function
 """
 
 from typing import Dict, Any, Callable
@@ -107,3 +107,61 @@ class DialogManager:
             with self.confirmation_area:
                 clear_output(wait=True)
                 display(dialog)
+        else:
+            # Fallback jika confirmation area tidak ada
+            display(dialog)
+    
+    def _cleanup_existing_dialog(self):
+        """Cleanup existing dialog dengan safe error handling."""
+        if self.active_dialog:
+            try:
+                # Call dialog cleanup if available
+                if hasattr(self.active_dialog, '_cleanup'):
+                    self.active_dialog._cleanup()
+            except Exception:
+                pass  # Silent cleanup errors
+            
+            # Clear confirmation area
+            if self.confirmation_area:
+                with self.confirmation_area:
+                    clear_output(wait=True)
+            
+            self.active_dialog = None
+    
+    def cleanup(self):
+        """Public cleanup method untuk external calls."""
+        self._cleanup_existing_dialog()
+        cleanup_all_dialogs()
+        
+        if self.logger:
+            self.logger.debug("🧹 DialogManager cleanup completed")
+
+
+def get_dialog_manager(ui_components: Dict[str, Any]) -> DialogManager:
+    """
+    Factory function untuk mendapatkan dialog manager instance.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Instance DialogManager
+    """
+    # Create atau reuse existing dialog manager
+    if 'dialog_manager' not in ui_components:
+        ui_components['dialog_manager'] = DialogManager(ui_components)
+    
+    return ui_components['dialog_manager']
+
+
+def create_dialog_manager(ui_components: Dict[str, Any]) -> DialogManager:
+    """
+    Alternative factory function untuk create new dialog manager.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        New DialogManager instance
+    """
+    return DialogManager(ui_components)

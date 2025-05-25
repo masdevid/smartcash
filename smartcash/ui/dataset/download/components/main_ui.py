@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/components/main_ui.py  
-Deskripsi: Updated to use enhanced progress tracking with ProgressTracker class
+Deskripsi: Fixed main UI dengan integrasi latest progress_tracking dan button_state_manager
 """
 
 import ipywidgets as widgets
@@ -17,7 +17,7 @@ from .action_section import create_action_section
 from .log_section import create_log_section
 
 def create_download_ui(config=None):
-    """Create download UI dengan enhanced progress tracking."""
+    """Create download UI dengan latest progress tracking integration."""
     config = config or {}
     roboflow_config = config.get('roboflow', {})
     
@@ -50,7 +50,7 @@ def create_download_ui(config=None):
         container_width="100%"
     )
     
-    # Enhanced progress tracking
+    # Latest progress tracking integration
     progress_components = create_progress_tracking_container()
     
     # Main container
@@ -73,7 +73,7 @@ def create_download_ui(config=None):
         border_radius='5px', background_color='#fff'
     ))
     
-    # UI components with enhanced progress tracking
+    # UI components dengan latest progress tracking integration
     ui_components = {
         'ui': main_container,
         'main_container': main_container,
@@ -84,7 +84,7 @@ def create_download_ui(config=None):
         'env_manager': env_manager,
     }
     
-    # Add enhanced progress components
+    # Add latest progress components (semua method dari ProgressTracker)
     ui_components.update(progress_components)
     
     # Add options, actions, save/reset, logs
@@ -97,6 +97,9 @@ def create_download_ui(config=None):
         'reset_button': save_reset_buttons['reset_button'],
     })
     ui_components.update({k: v for k, v in logs.items()})
+    
+    # Verify latest progress tracking methods tersedia
+    _verify_progress_integration(ui_components)
     
     return ui_components
 
@@ -115,3 +118,47 @@ def _create_storage_info_widget(env_manager):
         </div>
         """
     return widgets.HTML(info_html)
+
+def _verify_progress_integration(ui_components: Dict[str, Any]) -> None:
+    """Verify latest progress tracking methods tersedia."""
+    # Expected methods dari latest ProgressTracker
+    expected_methods = [
+        'show_for_operation', 'update_progress', 'complete_operation', 
+        'error_operation', 'reset_all', 'tracker'
+    ]
+    
+    missing_methods = []
+    for method in expected_methods:
+        if method not in ui_components:
+            missing_methods.append(method)
+    
+    logger = ui_components.get('logger')
+    if missing_methods and logger:
+        logger.warning(f"⚠️ Missing progress methods: {', '.join(missing_methods)}")
+        logger.info("🔧 Fallback progress handling akan digunakan")
+    elif logger:
+        logger.debug("✅ Latest progress tracking methods tersedia")
+    
+    # Add fallback methods jika diperlukan
+    _add_progress_fallbacks(ui_components, missing_methods)
+
+def _add_progress_fallbacks(ui_components: Dict[str, Any], missing_methods: List[str]) -> None:
+    """Add fallback methods untuk missing progress tracking."""
+    
+    # Simple fallback implementations
+    fallback_implementations = {
+        'show_for_operation': lambda operation: None,
+        'update_progress': lambda progress_type, value, message, color=None: None,
+        'complete_operation': lambda message: None,
+        'error_operation': lambda message: None,
+        'reset_all': lambda: None
+    }
+    
+    for method in missing_methods:
+        if method in fallback_implementations:
+            ui_components[method] = fallback_implementations[method]
+    
+    # Log fallback usage
+    if missing_methods:
+        logger = ui_components.get('logger')
+        logger and logger.info(f"🆘 Added fallback methods: {', '.join(missing_methods)}")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/download_action.py
-Deskripsi: Fixed complete download action handler dengan tqdm progress tracking dan proper error handling
+Deskripsi: Fixed download action dengan integrasi latest progress_tracking dan button_state_manager
 """
 
 from typing import Dict, Any
@@ -11,7 +11,7 @@ from smartcash.ui.dataset.download.handlers.execution_handler import execute_dow
 
 def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -> None:
     """
-    Handler utama untuk aksi download dataset dengan flow yang lengkap.
+    Handler utama untuk aksi download dataset dengan latest progress tracking integration.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -24,9 +24,9 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
         try:
             logger and logger.info("🚀 Memulai proses download dataset")
             
-            # Step 1: Clear UI dan setup progress
+            # Step 1: Clear UI dan setup progress dengan latest ProgressTracker
             _clear_ui_outputs(ui_components)
-            _setup_download_progress(ui_components)
+            _setup_enhanced_download_progress(ui_components)
             
             # Step 2: Validasi parameter (10% progress)
             _update_download_progress(ui_components, 10, "🔍 Validasi parameter...")
@@ -53,7 +53,7 @@ def execute_download_action(ui_components: Dict[str, Any], button: Any = None) -
 
 def _execute_confirmed_download(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
     """
-    Execute download setelah konfirmasi user.
+    Execute download setelah konfirmasi user dengan latest progress tracking.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -70,7 +70,7 @@ def _execute_confirmed_download(ui_components: Dict[str, Any], params: Dict[str,
                 if key != 'api_key':  # Don't log sensitive data
                     logger.info(f"   • {key}: {value}")
         
-        # Execute download process dengan progress tracking
+        # Execute download process dengan enhanced progress tracking
         result = execute_download_process(ui_components, params)
         
         # Handle hasil download
@@ -86,32 +86,41 @@ def _execute_confirmed_download(ui_components: Dict[str, Any], params: Dict[str,
         logger and logger.error(f"💥 Error saat execute download: {str(e)}")
         raise
 
-def _setup_download_progress(ui_components: Dict[str, Any]) -> None:
-    """Setup progress tracking untuk download operation."""
+def _setup_enhanced_download_progress(ui_components: Dict[str, Any]) -> None:
+    """Setup enhanced progress tracking untuk download operation."""
+    # Use latest ProgressTracker integration
     if 'show_for_operation' in ui_components:
         ui_components['show_for_operation']('download')
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].show('download')
 
-def _update_download_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update download progress dengan tqdm."""
+def _update_download_progress(ui_components: Dict[str, Any], progress: int, message: str, color: str = None) -> None:
+    """Update download progress dengan latest ProgressTracker integration."""
+    # Use latest progress tracking methods
     if 'update_progress' in ui_components:
-        color = 'success' if progress >= 100 else 'info' if progress > 0 else ''
-        ui_components['update_progress']('overall', progress, f"📊 {message} ({progress}%)", color)
+        ui_components['update_progress']('overall', progress, f"📊 {message}", color or 'info')
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].update('overall', progress, message, color)
 
 def _error_download_progress(ui_components: Dict[str, Any], message: str) -> None:
-    """Set error state untuk download progress."""
+    """Set error state dengan latest ProgressTracker integration."""
     if 'error_operation' in ui_components:
         ui_components['error_operation'](f"❌ {message}")
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].error(f"❌ {message}")
 
 def _complete_download_success(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
-    """Handle successful download completion."""
+    """Handle successful download completion dengan latest progress tracking."""
     logger = ui_components.get('logger')
     stats = result.get('stats', {})
     duration = result.get('duration', 0)
     storage_type = "Google Drive" if result.get('drive_storage', False) else "Local Storage"
     
-    # Complete progress tracking
+    # Complete progress tracking dengan latest integration
     if 'complete_operation' in ui_components:
         ui_components['complete_operation']("✅ Download selesai!")
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].complete("✅ Download selesai!")
     
     # Log success details
     if logger:

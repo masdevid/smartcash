@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/button_handlers.py
-Deskripsi: Refactored button handlers dengan delegation ke specialized handlers yang lebih kecil
+Deskripsi: Fixed button handlers dengan integrasi latest progress_tracking dan button_state_manager
 """
 
 from typing import Dict, Any
@@ -14,7 +14,7 @@ from smartcash.ui.dataset.download.handlers.save_action import execute_save_acti
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
     """
-    Setup semua button handlers dengan delegation ke specialized handlers.
+    Setup semua button handlers dengan latest progress tracking integration.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -60,73 +60,67 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, 
     return ui_components
 
 def _create_download_handler(ui_components: Dict[str, Any], env=None):
-    """Create download button handler dengan comprehensive error handling."""
+    """Create download button handler dengan latest integration."""
     def download_handler(button):
         try:
-            # Disable button sementara
-            if hasattr(button, 'disabled'):
-                button.disabled = True
-            
-            # Execute download action
+            # Execute download action - button state management handled in action
             execute_download_action(ui_components, button)
             
         except Exception as e:
             logger = ui_components.get('logger')
             logger and logger.error(f"💥 Download handler error: {str(e)}")
             
-            # Error state untuk UI
+            # Error state untuk UI dengan latest integration
             if 'error_operation' in ui_components:
                 ui_components['error_operation'](f"Download error: {str(e)}")
-        
-        finally:
-            # Always re-enable button
-            if hasattr(button, 'disabled'):
-                button.disabled = False
+            elif 'tracker' in ui_components:
+                ui_components['tracker'].error(f"Download error: {str(e)}")
     
     return download_handler
 
 def _create_check_handler(ui_components: Dict[str, Any], env=None):
-    """Create check button handler."""
+    """Create check button handler dengan latest integration."""
     def check_handler(button):
         try:
-            if hasattr(button, 'disabled'):
-                button.disabled = True
-            
+            # Execute check action - button state management handled in action
             execute_check_action(ui_components, button)
             
         except Exception as e:
             logger = ui_components.get('logger')
             logger and logger.error(f"💥 Check handler error: {str(e)}")
-        
-        finally:
-            if hasattr(button, 'disabled'):
-                button.disabled = False
+            
+            # Error state untuk UI dengan latest integration
+            if 'error_operation' in ui_components:
+                ui_components['error_operation'](f"Check error: {str(e)}")
+            elif 'tracker' in ui_components:
+                ui_components['tracker'].error(f"Check error: {str(e)}")
     
     return check_handler
 
 def _create_cleanup_handler(ui_components: Dict[str, Any], env=None):
-    """Create cleanup button handler."""
+    """Create cleanup button handler dengan latest integration."""
     def cleanup_handler(button):
         try:
-            if hasattr(button, 'disabled'):
-                button.disabled = True
-            
+            # Execute cleanup action - button state management handled in action
             execute_cleanup_action(ui_components, button)
             
         except Exception as e:
             logger = ui_components.get('logger')
             logger and logger.error(f"💥 Cleanup handler error: {str(e)}")
-        
-        finally:
-            if hasattr(button, 'disabled'):
-                button.disabled = False
+            
+            # Error state untuk UI dengan latest integration
+            if 'error_operation' in ui_components:
+                ui_components['error_operation'](f"Cleanup error: {str(e)}")
+            elif 'tracker' in ui_components:
+                ui_components['tracker'].error(f"Cleanup error: {str(e)}")
     
     return cleanup_handler
 
 def _create_reset_handler(ui_components: Dict[str, Any], env=None):
-    """Create reset button handler."""
+    """Create reset button handler dengan latest integration."""
     def reset_handler(button):
         try:
+            # Disable button sementara
             if hasattr(button, 'disabled'):
                 button.disabled = True
             
@@ -137,15 +131,17 @@ def _create_reset_handler(ui_components: Dict[str, Any], env=None):
             logger and logger.error(f"💥 Reset handler error: {str(e)}")
         
         finally:
+            # Always re-enable button
             if hasattr(button, 'disabled'):
                 button.disabled = False
     
     return reset_handler
 
 def _create_save_handler(ui_components: Dict[str, Any], env=None):
-    """Create save button handler."""
+    """Create save button handler dengan latest integration."""
     def save_handler(button):
         try:
+            # Disable button sementara
             if hasattr(button, 'disabled'):
                 button.disabled = True
             
@@ -156,6 +152,7 @@ def _create_save_handler(ui_components: Dict[str, Any], env=None):
             logger and logger.error(f"💥 Save handler error: {str(e)}")
         
         finally:
+            # Always re-enable button
             if hasattr(button, 'disabled'):
                 button.disabled = False
     

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/dataset_checker.py
-Deskripsi: Fixed dataset checker dengan progress bar untuk reporting dan clear outputs
+Deskripsi: Fixed dataset checker dengan proper button state management
 """
 
 from typing import Dict, Any
@@ -9,7 +9,7 @@ from smartcash.ui.dataset.preprocessing.utils.config_extractor import get_config
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup dataset checker dengan progress integration."""
+    """Setup dataset checker dengan proper button state management."""
     
     def execute_check_action(button=None) -> None:
         """Execute dataset checking dengan comprehensive analysis dan progress."""
@@ -22,9 +22,6 @@ def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         with button_manager.operation_context('check'):
             try:
                 logger and logger.info("🔍 Memeriksa dataset untuk preprocessing")
-                
-                # Disable other buttons
-                button_manager.disable_other_buttons('check')
                 
                 # Show progress untuk check operation
                 ui_components.get('show_for_operation', lambda x: None)('check')
@@ -63,9 +60,6 @@ def setup_dataset_checker(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 ui_components.get('error_operation', lambda x: None)(f"Check dataset gagal: {str(e)}")
                 _update_status_panel_error(ui_components, f"Check dataset gagal: {str(e)}")
                 raise
-            finally:
-                # Always re-enable buttons
-                button_manager.enable_other_buttons('check')
     
     # Register handler
     if 'check_button' in ui_components:

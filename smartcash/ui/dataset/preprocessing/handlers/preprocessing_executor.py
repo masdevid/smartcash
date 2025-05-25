@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_executor.py
-Deskripsi: Fixed preprocessing executor dengan parameter handling dan proper button state management
+Deskripsi: Fixed preprocessing executor dengan proper button state management
 """
 
 from typing import Dict, Any
@@ -10,10 +10,10 @@ from smartcash.ui.dataset.preprocessing.utils.progress_bridge import create_prep
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup preprocessing executor dengan fixed parameter handling."""
+    """Setup preprocessing executor dengan fixed button state management."""
     
     def execute_preprocessing_action(button=None) -> None:
-        """Execute preprocessing dengan fixed parameter handling."""
+        """Execute preprocessing dengan fixed button state management."""
         logger = ui_components.get('logger')
         button_manager = get_button_state_manager(ui_components)
         
@@ -23,9 +23,6 @@ def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dic
         with button_manager.operation_context('preprocessing'):
             try:
                 logger and logger.info("🚀 Memulai preprocessing dataset")
-                
-                # Disable all buttons
-                button_manager.disable_other_buttons('preprocess_button')
                 
                 # Setup progress tracking
                 ui_components.get('show_for_operation', lambda x: None)('download')
@@ -68,9 +65,6 @@ def setup_preprocessing_executor(ui_components: Dict[str, Any], env=None) -> Dic
                 ui_components.get('error_operation', lambda x: None)(f"Preprocessing gagal: {str(e)}")
                 _update_status_panel_error(ui_components, f"Preprocessing gagal: {str(e)}")
                 raise
-            finally:
-                # Always re-enable buttons
-                button_manager.enable_other_buttons('preprocess_button')
     
     # Register handler
     if 'preprocess_button' in ui_components:

@@ -35,9 +35,10 @@ def create_progress_tracking_container() -> Dict[str, Any]:
         tqdm_container
     ], layout=widgets.Layout(
         margin='10px 0', 
-        padding='10px', 
+        padding='20px', 
         display='block',  # Always block display
-        visibility='visible'  # Always visible
+        visibility='visible',  # Always visible
+        overflow='hidden'
     ))
     
     # Progress state management

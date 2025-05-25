@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/cleanup_executor.py
-Deskripsi: Fixed cleanup executor dengan dialog manager integration dan clear outputs
+Deskripsi: Fixed cleanup executor dengan proper button state management
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.preprocessing.utils.dialog_manager import get_dialog_m
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
 def setup_cleanup_executor(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup cleanup executor dengan fixed dialog management."""
+    """Setup cleanup executor dengan fixed button state management."""
     
     def execute_cleanup_action(button=None) -> None:
         """Execute cleanup dengan user confirmation."""
@@ -47,9 +47,6 @@ def _perform_cleanup_operation(ui_components: Dict[str, Any], logger) -> None:
         try:
             logger and logger.info("🧹 Memulai cleanup dataset preprocessed")
             
-            # Disable other buttons
-            button_manager.disable_other_buttons('cleanup')
-            
             # Setup progress
             ui_components.get('show_for_operation', lambda x: None)('cleanup')
             
@@ -82,9 +79,6 @@ def _perform_cleanup_operation(ui_components: Dict[str, Any], logger) -> None:
             ui_components.get('error_operation', lambda x: None)(f"Cleanup gagal: {str(e)}")
             _update_status_panel_error(ui_components, f"Cleanup gagal: {str(e)}")
             raise
-        finally:
-            # Always re-enable buttons
-            button_manager.enable_other_buttons('cleanup')
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs untuk fresh display."""

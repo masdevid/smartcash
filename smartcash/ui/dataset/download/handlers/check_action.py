@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/check_action.py
-Deskripsi: Fixed check action dengan comprehensive dataset analysis dan tqdm progress tracking
+Deskripsi: Fixed check action dengan comprehensive dataset analysis dan enhanced progress tracking integration
 """
 
 from typing import Dict, Any, List
@@ -9,7 +9,7 @@ from smartcash.ui.dataset.download.utils.button_state_manager import get_button_
 from smartcash.ui.dataset.download.utils.dataset_checker import check_complete_dataset_status, get_dataset_readiness_score
 
 def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> None:
-    """Check dataset dengan comprehensive analysis dan tqdm progress."""
+    """Check dataset dengan comprehensive analysis dan enhanced progress tracking."""
     logger = ui_components.get('logger')
     button_manager = get_button_state_manager(ui_components)
     
@@ -19,9 +19,8 @@ def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> N
             
             _clear_ui_outputs(ui_components)
             
-            # Step 1: Setup progress tracking
-            if 'show_for_operation' in ui_components:
-                ui_components['show_for_operation']('check')
+            # Step 1: Initialize progress tracking for check operation
+            _initialize_check_progress(ui_components)
             
             # Step 2: Analisis struktur dataset
             _update_check_progress(ui_components, 20, "📊 Menganalisis struktur dataset...")
@@ -39,16 +38,14 @@ def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> N
             _update_check_progress(ui_components, 95, "📋 Menyiapkan laporan...")
             _display_enhanced_results(ui_components, dataset_status, readiness_score, recommendations)
             
-            # Complete progress
-            if 'complete_operation' in ui_components:
-                ui_components['complete_operation']("✅ Analisis selesai")
-                
+            # Complete progress with success state
+            _complete_check_progress(ui_components, "Analisis dataset selesai")
+            
             logger and logger.success("🎉 Analisis dataset selesai!")
             
         except Exception as e:
             logger and logger.error(f"❌ Error check: {str(e)}")
-            if 'error_operation' in ui_components:
-                ui_components['error_operation'](f"Check error: {str(e)}")
+            _error_check_progress(ui_components, f"Check error: {str(e)}")
             raise
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
@@ -61,11 +58,40 @@ def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     except Exception:
         pass
 
+def _initialize_check_progress(ui_components: Dict[str, Any]) -> None:
+    """Initialize progress tracking untuk check operation."""
+    # Show progress container specifically for check operation
+    if 'show_for_operation' in ui_components:
+        ui_components['show_for_operation']('check')
+    elif 'show_container' in ui_components:
+        ui_components['show_container']('check')
+    
+    # Initialize with starting message
+    _update_check_progress(ui_components, 0, "🔍 Memulai analisis dataset...")
+
 def _update_check_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update check progress dengan tqdm."""
+    """Update check progress dengan enhanced progress tracker."""
+    # Use the enhanced progress tracker's update method
     if 'update_progress' in ui_components:
-        color = 'success' if progress >= 100 else 'info' if progress > 0 else ''
-        ui_components['update_progress']('overall', progress, f"🔍 {message} ({progress}%)", color)
+        ui_components['update_progress']('overall', progress, message)
+    
+    # Fallback to legacy method if available
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].update('overall', progress, message)
+
+def _complete_check_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Complete check progress dengan success state."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](f"✅ {message}")
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].complete(message)
+
+def _error_check_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Set error state untuk check progress."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](message)
+    elif 'tracker' in ui_components:
+        ui_components['tracker'].error(message)
 
 def _generate_actionable_recommendations(dataset_status: Dict[str, Any], 
                                        readiness_score: Dict[str, Any]) -> List[Dict[str, Any]]:

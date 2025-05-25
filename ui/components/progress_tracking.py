@@ -84,8 +84,8 @@ class ProgressTracker:
         self.container.layout.visibility = 'hidden'
         self._cleanup_bars()
     
-    def update(self, progress_type: str, value: int, message: str = ""):
-        """Update progress bar dengan message."""
+    def update(self, progress_type: str, value: int, message: str = "", color: str = None):
+        """Update progress bar dengan message dan optional color."""
         if progress_type not in ['overall', 'step', 'current']:
             return
             
@@ -93,10 +93,12 @@ class ProgressTracker:
         bar = getattr(self, f'{progress_type}_bar', None)
         
         if bar is not None:
-            self._update_bar(bar, value, progress_type, message)
+            self._update_bar(bar, value, progress_type, message, color)
         
         if message:
-            self._update_status(message)
+            # Determine status style based on color or progress
+            status_style = self._get_status_style(color, value)
+            self._update_status(message, status_style)
     
     def complete(self, message: str = "Selesai"):
         """Complete operation dengan success state."""
@@ -168,14 +170,19 @@ class ProgressTracker:
         setattr(self, f'{bar_type}_bar', bar)
         self.active_bars.add(bar_type)
     
-    def _update_bar(self, bar: tqdm, value: int, bar_type: str, message: str):
-        """Update single bar dengan smooth animation."""
+    def _update_bar(self, bar: tqdm, value: int, bar_type: str, message: str, color: str = None):
+        """Update single bar dengan smooth animation dan optional color."""
         diff = value - bar.n
         if diff > 0:
             bar.update(diff)
         elif diff < 0:
             bar.reset(total=100)
             bar.update(value)
+        
+        # Update color if provided
+        if color:
+            bar.colour = self._normalize_color(color)
+            bar.refresh()
         
         if message:
             emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
@@ -248,6 +255,39 @@ class ProgressTracker:
         
         self.status_widget.value = html_content
         self.status_widget.layout.visibility = 'visible'
+    
+    def _get_status_style(self, color: str, progress: int) -> str:
+        """Determine status style based on color or progress."""
+        if color:
+            color_style_map = {
+                'success': 'success',
+                '#28a745': 'success',
+                'info': 'info',
+                '#007bff': 'info',
+                'warning': 'warning',
+                '#ffc107': 'warning',
+                'error': 'error',
+                '#dc3545': 'error'
+            }
+            return color_style_map.get(color, 'info')
+        
+        # Default based on progress
+        if progress >= 100:
+            return 'success'
+        elif progress > 0:
+            return 'info'
+        else:
+            return None
+    
+    def _normalize_color(self, color: str) -> str:
+        """Normalize color string to hex format."""
+        color_map = {
+            'success': '#28a745',
+            'info': '#007bff',
+            'warning': '#ffc107',
+            'error': '#dc3545'
+        }
+        return color_map.get(color, color)
     
     @staticmethod
     def _calculate_optimal_width(num_bars: int) -> int:

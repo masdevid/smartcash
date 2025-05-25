@@ -60,7 +60,7 @@ class ProgressTracker:
             padding='15px',
             border='1px solid #28a745',
             border_radius='8px',
-            background_color='#f8fff8',
+            background_color='##fffdf8',
             width='100%',
             max_width='100%',
             min_height='120px',

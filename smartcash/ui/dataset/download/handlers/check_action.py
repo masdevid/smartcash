@@ -5,7 +5,7 @@ Deskripsi: Fixed check action dengan comprehensive dataset analysis dan enhanced
 
 from typing import Dict, Any, List
 from IPython.display import display, HTML
-from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
+from smartcash.ui.utils.button_state_manager import get_button_state_manager
 from smartcash.ui.dataset.download.utils.dataset_checker import check_complete_dataset_status, get_dataset_readiness_score
 
 def execute_check_action(ui_components: Dict[str, Any], button: Any = None) -> None:

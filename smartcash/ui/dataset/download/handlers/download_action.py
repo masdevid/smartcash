@@ -4,7 +4,7 @@ Deskripsi: Fixed complete download action handler dengan tqdm progress tracking 
 """
 
 from typing import Dict, Any
-from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
+from smartcash.ui.utils.button_state_manager import get_button_state_manager
 from smartcash.ui.dataset.download.handlers.validation_handler import validate_download_parameters
 from smartcash.ui.dataset.download.handlers.confirmation_handler import handle_download_confirmation
 from smartcash.ui.dataset.download.handlers.execution_handler import execute_download_process

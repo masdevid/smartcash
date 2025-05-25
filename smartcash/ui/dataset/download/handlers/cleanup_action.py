@@ -5,7 +5,7 @@ Deskripsi: Enhanced cleanup action dengan confirmation dialog dan comprehensive 
 
 from typing import Dict, Any
 from IPython.display import display
-from smartcash.ui.dataset.download.utils.button_state_manager import get_button_state_manager
+from smartcash.ui.utils.button_state_manager import get_button_state_manager
 from smartcash.ui.dataset.download.utils.dataset_checker import check_complete_dataset_status
 from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
@@ -20,12 +20,17 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         logger and logger.info("🧹 Memulai analisis untuk cleanup")
         _clear_ui_outputs(ui_components)
         
+        # Show progress container for cleanup operation
+        if 'show_for_operation' in ui_components:
+            ui_components['show_for_operation']('cleanup')
+        
         # Analyze current dataset status
         _update_cleanup_progress(ui_components, 20, "📊 Menganalisis dataset yang ada...")
         dataset_status = check_complete_dataset_status()
         
         if not _has_data_to_cleanup(dataset_status):
             logger and logger.info("ℹ️ Tidak ada data untuk dihapus")
+            _complete_cleanup_progress(ui_components, "Tidak ada data untuk dihapus")
             button_manager.enable_buttons('all')
             return
         
@@ -34,6 +39,7 @@ def execute_cleanup_action(ui_components: Dict[str, Any], button: Any = None) ->
         
     except Exception as e:
         logger and logger.error(f"❌ Error cleanup preparation: {str(e)}")
+        _error_cleanup_progress(ui_components, f"Error preparation: {str(e)}")
         button_manager.enable_buttons('all')
 
 def _has_data_to_cleanup(dataset_status: Dict[str, Any]) -> bool:
@@ -89,11 +95,16 @@ def _show_enhanced_cleanup_confirmation(ui_components: Dict[str, Any],
         except Exception as e:
             logger = ui_components.get('logger')
             logger and logger.error(f"❌ Error execute cleanup: {str(e)}")
+            _error_cleanup_progress(ui_components, f"Error execute cleanup: {str(e)}")
     
     def on_cancel(b):
         ui_components['confirmation_area'].clear_output()
         logger = ui_components.get('logger')
         logger and logger.info("❌ Cleanup dibatalkan oleh user")
+        
+        # Hide progress and reset
+        if 'hide_container' in ui_components:
+            ui_components['hide_container']()
         
         button_manager = get_button_state_manager(ui_components)
         button_manager.enable_buttons('all')
@@ -123,7 +134,7 @@ def execute_cleanup_confirmed(ui_components: Dict[str, Any],
         try:
             logger and logger.info("🗑️ Memulai proses cleanup komprehensif")
             
-            # Setup progress untuk cleanup dengan detail tracking
+            # Ensure progress is shown for cleanup operation
             if 'show_for_operation' in ui_components:
                 ui_components['show_for_operation']('cleanup')
             
@@ -162,11 +173,25 @@ def execute_cleanup_confirmed(ui_components: Dict[str, Any],
             # Execute cleanup phases
             _execute_cleanup_phases(ui_components, organizer, dataset_status, cleanup_results)
             
-            # Final summary
+            # Final summary and completion
             _display_cleanup_summary(ui_components, cleanup_results)
+            
+            # Complete progress tracking
+            if cleanup_results.get('success', False):
+                total_deleted = cleanup_results.get('total_files_removed', 0)
+                if total_deleted > 0:
+                    _complete_cleanup_progress(ui_components, f"Cleanup berhasil: {total_deleted} files dihapus")
+                else:
+                    message = cleanup_results.get('message', 'Tidak ada file untuk dihapus')
+                    _complete_cleanup_progress(ui_components, message)
+            else:
+                errors = cleanup_results.get('errors', [])
+                error_msg = errors[0] if errors else "Cleanup gagal"
+                _error_cleanup_progress(ui_components, error_msg)
             
         except Exception as e:
             logger and logger.error(f"❌ Error cleanup: {str(e)}")
+            _error_cleanup_progress(ui_components, f"Error cleanup: {str(e)}")
             raise
 
 def _execute_cleanup_phases(ui_components: Dict[str, Any], 
@@ -250,9 +275,19 @@ def _display_cleanup_summary(ui_components: Dict[str, Any],
             logger.info(f"   • ... dan {len(errors) - 3} errors lainnya")
 
 def _update_cleanup_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
-    """Update cleanup progress dengan tqdm."""
+    """Update cleanup progress dengan progress tracking system."""
     if 'update_progress' in ui_components:
         ui_components['update_progress']('overall', progress, f"🧹 {message}")
+
+def _complete_cleanup_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Complete cleanup progress dengan success state."""
+    if 'complete_operation' in ui_components:
+        ui_components['complete_operation'](f"🧹 {message}")
+
+def _error_cleanup_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Set error state untuk cleanup progress."""
+    if 'error_operation' in ui_components:
+        ui_components['error_operation'](f"🧹 {message}")
 
 def _clear_ui_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear UI outputs."""

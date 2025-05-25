@@ -9,7 +9,6 @@ import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-from smartcash.ui.components.sync_info_message import create_sync_info_message
 
 def create_training_strategy_button_components() -> Dict[str, Any]:
     """
@@ -24,13 +23,10 @@ def create_training_strategy_button_components() -> Dict[str, Any]:
     save_reset_buttons = create_save_reset_buttons(
         save_label="Simpan",
         reset_label="Reset",
-        save_tooltip="Simpan konfigurasi strategi pelatihan dan sinkronkan ke Google Drive",
-        reset_tooltip="Reset konfigurasi strategi pelatihan ke default",
-        save_icon="save",
-        reset_icon="reset",
+        save_tooltip="Simpan konfigurasi preprocessing",
+        reset_tooltip="Reset konfigurasi ke default",
         with_sync_info=True,
-        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
-        button_width="100px"
+        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive."
     )
     
     # Tambahkan komponen ke ui_components

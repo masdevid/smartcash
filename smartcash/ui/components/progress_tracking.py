@@ -60,7 +60,7 @@ class ProgressTracker:
             padding='15px',
             border='1px solid #28a745',
             border_radius='8px',
-            background_color='##fffdf8',
+            background_color='#f8fff8',
             width='100%',
             max_width='100%',
             min_height='120px',
@@ -103,7 +103,7 @@ class ProgressTracker:
     def complete(self, message: str = "Selesai"):
         """Complete operation dengan success state."""
         self._set_bars_state(100, '#28a745', '✅', message)
-        self._update_status(f"✅ {message}", 'success')
+        self._update_status(f"✅ {message}", "success")
         
         # Auto cleanup after delay
         threading.Thread(
@@ -114,7 +114,7 @@ class ProgressTracker:
     def error(self, message: str = "Error"):
         """Set error state untuk all active bars."""
         self._set_bars_state(None, '#dc3545', '❌', message)
-        self._update_status(f"❌ {message}", 'error')
+        self._update_status(f"❌ {message}", "error")
     
     def reset(self):
         """Reset progress dan hide container."""
@@ -141,9 +141,9 @@ class ProgressTracker:
         
         with self.tqdm_container:
             bar_configs = [
-                ('overall', '📊 Overall Progress', '#28a745', 0),
-                ('step', '🔄 Step Progress', '#17a2b8', 1),
-                ('current', '⚡ Current Operation', '#ffc107', 2)
+                ('overall', 'Overall Progress', '#28a745', 0),
+                ('step', 'Step Progress', '#17a2b8', 1),
+                ('current', 'Current Operation', '#ffc107', 2)
             ]
             
             for bar_type, desc, color, position in bar_configs:
@@ -188,6 +188,7 @@ class ProgressTracker:
             emoji_map = {'overall': '📊', 'step': '🔄', 'current': '⚡'}
             emoji = emoji_map.get(bar_type, '📊')
             truncated_msg = self._truncate_message(message, 30)
+            # Ensure only the last icon is used by setting description directly
             bar.set_description(f"{emoji} {truncated_msg}")
     
     def _set_bars_state(self, progress: Optional[int], color: str, prefix: str, message: str):
@@ -204,7 +205,9 @@ class ProgressTracker:
                 
                 emoji = emoji_map.get(bar_type, '📊')
                 truncated_msg = self._truncate_message(message, 25)
-                bar.set_description(f"{prefix} {emoji} {truncated_msg}")
+                # Use prefix for complete/error states, otherwise use emoji
+                desc_prefix = prefix if prefix in ['✅', '❌'] else emoji
+                bar.set_description(f"{desc_prefix} {truncated_msg}")
     
     def _cleanup_bars(self):
         """Cleanup all progress bars."""
@@ -238,7 +241,7 @@ class ProgressTracker:
             font-weight: 500; 
             margin: 0; 
             padding: 8px 12px; 
-            background: rgba(40, 167, 69, 0.08); 
+            background: rgba(233, 236, 239, 0.5); 
             border-radius: 6px; 
             border-left: 3px solid {color};
             width: 100%; 

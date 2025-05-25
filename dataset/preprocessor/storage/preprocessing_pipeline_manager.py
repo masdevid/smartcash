@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/storage/preprocessing_pipeline_manager.py
-Deskripsi: Optimized preprocessing pipeline dengan customizable transformations
+Deskripsi: Fixed preprocessing pipeline dengan missing methods dan reduced debug flooding
 """
 
 import cv2
@@ -12,7 +12,7 @@ from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 
 class PreprocessingPipelineManager:
-    """Optimized preprocessing pipeline dengan flexible transformations."""
+    """Fixed preprocessing pipeline dengan complete method set."""
     
     def __init__(self, config: Dict[str, Any], logger=None):
         """Initialize pipeline dengan configuration."""
@@ -30,21 +30,20 @@ class PreprocessingPipelineManager:
         
         self.current_options = self.default_options.copy()
     
-    def update_pipeline_options(self, **options) -> None:
-        """Update pipeline options dengan new parameters."""
+    def set_options(self, **options) -> None:
+        """FIXED: Missing method - set pipeline options."""
         self.current_options.update(options)
     
+    def update_pipeline_options(self, **options) -> None:
+        """Update pipeline options dengan new parameters."""
+        self.set_options(**options)
+    
+    def process(self, image: np.ndarray, custom_options: Optional[Dict[str, Any]] = None) -> np.ndarray:
+        """FIXED: Missing method - alias untuk process_image."""
+        return self.process_image(image, custom_options)
+    
     def process_image(self, image: np.ndarray, custom_options: Optional[Dict[str, Any]] = None) -> np.ndarray:
-        """
-        Process image melalui preprocessing pipeline.
-        
-        Args:
-            image: Input image sebagai numpy array
-            custom_options: Optional custom options untuk override
-            
-        Returns:
-            Processed image
-        """
+        """Process image melalui preprocessing pipeline."""
         if image is None:
             raise ValueError("Input image is None")
         

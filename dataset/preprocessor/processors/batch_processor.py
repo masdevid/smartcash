@@ -158,19 +158,20 @@ class BatchProcessor:
         
         self.logger.debug(f"🔧 Processing batch {batch_index+1}/{total_batches} with {len(batch)} images")
         
-        for image_path in batch:
+        # FIXED: Anti-flood debug - log sample files only
+        sample_logging = len(batch) > 10
+        
+        for i, image_path in enumerate(batch):
             try:
-                # DEBUG: Log individual image processing
-                self.logger.debug(f"🖼️ Processing image: {image_path.name}")
-                
                 # Process single image menggunakan image processor
                 result = self.image_processor.process_single_image(
                     image_path, source_labels_dir, target_images_dir, 
                     target_labels_dir, processing_config
                 )
                 
-                # DEBUG: Log individual result
-                self.logger.debug(f"🖼️ Image {image_path.name} result: {result}")
+                # Anti-flood: Log only first/last few samples
+                if not sample_logging or i < 3 or i >= len(batch) - 2:
+                    self.logger.debug(f"🖼️ Image {image_path.name}: {result.get('status', 'failed')}")
                 
                 if result['success']:
                     if result.get('status') == 'processed':
@@ -179,11 +180,15 @@ class BatchProcessor:
                         batch_stats['skipped'] += 1
                 else:
                     batch_stats['failed'] += 1
-                    self.logger.warning(f"⚠️ Failed to process {image_path.name}: {result.get('message')}")
+                    # Only log failures untuk important debugging
+                    if not sample_logging or batch_stats['failed'] <= 5:
+                        self.logger.warning(f"⚠️ Failed {image_path.name}: {result.get('message')}")
                     
             except Exception as e:
-                self.logger.error(f"💥 Image processing error {image_path.name}: {str(e)}")
                 batch_stats['failed'] += 1
+                # Only log first few errors untuk prevent flood
+                if batch_stats['failed'] <= 5:
+                    self.logger.error(f"💥 Error {image_path.name}: {str(e)}")
         
         self.logger.info(f"📊 Batch {batch_index+1} stats: {batch_stats}")
         return batch_stats

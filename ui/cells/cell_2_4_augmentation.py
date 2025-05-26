@@ -4,8 +4,8 @@ Deskripsi: Cell untuk augmentasi dataset mengikuti pola dataset download
 """
 
 from IPython.display import display
-from smartcash.ui.dataset.augmentation.augmentation_initializer import initialize_dataset_augmentation_ui
+from smartcash.ui.dataset.augmentation.augmentation_initializer import init_augmentation
 
 # Inisialisasi dan tampilkan UI
-ui = initialize_dataset_augmentation_ui()
+ui = init_augmentation()
 display(ui)

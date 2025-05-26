@@ -46,14 +46,6 @@ class ServiceFactory:
                     'logger': self.logger
                 }
             },
-            'augmentor': {
-                'class': 'smartcash.dataset.services.augmentor.augmentation_service.AugmentationService',
-                'params': {
-                    'config': self.config,
-                    'data_dir': self.config['dataset_dir'],
-                    'logger': self.logger
-                }
-            },
             'explorer': {
                 'class': 'smartcash.dataset.services.explorer.explorer_service.ExplorerService',
                 'params': {

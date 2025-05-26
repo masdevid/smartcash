@@ -4,6 +4,4 @@ Deskripsi: Entry point untuk pemilihan model, backbone dan konfigurasi layer Sma
 """
 
 from smartcash.ui.training_config.backbone.backbone_initializer import initialize_backbone_ui
-
-# Inisialisasi dan tampilkan UI backbone selection
 ui_components = initialize_backbone_ui()

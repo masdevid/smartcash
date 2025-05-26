@@ -55,7 +55,6 @@ def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[
         # Tampilkan UI
         display(ui_components['main_container'])
         
-        logger.success("🎯 Split dataset UI berhasil diinisialisasi")
         return ui_components
         
     except Exception as e:

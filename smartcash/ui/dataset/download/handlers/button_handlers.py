@@ -45,19 +45,17 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, 
                     _attach_handler_safely(ui_components[button_key], handler_func)
                     success_count += 1
             except Exception as e:
-                if 'log_output' in ui_components:
-                    ui_components['log_output'].warning(f"⚠️ Error setup {action_name} handler: {str(e)}")
+                logger and logger.warning(f"⚠️ Error setup {action_name} handler: {str(e)}")
         
         # Log success summary
-        if 'log_output' in ui_components and success_count > 0:
-            ui_components['log_output'].info(f"🔘 Button handlers aktif: {success_count} dari {len(handler_configs)}")
+        if logger and 'log_output' in ui_components and success_count > 0:
+            logger.info(f"🔘 Button handlers aktif: {success_count} dari {len(handler_configs)}")
         
         # Ensure semua buttons enabled setelah setup
         _ensure_buttons_enabled(ui_components)
         
     except Exception as e:
-        if 'log_output' in ui_components:
-            ui_components['log_output'].error(f"❌ Critical error dalam button handler setup: {str(e)}")
+        logger and logger.error(f"❌ Critical error dalam button handler setup: {str(e)}")
     
     return ui_components
 

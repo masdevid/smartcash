@@ -178,3 +178,20 @@ def get_download_initializer() -> DownloadInitializer:
         _download_initializer = DownloadInitializer()
     return _download_initializer
 
+
+# Public API functions - backward compatibility
+def initialize_dataset_download_ui(env=None, config=None, force_refresh=False) -> Any:
+    """
+    Initialize UI download dataset dengan CommonInitializer pattern.
+    
+    Args:
+        env: Environment context
+        config: Custom configuration
+        force_refresh: Force refresh UI components
+        
+    Returns:
+        UI widget untuk download dataset
+    """
+    initializer = get_download_initializer()
+    return initializer.initialize(env=env, config=config, force_refresh=force_refresh)
+

@@ -236,3 +236,17 @@ def get_split_initializer() -> SplitInitializer:
     if _split_initializer is None:
         _split_initializer = SplitInitializer()
     return _split_initializer
+
+def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Inisialisasi UI untuk konfigurasi split dataset dengan CommonInitializer pattern.
+    
+    Args:
+        env: Environment manager (optional)
+        config: Konfigurasi untuk dataset (optional)
+        
+    Returns:
+        Dict berisi komponen UI
+    """
+    initializer = get_split_initializer()
+    return initializer.initialize(env=env, config=config)

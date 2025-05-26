@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/service.py
-Deskripsi: Fixed main orchestrator service dengan smart directory detection dan proper error handling
+Deskripsi: Fixed main orchestrator service dengan Google Drive smart detection dan proper error handling
 """
 
 import os
@@ -13,7 +13,7 @@ from collections import defaultdict
 from smartcash.common.logger import get_logger
 from smartcash.common.threadpools import get_optimal_thread_count
 from .communicator import UICommunicator, create_communicator
-from .config import create_aug_config, extract_ui_config
+from .config import create_aug_config, extract_ui_config, get_best_data_location, auto_detect_config
 from .types import AugmentationResult, ProcessingStats, AugConfig
 from .core.engine import AugmentationEngine
 from .core.normalizer import NormalizationEngine
@@ -21,34 +21,62 @@ from .utils.cleaner import AugmentedDataCleaner
 from .utils.dataset_detector import detect_dataset_structure
 
 class AugmentationService:
-    """Fixed main orchestrator service dengan smart directory detection dan flow yang benar"""
+    """Fixed main orchestrator service dengan Google Drive smart detection dan proper flow"""
     
     def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None):
         """Initialize augmentation service dengan UI communication bridge."""
-        self.config = config
-        self.aug_config = create_aug_config(config)
+        # Auto-detect optimal config jika tidak disediakan proper paths
+        if not self._has_valid_paths(config):
+            self.config = auto_detect_config()
+            # Merge user config dengan auto-detected paths
+            self.config.update({k: v for k, v in config.items() if k not in ['data', 'augmentation', 'preprocessing'] or not isinstance(v, dict)})
+            if 'augmentation' in config and isinstance(config['augmentation'], dict):
+                self.config['augmentation'].update(config['augmentation'])
+        else:
+            self.config = config
+            
+        self.aug_config = create_aug_config(self.config)
         self.ui_components = ui_components or {}
         self.comm = create_communicator(ui_components)
         
         # Initialize engines
-        self.engine = AugmentationEngine(config, self.comm)
-        self.normalizer = NormalizationEngine(config, self.comm)
-        self.cleaner = AugmentedDataCleaner(config, self.comm)
+        self.engine = AugmentationEngine(self.config, self.comm)
+        self.normalizer = NormalizationEngine(self.config, self.comm)
+        self.cleaner = AugmentedDataCleaner(self.config, self.comm)
         
         self.logger = self.comm.logger
         self.stats = defaultdict(int)
         
+        # Log resolved paths untuk debugging
+        self.logger.info(f"🔧 Service initialized dengan paths:")
+        self.logger.info(f"   📁 Raw: {self.aug_config.raw_dir}")
+        self.logger.info(f"   🔄 Augmented: {self.aug_config.aug_dir}")
+        self.logger.info(f"   📊 Preprocessed: {self.aug_config.prep_dir}")
+    
+    def _has_valid_paths(self, config: Dict[str, Any]) -> bool:
+        """Check apakah config memiliki valid paths."""
+        try:
+            data_dir = config.get('data', {}).get('dir')
+            aug_dir = config.get('augmentation', {}).get('output_dir')
+            
+            # Check jika paths ada dan valid
+            return data_dir and (os.path.exists(data_dir) or os.path.exists(os.path.dirname(data_dir)))
+        except Exception:
+            return False
+    
     def augment_raw_dataset(self, progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
-        Fixed augmentasi dataset dengan smart directory detection.
-        Flow: /data → /data/augmented
+        Fixed augmentasi dataset dengan Google Drive smart detection.
+        Flow: Google Drive/data → Google Drive/data/augmented
         """
         operation_name = "Augmentasi Dataset"
         self.comm.start_operation(operation_name)
         
         try:
-            # Smart directory detection
+            # Smart directory detection dengan resolved paths
             raw_dir = self.aug_config.raw_dir
+            self.logger.info(f"🔍 Detecting dataset structure: {raw_dir}")
+            
             detection_result = detect_dataset_structure(raw_dir)
             
             if detection_result['status'] == 'error':
@@ -58,18 +86,19 @@ class AugmentationService:
             
             # Validate dataset structure
             if detection_result['total_images'] == 0:
-                error_msg = f"Tidak ada gambar ditemukan di {raw_dir}. Struktur: {detection_result['structure_type']}"
+                error_msg = f"Tidak ada gambar ditemukan di {detection_result['data_dir']}. Struktur: {detection_result['structure_type']}"
                 self.comm.error_operation(operation_name, error_msg)
                 return self._create_error_result(error_msg)
             
             self.logger.info(f"🔍 Dataset terdeteksi: {detection_result['structure_type']}, {detection_result['total_images']} gambar")
+            self.logger.info(f"📁 Resolved path: {detection_result['data_dir']}")
             
             # Setup progress callback bridge
             if progress_callback:
                 self._setup_progress_bridge(progress_callback)
             
-            # Execute augmentation dengan engine
-            aug_result = self.engine.process_raw_data(raw_dir, self.aug_config.aug_dir)
+            # Execute augmentation dengan engine (menggunakan resolved path)
+            aug_result = self.engine.process_raw_data(detection_result['data_dir'], self.aug_config.aug_dir)
             
             if aug_result['status'] == 'success':
                 success_msg = f"Augmentasi berhasil: {aug_result['total_generated']} gambar dihasilkan"
@@ -91,14 +120,14 @@ class AugmentationService:
     def normalize_augmented_dataset(self, target_split: str = "train", 
                                   progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
-        Fixed normalisasi dataset augmented ke preprocessed.
-        Flow: /data/augmented → /data/preprocessed/{split}
+        Fixed normalisasi dataset augmented ke preprocessed dengan Google Drive paths.
+        Flow: Google Drive/data/augmented → Google Drive/data/preprocessed/{split}
         """
         operation_name = f"Normalisasi ke Split {target_split}"
         self.comm.start_operation(operation_name)
         
         try:
-            # Validate augmented directory
+            # Validate augmented directory dengan resolved path
             aug_dir = self.aug_config.aug_dir
             if not os.path.exists(aug_dir):
                 error_msg = f"Augmented directory tidak ditemukan: {aug_dir}"
@@ -144,7 +173,7 @@ class AugmentationService:
     def run_full_augmentation_pipeline(self, target_split: str = "train", 
                                      progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
-        Fixed full pipeline augmentasi dengan smart detection dan validation.
+        Fixed full pipeline augmentasi dengan Google Drive smart detection dan validation.
         """
         pipeline_name = "Full Augmentation Pipeline"
         self.comm.start_operation(pipeline_name)
@@ -153,8 +182,10 @@ class AugmentationService:
         results = {}
         
         try:
-            # Pre-flight validation
+            # Pre-flight validation dengan resolved paths
             raw_dir = self.aug_config.raw_dir
+            self.logger.info(f"🚀 Pipeline validation: {raw_dir}")
+            
             detection_result = detect_dataset_structure(raw_dir)
             
             if detection_result['status'] == 'error' or detection_result['total_images'] == 0:
@@ -164,6 +195,7 @@ class AugmentationService:
             
             self.logger.info(f"🚀 Pipeline dimulai untuk dataset: {detection_result['structure_type']}")
             self.logger.info(f"📊 Input: {detection_result['total_images']} gambar, {detection_result['total_labels']} label")
+            self.logger.info(f"📁 Resolved data path: {detection_result['data_dir']}")
             
             # Step 1: Augmentasi raw dataset
             self.logger.info("📊 Step 1/2: Augmentasi raw dataset")
@@ -206,7 +238,7 @@ class AugmentationService:
     
     def cleanup_augmented_data(self, include_preprocessed: bool = True, 
                              progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """Fixed cleanup dengan progress tracking."""
+        """Fixed cleanup dengan Google Drive paths dan progress tracking."""
         operation_name = "Cleanup Augmented Data"
         self.comm.start_operation(operation_name)
         
@@ -233,7 +265,7 @@ class AugmentationService:
             return self._create_error_result(error_msg)
     
     def get_augmentation_status(self) -> Dict[str, Any]:
-        """Get status dengan dataset structure detection."""
+        """Get status dengan Google Drive dataset structure detection."""
         aug_dir = self.aug_config.aug_dir
         prep_dir = self.aug_config.prep_dir
         raw_dir = self.aug_config.raw_dir
@@ -248,9 +280,23 @@ class AugmentationService:
         preprocessed_files = 0
         train_dir = os.path.join(prep_dir, 'train', 'images')
         if os.path.exists(train_dir):
-            preprocessed_files = len([f for f in os.listdir(train_dir) if f.endswith(('.jpg', '.png'))])
+            try:
+                preprocessed_files = len([f for f in os.listdir(train_dir) if f.endswith(('.jpg', '.png'))])
+            except Exception:
+                preprocessed_files = 0
+        
+        # Google Drive status
+        drive_mounted = os.path.exists('/content/drive/MyDrive')
+        using_drive = '/content/drive/MyDrive' in raw_dir
         
         status = {
+            'paths_info': {
+                'raw_dir': raw_dir,
+                'aug_dir': aug_dir,
+                'prep_dir': prep_dir,
+                'using_drive': using_drive,
+                'drive_mounted': drive_mounted
+            },
             'raw_dataset': {
                 'exists': raw_detection['status'] == 'success',
                 'structure_type': raw_detection.get('structure_type', 'unknown'),
@@ -299,7 +345,8 @@ class AugmentationService:
             'input_dataset': {
                 'structure': detection_result.get('structure_type', 'unknown'),
                 'original_images': detection_result.get('total_images', 0),
-                'original_labels': detection_result.get('total_labels', 0)
+                'original_labels': detection_result.get('total_labels', 0),
+                'resolved_path': detection_result.get('data_dir', 'unknown')
             },
             'steps': {
                 'augmentation': {
@@ -324,17 +371,17 @@ class AugmentationService:
             'timestamp': time.time()
         }
 
-# Factory functions untuk service creation
+# Factory functions untuk service creation dengan Google Drive support
 def create_augmentation_service(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> AugmentationService:
-    """Factory function untuk create augmentation service."""
+    """Factory function untuk create augmentation service dengan Google Drive support."""
     return AugmentationService(config, ui_components)
 
 def create_service_from_ui(ui_components: Dict[str, Any]) -> AugmentationService:
-    """Factory function untuk create service dari UI components."""
+    """Factory function untuk create service dari UI components dengan Google Drive resolution."""
     config = extract_ui_config(ui_components)
     return AugmentationService(config, ui_components)
 
-# One-liner service operations dengan smart detection
+# One-liner service operations dengan Google Drive smart detection
 augment_raw_data = lambda config, ui_components=None: create_augmentation_service(config, ui_components).augment_raw_dataset()
 normalize_augmented_data = lambda config, split='train', ui_components=None: create_augmentation_service(config, ui_components).normalize_augmented_dataset(split)
 run_full_pipeline = lambda config, split='train', ui_components=None: create_augmentation_service(config, ui_components).run_full_augmentation_pipeline(split)

@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/core/engine.py
-Deskripsi: Fixed augmentation engine dengan proper communicator integration dan one-liner error handling
+Deskripsi: Fixed augmentation engine dengan proper Google Drive path resolution dan smart directory detection
 """
 
 import os
@@ -15,9 +15,10 @@ import time
 from smartcash.common.logger import get_logger
 from smartcash.common.threadpools import get_optimal_thread_count
 from .pipeline import PipelineFactory
+from ..utils.dataset_detector import detect_dataset_structure
 
 class AugmentationEngine:
-    """Fixed core engine dengan proper communicator integration dan error handling"""
+    """Fixed core engine dengan proper Google Drive path resolution dan smart detection"""
     
     def __init__(self, config: Dict[str, Any], communicator=None):
         self.config = config
@@ -28,7 +29,7 @@ class AugmentationEngine:
         self.stats = defaultdict(int)
         
     def process_raw_data(self, raw_dir: str, output_dir: str = None) -> Dict[str, Any]:
-        """Process raw data dengan fixed communicator logging."""
+        """Process raw data dengan fixed Google Drive path resolution."""
         if not output_dir:
             output_dir = self.config.get('augmentation', {}).get('output_dir', 'data/augmented')
             
@@ -39,14 +40,27 @@ class AugmentationEngine:
         start_time = time.time()
         
         try:
-            # Validate raw directory
-            raw_files = self._get_raw_files(raw_dir)
+            # Use dataset detector untuk smart path resolution
+            detection_result = detect_dataset_structure(raw_dir)
+            
+            if detection_result['status'] == 'error':
+                return self._create_error_result(f"Raw directory tidak valid: {detection_result['message']}")
+            
+            if detection_result['total_images'] == 0:
+                return self._create_error_result(f"Tidak ada gambar ditemukan di {detection_result['data_dir']}")
+            
+            # Use resolved path dari detector
+            resolved_raw_dir = detection_result['data_dir']
+            self.logger.info(f"📁 Dataset terdeteksi: {detection_result['structure_type']}, {detection_result['total_images']} gambar")
+            
+            # Get raw files dari detection result
+            raw_files = self._get_raw_files_from_detection(detection_result)
             if not raw_files:
                 return self._create_error_result("Tidak ada file raw yang valid ditemukan")
             
             # Setup dan process files
             self._ensure_output_directory(output_dir)
-            selected_files = self._select_files_for_augmentation(raw_files)
+            selected_files = self._select_files_for_augmentation(raw_files, resolved_raw_dir)
             
             if not selected_files:
                 return self._create_error_result("Tidak ada file yang memenuhi criteria augmentasi")
@@ -74,14 +88,42 @@ class AugmentationEngine:
             self.comm and hasattr(self.comm, 'log') and self.comm.log("error", error_msg)
             return self._create_error_result(error_msg)
     
+    def _get_raw_files_from_detection(self, detection_result: Dict[str, Any]) -> List[str]:
+        """Get raw files dari detection result dengan Google Drive support."""
+        image_files = []
+        
+        # Extract files dari image locations
+        for img_location in detection_result['image_locations']:
+            img_dir = img_location['path']
+            
+            try:
+                if os.path.exists(img_dir):
+                    valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+                    files = [os.path.join(img_dir, f) for f in os.listdir(img_dir) 
+                            if os.path.isfile(os.path.join(img_dir, f)) and Path(f).suffix.lower() in valid_extensions]
+                    image_files.extend(files)
+            except (PermissionError, OSError):
+                continue
+        
+        self.logger.info(f"📁 Ditemukan {len(image_files)} file gambar dari smart detection")
+        return image_files
+    
     def _get_raw_files(self, raw_dir: str) -> List[str]:
-        """Get raw image files dengan validation."""
+        """Get raw image files dengan validation - kept for compatibility."""
         if not os.path.exists(raw_dir):
             raise FileNotFoundError(f"Raw directory tidak ditemukan: {raw_dir}")
             
         images_dir = os.path.join(raw_dir, 'images')
         if not os.path.exists(images_dir):
-            raise FileNotFoundError(f"Images directory tidak ditemukan: {images_dir}")
+            # Try alternative structure - langsung di root
+            if os.path.exists(raw_dir):
+                valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+                raw_files = [os.path.join(raw_dir, f) for f in os.listdir(raw_dir) 
+                            if os.path.isfile(os.path.join(raw_dir, f)) and Path(f).suffix.lower() in valid_extensions]
+                self.logger.info(f"📁 Menggunakan struktur root: {len(raw_files)} file gambar")
+                return raw_files
+            else:
+                raise FileNotFoundError(f"Images directory tidak ditemukan: {images_dir}")
             
         # One-liner file collection
         valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
@@ -91,21 +133,48 @@ class AugmentationEngine:
         return raw_files
     
     def _ensure_output_directory(self, output_dir: str) -> None:
-        """One-liner output directory setup."""
+        """One-liner output directory setup dengan Google Drive compatibility."""
+        # Resolve output path untuk Google Drive
+        if output_dir.startswith('data/') and not os.path.exists(output_dir):
+            # Try resolve to Drive path
+            drive_base = '/content/drive/MyDrive/SmartCash'
+            if os.path.exists(drive_base):
+                output_dir = os.path.join(drive_base, output_dir)
+        
         [os.makedirs(path, exist_ok=True) for path in [output_dir, os.path.join(output_dir, 'images'), os.path.join(output_dir, 'labels')]]
         self.logger.info(f"📁 Output directory siap: {output_dir}")
     
-    def _select_files_for_augmentation(self, raw_files: List[str]) -> List[str]:
-        """Select files dengan label validation."""
-        raw_dir = Path(raw_files[0]).parent.parent
-        labels_dir = raw_dir / 'labels'
+    def _select_files_for_augmentation(self, raw_files: List[str], raw_dir: str) -> List[str]:
+        """Select files dengan label validation menggunakan smart detection."""
+        if not raw_files:
+            return []
         
-        if not labels_dir.exists():
-            self.logger.warning(f"⚠️ Labels directory tidak ditemukan: {labels_dir}")
-            return raw_files[:10]  # Fallback
+        # Detect label directory dari raw_dir structure
+        detection_result = detect_dataset_structure(raw_dir)
+        label_locations = detection_result.get('label_locations', [])
+        
+        if not label_locations:
+            self.logger.warning(f"⚠️ Tidak ada labels directory ditemukan")
+            return raw_files[:10]  # Fallback dengan sample files
+        
+        # Use first label location sebagai primary
+        primary_label_dir = label_locations[0]['path']
         
         # One-liner file selection dengan label check
-        selected = [img_file for img_file in raw_files if (labels_dir / f"{Path(img_file).stem}.txt").exists()]
+        selected = []
+        for img_file in raw_files:
+            img_stem = Path(img_file).stem
+            
+            # Search label file di berbagai lokasi
+            label_found = False
+            for label_loc in label_locations:
+                label_path = os.path.join(label_loc['path'], f"{img_stem}.txt")
+                if os.path.exists(label_path):
+                    label_found = True
+                    break
+            
+            if label_found:
+                selected.append(img_file)
         
         self.logger.info(f"🎯 Terpilih {len(selected)} file dengan label untuk augmentasi")
         return selected
@@ -116,9 +185,9 @@ class AugmentationEngine:
         
         # Extract config parameters
         aug_config = self.config.get('augmentation', {})
-        aug_type = aug_config.get('type', 'combined')
-        intensity = aug_config.get('intensity', 0.5)
-        num_variants = aug_config.get('num_variants', 2)
+        aug_type = aug_config.get('types', ['combined'])[0] if aug_config.get('types') else 'combined'
+        intensity = aug_config.get('intensity', 0.7)
+        num_variants = aug_config.get('num_variations', 2)
         
         # Create pipeline
         pipeline = self.pipeline_factory.create_pipeline(aug_type, intensity)
@@ -154,20 +223,34 @@ class AugmentationEngine:
         return results
     
     def _process_single_file(self, file_path: str, pipeline, output_dir: str, num_variants: int) -> Dict[str, Any]:
-        """Process single file dengan variants generation."""
+        """Process single file dengan variants generation dan smart label detection."""
         try:
             # Read image dan get label path
             image = cv2.imread(file_path)
             if image is None:
                 return {'status': 'error', 'file': file_path, 'error': 'Tidak dapat membaca gambar'}
             
-            raw_dir = Path(file_path).parent.parent
-            labels_dir = raw_dir / 'labels'
+            # Smart label detection
             img_name = Path(file_path).stem
-            label_path = labels_dir / f"{img_name}.txt"
+            img_dir = Path(file_path).parent
+            
+            # Try multiple label directory structures
+            potential_label_dirs = [
+                img_dir.parent / 'labels',  # Standard YOLO: data/labels
+                img_dir.parent / 'label',   # Alternative: data/label
+                img_dir / 'labels',         # Same level: images/labels
+                img_dir.parent,             # Root level mixed
+            ]
+            
+            label_path = None
+            for label_dir in potential_label_dirs:
+                potential_label = label_dir / f"{img_name}.txt"
+                if potential_label.exists():
+                    label_path = potential_label
+                    break
             
             # Read bboxes
-            bboxes, class_labels = self._read_yolo_labels(str(label_path)) if label_path.exists() else ([], [])
+            bboxes, class_labels = self._read_yolo_labels(str(label_path)) if label_path else ([], [])
             
             generated_count = 0
             
@@ -247,4 +330,4 @@ class AugmentationEngine:
 # One-liner factory functions
 create_augmentation_engine = lambda config, comm=None: AugmentationEngine(config, comm)
 process_raw_to_augmented = lambda config, raw_dir, comm=None: AugmentationEngine(config, comm).process_raw_data(raw_dir)
-validate_raw_directory = lambda raw_dir: os.path.exists(raw_dir) and os.path.exists(os.path.join(raw_dir, 'images'))
+validate_raw_directory = lambda raw_dir: detect_dataset_structure(raw_dir)['status'] == 'success' and detect_dataset_structure(raw_dir)['total_images'] > 0

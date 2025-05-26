@@ -49,7 +49,8 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None) -> Dict[str, 
         
         # Log success summary
         if logger and ui_components.get('log_output') and success_count > 0:
-            logger.info(f"🔘 Button handlers aktif: {success_count} dari {len(handler_configs)}")
+            with ui_components['log_output']:
+                logger.info(f"🔘 Button handlers aktif: {success_count} dari {len(handler_configs)}")
         
         # Ensure semua buttons enabled setelah setup
         _ensure_buttons_enabled(ui_components)

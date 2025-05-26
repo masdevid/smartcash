@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/service.py
-Deskripsi: Main orchestrator service untuk augmentasi dengan flow yang benar - Raw → Augmented → Preprocessed
+Deskripsi: Fixed main orchestrator service dengan smart directory detection dan proper error handling
 """
 
 import os
@@ -18,18 +18,13 @@ from .types import AugmentationResult, ProcessingStats, AugConfig
 from .core.engine import AugmentationEngine
 from .core.normalizer import NormalizationEngine
 from .utils.cleaner import AugmentedDataCleaner
+from .utils.dataset_detector import detect_dataset_structure
 
 class AugmentationService:
-    """Main orchestrator service untuk augmentasi dengan simplified dan focused flow"""
+    """Fixed main orchestrator service dengan smart directory detection dan flow yang benar"""
     
     def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None):
-        """
-        Initialize augmentation service dengan UI communication bridge.
-        
-        Args:
-            config: Dictionary konfigurasi aplikasi
-            ui_components: Dictionary komponen UI untuk communication
-        """
+        """Initialize augmentation service dengan UI communication bridge."""
         self.config = config
         self.aug_config = create_aug_config(config)
         self.ui_components = ui_components or {}
@@ -45,27 +40,29 @@ class AugmentationService:
         
     def augment_raw_dataset(self, progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
-        Augmentasi dataset dari raw data dengan progress tracking.
+        Fixed augmentasi dataset dengan smart directory detection.
         Flow: /data → /data/augmented
-        
-        Args:
-            progress_callback: Callback untuk progress updates
-            
-        Returns:
-            Dictionary hasil augmentasi
         """
         operation_name = "Augmentasi Dataset"
         self.comm.start_operation(operation_name)
         
         try:
-            # Validasi raw directory
+            # Smart directory detection
             raw_dir = self.aug_config.raw_dir
-            if not os.path.exists(raw_dir):
-                error_msg = f"Raw directory tidak ditemukan: {raw_dir}"
+            detection_result = detect_dataset_structure(raw_dir)
+            
+            if detection_result['status'] == 'error':
+                error_msg = f"Raw directory tidak valid: {detection_result['message']}"
                 self.comm.error_operation(operation_name, error_msg)
                 return self._create_error_result(error_msg)
             
-            self.logger.info(f"🚀 Memulai augmentasi raw dataset: {raw_dir}")
+            # Validate dataset structure
+            if detection_result['total_images'] == 0:
+                error_msg = f"Tidak ada gambar ditemukan di {raw_dir}. Struktur: {detection_result['structure_type']}"
+                self.comm.error_operation(operation_name, error_msg)
+                return self._create_error_result(error_msg)
+            
+            self.logger.info(f"🔍 Dataset terdeteksi: {detection_result['structure_type']}, {detection_result['total_images']} gambar")
             
             # Setup progress callback bridge
             if progress_callback:
@@ -77,6 +74,9 @@ class AugmentationService:
             if aug_result['status'] == 'success':
                 success_msg = f"Augmentasi berhasil: {aug_result['total_generated']} gambar dihasilkan"
                 self.comm.complete_operation(operation_name, success_msg)
+                
+                # Add dataset info ke result
+                aug_result['dataset_info'] = detection_result
                 return aug_result
             else:
                 self.comm.error_operation(operation_name, aug_result.get('message', 'Error tidak diketahui'))
@@ -91,28 +91,29 @@ class AugmentationService:
     def normalize_augmented_dataset(self, target_split: str = "train", 
                                   progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
-        Normalisasi dataset augmented ke preprocessed.
+        Fixed normalisasi dataset augmented ke preprocessed.
         Flow: /data/augmented → /data/preprocessed/{split}
-        
-        Args:
-            target_split: Target split untuk normalisasi (train/valid/test)
-            progress_callback: Callback untuk progress updates
-            
-        Returns:
-            Dictionary hasil normalisasi
         """
         operation_name = f"Normalisasi ke Split {target_split}"
         self.comm.start_operation(operation_name)
         
         try:
-            # Validasi augmented directory
+            # Validate augmented directory
             aug_dir = self.aug_config.aug_dir
             if not os.path.exists(aug_dir):
                 error_msg = f"Augmented directory tidak ditemukan: {aug_dir}"
                 self.comm.error_operation(operation_name, error_msg)
                 return self._create_error_result(error_msg)
             
+            # Check augmented files
+            aug_detection = detect_dataset_structure(aug_dir)
+            if aug_detection['total_images'] == 0:
+                error_msg = f"Tidak ada file augmented ditemukan di {aug_dir}"
+                self.comm.error_operation(operation_name, error_msg)
+                return self._create_error_result(error_msg)
+            
             self.logger.info(f"🔄 Memulai normalisasi: {aug_dir} → preprocessed/{target_split}")
+            self.logger.info(f"📊 File augmented: {aug_detection['total_images']} gambar, {aug_detection['total_labels']} label")
             
             # Setup progress callback bridge
             if progress_callback:
@@ -126,6 +127,9 @@ class AugmentationService:
             if norm_result['status'] == 'success':
                 success_msg = f"Normalisasi berhasil: {norm_result['total_normalized']} file dinormalisasi"
                 self.comm.complete_operation(operation_name, success_msg)
+                
+                # Add detection info
+                norm_result['augmented_info'] = aug_detection
                 return norm_result
             else:
                 self.comm.error_operation(operation_name, norm_result.get('message', 'Error tidak diketahui'))
@@ -140,14 +144,7 @@ class AugmentationService:
     def run_full_augmentation_pipeline(self, target_split: str = "train", 
                                      progress_callback: Optional[callable] = None) -> Dict[str, Any]:
         """
-        Jalankan full pipeline augmentasi: Raw → Augmented → Preprocessed.
-        
-        Args:
-            target_split: Target split untuk hasil akhir
-            progress_callback: Callback untuk progress updates
-            
-        Returns:
-            Dictionary hasil pipeline lengkap
+        Fixed full pipeline augmentasi dengan smart detection dan validation.
         """
         pipeline_name = "Full Augmentation Pipeline"
         self.comm.start_operation(pipeline_name)
@@ -156,9 +153,21 @@ class AugmentationService:
         results = {}
         
         try:
+            # Pre-flight validation
+            raw_dir = self.aug_config.raw_dir
+            detection_result = detect_dataset_structure(raw_dir)
+            
+            if detection_result['status'] == 'error' or detection_result['total_images'] == 0:
+                error_msg = f"Dataset tidak valid untuk augmentasi: {detection_result.get('message', 'Tidak ada gambar ditemukan')}"
+                self.comm.error_operation(pipeline_name, error_msg)
+                return self._create_pipeline_error_result(error_msg, results)
+            
+            self.logger.info(f"🚀 Pipeline dimulai untuk dataset: {detection_result['structure_type']}")
+            self.logger.info(f"📊 Input: {detection_result['total_images']} gambar, {detection_result['total_labels']} label")
+            
             # Step 1: Augmentasi raw dataset
             self.logger.info("📊 Step 1/2: Augmentasi raw dataset")
-            if self.comm: self.comm.progress("overall", 10, 100, "Step 1: Augmentasi raw dataset")
+            self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 10, 100, "Step 1: Augmentasi raw dataset")
             
             aug_result = self.augment_raw_dataset(progress_callback)
             results['augmentation'] = aug_result
@@ -170,7 +179,7 @@ class AugmentationService:
             
             # Step 2: Normalisasi ke preprocessed
             self.logger.info("📊 Step 2/2: Normalisasi ke preprocessed")
-            if self.comm: self.comm.progress("overall", 60, 100, "Step 2: Normalisasi ke preprocessed")
+            self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 60, 100, "Step 2: Normalisasi ke preprocessed")
             
             norm_result = self.normalize_augmented_dataset(target_split, progress_callback)
             results['normalization'] = norm_result
@@ -182,7 +191,7 @@ class AugmentationService:
             
             # Pipeline success summary
             total_time = time.time() - start_time
-            pipeline_summary = self._create_pipeline_success_result(results, total_time, target_split)
+            pipeline_summary = self._create_pipeline_success_result(results, total_time, target_split, detection_result)
             
             success_msg = f"Pipeline selesai: {pipeline_summary['total_files']} file → {pipeline_summary['final_output']}"
             self.comm.complete_operation(pipeline_name, success_msg)
@@ -197,16 +206,7 @@ class AugmentationService:
     
     def cleanup_augmented_data(self, include_preprocessed: bool = True, 
                              progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """
-        Cleanup data augmentasi dengan prefix aug_*.
-        
-        Args:
-            include_preprocessed: Apakah cleanup juga preprocessed files
-            progress_callback: Callback untuk progress updates
-            
-        Returns:
-            Dictionary hasil cleanup
-        """
+        """Fixed cleanup dengan progress tracking."""
         operation_name = "Cleanup Augmented Data"
         self.comm.start_operation(operation_name)
         
@@ -233,32 +233,45 @@ class AugmentationService:
             return self._create_error_result(error_msg)
     
     def get_augmentation_status(self) -> Dict[str, Any]:
-        """
-        Dapatkan status augmentasi saat ini.
-        
-        Returns:
-            Dictionary status augmentasi
-        """
+        """Get status dengan dataset structure detection."""
         aug_dir = self.aug_config.aug_dir
         prep_dir = self.aug_config.prep_dir
+        raw_dir = self.aug_config.raw_dir
         
-        status = {
-            'raw_exists': os.path.exists(self.aug_config.raw_dir),
-            'augmented_exists': os.path.exists(aug_dir),
-            'preprocessed_exists': os.path.exists(prep_dir),
-            'augmented_files': 0,
-            'preprocessed_files': 0
-        }
+        # Detect raw dataset structure
+        raw_detection = detect_dataset_structure(raw_dir)
         
-        # Count augmented files
-        if status['augmented_exists']:
-            aug_stats = self.normalizer.get_augmented_stats(aug_dir)
-            status['augmented_files'] = aug_stats.get('aug_images', 0)
+        # Detect augmented files
+        aug_detection = detect_dataset_structure(aug_dir) if os.path.exists(aug_dir) else {'total_images': 0, 'total_labels': 0}
         
         # Count preprocessed files (train split)
+        preprocessed_files = 0
         train_dir = os.path.join(prep_dir, 'train', 'images')
         if os.path.exists(train_dir):
-            status['preprocessed_files'] = len([f for f in os.listdir(train_dir) if f.endswith(('.jpg', '.png'))])
+            preprocessed_files = len([f for f in os.listdir(train_dir) if f.endswith(('.jpg', '.png'))])
+        
+        status = {
+            'raw_dataset': {
+                'exists': raw_detection['status'] == 'success',
+                'structure_type': raw_detection.get('structure_type', 'unknown'),
+                'total_images': raw_detection.get('total_images', 0),
+                'total_labels': raw_detection.get('total_labels', 0),
+                'recommendations': raw_detection.get('recommendations', [])
+            },
+            'augmented_dataset': {
+                'exists': os.path.exists(aug_dir),
+                'total_images': aug_detection.get('total_images', 0),
+                'total_labels': aug_detection.get('total_labels', 0)
+            },
+            'preprocessed_dataset': {
+                'exists': os.path.exists(prep_dir),
+                'total_files': preprocessed_files
+            },
+            'ready_for_augmentation': (
+                raw_detection['status'] == 'success' and 
+                raw_detection.get('total_images', 0) > 0
+            )
+        }
         
         return status
     
@@ -269,14 +282,10 @@ class AugmentationService:
     
     def _create_error_result(self, error_message: str) -> Dict[str, Any]:
         """Create standardized error result."""
-        return {
-            'status': 'error',
-            'message': error_message,
-            'timestamp': time.time()
-        }
+        return {'status': 'error', 'message': error_message, 'timestamp': time.time()}
     
-    def _create_pipeline_success_result(self, results: Dict, total_time: float, target_split: str) -> Dict[str, Any]:
-        """Create pipeline success result summary."""
+    def _create_pipeline_success_result(self, results: Dict, total_time: float, target_split: str, detection_result: Dict) -> Dict[str, Any]:
+        """Create enhanced pipeline success result."""
         aug_result = results.get('augmentation', {})
         norm_result = results.get('normalization', {})
         
@@ -287,6 +296,11 @@ class AugmentationService:
             'target_split': target_split,
             'total_files': aug_result.get('total_generated', 0),
             'final_output': f"{norm_result.get('target_dir', 'preprocessed')}/{target_split}",
+            'input_dataset': {
+                'structure': detection_result.get('structure_type', 'unknown'),
+                'original_images': detection_result.get('total_images', 0),
+                'original_labels': detection_result.get('total_labels', 0)
+            },
             'steps': {
                 'augmentation': {
                     'status': aug_result.get('status'),
@@ -320,8 +334,9 @@ def create_service_from_ui(ui_components: Dict[str, Any]) -> AugmentationService
     config = extract_ui_config(ui_components)
     return AugmentationService(config, ui_components)
 
-# One-liner service operations
+# One-liner service operations dengan smart detection
 augment_raw_data = lambda config, ui_components=None: create_augmentation_service(config, ui_components).augment_raw_dataset()
 normalize_augmented_data = lambda config, split='train', ui_components=None: create_augmentation_service(config, ui_components).normalize_augmented_dataset(split)
 run_full_pipeline = lambda config, split='train', ui_components=None: create_augmentation_service(config, ui_components).run_full_augmentation_pipeline(split)
 cleanup_augmented_files = lambda config, include_prep=True, ui_components=None: create_augmentation_service(config, ui_components).cleanup_augmented_data(include_prep)
+get_dataset_status = lambda config, ui_components=None: create_augmentation_service(config, ui_components).get_augmentation_status()

@@ -1,216 +1,235 @@
 """
 File: smartcash/dataset/augmentor/utils/cleaner.py
-Deskripsi: Utility untuk cleanup augmented data dengan optimized operations
+Deskripsi: Cleaner utility untuk augmented data dengan one-liner operations dan progress tracking
 """
 
 import os
 import glob
-import time
+import shutil
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from collections import defaultdict
 
+from smartcash.common.logger import get_logger
+
 class AugmentedDataCleaner:
-    """Utility untuk cleanup data augmented dengan progress tracking."""
+    """Cleaner untuk augmented data dengan progress tracking yang optimized."""
     
     def __init__(self, config: Dict[str, Any], communicator=None):
         self.config = config
         self.comm = communicator
-        self.logger = self.comm.logger if self.comm else None
-        
+        # One-liner logger setup dengan fallback
+        self.logger = getattr(self.comm, 'logger', None) if self.comm else get_logger(__name__)
+        self.stats = defaultdict(int)
+    
     def cleanup_all_augmented_files(self, include_preprocessed: bool = True) -> Dict[str, Any]:
         """
-        Cleanup semua file augmented dengan prefix aug_*.
+        Cleanup semua augmented files dengan prefix aug_*.
         
         Args:
-            include_preprocessed: Apakah termasuk cleanup di preprocessed
+            include_preprocessed: Apakah cleanup juga preprocessed files
             
         Returns:
             Dictionary hasil cleanup
         """
-        if self.logger: self.logger.info("🧹 Memulai cleanup augmented files")
-        if self.comm: self.comm.progress("overall", 5, 100, "Inisialisasi cleanup")
-        
-        start_time = time.time()
-        cleanup_stats = defaultdict(int)
+        self.logger.info("🧹 Memulai cleanup augmented data")
+        # One-liner progress start
+        self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 5, 100, "Memulai cleanup augmented data")
         
         try:
+            cleanup_results = {'total_deleted': 0, 'folders_cleaned': [], 'errors': []}
+            
             # Get directories untuk cleanup
-            directories_to_clean = self._get_cleanup_directories(include_preprocessed)
+            aug_dir = self.config.get('augmentation', {}).get('output_dir', 'data/augmented')
+            prep_dir = self.config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
             
-            if not directories_to_clean:
-                return self._create_result('empty', 'Tidak ada directory untuk cleanup', cleanup_stats, 0)
-            
-            # Count total files untuk progress calculation
-            if self.comm: self.comm.progress("overall", 10, 100, "Menghitung file untuk cleanup")
-            total_files = self._count_augmented_files(directories_to_clean)
-            
-            if total_files == 0:
-                return self._create_result('empty', 'Tidak ada file augmented untuk dihapus', cleanup_stats, 0)
-            
-            if self.logger: self.logger.info(f"📊 Ditemukan {total_files} file augmented untuk cleanup")
-            
-            # Cleanup directories satu per satu
-            processed_files = 0
-            for i, (dir_name, dir_path) in enumerate(directories_to_clean.items()):
-                start_progress = 20 + (i * 70 // len(directories_to_clean))
-                end_progress = 20 + ((i + 1) * 70 // len(directories_to_clean))
+            # Cleanup augmented directory
+            if os.path.exists(aug_dir):
+                aug_result = self._cleanup_directory(aug_dir, "augmented")
+                cleanup_results['total_deleted'] += aug_result['deleted']
+                cleanup_results['folders_cleaned'].extend(aug_result['folders'])
+                cleanup_results['errors'].extend(aug_result['errors'])
                 
-                if self.comm: self.comm.progress("overall", start_progress, 100, f"Cleanup {dir_name}")
+                # One-liner progress update
+                self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 50, 100, f"Cleanup augmented: {aug_result['deleted']} files")
+            
+            # Cleanup preprocessed directory jika diminta
+            if include_preprocessed and os.path.exists(prep_dir):
+                prep_result = self._cleanup_preprocessed_directory(prep_dir)
+                cleanup_results['total_deleted'] += prep_result['deleted']
+                cleanup_results['folders_cleaned'].extend(prep_result['folders'])
+                cleanup_results['errors'].extend(prep_result['errors'])
                 
-                dir_stats = self._cleanup_directory(dir_path, start_progress, end_progress)
-                cleanup_stats[f'{dir_name}_deleted'] = dir_stats['deleted']
-                cleanup_stats['total_deleted'] += dir_stats['deleted']
-                processed_files += dir_stats['processed']
+                # One-liner progress update
+                self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 90, 100, f"Cleanup preprocessed: {prep_result['deleted']} files")
             
-            # Final summary
-            processing_time = time.time() - start_time
+            # Final result
+            if cleanup_results['total_deleted'] > 0:
+                success_msg = f"✅ Cleanup berhasil: {cleanup_results['total_deleted']} file dihapus"
+                self.logger.success if hasattr(self.logger, 'success') else self.logger.info(success_msg)
+                cleanup_results['status'] = 'success'
+                cleanup_results['message'] = success_msg
+            else:
+                info_msg = "ℹ️ Tidak ada file augmented yang perlu dihapus"
+                self.logger.info(info_msg)
+                cleanup_results['status'] = 'success'
+                cleanup_results['message'] = info_msg
             
-            if self.comm: self.comm.progress("overall", 100, 100, f"Cleanup selesai: {cleanup_stats['total_deleted']} file")
-            if self.logger: self.logger.success(f"✅ Cleanup selesai: {cleanup_stats['total_deleted']} file dalam {processing_time:.1f}s")
+            # One-liner final progress
+            self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 100, 100, "Cleanup selesai")
             
-            return self._create_result('success', f"Berhasil menghapus {cleanup_stats['total_deleted']} file", cleanup_stats, processing_time)
+            return cleanup_results
             
         except Exception as e:
-            error_msg = f"Error cleanup: {str(e)}"
-            if self.logger: self.logger.error(f"❌ {error_msg}")
-            if self.comm: self.comm.log("error", error_msg)
-            return self._create_result('error', error_msg, cleanup_stats, time.time() - start_time)
+            error_msg = f"Error pada cleanup: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            # One-liner error logging
+            self.comm and hasattr(self.comm, 'log') and self.comm.log("error", error_msg)
+            return {'status': 'error', 'message': error_msg, 'total_deleted': 0}
     
-    def _get_cleanup_directories(self, include_preprocessed: bool) -> Dict[str, str]:
-        """Get directories yang perlu cleanup."""
-        directories = {}
+    def _cleanup_directory(self, directory: str, dir_type: str) -> Dict[str, Any]:
+        """Cleanup directory dengan one-liner file operations."""
+        self.logger.info(f"🗑️ Cleaning {dir_type} directory: {directory}")
         
-        # Augmented directory
-        aug_dir = self.config.get('augmentation', {}).get('output_dir', 'data/augmented')
-        if os.path.exists(aug_dir):
-            directories['augmented'] = aug_dir
-        
-        # Preprocessed directories jika diminta
-        if include_preprocessed:
-            prep_dir = self.config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
-            if os.path.exists(prep_dir):
-                for split in ['train', 'valid', 'test']:
-                    split_dir = os.path.join(prep_dir, split)
-                    if os.path.exists(split_dir):
-                        directories[f'preprocessed_{split}'] = split_dir
-        
-        return directories
-    
-    def _count_augmented_files(self, directories: Dict[str, str]) -> int:
-        """Count total augmented files di semua directories."""
-        total_count = 0
-        
-        for dir_name, dir_path in directories.items():
-            try:
-                count = len(find_aug_files(dir_path))
-                total_count += count
-                if self.logger: self.logger.debug(f"📁 {dir_name}: {count} file augmented")
-            except Exception:
-                continue
-                
-        return total_count
-    
-    def _cleanup_directory(self, directory: str, start_progress: int, end_progress: int) -> Dict[str, int]:
-        """Cleanup single directory dengan progress tracking."""
-        stats = {'deleted': 0, 'processed': 0, 'errors': 0}
+        deleted_count = 0
+        folders_cleaned = []
+        errors = []
         
         try:
-            # Find augmented files
-            aug_files = find_aug_files(directory)
+            # One-liner find all aug_ files
+            aug_files = glob.glob(os.path.join(directory, '**', 'aug_*.*'), recursive=True)
             
             if not aug_files:
-                return stats
+                return {'deleted': 0, 'folders': [], 'errors': []}
             
-            # Delete files dengan progress updates
-            for i, file_path in enumerate(aug_files):
+            # One-liner batch delete dengan error handling
+            for file_path in aug_files:
                 try:
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                        stats['deleted'] += 1
-                    stats['processed'] += 1
-                    
-                    # Update progress setiap 10% dari directory ini
-                    if i % max(1, len(aug_files) // 10) == 0:
-                        file_progress = int((i / len(aug_files)) * (end_progress - start_progress))
-                        current_progress = start_progress + file_progress
-                        if self.comm: self.comm.progress("overall", current_progress, 100, f"Deleted: {stats['deleted']}/{len(aug_files)}")
-                        
-                except Exception:
-                    stats['errors'] += 1
-                    continue
+                    os.remove(file_path)
+                    deleted_count += 1
+                except Exception as e:
+                    errors.append(f"Error deleting {file_path}: {str(e)}")
             
-            # Cleanup empty directories
-            self._cleanup_empty_directories(directory)
+            # Track cleaned folders
+            cleaned_folders = set(os.path.dirname(f) for f in aug_files)
+            folders_cleaned = [f"{dir_type}: {len(aug_files)} files" for _ in [None] if aug_files]  # One item list
+            
+            self.logger.info(f"🗑️ {dir_type} cleanup: {deleted_count} files deleted")
+            
+            return {'deleted': deleted_count, 'folders': folders_cleaned, 'errors': errors}
             
         except Exception as e:
-            if self.logger: self.logger.warning(f"⚠️ Error cleanup directory {directory}: {str(e)}")
+            error_msg = f"Error cleaning {dir_type} directory: {str(e)}"
+            self.logger.error(error_msg)
+            return {'deleted': 0, 'folders': [], 'errors': [error_msg]}
+    
+    def _cleanup_preprocessed_directory(self, prep_dir: str) -> Dict[str, Any]:
+        """Cleanup preprocessed directory dengan split handling."""
+        self.logger.info(f"🗑️ Cleaning preprocessed directory: {prep_dir}")
+        
+        total_deleted = 0
+        folders_cleaned = []
+        errors = []
+        
+        # One-liner check for splits
+        splits = ['train', 'valid', 'test']
+        existing_splits = [split for split in splits if os.path.exists(os.path.join(prep_dir, split))]
+        
+        for split in existing_splits:
+            split_dir = os.path.join(prep_dir, split)
+            split_result = self._cleanup_directory(split_dir, f"preprocessed/{split}")
             
-        return stats
-    
-    def _cleanup_empty_directories(self, base_dir: str) -> None:
-        """Cleanup empty directories setelah file deletion."""
-        try:
-            for root, dirs, files in os.walk(base_dir, topdown=False):
-                for dir_name in dirs:
-                    dir_path = os.path.join(root, dir_name)
-                    try:
-                        if not os.listdir(dir_path):  # Directory kosong
-                            os.rmdir(dir_path)
-                            if self.logger: self.logger.debug(f"🗑️ Removed empty directory: {dir_path}")
-                    except Exception:
-                        continue
-        except Exception:
-            pass
-    
-    def _create_result(self, status: str, message: str, stats: Dict, processing_time: float) -> Dict[str, Any]:
-        """Create standardized result dictionary."""
-        return {
-            'status': status,
-            'message': message,
-            'total_deleted': stats.get('total_deleted', 0),
-            'processing_time': processing_time,
-            'details': dict(stats),
-            'timestamp': time.time()
-        }
+            total_deleted += split_result['deleted']
+            folders_cleaned.extend(split_result['folders'])
+            errors.extend(split_result['errors'])
+        
+        return {'deleted': total_deleted, 'folders': folders_cleaned, 'errors': errors}
     
     def get_cleanup_preview(self, include_preprocessed: bool = True) -> Dict[str, Any]:
-        """
-        Preview file yang akan dihapus tanpa actual deletion.
+        """Preview files yang akan dihapus tanpa menghapus."""
+        self.logger.info("👁️ Preview cleanup augmented data")
         
-        Args:
-            include_preprocessed: Include preprocessed files
+        try:
+            preview_results = {'total_files': 0, 'directories': {}, 'file_types': defaultdict(int)}
             
-        Returns:
-            Preview information
-        """
-        directories = self._get_cleanup_directories(include_preprocessed)
-        preview = {'directories': {}, 'total_files': 0}
+            # Get directories
+            aug_dir = self.config.get('augmentation', {}).get('output_dir', 'data/augmented')  
+            prep_dir = self.config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+            
+            # Preview augmented directory
+            if os.path.exists(aug_dir):
+                aug_preview = self._preview_directory_cleanup(aug_dir, "augmented")
+                preview_results['directories']['augmented'] = aug_preview
+                preview_results['total_files'] += aug_preview['file_count']
+                
+                # Update file types
+                for ext, count in aug_preview['file_types'].items():
+                    preview_results['file_types'][ext] += count
+            
+            # Preview preprocessed directory
+            if include_preprocessed and os.path.exists(prep_dir):
+                prep_preview = self._preview_preprocessed_cleanup(prep_dir)
+                preview_results['directories']['preprocessed'] = prep_preview
+                preview_results['total_files'] += prep_preview['total_files']
+                
+                # Update file types
+                for ext, count in prep_preview['file_types'].items():
+                    preview_results['file_types'][ext] += count
+            
+            preview_results['status'] = 'success'
+            return preview_results
+            
+        except Exception as e:
+            return {'status': 'error', 'message': str(e), 'total_files': 0}
+    
+    def _preview_directory_cleanup(self, directory: str, dir_type: str) -> Dict[str, Any]:
+        """Preview directory cleanup dengan one-liner file analysis."""
+        aug_files = glob.glob(os.path.join(directory, '**', 'aug_*.*'), recursive=True)
         
-        for dir_name, dir_path in directories.items():
-            try:
-                files = find_aug_files(dir_path)
-                preview['directories'][dir_name] = {
-                    'path': dir_path,
-                    'file_count': len(files),
-                    'sample_files': files[:5]  # Sample 5 files
-                }
-                preview['total_files'] += len(files)
-            except Exception:
-                preview['directories'][dir_name] = {
-                    'path': dir_path,
-                    'file_count': 0,
-                    'error': 'Cannot access directory'
-                }
+        # One-liner file type analysis
+        file_types = defaultdict(int)
+        [file_types.update({Path(f).suffix.lower(): 1}) for f in aug_files]
         
-        return preview
-
-# One-liner utilities
-find_aug_files = lambda directory: glob.glob(os.path.join(directory, "**", "aug_*.*"), recursive=True)
-count_aug_files = lambda directory: len(find_aug_files(directory))
-delete_aug_files = lambda directory: [os.remove(f) for f in find_aug_files(directory) if os.path.exists(f)]
+        return {
+            'directory_type': dir_type,
+            'file_count': len(aug_files),
+            'file_types': dict(file_types),
+            'sample_files': aug_files[:5]  # First 5 files sebagai sample
+        }
+    
+    def _preview_preprocessed_cleanup(self, prep_dir: str) -> Dict[str, Any]:
+        """Preview preprocessed cleanup dengan split analysis."""
+        splits = ['train', 'valid', 'test']
+        existing_splits = [split for split in splits if os.path.exists(os.path.join(prep_dir, split))]
+        
+        total_files = 0
+        file_types = defaultdict(int)
+        split_details = {}
+        
+        for split in existing_splits:
+            split_dir = os.path.join(prep_dir, split)
+            split_preview = self._preview_directory_cleanup(split_dir, f"preprocessed/{split}")
+            
+            split_details[split] = split_preview
+            total_files += split_preview['file_count']
+            
+            # Merge file types
+            for ext, count in split_preview['file_types'].items():
+                file_types[ext] += count
+        
+        return {
+            'total_files': total_files,
+            'file_types': dict(file_types),
+            'splits': split_details
+        }
 
 # Factory function
-def create_augmented_cleaner(config: Dict[str, Any], communicator=None) -> AugmentedDataCleaner:
-    """Factory function untuk create augmented data cleaner."""
+def create_augmented_data_cleaner(config: Dict[str, Any], communicator=None) -> AugmentedDataCleaner:
+    """Factory function untuk create cleaner."""
     return AugmentedDataCleaner(config, communicator)
+
+# One-liner utility functions
+cleanup_all_aug_files = lambda config, include_prep=True, comm=None: AugmentedDataCleaner(config, comm).cleanup_all_augmented_files(include_prep)
+preview_cleanup = lambda config, include_prep=True, comm=None: AugmentedDataCleaner(config, comm).get_cleanup_preview(include_prep)
+find_aug_files = lambda directory: glob.glob(os.path.join(directory, '**', 'aug_*.*'), recursive=True)
+count_aug_files = lambda directory: len(find_aug_files(directory))

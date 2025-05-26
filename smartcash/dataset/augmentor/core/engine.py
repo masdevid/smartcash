@@ -15,7 +15,7 @@ import time
 from smartcash.common.logger import get_logger
 from smartcash.common.threadpools import get_optimal_thread_count
 from .pipeline import PipelineFactory
-from ..utils.dataset_detector import detect_dataset_structure
+from ..utils.core import detect_structure
 
 class AugmentationEngine:
     """Fixed augmentation engine dengan proper progress tracking (overall + steps)"""
@@ -41,7 +41,7 @@ class AugmentationEngine:
         
         try:
             # Smart dataset detection
-            detection_result = detect_dataset_structure(raw_dir)
+            detection_result = detect_structure(raw_dir)
             
             if detection_result['status'] == 'error':
                 return self._create_error_result(f"Raw directory tidak valid: {detection_result['message']}")
@@ -258,7 +258,7 @@ class AugmentationEngine:
         if not raw_files:
             return []
         
-        detection_result = detect_dataset_structure(raw_dir)
+        detection_result = detect_structure(raw_dir)
         label_locations = detection_result.get('label_locations', [])
         
         if not label_locations:

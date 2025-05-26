@@ -1,389 +1,244 @@
 """
 File: smartcash/dataset/augmentor/service.py
-Deskripsi: Fixed main orchestrator service dengan Google Drive smart detection dan proper error handling
+Deskripsi: Refactored service menggunakan core utilities untuk mengeliminasi duplikasi
 """
 
-import os
 import time
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, Any, Optional, Callable, List
 from collections import defaultdict
 
-from smartcash.common.logger import get_logger
-from smartcash.common.threadpools import get_optimal_thread_count
-from .communicator import UICommunicator, create_communicator
-from .config import create_aug_config, extract_ui_config, get_best_data_location, auto_detect_config
-from .types import AugmentationResult, ProcessingStats, AugConfig
-from .core.engine import AugmentationEngine
-from .core.normalizer import NormalizationEngine
-from .utils.cleaner import AugmentedDataCleaner
-from .utils.dataset_detector import detect_dataset_structure
+from .utils.core import (
+    create_context, process_batch, ensure_dirs, read_image, save_image, 
+    read_yolo_labels, save_yolo_labels, get_stem, safe_execute
+)
+from .core.pipeline import PipelineFactory
 
 class AugmentationService:
-    """Fixed main orchestrator service dengan Google Drive smart detection dan proper flow"""
+    """Main orchestrator service dengan consolidated utilities"""
     
     def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None):
-        """Initialize augmentation service dengan UI communication bridge."""
-        # Auto-detect optimal config jika tidak disediakan proper paths
-        if not self._has_valid_paths(config):
-            self.config = auto_detect_config()
-            # Merge user config dengan auto-detected paths
-            self.config.update({k: v for k, v in config.items() if k not in ['data', 'augmentation', 'preprocessing'] or not isinstance(v, dict)})
-            if 'augmentation' in config and isinstance(config['augmentation'], dict):
-                self.config['augmentation'].update(config['augmentation'])
-        else:
-            self.config = config
-            
-        self.aug_config = create_aug_config(self.config)
-        self.ui_components = ui_components or {}
-        self.comm = create_communicator(ui_components)
-        
-        # Initialize engines
-        self.engine = AugmentationEngine(self.config, self.comm)
-        self.normalizer = NormalizationEngine(self.config, self.comm)
-        self.cleaner = AugmentedDataCleaner(self.config, self.comm)
-        
-        self.logger = self.comm.logger
+        self.context = create_context(config, ui_components.get('comm') if ui_components else None)
+        self.config = self.context['config']
+        self.progress = self.context['progress']
+        self.paths = self.context['paths']
         self.stats = defaultdict(int)
-        
-        # Log resolved paths untuk debugging
-        self.logger.info(f"🔧 Service initialized dengan paths:")
-        self.logger.info(f"   📁 Raw: {self.aug_config.raw_dir}")
-        self.logger.info(f"   🔄 Augmented: {self.aug_config.aug_dir}")
-        self.logger.info(f"   📊 Preprocessed: {self.aug_config.prep_dir}")
+        self.pipeline_factory = PipelineFactory(config, self.progress.logger)
     
-    def _has_valid_paths(self, config: Dict[str, Any]) -> bool:
-        """Check apakah config memiliki valid paths."""
-        try:
-            data_dir = config.get('data', {}).get('dir')
-            aug_dir = config.get('augmentation', {}).get('output_dir')
-            
-            # Check jika paths ada dan valid
-            return data_dir and (os.path.exists(data_dir) or os.path.exists(os.path.dirname(data_dir)))
-        except Exception:
-            return False
-    
-    def augment_raw_dataset(self, progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """
-        Fixed augmentasi dataset dengan Google Drive smart detection.
-        Flow: Google Drive/data → Google Drive/data/augmented
-        """
-        operation_name = "Augmentasi Dataset"
-        self.comm.start_operation(operation_name)
-        
-        try:
-            # Smart directory detection dengan resolved paths
-            raw_dir = self.aug_config.raw_dir
-            self.logger.info(f"🔍 Detecting dataset structure: {raw_dir}")
-            
-            detection_result = detect_dataset_structure(raw_dir)
-            
-            if detection_result['status'] == 'error':
-                error_msg = f"Raw directory tidak valid: {detection_result['message']}"
-                self.comm.error_operation(operation_name, error_msg)
-                return self._create_error_result(error_msg)
-            
-            # Validate dataset structure
-            if detection_result['total_images'] == 0:
-                error_msg = f"Tidak ada gambar ditemukan di {detection_result['data_dir']}. Struktur: {detection_result['structure_type']}"
-                self.comm.error_operation(operation_name, error_msg)
-                return self._create_error_result(error_msg)
-            
-            self.logger.info(f"🔍 Dataset terdeteksi: {detection_result['structure_type']}, {detection_result['total_images']} gambar")
-            self.logger.info(f"📁 Resolved path: {detection_result['data_dir']}")
-            
-            # Setup progress callback bridge
-            if progress_callback:
-                self._setup_progress_bridge(progress_callback)
-            
-            # Execute augmentation dengan engine (menggunakan resolved path)
-            aug_result = self.engine.process_raw_data(detection_result['data_dir'], self.aug_config.aug_dir)
-            
-            if aug_result['status'] == 'success':
-                success_msg = f"Augmentasi berhasil: {aug_result['total_generated']} gambar dihasilkan"
-                self.comm.complete_operation(operation_name, success_msg)
-                
-                # Add dataset info ke result
-                aug_result['dataset_info'] = detection_result
-                return aug_result
-            else:
-                self.comm.error_operation(operation_name, aug_result.get('message', 'Error tidak diketahui'))
-                return aug_result
-                
-        except Exception as e:
-            error_msg = f"Error pada augmentasi raw dataset: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self.comm.error_operation(operation_name, error_msg)
-            return self._create_error_result(error_msg)
-    
-    def normalize_augmented_dataset(self, target_split: str = "train", 
-                                  progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """
-        Fixed normalisasi dataset augmented ke preprocessed dengan Google Drive paths.
-        Flow: Google Drive/data/augmented → Google Drive/data/preprocessed/{split}
-        """
-        operation_name = f"Normalisasi ke Split {target_split}"
-        self.comm.start_operation(operation_name)
-        
-        try:
-            # Validate augmented directory dengan resolved path
-            aug_dir = self.aug_config.aug_dir
-            if not os.path.exists(aug_dir):
-                error_msg = f"Augmented directory tidak ditemukan: {aug_dir}"
-                self.comm.error_operation(operation_name, error_msg)
-                return self._create_error_result(error_msg)
-            
-            # Check augmented files
-            aug_detection = detect_dataset_structure(aug_dir)
-            if aug_detection['total_images'] == 0:
-                error_msg = f"Tidak ada file augmented ditemukan di {aug_dir}"
-                self.comm.error_operation(operation_name, error_msg)
-                return self._create_error_result(error_msg)
-            
-            self.logger.info(f"🔄 Memulai normalisasi: {aug_dir} → preprocessed/{target_split}")
-            self.logger.info(f"📊 File augmented: {aug_detection['total_images']} gambar, {aug_detection['total_labels']} label")
-            
-            # Setup progress callback bridge
-            if progress_callback:
-                self._setup_progress_bridge(progress_callback)
-            
-            # Execute normalization dengan normalizer engine
-            norm_result = self.normalizer.normalize_augmented_data(
-                aug_dir, self.aug_config.prep_dir, target_split
-            )
-            
-            if norm_result['status'] == 'success':
-                success_msg = f"Normalisasi berhasil: {norm_result['total_normalized']} file dinormalisasi"
-                self.comm.complete_operation(operation_name, success_msg)
-                
-                # Add detection info
-                norm_result['augmented_info'] = aug_detection
-                return norm_result
-            else:
-                self.comm.error_operation(operation_name, norm_result.get('message', 'Error tidak diketahui'))
-                return norm_result
-                
-        except Exception as e:
-            error_msg = f"Error pada normalisasi dataset: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self.comm.error_operation(operation_name, error_msg)
-            return self._create_error_result(error_msg)
-    
-    def run_full_augmentation_pipeline(self, target_split: str = "train", 
-                                     progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """
-        Fixed full pipeline augmentasi dengan Google Drive smart detection dan validation.
-        """
-        pipeline_name = "Full Augmentation Pipeline"
-        self.comm.start_operation(pipeline_name)
-        
+    def run_full_augmentation_pipeline(self, target_split: str = "train", progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """Full pipeline dengan consolidated flow"""
         start_time = time.time()
-        results = {}
+        
+        # Validate dataset
+        dataset_info = self.context['detector']()
+        if dataset_info['status'] == 'error' or dataset_info['total_images'] == 0:
+            return self._error_result(f"Dataset tidak valid: {dataset_info.get('message', 'Tidak ada gambar')}")
+        
+        self.progress.log_info(f"🚀 Pipeline dimulai: {dataset_info['total_images']} gambar")
         
         try:
-            # Pre-flight validation dengan resolved paths
-            raw_dir = self.aug_config.raw_dir
-            self.logger.info(f"🚀 Pipeline validation: {raw_dir}")
-            
-            detection_result = detect_dataset_structure(raw_dir)
-            
-            if detection_result['status'] == 'error' or detection_result['total_images'] == 0:
-                error_msg = f"Dataset tidak valid untuk augmentasi: {detection_result.get('message', 'Tidak ada gambar ditemukan')}"
-                self.comm.error_operation(pipeline_name, error_msg)
-                return self._create_pipeline_error_result(error_msg, results)
-            
-            self.logger.info(f"🚀 Pipeline dimulai untuk dataset: {detection_result['structure_type']}")
-            self.logger.info(f"📊 Input: {detection_result['total_images']} gambar, {detection_result['total_labels']} label")
-            self.logger.info(f"📁 Resolved data path: {detection_result['data_dir']}")
-            
-            # Step 1: Augmentasi raw dataset
-            self.logger.info("📊 Step 1/2: Augmentasi raw dataset")
-            self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 10, 100, "Step 1: Augmentasi raw dataset")
-            
-            aug_result = self.augment_raw_dataset(progress_callback)
-            results['augmentation'] = aug_result
+            # Step 1: Augmentasi
+            self.progress.progress("overall", 10, "Memulai augmentasi dataset")
+            aug_result = self._process_augmentation(dataset_info)
             
             if aug_result['status'] != 'success':
-                error_msg = f"Pipeline gagal pada step augmentasi: {aug_result.get('message')}"
-                self.comm.error_operation(pipeline_name, error_msg)
-                return self._create_pipeline_error_result(error_msg, results)
+                return self._error_result(f"Augmentasi gagal: {aug_result['message']}")
             
-            # Step 2: Normalisasi ke preprocessed
-            self.logger.info("📊 Step 2/2: Normalisasi ke preprocessed")
-            self.comm and hasattr(self.comm, 'progress') and self.comm.progress("overall", 60, 100, "Step 2: Normalisasi ke preprocessed")
-            
-            norm_result = self.normalize_augmented_dataset(target_split, progress_callback)
-            results['normalization'] = norm_result
+            # Step 2: Normalisasi
+            self.progress.progress("overall", 60, "Memulai normalisasi ke preprocessed")
+            norm_result = self._process_normalization(target_split)
             
             if norm_result['status'] != 'success':
-                error_msg = f"Pipeline gagal pada step normalisasi: {norm_result.get('message')}"
-                self.comm.error_operation(pipeline_name, error_msg)
-                return self._create_pipeline_error_result(error_msg, results)
+                return self._error_result(f"Normalisasi gagal: {norm_result['message']}")
             
-            # Pipeline success summary
+            # Success summary
             total_time = time.time() - start_time
-            pipeline_summary = self._create_pipeline_success_result(results, total_time, target_split, detection_result)
+            result = {
+                'status': 'success',
+                'total_files': aug_result['total_generated'],
+                'final_output': f"{target_split}",
+                'processing_time': total_time,
+                'steps': {'augmentation': aug_result, 'normalization': norm_result}
+            }
             
-            success_msg = f"Pipeline selesai: {pipeline_summary['total_files']} file → {pipeline_summary['final_output']}"
-            self.comm.complete_operation(pipeline_name, success_msg)
-            
-            return pipeline_summary
+            self.progress.log_success(f"Pipeline selesai: {result['total_files']} file dalam {total_time:.1f}s")
+            return result
             
         except Exception as e:
-            error_msg = f"Error pada full pipeline: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self.comm.error_operation(pipeline_name, error_msg)
-            return self._create_pipeline_error_result(error_msg, results)
+            return self._error_result(f"Pipeline error: {str(e)}")
     
-    def cleanup_augmented_data(self, include_preprocessed: bool = True, 
-                             progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """Fixed cleanup dengan Google Drive paths dan progress tracking."""
-        operation_name = "Cleanup Augmented Data"
-        self.comm.start_operation(operation_name)
+    def _process_augmentation(self, dataset_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Process augmentation dengan consolidated utilities"""
+        ensure_dirs(self.paths['aug_images'], self.paths['aug_labels'])
         
-        try:
-            # Setup progress callback bridge
-            if progress_callback:
-                self._setup_progress_bridge(progress_callback)
+        # Get image files
+        image_files = []
+        for location in dataset_info['image_locations']:
+            images_dir = location['path']
+            if '/images' not in images_dir:
+                images_dir = f"{images_dir}/images" if Path(f"{images_dir}/images").exists() else images_dir
             
-            # Execute cleanup dengan cleaner
-            cleanup_result = self.cleaner.cleanup_all_augmented_files(include_preprocessed)
-            
-            if cleanup_result['status'] == 'success':
-                success_msg = f"Cleanup berhasil: {cleanup_result['total_deleted']} file dihapus"
-                self.comm.complete_operation(operation_name, success_msg)
-                return cleanup_result
-            else:
-                self.comm.error_operation(operation_name, cleanup_result.get('message', 'Error cleanup'))
-                return cleanup_result
-                
-        except Exception as e:
-            error_msg = f"Error pada cleanup: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self.comm.error_operation(operation_name, error_msg)
-            return self._create_error_result(error_msg)
-    
-    def get_augmentation_status(self) -> Dict[str, Any]:
-        """Get status dengan Google Drive dataset structure detection."""
-        aug_dir = self.aug_config.aug_dir
-        prep_dir = self.aug_config.prep_dir
-        raw_dir = self.aug_config.raw_dir
+            image_files.extend([str(f) for f in Path(images_dir).glob('*.*') 
+                              if f.suffix.lower() in ['.jpg', '.jpeg', '.png'] and f.is_file()])
         
-        # Detect raw dataset structure
-        raw_detection = detect_dataset_structure(raw_dir)
+        if not image_files:
+            return {'status': 'error', 'message': 'Tidak ada file gambar ditemukan'}
         
-        # Detect augmented files
-        aug_detection = detect_dataset_structure(aug_dir) if os.path.exists(aug_dir) else {'total_images': 0, 'total_labels': 0}
+        # Create pipeline
+        aug_config = self.config
+        aug_type = aug_config['types'][0] if aug_config['types'] else 'combined'
+        pipeline = self.pipeline_factory.create_pipeline(aug_type, aug_config['intensity'])
         
-        # Count preprocessed files (train split)
-        preprocessed_files = 0
-        train_dir = os.path.join(prep_dir, 'train', 'images')
-        if os.path.exists(train_dir):
-            try:
-                preprocessed_files = len([f for f in os.listdir(train_dir) if f.endswith(('.jpg', '.png'))])
-            except Exception:
-                preprocessed_files = 0
+        # Process files
+        process_func = lambda img_path: self._process_single_image(img_path, pipeline, aug_config['num_variations'])
+        results = process_batch(image_files, process_func, progress_tracker=self.progress)
         
-        # Google Drive status
-        drive_mounted = os.path.exists('/content/drive/MyDrive')
-        using_drive = '/content/drive/MyDrive' in raw_dir
-        
-        status = {
-            'paths_info': {
-                'raw_dir': raw_dir,
-                'aug_dir': aug_dir,
-                'prep_dir': prep_dir,
-                'using_drive': using_drive,
-                'drive_mounted': drive_mounted
-            },
-            'raw_dataset': {
-                'exists': raw_detection['status'] == 'success',
-                'structure_type': raw_detection.get('structure_type', 'unknown'),
-                'total_images': raw_detection.get('total_images', 0),
-                'total_labels': raw_detection.get('total_labels', 0),
-                'recommendations': raw_detection.get('recommendations', [])
-            },
-            'augmented_dataset': {
-                'exists': os.path.exists(aug_dir),
-                'total_images': aug_detection.get('total_images', 0),
-                'total_labels': aug_detection.get('total_labels', 0)
-            },
-            'preprocessed_dataset': {
-                'exists': os.path.exists(prep_dir),
-                'total_files': preprocessed_files
-            },
-            'ready_for_augmentation': (
-                raw_detection['status'] == 'success' and 
-                raw_detection.get('total_images', 0) > 0
-            )
-        }
-        
-        return status
-    
-    def _setup_progress_bridge(self, progress_callback: callable) -> None:
-        """Setup bridge untuk external progress callback."""
-        if hasattr(self.comm, 'report_progress_with_callback'):
-            self.comm.report_progress_with_callback = progress_callback
-    
-    def _create_error_result(self, error_message: str) -> Dict[str, Any]:
-        """Create standardized error result."""
-        return {'status': 'error', 'message': error_message, 'timestamp': time.time()}
-    
-    def _create_pipeline_success_result(self, results: Dict, total_time: float, target_split: str, detection_result: Dict) -> Dict[str, Any]:
-        """Create enhanced pipeline success result."""
-        aug_result = results.get('augmentation', {})
-        norm_result = results.get('normalization', {})
+        # Calculate stats
+        successful = [r for r in results if r.get('status') == 'success']
+        total_generated = sum(r.get('generated', 0) for r in successful)
         
         return {
             'status': 'success',
-            'pipeline': 'full_augmentation',
-            'total_time': total_time,
-            'target_split': target_split,
-            'total_files': aug_result.get('total_generated', 0),
-            'final_output': f"{norm_result.get('target_dir', 'preprocessed')}/{target_split}",
-            'input_dataset': {
-                'structure': detection_result.get('structure_type', 'unknown'),
-                'original_images': detection_result.get('total_images', 0),
-                'original_labels': detection_result.get('total_labels', 0),
-                'resolved_path': detection_result.get('data_dir', 'unknown')
-            },
-            'steps': {
-                'augmentation': {
-                    'status': aug_result.get('status'),
-                    'generated': aug_result.get('total_generated', 0),
-                    'time': aug_result.get('processing_time', 0)
-                },
-                'normalization': {
-                    'status': norm_result.get('status'),
-                    'normalized': norm_result.get('total_normalized', 0),
-                    'time': norm_result.get('processing_time', 0)
-                }
-            }
+            'total_generated': total_generated,
+            'processed_files': len(results),
+            'success_rate': len(successful) / len(results) * 100 if results else 0
         }
     
-    def _create_pipeline_error_result(self, error_message: str, partial_results: Dict) -> Dict[str, Any]:
-        """Create pipeline error result dengan partial results."""
+    def _process_single_image(self, image_path: str, pipeline, num_variations: int) -> Dict[str, Any]:
+        """Process single image dengan consolidated pattern"""
+        try:
+            image = read_image(image_path)
+            if image is None:
+                return {'status': 'error', 'error': 'Cannot read image'}
+            
+            # Find label file
+            img_stem = get_stem(image_path)
+            img_dir = Path(image_path).parent
+            label_paths = [
+                img_dir.parent / 'labels' / f'{img_stem}.txt',
+                img_dir.parent / f'{img_stem}.txt',
+                img_dir / f'{img_stem}.txt'
+            ]
+            
+            bboxes, class_labels = [], []
+            for label_path in label_paths:
+                if label_path.exists():
+                    label_data = read_yolo_labels(str(label_path))
+                    if label_data:
+                        bboxes = [bbox[1:5] for bbox in label_data]
+                        class_labels = [bbox[0] for bbox in label_data]
+                    break
+            
+            generated = 0
+            for var_idx in range(num_variations):
+                try:
+                    # Apply augmentation
+                    augmented = pipeline(image=image, bboxes=bboxes, class_labels=class_labels)
+                    aug_image = augmented['image']
+                    aug_bboxes = augmented['bboxes']
+                    aug_labels = augmented['class_labels']
+                    
+                    # Save files
+                    aug_filename = f"aug_{img_stem}_v{var_idx}"
+                    img_path = f"{self.paths['aug_images']}/{aug_filename}.jpg"
+                    label_path = f"{self.paths['aug_labels']}/{aug_filename}.txt"
+                    
+                    if save_image(aug_image, img_path):
+                        if aug_bboxes and aug_labels:
+                            # Reconstruct full bbox format
+                            full_bboxes = [[label] + bbox for bbox, label in zip(aug_bboxes, aug_labels)]
+                            save_yolo_labels(full_bboxes, label_path)
+                        generated += 1
+                        
+                except Exception:
+                    continue
+            
+            return {'status': 'success', 'generated': generated}
+            
+        except Exception as e:
+            return {'status': 'error', 'error': str(e)}
+    
+    def _process_normalization(self, target_split: str) -> Dict[str, Any]:
+        """Process normalization dengan consolidated utilities"""
+        from .utils.core import find_aug_files
+        
+        # Setup target directories
+        target_dir = f"{self.paths['prep_dir']}/{target_split}"
+        ensure_dirs(f"{target_dir}/images", f"{target_dir}/labels")
+        
+        # Find augmented files
+        aug_files = find_aug_files(self.paths['aug_dir'])
+        if not aug_files:
+            return {'status': 'error', 'message': 'Tidak ada file augmented ditemukan'}
+        
+        # Group by image/label pairs
+        pairs = []
+        image_files = [f for f in aug_files if any(f.endswith(ext) for ext in ['.jpg', '.jpeg', '.png'])]
+        
+        for img_file in image_files:
+            img_stem = get_stem(img_file)
+            label_file = f"{self.paths['aug_labels']}/{img_stem}.txt"
+            if Path(label_file).exists():
+                pairs.append((img_file, label_file))
+        
+        # Process normalization
+        normalized = 0
+        for img_file, label_file in pairs:
+            try:
+                # Generate normalized filename (remove aug_ prefix)
+                stem = get_stem(img_file)
+                norm_stem = stem[4:] if stem.startswith('aug_') else stem
+                
+                # Copy files
+                target_img = f"{target_dir}/images/{norm_stem}.jpg"
+                target_label = f"{target_dir}/labels/{norm_stem}.txt"
+                
+                if safe_copy_file(img_file, target_img) and safe_copy_file(label_file, target_label):
+                    normalized += 1
+                    
+            except Exception:
+                continue
+        
         return {
-            'status': 'error',
-            'message': error_message,
-            'partial_results': partial_results,
-            'timestamp': time.time()
+            'status': 'success',
+            'total_normalized': normalized,
+            'target_dir': target_dir
         }
+    
+    def cleanup_augmented_data(self, include_preprocessed: bool = True, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """Cleanup menggunakan consolidated cleaner"""
+        prep_dir = self.paths['prep_dir'] if include_preprocessed else None
+        return self.context['cleaner']()
+    
+    def get_augmentation_status(self) -> Dict[str, Any]:
+        """Get status menggunakan consolidated detector"""
+        from .utils.core import count_dataset_files
+        
+        raw_images, raw_labels = count_dataset_files(self.paths['raw_dir'])
+        aug_images, aug_labels = count_dataset_files(self.paths['aug_dir'])
+        
+        return {
+            'raw_dataset': {
+                'exists': raw_images > 0,
+                'total_images': raw_images,
+                'total_labels': raw_labels
+            },
+            'augmented_dataset': {
+                'exists': aug_images > 0,
+                'total_images': aug_images,
+                'total_labels': aug_labels
+            },
+            'ready_for_augmentation': raw_images > 0
+        }
+    
+    def _error_result(self, message: str) -> Dict[str, Any]:
+        """One-liner error result"""
+        return {'status': 'error', 'message': message, 'timestamp': time.time()}
 
-# Factory functions untuk service creation dengan Google Drive support
+# Factory functions
 def create_augmentation_service(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> AugmentationService:
-    """Factory function untuk create augmentation service dengan Google Drive support."""
     return AugmentationService(config, ui_components)
 
 def create_service_from_ui(ui_components: Dict[str, Any]) -> AugmentationService:
-    """Factory function untuk create service dari UI components dengan Google Drive resolution."""
-    config = extract_ui_config(ui_components)
-    return AugmentationService(config, ui_components)
-
-# One-liner service operations dengan Google Drive smart detection
-augment_raw_data = lambda config, ui_components=None: create_augmentation_service(config, ui_components).augment_raw_dataset()
-normalize_augmented_data = lambda config, split='train', ui_components=None: create_augmentation_service(config, ui_components).normalize_augmented_dataset(split)
-run_full_pipeline = lambda config, split='train', ui_components=None: create_augmentation_service(config, ui_components).run_full_augmentation_pipeline(split)
-cleanup_augmented_files = lambda config, include_prep=True, ui_components=None: create_augmentation_service(config, ui_components).cleanup_augmented_data(include_prep)
-get_dataset_status = lambda config, ui_components=None: create_augmentation_service(config, ui_components).get_augmentation_status()
+    from .utils.core import extract_config
+    config = extract_config(ui_components.get('config', {}))
+    return AugmentationService({'augmentation': config, 'data': {'dir': config['raw_dir']}}, ui_components)

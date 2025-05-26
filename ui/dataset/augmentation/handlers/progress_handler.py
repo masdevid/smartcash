@@ -1,137 +1,195 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/progress_handler.py
-Deskripsi: Handler untuk progress tracking dan komunikasi dengan service (SRP)
+Deskripsi: SRP handler untuk progress tracking dan UI updates
 """
 
-import time
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Optional, Callable
 
 class ProgressHandler:
-    """Handler untuk mengelola progress UI dan komunikasi dengan service."""
+    """SRP handler untuk mengelola progress tracking augmentasi."""
     
-    def __init__(self, ui_components: Dict[str, Any], ui_logger):
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+        self.tracker = ui_components.get('tracker')
+        self.current_operation = None
+        
+    def start_operation(self, operation_name: str) -> bool:
         """
-        Inisialisasi progress handler.
+        Mulai operasi dengan progress tracking.
         
         Args:
-            ui_components: Dictionary komponen UI
-            ui_logger: UI Logger bridge
-        """
-        self.ui_components = ui_components
-        self.ui_logger = ui_logger
-        self.last_update_time = 0
-        self.update_interval = 0.5  # Minimum interval antar update
-        
-    def start_progress(self, message: str) -> None:
-        """Mulai progress tracking."""
-        self._show_progress_container()
-        self.update_progress(0, message)
-        self.ui_logger.info(f"📊 {message}")
-    
-    def update_progress(self, value: int, message: str = "") -> None:
-        """Update progress bar dan message."""
-        current_time = time.time()
-        
-        # Throttle updates untuk menghindari spam
-        if current_time - self.last_update_time < self.update_interval:
-            return
+            operation_name: Nama operasi (augmentation, cleanup, etc.)
             
-        value = max(0, min(100, value))
-        
-        # Update progress bar
-        if 'progress_bar' in self.ui_components:
-            progress_bar = self.ui_components['progress_bar']
-            if hasattr(progress_bar, 'value'):
-                progress_bar.value = value
-                progress_bar.description = f"Progress: {value}%"
-        
-        # Update message labels
-        if message:
-            for label_key in ['progress_message', 'step_label', 'overall_label']:
-                if label_key in self.ui_components:
-                    label_widget = self.ui_components[label_key]
-                    if hasattr(label_widget, 'value'):
-                        label_widget.value = message
-        
-        self.last_update_time = current_time
-    
-    def complete_progress(self, message: str, success: bool = True) -> None:
-        """Selesaikan progress tracking."""
-        final_progress = 100 if success else self.ui_components.get('progress_bar', {}).get('value', 0)
-        self.update_progress(final_progress, message)
-        
-        if success:
-            self.ui_logger.success(f"🎉 {message}")
-        else:
-            self.ui_logger.error(f"❌ {message}")
-        
-        # Hide progress setelah delay singkat jika berhasil
-        if success:
-            self._hide_progress_after_delay()
-    
-    def create_service_callback(self) -> Callable:
+        Returns:
+            True jika berhasil dimulai
         """
-        Buat callback function untuk komunikasi dengan service.
+        try:
+            self.current_operation = operation_name
+            
+            # Show progress container untuk operation
+            if 'show_for_operation' in self.ui_components:
+                self.ui_components['show_for_operation'](operation_name)
+            elif self.tracker and hasattr(self.tracker, 'show'):
+                self.tracker.show(operation_name)
+                
+            return True
+        except Exception:
+            return False
+    
+    def update_progress(self, step: str, percentage: int, message: str = "", 
+                       color: Optional[str] = None) -> bool:
+        """
+        Update progress dengan percentage dan message.
+        
+        Args:
+            step: Step operasi ('overall', 'step', 'current')
+            percentage: Percentage progress (0-100)
+            message: Progress message
+            color: Optional color untuk progress
+            
+        Returns:
+            True jika berhasil diupdate
+        """
+        try:
+            # Normalize percentage
+            percentage = max(0, min(100, percentage))
+            
+            # Update tracker
+            if 'update_progress' in self.ui_components:
+                self.ui_components['update_progress'](step, percentage, message, color)
+            elif self.tracker and hasattr(self.tracker, 'update'):
+                self.tracker.update(step, percentage, message, color)
+                
+            return True
+        except Exception:
+            return False
+    
+    def complete_operation(self, message: str = "Operasi selesai") -> bool:
+        """
+        Complete operasi dengan success state.
+        
+        Args:
+            message: Message untuk completion
+            
+        Returns:
+            True jika berhasil completed
+        """
+        try:
+            if 'complete_operation' in self.ui_components:
+                self.ui_components['complete_operation'](message)
+            elif self.tracker and hasattr(self.tracker, 'complete'):
+                self.tracker.complete(message)
+                
+            self.current_operation = None
+            return True
+        except Exception:
+            return False
+    
+    def error_operation(self, message: str = "Error operasi") -> bool:
+        """
+        Set error state untuk operasi.
+        
+        Args:
+            message: Error message
+            
+        Returns:
+            True jika berhasil diset error
+        """
+        try:
+            if 'error_operation' in self.ui_components:
+                self.ui_components['error_operation'](message)
+            elif self.tracker and hasattr(self.tracker, 'error'):
+                self.tracker.error(message)
+                
+            return True
+        except Exception:
+            return False
+    
+    def hide_progress(self) -> bool:
+        """
+        Hide progress container.
         
         Returns:
-            Callback function yang kompatibel dengan service
+            True jika berhasil dihide
         """
-        def service_callback(current: int, total: int, message: str = "", **kwargs) -> bool:
-            # Cek stop signal
-            if self.ui_components.get('stop_requested', False):
-                self.ui_logger.warning("⏹️ Stop request detected")
-                return False
-            
-            # Hitung progress percentage (15-95% range untuk augmentasi)
-            if total > 0:
-                # Map service progress (0-100) ke UI progress range (15-95)
-                service_progress = min(100, (current / total) * 100)
-                ui_progress = 15 + int(service_progress * 0.8)  # 15 + (0-100 * 0.8) = 15-95
+        try:
+            if 'hide_container' in self.ui_components:
+                self.ui_components['hide_container']()
+            elif self.tracker and hasattr(self.tracker, 'hide'):
+                self.tracker.hide()
                 
-                # Format message
-                if message:
-                    display_message = f"{message} ({current}/{total})"
-                else:
-                    display_message = f"Memproses: {current}/{total}"
+            self.current_operation = None
+            return True
+        except Exception:
+            return False
+    
+    def reset_progress(self) -> bool:
+        """
+        Reset semua progress state.
+        
+        Returns:
+            True jika berhasil direset
+        """
+        try:
+            if 'reset_all' in self.ui_components:
+                self.ui_components['reset_all']()
+            elif self.tracker and hasattr(self.tracker, 'reset'):
+                self.tracker.reset()
                 
-                self.update_progress(ui_progress, display_message)
-            
-            return True  # Continue processing
-        
-        return service_callback
+            self.current_operation = None
+            return True
+        except Exception:
+            return False
     
-    def _show_progress_container(self) -> None:
-        """Tampilkan progress container."""
-        if 'progress_container' in self.ui_components:
-            container = self.ui_components['progress_container']
-            if hasattr(container, 'layout'):
-                container.layout.display = 'block'
+    def create_progress_callback(self) -> Callable:
+        """
+        Buat progress callback function untuk service.
         
-        # Show individual progress elements
-        for element_key in ['progress_bar', 'progress_message', 'step_label']:
-            if element_key in self.ui_components:
-                element = self.ui_components[element_key]
-                if hasattr(element, 'layout'):
-                    element.layout.visibility = 'visible'
-    
-    def _hide_progress_after_delay(self) -> None:
-        """Sembunyikan progress setelah delay singkat."""
-        # Untuk Colab, langsung hide tanpa threading
-        if 'progress_container' in self.ui_components:
-            container = self.ui_components['progress_container']
-            if hasattr(container, 'layout'):
-                container.layout.display = 'none'
-    
-    def reset_progress(self) -> None:
-        """Reset progress ke kondisi awal."""
-        self.update_progress(0, "")
+        Returns:
+            Callback function untuk progress updates
+        """
+        def progress_callback(step: str, current: int, total: int, message: str):
+            """Progress callback untuk service integration."""
+            try:
+                # Hitung percentage
+                percentage = int((current / max(1, total)) * 100) if total > 0 else current
+                
+                # Update progress
+                self.update_progress(step, percentage, message)
+                
+                # Log message jika ada logger
+                if 'logger' in self.ui_components:
+                    logger = self.ui_components['logger']
+                    if hasattr(logger, 'info'):
+                        logger.info(f"📊 {step}: {message} ({percentage}%)")
+                        
+            except Exception:
+                pass  # Silent fail untuk callback
         
-        # Hide progress elements
-        for element_key in ['progress_bar', 'progress_message', 'step_label', 'progress_container']:
-            if element_key in self.ui_components:
-                element = self.ui_components[element_key]
-                if hasattr(element, 'layout'):
-                    if element_key == 'progress_container':
-                        element.layout.display = 'none'
-                    else:
-                        element.layout.visibility = 'hidden'
+        return progress_callback
+    
+    def get_progress_status(self) -> Dict[str, Any]:
+        """
+        Dapatkan current progress status.
+        
+        Returns:
+            Dictionary dengan status progress
+        """
+        return {
+            'current_operation': self.current_operation,
+            'tracker_available': self.tracker is not None,
+            'has_ui_methods': 'update_progress' in self.ui_components,
+            'is_active': self.current_operation is not None
+        }
+
+# Factory function
+def create_progress_handler(ui_components: Dict[str, Any]) -> ProgressHandler:
+    """Factory function untuk create progress handler."""
+    return ProgressHandler(ui_components)
+
+# One-liner utilities
+start_progress = lambda handler, operation: handler.start_operation(operation)
+update_progress = lambda handler, step, pct, msg="": handler.update_progress(step, pct, msg)
+complete_progress = lambda handler, msg="Selesai": handler.complete_operation(msg)
+error_progress = lambda handler, msg="Error": handler.error_operation(msg)
+create_callback = lambda handler: handler.create_progress_callback()

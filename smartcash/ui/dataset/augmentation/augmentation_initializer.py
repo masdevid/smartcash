@@ -245,21 +245,21 @@ def initialize_augmentation_ui(env=None, config=None, force_refresh=False, **kwa
     initializer = get_augmentation_initializer()
     return initializer.initialize(env=env, config=config, force_refresh=force_refresh, **kwargs)
 
-def reset_augmentation_module():
-    """Reset augmentation module untuk debugging."""
-    initializer = get_augmentation_initializer()
-    initializer.reset_module()
+# def reset_augmentation_module():
+#     """Reset augmentation module untuk debugging."""
+#     initializer = get_augmentation_initializer()
+#     initializer.reset_module()
     
-def get_augmentation_status() -> Dict[str, Any]:
-    """Get status augmentation module untuk debugging."""
-    initializer = get_augmentation_initializer()
-    return initializer.get_module_status()
+# def get_augmentation_status() -> Dict[str, Any]:
+#     """Get status augmentation module untuk debugging."""
+#     initializer = get_augmentation_initializer()
+#     return initializer.get_module_status()
 
-# Convenience functions untuk backward compatibility
-create_augmentation_ui_safe = initialize_augmentation_ui
-get_augmentation_ui_status = get_augmentation_status
+# # Convenience functions untuk backward compatibility
+# create_augmentation_ui_safe = initialize_augmentation_ui
+# get_augmentation_ui_status = get_augmentation_status
 
-# One-liner utilities
-init_augmentation = lambda env=None, config=None: initialize_augmentation_ui(env, config)
-reset_augmentation = lambda: reset_augmentation_module()
-status_augmentation = lambda: get_augmentation_status()
+# # One-liner utilities
+# init_augmentation = lambda env=None, config=None: initialize_augmentation_ui(env, config)
+# reset_augmentation = lambda: reset_augmentation_module()
+# status_augmentation = lambda: get_augmentation_status()

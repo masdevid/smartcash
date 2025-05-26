@@ -21,7 +21,6 @@ def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         _setup_progress_observers(ui_components)
         
         ui_components['progress_setup'] = True
-        logger and logger.info("📊 Progress handlers ready")
         
     except Exception as e:
         logger and logger.error(f"❌ Error setup progress: {str(e)}")
@@ -53,14 +52,14 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
         ui_components['_progress_observer'] = progress_observer
         ui_components['_registered_events'] = registered_events
         
-        logger = ui_components.get('logger')
+        logger = ui_components.get('log_output')
         logger and logger.info(f"📡 Observers registered for {len(registered_events)} events")
         
     except ImportError:
-        logger = ui_components.get('logger')
+        logger = ui_components.get('log_output')
         logger and logger.warning("⚠️ Observer system tidak tersedia")
     except Exception as e:
-        logger = ui_components.get('logger')
+        logger = ui_components.get('log_output')
         logger and logger.warning(f"⚠️ Observer setup error: {str(e)}")
 
 class ProgressObserver:

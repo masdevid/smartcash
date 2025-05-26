@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/button_state_handler.py
-Deskripsi: SRP handler untuk button state management dengan restore functionality
+Deskripsi: Fixed SRP handler untuk button state dengan reset progress/logs dan proper click behavior
 """
 
 from typing import Dict, Any, Optional
@@ -8,22 +8,36 @@ import threading
 import time
 
 class ButtonStateHandler:
-    """SRP handler untuk mengelola state tombol UI dengan restore functionality."""
+    """SRP handler untuk mengelola state tombol dengan reset progress/logs functionality."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.original_states = {}
+        self.operation_buttons = ['augment_button', 'check_button', 'cleanup_button']
+        self.config_buttons = ['save_button', 'reset_button']
+    
+    def reset_progress_and_logs(self) -> None:
+        """One-liner reset progress bar dan clear log output."""
+        try:
+            # One-liner progress reset
+            [(getattr(self.ui_components.get('tracker'), 'reset', lambda: None)(), 
+              self.ui_components.get('reset_all', lambda: None)())]
+            
+            # One-liner log clearing
+            [getattr(widget, 'clear_output', lambda **kw: None)(wait=True) 
+             for key in ['log_output', 'status'] if (widget := self.ui_components.get(key))]
+        except Exception:
+            pass
+    
+    def prepare_for_operation(self, button_key: str) -> None:
+        """One-liner prepare UI untuk operasi."""
+        self.reset_progress_and_logs()
+        # One-liner disable operation buttons
+        [self.save_button_state(btn) or setattr(self.ui_components.get(btn), 'disabled', True) 
+         for btn in self.operation_buttons if self.ui_components.get(btn)]
     
     def save_button_state(self, button_key: str) -> bool:
-        """
-        Simpan state original button.
-        
-        Args:
-            button_key: Key button dalam ui_components
-            
-        Returns:
-            True jika berhasil disimpan
-        """
+        """Simpan state original button."""
         button = self.ui_components.get(button_key)
         if not button or not hasattr(button, 'description'):
             return False
@@ -38,23 +52,18 @@ class ButtonStateHandler:
     
     def set_processing_state(self, button_key: str, processing_text: str = "Processing...", 
                            style: str = 'warning') -> bool:
-        """
-        Set button ke processing state.
-        
-        Args:
-            button_key: Key button dalam ui_components
-            processing_text: Text saat processing
-            style: Button style untuk processing
-            
-        Returns:
-            True jika berhasil diset
-        """
+        """Set button ke processing state dengan disable operation buttons."""
         button = self.ui_components.get(button_key)
         if not button:
             return False
-            
-        # Save original state dulu
-        self.save_button_state(button_key)
+        
+        # Prepare untuk operasi
+        if button_key in self.operation_buttons:
+            self.prepare_for_operation(button_key)
+        else:
+            # Untuk config buttons, hanya reset logs
+            self.reset_progress_and_logs()
+            self.save_button_state(button_key)
         
         # Set processing state
         button.description = processing_text
@@ -66,15 +75,7 @@ class ButtonStateHandler:
         return True
     
     def restore_button_state(self, button_key: str) -> bool:
-        """
-        Restore button ke state original.
-        
-        Args:
-            button_key: Key button dalam ui_components
-            
-        Returns:
-            True jika berhasil direstore
-        """
+        """Restore button ke state original dan enable semua buttons."""
         button = self.ui_components.get(button_key)
         original = self.original_states.get(button_key)
         
@@ -87,26 +88,26 @@ class ButtonStateHandler:
         button.disabled = original['disabled']
         if hasattr(button, 'icon'):
             button.icon = original['icon']
-            
+        
+        # Enable semua operation buttons kembali
+        if button_key in self.operation_buttons:
+            self._enable_all_operation_buttons()
+        
         # Clear saved state
         if button_key in self.original_states:
             del self.original_states[button_key]
             
         return True
     
+    def _enable_all_operation_buttons(self) -> None:
+        """One-liner enable semua operation buttons."""
+        [setattr(self.ui_components.get(btn), 'disabled', 
+                self.original_states.get(btn, {}).get('disabled', False)) 
+         for btn in self.operation_buttons if self.ui_components.get(btn)]
+    
     def set_success_state(self, button_key: str, success_text: str = "Selesai!", 
                          duration: int = 3) -> bool:
-        """
-        Set button ke success state sementara dengan auto restore.
-        
-        Args:
-            button_key: Key button dalam ui_components
-            success_text: Text untuk success state
-            duration: Durasi dalam detik sebelum auto restore
-            
-        Returns:
-            True jika berhasil diset
-        """
+        """Set button ke success state dengan auto restore."""
         button = self.ui_components.get(button_key)
         if not button:
             return False
@@ -127,17 +128,7 @@ class ButtonStateHandler:
     
     def set_error_state(self, button_key: str, error_text: str = "Error!", 
                        duration: int = 3) -> bool:
-        """
-        Set button ke error state sementara dengan auto restore.
-        
-        Args:
-            button_key: Key button dalam ui_components
-            error_text: Text untuk error state
-            duration: Durasi sebelum auto restore
-            
-        Returns:
-            True jika berhasil diset
-        """
+        """Set button ke error state dengan auto restore."""
         button = self.ui_components.get(button_key)
         if not button:
             return False
@@ -156,52 +147,16 @@ class ButtonStateHandler:
         threading.Thread(target=delayed_restore, daemon=True).start()
         return True
     
-    def bulk_disable_buttons(self, button_keys: list) -> Dict[str, bool]:
-        """
-        Disable multiple buttons sekaligus.
+    def handle_config_button_click(self, button_key: str) -> None:
+        """Special handler untuk config buttons yang reset logs tapi tidak disable other buttons."""
+        # Reset progress dan logs saja
+        self.reset_progress_and_logs()
         
-        Args:
-            button_keys: List button keys untuk disable
-            
-        Returns:
-            Dict dengan status berhasil per button
-        """
-        results = {}
-        for button_key in button_keys:
-            button = self.ui_components.get(button_key)
-            if button and hasattr(button, 'disabled'):
-                self.save_button_state(button_key)
-                button.disabled = True
-                results[button_key] = True
-            else:
-                results[button_key] = False
-        return results
-    
-    def bulk_restore_buttons(self, button_keys: list) -> Dict[str, bool]:
-        """
-        Restore multiple buttons sekaligus.
-        
-        Args:
-            button_keys: List button keys untuk restore
-            
-        Returns:
-            Dict dengan status berhasil per button
-        """
-        results = {}
-        for button_key in button_keys:
-            results[button_key] = self.restore_button_state(button_key)
-        return results
+        # Save state untuk restore nanti
+        self.save_button_state(button_key)
     
     def get_button_state(self, button_key: str) -> Optional[Dict[str, Any]]:
-        """
-        Dapatkan current state button.
-        
-        Args:
-            button_key: Key button dalam ui_components
-            
-        Returns:
-            Dict state button atau None jika tidak ada
-        """
+        """Dapatkan current state button."""
         button = self.ui_components.get(button_key)
         if not button:
             return None
@@ -211,7 +166,9 @@ class ButtonStateHandler:
             'button_style': getattr(button, 'button_style', ''),
             'disabled': getattr(button, 'disabled', False),
             'icon': getattr(button, 'icon', ''),
-            'has_saved_state': button_key in self.original_states
+            'has_saved_state': button_key in self.original_states,
+            'is_operation_button': button_key in self.operation_buttons,
+            'is_config_button': button_key in self.config_buttons
         }
 
 # Factory function
@@ -220,7 +177,9 @@ def create_button_state_handler(ui_components: Dict[str, Any]) -> ButtonStateHan
     return ButtonStateHandler(ui_components)
 
 # One-liner utilities
+prepare_operation = lambda handler, key: handler.prepare_for_operation(key)
 set_button_processing = lambda handler, key, text="Processing...": handler.set_processing_state(key, text)
 restore_button = lambda handler, key: handler.restore_button_state(key)
 set_button_success = lambda handler, key, text="Success!": handler.set_success_state(key, text)
 set_button_error = lambda handler, key, text="Error!": handler.set_error_state(key, text)
+handle_config_click = lambda handler, key: handler.handle_config_button_click(key)

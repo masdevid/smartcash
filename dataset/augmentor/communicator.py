@@ -1,21 +1,16 @@
 """
 File: smartcash/dataset/augmentor/communicator.py
-Deskripsi: UI communication bridge untuk augmentasi dengan unified interface
+Deskripsi: Fixed UI communication bridge dengan log method yang benar dan one-liner optimizations
 """
 
 from typing import Dict, Any, Optional, Callable
 from smartcash.common.logger import get_logger
 
 class UICommunicator:
-    """Unified interface untuk UI communication dengan fallback yang aman."""
+    """Fixed unified interface untuk UI communication dengan log method yang lengkap."""
     
     def __init__(self, ui_components: Dict[str, Any] = None):
-        """
-        Initialize UI communicator dengan components.
-        
-        Args:
-            ui_components: Dictionary komponen UI
-        """
+        """Initialize UI communicator dengan components dan logger bridge."""
         self.ui_components = ui_components or {}
         self.logger = self._setup_logger()
         self.progress_tracker = self._get_progress_tracker()
@@ -35,52 +30,34 @@ class UICommunicator:
         """Dapatkan progress tracker dari UI components."""
         return self.ui_components.get('tracker')
     
-    def progress(self, operation: str, current: int, total: int, message: str = ""):
-        """
-        Report progress ke UI tracker dengan validasi.
-        
-        Args:
-            operation: Nama operasi ('overall', 'step', 'current')
-            current: Progress saat ini (0-100)
-            total: Total progress (biasanya 100)
-            message: Pesan progress
-        """
-        if self.progress_tracker and hasattr(self.progress_tracker, 'update'):
-            try:
-                # Normalize progress ke 0-100 range
-                percentage = min(100, max(0, int((current / max(1, total)) * 100)))
-                self.progress_tracker.update(operation, percentage, message)
-            except Exception:
-                pass  # Silent fail untuk progress tracking
+    # One-liner progress method
+    progress = lambda self, op, curr, total, msg="": (
+        self.progress_tracker.update(op, min(100, max(0, int((curr / max(1, total)) * 100))), msg)
+        if self.progress_tracker and hasattr(self.progress_tracker, 'update') else None
+    )
     
-    def log_info(self, message: str):
-        """Log info message dengan emoji kontekstual."""
-        self.logger.info(f"ℹ️ {message}")
+    # One-liner log methods dengan fallback yang aman
+    log_info = lambda self, msg: getattr(self.logger, 'info', lambda x: print(f"ℹ️ {x}"))(f"ℹ️ {msg}")
+    log_success = lambda self, msg: getattr(self.logger, 'success', lambda x: print(f"✅ {x}"))(f"✅ {msg}")
+    log_warning = lambda self, msg: getattr(self.logger, 'warning', lambda x: print(f"⚠️ {x}"))(f"⚠️ {msg}")
+    log_error = lambda self, msg: getattr(self.logger, 'error', lambda x: print(f"❌ {x}"))(f"❌ {msg}")
+    log_debug = lambda self, msg: getattr(self.logger, 'debug', lambda x: print(f"🔍 {x}"))(f"🔍 {msg}")
     
-    def log_success(self, message: str):
-        """Log success message dengan emoji kontekstual.""" 
-        self.logger.success(f"✅ {message}")
-    
-    def log_warning(self, message: str):
-        """Log warning message dengan emoji kontekstual."""
-        self.logger.warning(f"⚠️ {message}")
-    
-    def log_error(self, message: str):
-        """Log error message dengan emoji kontekstual."""
-        self.logger.error(f"❌ {message}")
-    
-    def log_debug(self, message: str):
-        """Log debug message dengan emoji kontekstual."""
-        self.logger.debug(f"🔍 {message}")
+    # Generic log method untuk backward compatibility
+    def log(self, level: str, message: str):
+        """Generic log method dengan level mapping."""
+        log_methods = {
+            'info': self.log_info,
+            'success': self.log_success,
+            'warning': self.log_warning,
+            'error': self.log_error,
+            'debug': self.log_debug
+        }
+        log_method = log_methods.get(level, self.log_info)
+        log_method(message)
     
     def start_operation(self, operation_name: str, total_steps: int = 100):
-        """
-        Mulai operasi dengan progress tracking.
-        
-        Args:
-            operation_name: Nama operasi
-            total_steps: Total steps untuk operasi
-        """
+        """Mulai operasi dengan progress tracking."""
         self.log_info(f"🚀 Memulai {operation_name}")
         if self.progress_tracker and hasattr(self.progress_tracker, 'show'):
             try:
@@ -89,13 +66,7 @@ class UICommunicator:
                 pass
     
     def complete_operation(self, operation_name: str, result_message: str = ""):
-        """
-        Selesaikan operasi dengan progress tracking.
-        
-        Args:
-            operation_name: Nama operasi
-            result_message: Pesan hasil operasi
-        """
+        """Selesaikan operasi dengan progress tracking."""
         final_message = result_message or f"{operation_name} selesai"
         self.log_success(final_message)
         
@@ -106,13 +77,7 @@ class UICommunicator:
                 pass
     
     def error_operation(self, operation_name: str, error_message: str):
-        """
-        Handle error operasi dengan progress tracking.
-        
-        Args:
-            operation_name: Nama operasi
-            error_message: Pesan error
-        """
+        """Handle error operasi dengan progress tracking."""
         final_message = f"{operation_name} gagal: {error_message}"
         self.log_error(final_message)
         
@@ -123,16 +88,8 @@ class UICommunicator:
                 pass
     
     def update_status(self, message: str, status_type: str = "info"):
-        """
-        Update status UI dengan pesan.
-        
-        Args:
-            message: Pesan status
-            status_type: Tipe status ('info', 'success', 'warning', 'error')
-        """
-        # Map status type ke log method
-        log_method = getattr(self, f'log_{status_type}', self.log_info)
-        log_method(message)
+        """Update status UI dengan pesan."""
+        self.log(status_type, message)
         
         # Update status panel jika tersedia
         if 'status_panel' in self.ui_components:
@@ -142,52 +99,27 @@ class UICommunicator:
             except ImportError:
                 pass
     
-    def is_stop_requested(self) -> bool:
-        """
-        Check apakah user meminta stop operasi.
-        
-        Returns:
-            True jika stop diminta
-        """
-        return self.ui_components.get('stop_requested', False)
+    # One-liner helper methods
+    is_stop_requested = lambda self: self.ui_components.get('stop_requested', False)
     
     def report_progress_with_callback(self, progress_callback: Optional[Callable] = None, 
                                     step: str = "overall", current: int = 0, 
                                     total: int = 100, message: str = ""):
-        """
-        Report progress dengan callback dan tracker sekaligus.
-        
-        Args:
-            progress_callback: Callback function eksternal
-            step: Step operasi
-            current: Progress saat ini
-            total: Total progress
-            message: Pesan progress
-        """
-        # Update internal tracker
+        """Report progress dengan callback dan tracker sekaligus."""
         self.progress(step, current, total, message)
         
-        # Call external callback jika ada
         if progress_callback and callable(progress_callback):
             try:
                 progress_callback(step, current, total, message)
             except Exception:
-                pass  # Silent fail untuk external callback
+                pass
 
 def create_communicator(ui_components: Dict[str, Any] = None) -> UICommunicator:
-    """
-    Factory function untuk membuat UI communicator.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Instance UICommunicator
-    """
+    """Factory function untuk membuat UI communicator."""
     return UICommunicator(ui_components)
 
-# One-liner helper functions untuk backward compatibility
-log_to_ui = lambda comm, msg, level="info": getattr(comm, f"log_{level}", comm.log_info)(msg)
+# One-liner helper functions
+log_to_ui = lambda comm, msg, level="info": comm.log(level, msg)
 progress_to_ui = lambda comm, op, curr, total, msg="": comm.progress(op, curr, total, msg)
 start_ui_operation = lambda comm, name: comm.start_operation(name)
 complete_ui_operation = lambda comm, name, msg="": comm.complete_operation(name, msg)

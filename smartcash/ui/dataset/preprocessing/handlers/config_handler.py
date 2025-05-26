@@ -81,7 +81,7 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         ui_components['reset_button'].on_click(reset_config_action)
     
     # Apply initial config jika ada
-    if config:
+    if config and 'log_output' in ui_components:
         try:
             config_extractor.apply_config_to_ui(config)
             logger and logger.info("⚙️ Konfigurasi awal diterapkan ke UI")

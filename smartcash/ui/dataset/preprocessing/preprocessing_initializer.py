@@ -235,7 +235,7 @@ class PreprocessingInitializer(CommonInitializer):
             'smartcash.dataset.preprocessor.core',
             'smartcash.dataset.preprocessor.processors', 
             'smartcash.dataset.preprocessor.operations',
-            'smartcash.dataset.services', 
+            'smartcash.dataset.services',
             'smartcash.dataset.utils', 
             'smartcash.common.threadpools',
             'concurrent.futures', 
@@ -328,3 +328,18 @@ def initialize_dataset_preprocessing_ui(env=None, config=None, force_refresh=Fal
         config=config, 
         force_refresh=force_refresh
     )
+
+def reset_preprocessing_module():
+    """Reset preprocessing module initialization."""
+    _preprocessing_initializer.reset_module()
+
+def get_preprocessing_status():
+    """Get preprocessing module status for debugging."""
+    return _preprocessing_initializer.get_module_status()
+
+def get_cached_preprocessing_components():
+    """Get cached preprocessing components if available."""
+    return _preprocessing_initializer.get_cached_components()
+
+# Alias untuk kompatibilitas
+initialize_preprocessing_ui = initialize_dataset_preprocessing_ui

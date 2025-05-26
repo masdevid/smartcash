@@ -96,7 +96,7 @@ class CommonInitializer(ABC):
             self._initialization_timestamp = self._get_timestamp()
             
             # Log success
-            if logger_bridge:
+            if logger_bridge and 'log_output' in ui_components:
                 logger_bridge.success(f"✅ {self.module_name} UI berhasil diinisialisasi")
             
             return self._get_return_value(ui_components)

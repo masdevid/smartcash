@@ -98,7 +98,7 @@ class CommonInitializer(ABC):
             # Log success
             if logger_bridge and 'log_output' in ui_components:
                 with ui_components['log_output']:
-                    ui_components['log_output'].info(f"✅ {self.module_name} UI berhasil diinisialisasi")
+                    logger_bridge.success(f"✅ {self.module_name} UI berhasil diinisialisasi")
             
             return self._get_return_value(ui_components)
             

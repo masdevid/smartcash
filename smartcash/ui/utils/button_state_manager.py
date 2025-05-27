@@ -286,11 +286,17 @@ def create_button_state_manager(ui_components: Dict[str, Any]) -> ButtonStateMan
 
 def get_button_state_manager(ui_components: Dict[str, Any]) -> ButtonStateManager:
     """Get or create ButtonStateManager safely"""
-    if 'button_state_manager' not in ui_components:
+    if 'button_state_manager' not in ui_components or ui_components['button_state_manager'] is None:
         ui_components['button_state_manager'] = create_button_state_manager(ui_components)
         
         logger = ui_components.get('logger')
         if logger:
             logger.debug("🔧 ButtonStateManager berhasil diinisialisasi")
     
-    return ui_components['button_state_manager']
+    # Validate manager has required methods
+    manager = ui_components['button_state_manager']
+    if not hasattr(manager, 'can_start_operation') or not hasattr(manager, 'config_context'):
+        ui_components['button_state_manager'] = FallbackButtonStateManager(ui_components)
+        return ui_components['button_state_manager']
+    
+    return manager

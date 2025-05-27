@@ -1,7 +1,3 @@
-"""
-File: smartcash/common/utils.py
-Deskripsi: Fungsi utilitas umum untuk SmartCash
-"""
 
 import os
 import sys

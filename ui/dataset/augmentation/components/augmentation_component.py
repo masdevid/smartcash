@@ -1,144 +1,194 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_component.py
-Deskripsi: Fixed augmentation component dengan proper communicator dan logger bridge setup
+Deskripsi: Fixed komponen UI dengan proper communicator setup dan layout responsive yang tidak overflow
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
-# Import existing components
-from smartcash.ui.components.progress_tracking import create_progress_tracking_container
-from smartcash.ui.components.action_buttons import create_action_buttons
-from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-from smartcash.ui.components.info_accordion import create_info_accordion
-from smartcash.ui.components.status_panel import create_status_panel
+def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
+    """
+    Fixed UI creation dengan proper communicator integration dan responsive layout.
 
-# Import existing widget components
-from .basic_options_widget import create_basic_options_widget
-from .advanced_options_widget import create_advanced_options_widget
-from .augmentation_types_widget import create_augmentation_types_widget
-from .split_selector import create_split_selector
-from . import form_fields
+    Args:
+        env: Environment manager
+        config: Konfigurasi aplikasi
 
-# Import utilities
-from smartcash.ui.utils.layout_utils import create_responsive_container, create_section_header
-from smartcash.common.environment import get_environment_manager
-from smartcash.common.logger import get_logger
+    Returns:
+        Dictionary berisi widget UI dengan proper communicator setup
+    """
+    # Import komponen UI standar 
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.utils.constants import COLORS, ICONS 
+    from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
+    from smartcash.ui.utils.layout_utils import create_divider
 
-def create_augmentation_ui(env=None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create augmentation UI dengan proper communicator dan logger bridge setup"""
-    
-    # One-liner environment dan config setup
-    env_manager, config = env or get_environment_manager(), config or {}
-    
-    # One-liner progress dan UI components creation
-    progress_components = create_progress_tracking_container()
-    status_panel = create_status_panel("Siap untuk augmentasi dataset", "info")
-    
-    # Create existing widget components
+    # Import shared components
+    from smartcash.ui.components.action_buttons import create_action_buttons
+    from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+    from smartcash.ui.components.status_panel import create_status_panel
+    from smartcash.ui.components.log_accordion import create_log_accordion
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+
+    # Import UI pure components
+    from smartcash.ui.dataset.augmentation.components.basic_options_widget import create_basic_options_widget
+    from smartcash.ui.dataset.augmentation.components.advanced_options_widget import create_advanced_options_widget
+    from smartcash.ui.dataset.augmentation.components.augmentation_types_widget import create_augmentation_types_widget
+
+    # Fixed header
+    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
+                          "Augmentasi dataset untuk meningkatkan performa model SmartCash")
+
+    # Status panel dengan default message
+    status_panel = create_status_panel("✅ Augmentation UI siap digunakan", "success")
+
+    # Create UI pure widgets
     basic_options = create_basic_options_widget()
-    advanced_options = create_advanced_options_widget()
-    aug_types = create_augmentation_types_widget()
-    
-    # Form fields dengan config values - one-liner creation
-    num_variations, target_count, output_prefix = form_fields.num_variations_field(config), form_fields.target_count_field(config), form_fields.output_prefix_field(config)
-    augmentation_types, target_split, balance_classes = form_fields.augmentation_types_field(config), form_fields.split_target_field(config), form_fields.balance_classes_field(config)
-    
-    # One-liner action buttons
-    action_buttons = create_action_buttons(
-        primary_label="Mulai Augmentasi", primary_icon="play",
-        secondary_buttons=[("Check Dataset", "search", "info")],
-        cleanup_enabled=True, primary_style='success'
-    )
-    
-    # One-liner save/reset buttons
-    save_reset_buttons = create_save_reset_buttons(
+    advanced_options = create_advanced_options_widget()  
+    augmentation_types = create_augmentation_types_widget()
+
+    # Config buttons dengan proper spacing
+    config_buttons = create_save_reset_buttons(
+        save_label="💾 Simpan",
+        reset_label="🔄 Reset",
+        save_tooltip="Simpan konfigurasi augmentasi",
+        reset_tooltip="Reset ke konfigurasi default",
         with_sync_info=True,
-        sync_message="Konfigurasi disimpan ke Google Drive untuk persistensi."
+        sync_message="Konfigurasi disinkronkan dengan Google Drive",
+        button_width="110px",
+        container_width="100%"
     )
-    
-    # One-liner output widgets
-    confirmation_area = widgets.Output(layout=widgets.Layout(width='100%'))
-    log_output = widgets.Output(layout=widgets.Layout(max_height='250px', overflow='auto', border='1px solid #ddd', padding='8px', width='100%'))
-    
-    # One-liner info accordion
-    info_content = widgets.HTML("""
-    <div style='padding: 10px;'>
-        <h4>🎯 Pipeline Augmentasi SmartCash</h4>
-        <p>Pipeline untuk augmentasi dataset currency detection:</p>
-        <ul>
-            <li><strong>📍 Variasi Posisi:</strong> Rotasi, flip, transformasi geometri</li>
-            <li><strong>💡 Variasi Pencahayaan:</strong> Brightness, kontras, shadow</li>
-            <li><strong>🔄 Normalisasi:</strong> Standarisasi ke format preprocessed</li>
-        </ul>
-        <p><strong>Target:</strong> Train split untuk penelitian currency detection</p>
-    </div>
-    """)
-    info_accordion = create_info_accordion("Info Pipeline Augmentasi", info_content, "info")
-    
-    # One-liner configuration section
-    config_section = widgets.VBox([
-        create_section_header("⚙️ Konfigurasi Dasar", "⚙️"),
-        widgets.HBox([
-            widgets.VBox([num_variations, target_count], layout=widgets.Layout(width='48%')),
-            widgets.VBox([output_prefix, balance_classes], layout=widgets.Layout(width='48%'))
-        ]),
-        aug_types['container'],
-        widgets.Accordion([advanced_options['container']], layout=widgets.Layout(width='100%'))
-    ])
-    
-    # Set accordion title - one-liner
-    config_section.children[-1].set_title(0, "🔧 Parameter Advanced"); config_section.children[-1].selected_index = None
-    
-    # One-liner UI components assembly dengan proper keys
+
+    # Action buttons dengan proper naming
+    action_buttons = create_action_buttons(
+        primary_label="🚀 Run Augmentation",
+        primary_icon="action", 
+        secondary_buttons=[
+            ("🔍 Check Dataset", "search", "info"),
+            ("🧹 Cleanup Dataset", "cleanup", "warning")
+        ],
+        cleanup_enabled=True,
+        button_width="160px"
+    )
+
+    # Fixed confirmation area positioning
+    confirmation_area = widgets.Output(layout=widgets.Layout(
+        width='100%', margin='8px 0', padding='0', overflow='hidden'
+    ))
+
+    # Progress tracking components
+    progress_components = create_progress_tracking_container()
+
+    # Log components 
+    log_components = create_log_accordion('augmentation', '180px', '100%')
+
+    # Help panel
+    help_panel = get_augmentation_info()
+
+    # Fixed responsive layout - no horizontal scroll
+    settings_row1 = widgets.HBox([
+        widgets.VBox([
+            widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>{ICONS['settings']} Opsi Dasar</h5>"),
+            basic_options['container']
+        ], layout=widgets.Layout(width='48%', padding='6px', margin='0 1% 0 0', 
+                                border='1px solid #e0e0e0', border_radius='4px')),
+        
+        widgets.VBox([
+            widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>{ICONS['settings']} Opsi Lanjutan</h5>"),
+            advanced_options['container']
+        ], layout=widgets.Layout(width='48%', padding='6px', 
+                                border='1px solid #e0e0e0', border_radius='4px'))
+    ], layout=widgets.Layout(width='100%', max_width='100%', justify_content='flex-start'))
+
+    # Fixed augmentation types row
+    settings_row2 = widgets.VBox([
+        augmentation_types['container']
+    ], layout=widgets.Layout(width='100%', padding='6px', margin='8px 0', 
+                            border='1px solid #e0e0e0', border_radius='4px'))
+
+    # Config buttons container
+    config_container = widgets.Box([config_buttons['container']], 
+        layout=widgets.Layout(display='flex', justify_content='flex-end', 
+                             width='100%', margin='8px 0'))
+
+    # Main settings container
+    settings_container = widgets.VBox([
+        settings_row1, settings_row2, config_container
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+
+    # Fixed main UI assembly
+    ui = widgets.VBox([
+        header,
+        status_panel, 
+        settings_container,
+        create_divider(),
+        action_buttons['container'],
+        confirmation_area,
+        progress_components['container'],
+        log_components['log_accordion'],
+        help_panel
+    ], layout=widgets.Layout(width='100%', max_width='100%', padding='0', 
+                            margin='0', overflow='hidden'))
+
+    # Fixed UI components mapping dengan proper communicator support
     ui_components = {
-        # Core widgets
-        'status_panel': status_panel, 'log_output': log_output, 'confirmation_area': confirmation_area,
+        'ui': ui,
+        'header': header, 
+        'status_panel': status_panel,
         
-        # Form components
-        'num_variations': num_variations, 'target_count': target_count, 'output_prefix': output_prefix,
-        'balance_classes': balance_classes, 'augmentation_types': augmentation_types, 'target_split': target_split,
+        # Core UI containers
+        'settings_container': settings_container,
+        'confirmation_area': confirmation_area,
         
-        # Merge all component dictionaries
-        **progress_components, **action_buttons, **save_reset_buttons, 
-        **basic_options['widgets'], **advanced_options['widgets'], **aug_types['widgets'],
+        # Widget mappings untuk config extraction
+        **basic_options['widgets'],
+        **advanced_options['widgets'], 
+        **augmentation_types['widgets'],
         
-        # Button aliases untuk handler consistency
-        'augment_button': action_buttons['download_button'],
+        # Fixed button mappings untuk handlers
+        'augment_button': action_buttons['download_button'],  # Primary action
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
+        'save_button': config_buttons['save_button'],
+        'reset_button': config_buttons['reset_button'],
         
-        # Environment dan config
-        'env_manager': env_manager, 'config': config,
-        'logger_namespace': 'smartcash.ui.dataset.augmentation'
+        # Progress tracking components
+        **progress_components,
+        
+        # Log components
+        'log_output': log_components['log_output'],
+        'log_accordion': log_components['log_accordion'],
+        'status': log_components['log_output'],  # Backward compatibility
+        
+        # Module metadata untuk communicator
+        'module_name': 'augmentation',
+        'logger_namespace': 'smartcash.ui.dataset.augmentation',
+        'data_dir': 'data',
+        'augmented_dir': 'data/augmented',
+        'preprocessed_dir': 'data/preprocessed',
+        
+        # Environment context
+        'env': env,
+        'config': config or {},
+        
+        # Communicator setup flags
+        'communicator_ready': False,
+        'ui_logger_ready': False,
+        
+        # Operation state
+        'operation_running': False,
+        'stop_requested': False,
+        
+        # Component references untuk debugging
+        'component_refs': {
+            'basic_options': basic_options,
+            'advanced_options': advanced_options,
+            'augmentation_types': augmentation_types,
+            'action_buttons': action_buttons,
+            'config_buttons': config_buttons,
+            'progress_components': progress_components,
+            'log_components': log_components
+        }
     }
-    
-    # One-liner logger bridge setup dengan proper error handling
-    try:
-        from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
-        ui_components['logger'] = create_ui_logger_bridge(ui_components, ui_components['logger_namespace'])
-    except ImportError:
-        ui_components['logger'] = get_logger(ui_components['logger_namespace'])
-    
-    # One-liner communicator setup dengan proper integration
-    try:
-        from smartcash.dataset.augmentor.communicator import create_communicator
-        ui_components['comm'] = create_communicator(ui_components)
-    except ImportError:
-        ui_components['comm'] = None
-    
-    # One-liner aug_options creation untuk backward compatibility
-    aug_options_container = widgets.VBox([augmentation_types])
-    ui_components['aug_options'] = aug_options_container
-    
-    # One-liner main UI layout dengan responsive design
-    ui_components['ui'] = create_responsive_container([
-        create_section_header("🔄 Dataset Augmentation", "🔄"),
-        status_panel, config_section,
-        widgets.VBox([create_section_header("🚀 Aksi", "🚀"), action_buttons['container'], save_reset_buttons['container']]),
-        widgets.VBox([create_section_header("📊 Progress", "📊"), progress_components['container']]),
-        widgets.VBox([create_section_header("📋 Log", "📋"), log_output]),
-        info_accordion['container'], confirmation_area
-    ], container_type="vbox", padding="10px")
-    
+
     return ui_components

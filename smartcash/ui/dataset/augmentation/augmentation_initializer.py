@@ -1,15 +1,13 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Augmentation initializer yang inherit dari CommonInitializer dengan SRP handlers integration
+Deskripsi: Fixed augmentation initializer dengan proper communicator setup dan SRP handlers
 """
 
 from typing import Dict, Any, List
 from smartcash.ui.utils.common_initializer import CommonInitializer
-from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
-from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import register_augmentation_handlers
 
 class AugmentationInitializer(CommonInitializer):
-    """Initializer untuk augmentation module dengan CommonInitializer inheritance."""
+    """Fixed initializer dengan proper communicator integration dan handlers"""
     
     def __init__(self):
         super().__init__(
@@ -18,183 +16,152 @@ class AugmentationInitializer(CommonInitializer):
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """
-        Create UI components untuk augmentation module.
+        """Create UI components dengan proper communicator setup"""
+        from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
         
-        Args:
-            config: Configuration dictionary
-            env: Environment context
-            **kwargs: Additional parameters
-            
-        Returns:
-            Dictionary of UI components
-        """
-        # Create augmentation UI dengan config dan env
+        # Create UI dengan enhanced config
         ui_components = create_augmentation_ui(env=env, config=config)
         
-        # Ensure critical components exist
-        critical_components = self._get_critical_components()
-        for component in critical_components:
-            if component not in ui_components or ui_components[component] is None:
-                raise ValueError(f"Critical component missing: {component}")
+        # Setup communicator integration
+        ui_components.update({
+            'logger_namespace': self.logger_namespace,
+            'module_initialized': True,
+            'communicator_setup': 'pending'
+        })
+        
+        # Validate critical components
+        critical_missing = [comp for comp in self._get_critical_components() 
+                           if comp not in ui_components or ui_components[comp] is None]
+        
+        if critical_missing:
+            raise ValueError(f"Critical components missing: {', '.join(critical_missing)}")
         
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], 
                              config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """
-        Setup handlers specific untuk augmentation module.
-        
-        Args:
-            ui_components: UI components dictionary
-            config: Configuration dictionary
-            env: Environment context
-            **kwargs: Additional parameters
-            
-        Returns:
-            Updated UI components dictionary dengan handlers
-        """
+        """Setup handlers dengan proper communicator integration"""
         try:
-            # Register augmentation-specific handlers
+            from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import register_augmentation_handlers
+            
+            # Register handlers dengan communicator support
             ui_components = register_augmentation_handlers(ui_components)
             
-            # Log handler registration success
+            # Setup communicator jika belum ada
+            if not ui_components.get('communicator_ready', False):
+                self._setup_communicator_integration(ui_components)
+            
+            # Log handler registration
             if 'logger' in ui_components:
                 registered_info = ui_components.get('registered_handlers', {})
                 ui_components['logger'].info(
-                    f"✅ {registered_info.get('total', 0)} handlers berhasil didaftarkan"
+                    f"✅ Handlers registered: {registered_info.get('total', 0)} dengan communicator integration"
                 )
             
             return ui_components
             
         except Exception as e:
-            # Log error tapi jangan fail completely
             if 'logger' in ui_components:
-                ui_components['logger'].error(f"❌ Error setup handlers: {str(e)}")
+                ui_components['logger'].error(f"❌ Handler setup error: {str(e)}")
             else:
-                self.logger.error(f"❌ Error setup handlers: {str(e)}")
+                self.logger.error(f"❌ Handler setup error: {str(e)}")
             
             return ui_components
     
+    def _setup_communicator_integration(self, ui_components: Dict[str, Any]):
+        """Setup communicator integration untuk UI components"""
+        try:
+            from smartcash.dataset.augmentor.communicator import create_communicator
+            
+            # Create communicator dengan UI components
+            communicator = create_communicator(ui_components)
+            ui_components['communicator'] = communicator
+            ui_components['communicator_ready'] = True
+            ui_components['communicator_setup'] = 'success'
+            
+            # Log success
+            if 'logger' in ui_components:
+                ui_components['logger'].info("🔗 Communicator integration berhasil")
+                
+        except ImportError:
+            ui_components['communicator_ready'] = False
+            ui_components['communicator_setup'] = 'failed'
+            if 'logger' in ui_components:
+                ui_components['logger'].warning("⚠️ Communicator tidak tersedia")
+    
     def _get_default_config(self) -> Dict[str, Any]:
-        """
-        Get default configuration untuk augmentation module.
-        
-        Returns:
-            Default configuration dictionary dengan nilai research-optimized
-        """
+        """Default config dengan research-optimized values"""
         return {
             'data_dir': 'data',
             'augmented_dir': 'data/augmented',
             'preprocessed_dir': 'data/preprocessed',
             
-            # Basic augmentation parameters dengan nilai moderat
+            # Research-optimized parameters
             'num_variations': 2,
             'target_count': 500,
             'output_prefix': 'aug',
             'balance_classes': False,
             
-            # Advanced parameters - research optimized dan tidak ekstrim
+            # Moderate augmentation parameters
             'fliplr': 0.5,
-            'degrees': 10,          # Reduced dari 15
-            'translate': 0.1,       # Reduced dari 0.15  
-            'scale': 0.1,           # Reduced dari 0.15
-            'hsv_h': 0.015,         # Reduced dari 0.025
+            'degrees': 10,
+            'translate': 0.1,
+            'scale': 0.1,
+            'hsv_h': 0.015,
             'hsv_s': 0.7,
-            'brightness': 0.2,      # Reduced dari 0.3
-            'contrast': 0.2,        # Reduced dari 0.3
+            'brightness': 0.2,
+            'contrast': 0.2,
             
-            # Pipeline research types
-            'augmentation_types': ['combined'],  # Default untuk penelitian
+            # Research pipeline configuration
+            'augmentation_types': ['combined'],
             'target_split': 'train',
-            'intensity': 0.7        # Moderate intensity
+            'intensity': 0.7
         }
     
     def _get_critical_components(self) -> List[str]:
-        """
-        Get list of critical component keys yang harus ada.
-        
-        Returns:
-            List of critical component keys
-        """
+        """Critical components untuk proper operation"""
         return [
-            'ui',                    # Main UI widget
-            'augment_button',        # Primary action button
-            'check_button',          # Check dataset button
-            'save_button',           # Save config button
-            'reset_button',          # Reset config button
-            
-            # Configuration widgets
-            'num_variations',        # Basic config
-            'target_count',
-            'output_prefix',
-            'balance_classes',
-            'augmentation_types',    # Aug types selector
-            'target_split',          # Split selector
-            
-            # Advanced parameter widgets
-            'fliplr', 'degrees', 'translate', 'scale',
-            'hsv_h', 'hsv_s', 'brightness', 'contrast',
-            
-            # Progress dan status components
-            'tracker',               # Progress tracker
-            'confirmation_area'      # Confirmation dialog area
+            'ui', 'augment_button', 'check_button', 'save_button', 'reset_button',
+            'num_variations', 'target_count', 'output_prefix', 'balance_classes',
+            'augmentation_types', 'target_split', 'tracker', 'confirmation_area',
+            'fliplr', 'degrees', 'translate', 'scale', 'hsv_h', 'hsv_s', 'brightness', 'contrast'
         ]
     
     def _additional_validation(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Additional validation untuk augmentation module.
-        
-        Args:
-            ui_components: UI components dictionary
-            
-        Returns:
-            Validation result dictionary
-        """
+        """Additional validation dengan communicator check"""
         # Validate button functionality
-        button_keys = ['augment_button', 'check_button', 'save_button', 'reset_button']
-        non_functional_buttons = []
-        
-        for button_key in button_keys:
-            button = ui_components.get(button_key)
-            if not button or not hasattr(button, 'on_click'):
-                non_functional_buttons.append(button_key)
+        non_functional_buttons = [key for key in ['augment_button', 'check_button', 'save_button', 'reset_button']
+                                 if not (button := ui_components.get(key)) or not hasattr(button, 'on_click')]
         
         if non_functional_buttons:
-            return {
-                'valid': False,
-                'message': f"Non-functional buttons: {', '.join(non_functional_buttons)}"
-            }
+            return {'valid': False, 'message': f"Non-functional buttons: {', '.join(non_functional_buttons)}"}
         
         # Validate widget values
-        widget_validations = [
+        validations = [
             ('num_variations', lambda w: getattr(w, 'value', 0) > 0, 'Jumlah variasi harus > 0'),
             ('target_count', lambda w: getattr(w, 'value', 0) > 0, 'Target count harus > 0'),
-            ('augmentation_types', lambda w: len(getattr(w, 'value', [])) > 0, 'Minimal 1 jenis augmentasi harus dipilih')
+            ('augmentation_types', lambda w: len(getattr(w, 'value', [])) > 0, 'Minimal 1 jenis augmentasi')
         ]
         
-        for widget_key, validator, error_msg in widget_validations:
-            widget = ui_components.get(widget_key)
-            if widget and not validator(widget):
-                return {
-                    'valid': False,
-                    'message': error_msg
-                }
+        for widget_key, validator, error_msg in validations:
+            if widget := ui_components.get(widget_key):
+                if not validator(widget):
+                    return {'valid': False, 'message': error_msg}
         
         return {'valid': True}
     
     def _handle_save_button(self, ui_components: Dict[str, Any], button) -> None:
-        """Override save button handler untuk augmentation-specific behavior."""
-        from .handlers.augmentation_handler import handle_save_config_button_click
+        """Fixed save button handler"""
+        from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import handle_save_config_button_click
         handle_save_config_button_click(ui_components, button)
     
     def _handle_reset_button(self, ui_components: Dict[str, Any], button) -> None:
-        """Override reset button handler untuk augmentation-specific behavior."""
-        from .handlers.augmentation_handler import handle_reset_config_button_click
+        """Fixed reset button handler"""
+        from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import handle_reset_config_button_click
         handle_reset_config_button_click(ui_components, button)
     
     def _update_cached_config(self, new_config: Dict[str, Any]) -> None:
-        """Update cached UI components dengan new config."""
+        """Update cached config dengan train split enforcement"""
         if not self._cached_components:
             return
             
@@ -202,13 +169,13 @@ class AugmentationInitializer(CommonInitializer):
             # Update basic config
             self._cached_components['config'].update(new_config)
             
-            # Apply config ke UI widgets jika ada config handler
-            from .handlers.config_handler import create_config_handler
+            # Apply to UI dengan config handler
+            from smartcash.ui.dataset.augmentation.handlers.config_handler import create_config_handler
             config_handler = create_config_handler(self._cached_components)
             
-            # Create full config structure
+            # Create full config dengan train enforcement
             full_config = {
-                'augmentation': new_config,
+                'augmentation': {**new_config, 'target_split': 'train'},
                 'data': {'dir': new_config.get('data_dir', 'data')},
                 'preprocessing': {'output_dir': new_config.get('preprocessed_dir', 'data/preprocessed')}
             }
@@ -219,47 +186,22 @@ class AugmentationInitializer(CommonInitializer):
             if self._cached_components and 'logger' in self._cached_components:
                 self._cached_components['logger'].warning(f"⚠️ Error updating cached config: {str(e)}")
 
-# Global instance untuk module-level access
+# Global instance management
 _augmentation_initializer = None
 
 def get_augmentation_initializer() -> AugmentationInitializer:
-    """Get singleton augmentation initializer."""
+    """Singleton augmentation initializer"""
     global _augmentation_initializer
     if _augmentation_initializer is None:
         _augmentation_initializer = AugmentationInitializer()
     return _augmentation_initializer
 
 def initialize_augmentation_ui(env=None, config=None, force_refresh=False, **kwargs):
-    """
-    Initialize augmentation UI dengan CommonInitializer pattern.
-    
-    Args:
-        env: Environment context
-        config: Custom configuration
-        force_refresh: Force refresh UI components
-        **kwargs: Additional parameters
-        
-    Returns:
-        UI widget atau error fallback
-    """
+    """Initialize augmentation UI dengan proper communicator setup"""
     initializer = get_augmentation_initializer()
     return initializer.initialize(env=env, config=config, force_refresh=force_refresh, **kwargs)
 
-# def reset_augmentation_module():
-#     """Reset augmentation module untuk debugging."""
-#     initializer = get_augmentation_initializer()
-#     initializer.reset_module()
-    
-# def get_augmentation_status() -> Dict[str, Any]:
-#     """Get status augmentation module untuk debugging."""
-#     initializer = get_augmentation_initializer()
-#     return initializer.get_module_status()
-
-# # Convenience functions untuk backward compatibility
-# create_augmentation_ui_safe = initialize_augmentation_ui
-# get_augmentation_ui_status = get_augmentation_status
-
-# # One-liner utilities
-# init_augmentation = lambda env=None, config=None: initialize_augmentation_ui(env, config)
-# reset_augmentation = lambda: reset_augmentation_module()
-# status_augmentation = lambda: get_augmentation_status()
+# One-liner utilities
+init_augmentation = lambda env=None, config=None: initialize_augmentation_ui(env, config)
+reset_augmentation = lambda: get_augmentation_initializer().reset_module()
+status_augmentation = lambda: get_augmentation_initializer().get_module_status()

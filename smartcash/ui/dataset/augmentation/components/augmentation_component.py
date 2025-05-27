@@ -124,7 +124,7 @@ def _create_orchestrator_section(title: str, content_widget, full_width: bool = 
     
     children = []
     if title:
-        children.append(widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>🎯 {ICONS['settings']} {title}</h5>"))
+        children.append(widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>{ICONS['settings']} {title}</h5>"))
     children.append(content_widget)
     
     width = '100%' if full_width else '48%'

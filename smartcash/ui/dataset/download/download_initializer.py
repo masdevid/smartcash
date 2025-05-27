@@ -19,7 +19,7 @@ class DownloadInitializer(CommonInitializer):
     """Fixed download initializer tanpa cache complexity"""
     
     def __init__(self):
-        super().__init__('dataset_download', DOWNLOAD_LOGGER_NAMESPACE)
+        super().__init__(MODULE_LOGGER_NAME, DOWNLOAD_LOGGER_NAMESPACE)
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Default configuration untuk download module"""

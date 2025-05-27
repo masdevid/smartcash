@@ -10,7 +10,6 @@ from IPython.display import display
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.dataset.visualization.components.main_layout import create_visualization_layout
-from smartcash.ui.dataset.visualization.handlers import setup_visualization_handlers, update_dashboard_cards
 
 logger = get_logger(__name__)
 
@@ -32,9 +31,6 @@ def setup_dataset_visualization() -> Dict[str, Any]:
         if 'main_container' in ui_components:
             display(ui_components['main_container'])
             logger.info(f"{ICONS.get('success', '✅')} UI visualisasi dataset berhasil ditampilkan")
-        
-        # Auto-refresh dashboard cards saat pertama kali dijalankan
-        update_dashboard_cards(ui_components)
         
         return ui_components
     

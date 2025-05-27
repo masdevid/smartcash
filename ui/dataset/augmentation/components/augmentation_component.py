@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_component.py
-Deskripsi: Fixed augmentation component dengan existing widgets integration dan one-liner style
+Deskripsi: Fixed augmentation component dengan proper communicator dan logger bridge setup
 """
 
 import ipywidgets as widgets
@@ -23,15 +23,15 @@ from . import form_fields
 # Import utilities
 from smartcash.ui.utils.layout_utils import create_responsive_container, create_section_header
 from smartcash.common.environment import get_environment_manager
-from smartcash.dataset.augmentor.communicator import create_communicator
+from smartcash.common.logger import get_logger
 
 def create_augmentation_ui(env=None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create augmentation UI dengan existing widgets integration dan one-liner style"""
+    """Create augmentation UI dengan proper communicator dan logger bridge setup"""
     
     # One-liner environment dan config setup
     env_manager, config = env or get_environment_manager(), config or {}
     
-    # One-liner UI components creation
+    # One-liner progress dan UI components creation
     progress_components = create_progress_tracking_container()
     status_panel = create_status_panel("Siap untuk augmentasi dataset", "info")
     
@@ -39,15 +39,10 @@ def create_augmentation_ui(env=None, config: Optional[Dict[str, Any]] = None) ->
     basic_options = create_basic_options_widget()
     advanced_options = create_advanced_options_widget()
     aug_types = create_augmentation_types_widget()
-    split_selector = create_split_selector()
     
-    # Form fields dengan config values
-    num_variations = form_fields.num_variations_field(config)
-    target_count = form_fields.target_count_field(config)
-    output_prefix = form_fields.output_prefix_field(config)
-    augmentation_types = form_fields.augmentation_types_field(config)
-    target_split = form_fields.split_target_field(config)
-    balance_classes = form_fields.balance_classes_field(config)
+    # Form fields dengan config values - one-liner creation
+    num_variations, target_count, output_prefix = form_fields.num_variations_field(config), form_fields.target_count_field(config), form_fields.output_prefix_field(config)
+    augmentation_types, target_split, balance_classes = form_fields.augmentation_types_field(config), form_fields.split_target_field(config), form_fields.balance_classes_field(config)
     
     # One-liner action buttons
     action_buttons = create_action_buttons(
@@ -62,7 +57,7 @@ def create_augmentation_ui(env=None, config: Optional[Dict[str, Any]] = None) ->
         sync_message="Konfigurasi disimpan ke Google Drive untuk persistensi."
     )
     
-    # One-liner widgets creation
+    # One-liner output widgets
     confirmation_area = widgets.Output(layout=widgets.Layout(width='100%'))
     log_output = widgets.Output(layout=widgets.Layout(max_height='250px', overflow='auto', border='1px solid #ddd', padding='8px', width='100%'))
     
@@ -92,22 +87,51 @@ def create_augmentation_ui(env=None, config: Optional[Dict[str, Any]] = None) ->
         widgets.Accordion([advanced_options['container']], layout=widgets.Layout(width='100%'))
     ])
     
-    # Set accordion title
-    config_section.children[-1].set_title(0, "🔧 Parameter Advanced")
-    config_section.children[-1].selected_index = None
+    # Set accordion title - one-liner
+    config_section.children[-1].set_title(0, "🔧 Parameter Advanced"); config_section.children[-1].selected_index = None
     
-    # One-liner UI components assembly
+    # One-liner UI components assembly dengan proper keys
     ui_components = {
-        **{k: v for k, v in locals().items() if k in ['status_panel', 'log_output', 'confirmation_area', 'num_variations', 'target_count', 'output_prefix', 'balance_classes', 'augmentation_types', 'target_split']},
-        **progress_components, **action_buttons, **save_reset_buttons, **basic_options['widgets'], **advanced_options['widgets'], **aug_types['widgets'],
-        'augment_button': action_buttons['download_button'], 'check_button': action_buttons['check_button'], 'cleanup_button': action_buttons.get('cleanup_button'),
-        'env_manager': env_manager, 'config': config, 'logger_namespace': 'smartcash.ui.dataset.augmentation'
+        # Core widgets
+        'status_panel': status_panel, 'log_output': log_output, 'confirmation_area': confirmation_area,
+        
+        # Form components
+        'num_variations': num_variations, 'target_count': target_count, 'output_prefix': output_prefix,
+        'balance_classes': balance_classes, 'augmentation_types': augmentation_types, 'target_split': target_split,
+        
+        # Merge all component dictionaries
+        **progress_components, **action_buttons, **save_reset_buttons, 
+        **basic_options['widgets'], **advanced_options['widgets'], **aug_types['widgets'],
+        
+        # Button aliases untuk handler consistency
+        'augment_button': action_buttons['download_button'],
+        'check_button': action_buttons['check_button'],
+        'cleanup_button': action_buttons.get('cleanup_button'),
+        
+        # Environment dan config
+        'env_manager': env_manager, 'config': config,
+        'logger_namespace': 'smartcash.ui.dataset.augmentation'
     }
     
-    # One-liner communicator creation
-    ui_components['comm'] = create_communicator(ui_components)
+    # One-liner logger bridge setup dengan proper error handling
+    try:
+        from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+        ui_components['logger'] = create_ui_logger_bridge(ui_components, ui_components['logger_namespace'])
+    except ImportError:
+        ui_components['logger'] = get_logger(ui_components['logger_namespace'])
     
-    # One-liner main UI layout
+    # One-liner communicator setup dengan proper integration
+    try:
+        from smartcash.dataset.augmentor.communicator import create_communicator
+        ui_components['comm'] = create_communicator(ui_components)
+    except ImportError:
+        ui_components['comm'] = None
+    
+    # One-liner aug_options creation untuk backward compatibility
+    aug_options_container = widgets.VBox([augmentation_types])
+    ui_components['aug_options'] = aug_options_container
+    
+    # One-liner main UI layout dengan responsive design
     ui_components['ui'] = create_responsive_container([
         create_section_header("🔄 Dataset Augmentation", "🔄"),
         status_panel, config_section,

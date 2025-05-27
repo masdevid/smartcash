@@ -24,9 +24,6 @@ def setup_dataset_visualization() -> Dict[str, Any]:
         # Buat komponen UI
         ui_components = create_visualization_layout()
         
-        # Setup handlers
-        ui_components = setup_visualization_handlers(ui_components)
-        
         # Tampilkan UI
         if 'main_container' in ui_components:
             display(ui_components['main_container'])

@@ -73,6 +73,11 @@ class AugmentationInitializer(CommonInitializer):
 # Global instance
 _aug_initializer = None
 
-get_aug_initializer = lambda: globals().setdefault('_aug_initializer', AugmentationInitializer())
+def get_aug_initializer():
+    global _aug_initializer
+    if _aug_initializer is None:
+        _aug_initializer = AugmentationInitializer()
+    return _aug_initializer
+
 init_augmentation = lambda env=None, config=None, force=False: get_aug_initializer().initialize(env=env, config=config, force_refresh=force)
 reset_augmentation = lambda: get_aug_initializer().reset_module()

@@ -34,7 +34,7 @@ def _create_augment_handler(ui_components: Dict[str, Any]):
     """Create augment handler dengan reset"""
     def handler(button):
         _reset_ui_state(ui_components)
-        from smartcash.ui.dataset.augmentation.handlers.operation_handler import execute_augmentation
+        from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_augmentation
         execute_augmentation(ui_components)
     return handler
 
@@ -42,7 +42,7 @@ def _create_check_handler(ui_components: Dict[str, Any]):
     """Create check handler dengan reset"""
     def handler(button):
         _reset_ui_state(ui_components)
-        from smartcash.ui.dataset.augmentation.handlers.operation_handler import execute_check
+        from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_check
         execute_check(ui_components)
     return handler
 

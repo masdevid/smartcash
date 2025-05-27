@@ -85,10 +85,8 @@ class ConfirmationHandler:
                     display(HTML(html))
                 return
             
-            # Fallback
-            print(message)
         except Exception:
-            print(message)
+            pass
 
 # Factory function
 def create_confirmation_handler(ui_components: Dict[str, Any]) -> ConfirmationHandler:

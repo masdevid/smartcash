@@ -12,7 +12,7 @@ def show_cleanup_confirmation(ui_components: Dict[str, Any]):
         from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
         
         def confirm_cleanup(button):
-            from .operation_handler import execute_cleanup
+            from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_cleanup
             execute_cleanup(ui_components)
         
         def cancel_cleanup(button):

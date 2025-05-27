@@ -106,12 +106,6 @@ def create_visualization_layout() -> Dict[str, Any]:
             'button': widgets.Button(description='Tampilkan Perbandingan Augmentasi', button_style='info'),
             'output': widgets.Output(layout=widgets.Layout(width='100%', min_height='400px'))
         }
-        
-        bbox_tab = {
-            'button': widgets.Button(description='Tampilkan Analisis Bounding Box', button_style='info'),
-            'output': widgets.Output(layout=widgets.Layout(width='100%', min_height='400px'))
-        }
-        
         # Buat tab content
         distribution_content = widgets.VBox([
             distribution_tab['button'],
@@ -138,10 +132,6 @@ def create_visualization_layout() -> Dict[str, Any]:
             augmentation_comparison_tab['output']
         ])
         
-        bbox_content = widgets.VBox([
-            bbox_tab['button'],
-            bbox_tab['output']
-        ])
         
         # Buat tabs
         tabs = create_tabs([
@@ -149,7 +139,6 @@ def create_visualization_layout() -> Dict[str, Any]:
             ('Distribusi Kelas', distribution_content),
             ('Distribusi Split', split_content),
             ('Distribusi Layer', layer_content),
-            ('Analisis Bounding Box', bbox_content),
             ('Sampel Preprocessing', preprocessing_samples_content),
             ('Perbandingan Augmentasi', augmentation_comparison_content)
         ])
@@ -180,7 +169,6 @@ def create_visualization_layout() -> Dict[str, Any]:
                 'layer_tab': layer_tab,
                 'preprocessing_samples_tab': preprocessing_samples_tab,
                 'augmentation_comparison_tab': augmentation_comparison_tab,
-                'bbox_tab': bbox_tab
             }
         }
         

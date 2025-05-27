@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/processors/batch_processor.py
-Deskripsi: Fixed batch processor dengan debug untuk zero processing issue
+Deskripsi: Streamlined batch processor dengan dataset_file_renamer integration untuk eliminasi duplikasi
 """
 
 import time
@@ -10,192 +10,171 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.common.logger import get_logger
 from smartcash.common.threadpools import get_optimal_thread_count
-from smartcash.dataset.preprocessor.processors.image_processor import ImageProcessor
+from smartcash.dataset.services.dataset_file_renamer import create_dataset_renamer
 
 
 class BatchProcessor:
-    """Fixed batch processor dengan debug logging untuk zero processing issue."""
+    """Streamlined batch processor dengan renamer integration - eliminasi duplikasi UUID logic."""
     
     def __init__(self, config: Dict[str, Any], logger=None):
-        """Initialize batch processor dengan threading optimization."""
         self.config = config
         self.logger = logger or get_logger()
         self._progress_callback: Optional[Callable] = None
-        
-        # Initialize image processor
-        self.image_processor = ImageProcessor(config, logger)
-        
-        # Threading configuration
-        self.max_workers = min(
-            config.get('preprocessing', {}).get('num_workers', 4),
-            get_optimal_thread_count()
-        )
+        # REUSE: Dataset renamer untuk batch operations
+        self.renamer = create_dataset_renamer(config)
+        self.max_workers = min(config.get('preprocessing', {}).get('num_workers', 4), get_optimal_thread_count())
         
     def register_progress_callback(self, callback: Callable) -> None:
-        """Register progress callback untuk batch updates."""
+        """Register callback dengan clean parameter handling"""
         self._progress_callback = callback
     
-    def process_image_batch(self, source_images_dir: Path, source_labels_dir: Path,
-                          target_images_dir: Path, target_labels_dir: Path,
-                          processing_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Fixed process batch dengan comprehensive debugging."""
+    def process_image_batch_with_renaming(self, source_images_dir: Path, source_labels_dir: Path,
+                                        target_images_dir: Path, target_labels_dir: Path,
+                                        processing_config: Dict[str, Any]) -> Dict[str, Any]:
+        """ENHANCED: Batch processing dengan pre-renaming untuk UUID consistency"""
         start_time = time.time()
         
         try:
-            # DEBUG: Log paths untuk validation
-            self.logger.info(f"🔍 Source images: {source_images_dir} (exists: {source_images_dir.exists()})")
-            self.logger.info(f"🔍 Source labels: {source_labels_dir} (exists: {source_labels_dir.exists()})")
-            self.logger.info(f"🔍 Target images: {target_images_dir}")
-            self.logger.info(f"🔍 Target labels: {target_labels_dir}")
+            # Phase 1: Pre-rename untuk UUID consistency (0-20%)
+            self._notify_batch_progress(10, "Pre-renaming files untuk UUID consistency")
+            rename_result = self._pre_rename_source_files(source_images_dir.parent)
             
-            # Get image files untuk processing
+            if not rename_result['success']:
+                self.logger.warning(f"⚠️ Pre-rename warning: {rename_result['message']}")
+            
+            # Phase 2: Process batch dengan UUID consistent files (20-100%) 
+            return self._process_batch_with_uuid_consistency(
+                source_images_dir, source_labels_dir, target_images_dir, 
+                target_labels_dir, processing_config, start_time
+            )
+            
+        except Exception as e:
+            return {'success': False, 'message': f'Batch processing error: {str(e)}', 'processed': 0}
+    
+    def _pre_rename_source_files(self, source_dir: Path) -> Dict[str, Any]:
+        """Pre-rename source files untuk UUID consistency - reuse renamer"""
+        try:
+            # Check if files already UUID consistent
+            preview = self.renamer.get_rename_preview(str(source_dir), limit=5)
+            if preview['status'] == 'success' and preview['total_files'] == 0:
+                return {'success': True, 'message': 'Files already UUID consistent', 'renamed': 0}
+            
+            # Execute rename jika diperlukan
+            rename_result = self.renamer.batch_rename_dataset(
+                str(source_dir), backup=False,
+                progress_callback=lambda p, m: self._notify_batch_progress(p // 5, f"Renaming: {m}")
+            )
+            
+            return {
+                'success': rename_result.get('status') == 'success',
+                'message': rename_result.get('message', 'Rename completed'),
+                'renamed': rename_result.get('renamed_files', 0)
+            }
+            
+        except Exception as e:
+            return {'success': False, 'message': f'Pre-rename error: {str(e)}'}
+    
+    def _process_batch_with_uuid_consistency(self, source_images_dir: Path, source_labels_dir: Path,
+                                           target_images_dir: Path, target_labels_dir: Path,
+                                           processing_config: Dict[str, Any], start_time: float) -> Dict[str, Any]:
+        """Process batch dengan UUID consistency - streamlined"""
+        try:
             image_files = self._get_image_files(source_images_dir)
             if not image_files:
-                self.logger.warning(f"⚠️ No image files found in {source_images_dir}")
-                return {'success': True, 'processed': 0, 'skipped': 0, 'failed': 0, 'message': 'No images found'}
+                return {'success': True, 'processed': 0, 'skipped': 0, 'failed': 0, 'message': 'No images'}
             
             total_images = len(image_files)
-            self.logger.info(f"📊 Found {total_images} image files to process")
-            self._notify_batch_progress(0, f"Starting batch processing: {total_images} images")
+            self._notify_batch_progress(25, f"Processing {total_images} UUID consistent files")
             
-            # DEBUG: Check existing files untuk force_reprocess logic
-            force_reprocess = processing_config.get('force_reprocess', False)
-            self.logger.info(f"🔄 Force reprocess: {force_reprocess}")
-            
-            # Create batches untuk optimized processing
-            batches = self._create_processing_batches(image_files, batch_size=50)
-            self.logger.info(f"📦 Created {len(batches)} batches for processing")
+            # Process dengan ThreadPoolExecutor
+            batches = self._create_processing_batches(image_files, 50)
             batch_results = []
             
-            # Process batches dengan parallel execution
             with ThreadPoolExecutor(max_workers=self.max_workers, thread_name_prefix="BatchProc") as executor:
-                # Submit batch processing tasks
-                future_to_batch = {}
-                for i, batch in enumerate(batches):
-                    self.logger.debug(f"📤 Submitting batch {i+1}/{len(batches)} with {len(batch)} images")
-                    future = executor.submit(
-                        self._process_single_batch,
-                        batch, i, len(batches), source_labels_dir, 
-                        target_images_dir, target_labels_dir, processing_config
-                    )
-                    future_to_batch[future] = i
+                future_to_batch = {
+                    executor.submit(self._process_single_batch_uuid_aware, batch, i, len(batches), 
+                                  source_labels_dir, target_images_dir, target_labels_dir, processing_config): i
+                    for i, batch in enumerate(batches)
+                }
                 
-                # Collect results as completed
-                completed_batches = 0
+                completed = 0
                 for future in as_completed(future_to_batch):
-                    batch_index = future_to_batch[future]
+                    result = future.result()
+                    batch_results.append(result)
+                    completed += 1
                     
-                    try:
-                        batch_result = future.result()
-                        batch_results.append(batch_result)
-                        completed_batches += 1
-                        
-                        # DEBUG: Log batch results
-                        self.logger.info(f"✅ Batch {completed_batches}/{len(batches)} completed: {batch_result}")
-                        
-                        # Update progress
-                        progress = int((completed_batches / len(batches)) * 100)
-                        processed_count = sum(r.get('processed', 0) for r in batch_results)
-                        
-                        self._notify_batch_progress(
-                            progress, 
-                            f"Batch {completed_batches}/{len(batches)}: {processed_count}/{total_images} images processed"
-                        )
-                        
-                    except Exception as e:
-                        self.logger.error(f"❌ Batch {batch_index} error: {str(e)}")
-                        batch_results.append({'processed': 0, 'skipped': 0, 'failed': len(batches[batch_index])})
+                    progress = 25 + int((completed / len(batches)) * 70)
+                    processed_count = sum(r.get('processed', 0) for r in batch_results)
+                    self._notify_batch_progress(progress, f"Batch {completed}/{len(batches)}: {processed_count} processed")
             
-            # Aggregate final results
+            # Aggregate results
             final_result = self._aggregate_batch_results(batch_results, time.time() - start_time)
-            
-            # DEBUG: Log final aggregated results
-            self.logger.info(f"📊 Final batch results: {final_result}")
-            
-            self.logger.success(
-                f"✅ Batch processing selesai: {final_result['processed']}/{total_images} images, "
-                f"{final_result['processing_time']:.1f}s"
-            )
+            self.logger.success(f"✅ Batch processing: {final_result['processed']}/{total_images} in {final_result['processing_time']:.1f}s")
             
             return final_result
             
         except Exception as e:
-            error_msg = f"Batch processing error: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            return {'success': False, 'message': error_msg, 'processed': 0, 'failed': 1}
+            return {'success': False, 'message': f'UUID batch processing error: {str(e)}', 'processed': 0}
+    
+    def _process_single_batch_uuid_aware(self, batch: List[Path], batch_index: int, total_batches: int,
+                                       source_labels_dir: Path, target_images_dir: Path, 
+                                       target_labels_dir: Path, processing_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Process single batch dengan UUID awareness - streamlined"""
+        batch_stats = {'processed': 0, 'skipped': 0, 'failed': 0}
+        
+        # REUSE: Import image processor di sini untuk avoid circular import
+        from smartcash.dataset.preprocessor.processors.image_processor import ImageProcessor
+        processor = ImageProcessor(self.config, self.logger)
+        
+        for image_path in batch[:3] + batch[-2:] if len(batch) > 10 else batch:  # Anti-flood sampling
+            try:
+                result = processor.process_single_image(
+                    image_path, source_labels_dir, target_images_dir, target_labels_dir, processing_config
+                )
+                
+                if result['success']:
+                    batch_stats['processed' if result.get('status') == 'processed' else 'skipped'] += 1
+                else:
+                    batch_stats['failed'] += 1
+                    
+            except Exception:
+                batch_stats['failed'] += 1
+        
+        # Process remaining files tanpa logging untuk avoid flood
+        for image_path in (batch[3:-2] if len(batch) > 10 else []):
+            try:
+                result = processor.process_single_image(
+                    image_path, source_labels_dir, target_images_dir, target_labels_dir, processing_config
+                )
+                if result['success']:
+                    batch_stats['processed' if result.get('status') == 'processed' else 'skipped'] += 1
+                else:
+                    batch_stats['failed'] += 1
+            except Exception:
+                batch_stats['failed'] += 1
+        
+        return batch_stats
     
     def _get_image_files(self, images_dir: Path) -> List[Path]:
-        """Get list image files dari directory dengan debug logging."""
-        if not images_dir.exists():
-            self.logger.warning(f"⚠️ Images directory does not exist: {images_dir}")
-            return []
+        """Get image files dengan UUID awareness check"""
+        if not images_dir.exists(): return []
         
-        image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp']
+        image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
         image_files = [f for f in images_dir.glob('*.*') if f.suffix.lower() in image_extensions]
         
-        self.logger.debug(f"🔍 Scanning {images_dir}: found {len(image_files)} image files")
-        if len(image_files) == 0:
-            # DEBUG: List all files untuk diagnosis
-            all_files = list(images_dir.glob('*.*'))
-            self.logger.debug(f"🔍 All files in directory: {[f.name for f in all_files[:10]]}")
+        # Log UUID consistency status
+        uuid_consistent = sum(1 for f in image_files[:10] if self.renamer.naming_manager.parse_existing_filename(f.name))
+        if uuid_consistent > 0:
+            self.logger.debug(f"🔍 UUID consistency: {uuid_consistent}/10 sample files")
         
         return image_files
     
     def _create_processing_batches(self, image_files: List[Path], batch_size: int = 50) -> List[List[Path]]:
-        """Create batches untuk optimized parallel processing."""
-        batches = []
-        for i in range(0, len(image_files), batch_size):
-            batch = image_files[i:i + batch_size]
-            batches.append(batch)
-        
-        return batches
+        """Create batches - one-liner"""
+        return [image_files[i:i + batch_size] for i in range(0, len(image_files), batch_size)]
     
-    def _process_single_batch(self, batch: List[Path], batch_index: int, total_batches: int,
-                            source_labels_dir: Path, target_images_dir: Path, 
-                            target_labels_dir: Path, processing_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Fixed process single batch dengan detailed logging."""
-        batch_stats = {'processed': 0, 'skipped': 0, 'failed': 0}
-        
-        self.logger.debug(f"🔧 Processing batch {batch_index+1}/{total_batches} with {len(batch)} images")
-        
-        # FIXED: Anti-flood debug - log sample files only
-        sample_logging = len(batch) > 10
-        
-        for i, image_path in enumerate(batch):
-            try:
-                # Process single image menggunakan image processor
-                result = self.image_processor.process_single_image(
-                    image_path, source_labels_dir, target_images_dir, 
-                    target_labels_dir, processing_config
-                )
-                
-                # Anti-flood: Log only first/last few samples
-                if not sample_logging or i < 3 or i >= len(batch) - 2:
-                    self.logger.debug(f"🖼️ Image {image_path.name}: {result.get('status', 'failed')}")
-                
-                if result['success']:
-                    if result.get('status') == 'processed':
-                        batch_stats['processed'] += 1
-                    else:
-                        batch_stats['skipped'] += 1
-                else:
-                    batch_stats['failed'] += 1
-                    # Only log failures untuk important debugging
-                    if not sample_logging or batch_stats['failed'] <= 5:
-                        self.logger.warning(f"⚠️ Failed {image_path.name}: {result.get('message')}")
-                    
-            except Exception as e:
-                batch_stats['failed'] += 1
-                # Only log first few errors untuk prevent flood
-                if batch_stats['failed'] <= 5:
-                    self.logger.error(f"💥 Error {image_path.name}: {str(e)}")
-        
-        self.logger.info(f"📊 Batch {batch_index+1} stats: {batch_stats}")
-        return batch_stats
-    
-    def _aggregate_batch_results(self, batch_results: List[Dict[str, Any]], 
-                               processing_time: float) -> Dict[str, Any]:
-        """Aggregate results dari semua batches."""
+    def _aggregate_batch_results(self, batch_results: List[Dict[str, Any]], processing_time: float) -> Dict[str, Any]:
+        """Aggregate results - streamlined"""
         aggregated = {
             'success': True,
             'processed': sum(r.get('processed', 0) for r in batch_results),
@@ -205,35 +184,34 @@ class BatchProcessor:
             'processing_time': processing_time
         }
         
-        # Calculate success rate
-        total_attempted = aggregated['processed'] + aggregated['skipped'] + aggregated['failed']
-        if total_attempted > 0:
-            aggregated['success_rate'] = (aggregated['processed'] / total_attempted) * 100
-        else:
-            aggregated['success_rate'] = 0
+        total = aggregated['processed'] + aggregated['skipped'] + aggregated['failed']
+        aggregated['success_rate'] = (aggregated['processed'] / total) * 100 if total > 0 else 0
         
         return aggregated
     
     def get_batch_status(self) -> Dict[str, Any]:
-        """Dapatkan status batch processor."""
+        """Enhanced status dengan renamer integration"""
         return {
-            'processor_ready': True,
-            'max_workers': self.max_workers,
-            'image_processor_ready': self.image_processor is not None,
+            'processor_ready': True, 'max_workers': self.max_workers,
+            'renamer_integrated': self.renamer is not None,
+            'uuid_registry_size': len(self.renamer.naming_manager.uuid_registry),
             'progress_callback_registered': self._progress_callback is not None
         }
     
     def cleanup_batch_state(self) -> None:
-        """Cleanup batch processor state."""
-        self.image_processor.cleanup_processor_state()
+        """Cleanup state"""
         self._progress_callback = None
-        self.logger.debug("🧹 Batch processor state cleaned up")
+        self.logger.debug("🧹 Batch processor state cleaned")
     
     def _notify_batch_progress(self, progress: int, message: str, **kwargs):
-        """Internal progress notification untuk batch processing."""
+        """Progress notification - clean parameter handling"""
         if self._progress_callback:
             try:
-                # FIXED: Call dengan positional args untuk avoid keyword conflicts
                 self._progress_callback(progress, message)
             except Exception as e:
-                self.logger.debug(f"🔧 Batch progress callback error: {str(e)}")
+                self.logger.debug(f"🔧 Batch progress error: {str(e)}")
+
+
+# REUSE: Factory dan one-liner utilities
+create_batch_processor = lambda config: BatchProcessor(config)
+process_batch_with_renaming = lambda src_imgs, src_labels, tgt_imgs, tgt_labels, config: create_batch_processor(config).process_image_batch_with_renaming(Path(src_imgs), Path(src_labels), Path(tgt_imgs), Path(tgt_labels), config)

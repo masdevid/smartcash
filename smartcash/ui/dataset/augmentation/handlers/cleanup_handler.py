@@ -1,22 +1,22 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/cleanup_handler.py
-Deskripsi: Handler untuk cleanup confirmation dan execution
+Deskripsi: Cleanup handler dengan unified logging dan simple fallback
 """
 
 from typing import Dict, Any
 from IPython.display import display
+from smartcash.ui.dataset.augmentation.utils.ui_logger_utils import log_to_ui, show_progress_safe, complete_progress_safe, error_progress_safe
 
 def show_cleanup_confirmation(ui_components: Dict[str, Any]):
-    """Show cleanup confirmation dialog"""
+    """Show cleanup confirmation dengan simple fallback"""
     try:
         from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
         
         def confirm_cleanup(button):
-            from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_cleanup
-            execute_cleanup(ui_components)
+            _execute_simple_cleanup(ui_components)
         
         def cancel_cleanup(button):
-            _log_to_ui(ui_components, "❌ Cleanup dibatalkan", 'info')
+            log_to_ui(ui_components, "Cleanup dibatalkan", 'info', "❌ ")
         
         dialog = create_confirmation_dialog(
             title="Konfirmasi Cleanup Dataset",
@@ -26,7 +26,6 @@ def show_cleanup_confirmation(ui_components: Dict[str, Any]):
             danger_mode=True
         )
         
-        # Show dalam confirmation area
         confirmation_area = ui_components.get('confirmation_area')
         if confirmation_area and hasattr(confirmation_area, 'clear_output'):
             confirmation_area.clear_output()
@@ -36,10 +35,27 @@ def show_cleanup_confirmation(ui_components: Dict[str, Any]):
             display(dialog)
             
     except ImportError:
-        _log_to_ui(ui_components, "❌ Cannot show confirmation dialog", 'error')
+        log_to_ui(ui_components, "Cannot show confirmation dialog", 'error', "❌ ")
 
-def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Log message ke UI"""
-    logger = ui_components.get('logger')
-    if logger and hasattr(logger, level):
-        getattr(logger, level)(message)
+def _execute_simple_cleanup(ui_components: Dict[str, Any]):
+    """Execute simple cleanup dengan fallback operations"""
+    try:
+        show_progress_safe(ui_components, 'cleanup')
+        
+        from smartcash.dataset.augmentor.service import create_service_from_ui
+        
+        service = create_service_from_ui(ui_components)
+        result = service.cleanup_augmented_data(include_preprocessed=True)
+        
+        if result.get('status') == 'success':
+            total_deleted = result.get('total_deleted', 0)
+            log_to_ui(ui_components, f"Cleanup berhasil: {total_deleted} file dihapus", 'success', "✅ ")
+            complete_progress_safe(ui_components, f"Cleanup selesai: {total_deleted} files")
+        else:
+            log_to_ui(ui_components, f"Cleanup gagal: {result.get('message', 'Unknown error')}", 'error', "❌ ")
+            error_progress_safe(ui_components, "Cleanup failed")
+        
+    except Exception as e:
+        error_msg = f"Cleanup error: {str(e)}"
+        log_to_ui(ui_components, error_msg, 'error', "❌ ")
+        error_progress_safe(ui_components, error_msg)

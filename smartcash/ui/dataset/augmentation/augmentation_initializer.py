@@ -1,21 +1,22 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Fixed initializer tanpa cache complexity dengan parameter alignment
+Deskripsi: Initializer yang sudah diperbaharui dengan reuse orchestrator dan SRP modules
 """
 
 from typing import Dict, Any, List
 from smartcash.ui.utils.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger_namespace import AUGMENTATION_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[AUGMENTATION_LOGGER_NAMESPACE]
 
 class AugmentationInitializer(CommonInitializer):
-    """Fixed initializer tanpa cache complexity"""
+    """Initializer dengan orchestrator reuse dan consolidated functionality"""
     
     def __init__(self):
         super().__init__(MODULE_LOGGER_NAME, AUGMENTATION_LOGGER_NAMESPACE)
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan aligned parameters"""
+        """Create UI components dengan full reuse dari existing components"""
         from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
         
         ui_components = create_augmentation_ui(env=env, config=config)
@@ -28,11 +29,11 @@ class AugmentationInitializer(CommonInitializer):
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers tanpa cache management"""
+        """Setup handlers dengan orchestrator integration"""
         try:
             from smartcash.ui.dataset.augmentation.handlers.main_handler import register_all_handlers
             
-            # Clear existing handlers
+            # Clear existing handlers untuk avoid duplication
             button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
             for key in button_keys:
                 button = ui_components.get(key)
@@ -42,10 +43,11 @@ class AugmentationInitializer(CommonInitializer):
                     except Exception:
                         pass
             
+            # Register handlers dengan orchestrator integration
             ui_components = register_all_handlers(ui_components)
             
             if 'logger' in ui_components:
-                ui_components['logger'].info(f"✅ Handlers registered: {ui_components.get('handlers_registered', 0)} total")
+                ui_components['logger'].info(f"✅ Handlers registered dengan orchestrator integration")
             
             return ui_components
             
@@ -55,7 +57,7 @@ class AugmentationInitializer(CommonInitializer):
             return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default config dengan aligned parameters"""
+        """Default config dengan aligned parameters untuk orchestrator"""
         return {
             'data': {'dir': 'data'},
             'augmentation': {
@@ -69,37 +71,17 @@ class AugmentationInitializer(CommonInitializer):
         }
     
     def _get_critical_components(self) -> List[str]:
-        """Critical components dengan aligned names"""
+        """Critical components untuk orchestrator integration"""
         return [
             'ui', 'augment_button', 'check_button', 'save_button', 'reset_button',
             'num_variations', 'target_count', 'augmentation_types', 'target_split',
             'tracker', 'log_output'
         ]
-    
-    def _setup_log_suppression(self) -> None:
-        """Enhanced log suppression untuk augmentation"""
-        super()._setup_log_suppression()
-        
-        augmentor_loggers = [
-            'smartcash.dataset.augmentor', 'smartcash.dataset.augmentor.core',
-            'smartcash.dataset.augmentor.utils', 'smartcash.dataset.augmentor.strategies',
-            'smartcash.dataset.augmentor.communicator', 'albumentations', 'cv2'
-        ]
-        
-        import logging
-        for logger_name in augmentor_loggers:
-            try:
-                logger = logging.getLogger(logger_name)
-                logger.setLevel(logging.CRITICAL)
-                logger.propagate = False
-            except Exception:
-                pass
 
-
-# Global instance - simplified
+# Global instance dengan orchestrator integration
 _aug_initializer = AugmentationInitializer()
 
-# Public API - no cache
+# Public API dengan orchestrator reuse
 init_augmentation = lambda env=None, config=None, force=False: _aug_initializer.initialize(env=env, config=config)
-reset_augmentation = lambda: print("🔄 Augmentation module reset")  # Simple reset
+reset_augmentation = lambda: print("🔄 Augmentation module reset dengan orchestrator cleanup")
 get_aug_status = lambda: _aug_initializer.get_module_status()

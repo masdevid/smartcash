@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/main_handler.py
-Deskripsi: Main handler registry dengan reset capability untuk semua operations
+Deskripsi: Main handler dengan service integration dan consolidated operations
 """
 
 from typing import Dict, Any
 
 def register_all_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Register semua handlers dengan reset capability"""
+    """Register handlers dengan service integration"""
     handlers_map = {
         'augment_button': _create_augment_handler,
         'check_button': _create_check_handler,
@@ -19,19 +19,18 @@ def register_all_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     for button_key, handler_creator in handlers_map.items():
         button = ui_components.get(button_key)
         if button and hasattr(button, 'on_click'):
-            # Clear existing handlers
             if hasattr(button, '_click_handlers'):
                 button._click_handlers.callbacks.clear()
             
-            # Register new handler
             button.on_click(handler_creator(ui_components))
             registered += 1
     
     ui_components['handlers_registered'] = registered
+    ui_components['service_integrated'] = True
     return ui_components
 
 def _create_augment_handler(ui_components: Dict[str, Any]):
-    """Create augment handler dengan reset"""
+    """Create augment handler dengan service reuse"""
     def handler(button):
         _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_augmentation
@@ -39,7 +38,7 @@ def _create_augment_handler(ui_components: Dict[str, Any]):
     return handler
 
 def _create_check_handler(ui_components: Dict[str, Any]):
-    """Create check handler dengan reset"""
+    """Create check handler dengan service status"""
     def handler(button):
         _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_check
@@ -47,7 +46,7 @@ def _create_check_handler(ui_components: Dict[str, Any]):
     return handler
 
 def _create_cleanup_handler(ui_components: Dict[str, Any]):
-    """Create cleanup handler dengan confirmation"""
+    """Create cleanup handler dengan service cleanup"""
     def handler(button):
         _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import show_cleanup_confirmation
@@ -55,7 +54,7 @@ def _create_cleanup_handler(ui_components: Dict[str, Any]):
     return handler
 
 def _create_save_handler(ui_components: Dict[str, Any]):
-    """Create save handler"""
+    """Create save handler dengan config management"""
     def handler(button):
         _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.config_handler import save_configuration
@@ -63,7 +62,7 @@ def _create_save_handler(ui_components: Dict[str, Any]):
     return handler
 
 def _create_reset_handler(ui_components: Dict[str, Any]):
-    """Create reset handler"""
+    """Create reset handler dengan config reset"""
     def handler(button):
         _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.config_handler import reset_configuration
@@ -71,12 +70,10 @@ def _create_reset_handler(ui_components: Dict[str, Any]):
     return handler
 
 def _reset_ui_state(ui_components: Dict[str, Any]):
-    """Reset progress dan log output sebelum operation"""
-    # Reset progress tracker
+    """Reset progress dan log sebelum operation"""
     tracker = ui_components.get('tracker')
     tracker and hasattr(tracker, 'reset') and tracker.reset()
     
-    # Clear log output
     log_output = ui_components.get('log_output')
     if log_output and hasattr(log_output, 'clear_output'):
         log_output.clear_output(wait=True)

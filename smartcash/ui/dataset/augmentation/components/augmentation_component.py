@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_component.py
-Deskripsi: Pure UI component tanpa logika bisnis, hanya widget assembly
+Deskripsi: UI component dengan orchestrator integration dan reuse existing components
 """
 
 import ipywidgets as widgets
@@ -8,12 +8,12 @@ from typing import Dict, Any
 
 def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Pure UI assembly tanpa logika bisnis.
+    UI assembly dengan orchestrator integration dan component reuse.
     
     Returns:
-        Dictionary berisi widget UI yang sudah terassembly
+        Dictionary berisi widget UI dengan orchestrator support
     """
-    # Import pure UI components
+    # Import reused components
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
@@ -26,52 +26,56 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.basic_options_widget import create_basic_options_widget
     from smartcash.ui.dataset.augmentation.components.advanced_options_widget import create_advanced_options_widget
     from smartcash.ui.dataset.augmentation.components.augmentation_types_widget import create_augmentation_types_widget
+    
+    from smartcash.ui.utils.ui_logger_namespace import AUGMENTATION_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 
-    # Header
-    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
-                          "Augmentasi dataset untuk meningkatkan performa model SmartCash")
+    MODULE_LOGGER_NAME = KNOWN_NAMESPACES[AUGMENTATION_LOGGER_NAMESPACE]
+    
+    # Header dengan orchestrator context
+    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation (Orchestrator)", 
+                          "Augmentasi dataset dengan orchestrator integration untuk performa optimal")
 
-    # Status panel
-    status_panel = create_status_panel("✅ Augmentation UI siap digunakan", "success")
+    # Status panel dengan orchestrator info
+    status_panel = create_status_panel("✅ Orchestrator UI siap digunakan", "success")
 
-    # Widget groups
+    # Widget groups dengan orchestrator support
     basic_options = create_basic_options_widget()
     advanced_options = create_advanced_options_widget()
     augmentation_types = create_augmentation_types_widget()
 
-    # Control buttons
+    # Control buttons dengan orchestrator integration
     config_buttons = create_save_reset_buttons(
-        save_label="Simpan", reset_label="Reset",
-        save_tooltip="Simpan konfigurasi augmentasi",
-        reset_tooltip="Reset ke konfigurasi default",
-        with_sync_info=True, button_width="110px"
+        save_label="Simpan Config", reset_label="Reset Config",
+        save_tooltip="Simpan konfigurasi orchestrator",
+        reset_tooltip="Reset ke konfigurasi orchestrator default",
+        with_sync_info=True, button_width="120px"
     )
 
     action_buttons = create_action_buttons(
-        primary_label="🚀 Run Augmentation", primary_icon="action",
+        primary_label="🎯 Run Orchestrator Pipeline", primary_icon="action",
         secondary_buttons=[
-            ("🔍 Check Dataset", "search", "info"),
-            ("🧹 Cleanup Dataset", "cleanup", "warning")
+            ("🔍 Check Orchestrator Status", "search", "info"),
+            ("🧹 Cleanup Orchestrator Data", "cleanup", "warning")
         ],
-        cleanup_enabled=True, button_width="160px"
+        cleanup_enabled=True, button_width="200px"
     )
 
-    # Output areas
+    # Output areas dengan orchestrator support
     confirmation_area = widgets.Output(layout=widgets.Layout(
         width='100%', margin='8px 0', overflow='hidden'
     ))
     
     progress_components = create_progress_tracking_container()
-    log_components = create_log_accordion('augmentation', '180px')
+    log_components = create_log_accordion('orchestrator', '200px')
     help_panel = get_augmentation_info()
 
-    # Layout assembly
+    # Layout assembly dengan orchestrator optimization
     settings_row1 = widgets.HBox([
-        _create_settings_section("Opsi Dasar", basic_options['container']),
-        _create_settings_section("Opsi Lanjutan", advanced_options['container'])
+        _create_orchestrator_section("Opsi Dasar", basic_options['container']),
+        _create_orchestrator_section("Opsi Lanjutan", advanced_options['container'])
     ], layout=widgets.Layout(width='100%', justify_content='flex-start'))
 
-    settings_row2 = _create_settings_section(None, augmentation_types['container'], full_width=True)
+    settings_row2 = _create_orchestrator_section(None, augmentation_types['container'], full_width=True)
     
     config_container = widgets.Box([config_buttons['container']], 
         layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0'))
@@ -80,46 +84,47 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         settings_row1, settings_row2, config_container
     ], layout=widgets.Layout(width='100%', overflow='hidden'))
 
-    # Main UI assembly
+    # Main UI assembly dengan orchestrator integration
     ui = widgets.VBox([
         header, status_panel, settings_container, create_divider(),
         action_buttons['container'], confirmation_area,
         progress_components['container'], log_components['log_accordion'], help_panel
     ], layout=widgets.Layout(width='100%', overflow='hidden'))
 
-    # Component mapping (pure widget references)
+    # Component mapping dengan orchestrator integration
     return {
         'ui': ui, 'header': header, 'status_panel': status_panel,
         'settings_container': settings_container, 'confirmation_area': confirmation_area,
         
-        # Widget mappings
+        # Widget mappings dengan orchestrator support
         **basic_options['widgets'], **advanced_options['widgets'], **augmentation_types['widgets'],
         
-        # Button mappings
+        # Button mappings dengan orchestrator context
         'augment_button': action_buttons['download_button'],
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
         'save_button': config_buttons['save_button'],
         'reset_button': config_buttons['reset_button'],
         
-        # Progress dan log
+        # Progress dan log dengan orchestrator integration
         **progress_components, 'log_output': log_components['log_output'],
         'log_accordion': log_components['log_accordion'],
         'status': log_components['log_output'],  # Compatibility
         
-        # Basic metadata
-        'module_name': 'augmentation',
-        'logger_namespace': 'smartcash.ui.dataset.augmentation',
+        # Orchestrator metadata
+        'module_name': MODULE_LOGGER_NAME,
+        'logger_namespace': AUGMENTATION_LOGGER_NAMESPACE,
+        'orchestrator_integrated': True,
         'env': env, 'config': config or {}
     }
 
-def _create_settings_section(title: str, content_widget, full_width: bool = False):
-    """Create settings section wrapper"""
+def _create_orchestrator_section(title: str, content_widget, full_width: bool = False):
+    """Create settings section dengan orchestrator styling"""
     from smartcash.ui.utils.constants import COLORS, ICONS
     
     children = []
     if title:
-        children.append(widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>{ICONS['settings']} {title}</h5>"))
+        children.append(widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>🎯 {ICONS['settings']} {title}</h5>"))
     children.append(content_widget)
     
     width = '100%' if full_width else '48%'
@@ -127,5 +132,6 @@ def _create_settings_section(title: str, content_widget, full_width: bool = Fals
     
     return widgets.VBox(children, layout=widgets.Layout(
         width=width, padding='6px', margin=margin,
-        border='1px solid #e0e0e0', border_radius='4px'
+        border='1px solid #e0e0e0', border_radius='4px',
+        background_color='rgba(248, 249, 250, 0.8)'  # Orchestrator background
     ))

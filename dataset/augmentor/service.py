@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List
 from collections import defaultdict
 
-from .utils.core import create_context, process_batch, ensure_dirs, read_image, save_image, read_yolo_labels, save_yolo_labels, get_stem, safe_execute, safe_copy_file, find_aug_files, count_dataset_files
-from .core.pipeline import PipelineFactory
-from .communicator import create_communicator
+from smartcash.dataset.augmentor.utils.core import create_context, process_batch, ensure_dirs, read_image, save_image, read_yolo_labels, save_yolo_labels, get_stem, safe_copy_file, find_aug_files, count_dataset_files
+from smartcash.dataset.augmentor.core.pipeline import PipelineFactory
+from smartcash.dataset.augmentor.communicator import create_communicator
 
 class AugmentationService:
     """Fixed service dengan aggressive log suppression dan parameter alignment"""
@@ -338,7 +338,7 @@ class AugmentationService:
 # Factory functions dengan parameter alignment
 def create_service_from_ui(ui_components: Dict[str, Any]) -> AugmentationService:
     """Create service dari UI components dengan aligned parameters"""
-    from .config import extract_ui_config
+    from smartcash.dataset.augmentor.config import extract_ui_config
     config = extract_ui_config(ui_components)
     return AugmentationService(config, ui_components)
 

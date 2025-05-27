@@ -24,6 +24,7 @@ def save_configuration(ui_components: Dict[str, Any]):
         if success:
             # Update cache dengan new config
             _update_component_cache(ui_components, config)
+            
             _log_to_ui(ui_components, '✅ Konfigurasi berhasil disimpan dan cache diperbarui', 'success')
         else:
             _log_to_ui(ui_components, '❌ Gagal menyimpan konfigurasi', 'error')
@@ -35,7 +36,7 @@ def reset_configuration(ui_components: Dict[str, Any]):
     """Reset configuration dengan aligned parameters dan cache invalidation"""
     try:
         # Get default config dengan research-friendly parameters
-        default_config = _get_research_friendly_default_config()
+        default_config = _get_default_config()
         
         # Apply config ke UI widgets
         _apply_aligned_config_to_ui(ui_components, default_config)
@@ -185,7 +186,7 @@ def _validate_config_parameters(config: Dict[str, Any]) -> bool:
     except Exception:
         return False
 
-def _get_research_friendly_default_config() -> Dict[str, Any]:
+def _get_default_config() -> Dict[str, Any]:
     """Default config dengan research-friendly parameters"""
     return {
         'data': {'dir': 'data'},

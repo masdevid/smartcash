@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Fixed UI components dengan unlimited height confirmation area dan visible progress
+Deskripsi: UI components preprocessing yang terintegrasi tanpa duplikasi utils
 """
 
 import ipywidgets as widgets
@@ -9,8 +9,6 @@ from typing import Dict, Any, Optional
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider
-
-# Import shared components
 from smartcash.ui.components.action_buttons import create_action_buttons
 from smartcash.ui.components.progress_tracking import create_progress_tracking_container
 from smartcash.ui.components.status_panel import create_status_panel
@@ -19,37 +17,19 @@ from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from .input_options import create_preprocessing_input_options
 
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Create comprehensive preprocessing UI dengan fixed confirmation area.
+    """Create preprocessing UI dengan integrated components"""
     
-    Args:
-        config: Konfigurasi preprocessing
-        
-    Returns:
-        Dict[str, Any]: Dictionary komponen UI dengan keys yang konsisten
-    """
-    def get_icon(key: str, fallback: str = "⚙️") -> str:
-        try:
-            return ICONS.get(key, fallback)
-        except (NameError, AttributeError, KeyError):
-            return fallback
+    get_icon = lambda key, fallback="⚙️": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
+    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
     
-    def get_color(key: str, fallback: str = "#333") -> str:
-        try:
-            return COLORS.get(key, fallback)
-        except (NameError, AttributeError, KeyError):
-            return fallback
-    
-    # Header dengan responsive width
+    # Header
     header = create_header(
         f"{get_icon('processing', '🔧')} Dataset Preprocessing", 
-        "Preprocessing dataset untuk training model SmartCash dengan normalisasi dan resize"
+        "Preprocessing dataset untuk training model SmartCash"
     )
     
     # Status panel
-    status_panel = create_status_panel(
-        "Siap memulai preprocessing dataset", "info"
-    )
+    status_panel = create_status_panel("Siap memulai preprocessing dataset", "info")
     
     # Input options
     input_options = create_preprocessing_input_options(config)
@@ -58,126 +38,77 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     action_buttons = create_action_buttons(
         primary_label="Mulai Preprocessing",
         primary_icon="play",
-        secondary_buttons=[
-            ("Check Dataset", "search", "info")
-        ],
+        secondary_buttons=[("Check Dataset", "search", "info")],
         cleanup_enabled=True,
-        button_width='130px',
-        container_width='100%'
+        button_width='130px'
     )
     
-    # Fixed: Confirmation Area dengan unlimited height
+    # Confirmation area
     confirmation_area = widgets.Output(
-        layout=widgets.Layout(
-            width='100%',
-            height='auto',  # Auto height instead of fixed
-            max_height=None,  # Remove max height limit
-            min_height='0px',  # Minimum height
-            margin='8px 0',
-            padding='0px',
-            overflow='visible'  # Allow content to show
-        )
+        layout=widgets.Layout(width='100%', height='auto', margin='8px 0', overflow='visible')
     )
     
     # Save & reset buttons
-    try:
-        save_reset_buttons = create_save_reset_buttons(
-            save_label="Simpan",
-            reset_label="Reset",
-            save_tooltip="Simpan konfigurasi preprocessing",
-            reset_tooltip="Reset konfigurasi ke default",
-            with_sync_info=True,
-            sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive."
-        )
-    except TypeError:
-        save_reset_buttons = create_save_reset_buttons(
-            save_label="Simpan",
-            reset_label="Reset"
-        )
-    
-    # Log accordion
-    log_components = create_log_accordion(
-        module_name='preprocessing',
-        height='220px',
-        width='100%'
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan", reset_label="Reset",
+        save_tooltip="Simpan konfigurasi preprocessing",
+        reset_tooltip="Reset konfigurasi ke default"
     )
     
-    # Help panel
-    try:
-        from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
-        help_panel = get_preprocessing_info()
-    except Exception:
-        help_content = """
-        <div style="padding: 8px; background: #ffffff; max-width: 100%; overflow-x: hidden;">
-            <p style="margin: 6px 0; font-size: 13px; line-height: 1.4;">Preprocessing akan mengubah ukuran gambar dan menormalisasi pixel untuk training yang optimal.</p>
-            
-            <div style="margin: 8px 0;">
-                <strong style="color: #495057; font-size: 13px;">Parameter Utama:</strong>
-                <ul style="margin: 4px 0; padding-left: 18px; color: #495057; font-size: 12px; line-height: 1.3;">
-                    <li><strong>Resolusi:</strong> Ukuran output gambar (640x640 direkomendasikan)</li>
-                    <li><strong>Normalisasi:</strong> Metode normalisasi pixel (minmax direkomendasikan)</li>
-                    <li><strong>Workers:</strong> Jumlah thread paralel (4-8 untuk performa optimal)</li>
-                    <li><strong>Split:</strong> Bagian dataset yang diproses (all untuk semua split)</li>
-                </ul>
-            </div>
-            
-            <div style="margin-top: 8px; padding: 6px; background: #e7f3ff; border-radius: 3px; font-size: 12px; line-height: 1.4;">
-                <strong>💡 Tips:</strong> Gunakan "Check Dataset" untuk memvalidasi struktur dataset sebelum preprocessing.
-            </div>
-        </div>
-        """
-        
-        help_panel = widgets.Accordion([widgets.HTML(value=help_content)])
-        help_panel.set_title(0, "💡 Info Preprocessing")
-        help_panel.selected_index = None
+    # Log accordion
+    log_components = create_log_accordion(module_name='preprocessing', height='220px')
     
-    # Fixed: Progress tracking dengan visible container
+    # Progress tracking
     progress_components = create_progress_tracking_container()
+    
+    # Help panel
+    help_content = """
+    <div style="padding: 8px; background: #ffffff;">
+        <p style="margin: 6px 0; font-size: 13px;">Preprocessing mengubah ukuran gambar dan normalisasi pixel untuk training optimal.</p>
+        <div style="margin: 8px 0;">
+            <strong style="color: #495057; font-size: 13px;">Parameter Utama:</strong>
+            <ul style="margin: 4px 0; padding-left: 18px; color: #495057; font-size: 12px;">
+                <li><strong>Resolusi:</strong> Ukuran output (640x640 direkomendasikan)</li>
+                <li><strong>Normalisasi:</strong> Metode normalisasi pixel (minmax)</li>
+                <li><strong>Workers:</strong> Thread paralel (4-8 optimal)</li>
+                <li><strong>Split:</strong> Bagian dataset (all untuk semua)</li>
+            </ul>
+        </div>
+        <div style="margin-top: 8px; padding: 6px; background: #e7f3ff; border-radius: 3px; font-size: 12px;">
+            <strong>💡 Tips:</strong> Gunakan "Check Dataset" untuk validasi sebelum preprocessing.
+        </div>
+    </div>
+    """
+    
+    help_panel = widgets.Accordion([widgets.HTML(value=help_content)])
+    help_panel.set_title(0, "💡 Info Preprocessing")
+    help_panel.selected_index = None
     
     # Section headers
     config_header = widgets.HTML(f"""
-        <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 8px 0; font-size: 16px; 
-                   padding: 0; overflow: hidden; text-overflow: ellipsis;'>
+        <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 8px 0; font-size: 16px;'>
             {get_icon('settings', '⚙️')} Konfigurasi Preprocessing
         </h4>
     """)
     
     action_header = widgets.HTML(f"""
-        <h4 style='color: {get_color('dark', '#333')}; margin: 12px 0 8px 0; font-size: 16px; 
-                   padding: 0; overflow: hidden; text-overflow: ellipsis;'>
+        <h4 style='color: {get_color('dark', '#333')}; margin: 12px 0 8px 0; font-size: 16px;'>
             {get_icon('play', '▶️')} Aksi Preprocessing
         </h4>
     """)
     
     # Main UI assembly
     ui = widgets.VBox([
-        header,
-        status_panel,
-        config_header,
-        input_options,
-        save_reset_buttons['container'],
-        create_divider(),
-        action_header,
-        action_buttons['container'],
-        confirmation_area,  # Fixed: Unlimited height confirmation area
-        progress_components['container'],  # Fixed: Always visible progress
-        log_components['log_accordion'],
-        create_divider(),
-        help_panel
-    ], layout=widgets.Layout(
-        width='100%',
-        max_width='100%',
-        padding='8px',
-        margin='0px',
-        overflow='hidden'
-    ))
+        header, status_panel, config_header, input_options, save_reset_buttons['container'],
+        create_divider(), action_header, action_buttons['container'], confirmation_area,
+        progress_components['container'], log_components['log_accordion'], 
+        create_divider(), help_panel
+    ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
     
-    # Compile semua komponen
+    # Compile components
     ui_components = {
         # Main UI
-        'ui': ui,
-        'header': header,
-        'status_panel': status_panel,
+        'ui': ui, 'header': header, 'status_panel': status_panel,
         
         # Input components
         'input_options': input_options,
@@ -192,7 +123,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
         
-        # Fixed: Confirmation area untuk dialog positioning
+        # Confirmation area
         'confirmation_area': confirmation_area,
         
         # Save/reset buttons
@@ -200,7 +131,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'save_button': save_reset_buttons['save_button'],
         'reset_button': save_reset_buttons['reset_button'],
         
-        # Fixed: Progress components dengan visible controls
+        # Progress components
         'progress_components': progress_components,
         'progress_container': progress_components['container'],
         'show_for_operation': progress_components.get('show_for_operation'),
@@ -215,14 +146,12 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'log_output': log_components['log_output'],
         'status': log_components['log_output'],
         
-        # UI info areas
+        # UI info
         'help_panel': help_panel,
-        
-        # Module metadata
         'module_name': 'preprocessing'
     }
     
-    # Validate critical components
+    # Validate critical components - create fallback buttons if missing
     critical_components = ['preprocess_button', 'check_button', 'save_button', 'reset_button']
     for comp_name in critical_components:
         if ui_components.get(comp_name) is None:

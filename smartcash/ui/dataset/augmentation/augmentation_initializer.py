@@ -29,7 +29,7 @@ class AugmentationInitializer(CommonInitializer):
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan orchestrator integration"""
+        """Setup handlers dengan service layer integration"""
         try:
             from smartcash.ui.dataset.augmentation.handlers.main_handler import register_all_handlers
             
@@ -43,11 +43,11 @@ class AugmentationInitializer(CommonInitializer):
                     except Exception:
                         pass
             
-            # Register handlers dengan orchestrator integration
+            # Register handlers dengan service layer integration
             ui_components = register_all_handlers(ui_components)
             
             if 'logger' in ui_components:
-                ui_components['logger'].info(f"✅ Handlers registered dengan orchestrator integration")
+                ui_components['logger'].info(f"✅ Handlers registered dengan service integration")
             
             return ui_components
             
@@ -57,7 +57,7 @@ class AugmentationInitializer(CommonInitializer):
             return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default config dengan aligned parameters untuk orchestrator"""
+        """Default config dengan aligned parameters untuk service layer"""
         return {
             'data': {'dir': 'data'},
             'augmentation': {
@@ -71,17 +71,17 @@ class AugmentationInitializer(CommonInitializer):
         }
     
     def _get_critical_components(self) -> List[str]:
-        """Critical components untuk orchestrator integration"""
+        """Critical components untuk service layer integration"""
         return [
             'ui', 'augment_button', 'check_button', 'save_button', 'reset_button',
             'num_variations', 'target_count', 'augmentation_types', 'target_split',
             'tracker', 'log_output'
         ]
 
-# Global instance dengan orchestrator integration
+# Global instance dengan service layer integration
 _aug_initializer = AugmentationInitializer()
 
-# Public API dengan orchestrator reuse
+# Public API dengan service layer reuse
 init_augmentation = lambda env=None, config=None, force=False: _aug_initializer.initialize(env=env, config=config)
-reset_augmentation = lambda: print("🔄 Augmentation module reset dengan orchestrator cleanup")
+reset_augmentation = lambda: print("🔄 Augmentation module reset dengan service layer cleanup")
 get_aug_status = lambda: _aug_initializer.get_module_status()

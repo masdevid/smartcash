@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/core/preprocessing_coordinator.py
-Deskripsi: Fixed koordinator untuk pemrosesan multi-split - resolved callback parameter conflicts
+Deskripsi: Koordinator preprocessing dengan callback yang diperbaiki dan fixed parameter conflicts
 """
 
 import time
@@ -11,88 +11,64 @@ from smartcash.common.logger import get_logger
 from smartcash.dataset.preprocessor.processors.split_processor import SplitProcessor
 from smartcash.dataset.utils.move_utils import calculate_total_images
 
-
 class SplitCoordinator:
-    """Fixed koordinator untuk pemrosesan multi-split - no parameter conflicts in callbacks."""
+    """Koordinator untuk pemrosesan multi-split dengan fixed callback handling"""
     
     def __init__(self, config: Dict[str, Any], logger=None):
-        """Initialize coordinator dengan configuration dan dependencies."""
         self.config = config
         self.logger = logger or get_logger()
         self._progress_callback: Optional[Callable] = None
         self.active_processors: Dict[str, SplitProcessor] = {}
         
     def register_progress_callback(self, callback: Callable) -> None:
-        """Register progress callback untuk coordination updates."""
+        """Register progress callback"""
         self._progress_callback = callback
     
     def resolve_target_splits(self, split_request: str) -> List[str]:
-        """Resolve target splits dari request dengan intelligent mapping."""
+        """Resolve target splits dengan val->valid mapping"""
         split_mapping = {'val': 'valid', 'validation': 'valid'}
-        normalized_request = split_mapping.get(split_request.lower(), split_request.lower())
+        normalized = split_mapping.get(split_request.lower(), split_request.lower())
         
-        if normalized_request == 'all':
+        if normalized == 'all':
             return ['train', 'valid', 'test']
-        elif normalized_request in ['train', 'valid', 'test']:
-            return [normalized_request]
+        elif normalized in ['train', 'valid', 'test']:
+            return [normalized]
         else:
-            self.logger.warning(f"⚠️ Unknown split request: {split_request}, using 'all'")
+            self.logger.warning(f"⚠️ Unknown split: {split_request}, using 'all'")
             return ['train', 'valid', 'test']
-    
-    def calculate_processing_order(self, target_splits: List[str]) -> List[Dict[str, Any]]:
-        """Hitung optimal processing order berdasarkan ukuran dataset dan dependencies."""
-        image_counts = calculate_total_images(target_splits, self.config)
-        
-        processing_order = []
-        for split in target_splits:
-            split_count = image_counts.get(split, 0)
-            processing_order.append({
-                'split': split,
-                'image_count': split_count,
-                'priority': self._calculate_split_priority(split, split_count),
-                'estimated_time': split_count * 0.1
-            })
-        
-        processing_order.sort(key=lambda x: (x['priority'], -x['image_count']))
-        self.logger.info(f"📊 Processing order: {[item['split'] for item in processing_order]}")
-        return processing_order
     
     def coordinate_parallel_splits(self, target_splits: List[str], processing_config: Dict[str, Any], 
                                  force_reprocess: bool = False) -> Dict[str, Any]:
-        """Fixed koordinasi pemrosesan parallel - resolved callback parameter conflicts."""
+        """Koordinasi parallel splits dengan fixed progress tracking"""
         start_time = time.time()
-        processing_order = self.calculate_processing_order(target_splits)
-        total_images = sum(item['image_count'] for item in processing_order)
+        image_counts = calculate_total_images(target_splits, self.config)
+        total_images = sum(image_counts.values())
         
-        self._notify_coordination_progress(15, f"Memulai koordinasi {len(target_splits)} splits", 
-                                         total_files=total_images)
+        self._notify_progress(40, f"🎯 Starting {len(target_splits)} splits processing", total_files=total_images)
         
         split_results = {}
-        max_workers = min(3, len(processing_order))
-        
-        self.logger.info(f"🔧 Processing config keys: {list(processing_config.keys())}")
-        self.logger.info(f"📂 Target splits: {target_splits}")
+        max_workers = min(3, len(target_splits))
         
         try:
             with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="SplitCoord") as executor:
                 future_to_split = {}
                 
-                for i, split_info in enumerate(processing_order):
-                    split_name = split_info['split']
-                    
+                for i, split_name in enumerate(target_splits):
                     processor = SplitProcessor(self.config, self.logger)
-                    # FIXED: Create callback dengan resolved parameters
-                    processor.register_progress_callback(
-                        self._create_split_progress_callback_fixed(split_name, i, len(processing_order), total_images)
-                    )
                     
+                    # Fixed callback - avoid parameter conflicts
+                    def create_split_callback(split_idx, total_splits):
+                        def split_callback(progress, message):
+                            mapped_progress = 40 + (split_idx / total_splits * 40) + (progress / 100 * 40 / total_splits)
+                            self._notify_progress(int(mapped_progress), f"Split {split_name}: {message}")
+                        return split_callback
+                    
+                    processor.register_progress_callback(create_split_callback(i, len(target_splits)))
                     self.active_processors[split_name] = processor
                     
                     future = executor.submit(
                         processor.process_split_dataset,
-                        split_name,
-                        processing_config,
-                        force_reprocess
+                        split_name, processing_config, force_reprocess
                     )
                     future_to_split[future] = split_name
                 
@@ -106,15 +82,15 @@ class SplitCoordinator:
                         result = future.result()
                         split_results[split_name] = result
                         
-                        coord_progress = 15 + (completed_count / len(processing_order)) * 75
-                        self._notify_coordination_progress(
-                            int(coord_progress), 
-                            f"Split {split_name} selesai: {result.get('processed', 0)} gambar",
-                            split_progress={split_name: result}
+                        progress = 40 + (completed_count / len(target_splits)) * 40
+                        processed = result.get('processed', 0)
+                        self._notify_progress(
+                            int(progress), 
+                            f"✅ Split {split_name}: {processed} gambar diproses"
                         )
                         
                     except Exception as e:
-                        self.logger.error(f"❌ Error processing split {split_name}: {str(e)}")
+                        self.logger.error(f"❌ Error processing {split_name}: {str(e)}")
                         split_results[split_name] = {
                             'success': False, 'error': str(e), 'processed': 0, 'failed': 1
                         }
@@ -130,54 +106,25 @@ class SplitCoordinator:
         successful_splits = [s for s, r in split_results.items() if r.get('success', False)]
         coordination_time = time.time() - start_time
         
-        self.logger.success(f"✅ Koordinasi selesai: {len(successful_splits)}/{len(target_splits)} splits berhasil")
+        success = len(successful_splits) > 0
+        message = f'{len(successful_splits)} dari {len(target_splits)} splits berhasil diproses'
+        
+        if success:
+            self.logger.success(f"✅ Koordinasi selesai: {message}")
+        else:
+            self.logger.error(f"❌ Koordinasi gagal: {message}")
         
         return {
-            'success': len(successful_splits) > 0,
-            'message': f'{len(successful_splits)} dari {len(target_splits)} splits berhasil diproses',
+            'success': success,
+            'message': message,
             'split_results': split_results,
             'successful_splits': successful_splits,
             'coordination_time': coordination_time,
             'total_target_images': total_images
         }
     
-    def _create_split_progress_callback_fixed(self, split_name: str, split_index: int, 
-                                            total_splits: int, total_images: int) -> Callable:
-        """FIXED: Create progress callback tanpa parameter conflicts."""
-        def split_progress_callback_fixed(*args, **kwargs):
-            """FIXED: Pure positional/keyword args untuk avoid duplicate parameters."""
-            if self._progress_callback:
-                try:
-                    # Extract parameters safely
-                    if args:
-                        callback_progress = args[0] if len(args) > 0 else 0
-                        callback_message = args[1] if len(args) > 1 else f'Processing {split_name}'
-                    else:
-                        callback_progress = kwargs.get('progress', 0)
-                        callback_message = kwargs.get('message', f'Processing {split_name}')
-                    
-                    # Map progress
-                    base_progress = 15 + (split_index / total_splits) * 75
-                    mapped_progress = base_progress + (callback_progress / 100) * (75 / total_splits)
-                    
-                    # FIXED: Call dengan explicit positional args untuk avoid keyword conflicts
-                    progress_params = {
-                        'progress': int(mapped_progress),
-                        'message': callback_message,
-                        'split': split_name,
-                        'step': 2,
-                        'split_step': f'{split_name} ({split_index+1}/{total_splits})',
-                        'total_files_all': total_images
-                    }
-                    
-                    self._progress_callback(**progress_params)
-                except Exception as e:
-                    self.logger.debug(f"🔧 Split callback error: {str(e)}")
-        
-        return split_progress_callback_fixed
-    
     def get_coordination_summary(self) -> Dict[str, Any]:
-        """Dapatkan summary status coordination."""
+        """Get coordination status summary"""
         return {
             'active_processors': len(self.active_processors),
             'processor_status': {
@@ -188,35 +135,15 @@ class SplitCoordinator:
         }
     
     def cleanup_coordination_state(self) -> None:
-        """Cleanup coordination state dan active processors."""
+        """Cleanup coordination state"""
         for processor in self.active_processors.values():
             processor.cleanup_processor_state()
         self.active_processors.clear()
-        self.logger.debug("🧹 Coordination state cleaned up")
     
-    def _calculate_split_priority(self, split: str, image_count: int) -> int:
-        """Calculate processing priority untuk split (lower = higher priority)."""
-        priority_map = {'train': 0, 'valid': 1, 'test': 2}
-        base_priority = priority_map.get(split, 3)
-        size_factor = max(0, 1000 - image_count) // 100
-        return base_priority + size_factor
-    
-    def _notify_coordination_progress(self, progress: int, message_text: str, **kwargs):
-        """FIXED: Internal coordination progress notification dengan clean parameters."""
+    def _notify_progress(self, progress: int, message: str, **kwargs):
+        """Internal progress notification dengan clean parameters"""
         if self._progress_callback:
             try:
-                # FIXED: Create clean parameter set untuk avoid conflicts
-                clean_progress_params = {
-                    'progress': progress, 
-                    'message': message_text, 
-                    'step': 2,
-                    'split_step': "Koordinasi"
-                }
-                # Add additional kwargs selectively
-                for key, value in kwargs.items():
-                    if key not in clean_progress_params:
-                        clean_progress_params[key] = value
-                
-                self._progress_callback(**clean_progress_params)
+                self._progress_callback(progress=progress, message=message, **kwargs)
             except Exception as e:
                 self.logger.debug(f"🔧 Coordination progress error: {str(e)}")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_component.py
-Deskripsi: UI component dengan orchestrator integration dan reuse existing components
+Deskripsi: UI component dengan service integration dan reuse existing components
 """
 
 import ipywidgets as widgets
@@ -8,10 +8,10 @@ from typing import Dict, Any
 
 def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    UI assembly dengan orchestrator integration dan component reuse.
+    UI assembly dengan service integration dan component reuse.
     
     Returns:
-        Dictionary berisi widget UI dengan orchestrator support
+        Dictionary berisi widget UI dengan service support
     """
     # Import reused components
     from smartcash.ui.utils.header_utils import create_header
@@ -31,51 +31,51 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
 
     MODULE_LOGGER_NAME = KNOWN_NAMESPACES[AUGMENTATION_LOGGER_NAMESPACE]
     
-    # Header dengan orchestrator context
-    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation (Orchestrator)", 
-                          "Augmentasi dataset dengan orchestrator integration untuk performa optimal")
+    # Header dengan service context
+    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
+                          "Augmentasi dataset dengan service integration untuk performa optimal")
 
-    # Status panel dengan orchestrator info
-    status_panel = create_status_panel("✅ Orchestrator UI siap digunakan", "success")
+    # Status panel dengan service info
+    status_panel = create_status_panel("✅ Augmentation UI siap digunakan", "success")
 
-    # Widget groups dengan orchestrator support
+    # Widget groups dengan service support
     basic_options = create_basic_options_widget()
     advanced_options = create_advanced_options_widget()
     augmentation_types = create_augmentation_types_widget()
 
-    # Control buttons dengan orchestrator integration
+    # Control buttons dengan service integration
     config_buttons = create_save_reset_buttons(
         save_label="Simpan Config", reset_label="Reset Config",
-        save_tooltip="Simpan konfigurasi orchestrator",
-        reset_tooltip="Reset ke konfigurasi orchestrator default",
+        save_tooltip="Simpan konfigurasi augmentation",
+        reset_tooltip="Reset ke konfigurasi default",
         with_sync_info=True, button_width="120px"
     )
 
     action_buttons = create_action_buttons(
-        primary_label="🎯 Run Orchestrator Pipeline", primary_icon="action",
+        primary_label="🎯 Run Augmentation Pipeline", primary_icon="action",
         secondary_buttons=[
-            ("🔍 Check Orchestrator Status", "search", "info"),
-            ("🧹 Cleanup Orchestrator Data", "cleanup", "warning")
+            ("🔍 Check Dataset Status", "search", "info"),
+            ("🧹 Cleanup Augmentation Data", "cleanup", "warning")
         ],
         cleanup_enabled=True, button_width="200px"
     )
 
-    # Output areas dengan orchestrator support
+    # Output areas dengan service support
     confirmation_area = widgets.Output(layout=widgets.Layout(
         width='100%', margin='8px 0', overflow='hidden'
     ))
     
     progress_components = create_progress_tracking_container()
-    log_components = create_log_accordion('orchestrator', '200px')
+    log_components = create_log_accordion('augmentation', '200px')
     help_panel = get_augmentation_info()
 
-    # Layout assembly dengan orchestrator optimization
+    # Layout assembly dengan service optimization
     settings_row1 = widgets.HBox([
-        _create_orchestrator_section("Opsi Dasar", basic_options['container']),
-        _create_orchestrator_section("Opsi Lanjutan", advanced_options['container'])
+        _create_service_section("Opsi Dasar", basic_options['container']),
+        _create_service_section("Opsi Lanjutan", advanced_options['container'])
     ], layout=widgets.Layout(width='100%', justify_content='flex-start'))
 
-    settings_row2 = _create_orchestrator_section(None, augmentation_types['container'], full_width=True)
+    settings_row2 = _create_service_section(None, augmentation_types['container'], full_width=True)
     
     config_container = widgets.Box([config_buttons['container']], 
         layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0'))
@@ -84,42 +84,42 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         settings_row1, settings_row2, config_container
     ], layout=widgets.Layout(width='100%', overflow='hidden'))
 
-    # Main UI assembly dengan orchestrator integration
+    # Main UI assembly dengan service integration
     ui = widgets.VBox([
         header, status_panel, settings_container, create_divider(),
         action_buttons['container'], confirmation_area,
         progress_components['container'], log_components['log_accordion'], help_panel
     ], layout=widgets.Layout(width='100%', overflow='hidden'))
 
-    # Component mapping dengan orchestrator integration
+    # Component mapping dengan service integration
     return {
         'ui': ui, 'header': header, 'status_panel': status_panel,
         'settings_container': settings_container, 'confirmation_area': confirmation_area,
         
-        # Widget mappings dengan orchestrator support
+        # Widget mappings dengan service support
         **basic_options['widgets'], **advanced_options['widgets'], **augmentation_types['widgets'],
         
-        # Button mappings dengan orchestrator context
+        # Button mappings dengan service context
         'augment_button': action_buttons['download_button'],
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
         'save_button': config_buttons['save_button'],
         'reset_button': config_buttons['reset_button'],
         
-        # Progress dan log dengan orchestrator integration
+        # Progress dan log dengan service integration
         **progress_components, 'log_output': log_components['log_output'],
         'log_accordion': log_components['log_accordion'],
         'status': log_components['log_output'],  # Compatibility
         
-        # Orchestrator metadata
+        # Service metadata
         'module_name': MODULE_LOGGER_NAME,
         'logger_namespace': AUGMENTATION_LOGGER_NAMESPACE,
-        'orchestrator_integrated': True,
+        'service_integrated': True,
         'env': env, 'config': config or {}
     }
 
-def _create_orchestrator_section(title: str, content_widget, full_width: bool = False):
-    """Create settings section dengan orchestrator styling"""
+def _create_service_section(title: str, content_widget, full_width: bool = False):
+    """Create settings section dengan service styling"""
     from smartcash.ui.utils.constants import COLORS, ICONS
     
     children = []
@@ -133,5 +133,5 @@ def _create_orchestrator_section(title: str, content_widget, full_width: bool = 
     return widgets.VBox(children, layout=widgets.Layout(
         width=width, padding='6px', margin=margin,
         border='1px solid #e0e0e0', border_radius='4px',
-        background_color='rgba(248, 249, 250, 0.8)'  # Orchestrator background
+        background_color='rgba(248, 249, 250, 0.8)'  # Service background
     ))

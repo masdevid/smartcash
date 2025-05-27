@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Initializer yang sudah diperbaharui dengan reuse orchestrator dan SRP modules
+Deskripsi: Initializer yang disederhanakan dengan reuse service dan SRP modules
 """
 
 from typing import Dict, Any, List
@@ -10,7 +10,7 @@ from smartcash.ui.utils.ui_logger_namespace import AUGMENTATION_LOGGER_NAMESPACE
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[AUGMENTATION_LOGGER_NAMESPACE]
 
 class AugmentationInitializer(CommonInitializer):
-    """Initializer dengan orchestrator reuse dan consolidated functionality"""
+    """Initializer dengan service reuse dan consolidated functionality"""
     
     def __init__(self):
         super().__init__(MODULE_LOGGER_NAME, AUGMENTATION_LOGGER_NAMESPACE)

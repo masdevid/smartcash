@@ -34,130 +34,206 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
     return ui_components
 
 def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup preprocessing handler terintegrasi"""
+    """Setup preprocessing handler dengan integrated state management"""
     
     def execute_preprocessing(button=None):
-        button_manager = get_button_state_manager(ui_components)
+        button_manager = _get_button_manager(ui_components)
         logger = ui_components.get('logger')
         
         _clear_outputs(ui_components)
+        button_manager.disable_buttons('preprocess_button')
         
-        with button_manager.operation_context('preprocessing'):
-            try:
-                logger and logger.info("🚀 Memulai preprocessing dataset")
-                ui_components.get('show_for_operation', lambda x: None)('preprocessing')
-                
-                # Extract config dari UI
-                params = _extract_processing_params(ui_components)
-                processing_config = {**config, 'preprocessing': {**config.get('preprocessing', {}), **params}}
-                
-                # Create manager dengan progress callback
-                manager = PreprocessingManager(processing_config, logger)
-                manager.register_progress_callback(ui_components['progress_callback'])
-                
-                # Execute preprocessing
-                result = manager.preprocess_with_uuid_consistency(
-                    split=params.get('split', 'all'),
-                    force_reprocess=params.get('force_reprocess', False)
+        try:
+            # Validate dataset ready
+            valid, msg = _validate_dataset_ready(config, logger)
+            if not valid:
+                _update_status_panel(ui_components, f"❌ {msg}", "error")
+                return
+            
+            logger and logger.info("🚀 Memulai preprocessing dataset")
+            ui_components.get('show_for_operation', lambda x: None)('preprocessing')
+            
+            # Extract config dan execute
+            params = _extract_processing_params(ui_components)
+            processing_config = {**config, 'preprocessing': {**config.get('preprocessing', {}), **params}}
+            
+            manager = PreprocessingManager(processing_config, logger)
+            manager.register_progress_callback(ui_components['progress_callback'])
+            
+            result = manager.preprocess_with_uuid_consistency(
+                split=params.get('split', 'all'),
+                force_reprocess=params.get('force_reprocess', False)
+            )
+            
+            if result['success']:
+                total = result.get('total_images', 0)
+                time_taken = result.get('processing_time', 0)
+                ui_components.get('complete_operation', lambda x: None)(
+                    f"Preprocessing selesai: {total:,} gambar dalam {time_taken:.1f}s"
                 )
+                _update_status_panel(ui_components, f"✅ Preprocessing berhasil: {total:,} gambar", "success")
+            else:
+                raise Exception(result['message'])
                 
-                if result['success']:
-                    total = result.get('total_images', 0)
-                    time_taken = result.get('processing_time', 0)
-                    ui_components.get('complete_operation', lambda x: None)(
-                        f"Preprocessing selesai: {total:,} gambar dalam {time_taken:.1f}s"
-                    )
-                    _update_status_panel(ui_components, f"✅ Preprocessing berhasil: {total:,} gambar", "success")
-                else:
-                    raise Exception(result['message'])
-                    
-            except Exception as e:
-                error_msg = f"Preprocessing gagal: {str(e)}"
-                logger and logger.error(f"💥 {error_msg}")
-                ui_components.get('error_operation', lambda x: None)(error_msg)
-                _update_status_panel(ui_components, error_msg, "error")
+        except Exception as e:
+            error_msg = f"Preprocessing gagal: {str(e)}"
+            logger and logger.error(f"💥 {error_msg}")
+            ui_components.get('error_operation', lambda x: None)(error_msg)
+            _update_status_panel(ui_components, error_msg, "error")
+        
+        finally:
+            button_manager.enable_buttons()
     
     ui_components['preprocess_button'].on_click(execute_preprocessing)
 
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup dataset checker terintegrasi"""
+    """Setup dataset checker dengan direct file scanning"""
     
     def execute_check(button=None):
-        button_manager = get_button_state_manager(ui_components)
+        button_manager = _get_button_manager(ui_components)
         logger = ui_components.get('logger')
         
         _clear_outputs(ui_components)
+        button_manager.disable_buttons('check_button')
         
-        with button_manager.operation_context('check'):
-            try:
-                logger and logger.info("🔍 Checking dataset")
-                ui_components.get('show_for_operation', lambda x: None)('check')
+        try:
+            logger and logger.info("🔍 Checking dataset")
+            ui_components.get('show_for_operation', lambda x: None)('check')
+            
+            # Check source dataset
+            ui_components.get('update_progress', lambda *a: None)('overall', 30, "Checking source dataset")
+            source_valid, source_msg = _validate_dataset_ready(config, logger)
+            
+            # Check preprocessed dengan direct scanning
+            ui_components.get('update_progress', lambda *a: None)('overall', 70, "Checking preprocessed dataset")
+            preprocessed_exists, preprocessed_count = _check_preprocessed_exists(config)
+            
+            # Display results
+            if source_valid:
+                logger and logger.success(f"✅ {source_msg}")
+                _update_status_panel(ui_components, f"Dataset siap: {source_msg.split(': ')[1]}", "success")
+            else:
+                logger and logger.error(f"❌ {source_msg}")
+                _update_status_panel(ui_components, f"❌ {source_msg}", "error")
+                return
+            
+            if preprocessed_exists:
+                logger and logger.success(f"💾 Preprocessed dataset: {preprocessed_count:,} gambar")
                 
-                checker = DatasetChecker(config, logger)
-                
-                # Check source
-                ui_components.get('update_progress', lambda *a: None)('overall', 30, "Checking source dataset")
-                source_result = checker.check_source_dataset(detailed=True)
-                
-                # Check preprocessed
-                ui_components.get('update_progress', lambda *a: None)('overall', 70, "Checking preprocessed dataset")
-                preprocessed_result = checker.check_preprocessed_dataset(detailed=True)
-                
-                # Display results
-                _display_check_results(ui_components, source_result, preprocessed_result, logger)
-                
-                ui_components.get('complete_operation', lambda x: None)("Dataset check selesai")
-                
-            except Exception as e:
-                error_msg = f"Check gagal: {str(e)}"
-                logger and logger.error(f"💥 {error_msg}")
-                ui_components.get('error_operation', lambda x: None)(error_msg)
+                # Show detailed breakdown
+                _show_preprocessed_breakdown(ui_components, config, logger)
+            else:
+                logger and logger.info("ℹ️ Belum ada preprocessed dataset")
+            
+            ui_components.get('complete_operation', lambda x: None)("Dataset check selesai")
+            
+        except Exception as e:
+            error_msg = f"Check gagal: {str(e)}"
+            logger and logger.error(f"💥 {error_msg}")
+            ui_components.get('error_operation', lambda x: None)(error_msg)
+        
+        finally:
+            button_manager.enable_buttons()
     
     ui_components['check_button'].on_click(execute_check)
 
+def _show_preprocessed_breakdown(ui_components: Dict[str, Any], config: Dict[str, Any], logger):
+    """Show detailed preprocessed breakdown"""
+    from pathlib import Path
+    from IPython.display import display, HTML
+    
+    preprocessed_dir = Path(config.get('preprocessing', {}).get('output_dir', 'data/preprocessed'))
+    image_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+    
+    breakdown = {}
+    total_images = 0
+    
+    for split in ['train', 'valid', 'test']:
+        split_images_dir = preprocessed_dir / split / 'images'
+        if split_images_dir.exists():
+            split_files = [f for f in split_images_dir.glob('*.*') if f.suffix.lower() in image_extensions]
+            count = len(split_files)
+            if count > 0:
+                breakdown[split] = count
+                total_images += count
+                logger and logger.info(f"📂 {split}: {count:,} gambar preprocessed")
+    
+    # Display detailed report
+    if 'log_output' in ui_components and breakdown:
+        report_html = f"""
+        <div style="background:#f0f8ff;padding:10px;border-radius:5px;margin:10px 0;">
+            <strong>📊 Preprocessed Dataset Breakdown:</strong><br>
+            <ul style="margin:8px 0;padding-left:20px;">
+        """
+        
+        for split, count in breakdown.items():
+            percentage = (count / total_images * 100) if total_images > 0 else 0
+            report_html += f"<li><strong>{split}:</strong> {count:,} gambar ({percentage:.1f}%)</li>"
+        
+        report_html += f"""
+            </ul>
+            <div style="margin-top:8px;padding:6px;background:#e7f3ff;border-radius:3px;">
+                <strong>Total:</strong> {total_images:,} gambar preprocessed siap untuk training
+            </div>
+        </div>
+        """
+        
+        with ui_components['log_output']:
+            display(HTML(report_html))
+
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup cleanup handler terintegrasi"""
+    """Setup cleanup handler dengan integrated confirmation"""
     
     def execute_cleanup(button=None):
         _clear_outputs(ui_components)
         
+        # Check existing preprocessed data
+        has_data, count = _check_preprocessed_exists(config)
+        if not has_data:
+            _update_status_panel(ui_components, "ℹ️ Tidak ada data preprocessed untuk dibersihkan", "info")
+            return
+        
         def confirmed_cleanup():
-            button_manager = get_button_state_manager(ui_components)
+            button_manager = _get_button_manager(ui_components)
             logger = ui_components.get('logger')
             
-            with button_manager.operation_context('cleanup'):
-                try:
-                    logger and logger.info("🧹 Cleanup preprocessed data")
-                    ui_components.get('show_for_operation', lambda x: None)('cleanup')
+            button_manager.disable_buttons('cleanup_button')
+            
+            try:
+                logger and logger.info("🧹 Cleanup preprocessed data")
+                ui_components.get('show_for_operation', lambda x: None)('cleanup')
+                
+                executor = CleanupExecutor(config, logger)
+                executor.register_progress_callback(ui_components['progress_callback'])
+                
+                result = executor.cleanup_preprocessed_data(safe_mode=True)
+                
+                if result['success']:
+                    stats = result.get('stats', {})
+                    files_removed = stats.get('files_removed', 0)
+                    ui_components.get('complete_operation', lambda x: None)(
+                        f"Cleanup selesai: {files_removed:,} file dihapus"
+                    )
+                    _update_status_panel(ui_components, f"🧹 Cleanup berhasil: {files_removed:,} file", "success")
+                else:
+                    raise Exception(result['message'])
                     
-                    executor = CleanupExecutor(config, logger)
-                    executor.register_progress_callback(ui_components['progress_callback'])
-                    
-                    result = executor.cleanup_preprocessed_data(safe_mode=True)
-                    
-                    if result['success']:
-                        stats = result.get('stats', {})
-                        files_removed = stats.get('files_removed', 0)
-                        ui_components.get('complete_operation', lambda x: None)(
-                            f"Cleanup selesai: {files_removed:,} file dihapus"
-                        )
-                        _update_status_panel(ui_components, f"🧹 Cleanup berhasil: {files_removed:,} file", "success")
-                    else:
-                        raise Exception(result['message'])
-                        
-                except Exception as e:
-                    error_msg = f"Cleanup gagal: {str(e)}"
-                    logger and logger.error(f"💥 {error_msg}")
-                    ui_components.get('error_operation', lambda x: None)(error_msg)
+            except Exception as e:
+                error_msg = f"Cleanup gagal: {str(e)}"
+                logger and logger.error(f"💥 {error_msg}")
+                ui_components.get('error_operation', lambda x: None)(error_msg)
+            
+            finally:
+                button_manager.enable_buttons()
         
-        # Show confirmation dialog
+        # Show confirmation dengan informasi detail
         if 'confirmation_area' in ui_components:
             from IPython.display import display, clear_output
             with ui_components['confirmation_area']:
                 clear_output(wait=True)
                 dialog = create_destructive_confirmation(
                     title="⚠️ Konfirmasi Cleanup Dataset",
-                    message="Operasi ini akan menghapus SEMUA data preprocessed. Data asli tetap aman.\n\nLanjutkan?",
+                    message=f"Operasi ini akan menghapus {count:,} file preprocessed.\n\nData asli tetap aman. Lanjutkan?",
                     on_confirm=lambda b: (confirmed_cleanup(), _clear_outputs(ui_components)),
                     on_cancel=lambda b: _clear_outputs(ui_components),
                     item_name="data preprocessed"
@@ -191,6 +267,73 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
     ui_components['save_button'].on_click(save_config)
     ui_components['reset_button'].on_click(reset_config)
 
+# Integrated validation helpers (replacing validation_helper.py)
+def _validate_dataset_ready(config: Dict[str, Any], logger) -> tuple[bool, str]:
+    """Integrated dataset validation"""
+    from smartcash.dataset.utils.path_validator import get_path_validator
+    
+    data_dir = config.get('data', {}).get('dir', 'data')
+    validator = get_path_validator(logger)
+    result = validator.validate_dataset_structure(data_dir)
+    
+    if not result['valid'] or result['total_images'] == 0:
+        return False, f"Dataset tidak valid: {result.get('issues', ['Unknown error'])[0] if result.get('issues') else 'No images found'}"
+    
+    return True, f"Dataset siap: {result['total_images']:,} gambar"
+
+def _check_preprocessed_exists(config: Dict[str, Any]) -> tuple[bool, int]:
+    """Check existing preprocessed data dengan direct file scanning"""
+    from pathlib import Path
+    
+    preprocessed_dir = Path(config.get('preprocessing', {}).get('output_dir', 'data/preprocessed'))
+    
+    if not preprocessed_dir.exists():
+        return False, 0
+    
+    total_files = 0
+    image_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+    
+    # Scan splits: train, valid, test
+    for split in ['train', 'valid', 'test']:
+        split_images_dir = preprocessed_dir / split / 'images'
+        if split_images_dir.exists():
+            split_files = [f for f in split_images_dir.glob('*.*') if f.suffix.lower() in image_extensions]
+            total_files += len(split_files)
+    
+    return total_files > 0, total_files
+
+# Integrated UI state management (replacing ui_state_manager.py)
+class SimpleButtonManager:
+    """Simplified button state management"""
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+        self.disabled_buttons = []
+    
+    def disable_buttons(self, exclude_button: str = None):
+        """Disable buttons except exclude_button"""
+        buttons = ['preprocess_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
+        for btn_key in buttons:
+            if btn_key != exclude_button and btn_key in self.ui_components:
+                btn = self.ui_components[btn_key]
+                if btn and not btn.disabled:
+                    btn.disabled = True
+                    self.disabled_buttons.append(btn_key)
+    
+    def enable_buttons(self):
+        """Re-enable previously disabled buttons"""
+        for btn_key in self.disabled_buttons:
+            if btn_key in self.ui_components:
+                btn = self.ui_components[btn_key]
+                if btn:
+                    btn.disabled = False
+        self.disabled_buttons.clear()
+
+def _get_button_manager(ui_components: Dict[str, Any]) -> SimpleButtonManager:
+    """Get button manager instance"""
+    if 'simple_button_manager' not in ui_components:
+        ui_components['simple_button_manager'] = SimpleButtonManager(ui_components)
+    return ui_components['simple_button_manager']
+
 # Helper functions
 def _extract_processing_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract parameters dari UI components"""
@@ -218,33 +361,8 @@ def _apply_default_config(ui_components: Dict[str, Any]):
 
 def _display_check_results(ui_components: Dict[str, Any], source_result: Dict[str, Any], 
                           preprocessed_result: Dict[str, Any], logger):
-    """Display check results"""
-    from IPython.display import display, HTML
-    
-    # Log results
-    if source_result.get('valid', False):
-        total = source_result.get('total_images', 0)
-        logger and logger.success(f"✅ Source dataset: {total:,} gambar valid")
-        _update_status_panel(ui_components, f"Dataset siap: {total:,} gambar", "success")
-    else:
-        msg = source_result.get('message', 'Dataset tidak valid')
-        logger and logger.error(f"❌ Source invalid: {msg}")
-        _update_status_panel(ui_components, "Dataset tidak valid", "error")
-        return
-    
-    if preprocessed_result.get('valid', False):
-        total = preprocessed_result.get('total_processed', 0)
-        logger and logger.success(f"💾 Preprocessed: {total:,} gambar")
-    else:
-        logger and logger.info("ℹ️ Belum ada preprocessed dataset")
-    
-    # Display reports
-    if 'log_output' in ui_components:
-        with ui_components['log_output']:
-            for result, title in [(source_result, "Source Dataset"), (preprocessed_result, "Preprocessed Dataset")]:
-                report = result.get('report', '')
-                if report:
-                    display(HTML(f"<pre style='background:#f8f9fa;padding:10px;border-radius:5px;font-size:12px;'><strong>{title}:</strong>\n{report}</pre>"))
+    """Display check results - REMOVED (replaced by direct scanning)"""
+    pass  # Functionality moved to setup_check_handler
 
 def _clear_outputs(ui_components: Dict[str, Any]):
     """Clear UI outputs"""

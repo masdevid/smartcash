@@ -1,222 +1,129 @@
 """
-File: smartcash/ui/dataset/augmentation/handlers/operation_handlers.py
-Deskripsi: Fixed handlers dengan proper communicator setup dan service integration
+File: smartcash/ui/dataset/augmentation/handlers/operation_handler.py
+Deskripsi: Handler untuk operations augmentation dan check dengan komunikasi ke service
 """
 
 from typing import Dict, Any
 
-class AugmentationOperationHandler:
-    """Fixed augmentation handler dengan proper communicator integration"""
-    
-    def __init__(self, ui_components: Dict[str, Any]):
-        self.ui_components = ui_components
-        self._setup_communicator()
-    
-    def _setup_communicator(self):
-        """Setup communicator dari UI components"""
-        try:
-            from smartcash.dataset.augmentor.communicator import create_communicator
-            self.comm = create_communicator(self.ui_components)
-            self.ui_components['communicator'] = self.comm
-            self.ui_components['communicator_ready'] = True
-        except ImportError:
-            self.comm = None
-            self.ui_components['communicator_ready'] = False
-    
-    def execute(self):
-        """Execute augmentation dengan proper service integration"""
-        try:
-            # Ensure communicator setup
-            if not self.comm:
-                self._setup_communicator()
-            
-            # Create service dengan UI components
-            from smartcash.dataset.augmentor.service import create_service_from_ui
-            service = create_service_from_ui(self.ui_components)
-            
-            # Start operation
-            self._start_operation('augmentation')
-            
-            # Execute pipeline dengan progress callback
-            result = service.run_full_augmentation_pipeline(
-                target_split='train',
-                progress_callback=self._create_progress_callback()
-            )
-            
-            # Handle result
-            self._handle_result(result)
-            return result.get('message', 'Augmentation completed')
-            
-        except ImportError as e:
-            raise Exception(f"Service import error: {str(e)}")
-        except Exception as e:
-            self._error_operation(f"Augmentation error: {str(e)}")
-            raise
-    
-    def _create_progress_callback(self):
-        """Create progress callback untuk service integration"""
-        def callback(step: str, current: int, total: int, message: str):
+def execute_augmentation(ui_components: Dict[str, Any]):
+    """Execute augmentation dengan komunikasi ke augmentor service"""
+    try:
+        # Show progress untuk augmentation
+        tracker = ui_components.get('tracker')
+        tracker and hasattr(tracker, 'show') and tracker.show('augmentation')
+        
+        # Create service dari augmentor dengan UI components
+        from smartcash.dataset.augmentor.service import create_service_from_ui
+        service = create_service_from_ui(ui_components)
+        
+        # Execute pipeline
+        result = service.run_full_augmentation_pipeline(
+            target_split=_get_target_split(ui_components),
+            progress_callback=_create_progress_callback(ui_components)
+        )
+        
+        # Handle result
+        _handle_operation_result(ui_components, result, 'augmentation')
+        
+    except Exception as e:
+        _handle_operation_error(ui_components, f"Augmentation error: {str(e)}")
+
+def execute_check(ui_components: Dict[str, Any]):
+    """Execute check dataset dengan komunikasi ke service"""
+    try:
+        # Show progress untuk check
+        tracker = ui_components.get('tracker')
+        tracker and hasattr(tracker, 'show') and tracker.show('check')
+        
+        # Create service dan check status
+        from smartcash.dataset.augmentor.service import create_service_from_ui
+        service = create_service_from_ui(ui_components)
+        status = service.get_augmentation_status()
+        
+        # Format status message
+        raw_info = status.get('raw_dataset', {})
+        aug_info = status.get('augmented_dataset', {})
+        prep_info = status.get('preprocessed_dataset', {})
+        
+        status_lines = [
+            f"📁 Raw: {'✅' if raw_info.get('exists') else '❌'} ({raw_info.get('total_images', 0)} img, {raw_info.get('total_labels', 0)} lbl)",
+            f"🔄 Aug: {'✅' if aug_info.get('exists') else '❌'} ({aug_info.get('total_images', 0)} files)",
+            f"📊 Prep: {'✅' if prep_info.get('exists') else '❌'} ({prep_info.get('total_files', 0)} files)",
+            f"🎯 Ready: {'✅' if status.get('ready_for_augmentation') else '❌'}"
+        ]
+        
+        result_message = "📊 Dataset Status:\n" + "\n".join(status_lines)
+        _log_to_ui(ui_components, result_message, 'info')
+        
+        # Complete check
+        tracker and hasattr(tracker, 'complete') and tracker.complete("Dataset check selesai")
+        
+    except Exception as e:
+        _handle_operation_error(ui_components, f"Check error: {str(e)}")
+
+def execute_cleanup(ui_components: Dict[str, Any]):
+    """Execute cleanup dengan komunikasi ke service"""
+    try:
+        # Show progress untuk cleanup
+        tracker = ui_components.get('tracker')
+        tracker and hasattr(tracker, 'show') and tracker.show('cleanup')
+        
+        # Create service dan cleanup
+        from smartcash.dataset.augmentor.service import create_service_from_ui
+        service = create_service_from_ui(ui_components)
+        
+        result = service.cleanup_augmented_data(
+            include_preprocessed=True,
+            progress_callback=_create_progress_callback(ui_components)
+        )
+        
+        # Handle result
+        _handle_operation_result(ui_components, result, 'cleanup')
+        
+    except Exception as e:
+        _handle_operation_error(ui_components, f"Cleanup error: {str(e)}")
+
+def _create_progress_callback(ui_components: Dict[str, Any]):
+    """Create progress callback untuk service integration"""
+    def callback(step: str, current: int, total: int, message: str):
+        tracker = ui_components.get('tracker')
+        if tracker and hasattr(tracker, 'update'):
             percentage = min(100, int((current / max(1, total)) * 100))
-            self._update_progress(step, percentage, message)
-        return callback
+            tracker.update(step, percentage, message)
+    return callback
+
+def _handle_operation_result(ui_components: Dict[str, Any], result: Dict[str, Any], operation: str):
+    """Handle operation result dengan UI feedback"""
+    tracker = ui_components.get('tracker')
     
-    # One-liner operation methods
-    _start_operation = lambda self, op: (
-        self.ui_components.get('show_for_operation', lambda x: None)(op) or
-        getattr(self.ui_components.get('tracker'), 'show', lambda x: None)(op)
-    )
-    
-    _update_progress = lambda self, step, pct, msg: (
-        self.ui_components.get('update_progress', lambda s, p, m: None)(step, pct, msg) or
-        getattr(self.ui_components.get('tracker'), 'update', lambda s, p, m: None)(step, pct, msg)
-    )
-    
-    _complete_operation = lambda self, msg: (
-        self.ui_components.get('complete_operation', lambda m: None)(msg) or  
-        getattr(self.ui_components.get('tracker'), 'complete', lambda m: None)(msg)
-    )
-    
-    _error_operation = lambda self, msg: (
-        self.ui_components.get('error_operation', lambda m: None)(msg) or
-        getattr(self.ui_components.get('tracker'), 'error', lambda m: None)(msg)
-    )
-    
-    def _handle_result(self, result: Dict[str, Any]):
-        """Handle operation result"""
-        if result['status'] == 'success':
+    if result.get('status') == 'success':
+        if operation == 'augmentation':
             success_msg = f"✅ Pipeline berhasil: {result.get('total_files', 0)} file dalam {result.get('processing_time', 0):.1f}s"
-            self._complete_operation(success_msg)
+        elif operation == 'cleanup':
+            success_msg = f"✅ Cleanup berhasil: {result.get('stats', {}).get('total_files_removed', 0)} file dihapus"
         else:
-            error_msg = f"❌ Pipeline gagal: {result.get('message', 'Unknown error')}"
-            self._error_operation(error_msg)
-            raise Exception(error_msg)
+            success_msg = f"✅ {operation.title()} berhasil"
+            
+        _log_to_ui(ui_components, success_msg, 'success')
+        tracker and hasattr(tracker, 'complete') and tracker.complete(success_msg)
+    else:
+        error_msg = f"❌ {operation.title()} gagal: {result.get('message', 'Unknown error')}"
+        _log_to_ui(ui_components, error_msg, 'error')
+        tracker and hasattr(tracker, 'error') and tracker.error(error_msg)
 
-class CheckOperationHandler:
-    """Fixed check handler dengan communicator integration"""
-    
-    def __init__(self, ui_components: Dict[str, Any]):
-        self.ui_components = ui_components
-    
-    def execute(self):
-        """Execute check dengan service integration"""
-        try:
-            from smartcash.dataset.augmentor.service import create_service_from_ui
-            service = create_service_from_ui(self.ui_components)
-            
-            # Start progress
-            self._start_operation('check')
-            
-            # Get status
-            status = service.get_augmentation_status()
-            
-            # Format result dengan better info
-            raw_info = status.get('raw_dataset', {})
-            aug_info = status.get('augmented_dataset', {})
-            prep_info = status.get('preprocessed_dataset', {})
-            
-            status_lines = [
-                f"📁 Raw: {'✅' if raw_info.get('exists') else '❌'} ({raw_info.get('total_images', 0)} img, {raw_info.get('total_labels', 0)} lbl)",
-                f"🔄 Aug: {'✅' if aug_info.get('exists') else '❌'} ({aug_info.get('total_images', 0)} files)",
-                f"📊 Prep: {'✅' if prep_info.get('exists') else '❌'} ({prep_info.get('total_files', 0)} files)",
-                f"🎯 Ready: {'✅' if status.get('ready_for_augmentation') else '❌'}"
-            ]
-            
-            result_message = "📊 Dataset Status:\n" + "\n".join(status_lines)
-            self._complete_operation("Dataset check completed")
-            
-            return result_message
-            
-        except ImportError as e:
-            raise Exception(f"Service import error: {str(e)}")
-    
-    # One-liner methods
-    _start_operation = lambda self, op: getattr(self.ui_components.get('tracker'), 'show', lambda x: None)(op)
-    _complete_operation = lambda self, msg: getattr(self.ui_components.get('tracker'), 'complete', lambda m: None)(msg)
+def _handle_operation_error(ui_components: Dict[str, Any], error_msg: str):
+    """Handle operation error dengan UI feedback"""
+    _log_to_ui(ui_components, error_msg, 'error')
+    tracker = ui_components.get('tracker')
+    tracker and hasattr(tracker, 'error') and tracker.error(error_msg)
 
-class CleanupOperationHandler:
-    """Fixed cleanup handler dengan communicator integration"""
-    
-    def __init__(self, ui_components: Dict[str, Any]):
-        self.ui_components = ui_components
-    
-    def execute(self):
-        """Execute cleanup dengan service integration"""
-        try:
-            from smartcash.dataset.augmentor.service import create_service_from_ui
-            service = create_service_from_ui(self.ui_components)
-            
-            # Start progress
-            self._start_operation('cleanup')
-            
-            # Execute cleanup dengan progress
-            result = service.cleanup_augmented_data(
-                include_preprocessed=True,
-                progress_callback=self._create_progress_callback()
-            )
-            
-            # Handle result
-            if result['status'] == 'success':
-                success_msg = f"✅ Cleanup berhasil: {result.get('total_deleted', 0)} file dihapus"
-                self._complete_operation(success_msg)
-                return success_msg
-            else:
-                error_msg = f"❌ Cleanup gagal: {result.get('message', 'Unknown error')}"
-                self._error_operation(error_msg)
-                raise Exception(error_msg)
-                
-        except ImportError as e:
-            raise Exception(f"Service import error: {str(e)}")
-    
-    def _create_progress_callback(self):
-        """Create progress callback"""
-        def callback(step: str, current: int, total: int, message: str):
-            percentage = min(100, int((current / max(1, total)) * 100))
-            getattr(self.ui_components.get('tracker'), 'update', lambda s, p, m: None)(step, percentage, message)
-        return callback
-    
-    # One-liner methods
-    _start_operation = lambda self, op: getattr(self.ui_components.get('tracker'), 'show', lambda x: None)(op)
-    _complete_operation = lambda self, msg: getattr(self.ui_components.get('tracker'), 'complete', lambda m: None)(msg)
-    _error_operation = lambda self, msg: getattr(self.ui_components.get('tracker'), 'error', lambda m: None)(msg)
+def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
+    """Log message ke UI log_output saja"""
+    logger = ui_components.get('logger')
+    if logger and hasattr(logger, level):
+        getattr(logger, level)(message)
 
-class ConfigOperationHandler:
-    """Fixed config handler dengan proper integration"""
-    
-    def __init__(self, ui_components: Dict[str, Any]):
-        self.ui_components = ui_components
-    
-    def save_config(self):
-        """Execute save config dengan train split enforcement"""
-        try:
-            from smartcash.ui.dataset.augmentation.handlers.config_handler import create_config_handler
-            handler = create_config_handler(self.ui_components)
-            result = handler.save_config()
-            
-            if result['status'] == 'error':
-                raise Exception(result['message'])
-            
-            return "💾 Konfigurasi berhasil disimpan (Train split only)"
-            
-        except ImportError as e:
-            raise Exception(f"Config handler import error: {str(e)}")
-    
-    def reset_config(self):
-        """Execute reset config dengan train split enforcement"""
-        try:
-            from smartcash.ui.dataset.augmentation.handlers.config_handler import create_config_handler
-            handler = create_config_handler(self.ui_components)
-            result = handler.reset_to_default()
-            
-            if result['status'] == 'error':
-                raise Exception(result['message'])
-            
-            return "🔄 Konfigurasi direset ke default (Train split only)"
-            
-        except ImportError as e:
-            raise Exception(f"Config handler import error: {str(e)}")
-
-# Factory functions dengan proper communicator integration
-create_augmentation_handler = lambda ui_components: AugmentationOperationHandler(ui_components)
-create_check_handler = lambda ui_components: CheckOperationHandler(ui_components)
-create_cleanup_handler = lambda ui_components: CleanupOperationHandler(ui_components)
-create_config_handler_ops = lambda ui_components: ConfigOperationHandler(ui_components)
+def _get_target_split(ui_components: Dict[str, Any]) -> str:
+    """Get target split dari UI dengan default train"""
+    target_split_widget = ui_components.get('target_split')
+    return getattr(target_split_widget, 'value', 'train') if target_split_widget else 'train'

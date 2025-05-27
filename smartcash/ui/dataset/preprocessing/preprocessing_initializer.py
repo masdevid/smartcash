@@ -8,7 +8,8 @@ from smartcash.common.config.manager import get_config_manager
 from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.ui.utils.common_initializer import CommonInitializer
-from smartcash.ui.utils.ui_logger_namespace import PREPROCESSING_LOGGER_NAMESPACE
+from smartcash.ui.utils.ui_logger_namespace import PREPROCESSING_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PREPROCESSING_LOGGER_NAMESPACE]
 
 # Import components
 from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
@@ -32,7 +33,7 @@ class PreprocessingInitializer(CommonInitializer):
     
     def __init__(self):
         super().__init__(
-            module_name='dataset_preprocessing',
+            module_name=MODULE_LOGGER_NAME,
             logger_namespace=PREPROCESSING_LOGGER_NAMESPACE
         )
     

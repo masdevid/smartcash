@@ -5,14 +5,16 @@ Deskripsi: Refactored augmentation initializer dengan komunikasi yang tepat ke a
 
 from typing import Dict, Any, List
 from smartcash.ui.utils.common_initializer import CommonInitializer
+from smartcash.ui.utils.ui_logger_namespace import AUGMENTATION_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[AUGMENTATION_LOGGER_NAMESPACE]
 
 class AugmentationInitializer(CommonInitializer):
     """Refactored initializer dengan komunikasi langsung ke augmentor service"""
     
     def __init__(self):
         super().__init__(
-            module_name='dataset_augmentation',
-            logger_namespace='smartcash.ui.dataset.augmentation'
+            module_name=MODULE_LOGGER_NAME,
+            logger_namespace=AUGMENTATION_LOGGER_NAMESPACE
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:

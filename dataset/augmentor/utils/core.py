@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/utils/core.py
-Deskripsi: Core utilities menggantikan multiple files dengan consolidated one-liner operations
+Deskripsi: Fixed core utilities dengan safe_copy_file yang hilang dan consolidated one-liner operations
 """
 
 import os
@@ -38,7 +38,7 @@ get_stem = lambda path: Path(path).stem
 get_parent = lambda path: str(Path(path).parent)
 
 # =============================================================================
-# FILE OPERATIONS - Replaces file.py
+# FILE OPERATIONS - Replaces file.py dengan safe_copy_file yang hilang
 # =============================================================================
 
 find_images = lambda dir_path, exts=['.jpg', '.jpeg', '.png']: [
@@ -49,6 +49,7 @@ find_labels = lambda dir_path: find_images(dir_path, ['.txt'])
 find_aug_files = lambda dir_path: [str(f) for f in Path(resolve_drive_path(dir_path)).rglob('aug_*.*') if f.is_file()]
 
 copy_file = lambda src, dst: shutil.copy2(resolve_drive_path(src), resolve_drive_path(dst)) if path_exists(src) else False
+safe_copy_file = lambda src, dst: safe_execute(lambda: copy_file(src, dst), False)  # ← Added missing function
 delete_file = lambda path: Path(resolve_drive_path(path)).unlink() if path_exists(path) else False
 get_file_size = lambda path: Path(resolve_drive_path(path)).stat().st_size if path_exists(path) else 0
 
@@ -175,7 +176,6 @@ def safe_execute(operation: Callable, fallback_result: Any = None, logger=None) 
         return fallback_result
 
 safe_create_dir = lambda path: safe_execute(lambda: Path(resolve_drive_path(path)).mkdir(parents=True, exist_ok=True), False)
-safe_copy_file = lambda src, dst: safe_execute(lambda: copy_file(src, dst), False)
 safe_read_image = lambda path: safe_execute(lambda: read_image(path), None)
 
 # =============================================================================

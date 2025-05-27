@@ -1,12 +1,12 @@
 """
 File: smartcash/dataset/augmentor/core/engine.py
-Deskripsi: Fixed augmentation engine dengan overall + steps progress tracking dan reduced logging
+Deskripsi: Fixed augmentation engine dengan proper Path import dan reduced logging
 """
 
 import os
 import cv2
 import shutil
-from pathlib import Path
+from pathlib import Path  # ← Added missing import
 from typing import Dict, Any, List, Optional, Callable, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
@@ -18,7 +18,7 @@ from .pipeline import PipelineFactory
 from ..utils.core import detect_structure
 
 class AugmentationEngine:
-    """Fixed augmentation engine dengan proper progress tracking (overall + steps)"""
+    """Fixed augmentation engine dengan proper Path import dan progress tracking"""
     
     def __init__(self, config: Dict[str, Any], communicator=None):
         self.config = config
@@ -146,7 +146,7 @@ class AugmentationEngine:
             if image is None:
                 return {'status': 'error', 'file': file_path, 'error': 'Tidak dapat membaca gambar'}
             
-            # Smart label detection
+            # Smart label detection menggunakan Path yang sudah diimport
             img_name = Path(file_path).stem
             img_dir = Path(file_path).parent
             
@@ -230,7 +230,7 @@ class AugmentationEngine:
                     f.write(f"{int(class_id)} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f}\n")
     
     def _get_raw_files_from_detection(self, detection_result: Dict[str, Any]) -> List[str]:
-        """Get raw files dari detection result"""
+        """Get raw files dari detection result dengan Path handling"""
         image_files = []
         
         for img_location in detection_result['image_locations']:
@@ -254,7 +254,7 @@ class AugmentationEngine:
         self.logger.info(f"📁 Output directory siap: {output_dir}")
     
     def _select_files_for_augmentation(self, raw_files: List[str], raw_dir: str) -> List[str]:
-        """Select files dengan label validation"""
+        """Select files dengan label validation menggunakan Path"""
         if not raw_files:
             return []
         

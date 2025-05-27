@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_component.py
-Deskripsi: Komponen UI utama untuk augmentasi dataset dengan integrasi shared components terbaru
+Deskripsi: Fixed komponen UI dengan confirmation area di bawah action buttons dan layout responsive
 """
 
 import ipywidgets as widgets
@@ -8,14 +8,14 @@ from typing import Dict, Any, Optional
 
 def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk augmentasi dataset dengan shared components terbaru.
+    Buat komponen UI untuk augmentasi dataset dengan confirmation area di posisi yang benar.
 
     Args:
         env: Environment manager
         config: Konfigurasi aplikasi
 
     Returns:
-        Dictionary berisi widget UI dengan integrasi shared components
+        Dictionary berisi widget UI dengan layout yang responsive
     """
     # Import komponen UI standar 
     from smartcash.ui.utils.header_utils import create_header
@@ -29,7 +29,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-    from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
 
     # Import komponen UI pure (tanpa logika bisnis)
     from smartcash.ui.dataset.augmentation.components.basic_options_widget import create_basic_options_widget
@@ -48,7 +47,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_options_widget = create_advanced_options_widget()
     augmentation_types_widget = create_augmentation_types_widget()
 
-    # Buat tombol save dan reset menggunakan shared component TERBARU
+    # Buat tombol save dan reset menggunakan shared component
     save_reset_buttons = create_save_reset_buttons(
         save_label="Simpan",
         reset_label="Reset",
@@ -59,7 +58,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         button_width="100px"
     )
 
-    # Buat tombol-tombol augmentasi dengan shared component TERBARU
+    # Buat tombol-tombol augmentasi dengan shared component
     action_buttons = create_action_buttons(
         primary_label="🚀 Run Augmentation",
         primary_icon="action",
@@ -71,7 +70,16 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         button_width="150px"
     )
 
-    # Progress tracking dengan shared component TERBARU
+    # Confirmation area untuk dialog - MOVED setelah action buttons
+    confirmation_area = widgets.Output(
+        layout=widgets.Layout(
+            width='100%', 
+            margin='10px 0 0 0',  # ← Top margin untuk spacing dari action buttons
+            padding='0'
+        )
+    )
+
+    # Progress tracking dengan shared component
     progress_components = create_progress_tracking_container()
 
     # Log accordion dengan shared component
@@ -81,61 +89,101 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         width='100%'
     )
 
-    # Confirmation area untuk dialog (shared component terbaru)
-    confirmation_area = widgets.Output(
-        layout=widgets.Layout(width='100%', margin='10px 0')
-    )
-
     # Help panel dengan komponen info_box standar
     help_panel = get_augmentation_info()
 
-    # Layout dengan pemisahan yang jelas antara UI dan logika
+    # Layout dengan pemisahan yang jelas antara UI dan logika - RESPONSIVE
     row1 = widgets.HBox([
         # Kolom 1: Basic Options
         widgets.VBox([
-            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Dasar</h4>"),
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>{ICONS['settings']} Opsi Dasar</h4>"),
             basic_options_widget['container']
-        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px')),
+        ], layout=widgets.Layout(
+            width='47%', 
+            padding='8px', 
+            margin='0 1% 0 0',
+            border='1px solid #eaeaea', 
+            border_radius='5px',
+            overflow='hidden'  # ← Prevent horizontal scroll
+        )),
         
         # Kolom 2: Advanced Options
         widgets.VBox([
-            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin: 5px 0; font-size: 14px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
             advanced_options_widget['container']
-        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
-    ], layout=widgets.Layout(width='100%', justify_content='space-between'))
+        ], layout=widgets.Layout(
+            width='47%', 
+            padding='8px', 
+            margin='0',
+            border='1px solid #eaeaea', 
+            border_radius='5px',
+            overflow='hidden'  # ← Prevent horizontal scroll
+        ))
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%',
+        justify_content='space-between',
+        overflow='hidden'  # ← Prevent horizontal scroll
+    ))
     
-    # Baris 2: Jenis Augmentasi & Split
+    # Baris 2: Jenis Augmentasi & Split - RESPONSIVE
     row2 = widgets.VBox([
         augmentation_types_widget['container']
-    ], layout=widgets.Layout(width='100%', padding='5px', margin='10px 0', border='1px solid #eaeaea', border_radius='5px'))
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%',
+        padding='8px', 
+        margin='10px 0', 
+        border='1px solid #eaeaea', 
+        border_radius='5px',
+        overflow='hidden'  # ← Prevent horizontal scroll
+    ))
     
-    # Container untuk tombol save/reset
+    # Container untuk tombol save/reset - RESPONSIVE
     button_container = widgets.Box(
         [save_reset_buttons['container']], 
-        layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='10px 0 5px 0')
+        layout=widgets.Layout(
+            display='flex', 
+            justify_content='flex-end', 
+            width='100%', 
+            max_width='100%',
+            margin='10px 0 5px 0',
+            overflow='hidden'  # ← Prevent horizontal scroll
+        )
     )
     
-    # Settings container
+    # Settings container - RESPONSIVE
     settings_container = widgets.VBox([
         row1,
         row2,
         button_container
-    ], layout=widgets.Layout(width='100%', padding='0'))
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%',
+        padding='0',
+        overflow='hidden'  # ← Prevent horizontal scroll
+    ))
 
-    # Main UI assembly dengan confirmation area
+    # Main UI assembly dengan confirmation area di posisi yang benar
     ui = widgets.VBox([
         header,
         status_panel,
         settings_container,
         create_divider(),
         action_buttons['container'],
-        confirmation_area,  # ← Area untuk confirmation dialog
-        progress_components['container'],  # ← Gunakan container dari progress tracking
+        confirmation_area,  # ← MOVED: Sekarang di bawah action buttons
+        progress_components['container'],
         log_components['log_accordion'],
         help_panel
-    ], layout=widgets.Layout(width='100%', padding='0', margin='0'))
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%',
+        padding='0', 
+        margin='0',
+        overflow='hidden'  # ← Prevent horizontal scroll
+    ))
 
-    # UI Components mapping dengan shared components terbaru
+    # UI Components mapping dengan shared components
     ui_components = {
         'ui': ui,
         'header': header,
@@ -151,19 +199,19 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         **advanced_options_widget['widgets'],
         **augmentation_types_widget['widgets'],
         
-        # Action buttons - UPDATED untuk shared component terbaru
+        # Action buttons
         'augment_button': action_buttons['download_button'],  # Primary button
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
         
-        # Config buttons - UPDATED
+        # Config buttons
         'save_button': save_reset_buttons['save_button'],
         'reset_button': save_reset_buttons['reset_button'],
         
-        # Progress components - UPDATED untuk shared component terbaru
-        **progress_components,  # Spread semua komponen progress
+        # Progress components
+        **progress_components,
         
-        # Confirmation area - BARU untuk shared confirmation dialog
+        # Confirmation area - FIXED: sekarang di posisi yang benar
         'confirmation_area': confirmation_area,
         
         # Log components

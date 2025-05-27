@@ -49,6 +49,7 @@ def _create_check_handler(ui_components: Dict[str, Any]):
 def _create_cleanup_handler(ui_components: Dict[str, Any]):
     """Create cleanup handler dengan confirmation"""
     def handler(button):
+        _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import show_cleanup_confirmation
         show_cleanup_confirmation(ui_components)
     return handler
@@ -56,6 +57,7 @@ def _create_cleanup_handler(ui_components: Dict[str, Any]):
 def _create_save_handler(ui_components: Dict[str, Any]):
     """Create save handler"""
     def handler(button):
+        _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.config_handler import save_configuration
         save_configuration(ui_components)
     return handler
@@ -63,6 +65,7 @@ def _create_save_handler(ui_components: Dict[str, Any]):
 def _create_reset_handler(ui_components: Dict[str, Any]):
     """Create reset handler"""
     def handler(button):
+        _reset_ui_state(ui_components)
         from smartcash.ui.dataset.augmentation.handlers.config_handler import reset_configuration
         reset_configuration(ui_components)
     return handler

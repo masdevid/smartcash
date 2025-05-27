@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Fixed config handler dengan train split only enforcement dan proper widget extraction
+Deskripsi: Fixed config handler dengan status panel updates dan train split enforcement
 """
 
 from typing import Dict, Any, Optional
@@ -8,7 +8,7 @@ from smartcash.common.config import get_config_manager
 from smartcash.dataset.augmentor.config import extract_ui_config, create_aug_config
 
 class ConfigHandler:
-    """Fixed config handler dengan train split enforcement"""
+    """Fixed config handler dengan train split enforcement dan status updates"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -79,7 +79,7 @@ class ConfigHandler:
     _get_widget_value = lambda self, key, default: getattr(self.ui_components.get(key), 'value', default)
     
     def save_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Save config dengan train split enforcement"""
+        """Save config dengan train split enforcement dan status update"""
         config = config or self.extract_config_from_ui()
         
         # Enforce train split
@@ -89,9 +89,13 @@ class ConfigHandler:
             success = self.config_manager.save_config(config, self.config_file)
             status_msg = '✅ Konfigurasi berhasil disimpan (Train split only)' if success else '❌ Gagal menyimpan konfigurasi'
             
+            # Update status panel jika ada
+            self._update_status_panel(status_msg, 'success' if success else 'error')
+            
             return {'status': 'success' if success else 'error', 'message': status_msg, 'config': config}
         except Exception as e:
             error_msg = f'❌ Error save config: {str(e)}'
+            self._update_status_panel(error_msg, 'error')
             return {'status': 'error', 'message': error_msg, 'config': config or {}}
     
     def load_config(self) -> Dict[str, Any]:
@@ -109,15 +113,20 @@ class ConfigHandler:
             return self.get_default_config()
     
     def reset_to_default(self) -> Dict[str, Any]:
-        """Reset dengan train split enforcement"""
+        """Reset dengan train split enforcement dan status update"""
         try:
             default_config = self.get_default_config()
             self.apply_config_to_ui(default_config)
             save_result = self.save_config(default_config)
             
-            return {'status': 'success', 'message': '🔄 Konfigurasi direset ke default (Train split only)', 'config': default_config}
+            status_msg = '🔄 Konfigurasi direset ke default (Train split only)'
+            self._update_status_panel(status_msg, 'success')
+            
+            return {'status': 'success', 'message': status_msg, 'config': default_config}
         except Exception as e:
-            return {'status': 'error', 'message': f'❌ Error reset config: {str(e)}'}
+            error_msg = f'❌ Error reset config: {str(e)}'
+            self._update_status_panel(error_msg, 'error')
+            return {'status': 'error', 'message': error_msg}
     
     def apply_config_to_ui(self, config: Dict[str, Any]) -> bool:
         """Apply config ke UI dengan train split enforcement"""
@@ -148,6 +157,13 @@ class ConfigHandler:
             return True
         except Exception:
             return False
+    
+    def _update_status_panel(self, message: str, status_type: str):
+        """One-liner update status panel dengan new message"""
+        status_panel = self.ui_components.get('status_panel')
+        if status_panel and hasattr(status_panel, 'value'):
+            from smartcash.ui.utils.alert_utils import create_alert_html
+            status_panel.value = create_alert_html(message, status_type)
     
     def get_default_config(self) -> Dict[str, Any]:
         """Default config dengan train split only"""

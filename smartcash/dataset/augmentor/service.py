@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/service.py
-Deskripsi: Regenerated service dengan one-liner style dan proper imports
+Deskripsi: Fixed service dengan proper error handling dan one-liner style yang benar
 """
 
 import time
@@ -16,7 +16,7 @@ from .utils.core import (
 from .core.pipeline import PipelineFactory
 
 class AugmentationService:
-    """One-liner style orchestrator service dengan consolidated utilities"""
+    """One-liner style orchestrator service dengan consolidated utilities dan fixed error handling"""
     
     def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None):
         self.context = create_context(config, ui_components.get('comm') if ui_components else None)
@@ -25,10 +25,10 @@ class AugmentationService:
         self.pipeline_factory = PipelineFactory(config, self.progress.logger)
     
     def run_full_augmentation_pipeline(self, target_split: str = "train", progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """One-liner full pipeline dengan consolidated flow"""
+        """Fixed full pipeline dengan proper error handling dan return statements"""
         start_time = time.time()
         
-        # One-liner dataset validation
+        # One-liner dataset validation dengan proper error return
         dataset_info = self.context['detector']()
         if dataset_info['status'] == 'error' or dataset_info['total_images'] == 0:
             return self._error_result(f"Dataset tidak valid: {dataset_info.get('message', 'Tidak ada gambar')}")
@@ -36,66 +36,85 @@ class AugmentationService:
         self.progress.log_info(f"🚀 Pipeline dimulai: {dataset_info['total_images']} gambar")
         
         try:
-            # One-liner augmentation step
+            # Fixed augmentation step dengan proper error checking
             self.progress.progress("overall", 10, "Memulai augmentasi dataset")
             aug_result = self._process_augmentation(dataset_info)
-            aug_result['status'] != 'success' and self._error_result(f"Augmentasi gagal: {aug_result['message']}")
+            if aug_result['status'] != 'success':
+                return self._error_result(f"Augmentasi gagal: {aug_result.get('message', 'Unknown error')}")
             
-            # One-liner normalization step
+            # Fixed normalization step dengan proper error checking
             self.progress.progress("overall", 60, "Memulai normalisasi ke preprocessed")
             norm_result = self._process_normalization(target_split)
-            norm_result['status'] != 'success' and self._error_result(f"Normalisasi gagal: {norm_result['message']}")
+            if norm_result['status'] != 'success':
+                return self._error_result(f"Normalisasi gagal: {norm_result.get('message', 'Unknown error')}")
             
-            # One-liner success result
+            # One-liner success result dengan proper data access
             total_time = time.time() - start_time
             result = {
-                'status': 'success', 'total_files': aug_result['total_generated'], 'final_output': target_split,
-                'processing_time': total_time, 'steps': {'augmentation': aug_result, 'normalization': norm_result}
+                'status': 'success', 
+                'total_files': aug_result.get('total_generated', 0), 
+                'final_output': target_split,
+                'processing_time': total_time, 
+                'steps': {'augmentation': aug_result, 'normalization': norm_result}
             }
             
-            self.progress.log_success(f"Pipeline selesai: {result['total_files']} file dalam {total_time:.1f}s")
+            self.progress.log_success(f"✅ Pipeline selesai: {result['total_files']} file dalam {total_time:.1f}s")
             return result
             
         except Exception as e:
-            return self._error_result(f"Pipeline error: {str(e)}")
+            error_msg = f"Pipeline error: {str(e)}"
+            self.progress.log_error(error_msg)
+            return self._error_result(error_msg)
     
     def _process_augmentation(self, dataset_info: Dict[str, Any]) -> Dict[str, Any]:
-        """One-liner augmentation processing dengan consolidated utilities"""
-        ensure_dirs(self.paths['aug_images'], self.paths['aug_labels'])
-        
-        # One-liner image files collection
-        image_files = [str(f) for location in dataset_info['image_locations'] 
-                      for images_dir in [location['path'] if '/images' in location['path'] 
-                                        else f"{location['path']}/images" if Path(f"{location['path']}/images").exists() 
-                                        else location['path']]
-                      for f in Path(images_dir).glob('*.*') 
-                      if f.suffix.lower() in ['.jpg', '.jpeg', '.png'] and f.is_file()]
-        
-        if not image_files:
-            return {'status': 'error', 'message': 'Tidak ada file gambar ditemukan'}
-        
-        # One-liner pipeline creation
-        aug_type = self.config['types'][0] if self.config['types'] else 'combined'
-        pipeline = self.pipeline_factory.create_pipeline(aug_type, self.config['intensity'])
-        
-        # One-liner batch processing
-        results = process_batch(image_files, 
-                               lambda img_path: self._process_single_image(img_path, pipeline, self.config['num_variations']), 
-                               progress_tracker=self.progress)
-        
-        # One-liner stats calculation
-        successful = [r for r in results if r.get('status') == 'success']
-        return {
-            'status': 'success', 'total_generated': sum(r.get('generated', 0) for r in successful),
-            'processed_files': len(results), 'success_rate': len(successful) / len(results) * 100 if results else 0
-        }
+        """Fixed augmentation processing dengan proper error handling"""
+        try:
+            ensure_dirs(self.paths['aug_images'], self.paths['aug_labels'])
+            
+            # One-liner image files collection dengan better error handling
+            image_files = [str(f) for location in dataset_info['image_locations'] 
+                          for images_dir in [location['path'] if '/images' in location['path'] 
+                                            else f"{location['path']}/images" if Path(f"{location['path']}/images").exists() 
+                                            else location['path']]
+                          for f in Path(images_dir).glob('*.*') 
+                          if f.suffix.lower() in ['.jpg', '.jpeg', '.png'] and f.is_file()]
+            
+            if not image_files:
+                return {'status': 'error', 'message': 'Tidak ada file gambar ditemukan'}
+            
+            # One-liner pipeline creation dengan error handling
+            aug_type = self.config.get('types', ['combined'])[0] if self.config.get('types') else 'combined'
+            pipeline = self.pipeline_factory.create_pipeline(aug_type, self.config.get('intensity', 0.7))
+            
+            # One-liner batch processing
+            results = process_batch(image_files, 
+                                   lambda img_path: self._process_single_image(img_path, pipeline, self.config.get('num_variations', 2)), 
+                                   progress_tracker=self.progress)
+            
+            # One-liner stats calculation dengan safety checks
+            successful = [r for r in results if r.get('status') == 'success']
+            total_generated = sum(r.get('generated', 0) for r in successful)
+            
+            if total_generated == 0:
+                return {'status': 'error', 'message': 'Tidak ada file yang berhasil diaugmentasi'}
+            
+            return {
+                'status': 'success', 
+                'total_generated': total_generated,
+                'processed_files': len(results), 
+                'success_rate': len(successful) / len(results) * 100 if results else 0
+            }
+            
+        except Exception as e:
+            return {'status': 'error', 'message': f"Error pada augmentasi: {str(e)}"}
     
     def _process_single_image(self, image_path: str, pipeline, num_variations: int) -> Dict[str, Any]:
         """One-liner single image processing dengan consolidated pattern"""
         try:
             # One-liner image reading
             image = read_image(image_path)
-            if image is None: return {'status': 'error', 'error': 'Cannot read image'}
+            if image is None: 
+                return {'status': 'error', 'error': 'Cannot read image'}
             
             # One-liner label finding
             img_stem, img_dir = get_stem(image_path), Path(image_path).parent
@@ -135,25 +154,36 @@ class AugmentationService:
             return False
     
     def _process_normalization(self, target_split: str) -> Dict[str, Any]:
-        """One-liner normalization processing dengan consolidated utilities"""
-        # One-liner target setup
-        target_dir = f"{self.paths['prep_dir']}/{target_split}"
-        ensure_dirs(f"{target_dir}/images", f"{target_dir}/labels")
-        
-        # One-liner augmented files finding
-        aug_files = find_aug_files(self.paths['aug_dir'])
-        if not aug_files: return {'status': 'error', 'message': 'Tidak ada file augmented ditemukan'}
-        
-        # One-liner pairs creation
-        image_files = [f for f in aug_files if any(f.endswith(ext) for ext in ['.jpg', '.jpeg', '.png'])]
-        pairs = [(img_file, f"{self.paths['aug_labels']}/{get_stem(img_file)}.txt") 
-                for img_file in image_files if Path(f"{self.paths['aug_labels']}/{get_stem(img_file)}.txt").exists()]
-        
-        # One-liner normalization processing
-        normalized = sum(1 for img_file, label_file in pairs 
-                        if self._normalize_pair(img_file, label_file, target_dir))
-        
-        return {'status': 'success', 'total_normalized': normalized, 'target_dir': target_dir}
+        """Fixed normalization processing dengan proper error handling"""
+        try:
+            # One-liner target setup
+            target_dir = f"{self.paths['prep_dir']}/{target_split}"
+            ensure_dirs(f"{target_dir}/images", f"{target_dir}/labels")
+            
+            # One-liner augmented files finding
+            aug_files = find_aug_files(self.paths['aug_dir'])
+            if not aug_files: 
+                return {'status': 'error', 'message': 'Tidak ada file augmented ditemukan'}
+            
+            # One-liner pairs creation
+            image_files = [f for f in aug_files if any(f.endswith(ext) for ext in ['.jpg', '.jpeg', '.png'])]
+            pairs = [(img_file, f"{self.paths['aug_labels']}/{get_stem(img_file)}.txt") 
+                    for img_file in image_files if Path(f"{self.paths['aug_labels']}/{get_stem(img_file)}.txt").exists()]
+            
+            if not pairs:
+                return {'status': 'error', 'message': 'Tidak ada pasangan image-label yang valid'}
+            
+            # One-liner normalization processing
+            normalized = sum(1 for img_file, label_file in pairs 
+                            if self._normalize_pair(img_file, label_file, target_dir))
+            
+            if normalized == 0:
+                return {'status': 'error', 'message': 'Tidak ada file yang berhasil dinormalisasi'}
+            
+            return {'status': 'success', 'total_normalized': normalized, 'target_dir': target_dir}
+            
+        except Exception as e:
+            return {'status': 'error', 'message': f"Error pada normalisasi: {str(e)}"}
     
     def _normalize_pair(self, img_file: str, label_file: str, target_dir: str) -> bool:
         """One-liner pair normalization"""
@@ -174,14 +204,22 @@ class AugmentationService:
     
     def get_augmentation_status(self) -> Dict[str, Any]:
         """One-liner status menggunakan consolidated detector"""
-        raw_images, raw_labels = count_dataset_files(self.paths['raw_dir'])
-        aug_images, aug_labels = count_dataset_files(self.paths['aug_dir'])
-        
-        return {
-            'raw_dataset': {'exists': raw_images > 0, 'total_images': raw_images, 'total_labels': raw_labels},
-            'augmented_dataset': {'exists': aug_images > 0, 'total_images': aug_images, 'total_labels': aug_labels},
-            'ready_for_augmentation': raw_images > 0
-        }
+        try:
+            raw_images, raw_labels = count_dataset_files(self.paths['raw_dir'])
+            aug_images, aug_labels = count_dataset_files(self.paths['aug_dir'])
+            
+            return {
+                'raw_dataset': {'exists': raw_images > 0, 'total_images': raw_images, 'total_labels': raw_labels},
+                'augmented_dataset': {'exists': aug_images > 0, 'total_images': aug_images, 'total_labels': aug_labels},
+                'ready_for_augmentation': raw_images > 0
+            }
+        except Exception as e:
+            return {
+                'raw_dataset': {'exists': False, 'total_images': 0, 'total_labels': 0},
+                'augmented_dataset': {'exists': False, 'total_images': 0, 'total_labels': 0},
+                'ready_for_augmentation': False,
+                'error': str(e)
+            }
     
     # One-liner error result creator
     _error_result = lambda self, msg: {'status': 'error', 'message': msg, 'timestamp': time.time()}

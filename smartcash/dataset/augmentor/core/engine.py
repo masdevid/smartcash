@@ -1,464 +1,320 @@
 """
-File: smartcash/dataset/augmentor/core/engine.py
-Deskripsi: Fixed augmentation engine dengan smart image detection untuk resolve "Tidak ada file gambar ditemukan"
+File: smartcash/dataset/augmentor/utils/core.py
+Deskripsi: Fixed core utilities dengan real-time progress tracking untuk resolve stepping updates
 """
 
 import os
-import cv2
+import glob
 import shutil
+import cv2
+import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import defaultdict
+from typing import Dict, Any, List, Tuple, Optional, Union, Callable
+from collections import defaultdict, Counter
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import time
 
 from smartcash.common.logger import get_logger
 from smartcash.common.threadpools import get_optimal_thread_count
-from .pipeline import PipelineFactory
-from ..utils.core import detect_structure, smart_find_images, resolve_drive_path
 
-class AugmentationEngine:
-    """Fixed augmentation engine dengan smart image detection dan robust file handling"""
+# =============================================================================
+# ENHANCED PATH OPERATIONS - Unchanged
+# =============================================================================
+
+def resolve_drive_path(path: str) -> str:
+    """Smart path resolution dengan prioritas Drive → Content → Local"""
+    if not os.path.isabs(path):
+        search_bases = ['/content/drive/MyDrive/SmartCash', '/content/drive/MyDrive', '/content/SmartCash', '/content', os.getcwd()]
+        for base in search_bases:
+            full_path = os.path.join(base, path)
+            if os.path.exists(full_path): return full_path
+    return path
+
+def find_dataset_directories(base_path: str) -> List[str]:
+    """Find all possible dataset directories dengan recursive search"""
+    resolved_path = resolve_drive_path(base_path)
+    yolo_patterns = [resolved_path, os.path.join(resolved_path, 'data'), os.path.join(resolved_path, 'dataset'), os.path.join(resolved_path, 'images')]
     
-    def __init__(self, config: Dict[str, Any], communicator=None):
-        self.config = config
+    # Add split directories
+    for split in ['train', 'valid', 'test', 'val']:
+        yolo_patterns.extend([os.path.join(resolved_path, split), os.path.join(resolved_path, split, 'images'), os.path.join(resolved_path, 'data', split), os.path.join(resolved_path, 'data', split, 'images')])
+    
+    return list(set([pattern for pattern in yolo_patterns if os.path.exists(pattern) and os.path.isdir(pattern)]))
+
+def smart_find_images(base_path: str, extensions: List[str] = None) -> List[str]:
+    """Smart image finder dengan multiple search strategies"""
+    extensions = extensions or ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
+    image_files = []
+    
+    # Strategy 1: Direct directory scan
+    for dir_path in find_dataset_directories(base_path):
+        try:
+            # Scan current directory
+            for file in os.listdir(dir_path):
+                file_path = os.path.join(dir_path, file)
+                if os.path.isfile(file_path) and Path(file).suffix.lower() in extensions:
+                    image_files.append(file_path)
+            
+            # Scan images subdirectory if exists
+            images_subdir = os.path.join(dir_path, 'images')
+            if os.path.exists(images_subdir):
+                for file in os.listdir(images_subdir):
+                    file_path = os.path.join(images_subdir, file)
+                    if os.path.isfile(file_path) and Path(file).suffix.lower() in extensions:
+                        image_files.append(file_path)
+        except (PermissionError, OSError):
+            continue
+    
+    # Strategy 2: Recursive glob search for backup
+    if not image_files:
+        try:
+            resolved_path = resolve_drive_path(base_path)
+            for ext in extensions:
+                pattern = os.path.join(resolved_path, '**', f'*{ext}')
+                image_files.extend(glob.glob(pattern, recursive=True))
+        except Exception:
+            pass
+    
+    return list(set(image_files))
+
+build_paths = lambda raw_dir, aug_dir, prep_dir, split="train": {'raw_dir': resolve_drive_path(raw_dir), 'aug_dir': resolve_drive_path(aug_dir), 'prep_dir': resolve_drive_path(prep_dir), 'aug_images': f"{resolve_drive_path(aug_dir)}/images", 'aug_labels': f"{resolve_drive_path(aug_dir)}/labels", 'prep_split': f"{resolve_drive_path(prep_dir)}/{split}"}
+ensure_dirs = lambda *paths: [Path(resolve_drive_path(p)).mkdir(parents=True, exist_ok=True) for p in paths]
+path_exists = lambda path: Path(resolve_drive_path(path)).exists()
+get_stem = lambda path: Path(path).stem
+get_parent = lambda path: str(Path(path).parent)
+
+# =============================================================================
+# ENHANCED FILE OPERATIONS - Unchanged
+# =============================================================================
+
+find_images = lambda dir_path, exts=['.jpg', '.jpeg', '.png']: smart_find_images(dir_path, exts)
+find_labels = lambda dir_path: smart_find_images(dir_path, ['.txt'])
+find_aug_files = lambda dir_path: [str(f) for f in Path(resolve_drive_path(dir_path)).rglob('aug_*.*') if f.is_file()]
+
+copy_file = lambda src, dst: shutil.copy2(resolve_drive_path(src), resolve_drive_path(dst)) if path_exists(src) else False
+safe_copy_file = lambda src, dst: safe_execute(lambda: copy_file(src, dst), False)
+delete_file = lambda path: Path(resolve_drive_path(path)).unlink() if path_exists(path) else False
+get_file_size = lambda path: Path(resolve_drive_path(path)).stat().st_size if path_exists(path) else 0
+
+# =============================================================================
+# IMAGE OPERATIONS - Unchanged
+# =============================================================================
+
+read_image = lambda path: cv2.imread(resolve_drive_path(path)) if path_exists(path) else None
+save_image = lambda img, path: cv2.imwrite(resolve_drive_path(path), img) if img is not None else False
+validate_image = lambda img: img is not None and img.size > 0
+resize_image = lambda img, size: cv2.resize(img, size) if validate_image(img) else None
+
+# =============================================================================
+# BBOX OPERATIONS - Unchanged
+# =============================================================================
+
+parse_yolo_line = lambda line: [int(float(parts[0]))] + [float(x) for x in parts[1:]] if (parts := line.strip().split()) and len(parts) >= 5 else []
+format_yolo_line = lambda bbox: f"{int(bbox[0])} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f} {bbox[4]:.6f}"
+validate_bbox = lambda bbox: len(bbox) >= 5 and isinstance(bbox[0], (int, float)) and all(0 <= x <= 1 for x in bbox[1:5])
+
+def read_yolo_labels(label_path: str) -> List[List[float]]:
+    try:
+        with open(resolve_drive_path(label_path), 'r') as f:
+            return [bbox for line in f if (bbox := parse_yolo_line(line)) and validate_bbox(bbox)]
+    except Exception:
+        return []
+
+def save_yolo_labels(bboxes: List[List[float]], output_path: str) -> bool:
+    try:
+        ensure_dirs(get_parent(output_path))
+        with open(resolve_drive_path(output_path), 'w') as f:
+            [f.write(format_yolo_line(bbox) + '\n') for bbox in bboxes if validate_bbox(bbox)]
+        return True
+    except Exception:
+        return False
+
+# =============================================================================
+# ENHANCED DATASET DETECTION - Unchanged
+# =============================================================================
+
+def detect_structure(data_dir: str) -> Dict[str, Any]:
+    """Enhanced dataset detection dengan smart image finder"""
+    resolved_dir = resolve_drive_path(data_dir)
+    
+    if not path_exists(resolved_dir):
+        return {'status': 'error', 'message': f'Directory tidak ditemukan: {resolved_dir}'}
+    
+    # Smart image detection
+    images = smart_find_images(resolved_dir)
+    labels = find_labels(resolved_dir)
+    
+    # Enhanced structure detection
+    has_yolo = path_exists(f"{resolved_dir}/images") and path_exists(f"{resolved_dir}/labels")
+    splits = [s for s in ['train', 'valid', 'test', 'val'] if path_exists(f"{resolved_dir}/{s}")]
+    
+    # Detailed image locations untuk tracking
+    image_locations = []
+    dataset_dirs = find_dataset_directories(resolved_dir)
+    
+    for dir_path in dataset_dirs:
+        dir_images = [img for img in images if img.startswith(dir_path)]
+        if dir_images:
+            image_locations.append({'path': dir_path, 'count': len(dir_images), 'has_images_subdir': path_exists(f"{dir_path}/images"), 'sample_files': dir_images[:3]})
+    
+    return {'status': 'success', 'data_dir': resolved_dir, 'total_images': len(images), 'total_labels': len(labels), 'structure_type': 'standard_yolo' if has_yolo else f'mixed_structure_{len(splits)}_splits' if splits else 'flat_structure', 'splits_detected': splits, 'image_locations': image_locations, 'recommendations': [f'✅ Ditemukan {len(images)} gambar di {len(image_locations)} lokasi' if images else '❌ Tidak ada gambar ditemukan - periksa path dan format file', f'📁 Struktur: {len(image_locations)} direktori dengan gambar', f'🏷️ Labels: {len(labels)} file label ditemukan']}
+
+# =============================================================================
+# PROGRESS TRACKING - Fixed dengan Real-time Updates
+# =============================================================================
+
+class ProgressTracker:
+    def __init__(self, communicator=None):
         self.comm = communicator
         self.logger = getattr(self.comm, 'logger', None) if self.comm else get_logger(__name__)
-        self.pipeline_factory = PipelineFactory(config, self.logger)
-        self.stats = defaultdict(int)
-        
-    def process_raw_data(self, raw_dir: str, output_dir: str = None) -> Dict[str, Any]:
-        """Fixed process raw data dengan enhanced image detection"""
-        if not output_dir:
-            output_dir = self.config.get('augmentation', {}).get('output_dir', 'data/augmented')
-            
-        self.logger.info(f"🚀 Memulai augmentasi dari {raw_dir} → {output_dir}")
-        
-        # Overall progress: Initialization
-        self._update_progress("overall", 5, "Inisialisasi augmentation engine")
-        
-        start_time = time.time()
-        
-        try:
-            # Enhanced dataset detection dengan smart finder
-            detection_result = detect_structure(raw_dir)
-            
-            if detection_result['status'] == 'error':
-                return self._create_error_result(f"Raw directory error: {detection_result['message']}")
-            
-            # Enhanced validation dengan detailed logging
-            total_images = detection_result['total_images']
-            image_locations = detection_result['image_locations']
-            
-            if total_images == 0:
-                # Debug info untuk troubleshooting
-                resolved_dir = resolve_drive_path(raw_dir)
-                self.logger.error(f"❌ Debug Info:")
-                self.logger.error(f"   • Raw dir input: {raw_dir}")
-                self.logger.error(f"   • Resolved path: {resolved_dir}")
-                self.logger.error(f"   • Path exists: {os.path.exists(resolved_dir)}")
-                self.logger.error(f"   • Image locations checked: {len(image_locations)}")
-                
-                # Try manual search as last resort
-                manual_images = smart_find_images(resolved_dir)
-                if manual_images:
-                    self.logger.info(f"🔍 Manual search found {len(manual_images)} images")
-                    # Update detection result
-                    detection_result['total_images'] = len(manual_images)
-                    detection_result['image_locations'] = [{'path': resolved_dir, 'count': len(manual_images)}]
-                else:
-                    return self._create_error_result(f"Tidak ada gambar ditemukan di {resolved_dir}. Periksa path dan format file (.jpg, .png, .jpeg)")
-            
-            resolved_raw_dir = detection_result['data_dir']
-            self.logger.info(f"📁 Dataset terdeteksi: {detection_result['structure_type']}, {total_images} gambar di {len(image_locations)} lokasi")
-            
-            # Log image locations untuk debugging
-            for location in image_locations[:3]:  # Show first 3 locations
-                self.logger.info(f"   📂 {location['path']}: {location['count']} files")
-            
-            # Overall progress: Dataset detected
-            self._update_progress("overall", 15, f"Dataset terdeteksi: {total_images} gambar")
-            
-            # Get and validate files dengan enhanced approach
-            raw_files = self._get_raw_files_from_detection_enhanced(detection_result)
-            if not raw_files:
-                return self._create_error_result("Tidak ada file raw yang valid ditemukan setelah validasi")
-            
-            self._ensure_output_directory(output_dir)
-            selected_files = self._select_files_for_augmentation_enhanced(raw_files, resolved_raw_dir)
-            
-            if not selected_files:
-                # Show some files that were found but not selected
-                self.logger.warning(f"⚠️ Dari {len(raw_files)} file ditemukan, tidak ada yang memenuhi kriteria")
-                self.logger.info(f"📋 Sample files found: {[Path(f).name for f in raw_files[:5]]}")
-                return self._create_error_result("Tidak ada file yang memenuhi criteria augmentasi - periksa label files")
-            
-            # Overall progress: Files selected
-            self._update_progress("overall", 25, f"Terpilih {len(selected_files)} file untuk augmentasi")
-            
-            # Process files dengan dual progress tracking
-            aug_results = self._process_files_batch(selected_files, output_dir)
-            
-            # Generate result
-            processing_time = time.time() - start_time
-            result = self._create_success_result(aug_results, processing_time, output_dir)
-            
-            # Overall progress: Complete
-            self._update_progress("overall", 100, "Augmentasi selesai")
-            self.logger.info(f"✅ Augmentasi selesai: {result['total_generated']} file dalam {processing_time:.1f}s")
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Error pada augmentation engine: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            self.comm and hasattr(self.comm, 'log') and self.comm.log("error", error_msg)
-            return self._create_error_result(error_msg)
     
-    def _get_raw_files_from_detection_enhanced(self, detection_result: Dict[str, Any]) -> List[str]:
-        """Enhanced raw files extraction dengan multiple strategies"""
-        image_files = []
+    def progress(self, step: str, current: int, total: int, msg: str = ""):
+        """Fixed progress dengan immediate UI updates."""
+        if self.comm and hasattr(self.comm, 'progress'):
+            percentage = min(100, max(0, int((current / max(1, total)) * 100)))
+            self.comm.progress(step, current, total, msg)
         
-        # Strategy 1: Use detection result locations
-        for img_location in detection_result['image_locations']:
-            img_dir = img_location['path']
-            
-            try:
-                if os.path.exists(img_dir):
-                    # Scan direct files
-                    valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
-                    
-                    # Check main directory
-                    for file in os.listdir(img_dir):
-                        file_path = os.path.join(img_dir, file)
-                        if os.path.isfile(file_path) and Path(file).suffix.lower() in valid_extensions:
-                            image_files.append(file_path)
-                    
-                    # Check images subdirectory
-                    images_subdir = os.path.join(img_dir, 'images')
-                    if os.path.exists(images_subdir):
-                        for file in os.listdir(images_subdir):
-                            file_path = os.path.join(images_subdir, file)
-                            if os.path.isfile(file_path) and Path(file).suffix.lower() in valid_extensions:
-                                image_files.append(file_path)
-                        
-            except (PermissionError, OSError) as e:
-                self.logger.debug(f"⚠️ Cannot access {img_dir}: {str(e)}")
-                continue
-        
-        # Strategy 2: Smart finder fallback
-        if not image_files:
-            self.logger.info("🔍 Menggunakan smart finder sebagai fallback")
-            image_files = smart_find_images(detection_result['data_dir'])
-        
-        # Remove duplicates dan validate
-        unique_files = list(set(image_files))
-        valid_files = [f for f in unique_files if os.path.exists(f) and os.path.getsize(f) > 0]
-        
-        self.logger.info(f"📁 Ditemukan {len(valid_files)} file gambar valid dari smart detection")
-        
-        # Debug info jika sedikit file
-        if len(valid_files) < 10:
-            self.logger.info(f"📋 Sample files: {[Path(f).name for f in valid_files[:5]]}")
-        
-        return valid_files
+        # Also update via direct methods untuk backup
+        if self.comm and hasattr(self.comm, 'report_progress_with_callback'):
+            self.comm.report_progress_with_callback(None, step, current, total, msg)
     
-    def _select_files_for_augmentation_enhanced(self, raw_files: List[str], raw_dir: str) -> List[str]:
-        """Enhanced file selection dengan flexible label matching"""
-        if not raw_files:
-            return []
-        
-        self.logger.info(f"🎯 Memvalidasi {len(raw_files)} file untuk augmentasi")
-        
-        # Get label locations dari dataset detection
-        detection_result = detect_structure(raw_dir)
-        
-        selected = []
-        label_dirs_to_check = []
-        
-        # Build list of potential label directories
-        for img_file in raw_files[:5]:  # Sample first 5 to find label pattern
-            img_dir = Path(img_file).parent
-            potential_label_dirs = [
-                img_dir.parent / 'labels',      # ../labels
-                img_dir / 'labels',             # ./labels  
-                img_dir.parent,                 # ../
-                img_dir,                        # ./
-                img_dir.parent / 'label',       # ../label
-                img_dir / 'label'               # ./label
-            ]
-            label_dirs_to_check.extend([str(d) for d in potential_label_dirs if d.exists()])
-        
-        # Remove duplicates
-        label_dirs_to_check = list(set(label_dirs_to_check))
-        self.logger.info(f"🏷️ Memeriksa label di {len(label_dirs_to_check)} direktori")
-        
-        # Check each image file for corresponding label
-        files_with_labels = 0
-        for img_file in raw_files:
-            img_stem = Path(img_file).stem
-            label_found = False
-            
-            # Search for label file
-            for label_dir in label_dirs_to_check:
-                label_path = os.path.join(label_dir, f"{img_stem}.txt")
-                if os.path.exists(label_path) and os.path.getsize(label_path) > 0:
-                    selected.append(img_file)
-                    label_found = True
-                    files_with_labels += 1
-                    break
-            
-            # Log first few files without labels for debugging
-            if not label_found and len(selected) < 5:
-                self.logger.debug(f"⚠️ Label tidak ditemukan untuk: {Path(img_file).name}")
-        
-        # Fallback: jika sangat sedikit yang punya label, ambil sample tanpa label requirement
-        if len(selected) < 5 and len(raw_files) > 10:
-            self.logger.warning(f"⚠️ Hanya {len(selected)} file dengan label, menggunakan sample tanpa requirement")
-            selected = raw_files[:20]  # Take first 20 as sample
-            files_with_labels = 0
-        
-        self.logger.info(f"🎯 Terpilih {len(selected)} file ({files_with_labels} dengan label) untuk augmentasi")
-        
-        return selected
+    log_info = lambda self, msg: self.comm.log_info(msg) if self.comm else print(f"ℹ️ {msg}")
+    log_success = lambda self, msg: self.comm.log_success(msg) if self.comm else print(f"✅ {msg}")
+    log_error = lambda self, msg: self.comm.log_error(msg) if self.comm else print(f"❌ {msg}")
+
+# =============================================================================
+# BATCH PROCESSING - Fixed dengan Real-time Progress Updates
+# =============================================================================
+
+def process_batch(items: List[Any], process_func: Callable, max_workers: int = None, 
+                 progress_tracker: ProgressTracker = None, operation_name: str = "processing") -> List[Dict[str, Any]]:
+    """Fixed batch processing dengan real-time progress updates."""
+    max_workers = max_workers or min(get_optimal_thread_count(), 8)
+    results = []
     
-    def _process_files_batch(self, files: List[str], output_dir: str) -> List[Dict[str, Any]]:
-        """Process files batch dengan enhanced error handling"""
-        self.logger.info(f"⚡ Memproses {len(files)} file dengan parallelism")
-        
-        # Extract config parameters
-        aug_config = self.config.get('augmentation', {})
-        aug_type = aug_config.get('types', ['combined'])[0] if aug_config.get('types') else 'combined'
-        intensity = aug_config.get('intensity', 0.7)
-        num_variants = aug_config.get('num_variations', 2)
-        
-        # Create pipeline
-        pipeline = self.pipeline_factory.create_pipeline(aug_type, intensity)
-        
-        results = []
-        total_files = len(files)
-        max_workers = min(get_optimal_thread_count(), 8)
-        
-        # Progress tracking
-        progress_interval = max(1, total_files // 10)
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_file = {executor.submit(self._process_single_file_enhanced, file_path, pipeline, output_dir, num_variants): file_path for file_path in files}
-            
-            processed = 0
-            for future in as_completed(future_to_file):
-                file_path = future_to_file[future]
-                try:
-                    result = future.result()
-                    results.append(result)
-                    processed += 1
-                    
-                    # Update progress at intervals only
-                    if processed % progress_interval == 0 or processed == total_files:
-                        # Dual progress tracking
-                        overall_progress = 25 + int((processed / total_files) * 65)  # 25-90% of overall
-                        current_progress = int((processed / total_files) * 100)
-                        
-                        self._update_progress("overall", overall_progress, f"Memproses file: {processed}/{total_files}")
-                        self._update_progress("current", current_progress, f"File {processed}/{total_files} selesai")
-                        
-                        # Log progress dengan success rate
-                        if processed % max(1, total_files // 5) == 0:
-                            successful = sum(1 for r in results if r.get('status') == 'success')
-                            success_rate = (successful / processed) * 100 if processed > 0 else 0
-                            self.logger.info(f"📊 Progress: {processed}/{total_files} file ({success_rate:.1f}% berhasil)")
-                        
-                except Exception as e:
-                    self.logger.debug(f"❌ Error processing {Path(file_path).name}: {str(e)}")
-                    results.append({'status': 'error', 'file': file_path, 'error': str(e)})
-                    processed += 1
-        
+    if not items:
+        progress_tracker and progress_tracker.log_info("⚠️ Tidak ada item untuk diproses")
         return results
     
-    def _process_single_file_enhanced(self, file_path: str, pipeline, output_dir: str, num_variants: int) -> Dict[str, Any]:
-        """Enhanced single file processing dengan robust label detection"""
-        try:
-            # Read and validate image
-            image = cv2.imread(file_path)
-            if image is None:
-                return {'status': 'error', 'file': file_path, 'error': 'Tidak dapat membaca gambar'}
-            
-            # Enhanced label detection dengan multiple strategies
-            img_name = Path(file_path).stem
-            img_dir = Path(file_path).parent
-            
-            # Strategy 1: Standard YOLO locations
-            potential_label_dirs = [
-                img_dir.parent / 'labels',      # Standard YOLO: ../labels/
-                img_dir / 'labels',             # Alternative: ./labels/
-                img_dir.parent / 'label',       # Alternative: ../label/
-                img_dir / 'label',              # Alternative: ./label/
-                img_dir.parent,                 # Same level as images dir
-                img_dir                         # Same as image directory
-            ]
-            
-            # Strategy 2: Sibling directory search
-            if img_dir.name == 'images':
-                parent_dir = img_dir.parent
-                for item in parent_dir.iterdir():
-                    if item.is_dir() and 'label' in item.name.lower():
-                        potential_label_dirs.append(item)
-            
-            # Find label file
-            label_path = None
-            for label_dir in potential_label_dirs:
-                if label_dir.exists():
-                    potential_label = label_dir / f"{img_name}.txt"
-                    if potential_label.exists() and potential_label.stat().st_size > 0:
-                        label_path = potential_label
-                        break
-            
-            # Read bboxes if label exists
-            bboxes, class_labels = self._read_yolo_labels(str(label_path)) if label_path else ([], [])
-            
-            generated_count = 0
-            
-            # Generate variants
-            for variant_idx in range(num_variants):
-                try:
-                    # Apply augmentation
-                    if bboxes and class_labels:
-                        # With bboxes
-                        augmented = pipeline(image=image, bboxes=bboxes, class_labels=class_labels)
-                        aug_image = augmented['image']
-                        aug_bboxes = augmented['bboxes']
-                        aug_labels = augmented['class_labels']
-                    else:
-                        # Image only (no bboxes)
-                        augmented = pipeline(image=image)
-                        aug_image = augmented['image']
-                        aug_bboxes = []
-                        aug_labels = []
+    total_items = len(items)
+    progress_tracker and progress_tracker.log_info(f"🚀 Memulai {operation_name}: {total_items} item")
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        futures = {executor.submit(process_func, item): i for i, item in enumerate(items)}
+        
+        # Process results dengan real-time updates
+        for completed_count, future in enumerate(as_completed(futures), 1):
+            try:
+                result = future.result()
+                results.append(result)
+                
+                # Real-time progress update setiap item selesai
+                if progress_tracker:
+                    progress_tracker.progress("current", completed_count, total_items, 
+                                            f"{operation_name}: {completed_count}/{total_items}")
+                
+                # Log progress setiap 10% atau significant milestones
+                if completed_count % max(1, total_items // 10) == 0:
+                    successful = sum(1 for r in results if r.get('status') == 'success')
+                    success_rate = (successful / completed_count) * 100
+                    progress_tracker and progress_tracker.log_info(
+                        f"📊 Progress: {completed_count}/{total_items} ({success_rate:.1f}% berhasil)"
+                    )
                     
-                    # Save augmented files
-                    aug_filename = f"aug_{img_name}_v{variant_idx}"
-                    self._save_augmented_files(aug_image, aug_bboxes, aug_labels, aug_filename, output_dir)
-                    generated_count += 1
-                    
-                except Exception as e:
-                    self.logger.debug(f"⚠️ Error variant {variant_idx} for {img_name}: {str(e)}")
-                    continue
-            
-            return {
-                'status': 'success', 
-                'file': file_path, 
-                'generated': generated_count, 
-                'variants': num_variants,
-                'has_labels': len(bboxes) > 0,
-                'label_path': str(label_path) if label_path else None
-            }
-            
-        except Exception as e:
-            return {'status': 'error', 'file': file_path, 'error': str(e)}
+            except Exception as e:
+                results.append({'status': 'error', 'error': str(e)})
+                completed_count += 1
     
-    def _read_yolo_labels(self, label_path: str) -> Tuple[List, List]:
-        """Enhanced YOLO label reader dengan validation"""
-        bboxes, class_labels = [], []
+    # Final summary
+    successful = sum(1 for r in results if r.get('status') == 'success')
+    progress_tracker and progress_tracker.log_success(
+        f"✅ {operation_name} selesai: {successful}/{total_items} berhasil"
+    )
+    
+    return results
+
+# =============================================================================
+# CONFIG EXTRACTION - Unchanged
+# =============================================================================
+
+extract_config = lambda config: {'raw_dir': resolve_drive_path(config.get('data', {}).get('dir', 'data')), 'aug_dir': resolve_drive_path(config.get('augmentation', {}).get('output_dir', 'data/augmented')), 'prep_dir': resolve_drive_path(config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')), 'num_variations': config.get('augmentation', {}).get('num_variations', 2), 'target_count': config.get('augmentation', {}).get('target_count', 500), 'types': config.get('augmentation', {}).get('types', ['combined']), 'intensity': config.get('augmentation', {}).get('intensity', 0.7)}
+
+def get_best_data_location() -> str:
+    """Smart data location detection dengan comprehensive search"""
+    search_paths = ['/content/drive/MyDrive/SmartCash/data', '/content/drive/MyDrive/data', '/content/SmartCash/data', '/content/data', 'data']
+    for path in search_paths:
+        if smart_find_images(path): return path
+        elif path_exists(path): return path
+    return 'data'
+
+# =============================================================================
+# ERROR HANDLING - Unchanged
+# =============================================================================
+
+def safe_execute(operation: Callable, fallback_result: Any = None, logger=None) -> Any:
+    try:
+        return operation()
+    except Exception as e:
+        logger and hasattr(logger, 'error') and logger.error(f"❌ Operation failed: {str(e)}")
+        return fallback_result
+
+safe_create_dir = lambda path: safe_execute(lambda: Path(resolve_drive_path(path)).mkdir(parents=True, exist_ok=True), False)
+safe_read_image = lambda path: safe_execute(lambda: read_image(path), None)
+
+# =============================================================================
+# CLEANUP OPERATIONS - Fixed dengan Real-time Progress
+# =============================================================================
+
+def cleanup_files(aug_dir: str, prep_dir: str = None, progress_tracker: ProgressTracker = None) -> Dict[str, Any]:
+    """Fixed cleanup dengan real-time progress updates."""
+    total_deleted = 0
+    errors = []
+    
+    aug_files = find_aug_files(aug_dir)
+    total_files = len(aug_files)
+    
+    if prep_dir:
+        prep_files = find_aug_files(prep_dir)
+        aug_files.extend(prep_files)
+        total_files = len(aug_files)
+    
+    progress_tracker and progress_tracker.progress("overall", 0, 100, f"Mulai cleanup: {total_files} file")
+    
+    for i, file_path in enumerate(aug_files):
+        if delete_file(file_path):
+            total_deleted += 1
+        else:
+            errors.append(f"Failed to delete {file_path}")
         
-        try:
-            with open(label_path, 'r') as f:
-                for line_num, line in enumerate(f, 1):
-                    parts = line.strip().split()
-                    if len(parts) >= 5:
-                        try:
-                            # Validate and convert
-                            class_id = int(float(parts[0]))
-                            coords = [float(x) for x in parts[1:5]]
-                            
-                            # Validate coordinates (should be 0-1)
-                            if all(0.0 <= coord <= 1.0 for coord in coords):
-                                bboxes.append(coords)
-                                class_labels.append(class_id)
-                            else:
-                                self.logger.debug(f"⚠️ Invalid coords in {Path(label_path).name}:{line_num}")
-                                
-                        except (ValueError, IndexError) as e:
-                            self.logger.debug(f"⚠️ Parse error in {Path(label_path).name}:{line_num}: {str(e)}")
-                            continue
-                            
-        except Exception as e:
-            self.logger.debug(f"⚠️ Error reading label {Path(label_path).name}: {str(e)}")
-            
-        return bboxes, class_labels
+        # Real-time progress update
+        if progress_tracker:
+            current_progress = int((i / max(total_files, 1)) * 100)
+            progress_tracker.progress("overall", current_progress, 100, 
+                                    f"Cleanup: {i+1}/{total_files} file")
     
-    def _save_augmented_files(self, image, bboxes: List, class_labels: List, filename: str, output_dir: str) -> None:
-        """Enhanced file saving dengan validation"""
-        try:
-            # Ensure output directories exist
-            img_dir = os.path.join(output_dir, 'images')
-            label_dir = os.path.join(output_dir, 'labels')
-            os.makedirs(img_dir, exist_ok=True)
-            os.makedirs(label_dir, exist_ok=True)
-            
-            # Save image
-            img_path = os.path.join(img_dir, f"{filename}.jpg")
-            success = cv2.imwrite(img_path, image)
-            
-            if not success:
-                raise Exception(f"Failed to save image: {img_path}")
-            
-            # Save labels jika ada
-            if bboxes and class_labels and len(bboxes) == len(class_labels):
-                label_path = os.path.join(label_dir, f"{filename}.txt")
-                with open(label_path, 'w') as f:
-                    for bbox, class_id in zip(bboxes, class_labels):
-                        # Ensure valid format
-                        if len(bbox) >= 4:
-                            f.write(f"{int(class_id)} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f}\n")
-            
-        except Exception as e:
-            self.logger.debug(f"⚠️ Error saving augmented files {filename}: {str(e)}")
-            raise
+    progress_tracker and progress_tracker.progress("overall", 100, 100, f"Cleanup selesai: {total_deleted} file dihapus")
     
-    def _ensure_output_directory(self, output_dir: str) -> None:
-        """Enhanced output directory setup"""
-        dirs_to_create = [
-            output_dir,
-            os.path.join(output_dir, 'images'),
-            os.path.join(output_dir, 'labels')
-        ]
-        
-        for dir_path in dirs_to_create:
-            os.makedirs(dir_path, exist_ok=True)
-        
-        self.logger.info(f"📁 Output directory siap: {output_dir}")
+    return {'status': 'success' if total_deleted > 0 else 'empty', 'total_deleted': total_deleted, 'message': f"Berhasil menghapus {total_deleted} file" if total_deleted > 0 else "Tidak ada file untuk dihapus", 'errors': errors}
+
+# =============================================================================
+# ENHANCED FACTORY FUNCTION
+# =============================================================================
+
+def create_context(config: Dict[str, Any], communicator=None) -> Dict[str, Any]:
+    """Enhanced context creation dengan communicator integration."""
+    aug_config = extract_config(config)
+    progress_tracker = ProgressTracker(communicator)
     
-    def _update_progress(self, step: str, percentage: int, message: str) -> None:
-        """Progress update helper"""
-        if self.comm and hasattr(self.comm, 'progress'):
-            self.comm.progress(step, percentage, 100, message)
-    
-    def _create_success_result(self, results: List[Dict], processing_time: float, output_dir: str) -> Dict[str, Any]:
-        """Enhanced success result dengan detailed statistics"""
-        successful = [r for r in results if r.get('status') == 'success']
-        with_labels = [r for r in successful if r.get('has_labels', False)]
-        total_generated = sum(r.get('generated', 0) for r in successful)
-        
-        return {
-            'status': 'success',
-            'total_files_processed': len(results),
-            'successful_files': len(successful),
-            'files_with_labels': len(with_labels),
-            'total_generated': total_generated,
-            'processing_time': processing_time,
-            'output_dir': output_dir,
-            'avg_variants_per_file': total_generated / len(successful) if successful else 0,
-            'processing_speed': len(results) / processing_time if processing_time > 0 else 0,
-            'success_rate': (len(successful) / len(results)) * 100 if results else 0
-        }
-    
-    def _create_error_result(self, msg: str) -> Dict[str, Any]:
-        """Enhanced error result dengan debug info"""
-        return {
-            'status': 'error', 
-            'message': msg, 
-            'total_files_processed': 0, 
-            'successful_files': 0, 
-            'total_generated': 0,
-            'timestamp': time.time()
-        }
+    return {
+        'config': aug_config,
+        'progress': progress_tracker,
+        'paths': build_paths(aug_config['raw_dir'], aug_config['aug_dir'], aug_config['prep_dir']),
+        'detector': lambda: detect_structure(aug_config['raw_dir']),
+        'cleaner': lambda: cleanup_files(aug_config['aug_dir'], aug_config['prep_dir'], progress_tracker),
+        'comm': communicator  # Pass communicator untuk service integration
+    }
+
+# Backward compatibility aliases
+count_dataset_files = lambda data_dir: (len(smart_find_images(data_dir)), len(find_labels(data_dir)))
+validate_dataset = lambda data_dir: detect_structure(data_dir)['total_images'] > 0

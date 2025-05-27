@@ -1,0 +1,770 @@
+
+/Users/masdevid/Projects/smartcash
+├── .env.example
+├── README.md
+├── commit.sh
+├── dev_commit.sh
+├── project-structure.txt
+├── python_cleanup_script.py
+├── requirements.txt
+├── runs
+├── setup.py
+└── smartcash
+|  ├── __init_.py
+|  ├── common
+|  |  ├── __init__.py
+|  |  ├── config
+|  |  |  ├── __init__.py
+|  |  |  ├── compat.py
+|  |  |  └── manager.py
+|  |  ├── constants
+|  |  |  ├── __init__.py
+|  |  |  ├── core.py
+|  |  |  ├── dataset.py
+|  |  |  ├── enums.py
+|  |  |  ├── environment.py
+|  |  |  ├── file_types.py
+|  |  |  ├── log_messages.py
+|  |  |  ├── model.py
+|  |  |  ├── paths.py
+|  |  |  └── ui.py
+|  |  ├── default_config.py
+|  |  ├── environment.py
+|  |  ├── exceptions.py
+|  |  ├── interfaces
+|  |  |  ├── __init__.py
+|  |  |  ├── checkpoint_interface.py
+|  |  |  ├── layer_config_interface.py
+|  |  |  └── visualization_interface.py
+|  |  ├── io
+|  |  |  ├── __init__.py
+|  |  |  ├── file_utils.py
+|  |  |  ├── path_utils.py
+|  |  |  └── serialization.py
+|  |  ├── layer_config.py
+|  |  ├── logger.py
+|  |  ├── progress
+|  |  |  ├── __init__.py
+|  |  |  ├── observer.py
+|  |  |  └── tracker.py
+|  |  ├── threadpools.py
+|  |  ├── types.py
+|  |  ├── utils.py
+|  |  └── visualization
+|  |     ├── __init_.py
+|  |     ├── core
+|  |     |  ├── __init_.py
+|  |     |  └── visualization_base.py
+|  |     └── helpers
+|  |        ├── __init__.py
+|  |        ├── annotation_helper.py
+|  |        ├── chart_helper.py
+|  |        ├── color_helper.py
+|  |        ├── export_helper.py
+|  |        ├── layout_helper.py
+|  |        └── style_helper.py
+|  ├── components
+|  |  ├── __init_.py
+|  |  ├── cache
+|  |  |  ├── __init__.py
+|  |  |  ├── cleanup_cache.py
+|  |  |  ├── indexing_cache.py
+|  |  |  ├── manager_cache.py
+|  |  |  ├── stats_cache.py
+|  |  |  └── storage_cache.py
+|  |  └── observer
+|  |     ├── __init__.py
+|  |     ├── base_observer.py
+|  |     ├── cleanup_observer.py
+|  |     ├── decorators_observer.py
+|  |     ├── event_dispatcher_observer.py
+|  |     ├── event_registry_observer.py
+|  |     ├── event_topics_observer.py
+|  |     ├── manager_observer.py
+|  |     └── priority_observer.py
+|  ├── configs
+|  |  ├── __init__.py
+|  |  ├── augmentation_config.yaml
+|  |  ├── base_config.yaml
+|  |  ├── colab_config.yaml
+|  |  ├── dataset_config.yaml
+|  |  ├── evaluation_config.yaml
+|  |  ├── hyperparameters_config.yaml
+|  |  ├── model_config.yaml
+|  |  ├── preprocessing_config.yaml
+|  |  └── training_config.yaml
+|  ├── dataset
+|  |  ├── __init__.py
+|  |  ├── augmentor
+|  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  └── service.cpython-312.pyc
+|  |  |  ├── communicator.py
+|  |  |  ├── config.py
+|  |  |  ├── core
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── __pycache__
+|  |  |  |  |  ├── engine.cpython-312.pyc
+|  |  |  |  |  └── normalizer.cpython-312.pyc
+|  |  |  |  ├── engine.py
+|  |  |  |  ├── engine.py.backup
+|  |  |  |  ├── normalizer.py
+|  |  |  |  └── pipeline.py
+|  |  |  ├── processors
+|  |  |  |  └── __init__.py
+|  |  |  ├── service.py
+|  |  |  ├── services
+|  |  |  |  └── __init__.py
+|  |  |  ├── strategies
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── balancer.py
+|  |  |  |  ├── priority.py
+|  |  |  |  └── selector.py
+|  |  |  ├── types.py
+|  |  |  └── utils
+|  |  |     ├── __init__.py
+|  |  |     ├── __pycache__
+|  |  |     |  └── core.cpython-312.pyc
+|  |  |     └── core.py
+|  |  ├── components
+|  |  |  ├── __init__.py
+|  |  |  ├── collate
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── multilayer_collate.py
+|  |  |  |  └── yolo_collate.py
+|  |  |  ├── datasets
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── base_dataset.py
+|  |  |  |  ├── multilayer_dataset.py
+|  |  |  |  └── yolo_dataset.py
+|  |  |  ├── geometry
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── coord_converter.py
+|  |  |  |  ├── geometry_utils.py
+|  |  |  |  └── polygon_handler.py
+|  |  |  ├── labels
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── format_converter.py
+|  |  |  |  ├── label_handler.py
+|  |  |  |  └── multilayer_handler.py
+|  |  |  └── samplers
+|  |  |     ├── __init__.py
+|  |  |     ├── balanced_sampler.py
+|  |  |     └── weighted_sampler.py
+|  |  ├── manager.py
+|  |  ├── preprocessor
+|  |  |  ├── __init__.py
+|  |  |  ├── core
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── preprocessing_coordinator.py
+|  |  |  |  ├── preprocessing_manager.py
+|  |  |  |  └── preprocessing_validator.py
+|  |  |  ├── operations
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── cleanup_executor.py
+|  |  |  |  ├── dataset_checker.py
+|  |  |  |  └── progress_tracker.py
+|  |  |  ├── processors
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── batch_processor.py
+|  |  |  |  ├── image_processor.py
+|  |  |  |  └── split_processor.py
+|  |  |  ├── storage
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── preprocessed_storage_manager.py
+|  |  |  |  └── preprocessing_pipeline_manager.py
+|  |  |  └── utils
+|  |  |     ├── __init__.py
+|  |  |     ├── preprocessing_config.py
+|  |  |     ├── preprocessing_factory.py
+|  |  |     ├── preprocessing_paths.py
+|  |  |     └── preprocessing_stats.py
+|  |  ├── services
+|  |  |  ├── __init__.py
+|  |  |  ├── balancer
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── balance_service.py
+|  |  |  |  ├── oversampler.py
+|  |  |  |  ├── undersampler.py
+|  |  |  |  └── weight_calculator.py
+|  |  |  ├── downloader
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── backup_service.py
+|  |  |  |  ├── cleanup_service.py
+|  |  |  |  ├── download_service.py
+|  |  |  |  ├── download_validator.py
+|  |  |  |  ├── file_processor.py
+|  |  |  |  ├── notification_utils.py
+|  |  |  |  ├── roboflow_downloader.py
+|  |  |  |  ├── ui_progress_mixin.py
+|  |  |  |  └── ui_roboflow_downloader.py
+|  |  |  ├── explorer
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── base_explorer.py
+|  |  |  |  ├── bbox_explorer.py
+|  |  |  |  ├── class_explorer.py
+|  |  |  |  ├── data_explorer.py
+|  |  |  |  ├── explorer_service.py
+|  |  |  |  ├── image_explorer.py
+|  |  |  |  └── layer_explorer.py
+|  |  |  ├── loader
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── batch_generator.py
+|  |  |  |  ├── cache_manager.py
+|  |  |  |  ├── dataset_loader.py
+|  |  |  |  ├── loader_factory.py
+|  |  |  |  ├── preprocessed_dataset_loader.py
+|  |  |  |  └── raw_dataset_loader.py
+|  |  |  ├── organizer
+|  |  |  |  └── dataset_organizer.py
+|  |  |  ├── reporter
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── export_formatter.py
+|  |  |  |  ├── metrics_reporter.py
+|  |  |  |  ├── report_service.py
+|  |  |  |  └── visualization_service.py
+|  |  |  ├── service_factory.py
+|  |  |  └── validator
+|  |  |     ├── __init__.py
+|  |  |     ├── dataset_validator.py
+|  |  |     ├── fixer.py
+|  |  |     ├── image_validator.py
+|  |  |     └── label_validator.py
+|  |  ├── utils
+|  |  |  ├── __init__.py
+|  |  |  ├── bbox_utils.py
+|  |  |  ├── data_utils.py
+|  |  |  ├── dataset_constants.py
+|  |  |  ├── dataset_utils.py
+|  |  |  ├── debug_helper.py
+|  |  |  ├── denomination_utils.py
+|  |  |  ├── file
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── file_processor.py
+|  |  |  |  ├── image_processor.py
+|  |  |  |  └── label_processor.py
+|  |  |  ├── file_mapping_utils.py
+|  |  |  ├── image_analysis_utils.py
+|  |  |  ├── image_utils.py
+|  |  |  ├── label_utils.py
+|  |  |  ├── move_utils.py
+|  |  |  ├── path_validator.py
+|  |  |  ├── preprocessing_image_utils.py
+|  |  |  ├── progress_utils.py
+|  |  |  ├── progress_wrapper.py
+|  |  |  ├── split
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── dataset_splitter.py
+|  |  |  |  ├── merger.py
+|  |  |  |  └── stratifier.py
+|  |  |  ├── statistics
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── class_stats.py
+|  |  |  |  ├── distribution_analyzer.py
+|  |  |  |  └── image_stats.py
+|  |  |  ├── symlink_manager.py
+|  |  |  └── transform
+|  |  |     ├── __init__.py
+|  |  |     ├── albumentations_adapter.py
+|  |  |     ├── bbox_transform.py
+|  |  |     ├── format_converter.py
+|  |  |     ├── image_transform.py
+|  |  |     └── polygon_transform.py
+|  |  └── visualization
+|  |     ├── __init__.py
+|  |     ├── dashboard
+|  |     |  ├── __init__.py
+|  |     |  ├── bbox_visualizer.py
+|  |     |  ├── class_visualizer.py
+|  |     |  ├── layer_visualizer.py
+|  |     |  ├── quality_visualizer.py
+|  |     |  ├── recommendation_visualizer.py
+|  |     |  └── split_visualizer.py
+|  |     ├── dashboard_visualizer.py
+|  |     ├── data.py
+|  |     └── report.py
+|  ├── detection
+|  |  ├── __init__.py
+|  |  ├── adapters
+|  |  |  ├── __init__.py
+|  |  |  ├── onnx_adapter.py
+|  |  |  └── torchscript_adapter.py
+|  |  ├── detector.py
+|  |  ├── handlers
+|  |  |  ├── __init__.py
+|  |  |  ├── batch_handler.py
+|  |  |  ├── detection_handler.py
+|  |  |  ├── integration_handler.py
+|  |  |  └── video_handler.py
+|  |  └── services
+|  |     ├── __init__.py
+|  |     ├── inference
+|  |     |  ├── __init__.py
+|  |     |  ├── accelerator.py
+|  |     |  ├── batch_processor.py
+|  |     |  ├── inference_service.py
+|  |     |  └── optimizers.py
+|  |     ├── postprocessing
+|  |     |  ├── __init__.py
+|  |     |  ├── bbox_refiner.py
+|  |     |  ├── confidence_filter.py
+|  |     |  ├── postprocessing_service.py
+|  |     |  └── result_formatter.py
+|  |     └── visualization_adapter.py
+|  ├── examples
+|  |  ├── visualisasi_augmentasi.ipynb
+|  |  ├── visualisasi_augmentasi_fixed.py
+|  |  └── visualization_augmentation_example.py
+|  ├── model
+|  |  ├── __init__.py
+|  |  ├── analysis
+|  |  |  ├── __init__.py
+|  |  |  ├── experiment_analyzer.py
+|  |  |  └── scenario_analyzer.py
+|  |  ├── architectures
+|  |  |  ├── __init__.py
+|  |  |  ├── backbones
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── base.py
+|  |  |  |  ├── cspdarknet.py
+|  |  |  |  └── efficientnet.py
+|  |  |  ├── heads
+|  |  |  |  ├── __init__.py
+|  |  |  |  └── detection_head.py
+|  |  |  └── necks
+|  |  |     ├── __init__.py
+|  |  |     └── fpn_pan.py
+|  |  ├── components
+|  |  |  ├── __init__.py
+|  |  |  └── losses.py
+|  |  ├── config
+|  |  |  ├── __init__.py
+|  |  |  ├── backbone_config.py
+|  |  |  ├── experiment_config.py
+|  |  |  ├── model_config.py
+|  |  |  └── model_config_definitions.py
+|  |  ├── manager.py
+|  |  ├── manager_checkpoint.py
+|  |  ├── models
+|  |  |  ├── __init__.py
+|  |  |  └── yolov5_model.py
+|  |  ├── services
+|  |  |  ├── __init__.py
+|  |  |  ├── checkpoint
+|  |  |  |  ├── __init__.py
+|  |  |  |  └── checkpoint_service.py
+|  |  |  ├── evaluation
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── core_evaluation_service.py
+|  |  |  |  ├── metrics_evaluation_service.py
+|  |  |  |  └── visualization_evaluation_service.py
+|  |  |  ├── experiment
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── data_manager.py
+|  |  |  |  ├── experiment_service.py
+|  |  |  |  └── metrics_tracker.py
+|  |  |  ├── postprocessing
+|  |  |  |  ├── __init__.py
+|  |  |  |  └── nms_processor.py
+|  |  |  ├── prediction
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── batch_processor_prediction_service.py
+|  |  |  |  ├── core_prediction_service.py
+|  |  |  |  ├── interface_prediction_service.py
+|  |  |  |  └── postprocessing_prediction_service.py
+|  |  |  ├── pretrained_downloader.py
+|  |  |  ├── pretrained_setup.py
+|  |  |  ├── research
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── comparison_runner.py
+|  |  |  |  ├── experiment_analyzer.py
+|  |  |  |  ├── experiment_creator.py
+|  |  |  |  ├── experiment_runner.py
+|  |  |  |  ├── experiment_service.py
+|  |  |  |  ├── parameter_tuner.py
+|  |  |  |  └── scenario_service.py
+|  |  |  └── training
+|  |  |     ├── __init__.py
+|  |  |     ├── callbacks_training_service.py
+|  |  |     ├── core_training_service.py
+|  |  |     ├── early_stopping_training_service.py
+|  |  |     ├── experiment_tracker_training_service.py
+|  |  |     ├── optimizer_training_service.py
+|  |  |     ├── scheduler_training_service.py
+|  |  |     └── warmup_scheduler_training_service.py
+|  |  ├── utils
+|  |  |  ├── __init__.py
+|  |  |  ├── metrics
+|  |  |  |  ├── __init__.py
+|  |  |  |  ├── ap_metrics.py
+|  |  |  |  ├── core_metrics.py
+|  |  |  |  ├── metrics_calculator.py
+|  |  |  |  └── nms_metrics.py
+|  |  |  ├── preprocessing_model_utils.py
+|  |  |  ├── research_model_utils.py
+|  |  |  └── validation_model_utils.py
+|  |  └── visualization
+|  |     ├── __init__.py
+|  |     ├── base_visualizer.py
+|  |     ├── detection_visualizer.py
+|  |     ├── evaluation_visualizer.py
+|  |     ├── metrics_visualizer.py
+|  |     ├── research
+|  |     |  ├── __init__.py
+|  |     |  ├── base_research_visualizer.py
+|  |     |  ├── experiment_visualizer.py
+|  |     |  ├── research_visualizer.py
+|  |     |  └── scenario_visualizer.py
+|  |     └── setup_visualization.py
+|  ├── panduan_modul_ui.md
+|  ├── project-structure.txt
+|  └── ui
+|     ├── cell_template.py
+|     ├── cells
+|     |  ├── cell_1_1_repo_clone.py
+|     |  ├── cell_1_2_env_config.py
+|     |  ├── cell_1_3_dependency_installer.py
+|     |  ├── cell_2_1_dataset_download.py
+|     |  ├── cell_2_2_split_config.py
+|     |  ├── cell_2_3_preprocessing.py
+|     |  ├── cell_2_4_augmentation.py
+|     |  ├── cell_2_5_dataset_visualization.py
+|     |  ├── cell_2_6_pretrained_model.py
+|     |  ├── cell_3_1_backbone_selection.py
+|     |  ├── cell_3_2_hyperparameters.py
+|     |  ├── cell_3_3_training_strategy.py
+|     |  ├── cell_4_1_model_training.py
+|     |  └── cell_4_2_model_scenario.py
+|     ├── charts
+|     |  └── __init__.py
+|     ├── components
+|     |  ├── __init__.py
+|     |  ├── accordion_factory.py
+|     |  ├── action_buttons.py
+|     |  ├── config_buttons.py
+|     |  ├── config_form.py
+|     |  ├── confirmation_dialog.py
+|     |  ├── dataset_distribution.py
+|     |  ├── dataset_stats_cards.py
+|     |  ├── feature_checkbox_group.py
+|     |  ├── header.py
+|     |  ├── info_accordion.py
+|     |  ├── log_accordion.py
+|     |  ├── model_info_panel.py
+|     |  ├── progress_component.py
+|     |  ├── progress_tracking.py
+|     |  ├── save_reset_buttons.py
+|     |  ├── split_config.py
+|     |  ├── split_selector.py
+|     |  ├── status_panel.py
+|     |  ├── sync_info_message.py
+|     |  ├── tab_factory.py
+|     |  ├── tabs.py
+|     |  ├── validation_options.py
+|     |  ├── visualization_buttons.py
+|     |  └── visualization_tabs.py
+|     ├── dataset
+|     |  ├── augmentation
+|     |  |  ├── __init__.py
+|     |  |  ├── augmentation_initializer.py
+|     |  |  ├── components
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── advanced_options_widget.py
+|     |  |  |  ├── augmentation_component.py
+|     |  |  |  ├── augmentation_types_widget.py
+|     |  |  |  ├── basic_options_widget.py
+|     |  |  |  ├── form_fields.py
+|     |  |  |  └── split_selector.py
+|     |  |  ├── handlers
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── augmentation_handler.py
+|     |  |  |  ├── button_handler.py
+|     |  |  |  ├── config_handler.py
+|     |  |  |  ├── confirmation_handler.py
+|     |  |  |  └── operation_handlers.py
+|     |  |  └── utils
+|     |  |     └── __init__.py
+|     |  ├── download
+|     |  |  ├── __init__.py
+|     |  |  ├── components
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── action_section.py
+|     |  |  |  ├── form_fields.py
+|     |  |  |  ├── log_section.py
+|     |  |  |  ├── main_ui.py
+|     |  |  |  └── options_panel.py
+|     |  |  ├── download_initializer.py
+|     |  |  ├── handlers
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── button_handlers.py
+|     |  |  |  ├── check_action.py
+|     |  |  |  ├── cleanup_action.py
+|     |  |  |  ├── config_handlers.py
+|     |  |  |  ├── confirmation_handler.py
+|     |  |  |  ├── download_action.py
+|     |  |  |  ├── execution_handler.py
+|     |  |  |  ├── progress_handlers.py
+|     |  |  |  ├── reset_action.py
+|     |  |  |  ├── save_action.py
+|     |  |  |  └── validation_handler.py
+|     |  |  ├── services
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── progress_bridge.py
+|     |  |  |  └── ui_download_service.py
+|     |  |  └── utils
+|     |  |     ├── __init__.py
+|     |  |     ├── dataset_checker.py
+|     |  |     ├── parameter_extractor.py
+|     |  |     └── progress_tracker.py
+|     |  ├── preprocessing
+|     |  |  ├── __init__.py
+|     |  |  ├── components
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── input_options.py
+|     |  |  |  └── ui_components.py
+|     |  |  ├── handlers
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── cleanup_executor.py
+|     |  |  |  ├── config_handler.py
+|     |  |  |  ├── dataset_checker.py
+|     |  |  |  ├── preprocessing_executor.py
+|     |  |  |  └── progress_handlers.py
+|     |  |  ├── preprocessing_initializer.py
+|     |  |  ├── services
+|     |  |  |  ├── __init__.py
+|     |  |  |  └── ui_preprocessing_service.py
+|     |  |  └── utils
+|     |  |     ├── __init__.py
+|     |  |     ├── config_extractor.py
+|     |  |     ├── dialog_manager.py
+|     |  |     ├── progress_bridge.py
+|     |  |     ├── ui_state_manager.py
+|     |  |     └── validation_helper.py
+|     |  ├── split
+|     |  |  ├── components
+|     |  |  |  ├── split_form.py
+|     |  |  |  └── split_layout.py
+|     |  |  ├── handlers
+|     |  |  |  ├── button_handlers.py
+|     |  |  |  ├── config_updater.py
+|     |  |  |  ├── defaults.py
+|     |  |  |  ├── reset_handler.py
+|     |  |  |  ├── save_handler.py
+|     |  |  |  ├── slider_handlers.py
+|     |  |  |  ├── status_updater.py
+|     |  |  |  ├── ui_extractor.py
+|     |  |  |  └── ui_updater.py
+|     |  |  └── split_initializer.py
+|     |  └── visualization
+|     |     ├── __init__.py
+|     |     ├── components
+|     |     |  ├── __init__.py
+|     |     |  ├── comparison_cards.py
+|     |     |  ├── dashboard_cards.py
+|     |     |  ├── dashboard_component.py
+|     |     |  ├── dataset_stats_cards.py
+|     |     |  ├── main_layout.py
+|     |     |  ├── split_stats_cards.py
+|     |     |  ├── visualization_components.py
+|     |     |  └── visualization_tabs.py
+|     |     ├── handlers
+|     |     |  ├── __init__.py
+|     |     |  ├── bbox_handlers.py
+|     |     |  ├── dashboard_handlers.py
+|     |     |  ├── layer_handlers.py
+|     |     |  ├── setup_handlers.py
+|     |     |  ├── status_handlers.py
+|     |     |  └── tabs
+|     |     |     ├── __init__.py
+|     |     |     ├── augmentation_tab.py
+|     |     |     ├── bbox_tab.py
+|     |     |     ├── distribution_tab.py
+|     |     |     ├── layer_tab.py
+|     |     |     ├── preprocessing_tab.py
+|     |     |     └── split_tab.py
+|     |     └── setup.py
+|     ├── detection
+|     |  └── __init_.py
+|     ├── handlers
+|     |  ├── __init__.py
+|     |  ├── error_handler.py
+|     |  ├── observer_handler.py
+|     |  ├── progress_handler.py
+|     |  └── single_progress.py
+|     ├── helpers
+|     |  ├── __init__.py
+|     |  └── ui_helpers.py
+|     ├── info_boxes
+|     |  ├── __init__.py
+|     |  ├── augmentation_info.py
+|     |  ├── backbones_info.py
+|     |  ├── dataset_info.py
+|     |  ├── dependencies_info.py
+|     |  ├── download_info.py
+|     |  ├── environment_info.py
+|     |  ├── hyperparameters_info.py
+|     |  ├── preprocessing_info.py
+|     |  ├── split_info.py
+|     |  ├── training_info.py
+|     |  └── training_strategy_info.py
+|     ├── model
+|     |  ├── __init__.py
+|     |  ├── components
+|     |  |  └── pretrained_components.py
+|     |  ├── handlers
+|     |  |  ├── download_handlers.py
+|     |  |  ├── simple_download.py
+|     |  |  └── sync_handlers.py
+|     |  └── pretrained_initializer.py
+|     ├── setup
+|     |  ├── __init__.py
+|     |  ├── dependency_installer
+|     |  |  ├── __init__.py
+|     |  |  ├── components
+|     |  |  |  ├── __init__.py
+|     |  |  |  └── dependency_installer_component.py
+|     |  |  ├── dependency_installer_initializer.py
+|     |  |  ├── handlers
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── analyzer_handler.py
+|     |  |  |  ├── install_handler.py
+|     |  |  |  ├── package_handler.py
+|     |  |  |  └── setup_handlers.py
+|     |  |  └── utils
+|     |  |     ├── __init__.py
+|     |  |     ├── logger_helper.py
+|     |  |     └── package_utils.py
+|     |  └── env_config
+|     |     ├── __init__.py
+|     |     ├── components
+|     |     |  ├── __init__.py
+|     |     |  ├── env_config_component.py
+|     |     |  ├── progress_tracking.py
+|     |     |  └── ui_factory.py
+|     |     ├── env_config_initializer.py
+|     |     ├── handlers
+|     |     |  ├── __init__.py
+|     |     |  ├── drive_setup_handler.py
+|     |     |  ├── environment_config_orchestrator.py
+|     |     |  └── environment_status_checker.py
+|     |     ├── helpers
+|     |     |  ├── __init__.py
+|     |     |  ├── silent_environment_manager.py
+|     |     |  └── system_info_helper.py
+|     |     └── utils
+|     |        └── __init__.py
+|     ├── training
+|     |  ├── __init__.py
+|     |  ├── components
+|     |  |  ├── training_component.py
+|     |  |  └── training_components.py
+|     |  ├── handlers
+|     |  |  ├── __init__.py
+|     |  |  ├── button_event_handlers.py
+|     |  |  ├── button_handlers.py
+|     |  |  ├── setup_handler.py
+|     |  |  ├── training_execution_handler.py
+|     |  |  ├── training_handler_utils.py
+|     |  |  └── training_info_handler.py
+|     |  └── training_initializer.py
+|     ├── training_config
+|     |  ├── __init__.py
+|     |  ├── backbone
+|     |  |  ├── __init__.py
+|     |  |  ├── backbone_initializer.py
+|     |  |  ├── components
+|     |  |  |  ├── __init__.py
+|     |  |  |  └── backbone_components.py
+|     |  |  └── handlers
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── button_handlers.py
+|     |  |  |  ├── config_handlers.py
+|     |  |  |  ├── default_config.py
+|     |  |  |  ├── drive_handlers.py
+|     |  |  |  ├── form_handlers.py
+|     |  |  |  ├── info_panel.py
+|     |  |  |  ├── save_handlers.py
+|     |  |  |  ├── status_handlers.py
+|     |  |  |  └── sync_logger.py
+|     |  ├── config_handler.py
+|     |  ├── hyperparameters
+|     |  |  ├── __init__.py
+|     |  |  ├── components
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── advanced_components.py
+|     |  |  |  ├── basic_components.py
+|     |  |  |  ├── button_components.py
+|     |  |  |  ├── info_panel_components.py
+|     |  |  |  ├── main_components.py
+|     |  |  |  └── optimization_components.py
+|     |  |  ├── handlers
+|     |  |  |  ├── __init__.py
+|     |  |  |  ├── button_handlers.py
+|     |  |  |  ├── config_handlers.py
+|     |  |  |  ├── config_manager.py
+|     |  |  |  ├── config_reader.py
+|     |  |  |  ├── config_writer.py
+|     |  |  |  ├── default_config.py
+|     |  |  |  ├── drive_handlers.py
+|     |  |  |  ├── form_handlers.py
+|     |  |  |  ├── info_panel_updater.py
+|     |  |  |  ├── status_handlers.py
+|     |  |  |  └── sync_logger.py
+|     |  |  └── hyperparameters_initializer.py
+|     |  └── training_strategy
+|     |     ├── components
+|     |     |  ├── __init__.py
+|     |     |  ├── button_components.py
+|     |     |  ├── info_panel_components.py
+|     |     |  ├── main_components.py
+|     |     |  ├── multiscale_components.py
+|     |     |  ├── utils_components.py
+|     |     |  └── validation_components.py
+|     |     ├── handlers
+|     |     |  ├── __init__.py
+|     |     |  ├── button_handlers.py
+|     |     |  ├── config_extractor.py
+|     |     |  ├── config_loader.py
+|     |     |  ├── default_config.py
+|     |     |  ├── drive_handlers.py
+|     |     |  ├── form_handlers.py
+|     |     |  ├── info_updater.py
+|     |     |  ├── status_handlers.py
+|     |     |  ├── sync_logger.py
+|     |     |  └── ui_updater.py
+|     |     └── training_strategy_initializer.py
+|     └── utils
+|        ├── __init__.py
+|        ├── alert_utils.py
+|        ├── base_initializer.py
+|        ├── button_state_manager.py
+|        ├── card_utils.py
+|        ├── cell_utils.py
+|        ├── colab_task_monitor.py
+|        ├── color_utils.py
+|        ├── common_initializer.py
+|        ├── constants.py
+|        ├── drive_utils.py
+|        ├── env_ui_utils.py
+|        ├── fallback_utils.py
+|        ├── file_utils.py
+|        ├── header_utils.py
+|        ├── info_utils.py
+|        ├── layout_utils.py
+|        ├── loading_indicator.py
+|        ├── logger_bridge.py
+|        ├── logging_utils.py
+|        ├── metric_utils.py
+|        ├── safe_handler_utils.py
+|        ├── ui_logger.py
+|        ├── ui_logger_namespace.py
+|        ├── validator_utils.py
+|        ├── visualization_utils.py
+|        └── widget_utils.py
+
+directory: 456 file: 8448
+
+ignored: directory (25), file (10)
+
+
+[2K[1G

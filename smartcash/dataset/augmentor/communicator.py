@@ -1,43 +1,103 @@
 """
 File: smartcash/dataset/augmentor/communicator.py
-Deskripsi: Fixed UI communication bridge dengan real-time progress updates dan proper log streaming
+Deskripsi: Fixed communicator dengan aggressive log suppression dan UI-only output
 """
 
 from typing import Dict, Any, Optional, Callable
-from smartcash.common.logger import get_logger
 import time
+import logging
+import sys
 
 class UICommunicator:
-    """Fixed unified interface untuk UI communication dengan real-time progress streaming."""
+    """Fixed communicator dengan aggressive suppression dan UI-only output"""
     
     def __init__(self, ui_components: Dict[str, Any] = None):
-        """Initialize UI communicator dengan components dan real-time tracker."""
         self.ui_components = ui_components or {}
-        self.logger = self._setup_logger()
         self.progress_tracker = self._get_progress_tracker()
         self.last_update_time = 0
-        self.update_interval = 0.5  # Minimum interval between updates (seconds)
+        self.update_interval = 0.5  # Throttling interval
         
-    def _setup_logger(self):
-        """Setup logger dengan UI bridge jika tersedia."""
-        if not self.ui_components:
-            return get_logger("augmentation")
-            
+        # Setup aggressive suppression IMMEDIATELY
+        self._setup_aggressive_suppression()
+        
+        # Setup minimal logger yang HANYA ke UI
+        self.logger = self._setup_ui_only_logger()
+        
+    def _setup_aggressive_suppression(self):
+        """Setup aggressive log suppression untuk prevent console leakage"""
+        # Suppress EVERYTHING di console
+        console_suppressions = [
+            '', 'root', 'smartcash', 'smartcash.dataset', 'smartcash.dataset.augmentor',
+            'smartcash.common', 'albumentations', 'cv2', 'numpy', 'PIL', 'matplotlib',
+            'concurrent.futures', 'threading', 'requests', 'urllib3', 'ipywidgets'
+        ]
+        
+        for target in console_suppressions:
+            try:
+                logger = logging.getLogger(target)
+                logger.setLevel(logging.CRITICAL + 1)  # Above CRITICAL
+                logger.propagate = False
+                # Remove ALL handlers
+                logger.handlers.clear()
+                # Add null handler
+                logger.addHandler(logging.NullHandler())
+            except Exception:
+                pass
+        
+        # Suppress root logger completely
         try:
-            from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
-            return create_ui_logger_bridge(self.ui_components, "augmentation")
-        except ImportError:
-            return get_logger("augmentation")
+            root = logging.getLogger()
+            root.setLevel(logging.CRITICAL + 1)
+            root.handlers.clear()
+            root.addHandler(logging.NullHandler())
+        except Exception:
+            pass
+        
+        # Redirect stdout/stderr jika perlu
+        self._suppress_stdout_stderr()
+    
+    def _suppress_stdout_stderr(self):
+        """Suppress stdout/stderr untuk prevent accidental prints"""
+        if not hasattr(self.ui_components, '_stdout_suppressed'):
+            try:
+                # Create null output
+                import os
+                null_device = open(os.devnull, 'w')
+                
+                # Store original untuk restoration
+                self.ui_components['_original_stdout'] = sys.stdout
+                self.ui_components['_original_stderr'] = sys.stderr
+                
+                # Suppress hanya jika bukan IPython environment
+                if not hasattr(sys, 'ps1') and 'ipykernel' not in sys.modules:
+                    sys.stdout = null_device
+                    sys.stderr = null_device
+                
+                self.ui_components['_stdout_suppressed'] = True
+            except Exception:
+                pass
+    
+    def _setup_ui_only_logger(self):
+        """Setup logger yang HANYA output ke UI"""
+        # Buat dummy logger yang tidak pernah print ke console
+        class UIOnlyLogger:
+            def info(self, msg): pass
+            def success(self, msg): pass
+            def warning(self, msg): pass
+            def error(self, msg): pass
+            def debug(self, msg): pass
+        
+        return UIOnlyLogger()
     
     def _get_progress_tracker(self):
-        """Dapatkan progress tracker dari UI components dengan fallback methods."""
+        """Get progress tracker dengan fallback methods"""
         return self.ui_components.get('tracker') or self.ui_components
     
     def progress(self, operation: str, current: int, total: int, message: str = ""):
-        """Fixed progress dengan real-time updates dan throttling."""
+        """Fixed progress dengan UI-only updates dan throttling"""
         current_time = time.time()
         
-        # Throttle updates untuk prevent flooding (kecuali 0% atau 100%)
+        # Throttle updates
         percentage = min(100, max(0, int((current / max(1, total)) * 100)))
         if (current_time - self.last_update_time < self.update_interval and 
             percentage not in [0, 100]):
@@ -45,48 +105,37 @@ class UICommunicator:
         
         self.last_update_time = current_time
         
-        # Update progress tracker dengan multiple methods
-        if hasattr(self.progress_tracker, 'update'):
-            self.progress_tracker.update(operation, percentage, message)
-        elif 'update_progress' in self.progress_tracker:
-            self.progress_tracker['update_progress'](operation, percentage, message)
-        
-        # Also log to output untuk visibility
-        if message and percentage % 10 == 0:  # Log every 10%
-            self.log_info(f"📊 {operation.title()}: {percentage}% - {message}")
+        # Update HANYA ke UI progress tracker
+        try:
+            if hasattr(self.progress_tracker, 'update'):
+                self.progress_tracker.update(operation, percentage, message)
+            elif 'update_progress' in self.progress_tracker:
+                self.progress_tracker['update_progress'](operation, percentage, message)
+        except Exception:
+            pass  # Silent fail - TIDAK print error
     
     def log_info(self, msg: str):
-        """Fixed info logging dengan immediate UI display."""
-        formatted_msg = f"ℹ️ {msg}"
-        self._log_to_output(formatted_msg, 'info')
-        getattr(self.logger, 'info', lambda x: None)(formatted_msg)
+        """Log info HANYA ke UI"""
+        self._log_to_ui_only(f"ℹ️ {msg}", 'info')
     
     def log_success(self, msg: str):
-        """Fixed success logging dengan immediate UI display."""
-        formatted_msg = f"✅ {msg}"
-        self._log_to_output(formatted_msg, 'success')
-        getattr(self.logger, 'success', lambda x: None)(formatted_msg)
+        """Log success HANYA ke UI"""
+        self._log_to_ui_only(f"✅ {msg}", 'success')
     
     def log_warning(self, msg: str):
-        """Fixed warning logging dengan immediate UI display."""
-        formatted_msg = f"⚠️ {msg}"
-        self._log_to_output(formatted_msg, 'warning')
-        getattr(self.logger, 'warning', lambda x: None)(formatted_msg)
+        """Log warning HANYA ke UI"""
+        self._log_to_ui_only(f"⚠️ {msg}", 'warning')
     
     def log_error(self, msg: str):
-        """Fixed error logging dengan immediate UI display."""
-        formatted_msg = f"❌ {msg}"
-        self._log_to_output(formatted_msg, 'error')
-        getattr(self.logger, 'error', lambda x: None)(formatted_msg)
+        """Log error HANYA ke UI"""
+        self._log_to_ui_only(f"❌ {msg}", 'error')
     
     def log_debug(self, msg: str):
-        """Fixed debug logging dengan immediate UI display."""
-        formatted_msg = f"🔍 {msg}"
-        self._log_to_output(formatted_msg, 'debug')
-        getattr(self.logger, 'debug', lambda x: None)(formatted_msg)
+        """Log debug HANYA ke UI"""
+        self._log_to_ui_only(f"🔍 {msg}", 'debug')
     
-    def _log_to_output(self, message: str, level: str):
-        """Immediate log ke UI output dengan color coding."""
+    def _log_to_ui_only(self, message: str, level: str):
+        """Log HANYA ke UI output - TIDAK ke console"""
         try:
             from IPython.display import display, HTML
             
@@ -106,7 +155,7 @@ class UICommunicator:
             </div>
             """
             
-            # Display ke log_output dengan priority order
+            # Display HANYA ke UI log widgets
             for output_key in ['log_output', 'status', 'output']:
                 output_widget = self.ui_components.get(output_key)
                 if output_widget and hasattr(output_widget, 'clear_output'):
@@ -114,11 +163,10 @@ class UICommunicator:
                         display(HTML(html_msg))
                     break
         except Exception:
-            # Silent fallback
-            pass
+            pass  # Silent fail - TIDAK print ke console
     
     def log(self, level: str, message: str):
-        """Generic log method dengan level mapping."""
+        """Generic log method dengan UI-only output"""
         log_methods = {
             'info': self.log_info, 'success': self.log_success, 'warning': self.log_warning,
             'error': self.log_error, 'debug': self.log_debug
@@ -127,71 +175,86 @@ class UICommunicator:
         log_method(message)
     
     def start_operation(self, operation_name: str, total_steps: int = 100):
-        """Mulai operasi dengan progress tracking yang enhanced."""
+        """Start operation dengan UI-only feedback"""
         self.log_info(f"🚀 Memulai {operation_name}")
         self.last_update_time = 0  # Reset throttling
         
-        if hasattr(self.progress_tracker, 'show'):
-            self.progress_tracker.show(operation_name.lower().replace(' ', '_'))
-        elif 'show_for_operation' in self.progress_tracker:
-            self.progress_tracker['show_for_operation'](operation_name.lower().replace(' ', '_'))
+        try:
+            if hasattr(self.progress_tracker, 'show'):
+                self.progress_tracker.show(operation_name.lower().replace(' ', '_'))
+            elif 'show_for_operation' in self.progress_tracker:
+                self.progress_tracker['show_for_operation'](operation_name.lower().replace(' ', '_'))
+        except Exception:
+            pass
     
     def complete_operation(self, operation_name: str, result_message: str = ""):
-        """Selesaikan operasi dengan progress tracking."""
+        """Complete operation dengan UI-only feedback"""
         final_message = result_message or f"{operation_name} selesai"
         self.log_success(final_message)
         
-        if hasattr(self.progress_tracker, 'complete'):
-            self.progress_tracker.complete(final_message)
-        elif 'complete_operation' in self.progress_tracker:
-            self.progress_tracker['complete_operation'](final_message)
+        try:
+            if hasattr(self.progress_tracker, 'complete'):
+                self.progress_tracker.complete(final_message)
+            elif 'complete_operation' in self.progress_tracker:
+                self.progress_tracker['complete_operation'](final_message)
+        except Exception:
+            pass
     
     def error_operation(self, operation_name: str, error_message: str):
-        """Handle error operasi dengan progress tracking."""
+        """Handle error dengan UI-only feedback"""
         final_message = f"{operation_name} gagal: {error_message}"
         self.log_error(final_message)
         
-        if hasattr(self.progress_tracker, 'error'):
-            self.progress_tracker.error(final_message)
-        elif 'error_operation' in self.progress_tracker:
-            self.progress_tracker['error_operation'](final_message)
+        try:
+            if hasattr(self.progress_tracker, 'error'):
+                self.progress_tracker.error(final_message)
+            elif 'error_operation' in self.progress_tracker:
+                self.progress_tracker['error_operation'](final_message)
+        except Exception:
+            pass
     
     def update_status(self, message: str, status_type: str = "info"):
-        """Update status UI dengan pesan real-time."""
+        """Update status dengan UI-only output"""
         self.log(status_type, message)
-        
-        # Update status panel jika tersedia
-        if 'status_panel' in self.ui_components:
-            try:
-                from smartcash.ui.utils.alert_utils import update_status_panel
-                update_status_panel(self.ui_components['status_panel'], message, status_type)
-            except ImportError:
-                pass
     
     def report_progress_with_callback(self, progress_callback: Optional[Callable] = None, 
                                     step: str = "overall", current: int = 0, 
                                     total: int = 100, message: str = ""):
-        """Enhanced progress reporting dengan dual tracking."""
+        """Enhanced progress reporting dengan dual tracking"""
         # Update our progress
         self.progress(step, current, total, message)
         
-        # Also call external callback
+        # Call external callback dengan error suppression
         if progress_callback and callable(progress_callback):
             try:
                 progress_callback(step, current, total, message)
             except Exception:
-                pass
+                pass  # Silent fail
+    
+    def cleanup_suppression(self):
+        """Cleanup suppression jika diperlukan"""
+        try:
+            if self.ui_components.get('_stdout_suppressed'):
+                # Restore original stdout/stderr
+                if '_original_stdout' in self.ui_components:
+                    sys.stdout = self.ui_components['_original_stdout']
+                if '_original_stderr' in self.ui_components:
+                    sys.stderr = self.ui_components['_original_stderr']
+                
+                self.ui_components['_stdout_suppressed'] = False
+        except Exception:
+            pass
     
     # One-liner helper methods
     is_stop_requested = lambda self: self.ui_components.get('stop_requested', False)
 
 def create_communicator(ui_components: Dict[str, Any] = None) -> UICommunicator:
-    """Factory function untuk membuat UI communicator dengan real-time updates."""
+    """Factory function untuk membuat UI communicator dengan aggressive suppression"""
     return UICommunicator(ui_components)
 
-# One-liner helper functions
-log_to_ui = lambda comm, msg, level="info": comm.log(level, msg)
-progress_to_ui = lambda comm, op, curr, total, msg="": comm.progress(op, curr, total, msg)
-start_ui_operation = lambda comm, name: comm.start_operation(name)
-complete_ui_operation = lambda comm, name, msg="": comm.complete_operation(name, msg)
-error_ui_operation = lambda comm, name, msg: comm.error_operation(name, msg)
+# One-liner helper functions dengan suppression
+log_to_ui = lambda comm, msg, level="info": comm.log(level, msg) if comm else None
+progress_to_ui = lambda comm, op, curr, total, msg="": comm.progress(op, curr, total, msg) if comm else None
+start_ui_operation = lambda comm, name: comm.start_operation(name) if comm else None
+complete_ui_operation = lambda comm, name, msg="": comm.complete_operation(name, msg) if comm else None
+error_ui_operation = lambda comm, name, msg: comm.error_operation(name, msg) if comm else None

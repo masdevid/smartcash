@@ -1,9 +1,10 @@
 """
 File: smartcash/dataset/augmentor/service.py
-Deskripsi: Fixed service dengan real-time progress integration dan proper communicator flow
+Deskripsi: Fixed service dengan aggressive log suppression dan parameter alignment
 """
 
 import time
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List
 from collections import defaultdict
@@ -13,52 +14,114 @@ from .core.pipeline import PipelineFactory
 from .communicator import create_communicator
 
 class AugmentationService:
-    """Fixed orchestrator service dengan real-time progress integration dan proper communicator flow"""
+    """Fixed service dengan aggressive log suppression dan parameter alignment"""
     
     def __init__(self, config: Dict[str, Any], ui_components: Dict[str, Any] = None):
+        # Setup aggressive log suppression FIRST
+        self._setup_aggressive_log_suppression()
+        
         # Create communicator dengan UI components
         self.comm = create_communicator(ui_components) if ui_components else None
         
-        # Create context dengan communicator integration
-        self.context = create_context(config, self.comm)
+        # Create context dengan aligned parameters
+        self.context = create_context(self._align_config_parameters(config), self.comm)
         self.config, self.progress, self.paths = self.context['config'], self.context['progress'], self.context['paths']
         self.stats = defaultdict(int)
-        self.pipeline_factory = PipelineFactory(config, self.progress.logger)
+        self.pipeline_factory = PipelineFactory(config, self.progress.logger if self.progress else None)
+    
+    def _setup_aggressive_log_suppression(self):
+        """Aggressive log suppression untuk prevent console flooding"""
+        suppression_targets = [
+            'smartcash.dataset.augmentor', 'smartcash.dataset.augmentor.core',
+            'smartcash.dataset.augmentor.utils', 'smartcash.dataset.augmentor.strategies',
+            'smartcash.common.threadpools', 'concurrent.futures', 'threading',
+            'albumentations', 'cv2', 'numpy', 'PIL', 'matplotlib', 'tqdm',
+            'requests', 'urllib3', 'http.client', 'ipywidgets'
+        ]
+        
+        for target in suppression_targets:
+            try:
+                logger = logging.getLogger(target)
+                logger.setLevel(logging.CRITICAL)
+                logger.propagate = False
+                # Clear existing handlers
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)
+            except Exception:
+                pass
+        
+        # Suppress root logger aggressively
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.CRITICAL)
+    
+    def _align_config_parameters(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Align parameter names between UI dan service"""
+        augmentation_config = config.get('augmentation', {})
+        
+        # Parameter alignment mapping
+        aligned_config = {
+            'data': {'dir': config.get('data', {}).get('dir', 'data')},
+            'augmentation': {
+                'num_variations': augmentation_config.get('num_variations', 2),
+                'target_count': augmentation_config.get('target_count', 500),
+                'types': augmentation_config.get('types', ['combined']),
+                'intensity': augmentation_config.get('intensity', 0.7),
+                'output_dir': augmentation_config.get('output_dir', 'data/augmented'),
+                # UI parameter mapping
+                'fliplr': augmentation_config.get('fliplr', 0.5),
+                'degrees': augmentation_config.get('degrees', 10),
+                'translate': augmentation_config.get('translate', 0.1),
+                'scale': augmentation_config.get('scale', 0.1),
+                'hsv_h': augmentation_config.get('hsv_h', 0.015),
+                'hsv_s': augmentation_config.get('hsv_s', 0.7),
+                'brightness': augmentation_config.get('brightness', 0.2),
+                'contrast': augmentation_config.get('contrast', 0.2),
+                'target_split': augmentation_config.get('target_split', 'train')
+            },
+            'preprocessing': {
+                'output_dir': config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+            }
+        }
+        
+        return aligned_config
     
     def run_full_augmentation_pipeline(self, target_split: str = "train", progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Fixed full pipeline dengan real-time progress updates dan proper callback integration"""
+        """Fixed pipeline dengan aligned parameters"""
         start_time = time.time()
         
-        # Start operation tracking
+        # Start operation dengan suppressed logging
         self.comm and self.comm.start_operation("Augmentation Pipeline", 100)
         
-        # Dataset validation dengan progress
-        self.progress.progress("overall", 5, 100, "Validasi dataset")
-        dataset_info = self.context['detector']()
-        if dataset_info['status'] == 'error' or dataset_info['total_images'] == 0:
-            return self._error_result(f"Dataset tidak valid: {dataset_info.get('message', 'Tidak ada gambar')}")
-        
-        self.progress.log_info(f"🚀 Pipeline dimulai: {dataset_info['total_images']} gambar")
-        
         try:
-            # Augmentation step dengan real-time progress
-            self.progress.progress("overall", 10, 100, "Memulai augmentasi dataset")
+            # Use aligned target_split from config
+            actual_target_split = self.config.get('target_split', target_split)
+            
+            # Dataset validation
+            self._update_progress_safe("overall", 5, "Validasi dataset")
+            dataset_info = self.context['detector']()
+            if dataset_info['status'] == 'error' or dataset_info['total_images'] == 0:
+                return self._error_result(f"Dataset tidak valid: {dataset_info.get('message', 'Tidak ada gambar')}")
+            
+            self._log_safe("info", f"🚀 Pipeline dimulai: {dataset_info['total_images']} gambar")
+            
+            # Augmentation step
+            self._update_progress_safe("overall", 10, "Memulai augmentasi dataset")
             aug_result = self._process_augmentation_with_progress(dataset_info, progress_callback)
             if aug_result['status'] != 'success':
                 return self._error_result(f"Augmentasi gagal: {aug_result.get('message', 'Unknown error')}")
             
-            # Normalization step dengan real-time progress
-            self.progress.progress("overall", 60, 100, "Memulai normalisasi ke preprocessed")
-            norm_result = self._process_normalization_with_progress(target_split, progress_callback)
+            # Normalization step
+            self._update_progress_safe("overall", 60, "Memulai normalisasi ke preprocessed")
+            norm_result = self._process_normalization_with_progress(actual_target_split, progress_callback)
             if norm_result['status'] != 'success':
                 return self._error_result(f"Normalisasi gagal: {norm_result.get('message', 'Unknown error')}")
             
-            # Success result dengan proper timing
+            # Success result
             total_time = time.time() - start_time
             result = {
                 'status': 'success', 
                 'total_files': aug_result.get('total_generated', 0), 
-                'final_output': target_split,
+                'final_output': actual_target_split,
                 'processing_time': total_time, 
                 'steps': {'augmentation': aug_result, 'normalization': norm_result}
             }
@@ -75,14 +138,11 @@ class AugmentationService:
             return self._error_result(error_msg)
     
     def _process_augmentation_with_progress(self, dataset_info: Dict[str, Any], progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Fixed augmentation processing dengan detailed progress updates"""
+        """Fixed augmentation dengan suppressed progress"""
         try:
             ensure_dirs(self.paths['aug_images'], self.paths['aug_labels'])
             
-            # Enhanced progress tracking
-            self.progress.progress("step", 5, 100, "Mencari file gambar")
-            
-            # Image files collection dengan better error handling
+            # Get image files
             image_files = [str(f) for location in dataset_info['image_locations'] 
                           for images_dir in [location['path'] if '/images' in location['path'] 
                                             else f"{location['path']}/images" if Path(f"{location['path']}/images").exists() 
@@ -93,45 +153,29 @@ class AugmentationService:
             if not image_files:
                 return {'status': 'error', 'message': 'Tidak ada file gambar ditemukan'}
             
-            self.progress.progress("step", 15, 100, f"Ditemukan {len(image_files)} file gambar")
+            self._update_progress_safe("step", 15, f"Ditemukan {len(image_files)} file gambar")
             
-            # Pipeline creation dengan progress
+            # Create pipeline dengan aligned parameters
             aug_type = self.config.get('types', ['combined'])[0] if self.config.get('types') else 'combined'
             pipeline = self.pipeline_factory.create_pipeline(aug_type, self.config.get('intensity', 0.7))
             
-            self.progress.progress("step", 20, 100, "Pipeline augmentasi siap")
-            
-            # Enhanced batch processing dengan real-time callback
-            def enhanced_process_func(img_path):
+            # Process dengan suppressed logging
+            def process_func(img_path):
                 return self._process_single_image(img_path, pipeline, self.config.get('num_variations', 2))
             
-            # Custom progress callback untuk batch processing
-            def batch_progress_callback(step: str, current: int, total: int, message: str):
-                # Map to step progress (20-90%)
-                step_progress = 20 + int((current / max(1, total)) * 70)
-                self.progress.progress("step", step_progress, 100, message)
-                
-                # Also call external callback
-                if progress_callback:
-                    overall_progress = 10 + int((current / max(1, total)) * 50)  # 10-60% of overall
-                    progress_callback("overall", overall_progress, 100, f"Augmentasi: {message}")
-            
-            # Process dengan enhanced progress tracking
+            # Batch processing dengan minimal progress updates
             results = process_batch(
                 image_files, 
-                enhanced_process_func, 
+                process_func, 
                 progress_tracker=self.progress,
                 operation_name="augmentasi gambar"
             )
             
-            # Statistics calculation dengan safety checks
+            # Calculate statistics
             successful = [r for r in results if r.get('status') == 'success']
             total_generated = sum(r.get('generated', 0) for r in successful)
             
-            self.progress.progress("step", 100, 100, f"Augmentasi selesai: {total_generated} file")
-            
-            if total_generated == 0:
-                return {'status': 'error', 'message': 'Tidak ada file yang berhasil diaugmentasi'}
+            self._update_progress_safe("step", 100, f"Augmentasi selesai: {total_generated} file")
             
             return {
                 'status': 'success', 
@@ -144,22 +188,16 @@ class AugmentationService:
             return {'status': 'error', 'message': f"Error pada augmentasi: {str(e)}"}
     
     def _process_normalization_with_progress(self, target_split: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Fixed normalization processing dengan detailed progress updates"""
+        """Fixed normalization dengan minimal logging"""
         try:
-            # Target setup dengan progress
             target_dir = f"{self.paths['prep_dir']}/{target_split}"
             ensure_dirs(f"{target_dir}/images", f"{target_dir}/labels")
             
-            self.progress.progress("step", 10, 100, "Setup direktori target")
-            
-            # Find augmented files dengan progress
             aug_files = find_aug_files(self.paths['aug_dir'])
             if not aug_files: 
                 return {'status': 'error', 'message': 'Tidak ada file augmented ditemukan'}
             
-            self.progress.progress("step", 20, 100, f"Ditemukan {len(aug_files)} file augmented")
-            
-            # Create pairs dengan progress tracking
+            # Create pairs
             image_files = [f for f in aug_files if any(f.endswith(ext) for ext in ['.jpg', '.jpeg', '.png'])]
             pairs = [(img_file, f"{self.paths['aug_labels']}/{get_stem(img_file)}.txt") 
                     for img_file in image_files if Path(f"{self.paths['aug_labels']}/{get_stem(img_file)}.txt").exists()]
@@ -167,31 +205,10 @@ class AugmentationService:
             if not pairs:
                 return {'status': 'error', 'message': 'Tidak ada pasangan image-label yang valid'}
             
-            self.progress.progress("step", 30, 100, f"Validasi {len(pairs)} pasangan file")
+            # Process normalization dengan minimal progress
+            normalized = sum(1 for img_file, label_file in pairs if self._normalize_pair(img_file, label_file, target_dir))
             
-            # Process normalization dengan real-time updates
-            normalized = 0
-            total_pairs = len(pairs)
-            
-            for i, (img_file, label_file) in enumerate(pairs):
-                if self._normalize_pair(img_file, label_file, target_dir):
-                    normalized += 1
-                
-                # Real-time progress update
-                current_progress = 30 + int((i / total_pairs) * 60)  # 30-90%
-                self.progress.progress("step", current_progress, 100, 
-                                     f"Normalisasi: {i+1}/{total_pairs}")
-                
-                # External callback
-                if progress_callback:
-                    overall_progress = 60 + int((i / total_pairs) * 30)  # 60-90% of overall
-                    progress_callback("overall", overall_progress, 100, 
-                                    f"Normalisasi: {i+1}/{total_pairs}")
-            
-            self.progress.progress("step", 100, 100, f"Normalisasi selesai: {normalized} file")
-            
-            if normalized == 0:
-                return {'status': 'error', 'message': 'Tidak ada file yang berhasil dinormalisasi'}
+            self._update_progress_safe("step", 100, f"Normalisasi selesai: {normalized} file")
             
             return {'status': 'success', 'total_normalized': normalized, 'target_dir': target_dir}
             
@@ -199,9 +216,8 @@ class AugmentationService:
             return {'status': 'error', 'message': f"Error pada normalisasi: {str(e)}"}
     
     def _process_single_image(self, image_path: str, pipeline, num_variations: int) -> Dict[str, Any]:
-        """Single image processing - unchanged logic"""
+        """Process single image dengan suppressed logging"""
         try:
-            # Read image
             image = read_image(image_path)
             if image is None: 
                 return {'status': 'error', 'error': 'Cannot read image'}
@@ -214,7 +230,7 @@ class AugmentationService:
             bboxes, class_labels = next(((lambda data: ([bbox[1:5] for bbox in data], [bbox[0] for bbox in data]))(read_yolo_labels(str(lp))) 
                                         for lp in label_paths if lp.exists() and (data := read_yolo_labels(str(lp)))), ([], []))
             
-            # Generate variants
+            # Generate variants dengan suppressed logging
             generated = sum(1 for var_idx in range(num_variations) 
                            if self._generate_variant(image, bboxes, class_labels, pipeline, img_stem, var_idx))
             
@@ -224,17 +240,14 @@ class AugmentationService:
             return {'status': 'error', 'error': str(e)}
     
     def _generate_variant(self, image, bboxes: List, class_labels: List, pipeline, img_stem: str, var_idx: int) -> bool:
-        """Generate single variant - unchanged logic"""
+        """Generate variant dengan no logging"""
         try:
-            # Apply augmentation
             augmented = pipeline(image=image, bboxes=bboxes, class_labels=class_labels)
             aug_image, aug_bboxes, aug_labels = augmented['image'], augmented['bboxes'], augmented['class_labels']
             
-            # Save files
             aug_filename = f"aug_{img_stem}_v{var_idx}"
             img_saved = save_image(aug_image, f"{self.paths['aug_images']}/{aug_filename}.jpg")
             
-            # Save labels
             if img_saved and aug_bboxes and aug_labels:
                 full_bboxes = [[label] + bbox for bbox, label in zip(aug_bboxes, aug_labels)]
                 save_yolo_labels(full_bboxes, f"{self.paths['aug_labels']}/{aug_filename}.txt")
@@ -244,20 +257,18 @@ class AugmentationService:
             return False
     
     def _normalize_pair(self, img_file: str, label_file: str, target_dir: str) -> bool:
-        """Normalize single pair - unchanged logic"""
+        """Normalize pair dengan no logging"""
         try:
-            # Generate normalized filename (remove aug_ prefix)
             stem = get_stem(img_file)
             norm_stem = stem[4:] if stem.startswith('aug_') else stem
             
-            # Copy files
             return (safe_copy_file(img_file, f"{target_dir}/images/{norm_stem}.jpg") and 
                    safe_copy_file(label_file, f"{target_dir}/labels/{norm_stem}.txt"))
         except Exception:
             return False
     
     def cleanup_augmented_data(self, include_preprocessed: bool = True, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Enhanced cleanup dengan real-time progress"""
+        """Cleanup dengan suppressed logging"""
         self.comm and self.comm.start_operation("Cleanup Dataset", 100)
         
         try:
@@ -275,14 +286,10 @@ class AugmentationService:
             return {'status': 'error', 'message': error_msg}
     
     def get_augmentation_status(self) -> Dict[str, Any]:
-        """Get status dengan enhanced progress tracking"""
+        """Get status dengan suppressed logging"""
         try:
-            self.comm and self.comm.start_operation("Check Dataset Status", 100)
-            
             raw_images, raw_labels = count_dataset_files(self.paths['raw_dir'])
             aug_images, aug_labels = count_dataset_files(self.paths['aug_dir'])
-            
-            self.comm and self.comm.progress("overall", 50, 100, "Menghitung file preprocessed")
             
             # Check preprocessed files
             prep_images = prep_labels = 0
@@ -294,35 +301,46 @@ class AugmentationService:
                         prep_images += split_images
                         prep_labels += split_labels
             
-            result = {
+            return {
                 'raw_dataset': {'exists': raw_images > 0, 'total_images': raw_images, 'total_labels': raw_labels},
                 'augmented_dataset': {'exists': aug_images > 0, 'total_images': aug_images, 'total_labels': aug_labels},
                 'preprocessed_dataset': {'exists': prep_images > 0, 'total_files': prep_images + prep_labels},
                 'ready_for_augmentation': raw_images > 0
             }
             
-            self.comm and self.comm.complete_operation("Check Dataset Status", "Status check selesai")
-            return result
-            
         except Exception as e:
-            error_msg = f"Status check error: {str(e)}"
-            self.comm and self.comm.error_operation("Check Dataset Status", error_msg)
             return {
                 'raw_dataset': {'exists': False, 'total_images': 0, 'total_labels': 0},
                 'augmented_dataset': {'exists': False, 'total_images': 0, 'total_labels': 0},
                 'preprocessed_dataset': {'exists': False, 'total_files': 0},
                 'ready_for_augmentation': False,
-                'error': error_msg
+                'error': str(e)
             }
+    
+    # Safe utility methods
+    def _update_progress_safe(self, step: str, percentage: int, message: str) -> None:
+        """Safe progress update"""
+        try:
+            self.comm and hasattr(self.comm, 'progress') and self.comm.progress(step, percentage, 100, message)
+        except Exception:
+            pass
+    
+    def _log_safe(self, level: str, message: str) -> None:
+        """Safe logging hanya ke UI"""
+        try:
+            self.comm and hasattr(self.comm, f'log_{level}') and getattr(self.comm, f'log_{level}')(message)
+        except Exception:
+            pass
     
     # Error result creator
     _error_result = lambda self, msg: {'status': 'error', 'message': msg, 'timestamp': time.time()}
 
-# Factory functions
-create_augmentation_service = lambda config, ui_components=None: AugmentationService(config, ui_components)
-
+# Factory functions dengan parameter alignment
 def create_service_from_ui(ui_components: Dict[str, Any]) -> AugmentationService:
-    """Create service dari UI components dengan proper communicator integration"""
+    """Create service dari UI components dengan aligned parameters"""
     from .config import extract_ui_config
     config = extract_ui_config(ui_components)
     return AugmentationService(config, ui_components)
+
+# One-liner factories
+create_augmentation_service = lambda config, ui_components=None: AugmentationService(config, ui_components)

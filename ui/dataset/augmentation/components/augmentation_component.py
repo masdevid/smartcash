@@ -47,10 +47,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_options = create_advanced_options_widget()  
     augmentation_types = create_augmentation_types_widget()
 
-    # Config buttons dengan proper spacing
+    # Config buttons tanpa icon
     config_buttons = create_save_reset_buttons(
-        save_label="💾 Simpan",
-        reset_label="🔄 Reset",
+        save_label="Simpan",
+        reset_label="Reset",
         save_tooltip="Simpan konfigurasi augmentasi",
         reset_tooltip="Reset ke konfigurasi default",
         with_sync_info=True,

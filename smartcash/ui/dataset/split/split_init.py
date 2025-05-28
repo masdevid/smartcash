@@ -52,7 +52,6 @@ class SplitConfigInitializer(ConfigCellInitializer):
 def create_split_config_cell(env=None, config=None, **kwargs):
     """Factory function untuk create split config cell"""
     ui = create_config_cell(SplitConfigInitializer, env, config, **kwargs)
-    display(ui) if hasattr(ui, 'children') else None
     return ui
 
 

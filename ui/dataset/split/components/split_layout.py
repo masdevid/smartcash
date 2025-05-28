@@ -6,16 +6,18 @@ Deskripsi: Layout komponen untuk UI split dataset - refactored dengan reusable c
 from typing import Dict, Any
 import ipywidgets as widgets
 
+from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.components.info_accordion import create_info_accordion
 from smartcash.ui.dataset.split.components.split_form import create_ratio_section, create_path_section
+
 
 def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     """Buat layout utama untuk UI split dataset dengan responsive design"""
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.layout_utils import create_responsive_two_column
     
-    # Header dengan existing utility
-    header = create_header("Konfigurasi Split Dataset", "Pengaturan pembagian dataset untuk training, validation, dan testing")
+    # Header dengan icon
+    header = create_header("Konfigurasi Split Dataset", "Pengaturan pembagian dataset untuk training, validation, dan testing", "✂️")
     
     # Create sections
     ratio_section = create_ratio_section(form_components)
@@ -25,15 +27,17 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     info_content = _create_info_content()
     info_accordion = create_info_accordion("Informasi Split Dataset", info_content, "info")
     
-    # Layout containers
+    # Layout containers - remove header from main_container since it's already in header
     form_container = widgets.VBox([
         create_responsive_two_column(ratio_section, path_section),
         form_components['save_reset_container']
     ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
     main_container = widgets.VBox([
-        header, form_components['status_panel'], 
-        form_container, info_accordion['container']
+        header, 
+        form_components['status_panel'], 
+        form_container, 
+        info_accordion['container']
     ], layout=widgets.Layout(width='100%', padding='10px'))
     
     return {

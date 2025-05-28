@@ -64,7 +64,7 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
         form_widgets['image_size_slider'],
         form_widgets['epochs_slider'],
         form_widgets['dropout_slider']
-    ], layout=widgets.Layout(width='30%', padding='10px', border='1px solid #ddd', border_radius='5px'))
+    ], layout=widgets.Layout(width='32%', padding='10px', border='1px solid #ddd', border_radius='5px'))
     
     optimization_group = widgets.VBox([
         widgets.HTML(f"<h4>{ICONS.get('optimization', '🔄')} Optimasi</h4>"),
@@ -76,7 +76,7 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
         form_widgets['scheduler_checkbox'],
         form_widgets['scheduler_dropdown'],
         form_widgets['warmup_epochs_slider']
-    ], layout=widgets.Layout(width='30%', padding='10px', border='1px solid #ddd', border_radius='5px'))
+    ], layout=widgets.Layout(width='32%', padding='10px', border='1px solid #ddd', border_radius='5px'))
     
     advanced_group = widgets.VBox([
         widgets.HTML(f"<h4>{ICONS.get('advanced', '🔧')} Parameter Lanjutan</h4>"),
@@ -94,7 +94,7 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
         widgets.HTML("<b>Checkpoint</b>"),
         form_widgets['save_best_checkbox'],
         form_widgets['checkpoint_metric_dropdown']
-    ], layout=widgets.Layout(width='30%', padding='10px', border='1px solid #ddd', border_radius='5px'))
+    ], layout=widgets.Layout(width='32%', padding='10px', border='1px solid #ddd', border_radius='5px'))
     
     # Save/reset buttons menggunakan shared component
     save_reset_buttons = create_save_reset_buttons(

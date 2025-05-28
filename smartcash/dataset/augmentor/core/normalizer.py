@@ -146,13 +146,15 @@ class NormalizationEngine:
             norm_config = self.config.get('preprocessing', {}).get('normalization', {})
             scaler_type = norm_config.get('scaler', 'minmax')
 
-            # Optional resizing dulu, sebelum normalisasi
-            target_size = norm_config.get('target_size', None)
-            if target_size and isinstance(target_size, (list, tuple)) and len(target_size) == 2:
+            # Set default target size jika tidak disediakan
+            target_size = norm_config.get('target_size', (640, 640))
+
+            # Resize dulu sebelum normalisasi
+            if isinstance(target_size, (list, tuple)) and len(target_size) == 2:
                 if image.shape[:2] != tuple(target_size):
                     image = cv2.resize(image, tuple(target_size), interpolation=cv2.INTER_LANCZOS4)
 
-            # Konversi tipe dan normalisasi (sesuai scaler_type)
+            # Konversi tipe dan normalisasi
             image = image.astype('float32')
 
             if scaler_type == 'minmax' or scaler_type == 'none':
@@ -163,7 +165,7 @@ class NormalizationEngine:
                 std = image.std()
                 if std > 0:
                     image = (image - mean) / std
-                    # Tidak dikembalikan ke 0–255, biarkan standar distribusinya
+                    # Tidak dikembalikan ke 0–255, biarkan dalam distribusi z-score
 
             return image
 

@@ -56,13 +56,13 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     # Custom packages
     custom_packages = widgets.Textarea(
         placeholder='Package tambahan (satu per baris)',
-        layout=widgets.Layout(width='100%', height='80px', max_width='100%', overflow='hidden')
+        layout=widgets.Layout(width='100%', height='80px')
     )
     
     custom_section = widgets.VBox([
         widgets.HTML(f"<h3>{ICONS.get('edit', '📝')} Custom Packages</h3>"),
         custom_packages
-    ])
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
     
     # Install button
     install_button = widgets.Button(

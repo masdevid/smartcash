@@ -46,9 +46,9 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(
             display='flex',
             flex_flow='row nowrap',
-            justify_content='space-between',
+            justify_content='justify-between',
             align_items='flex-start',
-            width='calc(33% - 10px)',
+            width='100%',
             margin='10px 0',
             overflow='hidden'
         )
@@ -160,8 +160,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     # Category container dengan center alignment
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           width='300px',
-                           max_width='300px',
+                           width='calc(33% - 12px)',
                            margin='0',
                            padding='12px',
                            border=f'1px solid {COLORS["border"]}',

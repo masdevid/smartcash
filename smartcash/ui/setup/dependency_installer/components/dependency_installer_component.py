@@ -40,16 +40,17 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         category_box = create_category_box(category, checkboxes)
         category_boxes.append(category_box)
     
-    # Packages container - 3 columns dengan proper spacing
+    # Packages container - 3 columns dengan center alignment
     packages_container = widgets.HBox(
         category_boxes,
         layout=widgets.Layout(
             display='flex',
             flex_flow='row nowrap',
-            justify_content='justify-between',
+            justify_content='center',
             align_items='flex-start',
             width='100%',
             margin='10px 0',
+            gap='15px',
             overflow='hidden'
         )
     )
@@ -136,10 +137,10 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(width='auto', margin='2px 5px 2px 0')
+            layout=widgets.Layout(flex='1 1 auto', margin='2px 0', max_width='calc(100% - 80px)')
         )
         
-        # Horizontal row tanpa justify center untuk natural checkbox spacing
+        # Horizontal row dengan space-between alignment
         row = widgets.HBox([checkbox, status_widget], 
                           layout=widgets.Layout(
                               width='100%',
@@ -147,7 +148,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                               justify_content='space-between',
                               align_items='center',
                               margin='3px 0',
-                              padding='0 5px',
+                              padding='0',
                               overflow='hidden',
                               box_sizing='border-box'
                           ))
@@ -160,8 +161,8 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     # Category container dengan center alignment
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           width='280px',
-                           max_width='280px',
+                           width='300px',
+                           max_width='300px',
                            margin='0',
                            padding='12px',
                            border=f'1px solid {COLORS["border"]}',

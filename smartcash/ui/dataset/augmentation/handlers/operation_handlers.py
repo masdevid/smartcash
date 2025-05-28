@@ -1,15 +1,19 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/operation_handlers.py
-Deskripsi: Operation handlers dengan implementasi yang disederhanakan dan check handler yang diperbaiki
+Deskripsi: Operation handlers dengan progress tracking dan button state management yang diperbaiki
 """
 
 from typing import Dict, Any
 from smartcash.ui.dataset.augmentation.utils.ui_logger_utils import log_to_ui, show_progress_safe, complete_progress_safe, error_progress_safe
 
 def execute_augmentation(ui_components: Dict[str, Any]):
-    """Execute augmentation menggunakan service reuse tanpa keyword extra"""
+    """Execute augmentation dengan progress tracking dan button state management"""
     try:
+        # Disable buttons dan show progress
+        _disable_operation_buttons(ui_components)
         show_progress_safe(ui_components, 'augmentation')
+        
+        log_to_ui(ui_components, "🚀 Memulai pipeline augmentasi...", 'info')
         
         service = _create_service_safely(ui_components)
         if not service:
@@ -17,30 +21,45 @@ def execute_augmentation(ui_components: Dict[str, Any]):
             return
         
         target_split = _get_target_split_safe(ui_components)
+        log_to_ui(ui_components, f"📂 Target split: {target_split}", 'info')
+        
+        # Execute dengan progress callback yang terlihat
         result = service.run_full_augmentation_pipeline(
             target_split=target_split,
-            progress_callback=_create_progress_callback(ui_components)
+            progress_callback=_create_visible_progress_callback(ui_components)
         )
         
         _handle_service_result(ui_components, result, 'augmentation pipeline')
         
     except Exception as e:
         log_to_ui(ui_components, f"Pipeline error: {str(e)}", 'error', "❌ ")
+    finally:
+        # Re-enable buttons
+        _enable_operation_buttons(ui_components)
 
 def execute_check(ui_components: Dict[str, Any]):
-    """Execute check dengan implementasi yang diperbaiki menggunakan detector utils"""
+    """Execute check dengan progress tracking"""
     try:
+        _disable_operation_buttons(ui_components)
         show_progress_safe(ui_components, 'check')
         
-        # Import detector utils untuk check yang lebih akurat
+        log_to_ui(ui_components, "🔍 Memulai pengecekan dataset...", 'info')
+        
         from smartcash.dataset.augmentor.utils.dataset_detector import detect_split_structure
         from smartcash.dataset.augmentor.utils.path_operations import get_best_data_location
         
-        # Detect data location dan structure
+        # Progress update
+        tracker = ui_components.get('tracker')
+        if tracker and hasattr(tracker, 'update'):
+            tracker.update('overall', 20, 100, "Mencari lokasi data")
+        
         data_location = get_best_data_location()
         log_to_ui(ui_components, f"📁 Mengecek data di: {data_location}", 'info')
         
-        # Detect raw dataset
+        # Check raw dataset dengan progress
+        if tracker and hasattr(tracker, 'update'):
+            tracker.update('overall', 40, 100, "Mengecek raw dataset")
+        
         raw_info = detect_split_structure(data_location)
         if raw_info['status'] == 'success':
             raw_images = raw_info.get('total_images', 0)
@@ -52,7 +71,10 @@ def execute_check(ui_components: Dict[str, Any]):
         else:
             log_to_ui(ui_components, f"❌ Raw dataset tidak ditemukan: {raw_info.get('message', 'Unknown error')}", 'error')
         
-        # Check augmented dataset
+        # Check augmented dataset dengan progress
+        if tracker and hasattr(tracker, 'update'):
+            tracker.update('overall', 70, 100, "Mengecek augmented dataset")
+        
         try:
             aug_info = detect_split_structure(f"{data_location}/augmented")
             if aug_info['status'] == 'success' and aug_info.get('total_images', 0) > 0:
@@ -63,7 +85,10 @@ def execute_check(ui_components: Dict[str, Any]):
         except Exception:
             log_to_ui(ui_components, "🔄 Augmented Dataset: Belum ada file augmented", 'info')
         
-        # Check preprocessed dataset
+        # Check preprocessed dataset dengan progress
+        if tracker and hasattr(tracker, 'update'):
+            tracker.update('overall', 90, 100, "Mengecek preprocessed dataset")
+        
         try:
             prep_info = detect_split_structure(f"{data_location}/preprocessed")
             if prep_info['status'] == 'success' and prep_info.get('total_images', 0) > 0:
@@ -83,6 +108,8 @@ def execute_check(ui_components: Dict[str, Any]):
     except Exception as e:
         log_to_ui(ui_components, f"Check error: {str(e)}", 'error', "❌ ")
         error_progress_safe(ui_components, f"Check error: {str(e)}")
+    finally:
+        _enable_operation_buttons(ui_components)
 
 def _create_service_safely(ui_components: Dict[str, Any]):
     """Create augmentation service dengan UI config integration"""
@@ -97,22 +124,30 @@ def _create_service_safely(ui_components: Dict[str, Any]):
         log_to_ui(ui_components, f"Service creation error: {str(e)}", 'error', "❌ ")
         return None
 
-def _create_progress_callback(ui_components: Dict[str, Any]):
-    """Create progress callback dengan service integration"""
+def _create_visible_progress_callback(ui_components: Dict[str, Any]):
+    """Create progress callback yang terlihat dengan throttling"""
     import time
-    last_update = {'time': 0}
+    last_update = {'time': 0, 'percentage': -1}
     
     def callback(step: str, current: int, total: int, message: str):
         current_time = time.time()
-        if current_time - last_update['time'] < 0.5 and current != total:
-            return
+        percentage = min(100, max(0, int((current / max(1, total)) * 100)))
         
-        last_update['time'] = current_time
-        
-        tracker = ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'update'):
-            percentage = min(100, int((current / max(1, total)) * 100))
-            tracker.update(step, percentage, f"🎯 {message}")
+        # Update setiap 0.3 detik atau perubahan signifikan
+        if (current_time - last_update['time'] > 0.3 or 
+            abs(percentage - last_update['percentage']) >= 5 or
+            percentage in [0, 100]):
+            
+            last_update['time'] = current_time
+            last_update['percentage'] = percentage
+            
+            # Log progress message
+            log_to_ui(ui_components, f"📊 {message} ({percentage}%)", 'info')
+            
+            # Update tracker
+            tracker = ui_components.get('tracker')
+            if tracker and hasattr(tracker, 'update'):
+                tracker.update(step, percentage, message)
     
     return callback
 
@@ -138,6 +173,31 @@ def _handle_service_result(ui_components: Dict[str, Any], result: Dict[str, Any]
         error_msg = f"{operation.title()} gagal: {result.get('message', 'Unknown error')}"
         log_to_ui(ui_components, error_msg, 'error', "❌ ")
         error_progress_safe(ui_components, error_msg)
+
+def _disable_operation_buttons(ui_components: Dict[str, Any]):
+    """Disable operation buttons saat proses berjalan"""
+    button_keys = ['augment_button', 'check_button', 'cleanup_button']
+    for key in button_keys:
+        button = ui_components.get(key)
+        if button and hasattr(button, 'disabled'):
+            button.disabled = True
+            # Update description jika bisa
+            if hasattr(button, 'description'):
+                original_desc = getattr(button, '_original_description', button.description)
+                if not hasattr(button, '_original_description'):
+                    button._original_description = button.description
+                button.description = f"⏳ {original_desc}"
+
+def _enable_operation_buttons(ui_components: Dict[str, Any]):
+    """Enable operation buttons setelah proses selesai"""
+    button_keys = ['augment_button', 'check_button', 'cleanup_button']
+    for key in button_keys:
+        button = ui_components.get(key)
+        if button and hasattr(button, 'disabled'):
+            button.disabled = False
+            # Restore original description
+            if hasattr(button, '_original_description'):
+                button.description = button._original_description
 
 def _get_target_split_safe(ui_components: Dict[str, Any]) -> str:
     """Get target split dengan safe default"""

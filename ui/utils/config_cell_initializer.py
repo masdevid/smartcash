@@ -34,7 +34,6 @@ class ConfigCellInitializer(ABC):
                 return create_error_ui("Required components missing", self.module_name)
             
             self._setup_handlers(ui_components, config)
-            update_status_panel_safe(ui_components, f"✅ {self.module_name} ready", "success")
             return ui_components.get('main_container', ui_components)
         except Exception as e:
             return create_error_ui(f"Error: {str(e)}", self.module_name)
@@ -83,7 +82,7 @@ class ConfigCellInitializer(ABC):
         """Save config dengan consolidated error handling"""
         try:
             button.disabled = True
-            update_status_panel_safe(ui_components, "💾 Saving...", "info")
+            update_status_panel_safe(ui_components, "💾 Menyimpan...", "info")
             
             config = self._extract_config(ui_components)
             success = get_config_manager().save_config(config, self.config_filename)

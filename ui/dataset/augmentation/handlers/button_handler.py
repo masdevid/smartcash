@@ -45,6 +45,7 @@ class ButtonHandler:
     def execute_config(self, config_name: str, config_func):
         """Execute config operation"""
         try:
+            self._reset_log_area_only()
             with self.manager.config_context(config_name):
                 config_func()
                 log_to_ui(self.ui_components, f"{config_name.title()} berhasil", 'success', "✅ ")

@@ -51,14 +51,14 @@ def execute_check(ui_components: Dict[str, Any]):
         # Progress update
         tracker = ui_components.get('tracker')
         if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 20, 100, "Mencari lokasi data")
+            tracker.update('overall', 20, "Mencari lokasi data")
         
         data_location = get_best_data_location()
         log_to_ui(ui_components, f"📁 Mengecek data di: {data_location}", 'info')
         
-        # Check raw dataset dengan progress
+        # Check augmented dataset dengan progress
         if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 40, 100, "Mengecek raw dataset")
+            tracker.update('overall', 40, "Mengecek raw dataset")
         
         raw_info = detect_split_structure(data_location)
         if raw_info['status'] == 'success':
@@ -73,7 +73,7 @@ def execute_check(ui_components: Dict[str, Any]):
         
         # Check augmented dataset dengan progress
         if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 70, 100, "Mengecek augmented dataset")
+            tracker.update('overall', 70, "Mengecek augmented dataset")
         
         try:
             aug_info = detect_split_structure(f"{data_location}/augmented")
@@ -87,7 +87,7 @@ def execute_check(ui_components: Dict[str, Any]):
         
         # Check preprocessed dataset dengan progress
         if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 90, 100, "Mengecek preprocessed dataset")
+            tracker.update('overall', 90, "Mengecek preprocessed dataset")
         
         try:
             prep_info = detect_split_structure(f"{data_location}/preprocessed")

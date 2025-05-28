@@ -27,15 +27,13 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         category_box = create_category_box(category, checkboxes)
         category_boxes.append(category_box)
     
-    # Packages container
-    packages_container = widgets.HBox(
+    # Packages container with responsive flex
+    packages_container = widgets.VBox(
         category_boxes,
         layout=widgets.Layout(
-            display='flex',
-            flex_flow='row wrap',
-            justify_content='space-between',
             width='100%',
-            margin='10px 0'
+            margin='10px 0',
+            overflow='hidden'
         )
     )
     
@@ -106,39 +104,50 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     
     # Header
     header = widgets.HTML(f"""
-    <div style="padding:5px 0">
-        <h3 style="margin:5px 0">{category['icon']} {category['name']}</h3>
-        <p style="margin:2px 0;color:{COLORS['muted']}">{category['description']}</p>
+    <div style="padding:8px 0; border-bottom:1px solid {COLORS['border']}; margin-bottom:8px;">
+        <h4 style="margin:0; color:{COLORS['primary']}">{category['icon']} {category['name']}</h4>
+        <small style="color:{COLORS['muted']}">{category['description']}</small>
     </div>
     """)
     
-    # Package rows
-    package_rows = []
+    # Package checkboxes with flex layout
+    package_widgets = []
     for package in category['packages']:
-        status_widget = widgets.HTML(f"<div style='width:100px;color:{COLORS['muted']}'>Checking...</div>")
+        status_widget = widgets.HTML(
+            f"<span style='color:{COLORS['muted']};font-size:11px;'>Checking...</span>",
+            layout=widgets.Layout(width='80px', margin='0')
+        )
         
         checkbox = widgets.Checkbox(
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(width='auto')
+            layout=widgets.Layout(flex='1 1 auto', margin='2px 0')
         )
         
+        # Horizontal row with flex
         row = widgets.HBox([checkbox, status_widget], 
-                          layout=widgets.Layout(justify_content='space-between'))
-        package_rows.append(row)
+                          layout=widgets.Layout(
+                              width='100%',
+                              justify_content='space-between',
+                              align_items='center',
+                              margin='3px 0'
+                          ))
+        package_widgets.append(row)
         
         # Store references
         checkboxes[package['key']] = checkbox
         checkboxes[f"{package['key']}_status"] = status_widget
     
-    # Category box
-    return widgets.VBox([header] + package_rows, 
+    # Category container with responsive layout
+    return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           margin='10px 0',
-                           padding='10px',
+                           width='100%',
+                           max_width='100%',
+                           margin='8px 0',
+                           padding='12px',
                            border=f'1px solid {COLORS["border"]}',
-                           border_radius='5px',
-                           width='31%',
-                           min_width='250px'
+                           border_radius='6px',
+                           overflow='hidden',
+                           box_sizing='border-box'
                        ))

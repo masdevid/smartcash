@@ -171,5 +171,6 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                            border=f'1px solid {COLORS["border"]}',
                            border_radius='6px',
                            overflow='hidden',
+                           justify_content='center',
                            box_sizing='border-box'
                        ))

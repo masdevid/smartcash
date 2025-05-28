@@ -1,10 +1,10 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Config handler dengan unified logging dan parameter alignment
+Deskripsi: Config handler dengan unified logging dan parameter alignment yang diperbaiki
 """
 
 from typing import Dict, Any
-from smartcash.common.config import get_config_manager
+from smartcash.common.config.manager import get_config_manager
 from smartcash.ui.dataset.augmentation.utils.ui_logger_utils import log_to_ui
 
 def save_configuration(ui_components: Dict[str, Any]):
@@ -52,7 +52,7 @@ def _extract_ui_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         return _manual_extraction(ui_components)
 
 def _manual_extraction(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Manual extraction dengan research parameters"""
+    """Manual extraction dengan research parameters dan preprocessing normalization"""
     from smartcash.dataset.augmentor.utils.path_operations import get_best_data_location
     
     aug_types = _extract_aug_types(ui_components)
@@ -61,7 +61,7 @@ def _manual_extraction(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         'target_count': _get_widget_value_safe(ui_components, 'target_count', 500),
         'target_split': _get_widget_value_safe(ui_components, 'target_split', 'train'),
         'output_prefix': _get_widget_value_safe(ui_components, 'output_prefix', 'aug_'),
-        'balance_classes': _get_widget_value_safe(ui_components, 'balance_classes', False)
+        'balance_classes': _get_widget_value_safe(ui_components, 'balance_classes', True)
     }
     
     advanced_params = {
@@ -75,10 +75,18 @@ def _manual_extraction(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         'contrast': _get_widget_value_safe(ui_components, 'contrast', 0.2)
     }
     
+    # Load preprocessing config untuk normalization sync
+    preprocessing_config = _load_preprocessing_config_safe()
+    
     return {
         'data': {'dir': get_best_data_location()},
         'augmentation': {'types': aug_types, 'intensity': 0.7, 'output_dir': 'data/augmented', **basic_params, **advanced_params},
-        'preprocessing': {'output_dir': 'data/preprocessed'}
+        'preprocessing': {
+            'output_dir': 'data/preprocessed',
+            'normalization': {
+                'scaler': preprocessing_config.get('normalization', {}).get('scaler', 'minmax')
+            }
+        }
     }
 
 def _extract_aug_types(ui_components: Dict[str, Any]) -> list:
@@ -122,16 +130,23 @@ def _validate_config(config: Dict[str, Any]) -> bool:
         return False
 
 def _get_default_config() -> Dict[str, Any]:
-    """Default config dengan research optimization"""
+    """Default config dengan research optimization dan preprocessing normalization"""
+    preprocessing_config = _load_preprocessing_config_safe()
+    
     return {
         'data': {'dir': 'data'},
         'augmentation': {
             'types': ['combined'], 'num_variations': 2, 'target_count': 500, 'target_split': 'train',
-            'intensity': 0.7, 'output_prefix': 'aug_', 'balance_classes': False, 'output_dir': 'data/augmented',
+            'intensity': 0.7, 'output_prefix': 'aug_', 'balance_classes': True, 'output_dir': 'data/augmented',
             'fliplr': 0.5, 'degrees': 10, 'translate': 0.1, 'scale': 0.1,
             'hsv_h': 0.015, 'hsv_s': 0.7, 'brightness': 0.2, 'contrast': 0.2
         },
-        'preprocessing': {'output_dir': 'data/preprocessed'}
+        'preprocessing': {
+            'output_dir': 'data/preprocessed',
+            'normalization': {
+                'scaler': preprocessing_config.get('normalization', {}).get('scaler', 'minmax')
+            }
+        }
     }
 
 def _apply_config_to_ui(ui_components: Dict[str, Any], config: Dict[str, Any]):
@@ -199,3 +214,18 @@ def _set_widget_value_safe(ui_components: Dict[str, Any], key: str, value: Any) 
             widget.value = value
         except Exception:
             pass
+
+def _load_preprocessing_config_safe() -> Dict[str, Any]:
+    """Load preprocessing config dengan fallback ke default scaler structure"""
+    try:
+        config_manager = get_config_manager()
+        preprocessing_config = config_manager.get_config('preprocessing_config.yaml')
+        
+        if preprocessing_config and 'preprocessing' in preprocessing_config:
+            return preprocessing_config['preprocessing']
+        
+        return {'normalization': {'scaler': 'minmax'}}
+        
+    except Exception:
+        # Fallback jika config tidak bisa dimuat
+        return {'normalization': {'scaler': 'minmax'}}

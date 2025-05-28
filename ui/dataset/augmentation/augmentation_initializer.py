@@ -61,13 +61,13 @@ class AugmentationInitializer(CommonInitializer):
         return {
             'data': {'dir': 'data'},
             'augmentation': {
-                'num_variations': 2, 'target_count': 500, 'output_prefix': 'aug_', 'balance_classes': False,
+                'num_variations': 2, 'target_count': 500, 'output_prefix': 'aug_', 'balance_classes': True,
                 'fliplr': 0.5, 'degrees': 10, 'translate': 0.1, 'scale': 0.1,
                 'hsv_h': 0.015, 'hsv_s': 0.7, 'brightness': 0.2, 'contrast': 0.2,
                 'types': ['combined'], 'target_split': 'train', 'intensity': 0.7,
                 'output_dir': 'data/augmented'
             },
-            'preprocessing': {'output_dir': 'data/preprocessed'}
+            'preprocessing': {'output_dir': 'data/preprocessed', 'normalization': {'scaler': 'minmax'}}
         }
     
     def _get_critical_components(self) -> List[str]:

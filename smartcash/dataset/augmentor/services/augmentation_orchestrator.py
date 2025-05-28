@@ -30,9 +30,12 @@ class AugmentationOrchestrator:
         self.target_split = self.config.get('target_split', 'train')
     
     def run_full_pipeline(self, target_split: str = None, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Execute pipeline dengan granular progress tracking termasuk balancing"""
+        """Execute pipeline dengan conditional balancing dan progress yang benar"""
         start_time = time.time()
         actual_target_split = target_split or self.target_split
+        
+        # Check balance_classes config
+        balance_enabled = self.config.get('augmentation', {}).get('balance_classes', False)
         
         self.comm and self.comm.start_operation("Augmentation Pipeline", 100)
         
@@ -45,31 +48,46 @@ class AugmentationOrchestrator:
             
             self._report_progress("overall", 10, 100, f"✅ Dataset valid: {dataset_info.get('total_images', 0)} gambar", progress_callback)
             
-            # Phase 2: Class balancing analysis (10-25%)
-            self._report_progress("overall", 15, 100, f"⚖️ Analyzing class balance untuk {actual_target_split}", progress_callback)
-            balance_result = self._execute_balancing_analysis(actual_target_split, progress_callback)
+            # Phase 2: Conditional balancing (10-25% atau skip ke 15%)
+            balance_result = {'status': 'skipped', 'classes_needing_aug': 0}
+            if balance_enabled:
+                self._report_progress("overall", 15, 100, f"⚖️ Analyzing class balance", progress_callback)
+                balance_result = self._execute_balancing_analysis(actual_target_split, progress_callback)
+                self._report_progress("overall", 25, 100, f"✅ Balance: {balance_result.get('classes_needing_aug', 0)} kelas", progress_callback)
+                aug_start = 25
+            else:
+                self._report_progress("overall", 15, 100, f"⚖️ Class balancing disabled", progress_callback)
+                aug_start = 15
             
-            self._report_progress("overall", 25, 100, f"✅ Balance analysis: {balance_result.get('classes_needing_aug', 0)} kelas butuh augmentasi", progress_callback)
-            
-            # Phase 3: Augmentation execution (25-70%)
-            self._report_progress("overall", 30, 100, f"🔄 Memulai augmentation untuk {actual_target_split}", progress_callback)
-            aug_result = self._execute_augmentation_with_progress(actual_target_split, progress_callback)
+            # Phase 3: Augmentation (25-70% atau 15-70%)
+            aug_end = 70
+            self._report_progress("overall", aug_start + 5, 100, f"🔄 Memulai augmentation", progress_callback)
+            aug_result = self._execute_augmentation_with_progress(actual_target_split, progress_callback, aug_start, aug_end)
             if aug_result['status'] != 'success':
                 return self._error_result(f"Augmentation failed: {aug_result['message']}")
             
-            self._report_progress("overall", 70, 100, f"✅ Augmentation selesai: {aug_result.get('total_generated', 0)} file", progress_callback)
+            self._report_progress("overall", aug_end, 100, f"✅ Augmentation: {aug_result.get('total_generated', 0)} file", progress_callback)
             
             # Phase 4: Normalization (70-95%)
-            self._report_progress("overall", 75, 100, f"🔧 Memulai normalisasi untuk {actual_target_split}", progress_callback)
+            self._report_progress("overall", 75, 100, f"🔧 Memulai normalisasi", progress_callback)
             norm_result = self._execute_normalization_with_progress(actual_target_split, progress_callback)
             
-            if norm_result['status'] != 'success':
-                self.comm and self.comm.log_warning(f"Normalization issue: {norm_result.get('message', 'Unknown error')}")
+            self._report_progress("overall", 95, 100, f"✅ Normalisasi: {norm_result.get('total_normalized', 0)} file", progress_callback)
             
-            self._report_progress("overall", 95, 100, f"✅ Normalisasi selesai: {norm_result.get('total_normalized', 0)} file", progress_callback)
-            
-            # Phase 5: Final summary (95-100%)
+            # Phase 5: Completion (95-100%)
             self._report_progress("overall", 100, 100, "🎉 Pipeline selesai", progress_callback)
+            
+            result = {
+                'status': 'success', 'total_generated': aug_result.get('total_generated', 0),
+                'total_normalized': norm_result.get('total_normalized', 0), 'target_split': actual_target_split,
+                'processing_time': time.time() - start_time, 'balance_enabled': balance_enabled,
+                'balance_result': balance_result, 'aug_result': aug_result, 'norm_result': norm_result
+            }
+            
+            self.comm and self.comm.complete_operation("Augmentation Pipeline", 
+                f"Pipeline selesai: {result['total_generated']} generated, {result['total_normalized']} normalized")
+            
+            return result
             
             result = {
                 'status': 'success', 'total_generated': aug_result.get('total_generated', 0),
@@ -133,20 +151,21 @@ class AugmentationOrchestrator:
             self.comm and self.comm.log_error(error_msg)
             return {'status': 'error', 'message': error_msg, 'classes_needing_aug': 0}
     
-    def _execute_augmentation_with_progress(self, target_split: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """Execute augmentation dengan progress tracking yang detail"""
+    def _execute_augmentation_with_progress(self, target_split: str, progress_callback: Optional[Callable], start_pct: int, end_pct: int) -> Dict[str, Any]:
+        """Execute augmentation dengan range progress yang dinamis"""
         try:
-            self._report_progress("step", 0, 100, "🔍 Analyzing dataset files", progress_callback)
+            # Calculate progress range
+            progress_range = end_pct - start_pct
             
-            # Create augmentation-specific progress callback (25-70% range)
             def aug_progress_callback(step: str, current: int, total: int, message: str):
-                overall_current = 25 + int((current / max(total, 1)) * 45)
-                self._report_progress("overall", overall_current, 100, f"🔄 Augmentation: {message}", progress_callback)
+                step_progress = int((current / max(total, 1)) * progress_range)
+                overall_current = start_pct + step_progress
+                self._report_progress("overall", overall_current, 100, f"🔄 {message}", progress_callback)
             
             result = self.engine.run_augmentation_pipeline(target_split, aug_progress_callback)
             
             if result['status'] == 'success':
-                self.comm and self.comm.log_success(f"✅ Augmentation berhasil: {result.get('total_generated', 0)} file dibuat")
+                self.comm and self.comm.log_success(f"✅ Augmentation: {result.get('total_generated', 0)} file")
             
             return result
             

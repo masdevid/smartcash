@@ -141,24 +141,48 @@ class NormalizationEngine:
         return ""
     
     def _apply_research_normalization(self, image):
-        """Apply research-quality normalization"""
+        """Apply normalization dengan config logging dan minmax default"""
         try:
             norm_config = self.config.get('preprocessing', {}).get('normalization', {})
+            scaler_type = norm_config.get('scaler', 'minmax')  # Default minmax dari preprocessing module
             
-            # Optional pixel normalization
-            if norm_config.get('normalize_pixel_values', False):
+            # Log scaler yang digunakan
+            scaler_source = "🔧 CONFIG" if 'scaler' in norm_config else "⚙️ DEFAULT (preprocessing)"
+            self.progress.log_info(f"🔧 Applying {scaler_type} normalization ({scaler_source})")
+            
+            # Apply scaler sesuai pilihan
+            if scaler_type == 'minmax':
+                # MinMax normalization (0-1)
                 normalized = image.astype('float32') / 255.0
                 image = (normalized * 255.0).astype('uint8')
+                
+            elif scaler_type == 'standard':
+                # Standard scaler (z-score normalization)
+                normalized = image.astype('float32')
+                mean = normalized.mean()
+                std = normalized.std()
+                if std > 0:
+                    normalized = (normalized - mean) / std
+                    # Rescale to 0-255 range
+                    normalized = ((normalized - normalized.min()) / (normalized.max() - normalized.min()) * 255.0)
+                image = normalized.astype('uint8')
+            
+            elif scaler_type == 'none':
+                # No scaling applied
+                pass
             
             # Optional resizing
             target_size = norm_config.get('target_size', None)
             if target_size and isinstance(target_size, (list, tuple)) and len(target_size) == 2:
                 if image.shape[:2] != tuple(target_size):
+                    size_source = "🔧 CONFIG" if 'target_size' in norm_config else "⚙️ DEFAULT"
+                    self.progress.log_info(f"🔧 Resizing to {target_size} ({size_source})")
                     image = cv2.resize(image, tuple(target_size), interpolation=cv2.INTER_LANCZOS4)
             
             return image
             
-        except Exception:
+        except Exception as e:
+            self.progress.log_error(f"❌ Normalization error: {str(e)}, using original image")
             return image
     
     def _copy_validated_label(self, source_label: str, target_label: str) -> bool:

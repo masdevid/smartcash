@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/communicator.py
-Deskripsi: Fixed communicator dengan clear progress tracking dan granular feedback
+Deskripsi: Fixed communicator dengan log reset dan progress completion yang benar
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -8,21 +8,20 @@ import time
 import logging
 
 class UICommunicator:
-    """Fixed communicator dengan clear progress tracking tanpa over-suppression"""
+    """Fixed communicator dengan auto log reset dan proper progress completion"""
     
     def __init__(self, ui_components: Dict[str, Any] = None):
         self.ui_components = ui_components or {}
         self.progress_tracker = self._get_progress_tracker()
         self.last_update_time = 0
-        self.update_interval = 0.3  # Update setiap 300ms
+        self.update_interval = 0.3
         self.current_operation = None
+        self.log_count = 0  # Track log messages
         
-        # Setup minimal suppression - HANYA backend noise
         self._setup_minimal_suppression()
         
     def _setup_minimal_suppression(self):
         """Setup minimal suppression - hanya backend noise"""
-        # Hanya suppress library noise, TIDAK suppress progress/result
         noise_loggers = ['requests', 'urllib3', 'http.client', 'albumentations']
         for logger_name in noise_loggers:
             logger = logging.getLogger(logger_name)
@@ -34,7 +33,7 @@ class UICommunicator:
         return self.ui_components.get('tracker') or self.ui_components
     
     def progress(self, operation: str, current: int, total: int, message: str = ""):
-        """Fixed progress dengan clear UI updates"""
+        """Progress dengan proper completion tracking"""
         current_time = time.time()
         percentage = min(100, max(0, int((current / max(1, total)) * 100)))
         
@@ -46,7 +45,7 @@ class UICommunicator:
         
         self.last_update_time = current_time
         
-        # Update UI tracker dengan clear feedback
+        # Update UI tracker
         try:
             if hasattr(self.progress_tracker, 'update'):
                 self.progress_tracker.update(operation, percentage, message)
@@ -55,41 +54,62 @@ class UICommunicator:
         except Exception:
             pass
         
-        # Log progress milestone
+        # Log milestone dengan auto-reset
         if percentage in [0, 25, 50, 75, 100]:
             self._log_progress_milestone(operation, percentage, message)
     
     def _log_progress_milestone(self, operation: str, percentage: int, message: str):
-        """Log progress milestone untuk visibility"""
+        """Log milestone dengan emoji mapping"""
         milestone_emoji = {0: "🚀", 25: "📊", 50: "⚡", 75: "🎯", 100: "✅"}
         emoji = milestone_emoji.get(percentage, "📈")
         
         milestone_msg = f"{emoji} {operation.title()}: {percentage}% - {message}"
-        self._log_to_ui_clear(milestone_msg, 'info')
+        self._log_to_ui_with_reset(milestone_msg, 'info')
     
     def log_info(self, msg: str):
-        """Log info dengan clear UI output"""
-        self._log_to_ui_clear(f"ℹ️ {msg}", 'info')
+        """Log info dengan auto reset"""
+        self._log_to_ui_with_reset(f"ℹ️ {msg}", 'info')
     
     def log_success(self, msg: str):
-        """Log success dengan clear UI output"""
-        self._log_to_ui_clear(f"✅ {msg}", 'success')
+        """Log success dengan auto reset"""
+        self._log_to_ui_with_reset(f"✅ {msg}", 'success')
     
     def log_warning(self, msg: str):
-        """Log warning dengan clear UI output"""
-        self._log_to_ui_clear(f"⚠️ {msg}", 'warning')
+        """Log warning dengan auto reset"""
+        self._log_to_ui_with_reset(f"⚠️ {msg}", 'warning')
     
     def log_error(self, msg: str):
-        """Log error dengan clear UI output"""
-        self._log_to_ui_clear(f"❌ {msg}", 'error')
+        """Log error dengan auto reset"""
+        self._log_to_ui_with_reset(f"❌ {msg}", 'error')
     
-    def _log_to_ui_clear(self, message: str, level: str):
-        """Log ke UI dengan clear visibility"""
+    def _log_to_ui_with_reset(self, message: str, level: str):
+        """Log ke UI dengan auto reset setiap 30 messages"""
+        self.log_count += 1
+        
+        # Reset log setiap 30 messages
+        if self.log_count % 30 == 0:
+            self._clear_log_output()
+            self._log_to_ui_clean("🔄 Log cleared after 30 messages", 'info')
+        
+        self._log_to_ui_clean(message, level)
+    
+    def _clear_log_output(self):
+        """Clear log output untuk prevent overflow"""
+        try:
+            for output_key in ['log_output', 'status', 'output']:
+                output_widget = self.ui_components.get(output_key)
+                if output_widget and hasattr(output_widget, 'clear_output'):
+                    output_widget.clear_output(wait=True)
+                    break
+        except Exception:
+            pass
+    
+    def _log_to_ui_clean(self, message: str, level: str):
+        """Log ke UI tanpa reset logic"""
         try:
             from IPython.display import display, HTML
             import time
             
-            # Color mapping
             colors = {'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 'error': '#dc3545'}
             color = colors.get(level, '#007bff')
             
@@ -104,7 +124,6 @@ class UICommunicator:
             </div>
             """
             
-            # Display ke UI log widgets
             for output_key in ['log_output', 'status', 'output']:
                 output_widget = self.ui_components.get(output_key)
                 if output_widget and hasattr(output_widget, 'clear_output'):
@@ -112,11 +131,12 @@ class UICommunicator:
                         display(HTML(html_msg))
                     break
         except Exception:
-            print(message)  # Fallback ke console
+            print(message)
     
     def start_operation(self, operation_name: str, total_steps: int = 100):
-        """Start operation dengan clear feedback"""
+        """Start operation dengan log reset"""
         self.current_operation = operation_name
+        self.log_count = 0  # Reset counter untuk operation baru
         self.log_info(f"🚀 Memulai {operation_name}")
         self.last_update_time = 0
         
@@ -129,8 +149,12 @@ class UICommunicator:
             pass
     
     def complete_operation(self, operation_name: str, result_message: str = ""):
-        """Complete operation dengan clear feedback"""
+        """Complete operation dengan proper 100% progress"""
         final_message = result_message or f"{operation_name} selesai"
+        
+        # Ensure 100% progress
+        self.progress("overall", 100, 100, "Completed")
+        
         self.log_success(final_message)
         
         try:
@@ -159,7 +183,7 @@ class UICommunicator:
         self.current_operation = None
     
     def update_status(self, message: str, status_type: str = "info"):
-        """Update status dengan clear visibility"""
+        """Update status dengan auto reset"""
         status_methods = {'info': self.log_info, 'success': self.log_success, 'warning': self.log_warning, 'error': self.log_error}
         log_method = status_methods.get(status_type, self.log_info)
         log_method(message)
@@ -168,10 +192,8 @@ class UICommunicator:
                                     step: str = "overall", current: int = 0, 
                                     total: int = 100, message: str = ""):
         """Report progress dengan dual tracking"""
-        # Update internal progress
         self.progress(step, current, total, message)
         
-        # Call external callback
         if progress_callback and callable(progress_callback):
             try:
                 progress_callback(step, current, total, message)
@@ -179,12 +201,12 @@ class UICommunicator:
                 pass
 
 def create_communicator(ui_components: Dict[str, Any] = None) -> UICommunicator:
-    """Factory function untuk membuat UI communicator dengan clear progress"""
+    """Factory function untuk communicator dengan log reset"""
     return UICommunicator(ui_components)
 
-# One-liner helper functions
-log_to_ui = lambda comm, msg, level="info": comm.update_status(msg, level) if comm else print(f"{level.upper()}: {msg}")
-progress_to_ui = lambda comm, op, curr, total, msg="": comm.progress(op, curr, total, msg) if comm else print(f"{op}: {curr}/{total} - {msg}")
+# One-liner helpers
+log_to_ui = lambda comm, msg, level="info": comm.update_status(msg, level) if comm else print(f"{level}: {msg}")
+progress_to_ui = lambda comm, op, curr, total, msg="": comm.progress(op, curr, total, msg) if comm else print(f"{op}: {curr}/{total}")
 start_ui_operation = lambda comm, name: comm.start_operation(name) if comm else print(f"START: {name}")
-complete_ui_operation = lambda comm, name, msg="": comm.complete_operation(name, msg) if comm else print(f"COMPLETE: {name} - {msg}")
-error_ui_operation = lambda comm, name, msg: comm.error_operation(name, msg) if comm else print(f"ERROR: {name} - {msg}")
+complete_ui_operation = lambda comm, name, msg="": comm.complete_operation(name, msg) if comm else print(f"COMPLETE: {name}")
+error_ui_operation = lambda comm, name, msg: comm.error_operation(name, msg) if comm else print(f"ERROR: {name}")

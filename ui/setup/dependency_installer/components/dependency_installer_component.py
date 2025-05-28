@@ -46,9 +46,9 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(
             display='flex',
             flex_flow='row nowrap',
-            justify_content='space-evenly',
+            justify_content='space-between',
             align_items='flex-start',
-            width='100%',
+            width='calc(33% - 10px)',
             margin='10px 0',
             overflow='hidden'
         )

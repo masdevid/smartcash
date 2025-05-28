@@ -40,17 +40,16 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         category_box = create_category_box(category, checkboxes)
         category_boxes.append(category_box)
     
-    # Packages container - 3 columns dengan center alignment
+    # Packages container - 3 columns dengan proper spacing
     packages_container = widgets.HBox(
         category_boxes,
         layout=widgets.Layout(
             display='flex',
             flex_flow='row nowrap',
-            justify_content='center',
+            justify_content='space-evenly',
             align_items='flex-start',
             width='100%',
             margin='10px 0',
-            gap='15px',
             overflow='hidden'
         )
     )
@@ -137,10 +136,10 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(flex='1 1 auto', margin='2px 0', max_width='calc(100% - 80px)')
+            layout=widgets.Layout(width='auto', margin='2px 5px 2px 0')
         )
         
-        # Horizontal row dengan space-between alignment
+        # Horizontal row tanpa justify center untuk natural checkbox spacing
         row = widgets.HBox([checkbox, status_widget], 
                           layout=widgets.Layout(
                               width='100%',
@@ -148,7 +147,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                               justify_content='space-between',
                               align_items='center',
                               margin='3px 0',
-                              padding='0',
+                              padding='0 5px',
                               overflow='hidden',
                               box_sizing='border-box'
                           ))

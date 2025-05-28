@@ -1,212 +1,125 @@
 """
 File: smartcash/ui/training_config/hyperparameters/components/main_components.py
-Deskripsi: Komponen utama yang mengintegrasikan semua komponen UI hyperparameter
+Deskripsi: Form components untuk hyperparameters dengan reusable widgets
 """
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any
 import ipywidgets as widgets
-from IPython.display import display, clear_output
-
-from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.utils.header_utils import create_header
-from smartcash.ui.utils.layout_utils import create_divider
-from smartcash.common.logger import get_logger
-from smartcash.ui.components.tab_factory import create_tab_widget
-from smartcash.ui.info_boxes.hyperparameters_info import (
-    get_hyperparameters_info,
-    get_basic_hyperparameters_info,
-    get_optimization_hyperparameters_info,
-    get_advanced_hyperparameters_info
-)
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from smartcash.ui.components.status_panel import create_status_panel
+from smartcash.ui.utils.constants import ICONS
 
-from smartcash.ui.training_config.hyperparameters.components.basic_components import create_hyperparameters_basic_components
-from smartcash.ui.training_config.hyperparameters.components.optimization_components import create_hyperparameters_optimization_components
-from smartcash.ui.training_config.hyperparameters.components.advanced_components import create_hyperparameters_advanced_components
-from smartcash.ui.training_config.hyperparameters.components.button_components import create_hyperparameters_button_components
-from smartcash.ui.training_config.hyperparameters.components.info_panel_components import create_hyperparameters_info_panel
-from smartcash.ui.components.sync_info_message import create_sync_info_message
 
-logger = get_logger(__name__)
-
-def create_hyperparameters_ui_components() -> Dict[str, Any]:
-    """
-    Membuat semua komponen UI untuk hyperparameter.
+def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Buat form hyperparameters dengan reusable components"""
     
-    Returns:
-        Dict berisi semua komponen UI
-    """
-    ui_components = {}
+    # One-liner widget creation dari config
+    hp_config = config.get('hyperparameters', {})
+    training = hp_config.get('training', {})
+    optimizer = hp_config.get('optimizer', {})
+    scheduler = hp_config.get('scheduler', {})
+    early_stopping = hp_config.get('early_stopping', {})
+    augmentation = hp_config.get('augmentation', {})
+    checkpoint = hp_config.get('checkpoint', {})
     
-    # Buat enabled checkbox
-    ui_components['enabled_checkbox'] = widgets.Checkbox(
-        value=True,
-        description='Aktifkan Hyperparameter',
-        style={'description_width': 'auto'},
-        layout=widgets.Layout(width='100%')
+    # Basic parameters dengan one-liner creation
+    form_widgets = {
+        'batch_size_slider': widgets.IntSlider(value=training.get('batch_size', 16), min=1, max=128, description='Batch Size:', style={'description_width': '120px'}),
+        'image_size_slider': widgets.IntSlider(value=training.get('image_size', 640), min=320, max=1280, step=32, description='Image Size:', style={'description_width': '120px'}),
+        'epochs_slider': widgets.IntSlider(value=training.get('epochs', 100), min=1, max=500, description='Epochs:', style={'description_width': '120px'}),
+        'dropout_slider': widgets.FloatSlider(value=training.get('dropout', 0.0), min=0.0, max=0.5, step=0.01, description='Dropout:', readout_format='.2f', style={'description_width': '120px'}),
+        
+        # Optimizer parameters
+        'optimizer_dropdown': widgets.Dropdown(options=['SGD', 'Adam', 'AdamW', 'RMSprop'], value=optimizer.get('type', 'SGD'), description='Optimizer:', style={'description_width': '120px'}),
+        'learning_rate_slider': widgets.FloatLogSlider(value=optimizer.get('learning_rate', 0.01), base=10, min=-5, max=-1, description='Learning Rate:', readout_format='.6f', style={'description_width': '120px'}),
+        'weight_decay_slider': widgets.FloatLogSlider(value=optimizer.get('weight_decay', 0.0005), base=10, min=-6, max=-2, description='Weight Decay:', readout_format='.6f', style={'description_width': '120px'}),
+        'momentum_slider': widgets.FloatSlider(value=optimizer.get('momentum', 0.937), min=0.8, max=0.999, step=0.001, description='Momentum:', readout_format='.3f', style={'description_width': '120px'}),
+        
+        # Scheduler parameters
+        'scheduler_checkbox': widgets.Checkbox(value=scheduler.get('enabled', True), description='Gunakan Scheduler'),
+        'scheduler_dropdown': widgets.Dropdown(options=['cosine', 'linear', 'step', 'exp', 'none'], value=scheduler.get('type', 'cosine'), description='LR Scheduler:', style={'description_width': '120px'}),
+        'warmup_epochs_slider': widgets.IntSlider(value=scheduler.get('warmup_epochs', 3), min=0, max=10, description='Warmup Epochs:', style={'description_width': '120px'}),
+        
+        # Loss parameters
+        'box_loss_gain_slider': widgets.FloatSlider(value=hp_config.get('loss', {}).get('box_loss_gain', 0.05), min=0.01, max=0.1, step=0.01, description='Box Loss Gain:', readout_format='.2f', style={'description_width': '120px'}),
+        'cls_loss_gain_slider': widgets.FloatSlider(value=hp_config.get('loss', {}).get('cls_loss_gain', 0.5), min=0.1, max=1.0, step=0.1, description='Class Loss Gain:', readout_format='.1f', style={'description_width': '120px'}),
+        'obj_loss_gain_slider': widgets.FloatSlider(value=hp_config.get('loss', {}).get('obj_loss_gain', 1.0), min=0.5, max=2.0, step=0.1, description='Object Loss Gain:', readout_format='.1f', style={'description_width': '120px'}),
+        
+        # Early stopping parameters
+        'early_stopping_checkbox': widgets.Checkbox(value=early_stopping.get('enabled', True), description='Early Stopping'),
+        'patience_slider': widgets.IntSlider(value=early_stopping.get('patience', 10), min=1, max=50, description='Patience:', style={'description_width': '120px'}),
+        'min_delta_slider': widgets.FloatSlider(value=early_stopping.get('min_delta', 0.001), min=0.0001, max=0.01, step=0.0001, description='Min Delta:', readout_format='.4f', style={'description_width': '120px'}),
+        
+        # Augmentation and checkpoint
+        'augment_checkbox': widgets.Checkbox(value=augmentation.get('enabled', True), description='Gunakan Augmentasi'),
+        'save_best_checkbox': widgets.Checkbox(value=checkpoint.get('save_best', True), description='Simpan Model Terbaik'),
+        'checkpoint_metric_dropdown': widgets.Dropdown(options=['mAP_0.5', 'mAP_0.5:0.95', 'precision', 'recall', 'f1', 'loss'], value=checkpoint.get('metric', 'mAP_0.5'), description='Metrik Checkpoint:', style={'description_width': '120px'})
+    }
+    
+    # Grouped widgets dengan responsive layout
+    basic_group = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('settings', '⚙️')} Parameter Dasar</h4>"),
+        form_widgets['batch_size_slider'],
+        form_widgets['image_size_slider'],
+        form_widgets['epochs_slider'],
+        form_widgets['dropout_slider']
+    ], layout=widgets.Layout(width='100%', padding='10px', border='1px solid #ddd', border_radius='5px'))
+    
+    optimization_group = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('optimization', '🔄')} Optimasi</h4>"),
+        form_widgets['optimizer_dropdown'],
+        form_widgets['learning_rate_slider'],
+        form_widgets['weight_decay_slider'],
+        form_widgets['momentum_slider'],
+        widgets.HTML("<hr style='margin: 10px 0'>"),
+        form_widgets['scheduler_checkbox'],
+        form_widgets['scheduler_dropdown'],
+        form_widgets['warmup_epochs_slider']
+    ], layout=widgets.Layout(width='100%', padding='10px', border='1px solid #ddd', border_radius='5px'))
+    
+    advanced_group = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('advanced', '🔧')} Parameter Lanjutan</h4>"),
+        form_widgets['augment_checkbox'],
+        widgets.HTML("<b>Parameter Loss</b>"),
+        form_widgets['box_loss_gain_slider'],
+        form_widgets['cls_loss_gain_slider'],
+        form_widgets['obj_loss_gain_slider'],
+        widgets.HTML("<hr style='margin: 10px 0'>"),
+        widgets.HTML("<b>Early Stopping</b>"),
+        form_widgets['early_stopping_checkbox'],
+        form_widgets['patience_slider'],
+        form_widgets['min_delta_slider'],
+        widgets.HTML("<hr style='margin: 10px 0'>"),
+        widgets.HTML("<b>Checkpoint</b>"),
+        form_widgets['save_best_checkbox'],
+        form_widgets['checkpoint_metric_dropdown']
+    ], layout=widgets.Layout(width='100%', padding='10px', border='1px solid #ddd', border_radius='5px'))
+    
+    # Save/reset buttons menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_tooltip="Simpan konfigurasi hyperparameter",
+        reset_tooltip="Reset ke nilai default",
+        with_sync_info=True,
+        sync_message="Konfigurasi akan disinkronkan dengan Google Drive."
     )
     
-    # Buat komponen dasar
-    basic_components = create_hyperparameters_basic_components()
-    ui_components.update(basic_components)
+    # Status panel menggunakan shared component
+    status_panel = create_status_panel()
     
-    # Buat komponen optimasi
-    optimization_components = create_hyperparameters_optimization_components()
-    ui_components.update(optimization_components)
+    # Three-column layout dengan responsive design
+    form_layout = widgets.VBox([
+        create_header("Konfigurasi Hyperparameter", "Pengaturan parameter untuk training model", ICONS.get('settings', '⚙️')),
+        widgets.HBox([basic_group, optimization_group, advanced_group], layout=widgets.Layout(width='100%', justify_content='space-between')),
+        save_reset_buttons['container'],
+        status_panel
+    ], layout=widgets.Layout(width='100%', padding='10px'))
     
-    # Buat komponen lanjutan
-    advanced_components = create_hyperparameters_advanced_components()
-    ui_components.update(advanced_components)
-    
-    # Buat komponen tombol
-    button_components = create_hyperparameters_button_components()
-    ui_components.update(button_components)
-    
-    # Buat panel informasi
-    info_panel, update_info_func = create_hyperparameters_info_panel()
-    ui_components['info_panel'] = info_panel
-    ui_components['update_hyperparameters_info'] = update_info_func
-    
-    # Buat header
-    header = create_header(
-        title="Konfigurasi Hyperparameter",
-        description="Pengaturan parameter untuk proses training model",
-        icon=ICONS.get('settings', '⚙️')
-    )
-    
-    # Buat button container untuk kompatibilitas dengan tes
-    ui_components['button_container'] = widgets.HBox([
-        button_components['save_button'],
-        button_components['reset_button']
-    ], layout=widgets.Layout(
-        display='flex',
-        flex_flow='row nowrap',
-        justify_content='flex-end',
-        align_items='center',
-        gap='10px',
-        width='auto',
-        margin='10px 0px'
-    ))
-    
-    # Tambahkan sync_info menggunakan shared component
-    sync_info_component = create_sync_info_message(
-        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
-        icon="info",
-        color="#666",
-        font_style="italic",
-        margin_top="5px",
-        width="100%"
-    )
-    
-    # Tambahkan ke ui_components untuk kompatibilitas dengan tes
-    ui_components['sync_info'] = sync_info_component['sync_info']
-    
-    # Buat form container untuk tab konfigurasi dengan 3 kolom sejajar
-    form_container = widgets.VBox([
-        widgets.HBox([
-            widgets.Box([basic_components['basic_box']], 
-                       layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
-                                            border='1px solid #eaeaea', border_radius='5px', margin='2px')),
-            widgets.Box([optimization_components['optimization_box']], 
-                       layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
-                                            border='1px solid #eaeaea', border_radius='5px', margin='2px')),
-            widgets.Box([advanced_components['advanced_box']], 
-                       layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
-                                            border='1px solid #eaeaea', border_radius='5px', margin='2px'))
-        ], layout=widgets.Layout(
-            width='100%',
-            display='flex',
-            flex_flow='row nowrap',
-            align_items='flex-start',
-            justify_content='space-between',
-            overflow='visible',
-            margin='0',
-            padding='0'
-        )),
-        widgets.VBox([
-            ui_components['button_container'],
-            widgets.HBox([ui_components['sync_info']], layout=widgets.Layout(justify_content='flex-end', width='100%', margin='0', padding='0'))
-        ], layout=widgets.Layout(width='100%', overflow='visible', margin='5px 0 0 0', padding='0'))
-    ], layout=widgets.Layout(width='100%', overflow='visible', margin='0', padding='0'))
-    
-    # Buat info box umum untuk hyperparameter
-    general_info = get_hyperparameters_info(open_by_default=True)
-    
-    # Buat info container untuk tab informasi
-    info_container = widgets.VBox([
-        widgets.HTML(f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Hyperparameter</h4>"),
-        general_info,
-        info_panel
-    ], layout=widgets.Layout(width='auto', overflow='visible'))
-    
-    # Buat tab untuk form dan info
-    tab_items = [
-        ('Konfigurasi', form_container),
-        ('Informasi', info_container)
-    ]
-    tabs = create_tab_widget(tab_items)
-    
-    # Set tab yang aktif
-    tabs.selected_index = 0
-    
-    # Buat info boxes untuk footer
-    basic_info = get_basic_hyperparameters_info(open_by_default=False)
-    optimization_info = get_optimization_hyperparameters_info(open_by_default=False)
-    advanced_info = get_advanced_hyperparameters_info(open_by_default=False)
-    
-    # Buat footer dengan info boxes yang menumpuk (stacked)
-    # Set accordion behavior agar hanya satu yang terbuka
-    basic_info.selected_index = None
-    optimization_info.selected_index = None
-    advanced_info.selected_index = None
-    
-    # Fungsi untuk menutup accordion lain saat satu dibuka
-    def on_accordion_select(change, accordion_list):
-        if change['new'] is not None:  # Jika ada yang dibuka
-            # Tutup semua accordion lain
-            for acc in accordion_list:
-                if acc != change['owner']:
-                    acc.selected_index = None
-    
-    # Daftar semua accordion
-    accordion_list = [basic_info, optimization_info, advanced_info]
-    
-    # Tambahkan observer ke masing-masing accordion
-    for acc in accordion_list:
-        acc.observe(lambda change, acc_list=accordion_list: on_accordion_select(change, acc_list), names='selected_index')
-    
-    # Buat footer dengan info boxes yang menumpuk (stacked)
-    footer_info = widgets.VBox([
-        widgets.HTML(f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Parameter</h4>"),
-        widgets.VBox([
-            basic_info,
-            optimization_info,
-            advanced_info
-        ], layout=widgets.Layout(
-            width='auto',
-            display='flex',
-            flex_flow='column',
-            align_items='stretch',
-            overflow='visible'
-        ))
-    ], layout=widgets.Layout(
-        width='auto',
-        margin='20px 0 0 0',
-        padding='10px',
-        border_top='1px solid #ddd',
-        overflow='visible'
-    ))
-    
-    # Buat container utama dengan layout yang lebih compact
-    main_container = widgets.VBox([
-        header,
-        tabs,
-        button_components['status'],
-        footer_info
-    ], layout=widgets.Layout(width='100%', padding='5px', overflow='visible', margin='0'))
-    
-    ui_components['main_container'] = main_container
-    ui_components['main_layout'] = main_container  # Untuk kompatibilitas
-    ui_components['tabs'] = tabs
-    ui_components['header'] = header
-    
-    return ui_components
+    # Return components dengan naming yang konsisten
+    return {
+        'main_container': form_layout,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_button': save_reset_buttons['reset_button'],
+        'status_panel': status_panel,
+        **form_widgets
+    }

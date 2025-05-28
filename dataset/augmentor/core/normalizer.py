@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/core/normalizer.py
-Deskripsi: Updated normalizer menggunakan SRP utils modules dengan one-liner style
+Deskripsi: Fixed normalizer dengan path handling dan progress tracking yang benar
 """
 
 import cv2
@@ -9,7 +9,6 @@ from typing import Dict, Any, List, Tuple
 from collections import defaultdict
 import time
 
-# Updated imports dari SRP utils modules - menggantikan direct operations
 from smartcash.dataset.augmentor.utils.file_operations import find_augmented_files_split_aware, copy_file_with_uuid_preservation
 from smartcash.dataset.augmentor.utils.path_operations import ensure_split_dirs, resolve_drive_path
 from smartcash.dataset.augmentor.utils.batch_processor import process_batch_split_aware
@@ -17,7 +16,7 @@ from smartcash.dataset.augmentor.utils.progress_tracker import create_progress_t
 from smartcash.dataset.augmentor.utils.bbox_operations import save_validated_labels
 
 class NormalizationEngine:
-    """Updated normalization engine menggunakan SRP utils modules"""
+    """Fixed normalization engine dengan path handling dan progress yang benar"""
     
     def __init__(self, config: Dict[str, Any], communicator=None):
         self.config = config
@@ -26,22 +25,26 @@ class NormalizationEngine:
         self.stats = defaultdict(int)
         
     def normalize_augmented_data(self, augmented_dir: str, preprocessed_dir: str, target_split: str = "train") -> Dict[str, Any]:
-        """Normalisasi menggunakan SRP modules"""
+        """Normalisasi dengan path handling yang diperbaiki"""
         self.progress.log_info(f"🔄 Memulai normalisasi split-aware: {target_split}")
+        self.progress.log_info(f"📁 Source: {augmented_dir}")
+        self.progress.log_info(f"📁 Target: {preprocessed_dir}")
+        
         start_time = time.time()
         
         try:
-            # Setup directories menggunakan SRP path operations
+            # Setup directories
             ensure_split_dirs(preprocessed_dir, target_split)
             
-            # Get augmented files menggunakan SRP file operations
-            aug_files = find_augmented_files_split_aware(augmented_dir, target_split)
+            # Find augmented files dengan path yang benar
+            aug_files = self._find_augmented_files_corrected(augmented_dir, target_split)
             if not aug_files:
-                return self._error_result("Tidak ada file augmented ditemukan untuk normalisasi")
+                self.progress.log_warning(f"⚠️ Tidak ada file augmented ditemukan di {augmented_dir}")
+                return self._create_empty_result(preprocessed_dir, target_split)
             
-            self.progress.progress("step", 20, 100, f"Ditemukan {len(aug_files)} file untuk normalisasi")
+            self.progress.log_info(f"📊 Ditemukan {len(aug_files)} file untuk normalisasi")
             
-            # Process menggunakan SRP batch processor
+            # Process dengan progress tracking
             normalization_processor = lambda file_path: self._normalize_single_file(file_path, preprocessed_dir, target_split)
             norm_results = process_batch_split_aware(aug_files, normalization_processor,
                                                    progress_tracker=self.progress,
@@ -55,8 +58,34 @@ class NormalizationEngine:
             self.progress.log_error(error_msg)
             return self._error_result(error_msg)
     
+    def _find_augmented_files_corrected(self, augmented_dir: str, target_split: str) -> List[str]:
+        """Find augmented files dengan path correction"""
+        resolved_dir = resolve_drive_path(augmented_dir)
+        
+        # Try multiple path patterns
+        search_patterns = [
+            f"{resolved_dir}/{target_split}/images",
+            f"{resolved_dir}/{target_split}",
+            f"{resolved_dir}/images",
+            resolved_dir
+        ]
+        
+        aug_files = []
+        for pattern_dir in search_patterns:
+            try:
+                if Path(pattern_dir).exists():
+                    pattern_files = [str(f) for f in Path(pattern_dir).glob('aug_*.jpg')]
+                    if pattern_files:
+                        aug_files.extend(pattern_files)
+                        self.progress.log_info(f"📂 Found {len(pattern_files)} files in {pattern_dir}")
+                        break
+            except Exception:
+                continue
+        
+        return list(set(aug_files))  # Remove duplicates
+    
     def _normalize_single_file(self, file_path: str, preprocessed_dir: str, target_split: str) -> Dict[str, Any]:
-        """Normalize single file menggunakan research-quality settings"""
+        """Normalize single file dengan validation"""
         try:
             # Load image
             image = cv2.imread(file_path)
@@ -65,7 +94,7 @@ class NormalizationEngine:
             
             original_size = image.shape[:2]
             
-            # Apply normalization menggunakan config
+            # Apply normalization
             normalized_image = self._apply_research_normalization(image)
             
             # Generate target paths
@@ -73,26 +102,47 @@ class NormalizationEngine:
             target_img_path = Path(preprocessed_dir) / target_split / 'images' / f"{file_stem}.jpg"
             target_label_path = Path(preprocessed_dir) / target_split / 'labels' / f"{file_stem}.txt"
             
-            # Save dengan research quality
+            # Ensure directories exist
+            target_img_path.parent.mkdir(parents=True, exist_ok=True)
+            target_label_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Save image dengan quality settings
             save_params = [cv2.IMWRITE_JPEG_QUALITY, 95, cv2.IMWRITE_JPEG_OPTIMIZE, 1]
             img_saved = cv2.imwrite(str(target_img_path), normalized_image, save_params)
             
             # Copy dan validate label
-            source_label_path = str(Path(file_path).parent.parent / 'labels' / f"{file_stem}.txt")
+            source_label_path = self._find_corresponding_label(file_path)
             label_saved = self._copy_validated_label(source_label_path, str(target_label_path))
             
             return {
                 'status': 'success', 'file': file_path, 'normalized_name': file_stem,
-                'original_size': original_size, 'size_changed': False, 'img_saved': img_saved, 'label_saved': label_saved
+                'target_image': str(target_img_path), 'target_label': str(target_label_path),
+                'original_size': original_size, 'img_saved': img_saved, 'label_saved': label_saved
             }
             
         except Exception as e:
             return {'status': 'error', 'file': file_path, 'error': str(e)}
     
+    def _find_corresponding_label(self, image_path: str) -> str:
+        """Find corresponding label file untuk image"""
+        image_path_obj = Path(image_path)
+        
+        # Try multiple label locations
+        potential_label_paths = [
+            image_path_obj.parent.parent / 'labels' / f"{image_path_obj.stem}.txt",
+            image_path_obj.parent / 'labels' / f"{image_path_obj.stem}.txt",
+            image_path_obj.parent / f"{image_path_obj.stem}.txt"
+        ]
+        
+        for label_path in potential_label_paths:
+            if label_path.exists():
+                return str(label_path)
+        
+        return ""
+    
     def _apply_research_normalization(self, image):
         """Apply research-quality normalization"""
         try:
-            # Get normalization settings
             norm_config = self.config.get('preprocessing', {}).get('normalization', {})
             
             # Optional pixel normalization
@@ -109,14 +159,14 @@ class NormalizationEngine:
             return image
             
         except Exception:
-            return image  # Return original jika normalization gagal
+            return image
     
     def _copy_validated_label(self, source_label: str, target_label: str) -> bool:
-        """Copy dan validate label menggunakan SRP bbox operations"""
+        """Copy dan validate label"""
+        if not source_label or not Path(source_label).exists():
+            return False
+        
         try:
-            if not Path(source_label).exists():
-                return False
-            
             # Read dan validate labels
             valid_lines = []
             with open(source_label, 'r') as f:
@@ -154,6 +204,11 @@ class NormalizationEngine:
         img_saved_count = sum(1 for r in successful if r.get('img_saved', False))
         label_saved_count = sum(1 for r in successful if r.get('label_saved', False))
         
+        # Log detailed results
+        self.progress.log_success(f"✅ Normalisasi berhasil: {len(successful)}/{len(results)} file")
+        self.progress.log_info(f"📊 Images saved: {img_saved_count}, Labels saved: {label_saved_count}")
+        self.progress.log_info(f"📁 Target directory: {preprocessed_dir}/{target_split}")
+        
         return {
             'status': 'success', 'total_files_processed': len(results), 'total_normalized': len(successful),
             'images_saved': img_saved_count, 'labels_saved': label_saved_count,
@@ -162,11 +217,20 @@ class NormalizationEngine:
             'normalization_speed': len(results) / processing_time if processing_time > 0 else 0
         }
     
+    def _create_empty_result(self, preprocessed_dir: str, target_split: str) -> Dict[str, Any]:
+        """Create result untuk empty dataset"""
+        return {
+            'status': 'success', 'total_files_processed': 0, 'total_normalized': 0,
+            'images_saved': 0, 'labels_saved': 0, 'processing_time': 0.0,
+            'target_split': target_split, 'target_dir': f"{preprocessed_dir}/{target_split}",
+            'normalization_speed': 0.0
+        }
+    
     def _error_result(self, message: str) -> Dict[str, Any]:
         """Create error result"""
         return {'status': 'error', 'message': message, 'total_normalized': 0}
 
-# One-liner utilities menggunakan SRP modules
+# One-liner utilities
 create_normalization_engine = lambda config, communicator=None: NormalizationEngine(config, communicator)
 normalize_split_data = lambda config, aug_dir, prep_dir, target_split='train': create_normalization_engine(config).normalize_augmented_data(aug_dir, prep_dir, target_split)
 apply_research_normalization = lambda image, config: NormalizationEngine(config)._apply_research_normalization(image)

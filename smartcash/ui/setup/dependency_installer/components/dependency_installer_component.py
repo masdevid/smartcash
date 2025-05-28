@@ -56,7 +56,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     # Custom packages
     custom_packages = widgets.Textarea(
         placeholder='Package tambahan (satu per baris)',
-        layout=widgets.Layout(width='100%', height='80px')
+        layout=widgets.Layout(width='100%', height='80px', max_width='100%', overflow='hidden')
     )
     
     custom_section = widgets.VBox([
@@ -100,7 +100,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         progress_components['container'],
         status,
         info_box
-    ], layout=widgets.Layout(width='100%', padding='10px'))
+    ], layout=widgets.Layout(width='100%', max_width='100%', padding='10px', overflow='hidden'))
     
     # UI components
     ui_components = {
@@ -172,5 +172,5 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                            border_radius='6px',
                            overflow='hidden',
                            justify_content='center',
-                           box_sizing='border-box'
+                           box_sizing='border-box',
                        ))

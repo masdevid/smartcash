@@ -48,13 +48,13 @@ def create_backbone_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     # Main container dengan responsive layout
     main_container = create_responsive_container([
         header,
+        form_components['status_panel'],
         model_section,
         widgets.HTML("<hr style='margin: 10px 0; border-style: dashed;'>"),
         optimization_section,
         widgets.HTML("<hr style='margin: 10px 0; border-style: dashed;'>"),
         controls_section,
-        form_components['status_panel']
-    ], padding="15px", max_width="800px")
+    ], padding="15px",width="100%")
     
     # Merge semua components
     layout_components = {

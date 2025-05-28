@@ -80,10 +80,10 @@ def create_training_strategy_layout(form_components: Dict[str, Any]) -> Dict[str
     
     # Create tabs dengan logical grouping
     tab_items = [
-        ('Parameter', widgets.VBox([main_params_section, optimizer_section], layout=widgets.Layout(overflow='hidden'))),
-        ('Training', widgets.VBox([scheduler_section, stopping_section, checkpoint_section], layout=widgets.Layout(overflow='hidden'))),
+        ('Parameter', widgets.VBox([main_params_section, optimizer_section], )),
+        ('Training', widgets.VBox([scheduler_section, stopping_section, checkpoint_section])),
         ('Utilitas', utils_section),
-        ('Validasi', widgets.VBox([validation_section, multiscale_section], layout=widgets.Layout(overflow='hidden')))
+        ('Validasi', widgets.VBox([validation_section, multiscale_section]))
     ]
     
     tabs = create_tab_widget(tab_items)

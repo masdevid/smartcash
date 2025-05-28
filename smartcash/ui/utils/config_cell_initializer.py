@@ -73,7 +73,7 @@ class ConfigCellInitializer(ABC):
         getattr(self, '_setup_custom_handlers', lambda ui, cfg: None)(ui_components, config)
     
     def _save_config(self, ui_components: Dict[str, Any], button) -> None:
-        """Save config dengan one-liner success/error handling"""
+        """Save config dengan proper success/error handling"""
         button.disabled = True
         self._update_status_panel(ui_components, "💾 Saving...", "info")
         
@@ -81,10 +81,12 @@ class ConfigCellInitializer(ABC):
             config = self._extract_config(ui_components)
             success = get_config_manager().save_config(config, self.config_filename)
             
-            # One-liner success handling
-            (ui_components.update({'config': config}) and 
-             self._update_status_panel(ui_components, "✅ Saved", "success") and
-             [cb(config) for cb in self.config_callbacks]) if success else self._update_status_panel(ui_components, "❌ Save failed", "error")
+            if success:
+                ui_components['config'] = config
+                self._update_status_panel(ui_components, "✅ Saved", "success")
+                [cb(config) for cb in self.config_callbacks]
+            else:
+                self._update_status_panel(ui_components, "❌ Save failed", "error")
              
         except Exception as e:
             self._update_status_panel(ui_components, f"❌ Error: {str(e)}", "error")

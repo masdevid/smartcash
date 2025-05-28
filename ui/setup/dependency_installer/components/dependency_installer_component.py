@@ -143,7 +143,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             layout=widgets.Layout(flex='1 1 auto', margin='2px 0', max_width='calc(100% - 80px)')
         )
         
-        # Horizontal row with controlled spacing
+        # Horizontal row with controlled spacing - fix full width
         row = widgets.HBox([checkbox, status_widget], 
                           layout=widgets.Layout(
                               width='100%',
@@ -151,7 +151,9 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                               justify_content='space-between',
                               align_items='center',
                               margin='3px 0',
-                              overflow='hidden'
+                              padding='0',
+                              overflow='hidden',
+                              box_sizing='border-box'
                           ))
         package_widgets.append(row)
         

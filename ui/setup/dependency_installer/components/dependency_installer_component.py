@@ -148,6 +148,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                           layout=widgets.Layout(
                               width='100%',
                               max_width='100%',
+                              justify_content='space-between',
                               align_items='center',
                               margin='3px 0',
                               overflow='hidden'

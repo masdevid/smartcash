@@ -129,14 +129,14 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     for package in category['packages']:
         status_widget = widgets.HTML(
             f"<span style='color:{COLORS['muted']};font-size:11px;white-space:nowrap;'>Checking...</span>",
-            layout=widgets.Layout(width='80px', margin='0')
+            layout=widgets.Layout(width='70px', margin='0')
         )
         
         checkbox = widgets.Checkbox(
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(width='auto', margin='2px 0')
+            layout=widgets.Layout(width='calc(100% - 80px)', margin='2px 0')
         )
         
         # Horizontal row dengan center alignment dan proper width

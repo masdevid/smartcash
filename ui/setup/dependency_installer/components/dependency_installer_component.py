@@ -160,7 +160,8 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     # Category container dengan center alignment
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           width='calc(33% - 12px)',
+                           width='280px',
+                           max_width='280px',
                            margin='0',
                            padding='12px',
                            border=f'1px solid {COLORS["border"]}',

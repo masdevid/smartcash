@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/fallback_utils.py
-Deskripsi: Enhanced fallback utilities untuk UI recovery dan error handling
+Deskripsi: Fixed fallback utilities untuk UI recovery dan error handling
 """
 
 from IPython.display import display, HTML
@@ -82,15 +82,6 @@ def create_fallback_ui(error_message: str, module_name: str = 'UI', ui_component
             ui_components['status']
         ], layout=widgets.Layout(width='100%', padding='10px'))
     
-    # Add safe dummy components untuk prevent NoneType errors
-    ui_components.update({
-        'aug_options': widgets.VBox([widgets.SelectMultiple(
-            options=[('Combined', 'combined')], value=['combined'],
-            description='Jenis:', layout=widgets.Layout(width='70%', height='80px'))]),
-        'module_name': module_name.lower(),
-        'fallback_mode': True
-    })
-    
     # Show error message
     show_status_safe(f"🚨 {error_message}", 'error', ui_components)
     
@@ -147,10 +138,12 @@ def get_service_safe(service_path: str, fallback_value: Any = None, **kwargs) ->
     ServiceClass = import_with_fallback(service_path, None)
     return try_operation_safe(lambda: ServiceClass(**kwargs), fallback_value) if ServiceClass else fallback_value
 
-def update_status_panel_safe(ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
-    """Update status panel dengan safe fallback"""
+def update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
+    """Update status panel dengan safe fallback - Fixed function name"""
     if ui_components and 'status_panel' in ui_components:
         ui_components['status_panel'].value = create_status_message(message, status_type=status_type)
+    else:
+        show_status_safe(message, status_type, ui_components)
 
 def handle_ui_error(ui_components: Dict[str, Any], error: Exception, 
                    operation_name: str = "operasi", show_fallback: bool = True) -> Dict[str, Any]:

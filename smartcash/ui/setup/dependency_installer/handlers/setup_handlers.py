@@ -1,54 +1,36 @@
 """
 File: smartcash/ui/setup/dependency_installer/handlers/setup_handlers.py
-Deskripsi: Setup handlers untuk UI dependency installer
+Deskripsi: Fixed setup handlers menggunakan existing progress tracking
 """
 
 from typing import Dict, Any
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """
-    Setup handlers untuk UI dependency installer
-    
-    Args:
-        ui_components: Dictionary UI components
-        env: Environment manager (opsional)
-        config: Konfigurasi aplikasi (opsional)
-        
-    Returns:
-        Dictionary UI components yang diupdate
-    """
-    # Setup handlers
+    """Setup handlers untuk dependency installer"""
+    # Import existing handlers
     from smartcash.ui.setup.dependency_installer.handlers.install_handler import setup_install_handler
     from smartcash.ui.setup.dependency_installer.handlers.analyzer_handler import setup_analyzer_handler
     from smartcash.ui.setup.dependency_installer.utils.package_utils import analyze_installed_packages
     from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
-    # Setup progress tracking
-    from smartcash.ui.handlers.single_progress import setup_progress_tracking
+    # Setup progress tracking menggunakan existing component
+    from smartcash.ui.components.progress_tracking import create_progress_tracking_container
     
-    # Setup progress tracking
-    tracker = setup_progress_tracking(
-        ui_components, 
-        tracker_name="dependency_installer",
-        progress_widget_key="install_progress",
-        progress_label_key="progress_label",
-        total=100,
-        description="Instalasi dependencies"
-    )
-    
-    # Pastikan tracker tersedia di ui_components dengan kunci yang benar
-    if tracker and 'dependency_installer_tracker' not in ui_components:
-        ui_components['dependency_installer_tracker'] = tracker
+    # Create progress tracker
+    progress_container = create_progress_tracking_container()
+    ui_components.update({
+        'progress_tracker': progress_container['tracker'],
+        'progress_container': progress_container['container']
+    })
     
     # Setup handlers
     setup_install_handler(ui_components)
     setup_analyzer_handler(ui_components)
     
-    # Deteksi packages yang sudah terinstall dan siapkan instalasi
+    # Deteksi packages yang sudah terinstall
     try:
         analyze_installed_packages(ui_components)
     except Exception as e:
-        # Gunakan log_message untuk mencegah tercampur dengan logger lain
-        log_message(ui_components, f"Gagal mendeteksi packages otomatis: {str(e)}", "warning")
+        log_message(ui_components, f"⚠️ Gagal mendeteksi packages: {str(e)}", "warning")
     
     return ui_components

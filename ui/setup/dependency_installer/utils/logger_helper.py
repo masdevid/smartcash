@@ -1,65 +1,45 @@
 """
 File: smartcash/ui/setup/dependency_installer/utils/logger_helper.py
-Deskripsi: Helper untuk penggunaan UI logger yang konsisten di module dependency installer
+Deskripsi: Fixed logger helper dengan import path yang benar
 """
 
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.ui_logger import log_to_ui as ui_log
 from smartcash.common.logger import get_logger
 
-# Import namespace konstanta
-from smartcash.ui.setup.dependency_installer.dependency_installer_initializer import DEPENDENCY_INSTALLER_LOGGER_NAMESPACE, MODULE_LOGGER_NAME
+# Fixed import path
+DEPENDENCY_INSTALLER_LOGGER_NAMESPACE = "smartcash.setup.dependency_installer"
+MODULE_LOGGER_NAME = "DEPS"
 
 def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: Optional[str] = None) -> None:
-    """
-    Log pesan ke UI dan logger Python dengan namespace khusus dependency installer.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan di-log
-        level: Level log (info, warning, error, success)
-        icon: Ikon opsional untuk ditampilkan di depan pesan
-    """
-    # Cek apakah ini adalah dependency installer yang sudah diinisialisasi
+    """Log pesan ke UI dan logger dengan namespace dependency installer"""
+    # Check initialization
     if not is_initialized(ui_components):
-        # Skip UI logging jika belum diinisialisasi untuk mencegah log muncul di modul lain
         return
     
-    # Pastikan menggunakan logger dengan namespace yang tepat
+    # Get logger
     logger = ui_components.get('logger') or get_logger(DEPENDENCY_INSTALLER_LOGGER_NAMESPACE)
     
-    # Log ke UI hanya jika log_output atau output tersedia
-    if 'log_output' in ui_components or 'output' in ui_components:
-        # Log ke UI dengan konsisten menggunakan UI logger
+    # Log ke UI
+    if 'log_output' in ui_components or 'output' in ui_components or 'status' in ui_components:
         ui_log(ui_components, message, level, icon)
     
-    # Tambahkan prefix untuk memudahkan filtering
+    # Log ke Python logger dengan prefix
     prefixed_message = f"[{MODULE_LOGGER_NAME}] {message}"
     
-    # Log ke Python logger
     if logger:
-        if level == "info":
-            logger.info(prefixed_message)
-        elif level == "warning" or level == "warn":
-            logger.warning(prefixed_message)
-        elif level == "error":
-            logger.error(prefixed_message)
-        elif level == "debug":
-            logger.debug(prefixed_message)
-        elif level == "success":
-            # Success level tidak ada di Python logger standard, gunakan info
-            logger.info(f"✅ {prefixed_message}")
-        elif level == "critical":
-            logger.critical(prefixed_message)
+        log_methods = {
+            "info": logger.info,
+            "warning": logger.warning,
+            "warn": logger.warning,
+            "error": logger.error,
+            "debug": logger.debug,
+            "success": lambda msg: logger.info(f"✅ {msg}"),
+            "critical": logger.critical
+        }
+        log_method = log_methods.get(level, logger.info)
+        log_method(prefixed_message)
 
 def is_initialized(ui_components: Dict[str, Any]) -> bool:
-    """
-    Cek apakah UI dependency installer sudah diinisialisasi.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        bool: True jika sudah diinisialisasi, False jika belum
-    """
-    return ui_components.get('dependency_installer_initialized', False) 
+    """Check apakah dependency installer sudah diinisialisasi"""
+    return ui_components.get('dependency_installer_initialized', False) or ui_components.get('module_name') == 'dependency_installer'

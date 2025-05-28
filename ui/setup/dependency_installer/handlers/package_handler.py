@@ -1,62 +1,26 @@
 """
 File: smartcash/ui/setup/dependency_installer/handlers/package_handler.py
-Deskripsi: Handler untuk manajemen package
+Deskripsi: Fixed package handler menggunakan existing implementations
 """
 
 import time
 import subprocess
 import sys
-import contextlib
 from typing import Dict, Any, List, Tuple
-from tqdm.notebook import tqdm
 from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
 
-@contextlib.contextmanager
-def disable_tqdm():
-    """Context manager to temporarily disable tqdm output"""
-    old_disable = getattr(tqdm, 'disable', False)
-    tqdm.disable = True
-    try:
-        yield
-    finally:
-        tqdm.disable = old_disable
-
-class SilentTqdm(tqdm):
-    """Custom tqdm class that doesn't display to console"""
-    def __init__(self, *args, **kwargs):
-        kwargs['display'] = False  # Disable display
-        kwargs['disable'] = True   # Completely disable tqdm
-        super().__init__(*args, **kwargs)
-    
-    def display(self, *args, **kwargs):
-        """Override display to do nothing"""
-        pass
-
 def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
-    """
-    Dapatkan semua package yang perlu diinstall berdasarkan UI state
-    
-    Args:
-        ui_components: Dictionary UI components
-        
-    Returns:
-        List package yang perlu diinstall
-    """
+    """Dapatkan semua package yang perlu diinstall berdasarkan UI state"""
     from smartcash.ui.setup.dependency_installer.utils.package_utils import (
         get_package_groups, parse_custom_packages, get_installed_packages, check_missing_packages
     )
     
-    # Get installed packages
     installed_packages = get_installed_packages()
-    
-    # Dapatkan package groups
-    PACKAGE_GROUPS = get_package_groups()
-    
-    # Collect packages to install
+    package_groups = get_package_groups()
     missing_packages = []
     
-    # Add selected packages from groups
-    for pkg_key, pkg_list in PACKAGE_GROUPS.items():
+    # Add selected packages dari groups
+    for pkg_key, pkg_list in package_groups.items():
         checkbox = ui_components.get(pkg_key)
         if checkbox and checkbox.value:
             package_list = pkg_list() if callable(pkg_list) else pkg_list
@@ -64,101 +28,70 @@ def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
             missing_packages.extend(missing)
     
     # Add custom packages
-    custom_text = ui_components.get('custom_packages').value.strip()
+    custom_text = ui_components.get('custom_packages', type('', (), {'value': ''})).value.strip()
     if custom_text:
         custom_packages = parse_custom_packages(custom_text)
         missing = check_missing_packages(custom_packages, installed_packages)
         missing_packages.extend(missing)
     
-    # Remove duplicates while preserving order
-    return list(dict.fromkeys(missing_packages))
+    return list(dict.fromkeys(missing_packages))  # Remove duplicates
 
 def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
-    """
-    Jalankan instalasi batch untuk package
-    
-    Args:
-        packages: List package yang akan diinstall
-        ui_components: Dictionary UI components
-        
-    Returns:
-        Tuple (success, stats)
-    """
-    # Jika tidak ada package yang perlu diinstall
+    """Jalankan instalasi batch untuk package"""
     if not packages:
-        return True, {
-            'total': 0,
-            'success': 0,
-            'failed': 0,
-            'duration': 0,
-            'errors': []
-        }
+        return True, {'total': 0, 'success': 0, 'failed': 0, 'duration': 0, 'errors': []}
     
-    # Dapatkan komponen UI
-    progress_bar = ui_components.get('install_progress')
-    progress_label = ui_components.get('progress_label')
-    tracker = ui_components.get('dependency_installer_tracker')
+    # Get progress tracker
+    progress_tracker = ui_components.get('progress_tracker')
     
-    # Statistik instalasi
-    stats = {
-        'total': len(packages),
-        'success': 0,
-        'failed': 0,
-        'duration': 0,
-        'errors': []
-    }
-    
-    # Waktu mulai
+    # Initialize stats
+    stats = {'total': len(packages), 'success': 0, 'failed': 0, 'duration': 0, 'errors': []}
     start_time = time.time()
     
-    # Log info ke UI dengan namespace khusus
-    log_message(ui_components, f"Memulai instalasi {len(packages)} package...", "info")
+    log_message(ui_components, f"🚀 Memulai instalasi {len(packages)} package...", "info")
     
-    # Gunakan context manager untuk menonaktifkan tqdm output
-    with disable_tqdm():
-        # Gunakan SilentTqdm untuk progress bar yang tidak menampilkan ke console
-        for i, package in enumerate(SilentTqdm(packages, desc="Instalasi Package")):
-            # Update progress
-            progress_pct = int((i / len(packages)) * 100)
-            if progress_bar: progress_bar.value = progress_pct
-            if progress_label: progress_label.value = f"Menginstall {package}... ({i+1}/{len(packages)})"
-            if tracker: tracker.update(progress_pct)
+    # Install each package
+    for i, package in enumerate(packages):
+        progress_pct = int((i / len(packages)) * 100)
+        
+        # Update progress tracker
+        if progress_tracker:
+            progress_tracker.update('overall', progress_pct, f"Installing {package}...")
+            progress_tracker.update('current', 0, f"Package {i+1}/{len(packages)}")
+        
+        log_message(ui_components, f"📦 Installing {package}...", "info")
+        
+        try:
+            # Run pip install silently
+            cmd = [sys.executable, "-m", "pip", "install", package, "--quiet"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             
-            # Log info ke UI dengan namespace khusus
-            log_message(ui_components, f"Menginstall {package}...", "info")
-            
-            try:
-                # Jalankan pip install dengan --quiet untuk mengurangi output
-                cmd = [sys.executable, "-m", "pip", "install", package, "--quiet"]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-                
-                if result.returncode == 0:
-                    # Sukses
-                    stats['success'] += 1
-                    log_message(ui_components, f"Berhasil menginstall {package}", "success")
-                else:
-                    # Gagal
-                    stats['failed'] += 1
-                    error_msg = result.stderr.strip() or "Unknown error"
-                    stats['errors'].append((package, error_msg))
-                    log_message(ui_components, f"Gagal menginstall {package}: {error_msg}", "error")
-            except Exception as e:
-                # Error
+            if result.returncode == 0:
+                stats['success'] += 1
+                log_message(ui_components, f"✅ Berhasil install {package}", "success")
+                if progress_tracker:
+                    progress_tracker.update('current', 100, f"✅ {package}")
+            else:
                 stats['failed'] += 1
-                stats['errors'].append((package, str(e)))
-                log_message(ui_components, f"Error saat menginstall {package}: {str(e)}", "error")
+                error_msg = result.stderr.strip() or "Unknown error"
+                stats['errors'].append((package, error_msg))
+                log_message(ui_components, f"❌ Gagal install {package}: {error_msg}", "error")
+                if progress_tracker:
+                    progress_tracker.update('current', 100, f"❌ {package}")
+        
+        except Exception as e:
+            stats['failed'] += 1
+            stats['errors'].append((package, str(e)))
+            log_message(ui_components, f"💥 Error install {package}: {str(e)}", "error")
+            if progress_tracker:
+                progress_tracker.update('current', 100, f"💥 {package}")
     
-    # Update progress ke 100%
-    if progress_bar: progress_bar.value = 100
-    if progress_label: progress_label.value = f"Selesai menginstall {len(packages)} package"
-    if tracker: tracker.update(100)
+    # Final progress update
+    if progress_tracker:
+        progress_tracker.update('overall', 100, "Installation complete")
     
-    # Hitung durasi
     stats['duration'] = time.time() - start_time
     
-    # Log ringkasan ke UI dengan namespace khusus
-    log_message(ui_components, f"Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal", "success")
-    log_message(ui_components, f"Waktu: {stats['duration']:.1f} detik", "info")
+    log_message(ui_components, f"📊 Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal ({stats['duration']:.1f}s)", "success")
     
-    # Return success jika semua berhasil
     return stats['failed'] == 0, stats

@@ -111,7 +111,7 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
     form_layout = widgets.VBox([
         create_header("Konfigurasi Hyperparameter", "Pengaturan parameter untuk training model", ICONS.get('settings', '⚙️')),
         status_panel,
-        widgets.HBox([basic_group, optimization_group, advanced_group], layout=widgets.Layout(width='100%', justify_content='space-between', align_items='stretch', gap='10px')),
+        widgets.HBox([basic_group, optimization_group, advanced_group], layout=widgets.Layout(width='100%', display='flex', justify_content='space-between', align_items='stretch', gap='10px')),
         save_reset_buttons['container'],
     ], layout=widgets.Layout(width='100%', padding='10px'))
     

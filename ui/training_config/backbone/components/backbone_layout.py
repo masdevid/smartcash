@@ -4,6 +4,7 @@ Deskripsi: Layout arrangement untuk backbone configuration UI dengan responsive 
 """
 
 from typing import Dict, Any
+from IPython import display
 import ipywidgets as widgets
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.layout_utils import create_responsive_container
@@ -44,14 +45,13 @@ def create_backbone_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     controls_section = create_responsive_container([
         form_components['save_reset_container']
     ], container_type="hbox", justify_content="flex-end", margin="10px 0")
-    
+    parameters = widgets.HBox([model_section, optimization_section], layout=widgets.Layout(display="flex", justify_content="space-between"))
     # Main container dengan responsive layout
     main_container = create_responsive_container([
         header,
         form_components['status_panel'],
-        model_section,
         widgets.HTML("<hr style='margin: 10px 0; border-style: dashed;'>"),
-        optimization_section,
+        parameters,
         widgets.HTML("<hr style='margin: 10px 0; border-style: dashed;'>"),
         controls_section,
     ], padding="15px",width="100%")

@@ -69,28 +69,23 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def create_ratio_section(components: Dict[str, Any]) -> widgets.VBox:
-    """Buat section untuk ratio split dengan reusable header"""
-    from smartcash.ui.utils.header_utils import create_section_header
+    """Buat section untuk ratio split dengan existing header"""
+    from smartcash.ui.utils.header_utils import create_section_title
     
     return widgets.VBox([
-        create_section_header("Ratio Split Dataset", ICONS.get('split', '✂️')),
-        components['train_slider'],
-        components['valid_slider'], 
-        components['test_slider'],
-        components['total_label'],
-        components['stratified_checkbox'],
-        components['random_seed']
+        create_section_title("Ratio Split Dataset", ICONS.get('split', '✂️')),
+        components['train_slider'], components['valid_slider'], 
+        components['test_slider'], components['total_label'], 
+        components['stratified_checkbox'], components['random_seed']
     ], layout=widgets.Layout(width='100%', padding='5px'))
 
 
 def create_path_section(components: Dict[str, Any]) -> widgets.VBox:
-    """Buat section untuk path dan backup dengan reusable header"""
-    from smartcash.ui.utils.header_utils import create_section_header
+    """Buat section untuk path dan backup dengan existing header"""
+    from smartcash.ui.utils.header_utils import create_section_title
     
     return widgets.VBox([
-        create_section_header("Path dan Backup", ICONS.get('folder', '📁')),
-        components['dataset_path'],
-        components['preprocessed_path'],
-        components['backup_checkbox'],
-        components['backup_dir']
+        create_section_title("Path dan Backup", ICONS.get('folder', '📁')),
+        components['dataset_path'], components['preprocessed_path'],
+        components['backup_checkbox'], components['backup_dir']
     ], layout=widgets.Layout(width='100%', padding='5px'))

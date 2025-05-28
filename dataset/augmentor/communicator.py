@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/communicator.py
-Deskripsi: Fixed communicator dengan log reset dan progress completion yang benar
+Deskripsi: Fixed communicator dengan selective log suppression tanpa auto-reset
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -8,7 +8,7 @@ import time
 import logging
 
 class UICommunicator:
-    """Fixed communicator dengan auto log reset dan proper progress completion"""
+    """Fixed communicator dengan selective suppression tanpa auto log reset"""
     
     def __init__(self, ui_components: Dict[str, Any] = None):
         self.ui_components = ui_components or {}
@@ -16,17 +16,26 @@ class UICommunicator:
         self.last_update_time = 0
         self.update_interval = 0.3
         self.current_operation = None
-        self.log_count = 0  # Track log messages
         
-        self._setup_minimal_suppression()
+        # Setup aggressive suppression untuk verbose libraries
+        self._setup_selective_suppression()
         
-    def _setup_minimal_suppression(self):
-        """Setup minimal suppression - hanya backend noise"""
-        noise_loggers = ['requests', 'urllib3', 'http.client', 'albumentations']
-        for logger_name in noise_loggers:
+    def _setup_selective_suppression(self):
+        """Setup selective suppression - suppress verbose libraries aggressively"""
+        # Aggressive suppression untuk libraries yang sangat verbose
+        verbose_loggers = [
+            'requests', 'urllib3', 'http.client', 'requests.packages.urllib3',
+            'albumentations', 'cv2', 'numpy', 'PIL', 'matplotlib', 
+            'concurrent.futures', 'threading', 'multiprocessing',
+            'tqdm', 'ipywidgets', 'traitlets', 'tornado', 'zmq'
+        ]
+        
+        for logger_name in verbose_loggers:
             logger = logging.getLogger(logger_name)
-            logger.setLevel(logging.CRITICAL)
+            logger.setLevel(logging.CRITICAL + 1)  # Above CRITICAL
             logger.propagate = False
+            logger.handlers.clear()
+            logger.addHandler(logging.NullHandler())
     
     def _get_progress_tracker(self):
         """Get progress tracker dengan fallback methods"""
@@ -54,7 +63,7 @@ class UICommunicator:
         except Exception:
             pass
         
-        # Log milestone dengan auto-reset
+        # Log milestone tanpa reset
         if percentage in [0, 25, 50, 75, 100]:
             self._log_progress_milestone(operation, percentage, message)
     
@@ -64,48 +73,26 @@ class UICommunicator:
         emoji = milestone_emoji.get(percentage, "📈")
         
         milestone_msg = f"{emoji} {operation.title()}: {percentage}% - {message}"
-        self._log_to_ui_with_reset(milestone_msg, 'info')
+        self._log_to_ui_clean(milestone_msg, 'info')
     
     def log_info(self, msg: str):
-        """Log info dengan auto reset"""
-        self._log_to_ui_with_reset(f"ℹ️ {msg}", 'info')
+        """Log info tanpa reset"""
+        self._log_to_ui_clean(f"ℹ️ {msg}", 'info')
     
     def log_success(self, msg: str):
-        """Log success dengan auto reset"""
-        self._log_to_ui_with_reset(f"✅ {msg}", 'success')
+        """Log success tanpa reset"""
+        self._log_to_ui_clean(f"✅ {msg}", 'success')
     
     def log_warning(self, msg: str):
-        """Log warning dengan auto reset"""
-        self._log_to_ui_with_reset(f"⚠️ {msg}", 'warning')
+        """Log warning tanpa reset"""
+        self._log_to_ui_clean(f"⚠️ {msg}", 'warning')
     
     def log_error(self, msg: str):
-        """Log error dengan auto reset"""
-        self._log_to_ui_with_reset(f"❌ {msg}", 'error')
-    
-    def _log_to_ui_with_reset(self, message: str, level: str):
-        """Log ke UI dengan auto reset setiap 30 messages"""
-        self.log_count += 1
-        
-        # Reset log setiap 30 messages
-        if self.log_count % 30 == 0:
-            self._clear_log_output()
-            self._log_to_ui_clean("🔄 Log cleared after 30 messages", 'info')
-        
-        self._log_to_ui_clean(message, level)
-    
-    def _clear_log_output(self):
-        """Clear log output untuk prevent overflow"""
-        try:
-            for output_key in ['log_output', 'status', 'output']:
-                output_widget = self.ui_components.get(output_key)
-                if output_widget and hasattr(output_widget, 'clear_output'):
-                    output_widget.clear_output(wait=True)
-                    break
-        except Exception:
-            pass
+        """Log error tanpa reset"""
+        self._log_to_ui_clean(f"❌ {msg}", 'error')
     
     def _log_to_ui_clean(self, message: str, level: str):
-        """Log ke UI tanpa reset logic"""
+        """Log ke UI tanpa auto reset"""
         try:
             from IPython.display import display, HTML
             import time
@@ -134,9 +121,8 @@ class UICommunicator:
             print(message)
     
     def start_operation(self, operation_name: str, total_steps: int = 100):
-        """Start operation dengan log reset"""
+        """Start operation tanpa log reset"""
         self.current_operation = operation_name
-        self.log_count = 0  # Reset counter untuk operation baru
         self.log_info(f"🚀 Memulai {operation_name}")
         self.last_update_time = 0
         
@@ -183,7 +169,7 @@ class UICommunicator:
         self.current_operation = None
     
     def update_status(self, message: str, status_type: str = "info"):
-        """Update status dengan auto reset"""
+        """Update status tanpa reset"""
         status_methods = {'info': self.log_info, 'success': self.log_success, 'warning': self.log_warning, 'error': self.log_error}
         log_method = status_methods.get(status_type, self.log_info)
         log_method(message)
@@ -201,7 +187,7 @@ class UICommunicator:
                 pass
 
 def create_communicator(ui_components: Dict[str, Any] = None) -> UICommunicator:
-    """Factory function untuk communicator dengan log reset"""
+    """Factory function untuk communicator dengan selective suppression"""
     return UICommunicator(ui_components)
 
 # One-liner helpers

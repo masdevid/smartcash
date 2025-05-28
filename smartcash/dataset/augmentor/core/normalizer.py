@@ -141,48 +141,34 @@ class NormalizationEngine:
         return ""
     
     def _apply_research_normalization(self, image):
-        """Apply normalization dengan config logging dan minmax default"""
+        """Apply normalization dengan config logging di akhir proses"""
         try:
             norm_config = self.config.get('preprocessing', {}).get('normalization', {})
-            scaler_type = norm_config.get('scaler', 'minmax')  # Default minmax dari preprocessing module
+            scaler_type = norm_config.get('scaler', 'minmax')
             
-            # Log scaler yang digunakan
-            scaler_source = "🔧 CONFIG" if 'scaler' in norm_config else "⚙️ DEFAULT (preprocessing)"
-            self.progress.log_info(f"🔧 Applying {scaler_type} normalization ({scaler_source})")
-            
-            # Apply scaler sesuai pilihan
+            # Apply scaler tanpa log verbose
             if scaler_type == 'minmax':
-                # MinMax normalization (0-1)
                 normalized = image.astype('float32') / 255.0
                 image = (normalized * 255.0).astype('uint8')
                 
             elif scaler_type == 'standard':
-                # Standard scaler (z-score normalization)
                 normalized = image.astype('float32')
                 mean = normalized.mean()
                 std = normalized.std()
                 if std > 0:
                     normalized = (normalized - mean) / std
-                    # Rescale to 0-255 range
                     normalized = ((normalized - normalized.min()) / (normalized.max() - normalized.min()) * 255.0)
                 image = normalized.astype('uint8')
             
-            elif scaler_type == 'none':
-                # No scaling applied
-                pass
-            
-            # Optional resizing
+            # Optional resizing tanpa log verbose
             target_size = norm_config.get('target_size', None)
             if target_size and isinstance(target_size, (list, tuple)) and len(target_size) == 2:
                 if image.shape[:2] != tuple(target_size):
-                    size_source = "🔧 CONFIG" if 'target_size' in norm_config else "⚙️ DEFAULT"
-                    self.progress.log_info(f"🔧 Resizing to {target_size} ({size_source})")
                     image = cv2.resize(image, tuple(target_size), interpolation=cv2.INTER_LANCZOS4)
             
             return image
             
         except Exception as e:
-            self.progress.log_error(f"❌ Normalization error: {str(e)}, using original image")
             return image
     
     def _copy_validated_label(self, source_label: str, target_label: str) -> bool:
@@ -223,15 +209,18 @@ class NormalizationEngine:
     
     def _create_success_result(self, results: List[Dict], processing_time: float, 
                              preprocessed_dir: str, target_split: str) -> Dict[str, Any]:
-        """Create success result dengan detailed statistics"""
+        """Create success result dengan config summary di akhir"""
         successful = [r for r in results if r.get('status') == 'success']
         img_saved_count = sum(1 for r in successful if r.get('img_saved', False))
         label_saved_count = sum(1 for r in successful if r.get('label_saved', False))
         
-        # Log detailed results
+        # Log summary results
         self.progress.log_success(f"✅ Normalisasi berhasil: {len(successful)}/{len(results)} file")
-        self.progress.log_info(f"📊 Images saved: {img_saved_count}, Labels saved: {label_saved_count}")
-        self.progress.log_info(f"📁 Target directory: {preprocessed_dir}/{target_split}")
+        self.progress.log_info(f"📊 Images: {img_saved_count}, Labels: {label_saved_count}")
+        self.progress.log_info(f"📁 Saved to: {preprocessed_dir}/{target_split}")
+        
+        # Log config summary di akhir (tidak akan hilang karena reset)
+        self._log_final_config_summary()
         
         return {
             'status': 'success', 'total_files_processed': len(results), 'total_normalized': len(successful),
@@ -240,6 +229,20 @@ class NormalizationEngine:
             'target_dir': f"{preprocessed_dir}/{target_split}",
             'normalization_speed': len(results) / processing_time if processing_time > 0 else 0
         }
+    
+    def _log_final_config_summary(self):
+        """Log config summary di akhir proses"""
+        norm_config = self.config.get('preprocessing', {}).get('normalization', {})
+        scaler = norm_config.get('scaler', 'minmax')
+        target_size = norm_config.get('target_size', None)
+        
+        # Determine config sources
+        scaler_source = "CONFIG" if 'preprocessing' in self.config and 'normalization' in self.config['preprocessing'] and 'scaler' in norm_config else "DEFAULT"
+        size_source = "CONFIG" if target_size else "DEFAULT"
+        
+        self.progress.log_success(f"🔧 Normalization Applied:")
+        self.progress.log_info(f"   • Scaler: {scaler} ({scaler_source})")
+        self.progress.log_info(f"   • Resize: {target_size or 'None'} ({size_source})")
     
     def _create_empty_result(self, preprocessed_dir: str, target_split: str) -> Dict[str, Any]:
         """Create result untuk empty dataset"""

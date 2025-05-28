@@ -17,6 +17,18 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     # Header
     header = create_header("📦 Instalasi Dependencies", "Setup package yang diperlukan untuk SmartCash")
     
+    # Status panel
+    status_panel = widgets.HTML(
+        value=f"""
+        <div style="padding:8px 12px; background-color:#d1ecf1; 
+                   color:#0c5460; border-radius:4px; margin:10px 0;
+                   border-left:4px solid #17a2b8;">
+            <p style="margin:3px 0">ℹ️ Pilih packages yang akan diinstall dan klik "Mulai Instalasi"</p>
+        </div>
+        """,
+        layout=widgets.Layout(width='100%', margin='10px 0')
+    )
+    
     # Package categories
     package_categories = get_package_categories()
     checkboxes = {}
@@ -27,12 +39,16 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         category_box = create_category_box(category, checkboxes)
         category_boxes.append(category_box)
     
-    # Packages container with responsive flex
-    packages_container = widgets.VBox(
+    # Packages container - 3 columns with gap
+    packages_container = widgets.HBox(
         category_boxes,
         layout=widgets.Layout(
+            display='flex',
+            flex_flow='row nowrap',
+            justify_content='space-between',
             width='100%',
             margin='10px 0',
+            gap='10px',
             overflow='hidden'
         )
     )
@@ -77,6 +93,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     # Main container
     main = widgets.VBox([
         header,
+        status_panel,
         packages_container,
         custom_section,
         widgets.HBox([install_button], layout=widgets.Layout(justify_content='center')),
@@ -89,6 +106,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     ui_components = {
         'ui': main,
         'status': status,
+        'status_panel': status_panel,
         'install_button': install_button,
         'custom_packages': custom_packages,
         'progress_tracker': progress_components['tracker'],
@@ -139,12 +157,12 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
         checkboxes[package['key']] = checkbox
         checkboxes[f"{package['key']}_status"] = status_widget
     
-    # Category container with responsive layout
+    # Category container with 3-column flex layout
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           width='100%',
-                           max_width='100%',
-                           margin='8px 0',
+                           width='calc(33.33% - 7px)',
+                           max_width='calc(33.33% - 7px)',
+                           margin='0',
                            padding='12px',
                            border=f'1px solid {COLORS["border"]}',
                            border_radius='6px',

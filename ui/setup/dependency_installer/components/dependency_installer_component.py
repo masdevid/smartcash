@@ -40,13 +40,13 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         category_box = create_category_box(category, checkboxes)
         category_boxes.append(category_box)
     
-    # Packages container - 3 columns dengan proper spacing
+    # Packages container - 3 columns full width dengan space-between
     packages_container = widgets.HBox(
         category_boxes,
         layout=widgets.Layout(
             display='flex',
             flex_flow='row nowrap',
-            justify_content='space-evenly',
+            justify_content='space-between',
             align_items='flex-start',
             width='100%',
             margin='10px 0',
@@ -157,12 +157,12 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
         checkboxes[package['key']] = checkbox
         checkboxes[f"{package['key']}_status"] = status_widget
     
-    # Category container dengan spacing antar box
+    # Category container dengan 33% width dan spacing
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           width='280px',
-                           max_width='280px',
-                           margin='0 10px',
+                           width='calc(33.33% - 10px)',
+                           max_width='calc(33.33% - 10px)',
+                           margin='0',
                            padding='12px',
                            border=f'1px solid {COLORS["border"]}',
                            border_radius='6px',

@@ -142,7 +142,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
         # Horizontal row dengan center alignment dan proper width
         row = widgets.HBox([checkbox, status_widget], 
                           layout=widgets.Layout(
-                              width='300px',
+                              width='70%',
                               justify_content='space-between',
                               align_items='center',
                               margin='3px 0',

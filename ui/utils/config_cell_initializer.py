@@ -80,40 +80,40 @@ class ConfigCellInitializer(ABC):
             custom_handler(ui_components, config)
     
     def _save_config(self, ui_components: Dict[str, Any], button) -> None:
-        """Save config dengan fixed status handling"""
+        """Save config dengan proper status panel update"""
         try:
             button.disabled = True
-            show_status_safe("💾 Saving...", "info", ui_components)
+            self._update_status_panel(ui_components, "💾 Saving...", "info")
             
             config = self._extract_config(ui_components)
             success = get_config_manager().save_config(config, self.config_filename)
             
             if success:
                 ui_components['config'] = config
-                show_status_safe("✅ Saved", "success", ui_components)
+                self._update_status_panel(ui_components, "✅ Saved", "success")
                 [cb(config) for cb in self.config_callbacks]
             else:
-                show_status_safe("❌ Save failed", "error", ui_components)
+                self._update_status_panel(ui_components, "❌ Save failed", "error")
         except Exception as e:
-            show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
+            self._update_status_panel(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
             button.disabled = False
     
     def _reset_config(self, ui_components: Dict[str, Any], button) -> None:
-        """Reset config dengan fixed status handling"""
+        """Reset config dengan proper status panel update"""
         try:
             button.disabled = True
-            show_status_safe("🔄 Resetting...", "info", ui_components)
+            self._update_status_panel(ui_components, "🔄 Resetting...", "info")
             
             default_config = self._get_default_config()
             self._update_ui(ui_components, default_config)
             get_config_manager().save_config(default_config, self.config_filename)
             
             ui_components['config'] = default_config
-            show_status_safe("✅ Reset complete", "success", ui_components)
+            self._update_status_panel(ui_components, "✅ Reset complete", "success")
             [cb(default_config) for cb in self.config_callbacks]
         except Exception as e:
-            show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
+            self._update_status_panel(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
             button.disabled = False
     

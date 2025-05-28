@@ -52,7 +52,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
     
     # Balance classes
     balance_classes = widgets.Checkbox(
-        value=False,
+        value=True,
         description='Balance Classes (Layer 1 & 2 only)',
         indent=False,
         layout=widgets.Layout(width='auto')

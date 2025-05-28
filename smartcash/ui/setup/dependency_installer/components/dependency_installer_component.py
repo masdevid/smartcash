@@ -136,7 +136,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(width='auto', margin='2px 0')
+            layout=widgets.Layout(margin='2px 0')
         )
         
         # Horizontal row dengan center alignment dan proper width

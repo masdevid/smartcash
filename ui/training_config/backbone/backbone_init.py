@@ -9,8 +9,8 @@ from smartcash.ui.utils.config_cell_initializer import ConfigCellInitializer, cr
 class BackboneConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk backbone model configuration"""
     
-    def __init__(self):
-        super().__init__('backbone', 'backbone_config')
+    def __init__(self, module_name='backbone', config_filename='backbone_config'):
+        super().__init__(module_name, config_filename)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk backbone configuration"""

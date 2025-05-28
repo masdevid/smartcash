@@ -15,8 +15,8 @@ from smartcash.ui.training_config.training_strategy.handlers.defaults import get
 class TrainingStrategyConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk strategi pelatihan yang DRY dan sederhana"""
     
-    def __init__(self):
-        super().__init__('training_strategy', 'training_strategy_config')
+    def __init__(self, module_name='training_strategy', config_filename='training_strategy_config'):
+        super().__init__(module_name, config_filename)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components dengan reusable form dan layout"""
@@ -36,11 +36,6 @@ class TrainingStrategyConfigInitializer(ConfigCellInitializer):
         return get_default_training_strategy_config()
 
 
-def create_training_strategy_init(env=None, config=None, **kwargs):
+def initialize_training_strategy_config(env=None, config=None, **kwargs):
     """Factory function untuk training strategy config cell"""
     return create_config_cell(TrainingStrategyConfigInitializer, 'training_strategy', 'training_strategy_config', env, config, **kwargs)
-
-
-# Alias untuk backward compatibility
-initialize_training_strategy_ui = create_training_strategy_init
-get_training_strategy_ui = create_training_strategy_init

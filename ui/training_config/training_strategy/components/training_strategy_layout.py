@@ -98,10 +98,9 @@ def create_training_strategy_layout(form_components: Dict[str, Any]) -> Dict[str
     # Create main container dengan required components
     main_container = widgets.VBox([
         header,
+        form_components['status_panel'],
         tabs,
-        form_components['button_container'],
-        form_components['sync_info'],
-        form_components['status_panel']
+        form_components['button_container']
     ], layout=widgets.Layout(width='100%', padding='10px'))
     
     # Return components dengan required keys untuk ConfigCellInitializer

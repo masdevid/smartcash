@@ -15,8 +15,8 @@ from smartcash.ui.dataset.split.components.split_layout import create_split_layo
 class SplitConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk split dataset configuration"""
     
-    def __init__(self):
-        super().__init__('split_dataset', 'dataset_config')
+    def __init__(self, module_name='split_dataset', config_filename='dataset_config'):
+        super().__init__(module_name, config_filename)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components untuk split config"""
@@ -51,7 +51,7 @@ class SplitConfigInitializer(ConfigCellInitializer):
 
 def create_split_config_cell(env=None, config=None, **kwargs):
     """Factory function untuk create split config cell"""
-    ui = create_config_cell(SplitConfigInitializer, 'split_dataset', 'dataset_config', env, config, **kwargs)
+    ui = create_config_cell(SplitConfigInitializer, env, config, **kwargs)
     display(ui) if hasattr(ui, 'children') else None
     return ui
 

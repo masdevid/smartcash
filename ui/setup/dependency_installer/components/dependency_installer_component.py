@@ -140,7 +140,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(flex='1 1 auto', margin='2px 0', max_width='calc(100% - 80px)')
+            layout=widgets.Layout(flex='1 1 auto', margin='2px 0', max_width='calc(100% - 40px)')
         )
         
         # Horizontal row with controlled spacing

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/config_cell_initializer.py
-Deskripsi: Fixed config cell initializer menggunakan existing implementations
+Deskripsi: Fixed config cell initializer dengan one-liner style implementation
 """
 
 from typing import Dict, Any, Optional
@@ -15,7 +15,7 @@ from smartcash.ui.utils.fallback_utils import create_error_ui, show_status_safe
 
 
 class ConfigCellInitializer(ABC):
-    """Fixed config cell initializer menggunakan existing implementations"""
+    """Fixed config cell initializer dengan one-liner style implementation"""
     
     def __init__(self, module_name: str, config_filename: str):
         self.module_name = module_name
@@ -24,108 +24,90 @@ class ConfigCellInitializer(ABC):
         self.config_callbacks = []
     
     def initialize(self, env=None, config=None, **kwargs) -> Any:
-        """Main initialization dengan fixed error handling"""
+        """Main initialization dengan one-liner error handling"""
         try:
             suppress_all_outputs()
             config = self._load_config(config)
             ui_components = self._create_config_ui(config, env, **kwargs)
             
-            if not self._validate_ui(ui_components):
-                return create_error_ui("Required components missing", self.module_name)
-            
-            self._setup_handlers(ui_components, config)
-            show_status_safe(f"✅ {self.module_name} ready", "success", ui_components)
-            return ui_components.get('main_container', ui_components)
+            return (self._setup_handlers(ui_components, config) and 
+                   show_status_safe(f"✅ {self.module_name} ready", "success", ui_components) and
+                   ui_components.get('main_container', ui_components)) if self._validate_ui(ui_components) else create_error_ui("Required components missing", self.module_name)
         except Exception as e:
             return create_error_ui(f"Error: {str(e)}", self.module_name)
     
-    # Abstract methods
+    # Abstract methods - one-liner declarations
     @abstractmethod
-    def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        pass
-    
-    @abstractmethod
-    def _extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        pass
+    def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]: pass
     
     @abstractmethod
-    def _update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        pass
+    def _extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]: pass
     
     @abstractmethod
-    def _get_default_config(self) -> Dict[str, Any]:
-        pass
+    def _update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None: pass
     
-    def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Load config dengan fallback ke default"""
-        return (config or 
-                get_config_manager().get_config(self.config_filename) or 
-                self._get_default_config())
+    @abstractmethod
+    def _get_default_config(self) -> Dict[str, Any]: pass
     
-    def _validate_ui(self, ui_components: Dict[str, Any]) -> bool:
-        """Validate required components"""
-        return all(comp in ui_components for comp in ['save_button', 'reset_button', 'status_panel'])
+    # One-liner implementations
+    _load_config = lambda self, config: config or get_config_manager().get_config(self.config_filename) or self._get_default_config()
+    _validate_ui = lambda self, ui_components: all(comp in ui_components for comp in ['save_button', 'reset_button', 'status_panel'])
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Setup handlers dengan fixed status updates"""
+        """Setup handlers dengan one-liner style"""
         ui_components.update({'module_name': self.module_name, 'config': config})
         
-        # Button handlers
+        # One-liner button handlers
         getattr(ui_components.get('save_button'), 'on_click', lambda x: None)(lambda b: self._save_config(ui_components, b))
         getattr(ui_components.get('reset_button'), 'on_click', lambda x: None)(lambda b: self._reset_config(ui_components, b))
         
-        # Custom handlers
-        custom_handler = getattr(self, '_setup_custom_handlers', None)
-        if custom_handler:
-            custom_handler(ui_components, config)
+        # Custom handlers - one-liner check
+        getattr(self, '_setup_custom_handlers', lambda ui, cfg: None)(ui_components, config)
     
     def _save_config(self, ui_components: Dict[str, Any], button) -> None:
-        """Save config dengan proper status panel update"""
+        """Save config dengan one-liner error handling"""
         try:
-            button.disabled = True
+            button.disabled, config = True, self._extract_config(ui_components)
             self._update_status_panel(ui_components, "💾 Saving...", "info")
             
-            config = self._extract_config(ui_components)
-            success = get_config_manager().save_config(config, self.config_filename)
-            
-            if success:
-                ui_components['config'] = config
-                self._update_status_panel(ui_components, "✅ Saved", "success")
-                [cb(config) for cb in self.config_callbacks]
-            else:
-                self._update_status_panel(ui_components, "❌ Save failed", "error")
+            (ui_components.update({'config': config}) and 
+             self._update_status_panel(ui_components, "✅ Saved", "success") and
+             [cb(config) for cb in self.config_callbacks]) if get_config_manager().save_config(config, self.config_filename) else self._update_status_panel(ui_components, "❌ Save failed", "error")
         except Exception as e:
             self._update_status_panel(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
             button.disabled = False
     
     def _reset_config(self, ui_components: Dict[str, Any], button) -> None:
-        """Reset config dengan proper status panel update"""
+        """Reset config dengan one-liner error handling"""
         try:
-            button.disabled = True
+            button.disabled, default_config = True, self._get_default_config()
             self._update_status_panel(ui_components, "🔄 Resetting...", "info")
             
-            default_config = self._get_default_config()
-            self._update_ui(ui_components, default_config)
-            get_config_manager().save_config(default_config, self.config_filename)
-            
-            ui_components['config'] = default_config
-            self._update_status_panel(ui_components, "✅ Reset complete", "success")
-            [cb(default_config) for cb in self.config_callbacks]
+            (self._update_ui(ui_components, default_config) and
+             get_config_manager().save_config(default_config, self.config_filename) and
+             ui_components.update({'config': default_config}) and
+             self._update_status_panel(ui_components, "✅ Reset complete", "success") and
+             [cb(default_config) for cb in self.config_callbacks])
         except Exception as e:
             self._update_status_panel(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
             button.disabled = False
     
-    # Callback management
+    # One-liner status panel update
+    _update_status_panel = lambda self, ui_components, message, status_type='info': (
+        getattr(ui_components.get('status_panel'), 'value', type('', (), {'__setattr__': lambda s, k, v: None})()).__setattr__(
+            'value', __import__('smartcash.ui.utils.fallback_utils', fromlist=['create_status_message']).create_status_message(message, status_type=status_type, show_icon=True)
+        ) if ui_components.get('status_panel') and hasattr(ui_components['status_panel'], 'value') else 
+        show_status_safe(message, status_type, ui_components)
+    )
+    
+    # One-liner callback management
     add_callback = lambda self, cb: self.config_callbacks.append(cb) if cb not in self.config_callbacks else None
     remove_callback = lambda self, cb: self.config_callbacks.remove(cb) if cb in self.config_callbacks else None
 
 
-def create_config_cell(initializer_class, module_name: str, config_filename: str, 
-                      env=None, config=None, **kwargs) -> Any:
-    """Factory untuk create config cell dengan fixed error handling"""
-    try:
-        return initializer_class(module_name, config_filename).initialize(env, config, **kwargs)
-    except Exception as e:
-        return create_error_ui(f"Factory error: {str(e)}", module_name)
+# One-liner factory function
+create_config_cell = lambda initializer_class, module_name, config_filename, env=None, config=None, **kwargs: (
+    lambda init: init.initialize(env, config, **kwargs)
+)(initializer_class(module_name, config_filename)) if True else create_error_ui(f"Factory error", module_name)

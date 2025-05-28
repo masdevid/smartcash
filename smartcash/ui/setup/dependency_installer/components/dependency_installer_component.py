@@ -129,7 +129,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     for package in category['packages']:
         status_widget = widgets.HTML(
             f"<span style='color:{COLORS['muted']};font-size:11px;white-space:nowrap;'>Checking...</span>",
-            layout=widgets.Layout(width='60px', margin='0')
+            layout=widgets.Layout(width='80px', margin='0')
         )
         
         checkbox = widgets.Checkbox(

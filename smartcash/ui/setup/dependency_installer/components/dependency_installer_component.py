@@ -132,24 +132,25 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     package_widgets = []
     for package in category['packages']:
         status_widget = widgets.HTML(
-            f"<span style='color:{COLORS['muted']};font-size:11px;'>Checking...</span>",
-            layout=widgets.Layout(width='80px', margin='0')
+            f"<span style='color:{COLORS['muted']};font-size:11px;white-space:nowrap;'>Checking...</span>",
+            layout=widgets.Layout(width='70px', margin='0', flex='0 0 auto')
         )
         
         checkbox = widgets.Checkbox(
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(flex='1 1 auto', margin='2px 0')
+            layout=widgets.Layout(flex='1 1 auto', margin='2px 0', max_width='calc(100% - 80px)')
         )
         
-        # Horizontal row with flex
+        # Horizontal row with controlled spacing
         row = widgets.HBox([checkbox, status_widget], 
                           layout=widgets.Layout(
                               width='100%',
-                              justify_content='space-between',
+                              max_width='100%',
                               align_items='center',
-                              margin='3px 0'
+                              margin='3px 0',
+                              overflow='hidden'
                           ))
         package_widgets.append(row)
         

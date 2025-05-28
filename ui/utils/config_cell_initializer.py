@@ -90,10 +90,10 @@ class ConfigCellInitializer(ABC):
             
             if success:
                 ui_components['config'] = config
-                update_status_panel_safe(ui_components, "✅ Saved", "success")
+                update_status_panel_safe(ui_components, "✅ Konfigurasi disimpan", "success")
                 [cb(config) for cb in self.config_callbacks]  # One-liner callback notification
             else:
-                update_status_panel_safe(ui_components, "❌ Save failed", "error")
+                update_status_panel_safe(ui_components, "❌ Gagal menyimpan konfigurasi", "error")
         except Exception as e:
             update_status_panel_safe(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
@@ -103,14 +103,14 @@ class ConfigCellInitializer(ABC):
         """Reset config dengan consolidated utilities"""
         try:
             button.disabled = True
-            update_status_panel_safe(ui_components, "🔄 Resetting...", "info")
+            update_status_panel_safe(ui_components, "🔄 Mencoba reset...", "info")
             
             default_config = self._get_default_config()
             self._update_ui(ui_components, default_config)
             get_config_manager().save_config(default_config, self.config_filename)
             
             ui_components['config'] = default_config
-            update_status_panel_safe(ui_components, "✅ Reset complete", "success")
+            update_status_panel_safe(ui_components, "✅ Reset konfigurasi berhasil!", "success")
             [cb(default_config) for cb in self.config_callbacks]  # One-liner callback notification
         except Exception as e:
             update_status_panel_safe(ui_components, f"❌ Error: {str(e)}", "error")

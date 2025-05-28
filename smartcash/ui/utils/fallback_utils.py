@@ -47,7 +47,7 @@ def create_status_message(message: str, title: str = 'Status', status_type: str 
     <div style="padding:8px 12px; background-color:{style['bg_color']}; 
                color:{style['text_color']}; border-radius:4px; margin:5px 0;
                border-left:4px solid {style['text_color']};">
-        <h4 style="margin:0 0 5px 0; color:{style['text_color']};">{icon} {title}</h4>
+        <h4 style="margin:0 0 5px 0; color:{style['text_color']};">{title}</h4>
         <p style="margin:3px 0">{message}</p>
     </div>
     """

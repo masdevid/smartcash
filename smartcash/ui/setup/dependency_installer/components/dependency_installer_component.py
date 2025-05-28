@@ -128,28 +128,26 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     package_widgets = []
     for package in category['packages']:
         status_widget = widgets.HTML(
-            f"<span style='color:{COLORS['muted']};font-size:11px;white-space:nowrap;text-align:center;'>Checking...</span>",
-            layout=widgets.Layout(width='70px', margin='0', flex='0 0 auto')
+            f"<span style='color:{COLORS['muted']};font-size:11px;white-space:nowrap;'>Checking...</span>",
+            layout=widgets.Layout(width='60px', margin='0')
         )
         
         checkbox = widgets.Checkbox(
             description=package['name'],
             value=package['default'],
             tooltip=package['description'],
-            layout=widgets.Layout(width='auto', margin='2px 5px 2px 0')
+            layout=widgets.Layout(width='auto', margin='2px 0')
         )
         
-        # Horizontal row tanpa justify center untuk natural checkbox spacing
+        # Horizontal row dengan center alignment dan proper width
         row = widgets.HBox([checkbox, status_widget], 
                           layout=widgets.Layout(
                               width='100%',
-                              max_width='100%',
                               justify_content='space-between',
                               align_items='center',
                               margin='3px 0',
-                              padding='0 5px',
-                              overflow='hidden',
-                              box_sizing='border-box'
+                              padding='0',
+                              overflow='hidden'
                           ))
         package_widgets.append(row)
         
@@ -157,16 +155,15 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
         checkboxes[package['key']] = checkbox
         checkboxes[f"{package['key']}_status"] = status_widget
     
-    # Category container dengan 33% width dan spacing
+    # Category container dengan proper responsive width
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
-                           width='calc(33.33% - 10px)',
-                           max_width='calc(33.33% - 10px)',
+                           width='32%',
+                           max_width='32%',
                            margin='0',
-                           padding='12px',
+                           padding='10px',
                            border=f'1px solid {COLORS["border"]}',
                            border_radius='6px',
                            overflow='hidden',
-                           align_items='center',
-                           box_sizing='border-box',
+                           box_sizing='border-box'
                        ))

@@ -114,7 +114,7 @@ class PreprocessingPipelineManager:
         # Convert to float32 for processing
         normalized = image.astype(np.float32)
         
-        if method == 'minmax':
+        if method == 'minmax' or method == 'none':
             # Min-max normalization [0, 1]
             if image.dtype == np.uint8:
                 normalized = normalized / 255.0
@@ -126,9 +126,6 @@ class PreprocessingPipelineManager:
             std = np.std(normalized)
             if std > 0:
                 normalized = (normalized - mean) / std
-        elif method == 'none':
-            # No normalization
-            return image
         
         return normalized
     

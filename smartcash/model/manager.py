@@ -1,6 +1,6 @@
 """
 File: smartcash/model/manager.py
-Deskripsi: Komponen untuk manajemen model deteksi objek
+Deskripsi: Updated model manager dengan simplified training integration
 """
 
 import torch
@@ -15,10 +15,7 @@ from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.common.layer_config import get_layer_config
 
 # Imports dari architectures
-from smartcash.model.architectures.backbones import (
-    EfficientNetBackbone, 
-    CSPDarknet
-)
+from smartcash.model.architectures.backbones import EfficientNetBackbone, CSPDarknet
 from smartcash.model.architectures.necks import FeatureProcessingNeck
 from smartcash.model.architectures.heads import DetectionHead
 
@@ -32,16 +29,7 @@ from smartcash.model.models.yolov5_model import YOLOv5Model
 DETECTION_LAYERS = ['banknote', 'nominal', 'security']
 
 class ModelManager:
-    """
-    Model Manager yang mengkoordinasikan berbagai arsitektur dan layanan model.
-    
-    Bertanggung jawab untuk:
-    - Inisialisasi model dengan konfigurasi yang tepat
-    - Integrasi dengan layanan checkpoint, training, dan inference
-    - Validasi kompatibilitas antar komponen
-    - Manajemen konfigurasi model
-    - Dukungan untuk model teroptimasi (FeatureAdapter, ResidualAdapter, CIoU)
-    """
+    """Model Manager dengan simplified training integration untuk YOLOv5 + EfficientNet-B4"""
     
     # Enum untuk backbone yang didukung
     SUPPORTED_BACKBONES = {
@@ -92,27 +80,17 @@ class ModelManager:
             'use_attention': True,
             'use_residual': True,
             'use_ciou': True,
-            'num_repeats': 3  # Jumlah residual blocks
+            'num_repeats': 3
         }
     }
     
     def __init__(
         self,
         config: Optional[Dict] = None,
-        model_type: str = 'basic',
+        model_type: str = 'efficient_optimized',
         logger: Optional[SmartCashLogger] = None
     ):
-        """
-        Inisialisasi Model Manager.
-        
-        Args:
-            config: Konfigurasi model (opsional)
-            model_type: Tipe model ('basic', 'efficient', 'optimized', 'research') 
-            logger: Logger untuk mencatat proses (opsional)
-            
-        Raises:
-            ModelConfigurationError: Jika konfigurasi tidak valid
-        """
+        """Inisialisasi Model Manager dengan simplified configuration"""
         self.logger = logger or SmartCashLogger(__name__)
         
         # Default konfigurasi
@@ -126,7 +104,7 @@ class ModelManager:
             'checkpoint_dir': 'checkpoints',
             'batch_size': 16,
             'dropout': 0.0,
-            'anchors': None,  # Use default
+            'anchors': None,
             'use_attention': False,
             'use_residual': False,
             'use_ciou': False
@@ -134,18 +112,15 @@ class ModelManager:
         
         # Verifikasi tipe model
         if model_type not in self.OPTIMIZED_MODELS:
-            self.logger.warning(
-                f"⚠️ Tipe model '{model_type}' tidak dikenal, menggunakan 'basic'. "
-                f"Tipe yang tersedia: {list(self.OPTIMIZED_MODELS.keys())}"
-            )
-            model_type = 'basic'
+            self.logger.warning(f"⚠️ Tipe model '{model_type}' tidak dikenal, menggunakan 'efficient_optimized'")
+            model_type = 'efficient_optimized'
             
         self.model_type = model_type
         
         # Update default config dengan konfigurasi tipe model
         model_config = self.OPTIMIZED_MODELS[model_type]
         for key, value in model_config.items():
-            if key != 'description':  # Skip deskripsi
+            if key != 'description':
                 self.default_config[key] = value
         
         # Merge konfigurasi
@@ -165,8 +140,6 @@ class ModelManager:
         
         # Services dependencies (akan diset dari luar)
         self.checkpoint_service = None
-        self.training_service = None
-        self.evaluation_service = None
         
         self.logger.info(f"✅ ModelManager diinisialisasi dengan model {model_type}:")
         self.logger.info(f"   • {model_config['description']}")
@@ -174,19 +147,11 @@ class ModelManager:
             self.logger.info(f"   • {key}: {value}")
             
     def _validate_config(self):
-        """
-        Validasi konfigurasi model.
-        
-        Raises:
-            ModelConfigurationError: Jika konfigurasi tidak valid
-        """
+        """Validasi konfigurasi model"""
         # Validasi backbone
         if self.config['backbone'] not in self.SUPPORTED_BACKBONES:
             supported = list(self.SUPPORTED_BACKBONES.keys())
-            raise ModelConfigurationError(
-                f"❌ Backbone '{self.config['backbone']}' tidak didukung. "
-                f"Backbone yang didukung: {supported}"
-            )
+            raise ModelConfigurationError(f"❌ Backbone '{self.config['backbone']}' tidak didukung. Backbone yang didukung: {supported}")
             
         # Dapatkan layer_config
         layer_config = get_layer_config()
@@ -196,10 +161,7 @@ class ModelManager:
         for layer in self.config['detection_layers']:
             if layer not in all_layers and layer != 'all':
                 supported = list(all_layers)
-                raise ModelConfigurationError(
-                    f"❌ Detection layer '{layer}' tidak didukung. "
-                    f"Layer yang didukung: {supported}"
-                )
+                raise ModelConfigurationError(f"❌ Detection layer '{layer}' tidak didukung. Layer yang didukung: {supported}")
                 
         # Jika layer 'all', ganti dengan semua layer individual
         if 'all' in self.config['detection_layers']:
@@ -212,29 +174,11 @@ class ModelManager:
             total_classes += len(layer_config_data.get('class_ids', []))
             
         if self.config['num_classes'] != total_classes:
-            self.logger.warning(
-                f"⚠️ Jumlah kelas ({self.config['num_classes']}) tidak sesuai dengan "
-                f"total kelas dari detection layers ({total_classes}). "
-                f"Menggunakan {total_classes} kelas."
-            )
+            self.logger.warning(f"⚠️ Jumlah kelas ({self.config['num_classes']}) disesuaikan ke {total_classes}")
             self.config['num_classes'] = total_classes
-            
-        # Validasi image size
-        if not isinstance(self.config['img_size'], tuple) or len(self.config['img_size']) != 2:
-            raise ModelConfigurationError(
-                f"❌ Format img_size tidak valid. Harus berupa tuple (width, height)."
-            )
     
     def build_model(self) -> nn.Module:
-        """
-        Buat dan inisialisasi model berdasarkan konfigurasi.
-        
-        Returns:
-            nn.Module: Model yang telah diinisialisasi
-            
-        Raises:
-            ModelError: Jika gagal membangun model
-        """
+        """Buat dan inisialisasi model berdasarkan konfigurasi"""
         try:
             # 1. Buat backbone
             self._build_backbone()
@@ -261,10 +205,7 @@ class ModelManager:
             self.model.to(device)
             
             model_desc = self.OPTIMIZED_MODELS[self.model_type]['description']
-            self.logger.success(
-                f"✅ Model {self.model_type} ({model_desc}) berhasil dibangun "
-                f"dan dipindahkan ke device {self.config['device']}"
-            )
+            self.logger.success(f"✅ Model {self.model_type} ({model_desc}) berhasil dibangun pada device {self.config['device']}")
             
             return self.model
             
@@ -273,12 +214,7 @@ class ModelManager:
             raise ModelError(f"Gagal membangun model: {str(e)}")
             
     def _build_backbone(self):
-        """
-        Buat backbone berdasarkan konfigurasi.
-        
-        Raises:
-            ModelError: Jika gagal membangun backbone
-        """
+        """Buat backbone berdasarkan konfigurasi"""
         try:
             backbone_config = self.SUPPORTED_BACKBONES[self.config['backbone']]
             
@@ -305,12 +241,7 @@ class ModelManager:
             raise ModelError(f"Gagal membangun backbone: {str(e)}")
             
     def _build_neck(self):
-        """
-        Buat neck berdasarkan konfigurasi.
-        
-        Raises:
-            ModelError: Jika gagal membangun neck
-        """
+        """Buat neck berdasarkan konfigurasi"""
         try:
             if not self.backbone:
                 raise ModelError("❌ Backbone harus diinisialisasi sebelum neck")
@@ -339,12 +270,7 @@ class ModelManager:
             raise ModelError(f"Gagal membangun neck: {str(e)}")
             
     def _build_head(self):
-        """
-        Buat detection head berdasarkan konfigurasi.
-        
-        Raises:
-            ModelError: Jika gagal membangun head
-        """
+        """Buat detection head berdasarkan konfigurasi"""
         try:
             if not self.neck:
                 raise ModelError("❌ Neck harus diinisialisasi sebelum head")
@@ -365,12 +291,7 @@ class ModelManager:
             raise ModelError(f"Gagal membangun detection head: {str(e)}")
             
     def _build_loss_function(self):
-        """
-        Buat loss function berdasarkan konfigurasi.
-        
-        Raises:
-            ModelError: Jika gagal membangun loss function
-        """
+        """Buat loss function berdasarkan konfigurasi"""
         try:
             # Buat loss function untuk setiap detection layer
             self.loss_fn = {}
@@ -393,117 +314,74 @@ class ModelManager:
             self.logger.error(f"❌ Gagal membangun loss function: {str(e)}")
             raise ModelError(f"Gagal membangun loss function: {str(e)}")
     
+    def get_training_service(self, config: Dict[str, Any] = None):
+        """Get training service terintegrasi dengan model manager"""
+        try:
+            from smartcash.model.services.training_service import ModelTrainingService
+            return ModelTrainingService(self, config)
+        except ImportError as e:
+            self.logger.error(f"❌ Training service tidak tersedia: {str(e)}")
+            return None
+    
+    def get_optimizer(self, learning_rate: float = 0.001, weight_decay: float = 0.0005):
+        """Buat optimizer dengan parameter groups untuk backbone dan head"""
+        if not self.model:
+            raise ModelError("❌ Model harus dibangun sebelum membuat optimizer")
+        
+        # Split parameter untuk grup berbeda
+        backbone_params = [p for n, p in self.model.named_parameters() if 'backbone' in n and p.requires_grad]
+        head_params = [p for n, p in self.model.named_parameters() if ('head' in n or 'neck' in n) and p.requires_grad]
+        
+        # Buat parameter groups dengan different learning rate
+        param_groups = [
+            {'params': backbone_params, 'lr': learning_rate * 0.1},  # Backbone dengan LR lebih rendah
+            {'params': head_params, 'lr': learning_rate}             # Head dengan LR normal
+        ]
+        
+        return torch.optim.Adam(param_groups, weight_decay=weight_decay)
+    
+    def get_scheduler(self, optimizer, epochs: int = 100):
+        """Buat learning rate scheduler"""
+        return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    
     @classmethod
     def create_model(cls, model_type: str, **kwargs) -> 'ModelManager':
-        """
-        Factory method untuk membuat model berdasarkan tipe.
-        
-        Args:
-            model_type: Tipe model ('basic', 'efficient', 'optimized', 'research')
-            **kwargs: Parameter tambahan untuk konfigurasi
-            
-        Returns:
-            ModelManager: Instance ModelManager dengan konfigurasi sesuai tipe
-            
-        Raises:
-            ModelConfigurationError: Jika tipe model tidak valid
-        """
+        """Factory method untuk membuat model berdasarkan tipe"""
         if model_type not in cls.OPTIMIZED_MODELS:
             available_types = list(cls.OPTIMIZED_MODELS.keys())
-            raise ModelConfigurationError(
-                f"❌ Tipe model '{model_type}' tidak dikenal. "
-                f"Tipe yang tersedia: {available_types}"
-            )
+            raise ModelConfigurationError(f"❌ Tipe model '{model_type}' tidak dikenal. Tipe yang tersedia: {available_types}")
             
-        # Buat instance manager dengan tipe model yang dipilih
         return cls(model_type=model_type, **kwargs)
             
     def get_config(self) -> Dict:
-        """
-        Dapatkan konfigurasi model.
-        
-        Returns:
-            Dict: Konfigurasi model
-        """
+        """Dapatkan konfigurasi model"""
         return self.config.copy()
         
     def update_config(self, config_updates: Dict) -> Dict:
-        """
-        Update konfigurasi model.
-        
-        Args:
-            config_updates: Dictionary dengan nilai-nilai konfigurasi baru
-            
-        Returns:
-            Dict: Konfigurasi model yang telah diupdate
-            
-        Raises:
-            ModelConfigurationError: Jika konfigurasi baru tidak valid
-        """
-        # Simpan konfigurasi lama untuk rollback
+        """Update konfigurasi model"""
         old_config = self.config.copy()
         
         try:
-            # Update konfigurasi
             self.config.update(config_updates)
-            
-            # Validasi konfigurasi baru
             self._validate_config()
-            
             self.logger.info(f"✅ Konfigurasi model berhasil diupdate")
             return self.config
             
         except Exception as e:
-            # Rollback ke konfigurasi lama
             self.config = old_config
             self.logger.error(f"❌ Gagal update konfigurasi: {str(e)}")
             raise ModelConfigurationError(f"Gagal update konfigurasi: {str(e)}")
     
     def set_checkpoint_service(self, service: ICheckpointService):
-        """
-        Set checkpoint service untuk model manager.
-        
-        Args:
-            service: ICheckpointService instance
-        """
+        """Set checkpoint service untuk model manager"""
         self.checkpoint_service = service
         
-    def set_training_service(self, service):
-        """
-        Set training service untuk model manager.
-        
-        Args:
-            service: Training service instance
-        """
-        self.training_service = service
-        
-    def set_evaluation_service(self, service):
-        """
-        Set evaluation service untuk model manager.
-        
-        Args:
-            service: Evaluation service instance
-        """
-        self.evaluation_service = service
-        
     def save_model(self, path: str) -> str:
-        """
-        Simpan model ke file.
-        
-        Args:
-            path: Path untuk menyimpan model
-            
-        Returns:
-            str: Path lengkap file model tersimpan
-            
-        Raises:
-            ModelError: Jika gagal menyimpan model
-        """
+        """Simpan model ke file"""
         if self.checkpoint_service:
             return self.checkpoint_service.save_checkpoint(self.model, path)
         else:
             try:
-                # Fallback jika tidak ada checkpoint service
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 torch.save(self.model.state_dict(), path)
                 self.logger.info(f"✅ Model berhasil disimpan ke {path}")
@@ -513,25 +391,13 @@ class ModelManager:
                 raise ModelError(f"Gagal menyimpan model: {str(e)}")
                 
     def load_model(self, path: str) -> nn.Module:
-        """
-        Load model dari file.
-        
-        Args:
-            path: Path file model
-            
-        Returns:
-            nn.Module: Model yang telah diload
-            
-        Raises:
-            ModelError: Jika gagal load model
-        """
+        """Load model dari file"""
         if self.checkpoint_service:
             loaded_checkpoint = self.checkpoint_service.load_checkpoint(path, self.model)
             self.model = loaded_checkpoint
             return self.model
         else:
             try:
-                # Fallback jika tidak ada checkpoint service
                 if not self.model:
                     self.build_model()
                     
@@ -541,59 +407,20 @@ class ModelManager:
             except Exception as e:
                 self.logger.error(f"❌ Gagal load model: {str(e)}")
                 raise ModelError(f"Gagal load model: {str(e)}")
-                
-    def train(self, *args, **kwargs):
-        """
-        Latih model.
-        
-        Raises:
-            ModelError: Jika training service tidak tersedia
-        """
-        if self.training_service:
-            return self.training_service.train(self.model, self.loss_fn, *args, **kwargs)
-        else:
-            raise ModelError("❌ Training service tidak tersedia")
-            
-    def evaluate(self, *args, **kwargs):
-        """
-        Evaluasi model.
-        
-        Raises:
-            ModelError: Jika evaluation service tidak tersedia
-        """
-        if self.evaluation_service:
-            return self.evaluation_service.evaluate(self.model, *args, **kwargs)
-        else:
-            raise ModelError("❌ Evaluation service tidak tersedia")
-            
+    
     def predict(self, image, conf_threshold=0.25, iou_threshold=0.45):
-        """
-        Lakukan prediksi pada gambar.
-        
-        Args:
-            image: Input image (dapat berupa tensor, numpy array, atau file path)
-            conf_threshold: Threshold confidence
-            iou_threshold: Threshold IoU untuk NMS
-            
-        Returns:
-            Hasil prediksi
-            
-        Raises:
-            ModelError: Jika gagal melakukan prediksi
-        """
+        """Lakukan prediksi pada gambar"""
         try:
             if not self.model:
                 raise ModelError("❌ Model belum diinisialisasi")
                 
             # Preprocess image
             if isinstance(image, str):
-                # Load from file path
                 from PIL import Image
                 import numpy as np
                 image = np.array(Image.open(image).convert('RGB'))
                 
             if isinstance(image, np.ndarray):
-                # Convert numpy array to tensor
                 image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
                 
             # Ensure batch dimension
@@ -608,25 +435,21 @@ class ModelManager:
             with torch.no_grad():
                 predictions = self.model(image)
                 
-            # Process predictions
+            # Process predictions dengan NMS
             results = {}
             for layer_name, layer_preds in predictions.items():
-                # Apply NMS if needed - simplified version
                 detections = []
                 for pred in layer_preds:
-                    # Flatten predictions to [batch, objects, data]
                     bs, na, h, w, no = pred.shape
                     pred = pred.view(bs, -1, no)
                     
                     # Filter by confidence
                     conf_mask = pred[..., 4] > conf_threshold
                     for b in range(bs):
-                        # Get detections for this image
                         det = pred[b][conf_mask[b]]
                         if len(det):
                             detections.append(det)
                             
-                # Store results
                 results[layer_name] = detections
                 
             return results
@@ -634,3 +457,9 @@ class ModelManager:
         except Exception as e:
             self.logger.error(f"❌ Gagal melakukan prediksi: {str(e)}")
             raise ModelError(f"Gagal melakukan prediksi: {str(e)}")
+    
+    # One-liner utilities
+    is_model_built = lambda self: self.model is not None
+    get_model_type = lambda self: self.model_type
+    get_device = lambda self: self.config['device']
+    get_model_description = lambda self: self.OPTIMIZED_MODELS[self.model_type]['description']

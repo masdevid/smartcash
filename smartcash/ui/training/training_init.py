@@ -42,22 +42,24 @@ class TrainingInitializer(CommonInitializer):
         return ui_components
     
     def _initialize_model_services(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Initialize model services langsung dari model domain"""
+        """Initialize model services dengan progress tracking integration"""
         try:
-            # Import dari model domain langsung
             from smartcash.model.manager import ModelManager
             from smartcash.model.manager_checkpoint import ModelCheckpointManager
             from smartcash.model.services.training_service import ModelTrainingService
             from smartcash.model.services.evaluation.core_evaluation_service import EvaluationService
             
-            # Config parsing
+            # Progress tracking untuk initialization
+            from smartcash.ui.training.utils.training_progress_utils import update_model_loading_progress
+            
+            logger = ui_components.get('logger')
+            
+            # Step 1: Parse config
+            update_model_loading_progress(ui_components, 1, 4, "📋 Parsing configuration...")
             training_config = config.get('training', {})
             model_type = training_config.get('model_type', 'efficient_optimized')
             checkpoint_dir = config.get('paths', {}).get('checkpoint_dir', 'runs/train/checkpoints')
             
-            logger = ui_components.get('logger')
-            
-            # Model manager dengan specific config
             model_config = {
                 'backbone': training_config.get('backbone', 'efficientnet_b4'),
                 'detection_layers': training_config.get('detection_layers', ['banknote', 'nominal']),
@@ -68,23 +70,34 @@ class TrainingInitializer(CommonInitializer):
                 'use_ciou': config.get('model_optimization', {}).get('use_ciou', True)
             }
             
-            # Create model manager
+            # Step 2: Create model manager
+            update_model_loading_progress(ui_components, 2, 4, f"🧠 Creating {model_type} model manager...")
             model_manager = ModelManager(config=model_config, model_type=model_type, logger=logger)
             
-            # Create checkpoint manager
+            # Step 3: Create checkpoint manager dengan progress callback
+            update_model_loading_progress(ui_components, 3, 4, "💾 Setting up checkpoint manager...")
+            
+            # Create progress callback untuk checkpoint operations
+            def checkpoint_progress_callback(current, total, message):
+                from smartcash.ui.training.utils.training_progress_utils import update_checkpoint_progress
+                update_checkpoint_progress(ui_components, current, total, message)
+            
             checkpoint_manager = ModelCheckpointManager(
                 model_manager=model_manager,
                 checkpoint_dir=checkpoint_dir,
-                logger=logger
+                logger=logger,
+                progress_callback=checkpoint_progress_callback
             )
             
-            # Create training service (dari model domain)
-            training_service = ModelTrainingService(model_manager, config)
+            # Set checkpoint manager ke model manager untuk integration
+            model_manager.checkpoint_manager = checkpoint_manager
             
-            # Create evaluation service
+            # Step 4: Create services
+            update_model_loading_progress(ui_components, 4, 4, "🚀 Initializing training services...")
+            training_service = ModelTrainingService(model_manager, config)
             evaluation_service = EvaluationService(config=config, logger=logger)
             
-            # Add to UI components
+            # Update UI components
             ui_components.update({
                 'model_manager': model_manager,
                 'checkpoint_manager': checkpoint_manager,
@@ -92,12 +105,13 @@ class TrainingInitializer(CommonInitializer):
                 'evaluation_service': evaluation_service
             })
             
-            logger and logger.success(f"✅ Model services initialized untuk {model_type}")
+            logger and logger.success(f"✅ Model services initialized: {model_type}")
             
         except Exception as e:
             logger = ui_components.get('logger')
-            logger and logger.error(f"❌ Error initializing model services: {str(e)}")
-            # Add fallback components
+            logger and logger.error(f"❌ Model services initialization error: {str(e)}")
+            
+            # Fallback services
             ui_components.update({
                 'model_manager': None,
                 'checkpoint_manager': None,

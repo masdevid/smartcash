@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
 
+
 def create_inference_augmentation_pipeline(img_size: int = 416, 
                                          normalize: bool = True) -> A.Compose:
     """

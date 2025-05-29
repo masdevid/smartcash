@@ -144,3 +144,79 @@ def _update_metrics_chart(ui_components: Dict[str, Any], metrics: Dict[str, list
     if not chart_output:
         return
     
+    # Create comprehensive training chart
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
+    epochs = list(range(1, current_epoch + 1))
+    
+    # Loss curves
+    ax1.plot(epochs, metrics['train_loss'], 'r-', label='Train Loss', linewidth=2)
+    ax1.plot(epochs, metrics['val_loss'], 'b--', label='Val Loss', linewidth=2)
+    ax1.set_title('Training & Validation Loss')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # mAP progression
+    ax2.plot(epochs, metrics['map'], 'g-', label='mAP', linewidth=2, color='#27ae60')
+    ax2.set_title('Mean Average Precision (mAP)')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('mAP')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    # Precision & Recall
+    ax3.plot(epochs, metrics['precision'], 'orange', label='Precision', linewidth=2)
+    ax3.plot(epochs, metrics['recall'], 'purple', label='Recall', linewidth=2)
+    ax3.set_title('Precision & Recall')
+    ax3.set_xlabel('Epoch')
+    ax3.set_ylabel('Score')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+    
+    # F1 Score (calculated from precision and recall)
+    f1_scores = [2 * (p * r) / (p + r) if (p + r) > 0 else 0 
+                 for p, r in zip(metrics['precision'], metrics['recall'])]
+    ax4.plot(epochs, f1_scores, 'darkblue', label='F1 Score', linewidth=2)
+    ax4.set_title('F1 Score')
+    ax4.set_xlabel('Epoch')
+    ax4.set_ylabel('F1 Score')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.suptitle(f'Training Metrics - Epoch {current_epoch}', fontsize=14, y=0.98)
+    
+    # Convert to base64 untuk display
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    img_str = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+    
+    with chart_output:
+        chart_output.clear_output(wait=True)
+        display(HTML(f'<img src="data:image/png;base64,{img_str}" style="width: 100%; max-width: 800px;">'))
+
+
+def _estimate_remaining_time(current_epoch: int, total_epochs: int) -> str:
+    """Estimate remaining training time"""
+    if current_epoch == 0:
+        return "Calculating..."
+    
+    # Simulate realistic time estimation
+    epochs_remaining = total_epochs - current_epoch
+    time_per_epoch = 2.5  # Average seconds per epoch (simulated)
+    
+    total_seconds = epochs_remaining * time_per_epoch
+    
+    if total_seconds < 60:
+        return f"{int(total_seconds)}s"
+    elif total_seconds < 3600:
+        minutes = int(total_seconds / 60)
+        seconds = int(total_seconds % 60)
+        return f"{minutes}m {seconds}s"
+    else:
+        hours = int(total_seconds / 3600)
+        minutes = int((total_seconds % 3600) / 60)
+        return f"{hours}h {minutes}m"

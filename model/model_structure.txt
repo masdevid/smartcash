@@ -1,0 +1,109 @@
+
+/Users/masdevid/Projects/smartcash/smartcash/model
+├── __init__.py
+├── analysis
+|  ├── __init__.py
+|  ├── experiment_analyzer.py
+|  └── scenario_analyzer.py
+├── architectures
+|  ├── __init__.py
+|  ├── backbones
+|  |  ├── __init__.py
+|  |  ├── base.py
+|  |  ├── cspdarknet.py
+|  |  └── efficientnet.py
+|  ├── heads
+|  |  ├── __init__.py
+|  |  └── detection_head.py
+|  └── necks
+|     ├── __init__.py
+|     └── fpn_pan.py
+├── components
+|  ├── __init__.py
+|  └── losses.py
+├── config
+|  ├── __init__.py
+|  ├── backbone_config.py
+|  ├── experiment_config.py
+|  ├── model_config.py
+|  └── model_config_definitions.py
+├── manager.py
+├── manager_checkpoint.py
+├── models
+|  ├── __init__.py
+|  └── yolov5_model.py
+├── project-structure.txt
+├── services
+|  ├── __init__.py
+|  ├── checkpoint
+|  |  ├── __init__.py
+|  |  └── checkpoint_service.py
+|  ├── evaluation
+|  |  ├── __init__.py
+|  |  ├── core_evaluation_service.py
+|  |  ├── metrics_evaluation_service.py
+|  |  └── visualization_evaluation_service.py
+|  ├── experiment
+|  |  ├── __init__.py
+|  |  ├── data_manager.py
+|  |  ├── experiment_service.py
+|  |  └── metrics_tracker.py
+|  ├── postprocessing
+|  |  ├── __init__.py
+|  |  └── nms_processor.py
+|  ├── prediction
+|  |  ├── __init__.py
+|  |  ├── batch_processor_prediction_service.py
+|  |  ├── core_prediction_service.py
+|  |  ├── interface_prediction_service.py
+|  |  └── postprocessing_prediction_service.py
+|  ├── pretrained_downloader.py
+|  ├── pretrained_setup.py
+|  ├── research
+|  |  ├── __init__.py
+|  |  ├── comparison_runner.py
+|  |  ├── experiment_analyzer.py
+|  |  ├── experiment_creator.py
+|  |  ├── experiment_runner.py
+|  |  ├── experiment_service.py
+|  |  ├── parameter_tuner.py
+|  |  └── scenario_service.py
+|  └── training
+|     ├── __init__.py
+|     ├── callbacks_training_service.py
+|     ├── core_training_service.py
+|     ├── early_stopping_training_service.py
+|     ├── experiment_tracker_training_service.py
+|     ├── optimizer_training_service.py
+|     ├── scheduler_training_service.py
+|     └── warmup_scheduler_training_service.py
+├── utils
+|  ├── __init__.py
+|  ├── metrics
+|  |  ├── __init__.py
+|  |  ├── ap_metrics.py
+|  |  ├── core_metrics.py
+|  |  ├── metrics_calculator.py
+|  |  └── nms_metrics.py
+|  ├── preprocessing_model_utils.py
+|  ├── research_model_utils.py
+|  └── validation_model_utils.py
+└── visualization
+   ├── __init__.py
+   ├── base_visualizer.py
+   ├── detection_visualizer.py
+   ├── evaluation_visualizer.py
+   ├── metrics_visualizer.py
+   ├── research
+   |  ├── __init__.py
+   |  ├── base_research_visualizer.py
+   |  ├── experiment_visualizer.py
+   |  ├── research_visualizer.py
+   |  └── scenario_visualizer.py
+   └── setup_visualization.py
+
+directory: 20 file: 81
+
+
+
+[2K[1G

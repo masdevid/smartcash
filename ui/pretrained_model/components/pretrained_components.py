@@ -34,12 +34,17 @@ def create_pretrained_ui() -> Dict[str, Any]:
         log_accordion = create_log_accordion(module_name="pretrained_model", height="200px")
         log_output = log_accordion['log_output']
         
-        # Buat tombol Download & Sync
+        # Buat tombol download & sync dengan layout di tengah
         download_sync_button = widgets.Button(
             description="Download & Sync Model",
-            button_style="primary",
-            icon=ICONS.get('download', '📥'),
-            layout=widgets.Layout(width='auto')
+            button_style='primary',
+            icon='download',
+            tooltip='Download dan sinkronisasi model pretrained',
+            layout=widgets.Layout(
+                width='50%',
+                margin='15px auto',  # Auto margin untuk centering
+                display='flex'
+            )
         )
         
         # Buat header dengan create_header
@@ -65,24 +70,17 @@ def create_pretrained_ui() -> Dict[str, Any]:
             </div>"""
         )
         
-        # Buat button container dengan layout yang baik
-        button_container = widgets.HBox(
-            [download_sync_button], 
-            layout=widgets.Layout(
-                justify_content='flex-start',
-                margin='10px 0'
-            )
-        )
-        
-        # Tambahkan elemen ke main_container dengan progress tracking
-        main_container.children = [
+        # Buat container utama dengan semua komponen
+        main_container = widgets.VBox([
             header, 
             info_html,
-            button_container,
+            download_sync_button,
             status_panel,
-            progress_tracking['container'],
-            log_accordion['log_accordion']
-        ]
+            widgets.VBox([progress_tracking['container']], 
+                        layout=widgets.Layout(padding='15px', margin='10px 0')),
+            widgets.VBox([log_accordion['log_accordion']], 
+                        layout=widgets.Layout(margin='10px 0'))
+        ], layout=widgets.Layout(padding='10px'))
         
         # Definisikan direktori untuk model
         models_dir = '/content/models'

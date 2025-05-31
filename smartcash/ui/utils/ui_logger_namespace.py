@@ -40,7 +40,10 @@ KNOWN_NAMESPACES = {
     
     # Detection modules
     "smartcash.detection.service": "DETECT",
-    "smartcash.detection.postprocess": "POST"
+    "smartcash.detection.postprocess": "POST",
+    
+    # Pretrained model modules
+    "smartcash.ui.pretrained_model": "PRETRAIN"
 }
 
 # Export konstanta untuk backward compatibility
@@ -51,6 +54,7 @@ AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
 PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
 TRAINING_LOGGER_NAMESPACE = "smartcash.model.training"
 EVALUATION_LOGGER_NAMESPACE = "smartcash.model.evaluation"
+PRETRAINED_MODEL_LOGGER_NAMESPACE = "smartcash.ui.pretrained_model"
 
 # Color mapping untuk setiap namespace
 NAMESPACE_COLORS = {
@@ -76,7 +80,8 @@ NAMESPACE_COLORS = {
     "CFG": "#EBDEF0",       # Light lavender untuk config
     "UTILS": "#E5E7E9",     # Light gray untuk utils
     "DETECT": "#ABEBC6",    # Light green untuk detection
-    "POST": "#F9E79F"       # Light yellow untuk postprocess
+    "POST": "#F9E79F",      # Light yellow untuk postprocess
+    "PRETRAIN": "#D7BDE2"   # Light purple untuk pretrained model
 }
 
 def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:

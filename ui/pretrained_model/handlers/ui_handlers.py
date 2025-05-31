@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 def handle_download_sync_button(b, ui_components: Dict[str, Any]) -> None:
     """
-    Handler sederhana untuk tombol download dan sinkronisasi model pretrained.
+    Handler untuk tombol download dan sinkronisasi model pretrained dengan UI yang responsif.
     
     Args:
         b: Button widget yang dipicu
@@ -36,26 +36,65 @@ def handle_download_sync_button(b, ui_components: Dict[str, Any]) -> None:
             <p style="margin:5px 0">{ICONS.get('processing', '⏳')} Memeriksa dan memproses model pretrained...</p>
         </div>"""))
     
-    # Reset progress tracking jika tersedia - one-liner style
+    # Reset progress tracking dengan parameter show_progress=True untuk menampilkan progress bar yang bergerak
     if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-        ui_components['reset_progress_bar'](0, "Bersiap untuk download dan sinkronisasi model...")
+        ui_components['reset_progress_bar'](0, "Inisialisasi proses download model...", show_progress=True)
     
-    # Buka log accordion secara otomatis jika tersedia - one-liner style
+    # Buka log accordion secara otomatis jika tersedia
     if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
         ui_components['log_accordion'].selected_index = 0  # Expand log accordion
     
     # Nonaktifkan tombol selama proses berjalan
     b.disabled = True
     b.description = "Sedang Memproses..."
+    b.icon = ICONS.get('processing', '⏳')
+    
+    # Tambahkan observer manager jika tersedia
+    observer_manager = ui_components.get('observer_manager')
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            observer_manager.notify('MODEL_PROCESS_START', None, {
+                'message': "Memulai proses download dan sinkronisasi model",
+                'timestamp': __import__('time').time()
+            })
+        except Exception:
+            pass  # Silent fail untuk observer notification
     
     # Jalankan proses download dan sync dalam thread terpisah agar UI tetap responsif
     def run_process():
         try:
+            # Jalankan proses download dan sync
             process_download_sync(ui_components)
+            
+            # Notify complete via observer
+            if observer_manager and hasattr(observer_manager, 'notify'):
+                try:
+                    observer_manager.notify('MODEL_PROCESS_COMPLETE', None, {
+                        'message': "Proses download dan sinkronisasi model selesai",
+                        'timestamp': __import__('time').time()
+                    })
+                except Exception:
+                    pass  # Silent fail untuk observer notification
+        except Exception as e:
+            logger.error(f"Error dalam proses download dan sinkronisasi: {str(e)}")
+            
+            # Notify error via observer
+            if observer_manager and hasattr(observer_manager, 'notify'):
+                try:
+                    observer_manager.notify('MODEL_PROCESS_ERROR', None, {
+                        'message': f"Error dalam proses download dan sinkronisasi: {str(e)}",
+                        'timestamp': __import__('time').time(),
+                        'error': str(e)
+                    })
+                except Exception:
+                    pass  # Silent fail untuk observer notification
         finally:
             # Aktifkan kembali tombol setelah proses selesai
             b.disabled = False
             b.description = "Download & Sync Model"
+            b.icon = ICONS.get('download', '📥')
     
     # Mulai thread untuk proses download
-    threading.Thread(target=run_process).start()
+    thread = threading.Thread(target=run_process)
+    thread.daemon = True
+    thread.start()

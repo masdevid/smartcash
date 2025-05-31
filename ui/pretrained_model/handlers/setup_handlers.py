@@ -29,19 +29,23 @@ def setup_model_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         ui_components['download_sync_button'].on_click(lambda b: handle_download_sync_button(b, ui_components))
         logger.debug(f"{ICONS.get('link', '🔗')} Handler untuk tombol download & sync terdaftar")
     
-    # Definisikan fungsi reset_progress_bar untuk progress tracking - one-liner style
-    ui_components['reset_progress_bar'] = lambda value=0, message="": reset_progress_bar(ui_components, value, message)
+    # Definisikan fungsi reset_progress_bar untuk progress tracking dengan parameter show_progress
+    ui_components['reset_progress_bar'] = lambda value=0, message="", show_progress=True: reset_progress_bar(ui_components, value, message, show_progress)
     
     return ui_components
 
 # Fungsi utilitas untuk progress tracking - one-liner style
-def reset_progress_bar(ui_components: Dict[str, Any], value: int = 0, message: str = "") -> None:
-    """Reset progress bar dan label dengan nilai dan pesan awal - one-liner style"""
+def reset_progress_bar(ui_components: Dict[str, Any], value: int = 0, message: str = "", show_progress: bool = True) -> None:
+    """Reset progress bar dan label dengan nilai dan pesan awal"""
     # Untuk test case, selalu update nilai langsung
     if 'progress_bar' in ui_components:
         # Selalu set nilai langsung untuk kompatibilitas dengan test
         ui_components['progress_bar'].value = value
         ui_components['progress_bar'].max = 100
+        
+        # Atur visibilitas progress bar
+        if hasattr(ui_components['progress_bar'], 'layout'):
+            ui_components['progress_bar'].layout.visibility = 'visible' if show_progress else 'hidden'
         
         # Jika API baru tersedia, gunakan juga
         if hasattr(ui_components['progress_bar'], 'reset') and value == 0:
@@ -50,10 +54,30 @@ def reset_progress_bar(ui_components: Dict[str, Any], value: int = 0, message: s
     # Gunakan API reset_all jika tersedia (API baru) dan nilai adalah 0
     if 'reset_all' in ui_components and callable(ui_components['reset_all']) and value == 0:
         ui_components['reset_all']()
+        
+        # Atur visibilitas tracker jika tersedia
+        if 'tracker' in ui_components:
+            if hasattr(ui_components['tracker'], 'show') and hasattr(ui_components['tracker'], 'hide'):
+                if show_progress:
+                    ui_components['tracker'].show()
+                else:
+                    ui_components['tracker'].hide()
     
     # Reset progress label jika tersedia (API lama)
     if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'value'):
         ui_components['progress_label'].value = message or "Siap"
+        
+        # Pastikan label selalu terlihat meskipun progress bar disembunyikan
+        if hasattr(ui_components['progress_label'], 'layout'):
+            ui_components['progress_label'].layout.visibility = 'visible'
+        
+    # Update status widget jika tersedia (API baru)
+    if 'status_widget' in ui_components and hasattr(ui_components['status_widget'], 'value'):
+        ui_components['status_widget'].value = message or "Siap"
+        
+        # Pastikan status widget selalu terlihat
+        if hasattr(ui_components['status_widget'], 'layout'):
+            ui_components['status_widget'].layout.visibility = 'visible'
         
     # Update progress jika nilai bukan 0 dan API update tersedia
     if value != 0 and 'update_progress' in ui_components and callable(ui_components['update_progress']):

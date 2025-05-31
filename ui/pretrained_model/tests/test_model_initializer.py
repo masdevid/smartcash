@@ -97,19 +97,41 @@ class TestSetupHandlers(unittest.TestCase):
         self.assertEqual(result, ui_components)
             
     def test_reset_progress_bar(self):
-        """Test reset_progress_bar memperbarui progress bar dan label"""
+        """Test reset_progress_bar memperbarui progress bar dan label dengan parameter show_progress"""
         from smartcash.ui.pretrained_model.handlers.setup_handlers import reset_progress_bar
         ui_components = {
-            'progress_bar': MagicMock(),
-            'progress_label': MagicMock()
+            'progress_bar': MagicMock(layout=MagicMock()),
+            'progress_label': MagicMock(layout=MagicMock()),
+            'status_widget': MagicMock(layout=MagicMock()),
+            'tracker': MagicMock(show=MagicMock(), hide=MagicMock())
         }
-        # Panggil fungsi dan verifikasi update
+        
+        # Test dengan show_progress=True (default)
         reset_progress_bar(ui_components, 42, "Sedang memproses")
         
         # Verifikasi progress bar dan label diperbarui dengan benar
         self.assertEqual(ui_components['progress_bar'].value, 42)
         self.assertEqual(ui_components['progress_bar'].max, 100)
         self.assertEqual(ui_components['progress_label'].value, "Sedang memproses")
+        self.assertEqual(ui_components['progress_bar'].layout.visibility, 'visible')
+        
+        # Test dengan show_progress=False
+        # Reset mock untuk tracker.hide
+        ui_components['tracker'].hide.reset_mock()
+        
+        # Tambahkan reset_all untuk memicu pemanggilan hide
+        ui_components['reset_all'] = MagicMock()
+        
+        reset_progress_bar(ui_components, 0, "Memeriksa model", show_progress=False)
+        
+        # Verifikasi progress bar disembunyikan tapi label tetap terlihat
+        self.assertEqual(ui_components['progress_bar'].layout.visibility, 'hidden')
+        self.assertEqual(ui_components['progress_label'].layout.visibility, 'visible')
+        self.assertEqual(ui_components['status_widget'].layout.visibility, 'visible')
+        
+        # Verifikasi reset_all dipanggil dan hide dipanggil
+        ui_components['reset_all'].assert_called_once()
+        ui_components['tracker'].hide.assert_called_once()
     
     def test_setup_model_cleanup_handler(self):
         """Test setup_model_cleanup_handler mendaftarkan cleanup function"""

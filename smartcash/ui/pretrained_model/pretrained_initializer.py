@@ -8,8 +8,10 @@ from IPython.display import display
 
 from smartcash.ui.utils.common_initializer import CommonInitializer
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
 
 logger = get_logger(__name__)
 
@@ -17,7 +19,7 @@ class PretrainedModelInitializer(CommonInitializer):
     """Implementasi CommonInitializer untuk modul pretrained model"""
     
     def __init__(self):
-        super().__init__(module_name="pretrained_model", logger_namespace="pretrained_model_initializer")
+        super().__init__(module_name=MODULE_LOGGER_NAME, logger_namespace=PRETRAINED_MODEL_LOGGER_NAMESPACE)
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Membuat komponen UI untuk model pretrained - one-liner style"""

@@ -84,7 +84,19 @@ def create_fallback_training_form(error_msg: str) -> Dict[str, Any]:
     # Create fallback components
     fallback = create_fallback_component(error_msg)
     
+    # Buat main container - penting untuk daftar komponen kritis
+    main_container = widgets.VBox([
+        widgets.HTML(f"""<div style="text-align: center; padding: 10px; background: #ffecb3; border-radius: 5px;">
+            <h3>⚠️ SmartCash Training - Fallback Mode</h3>
+            <p>{error_msg}</p>
+        </div>"""),
+        button_container,
+        status_panel,
+        log_output
+    ])
+    
     return {
+        'main_container': main_container,  # Komponen kritis yang harus ada
         'start_button': start_button,
         'stop_button': stop_button,
         'reset_button': reset_button,

@@ -5,6 +5,7 @@ Deskripsi: EfficientNet backbone implementation for YOLOv5
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from typing import List, Tuple, Optional, Dict, Any, Union
 from pathlib import Path
 import timm
@@ -13,241 +14,188 @@ from smartcash.common.logger import SmartCashLogger
 from smartcash.common.exceptions import BackboneError, UnsupportedBackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
 
-# Daftar variasi model EfficientNet yang didukung
-SUPPORTED_MODELS = ['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 
-                    'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5']
-
-# Definisi channel output untuk setiap stage - versi public untuk akses modul lain
-EXPECTED_CHANNELS = {
-    'efficientnet_b0': [24, 48, 208],  # P3, P4, P5 stages
-    'efficientnet_b1': [32, 88, 320],
-    'efficientnet_b2': [32, 112, 352], 
-    'efficientnet_b3': [40, 112, 384],
-    'efficientnet_b4': [56, 160, 448],
-    'efficientnet_b5': [64, 176, 512],
-}
+from smartcash.model.config.model_constants import (
+    SUPPORTED_EFFICIENTNET_MODELS, 
+    EFFICIENTNET_CHANNELS, 
+    YOLO_CHANNELS,
+    DEFAULT_EFFICIENTNET_INDICES
+)
 
 class FeatureAdapter(nn.Module):
-    """
-    Adapter khusus untuk memetakan feature maps dari EfficientNet ke format YOLOv5.
-    Menyediakan adaptasi spasial dan adaptasi channel dengan 1x1 Conv + SiLU.
-    """
+    """Adapter untuk memetakan feature maps dari EfficientNet ke format YOLOv5."""
     
     def __init__(self, in_channels: int, out_channels: int, use_attention: bool = True):
-        """
-        Inisialisasi Feature Adapter.
-        
-        Args:
-            in_channels: Jumlah input channels
-            out_channels: Jumlah output channels
-            use_attention: Gunakan channel attention
-        """
+        """Inisialisasi adapter dengan channel adaptation dan opsional attention."""
         super().__init__()
-        
-        # 1x1 Conv untuk channel adaptation
-        self.channel_adapt = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.SiLU(inplace=True)
-        )
-        
-        # Opsional: Channel Attention
-        self.attention = None
-        if use_attention:
-            self.attention = ChannelAttention(out_channels)
+        self.channel_adapt = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False), nn.BatchNorm2d(out_channels), nn.SiLU(inplace=True))
+        self.attention = ChannelAttention(out_channels) if use_attention else None
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass untuk mengadaptasi feature."""
-        # Channel adaptation
+        """Forward pass dengan channel adaptation dan opsional attention."""
         x = self.channel_adapt(x)
-        
-        # Apply channel attention jika aktif
-        if self.attention is not None:
-            x = self.attention(x) * x
-            
-        return x
+        return self.attention(x) * x if self.attention is not None else x
 
 class ChannelAttention(nn.Module):
-    """Modul Channel Attention untuk memperkuat feature penting."""
+    """Channel Attention untuk memperkuat feature penting dengan dual pooling."""
     
     def __init__(self, channels: int, reduction_ratio: int = 16):
         super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.max_pool = nn.AdaptiveMaxPool2d(1)
-        
-        # Shared MLP
-        self.mlp = nn.Sequential(
-            nn.Conv2d(channels, channels // reduction_ratio, 1, bias=False),
-            nn.SiLU(inplace=True),
-            nn.Conv2d(channels // reduction_ratio, channels, 1, bias=False)
-        )
-        
+        self.avg_pool, self.max_pool = nn.AdaptiveAvgPool2d(1), nn.AdaptiveMaxPool2d(1)
+        self.mlp = nn.Sequential(nn.Conv2d(channels, channels // reduction_ratio, 1, bias=False), nn.SiLU(inplace=True), nn.Conv2d(channels // reduction_ratio, channels, 1, bias=False))
         self.sigmoid = nn.Sigmoid()
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass attention."""
-        avg_out = self.mlp(self.avg_pool(x))
-        max_out = self.mlp(self.max_pool(x))
-        out = self.sigmoid(avg_out + max_out)
-        return out
+    def forward(self, x: torch.Tensor) -> torch.Tensor: return self.sigmoid(self.mlp(self.avg_pool(x)) + self.mlp(self.max_pool(x)))
 
 class EfficientNetBackbone(BaseBackbone):
-    """
-    EfficientNet backbone untuk arsitektur YOLOv5 dengan adaptasi channel yang optimal.
+    """EfficientNet backbone untuk YOLOv5 dengan ekstraksi feature maps dan adaptasi channel."""
     
-    Menggunakan pretrained EfficientNet dari library timm dengan
-    adaptasi channel output untuk kompatibilitas dengan arsitektur YOLOv5.
-    """
-    
-    # Output channels standar yang digunakan YOLOv5
-    YOLO_CHANNELS = [128, 256, 512]
-    
-    def __init__(
-        self, 
-        pretrained: bool = True, 
-        model_name: str = 'efficientnet_b4',
-        out_indices: Tuple[int, ...] = (2, 3, 4),  # P3, P4, P5 stages
-        use_attention: bool = True,
-        logger: Optional[SmartCashLogger] = None
-    ):
-        """
-        Inisialisasi EfficientNet backbone.
-        
-        Args:
-            pretrained: Gunakan pretrained weights atau tidak
-            model_name: Nama model EfficientNet (efficientnet_b0 hingga efficientnet_b7)
-            out_indices: Indeks untuk output feature map
-            use_attention: Gunakan channel attention untuk adaptasi
-            logger: Logger untuk mencatat proses (opsional)
-        
-        Raises:
-            BackboneError: Jika model_name tidak didukung
-        """
+    def __init__(self, model_name: str = 'efficientnet_b4', pretrained: bool = True, feature_indices: Optional[List[int]] = None, out_channels: Optional[List[int]] = None, use_attention: bool = True, testing_mode: bool = False, logger: Optional[SmartCashLogger] = None):
+        """Inisialisasi EfficientNet backbone dengan konfigurasi model."""
         super().__init__(logger=logger)
         self.model_name = model_name
+        self.testing_mode = testing_mode
+        self.feature_indices = feature_indices or DEFAULT_EFFICIENTNET_INDICES
+        self.use_attention = use_attention
         
-        try:
-            # Validasi model name
-            if model_name not in EXPECTED_CHANNELS:
-                supported = list(EXPECTED_CHANNELS.keys())
-                raise BackboneError(
-                    f"❌ Model {model_name} tidak didukung. "
-                    f"Model yang didukung: {supported}"
-                )
-            
-            # Load pretrained EfficientNet
-            self.logger.info(f"🔄 Loading EfficientNet backbone: {model_name}")
-            self.model = timm.create_model(
-                model_name,
-                pretrained=pretrained,
-                features_only=True,
-                out_indices=out_indices
-            )
-            
-            # Deteksi output channel secara dinamis
-            with torch.no_grad():
-                dummy_input = torch.zeros(1, 3, 640, 640)
-                outputs = self.model(dummy_input)
-                actual_channels = [o.shape[1] for o in outputs]
-                
-                # Log informasi channel
-                expected = EXPECTED_CHANNELS[model_name]
-                self.logger.debug(f"🔍 {model_name} channels (expected): {expected}")
-                self.logger.debug(f"🔍 {model_name} channels (actual): {actual_channels}")
-                
-                # Verifikasi channel sesuai dengan ekspektasi
-                if actual_channels != expected:
-                    self.logger.warning(
-                        f"⚠️ Channel yang diharapkan ({expected}) tidak sesuai dengan "
-                        f"channel sebenarnya ({actual_channels})! Akan mengadaptasi sesuai output aktual."
-                    )
-                
-                # Simpan channel aktual untuk referensi
-                self.actual_channels = actual_channels
-            
-            # Buat adapter layer untuk konversi channel + attention
-            self.adapters = nn.ModuleList([
-                FeatureAdapter(in_ch, out_ch, use_attention=use_attention)
-                for in_ch, out_ch in zip(actual_channels, self.YOLO_CHANNELS)
-            ])
-            
-            self.logger.success(
-                f"✅ Berhasil load EfficientNet backbone:\n"
-                f"   • Model: {model_name}\n"
-                f"   • Pretrained: {pretrained}\n"
-                f"   • Input channels: {actual_channels}\n"
-                f"   • Output channels: {self.YOLO_CHANNELS}\n"
-                f"   • Attention: {'Aktif' if use_attention else 'Nonaktif'}"
-            )
-        except BackboneError as e:
-            self.logger.error(str(e))
-            raise
-        except Exception as e:
-            self.logger.error(f"❌ Gagal load {model_name}: {str(e)}")
-            raise BackboneError(f"Gagal load {model_name}: {str(e)}")
-    
-    def get_output_channels(self) -> List[int]:
-        """
-        Dapatkan jumlah output channel untuk setiap level feature.
+        # Validasi model
+        if model_name not in SUPPORTED_EFFICIENTNET_MODELS:
+            raise BackboneError(f"❌ Model {model_name} tidak didukung. Model yang didukung: {', '.join(SUPPORTED_EFFICIENTNET_MODELS)}")
         
-        Returns:
-            List[int]: Jumlah channel dari setiap feature map yang akan diteruskan ke neck
-        """
-        return self.YOLO_CHANNELS
+        # Setup model berdasarkan mode
+        if testing_mode:
+            self.logger.info(f"🧪 Membuat dummy EfficientNet backbone untuk testing: {model_name}")
+            self._setup_dummy_model_for_testing()
+        else:
+            try:
+                self.logger.info(f"🔄 Loading EfficientNet backbone: {model_name}")
+                self.model = timm.create_model(model_name, pretrained=pretrained, features_only=True, out_indices=self.feature_indices)
+                
+                # Validasi channels dengan dummy input
+                expected = EFFICIENTNET_CHANNELS[model_name]
+                with torch.no_grad():
+                    features = self.model(torch.zeros(1, 3, 224, 224))  # Gunakan dummy input untuk validasi
+                    actual_channels = [f.shape[1] for f in features]
+                    
+                    if actual_channels != expected:
+                        self.logger.warning(f"⚠️ Channels tidak sesuai ekspektasi: {actual_channels} vs {expected}")
+                    
+                    self.channels = actual_channels
+                    self.logger.info(f"✅ EfficientNet backbone berhasil dimuat dengan channels: {self.channels}")
+            except Exception as e:
+                raise BackboneError(f"❌ Gagal memuat EfficientNet backbone: {str(e)}")
+            
+    def _setup_dummy_model_for_testing(self):
+        """Membuat model dummy untuk testing tanpa memerlukan pretrained weights."""
+        # Langsung gunakan YOLO_CHANNELS untuk output channels
+        self.out_channels = YOLO_CHANNELS
+        
+        # Simpan juga channels asli EfficientNet untuk referensi
+        self.efficientnet_channels = EFFICIENTNET_CHANNELS[self.model_name]
+        
+        # Untuk mode testing, kita langsung menggunakan YOLO_CHANNELS sebagai output
+        self.channels = self.out_channels
+        
+        # Setup feature indices
+        self.feature_indices = [0, 1, 2]  # Simplified indices for dummy model
+        
+        # Buat layer dummy yang langsung menghasilkan channel sesuai dengan YOLO_CHANNELS
+        self.dummy_layers = nn.ModuleList()
+        in_channels = 3
+        
+        # Buat layer dummy untuk setiap output channel yang diharapkan
+        for i, out_ch in enumerate(self.out_channels):
+            # Buat layer konvolusi sederhana yang langsung menghasilkan channel yang diharapkan
+            layer = nn.Sequential(
+                nn.Conv2d(in_channels, out_ch, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True)
+            )
+            self.dummy_layers.append(layer)
+            in_channels = out_ch
+        
+        self.logger.info(f"✅ Dummy model untuk EfficientNet-{self.model_name} berhasil dibuat dengan {len(self.out_channels)} feature maps")
+        self.logger.info(f"   • Output channels: {self.out_channels} (sesuai dengan YOLO_CHANNELS)")
+        
+        # Override metode forward untuk menggunakan model dummy
+        self.forward = self._forward_dummy
+        
+    def _forward_dummy(self, x: torch.Tensor) -> List[torch.Tensor]:
+        """Forward pass dengan model dummy untuk testing."""
+        features = []
+        
+        # Buat dummy feature maps dengan channel yang sesuai dengan YOLO_CHANNELS
+        for i, out_ch in enumerate(self.out_channels):
+            # Downsample input sesuai dengan level feature map
+            # P3 = 1/8, P4 = 1/16, P5 = 1/32 dari input asli
+            scale_factor = 1 / (2 ** (i + 3))
+            h, w = x.shape[2], x.shape[3]
+            new_h, new_w = int(h * scale_factor), int(w * scale_factor)
+            
+            # Buat dummy tensor dengan channel yang sesuai
+            batch_size = x.shape[0]
+            dummy_feature = torch.zeros(batch_size, out_ch, new_h, new_w, device=x.device)
+            
+            # Isi dengan nilai random untuk simulasi feature map
+            dummy_feature.normal_(0, 0.02)
+            
+            features.append(dummy_feature)
+            
+            # Log untuk debugging
+            self.logger.debug(f"🔍 Feature map {i}: shape={dummy_feature.shape}, channels={dummy_feature.shape[1]}")
+        
+        # Pastikan jumlah feature maps sesuai dengan yang diharapkan
+        if len(features) != len(self.out_channels):
+            self.logger.warning(f"⚠️ Jumlah feature maps ({len(features)}) tidak sesuai dengan yang diharapkan ({len(self.out_channels)})")
+        
+        return features
+
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
+        """Forward pass untuk EfficientNet backbone, mengembalikan feature maps."""
+        if hasattr(self, 'model'):
+            # Mode normal, gunakan model timm
+            features = self.model(x)
+            return features
+        else:
+            # Mode testing, gunakan _forward_dummy
+            return self._forward_dummy(x)
+
+    def get_output_channels(self) -> List[int]: 
+        if hasattr(self, 'out_channels'):
+            return self.out_channels
+        else:
+            self.out_channels = YOLO_CHANNELS
+            return self.out_channels
     
     def get_output_shapes(self, input_size: Tuple[int, int] = (640, 640)) -> List[Tuple[int, int]]:
-        """
-        Dapatkan dimensi spasial dari output feature maps.
-        
-        Args:
-            input_size: Ukuran input (width, height)
-            
-        Returns:
-            List[Tuple[int, int]]: Ukuran spasial untuk setiap output feature map
-        """
-        # Untuk input 640x640, output stride biasanya adalah 8, 16, 32
+        """Dapatkan dimensi spasial dari output feature maps untuk input_size tertentu."""
         width, height = input_size
-        return [
-            (height // 8, width // 8),   # P3
-            (height // 16, width // 16), # P4
-            (height // 32, width // 32)  # P5
-        ]
+        return [(height // 8, width // 8), (height // 16, width // 16), (height // 32, width // 32)]  # P3, P4, P5
+        
+    def get_info(self) -> Dict:
+        """Dapatkan informasi backbone dalam bentuk dictionary.
+        
+        Returns:
+            Dict: Informasi tentang backbone
+        """
+        return {
+            'type': 'EfficientNet',
+            'variant': self.model_name,
+            'out_channels': self.out_channels,
+            'feature_indices': self.feature_indices,
+            'input_channels': self.actual_channels,
+            'pretrained': True,  # Berdasarkan inisialisasi
+            'num_parameters': sum(p.numel() for p in self.parameters()),
+            'trainable_parameters': sum(p.numel() for p in self.parameters() if p.requires_grad)
+        }
     
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
-        """
-        Forward pass dengan ekstraksi fitur dan adaptasi channel.
-        
-        Args:
-            x: Input tensor dengan shape [batch_size, channels, height, width]
-            
-        Returns:
-            List[torch.Tensor]: Feature maps dengan channel yang sudah diadaptasi
-            
-        Raises:
-            BackboneError: Jika forward pass gagal
-        """
+        """Forward pass dengan ekstraksi fitur dan adaptasi channel untuk input tensor."""
         try:
-            # Extract multi-scale features dari EfficientNet
-            features = self.model(x)
-            
-            # Verifikasi output shape sesuai ekspektasi
-            if len(features) != len(self.adapters):
-                self.logger.warning(
-                    f"⚠️ Jumlah feature map ({len(features)}) tidak sesuai dengan "
-                    f"jumlah adapters ({len(self.adapters)})!"
-                )
-            
-            # Apply channel adapters dengan attention
-            adapted_features = []
-            for feat, adapter in zip(features, self.adapters):
-                adapted = adapter(feat)
-                adapted_features.append(adapted)
-            
-            # Validasi output feature
-            self.validate_output(adapted_features, self.YOLO_CHANNELS)
-                
+            features = self.model(x)  # Extract multi-scale features
+            if len(features) != len(self.adapters): self.logger.warning(f"⚠️ Jumlah feature map ({len(features)}) tidak sesuai dengan jumlah adapters ({len(self.adapters)})!")
+            adapted_features = [adapter(feat) for feat, adapter in zip(features, self.adapters)]  # Apply adapters
+            self.validate_output(adapted_features, self.out_channels)  # Validasi output
             return adapted_features
-            
         except Exception as e:
             self.logger.error(f"❌ Forward pass gagal: {str(e)}")
             raise BackboneError(f"Forward pass gagal: {str(e)}")

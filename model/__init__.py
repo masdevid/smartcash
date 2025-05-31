@@ -33,15 +33,6 @@ from smartcash.model.architectures.heads import DetectionHead
 # Re-export dari components submodule
 from smartcash.model.components import YOLOLoss
 
-# Re-export dari visualization submodule
-from smartcash.model.visualization import (
-    MetricsVisualizer,
-    DetectionVisualizer,
-    ExperimentVisualizer,
-    ScenarioVisualizer,
-    ResearchVisualizer
-)
-
 __all__ = [
     # Core classes
     'ModelManager',

@@ -14,70 +14,36 @@ from smartcash.common.exceptions import ModelError
 from smartcash.model.utils.metrics.core_metrics import box_iou
 
 def bbox_ciou(box1, box2, format="xyxy", eps=1e-7):
-    """
-    Complete-IoU (CIoU) untuk bounding box regression.
-    CIoU = IoU - distance/c^2 - alpha*v
-    
-    Args:
-        box1: Tensor boxes pertama [N, 4]
-        box2: Tensor boxes kedua [N, 4]
-        format: Format box ('xyxy' atau 'xywh')
-        eps: Epsilon untuk stabilitas numerik
-        
-    Returns:
-        CIoU: Tensor [N]
-    """
+    """Complete-IoU (CIoU) untuk bounding box regression dengan formula CIoU = IoU - distance/c^2 - alpha*v."""
     # Konversi ke format xyxy jika perlu
     if format == "xywh":
-        box1_x1 = box1[:, 0] - box1[:, 2] / 2
-        box1_y1 = box1[:, 1] - box1[:, 3] / 2
-        box1_x2 = box1[:, 0] + box1[:, 2] / 2
-        box1_y2 = box1[:, 1] + box1[:, 3] / 2
-        box2_x1 = box2[:, 0] - box2[:, 2] / 2
-        box2_y1 = box2[:, 1] - box2[:, 3] / 2
-        box2_x2 = box2[:, 0] + box2[:, 2] / 2
-        box2_y2 = box2[:, 1] + box2[:, 3] / 2
+        box1_x1, box1_y1 = box1[:, 0] - box1[:, 2] / 2, box1[:, 1] - box1[:, 3] / 2
+        box1_x2, box1_y2 = box1[:, 0] + box1[:, 2] / 2, box1[:, 1] + box1[:, 3] / 2
+        box2_x1, box2_y1 = box2[:, 0] - box2[:, 2] / 2, box2[:, 1] - box2[:, 3] / 2
+        box2_x2, box2_y2 = box2[:, 0] + box2[:, 2] / 2, box2[:, 1] + box2[:, 3] / 2
     else:  # xyxy format
         box1_x1, box1_y1, box1_x2, box1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
         box2_x1, box2_y1, box2_x2, box2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
     
-    # Intersection
-    inter_x1 = torch.max(box1_x1, box2_x1)
-    inter_y1 = torch.max(box1_y1, box2_y1)
-    inter_x2 = torch.min(box1_x2, box2_x2)
-    inter_y2 = torch.min(box1_y2, box2_y2)
-    
-    # Width and height of intersection
-    inter_w = (inter_x2 - inter_x1).clamp(min=0)
-    inter_h = (inter_y2 - inter_y1).clamp(min=0)
-    
-    # Intersection area
+    # Intersection dan area
+    inter_x1, inter_y1 = torch.max(box1_x1, box2_x1), torch.max(box1_y1, box2_y1)
+    inter_x2, inter_y2 = torch.min(box1_x2, box2_x2), torch.min(box1_y2, box2_y2)
+    inter_w, inter_h = (inter_x2 - inter_x1).clamp(min=0), (inter_y2 - inter_y1).clamp(min=0)
     inter_area = inter_w * inter_h
     
-    # Box areas
-    box1_area = (box1_x2 - box1_x1) * (box1_y2 - box1_y1)
-    box2_area = (box2_x2 - box2_x1) * (box2_y2 - box2_y1)
-    
-    # Union area
+    # Box areas dan IoU
+    box1_area, box2_area = (box1_x2 - box1_x1) * (box1_y2 - box1_y1), (box2_x2 - box2_x1) * (box2_y2 - box2_y1)
     union_area = box1_area + box2_area - inter_area + eps
-    
-    # IoU
     iou = inter_area / union_area
     
     # Box center distance
-    box1_cx = (box1_x1 + box1_x2) / 2
-    box1_cy = (box1_y1 + box1_y2) / 2
-    box2_cx = (box2_x1 + box2_x2) / 2
-    box2_cy = (box2_y1 + box2_y2) / 2
-    
-    # Distance between centers
+    box1_cx, box1_cy = (box1_x1 + box1_x2) / 2, (box1_y1 + box1_y2) / 2
+    box2_cx, box2_cy = (box2_x1 + box2_x2) / 2, (box2_y1 + box2_y2) / 2
     center_distance = ((box1_cx - box2_cx) ** 2 + (box1_cy - box2_cy) ** 2)
     
     # Diagonal length of the smallest enclosing box
-    c_x1 = torch.min(box1_x1, box2_x1)
-    c_y1 = torch.min(box1_y1, box2_y1)
-    c_x2 = torch.max(box1_x2, box2_x2)
-    c_y2 = torch.max(box1_y2, box2_y2)
+    c_x1, c_y1 = torch.min(box1_x1, box2_x1), torch.min(box1_y1, box2_y1)
+    c_x2, c_y2 = torch.max(box1_x2, box2_x2), torch.max(box1_y2, box2_y2)
     c_diag = ((c_x2 - c_x1) ** 2 + (c_y2 - c_y1) ** 2) + eps
     
     # Aspect ratio consistency
@@ -100,27 +66,9 @@ def bbox_ciou(box1, box2, format="xyxy", eps=1e-7):
 
 
 class YOLOLoss(nn.Module):
-    """
-    YOLOv5 Loss Function dengan perbaikan struktur untuk stabilitas training.
+    """YOLOv5 Loss Function dengan perbaikan struktur untuk stabilitas training yang menghitung box loss (CIoU), objectness loss, dan classification loss."""
     
-    Menghitung box loss (CIoU), objectness loss, dan classification loss
-    dengan penanganan error yang robust untuk mencegah NaN gradient.
-    """
-    
-    def __init__(
-        self,
-        num_classes: int = 7,
-        anchors: List[List[int]] = None,
-        anchor_t: float = 4.0,
-        balance: List[float] = [4.0, 1.0, 0.4],
-        box_weight: float = 0.05,
-        cls_weight: float = 0.5,
-        obj_weight: float = 1.0,
-        label_smoothing: float = 0.0,
-        eps: float = 1e-16,  # Epsilon untuk stabilitas numerik
-        use_ciou: bool = True,  # Gunakan CIoU loss alih-alih IoU loss
-        logger: Optional[SmartCashLogger] = None
-    ):
+    def __init__(self, num_classes: int = 7, anchors: List[List[int]] = None, anchor_t: float = 4.0, balance: List[float] = [4.0, 1.0, 0.4], box_weight: float = 0.05, cls_weight: float = 0.5, obj_weight: float = 1.0, label_smoothing: float = 0.0, eps: float = 1e-16, use_ciou: bool = True, logger: Optional[SmartCashLogger] = None):
         """
         Inisialisasi YOLOLoss.
         
@@ -301,11 +249,7 @@ class YOLOLoss(nn.Module):
             'cls_loss': lcls
         }
     
-    def _validate_inputs(
-        self,
-        predictions: List[torch.Tensor],
-        targets: torch.Tensor
-    ) -> bool:
+    def _validate_inputs(self, predictions: List[torch.Tensor], targets: torch.Tensor) -> bool:
         """
         Validasi input untuk YOLOLoss.
         
@@ -328,10 +272,7 @@ class YOLOLoss(nn.Module):
             
         return True
     
-    def _standardize_targets(
-        self,
-        targets: torch.Tensor
-    ) -> torch.Tensor:
+    def _standardize_targets(self, targets: torch.Tensor) -> torch.Tensor:
         """
         Standarisasi format targets ke [batch, num_targets, target_data].
         
@@ -360,12 +301,7 @@ class YOLOLoss(nn.Module):
                 # Tidak bisa reshape
                 return torch.zeros((1, 0, 6), device=targets.device)  # Empty tensor
     
-    def _build_targets(
-        self,
-        pred: torch.Tensor,
-        targets: torch.Tensor,
-        layer_idx: int
-    ) -> Dict[str, torch.Tensor]:
+    def _build_targets(self, pred: torch.Tensor, targets: torch.Tensor, layer_idx: int) -> Dict[str, torch.Tensor]:
         """
         Build targets untuk satu skala dengan penanganan error.
         
@@ -476,23 +412,11 @@ class YOLOLoss(nn.Module):
 
 # Function untuk menghitung gabungan loss dari multiple components
 def compute_loss(predictions, targets, model, active_layers):
-    """
-    Menghitung loss untuk semua layer aktif.
-    
-    Args:
-        predictions: Output model
-        targets: Target labels
-        model: Model yang digunakan
-        active_layers: List nama layer yang aktif
-        
-    Returns:
-        Total loss
-    """
+    """Menghitung total loss untuk semua layer aktif dari output model, target labels, model, dan active_layers."""
     total_loss = torch.tensor(0.0, device=targets[list(targets.keys())[0]].device, requires_grad=True)
     
     # Untuk model dengan attribute compute_loss
-    if hasattr(model, 'compute_loss'):
-        return model.compute_loss(predictions, targets)[0]
+    if hasattr(model, 'compute_loss'): return model.compute_loss(predictions, targets)[0]
     
     # Untuk model yang memerlukan perhitungan loss manual
     if hasattr(model, 'loss_fn'):
@@ -503,7 +427,6 @@ def compute_loss(predictions, targets, model, active_layers):
                     layer_loss, _ = model.loss_fn[layer](predictions[layer], targets[layer])
                     total_loss = total_loss + layer_loss
         # Jika model memiliki single loss function
-        else:
-            total_loss, _ = model.loss_fn(predictions, targets)
+        else: total_loss, _ = model.loss_fn(predictions, targets)
     
     return total_loss

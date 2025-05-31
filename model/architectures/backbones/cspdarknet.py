@@ -5,99 +5,40 @@ Deskripsi: CSPDarknet backbone implementation for YOLOv5
 
 import torch
 import torch.nn as nn
-from typing import List, Tuple, Optional, Dict, Union
+import torch.nn.functional as F
+from typing import List, Dict, Tuple, Optional, Union, Any
+import os
+import sys
 from pathlib import Path
 import os
 import urllib.request
 import warnings
-from tqdm import tqdm
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.common.exceptions import BackboneError
+from smartcash.common.utils.progress_utils import download_with_progress
 from smartcash.model.architectures.backbones.base import BaseBackbone
-
-class DownloadProgressBar(tqdm):
-    """Progress bar kustom untuk download file."""
-    def update_to(self, b=1, bsize=1, tsize=None):
-        if tsize is not None:
-            self.total = tsize
-        self.update(b * bsize - self.n)
+from smartcash.model.config.model_constants import YOLOV5_CONFIG, YOLO_CHANNELS
 
 class CSPDarknet(BaseBackbone):
-    """
-    CSPDarknet backbone untuk YOLOv5.
+    """CSPDarknet backbone untuk YOLOv5 dengan download otomatis dan validasi feature maps."""
     
-    Fitur:
-    1. Download otomatis dari torch.hub dengan validasi
-    2. Fallback ke weights lokal
-    3. Validasi output feature maps
-    4. Deteksi struktur model yang tidak sesuai
-    """
-    
-    # Konfigurasi model YOLOv5
-    YOLOV5_CONFIG = {
-        'yolov5s': {
-            'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
-            'feature_indices': [4, 6, 9],  # P3, P4, P5 layers
-            'expected_channels': [128, 256, 512],
-            'expected_shapes': [(80, 80), (40, 40), (20, 20)],  # untuk input 640x640
-        },
-        'yolov5m': {
-            'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5m.pt',
-            'feature_indices': [4, 6, 9],
-            'expected_channels': [192, 384, 768],
-            'expected_shapes': [(80, 80), (40, 40), (20, 20)],
-        },
-        'yolov5l': {
-            'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5l.pt',
-            'feature_indices': [4, 6, 9],
-            'expected_channels': [256, 512, 1024],
-            'expected_shapes': [(80, 80), (40, 40), (20, 20)],
-        }
-    }
-    
-    def __init__(
-        self,
-        pretrained: bool = True,
-        model_size: str = 'yolov5s',
-        weights_path: Optional[str] = None,
-        fallback_to_local: bool = True,
-        pretrained_dir: str = './pretrained',
-        logger: Optional[SmartCashLogger] = None
-    ):
-        """
-        Inisialisasi CSPDarknet backbone.
-        
-        Args:
-            pretrained: Gunakan pretrained weights atau tidak
-            model_size: Ukuran model ('yolov5s', 'yolov5m', 'yolov5l')
-            weights_path: Path ke file weights kustom (opsional)
-            fallback_to_local: Fallback ke weights lokal jika download gagal
-            pretrained_dir: Direktori untuk menyimpan pretrained weights
-            logger: Logger untuk mencatat proses (opsional)
-            
-        Raises:
-            BackboneError: Jika model_size tidak didukung atau gagal inisialisasi
-        """
+    def __init__(self, pretrained: bool = True, model_size: str = 'yolov5s', weights_path: Optional[str] = None, fallback_to_local: bool = True, pretrained_dir: str = './pretrained', testing_mode: bool = False, logger: Optional[SmartCashLogger] = None):
+        """Inisialisasi CSPDarknet backbone dengan konfigurasi model dan pretrained weights."""
         super().__init__(logger=logger)
         
         # Validasi model size
-        if model_size not in self.YOLOV5_CONFIG:
-            supported = list(self.YOLOV5_CONFIG.keys())
-            raise BackboneError(
-                f"❌ Model size {model_size} tidak didukung. "
-                f"Pilihan yang tersedia: {supported}"
-            )
+        if model_size not in YOLOV5_CONFIG: raise BackboneError(f"❌ Model size {model_size} tidak didukung. Pilihan yang tersedia: {list(YOLOV5_CONFIG.keys())}")
             
-        self.model_size = model_size
-        self.config = self.YOLOV5_CONFIG[model_size]
-        self.feature_indices = self.config['feature_indices']
-        self.expected_channels = self.config['expected_channels']
-        self.pretrained_dir = Path(pretrained_dir)
+        self.model_size, self.config, self.pretrained_dir = model_size, YOLOV5_CONFIG[model_size], Path(pretrained_dir)
+        self.feature_indices, self.expected_channels = self.config['feature_indices'], self.config['expected_channels']
+        self.testing_mode = testing_mode
         
         try:
             # Setup model
-            if pretrained:
+            if testing_mode:
+                self._setup_dummy_model_for_testing()
+            elif pretrained:
                 self._setup_pretrained_model(weights_path, fallback_to_local)
             else:
                 self._setup_model_from_scratch()
@@ -121,23 +62,12 @@ class CSPDarknet(BaseBackbone):
             raise BackboneError(f"Gagal inisialisasi CSPDarknet: {str(e)}")
     
     def _setup_pretrained_model(self, weights_path: Optional[str], fallback_to_local: bool):
-        """
-        Setup pretrained model dengan fallback ke local weights.
-        
-        Args:
-            weights_path: Path ke file weights kustom
-            fallback_to_local: Fallback ke torch.hub jika download gagal
-            
-        Raises:
-            BackboneError: Jika gagal load model
-        """
+        """Setup pretrained model dengan download otomatis dan fallback ke local weights."""
         # Tentukan weights path
         if weights_path is None:
-            # Setup default pretrained directory
             self.pretrained_dir.mkdir(exist_ok=True)
             weights_file = self.pretrained_dir / f"{self.model_size}.pt"
             
-            # Check jika weights sudah ada secara lokal
             if weights_file.exists():
                 self.logger.info(f"💾 Menggunakan weights lokal: {weights_file}")
                 weights_path = str(weights_file)
@@ -195,13 +125,36 @@ class CSPDarknet(BaseBackbone):
             self.logger.error(f"❌ Gagal memuat model: {str(e)}")
             raise BackboneError(f"Gagal memuat model: {str(e)}")
     
-    def _setup_model_from_scratch(self):
-        """
-        Setup model dari awal tanpa pretrained weights.
+    def _setup_dummy_model_for_testing(self):
+        """Buat model dummy untuk testing tanpa perlu mengunduh model pretrained."""
+        self.logger.info("🧪 Membuat model dummy untuk testing...")
         
-        Raises:
-            BackboneError: Jika gagal setup model
-        """
+        # Gunakan YOLO_CHANNELS langsung untuk output channels
+        self.expected_channels = YOLO_CHANNELS
+        
+        # Buat layer dummy untuk setiap output channel yang diharapkan
+        self.dummy_layers = nn.ModuleList()
+        in_channels = 3
+        
+        # Buat layer dummy untuk setiap feature map yang diharapkan
+        for i, out_ch in enumerate(self.expected_channels):
+            # Buat layer konvolusi sederhana yang langsung menghasilkan channel yang diharapkan
+            layer = nn.Sequential(
+                nn.Conv2d(in_channels, out_ch, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True)
+            )
+            self.dummy_layers.append(layer)
+            in_channels = out_ch
+        
+        # Override metode forward untuk menggunakan model dummy
+        self.forward = self._forward_dummy
+        
+        self.logger.info(f"✅ Model dummy berhasil dibuat dengan {len(self.dummy_layers)} feature maps")
+        self.logger.info(f"   • Output channels: {self.expected_channels} (sesuai dengan YOLO_CHANNELS)")
+    
+    def _setup_model_from_scratch(self):
+        """Setup model dari awal tanpa pretrained weights."""
         try:
             # Import YOLOv5 repo locally if available
             try:
@@ -259,27 +212,11 @@ class CSPDarknet(BaseBackbone):
             raise BackboneError(f"Gagal setup model dari awal: {str(e)}")
     
     def _download_weights(self, url: str, output_path: Union[str, Path]):
-        """
-        Download weights dengan progress bar.
-        
-        Args:
-            url: URL untuk download weights
-            output_path: Path untuk menyimpan file weights
-        """
-        with DownloadProgressBar(unit='B', unit_scale=True,
-                                 miniters=1, desc=f"⬇️ Downloading {self.model_size}") as t:
-            urllib.request.urlretrieve(url, output_path, reporthook=t.update_to)
+        """Download weights dengan progress callback dari URL ke output_path."""
+        download_with_progress(url, str(output_path), logger=self.logger)
     
     def _extract_backbone(self, model):
-        """
-        Extract backbone dari YOLOv5 model dengan validasi struktur.
-        
-        Args:
-            model: Model YOLOv5 yang akan diekstrak backbone-nya
-            
-        Raises:
-            BackboneError: Jika struktur model tidak valid
-        """
+        """Extract backbone dari YOLOv5 model dengan validasi struktur."""
         if hasattr(model, 'model'):
             modules = list(model.model.children())
         else:
@@ -309,152 +246,113 @@ class CSPDarknet(BaseBackbone):
             )
     
     def _verify_model_structure(self):
-        """
-        Verifikasi struktur model dengan dummy forward pass.
+        """Verifikasi struktur model dan output channels."""
+        # Skip verifikasi jika dalam mode testing
+        if self.testing_mode:
+            self.logger.info("🧪 Skip verifikasi model dalam mode testing")
+            return
+            
+        # Validasi feature indices
+        if max(self.feature_indices) >= len(self.backbone):
+            raise BackboneError(f"❌ Feature indices {self.feature_indices} melebihi jumlah layer backbone ({len(self.backbone)})")
         
-        Raises:
-            BackboneError: Jika struktur model tidak valid
-        """
+        # Validasi output channels dengan dummy input
         try:
             with torch.no_grad():
                 dummy_input = torch.zeros(1, 3, 640, 640)
                 features = self.forward(dummy_input)
+                actual_channels = [f.shape[1] for f in features]
                 
-                # Validasi jumlah features
-                if len(features) != len(self.feature_indices):
-                    raise BackboneError(
-                        f"❌ Jumlah feature maps ({len(features)}) tidak sesuai dengan "
-                        f"jumlah indeks feature ({len(self.feature_indices)})!"
-                    )
+                # Validasi jumlah feature maps
+                if len(actual_channels) != len(self.expected_channels):
+                    raise BackboneError(f"❌ Jumlah feature maps tidak sesuai: {len(actual_channels)} vs {len(self.expected_channels)}")
                 
-                # Validasi channel dimensions
-                actual_channels = [feat.shape[1] for feat in features]
-                if actual_channels != self.expected_channels:
-                    self.logger.warning(
-                        f"⚠️ Channel dimensions ({actual_channels}) tidak sesuai dengan "
-                        f"yang diharapkan ({self.expected_channels})!"
-                    )
-                    
-                    # Update expected channels untuk integrasi yang benar
-                    self.expected_channels = actual_channels
+                # Validasi channels per feature map
+                for i, (actual, expected) in enumerate(zip(actual_channels, self.expected_channels)):
+                    if actual != expected:
+                        self.logger.warning(f"⚠️ Channel output pada index {i} tidak sesuai: {actual} vs {expected}")
                 
-                # Verifikasi spatial dimensions
-                for i, feat in enumerate(features):
-                    _, _, h, w = feat.shape
-                    expected_h, expected_w = self.config['expected_shapes'][i]
-                    
-                    if h != expected_h or w != expected_w:
-                        self.logger.warning(
-                            f"⚠️ Spatial dimensions dari feature {i} ({h}x{w}) tidak sesuai dengan "
-                            f"yang diharapkan ({expected_h}x{expected_w})!"
-                        )
-                
-                self.logger.info(
-                    f"✅ Verifikasi struktur backbone berhasil:\n"
-                    f"   • Channels: {actual_channels}\n"
-                    f"   • Shapes: {[f.shape[2:] for f in features]}"
-                )
+                self.logger.debug(f"🔍 Feature shapes: {[f.shape for f in features]}")
                     
         except Exception as e:
             self.logger.error(f"❌ Verifikasi model gagal: {str(e)}")
             raise BackboneError(f"Verifikasi model gagal: {str(e)}")
     
     def _make_downsample_block(self, in_channels: int, out_channels: int) -> nn.Sequential:
-        """
-        Helper untuk membuat blok downsampling sederhana untuk implementasi CSPDarknet.
+        """Membuat blok downsampling untuk CSPDarknet."""
+        return nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=False), nn.BatchNorm2d(out_channels), nn.SiLU(inplace=True), 
+                            nn.Conv2d(out_channels, out_channels//2, kernel_size=1, bias=False), nn.BatchNorm2d(out_channels//2), nn.SiLU(inplace=True),
+                            nn.Conv2d(out_channels//2, out_channels, kernel_size=3, padding=1, bias=False), nn.BatchNorm2d(out_channels), nn.SiLU(inplace=True))
+    
+    def _forward_dummy(self, x: torch.Tensor) -> List[torch.Tensor]:
+        """Forward pass dengan model dummy untuk testing."""
+        features = []
         
-        Args:
-            in_channels: Jumlah channel input
-            out_channels: Jumlah channel output
+        # Buat dummy feature maps dengan channel yang sesuai dengan YOLO_CHANNELS
+        for i, out_ch in enumerate(self.expected_channels):
+            # Downsample input sesuai dengan level feature map
+            # P3 = 1/8, P4 = 1/16, P5 = 1/32 dari input asli
+            scale_factor = 1 / (2 ** (i + 3))
+            h, w = x.shape[2], x.shape[3]
+            new_h, new_w = int(h * scale_factor), int(w * scale_factor)
             
-        Returns:
-            nn.Sequential: Blok downsampling
-        """
-        return nn.Sequential(
-            # Downsample
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.SiLU(inplace=True),
+            # Buat dummy tensor dengan channel yang sesuai
+            batch_size = x.shape[0]
+            dummy_feature = torch.zeros(batch_size, out_ch, new_h, new_w, device=x.device)
             
-            # Residual block
-            nn.Conv2d(out_channels, out_channels//2, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels//2),
-            nn.SiLU(inplace=True),
-            nn.Conv2d(out_channels//2, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.SiLU(inplace=True)
-        )
+            # Isi dengan nilai random untuk simulasi feature map
+            dummy_feature.normal_(0, 0.02)
+            
+            features.append(dummy_feature)
+            
+            # Log untuk debugging
+            self.logger.debug(f"🔍 Feature map {i}: shape={dummy_feature.shape}, channels={dummy_feature.shape[1]}")
+        
+        # Pastikan jumlah feature maps sesuai dengan yang diharapkan
+        if len(features) != len(self.expected_channels):
+            self.logger.warning(f"⚠️ Jumlah feature maps ({len(features)}) tidak sesuai dengan yang diharapkan ({len(self.expected_channels)})")
+        
+        return features
     
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
-        """
-        Forward pass, mengembalikan feature maps P3, P4, P5.
-        
-        Args:
-            x: Input tensor dengan shape [batch_size, channels, height, width]
-            
-        Returns:
-            List[torch.Tensor]: Feature maps dari backbone
-            
-        Raises:
-            BackboneError: Jika forward pass gagal
-        """
+        """Forward pass, mengembalikan feature maps P3, P4, P5."""
         try:
             features = []
             for i, layer in enumerate(self.backbone):
                 x = layer(x)
-                if i in self.feature_indices:
-                    features.append(x)
-                    
-            # Validasi output feature maps
+                if i in self.feature_indices: features.append(x)
             self.validate_output(features, self.expected_channels)
-            
             return features
         except Exception as e:
             self.logger.error(f"❌ Forward pass gagal: {str(e)}")
             raise BackboneError(f"Forward pass gagal: {str(e)}")
     
-    def get_output_channels(self) -> List[int]:
-        """
-        Dapatkan jumlah output channel untuk setiap level feature.
+    def get_info(self):
+        """Dapatkan informasi backbone dalam bentuk dictionary.
         
         Returns:
-            List[int]: Jumlah channel untuk setiap feature map
+            Dict: Informasi tentang backbone
         """
-        return self.expected_channels
+        return {
+            'type': 'CSPDarknet',
+            'variant': self.model_size,
+            'out_channels': self.expected_channels,
+            'feature_stages': self.feature_indices,
+            'pretrained': self.pretrained,
+            'num_parameters': sum(p.numel() for p in self.parameters()),
+            'trainable_parameters': sum(p.numel() for p in self.parameters() if p.requires_grad)
+        }
     
-    def get_output_shapes(self, input_size: Tuple[int, int] = (640, 640)) -> List[Tuple[int, int]]:
-        """
-        Dapatkan dimensi spasial dari output feature maps.
-        
-        Args:
-            input_size: Ukuran input (width, height)
-            
-        Returns:
-            List[Tuple[int, int]]: Ukuran spasial untuk setiap output feature map
-        """
-        return self.config['expected_shapes']
+    def get_output_channels(self) -> List[int]: return self.expected_channels
+    
+    def get_output_shapes(self, input_size: Tuple[int, int] = (640, 640)) -> List[Tuple[int, int]]: return self.config['expected_shapes']
         
     def load_weights(self, state_dict: Dict[str, torch.Tensor], strict: bool = False):
-        """
-        Load state dictionary dengan validasi dan logging.
-        
-        Args:
-            state_dict: State dictionary dengan weights
-            strict: Flag untuk strict loading
-            
-        Raises:
-            BackboneError: Jika loading weights gagal
-        """
+        """Load state dictionary dengan validasi dan logging."""
         try:
-            missing_keys, unexpected_keys = super().load_state_dict(
-                state_dict, strict=strict
-            )
-            
-            if missing_keys and self.logger:
-                self.logger.warning(f"⚠️ Missing keys: {missing_keys}")
-            if unexpected_keys and self.logger:
-                self.logger.warning(f"⚠️ Unexpected keys: {unexpected_keys}")
-                
+            missing_keys, unexpected_keys = super().load_state_dict(state_dict, strict=strict)
+            if missing_keys and self.logger: self.logger.warning(f"⚠️ Missing keys: {missing_keys}")
+            if unexpected_keys and self.logger: self.logger.warning(f"⚠️ Unexpected keys: {unexpected_keys}")
             self.logger.success("✅ Berhasil memuat state dictionary")
         except Exception as e:
             self.logger.error(f"❌ Gagal memuat state dictionary: {str(e)}")

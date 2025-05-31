@@ -177,6 +177,20 @@ def get_safe_component(ui_components: Dict[str, Any], key: str, fallback_widget=
     return fallback_widget
 
 
+# Fungsi safe_operation yang dibutuhkan oleh evaluation module
+def safe_operation(operation_func, fallback_value=None, error_handler=None):
+    """Execute operation dengan safe error handling dan custom error handler"""
+    try:
+        return operation_func()
+    except Exception as e:
+        if error_handler:
+            try:
+                error_handler(e)
+            except Exception:
+                pass  # Silent fail pada error handler
+        return fallback_value
+
+
 # One-liner utilities untuk common patterns
 safe_import = lambda path, default=None: import_with_fallback(path, default)
 safe_getattr = lambda obj, attr, default=None: getattr(obj, attr, default) if obj else default

@@ -4,7 +4,9 @@ Deskripsi: Package initialization untuk utils
 """
 
 from smartcash.common.utils.core import *
+from smartcash.common.utils.progress_utils import ProgressCallback, DownloadProgressCallback, download_with_progress
 __all__ = [
+    # Core utils
     'is_colab',
     'is_notebook',
     'get_system_info',
@@ -16,5 +18,10 @@ __all__ = [
     'load_yaml',
     'save_yaml',
     'get_project_root',
-    'deep_merge'
+    'deep_merge',
+    
+    # Progress utils
+    'ProgressCallback',
+    'DownloadProgressCallback',
+    'download_with_progress'
 ]

@@ -41,7 +41,6 @@ def create_pretrained_ui() -> Dict[str, Any]:
             icon='download',
             tooltip='Download dan sinkronisasi model pretrained',
             layout=widgets.Layout(
-                width='50%',
                 margin='15px auto',  # Auto margin untuk centering
                 display='flex'
             )
@@ -77,7 +76,7 @@ def create_pretrained_ui() -> Dict[str, Any]:
             download_sync_button,
             status_panel,
             widgets.VBox([progress_tracking['container']], 
-                        layout=widgets.Layout(padding='15px', margin='10px 0')),
+                        layout=widgets.Layout(margin='10px 0')),
             widgets.VBox([log_accordion['log_accordion']], 
                         layout=widgets.Layout(margin='10px 0'))
         ], layout=widgets.Layout(padding='10px'))

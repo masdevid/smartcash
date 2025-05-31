@@ -52,3 +52,9 @@ def handle_cleanup_gpu(ui_components: Dict[str, Any]):
     """Re-export cleanup handler"""
     from smartcash.ui.training.handlers.cleanup_handler import handle_cleanup_gpu as cleanup_handler
     return cleanup_handler(ui_components)
+
+
+def handle_refresh_config(ui_components: Dict[str, Any]):
+    """Re-export refresh config handler"""
+    from smartcash.ui.training.handlers.refresh_config_handler import handle_refresh_config as refresh_handler
+    return refresh_handler(ui_components)

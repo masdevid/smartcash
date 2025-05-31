@@ -60,7 +60,7 @@ def create_config_tabs(config: Dict[str, Any]) -> Dict[str, Any]:
     <div style="padding: 10px;">
         <h5 style="margin: 0 0 10px 0; color: #00695c;">📁 Paths & Storage</h5>
         <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
-            <li><b>Data Dir:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('data_dir', 'data/currency')}</span></li>
+            <li><b>Data Dir:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('data_dir', '/data/preprocessed')}</span></li>
             <li><b>Checkpoint Dir:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('checkpoint_dir', 'runs/train/checkpoints')}</span></li>
             <li><b>Tensorboard Dir:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('tensorboard_dir', 'runs/tensorboard')}</span></li>
         </ul>

@@ -3,7 +3,6 @@ File: smartcash/ui/training/handlers/start_training_handler.py
 Deskripsi: Updated start training handler dengan full progress tracking integration
 """
 
-import threading
 from typing import Dict, Any, Callable
 from smartcash.ui.training.handlers.training_button_handlers import get_state, set_state
 from smartcash.ui.training.utils.training_status_utils import update_training_status
@@ -49,13 +48,8 @@ def handle_start_training(ui_components: Dict[str, Any], config: Dict[str, Any])
     # Set callbacks ke training service
     training_service.set_progress_callbacks(progress_callback, metrics_callback, checkpoint_callback)
     
-    # Start training dalam background thread
-    training_thread = threading.Thread(
-        target=_execute_training_process,
-        args=(ui_components, training_service, config),
-        daemon=True
-    )
-    training_thread.start()
+    # Jalankan training secara langsung (tidak perlu threading di colab)
+    _execute_training_process(ui_components, training_service, config)
     
     logger and logger.info("🚀 Training started dengan full progress integration")
 

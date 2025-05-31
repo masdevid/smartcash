@@ -328,3 +328,8 @@ def create_progress_tracking_container() -> Dict[str, Any]:
         'error_operation': tracker.error,
         'reset_all': tracker.reset
     }
+
+
+def create_progress_tracking() -> Dict[str, Any]:
+    """Alias untuk create_progress_tracking_container untuk kompatibilitas"""
+    return create_progress_tracking_container()

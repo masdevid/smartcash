@@ -43,6 +43,13 @@ def create_training_control_buttons() -> Dict[str, Any]:
         layout=widgets.Layout(width='130px', height='35px', margin='2px')
     )
     
+    refresh_button = widgets.Button(
+        description="🔄 Refresh Config",
+        button_style='info',
+        tooltip='Perbarui informasi konfigurasi dari modul lain',
+        layout=widgets.Layout(width='130px', height='35px', margin='2px')
+    )
+    
     cleanup_button = widgets.Button(
         description="🧹 Cleanup GPU",
         button_style='',
@@ -56,7 +63,8 @@ def create_training_control_buttons() -> Dict[str, Any]:
         stop_button, 
         reset_button,
         validate_button, 
-        cleanup_button
+        cleanup_button,
+        refresh_button
     ], layout=widgets.Layout(
         margin='5px 0',
         padding='5px',
@@ -71,6 +79,7 @@ def create_training_control_buttons() -> Dict[str, Any]:
         'reset_button': reset_button,
         'validate_button': validate_button,
         'cleanup_button': cleanup_button,
+        'refresh_button': refresh_button,
         'button_container': button_container
     }
 

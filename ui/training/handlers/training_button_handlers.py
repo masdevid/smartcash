@@ -25,6 +25,7 @@ def setup_training_button_handlers(ui_components: Dict[str, Any], config: Dict[s
     from smartcash.ui.training.handlers.reset_training_handler import handle_reset_training
     from smartcash.ui.training.handlers.validation_handler import handle_validate_model
     from smartcash.ui.training.handlers.cleanup_handler import handle_cleanup_gpu
+    from smartcash.ui.training.handlers.refresh_config_handler import handle_refresh_config
     
     # Register button handlers
     button_handlers = {
@@ -32,7 +33,8 @@ def setup_training_button_handlers(ui_components: Dict[str, Any], config: Dict[s
         'stop_button': lambda b: handle_stop_training(ui_components),
         'reset_button': lambda b: handle_reset_training(ui_components),
         'validate_button': lambda b: handle_validate_model(ui_components, config),
-        'cleanup_button': lambda b: handle_cleanup_gpu(ui_components)
+        'cleanup_button': lambda b: handle_cleanup_gpu(ui_components),
+        'refresh_button': lambda b: handle_refresh_config(ui_components)
     }
     
     # One-liner button registration
@@ -49,7 +51,8 @@ def update_button_states(ui_components: Dict[str, Any], training_active: bool):
         'stop_button': not training_active,
         'reset_button': training_active,
         'validate_button': training_active,
-        'cleanup_button': training_active
+        'cleanup_button': training_active,
+        'refresh_button': False  # Refresh selalu enabled
     }
     
     [setattr(ui_components.get(btn), 'disabled', disabled) 

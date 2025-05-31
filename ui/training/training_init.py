@@ -133,7 +133,7 @@ class TrainingInitializer(CommonInitializer):
     
     def _setup_config_callback(self, ui_components: Dict[str, Any]):
         """Setup callback untuk config updates dengan integrasi dari berbagai modul"""
-        from smartcash.common.config.manager import ConfigManager
+        from smartcash.common.config.manager import SimpleConfigManager, get_config_manager
         from smartcash.ui.training.components.config_tabs import create_config_tabs, update_config_tabs
         
         def config_update_callback(new_config: Dict[str, Any]):
@@ -143,10 +143,10 @@ class TrainingInitializer(CommonInitializer):
                 merged_config = {}
                 
                 # Get config manager singleton
-                config_manager = ConfigManager.get_instance()
+                config_manager = get_config_manager()
                 
                 # Model config dari backbone
-                model_config = config_manager.get_module_config('backbone')
+                model_config = config_manager.get_config('backbone')
                 if model_config:
                     merged_config['model'] = model_config
                 

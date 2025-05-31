@@ -12,6 +12,12 @@ def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+        from smartcash.components.observer.manager_observer import get_observer_manager
+        
+        # Pastikan observer_manager tersedia di ui_components
+        if 'observer_manager' not in ui_components:
+            ui_components['observer_manager'] = get_observer_manager()
+            logger and logger.debug("🔄 Observer manager initialized")
         
         if 'progress_container' not in ui_components:
             progress_components = create_progress_tracking_container()
@@ -31,6 +37,11 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
     """Setup observers dengan BaseObserver inheritance."""
     try:
         from smartcash.components.observer import EventDispatcher, BaseObserver
+        from smartcash.components.observer.manager_observer import get_observer_manager
+        
+        # Pastikan observer_manager tersedia di ui_components
+        if 'observer_manager' not in ui_components:
+            ui_components['observer_manager'] = get_observer_manager()
         
         progress_observer = ProgressObserver(ui_components)
         
@@ -41,13 +52,26 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
         ]
         
         registered_events = []
-        for event in download_events:
-            try:
-                EventDispatcher.register(event, progress_observer)
-                registered_events.append(event)
-            except Exception as e:
-                logger = ui_components.get('logger')
-                logger and logger.debug(f"⚠️ Could not register event {event}: {str(e)}")
+        
+        # Coba register melalui observer_manager terlebih dahulu
+        observer_manager = ui_components.get('observer_manager')
+        if observer_manager and hasattr(observer_manager, 'register'):
+            for event in download_events:
+                try:
+                    observer_manager.register(event, progress_observer)
+                    registered_events.append(event)
+                except Exception as e:
+                    logger = ui_components.get('logger')
+                    logger and logger.debug(f"⚠️ Could not register event via manager {event}: {str(e)}")
+        # Fallback ke EventDispatcher
+        else:
+            for event in download_events:
+                try:
+                    EventDispatcher.register(event, progress_observer)
+                    registered_events.append(event)
+                except Exception as e:
+                    logger = ui_components.get('logger')
+                    logger and logger.debug(f"⚠️ Could not register event {event}: {str(e)}")
         
         ui_components['_progress_observer'] = progress_observer
         ui_components['_registered_events'] = registered_events
@@ -64,15 +88,12 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
         logger = ui_components.get('logger')
         logger and logger.warning(f"⚠️ Observer setup error: {str(e)}")
 
-class ProgressObserver:
+class ProgressObserver(BaseObserver):
     """BaseObserver implementation untuk progress tracking."""
     
     def __init__(self, ui_components):
-        try:
-            from smartcash.components.observer import BaseObserver
-            super().__init__()  # Only if BaseObserver is available
-        except ImportError:
-            pass  # Fallback tanpa BaseObserver
+        # Inisialisasi BaseObserver dengan nama dan prioritas
+        super().__init__(name="ProgressObserver", priority=0)
             
         self.ui_components = ui_components
         self.tracker = ui_components.get('tracker')
@@ -102,7 +123,13 @@ class ProgressObserver:
                 self._handle_download_error(**kwargs)
                 
         except Exception as e:
-            self.logger and self.logger.error(f"❌ Observer error for {event_type}: {str(e)}")
+            if self.logger:
+                self.logger.error(f"❌ Observer error: {str(e)}")
+                
+    def should_process_event(self, event_type: str) -> bool:
+        """Implementasi metode should_process_event dari BaseObserver."""
+        # Filter hanya event yang dimulai dengan DOWNLOAD_
+        return event_type and event_type.startswith('DOWNLOAD_')
     
     def _handle_download_start(self, **kwargs):
         """Handle download start."""

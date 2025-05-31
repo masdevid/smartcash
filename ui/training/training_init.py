@@ -226,6 +226,6 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         return fallback
 
 
-# One-liner factory untuk compatibility
+# One-liner factory untuk compatibility dengan cell entry
 create_training_ui = lambda env=None, config=None, **kw: initialize_training_ui(env, config, **kw)
 get_training_initializer = lambda: TrainingInitializer('training', 'smartcash.ui.training')

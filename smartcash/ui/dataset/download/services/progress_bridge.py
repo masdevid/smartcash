@@ -5,15 +5,21 @@ Deskripsi: Enhanced progress bridge dengan tqdm persistent tracking dan detail p
 
 from typing import Dict, Any, Optional, Callable, List
 from smartcash.components.observer import notify, EventTopics
+from smartcash.components.observer.base_observer import BaseObserver
+from smartcash.components.observer.manager_observer import get_observer_manager
 import logging
 import sys
 import time
 
-class ProgressBridge:
-    """Enhanced bridge dengan tqdm persistent tracking dan detail progress."""
+class ProgressBridge(BaseObserver):
+    """Enhanced bridge dengan tqdm persistent tracking dan detail progress yang mengimplementasikan BaseObserver."""
     
     def __init__(self, observer_manager=None, namespace: str = "download"):
-        self.observer_manager = observer_manager
+        # Inisialisasi BaseObserver
+        super().__init__(name=f"ProgressBridge_{namespace}", priority=0)
+        
+        # Dapatkan observer_manager jika tidak diberikan
+        self.observer_manager = observer_manager or get_observer_manager()
         self.namespace = namespace
         
         # Overall progress tracking
@@ -257,8 +263,9 @@ class ProgressBridge:
             if self.observer_manager and hasattr(self.observer_manager, 'notify'):
                 self.observer_manager.notify(event_type, self, **data)
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            if self._ui_components_ref and 'logger' in self._ui_components_ref:
+                self._ui_components_ref['logger'].debug(f"Observer notify error: {str(e)}")
         
         try:
             from smartcash.components.observer import EventDispatcher
@@ -305,3 +312,14 @@ class ProgressBridge:
                     ui['hide_container']()
             except Exception:
                 pass
+    
+    def update(self, event_type: str, sender: Any, **kwargs) -> None:
+        """Implementasi metode update dari BaseObserver."""
+        # Metode ini diperlukan untuk implementasi BaseObserver
+        # Kita tidak perlu implementasi khusus karena ProgressBridge adalah pengirim event, bukan penerima
+        pass
+    
+    def should_process_event(self, event_type: str) -> bool:
+        """Implementasi metode should_process_event dari BaseObserver."""
+        # Selalu return True karena kita tidak memfilter event
+        return True

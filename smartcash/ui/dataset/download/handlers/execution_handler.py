@@ -6,6 +6,7 @@ Deskripsi: Fixed execution handler dengan integrasi latest progress_tracking dan
 import time
 from typing import Dict, Any, Callable
 from smartcash.ui.dataset.download.services.ui_download_service import UIDownloadService
+from smartcash.components.observer.manager_observer import get_observer_manager
 
 def execute_download_process(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -22,6 +23,25 @@ def execute_download_process(ui_components: Dict[str, Any], params: Dict[str, An
     start_time = time.time()
     
     try:
+        # Pastikan observer_manager tersedia di ui_components
+        if 'observer_manager' not in ui_components:
+            ui_components['observer_manager'] = get_observer_manager()
+            if logger and hasattr(logger, 'debug'):
+                logger.debug("🔄 Observer manager initialized")
+        
+        # Notify start via observer jika tersedia
+        observer_manager = ui_components.get('observer_manager')
+        if observer_manager and hasattr(observer_manager, 'notify'):
+            try:
+                observer_manager.notify('DOWNLOAD_START', None, {
+                    'message': "Memulai proses download dataset",
+                    'timestamp': time.time(),
+                    'params': {k: v for k, v in params.items() if k != 'api_key'}
+                })
+            except Exception as e:
+                if logger and hasattr(logger, 'debug'):
+                    logger.debug(f"⚠️ Observer notification error: {str(e)}")
+        
         # Initialize download service
         _update_execution_progress(ui_components, 40, "🔧 Menginisialisasi service...")
         download_service = UIDownloadService(ui_components)
@@ -37,17 +57,46 @@ def execute_download_process(ui_components: Dict[str, Any], params: Dict[str, An
         result['duration'] = time.time() - start_time
         
         # Log hasil dengan success indicator
-        if result.get('status') == 'success' and logger:
-            logger.info("🎯 Download service menyelesaikan proses dengan sukses")
+        if result.get('status') == 'success':
+            # Notify complete via observer
+            if observer_manager and hasattr(observer_manager, 'notify'):
+                try:
+                    observer_manager.notify('DOWNLOAD_COMPLETE', None, {
+                        'message': "Download dataset selesai",
+                        'timestamp': time.time(),
+                        'duration': result['duration'],
+                        'stats': result.get('stats', {})
+                    })
+                except Exception:
+                    pass  # Silent fail untuk observer notification
             
-            stats = result.get('stats', {})
-            if stats.get('total_images', 0) > 0:
-                logger.info(f"📊 Berhasil mengorganisir {stats['total_images']} gambar")
+            if logger and hasattr(logger, 'info'):
+                logger.info("🎯 Download service menyelesaikan proses dengan sukses")
+                
+                stats = result.get('stats', {})
+                if stats.get('total_images', 0) > 0:
+                    logger.info(f"📊 Berhasil mengorganisir {stats['total_images']} gambar")
         
         return result
         
     except Exception as e:
         duration = time.time() - start_time
+        
+        # Notify error via observer
+        observer_manager = ui_components.get('observer_manager')
+        if observer_manager and hasattr(observer_manager, 'notify'):
+            try:
+                observer_manager.notify('DOWNLOAD_ERROR', None, {
+                    'message': f"Error: {str(e)}",
+                    'timestamp': time.time(),
+                    'error_details': str(e)
+                })
+            except Exception:
+                pass  # Silent fail untuk observer notification
+        
+        if logger and hasattr(logger, 'error'):
+            logger.error(f"❌ Download execution error: {str(e)}")
+            
         return {
             'status': 'error',
             'message': f'Download execution error: {str(e)}',
@@ -74,51 +123,66 @@ def _create_enhanced_progress_callback(ui_components: Dict[str, Any]) -> Callabl
                 _update_execution_progress(ui_components, base_progress, f"📥 Download: {message}")
                 
                 # Step progress untuk download detail dengan latest integration
-                if 'update_progress' in ui_components:
+                if 'update_progress' in ui_components and callable(ui_components['update_progress']):
                     ui_components['update_progress']('step', progress, f"📥 {message}")
-                elif 'tracker' in ui_components:
+                elif 'tracker' in ui_components and hasattr(ui_components['tracker'], 'update'):
                     ui_components['tracker'].update('step', progress, f"📥 {message}")
             
             elif stage == 'extract':
                 # Extract progress: masih dalam range download dengan latest integration
-                if 'update_progress' in ui_components:
+                if 'update_progress' in ui_components and callable(ui_components['update_progress']):
                     ui_components['update_progress']('step', progress, f"📦 Extract: {message}")
-                elif 'tracker' in ui_components:
-                    ui_components['tracker'].update('step', progress, f"📦 Extract: {message}")
-            
+                elif 'tracker' in ui_components and hasattr(ui_components['tracker'], 'update'):
+                    ui_components['tracker'].update('step', progress, f"📦 {message}")
+                
+                # Overall progress: 80-85%
+                base_progress = 80 + int((progress / 100) * 5)
+                _update_execution_progress(ui_components, base_progress, f"📦 Extract: {message}")
+                
             elif stage == 'organize':
-                # Organize progress: 80-95% overall
-                base_progress = 80 + int((progress / 100) * 15)
-                _update_execution_progress(ui_components, base_progress, f"📁 Organisir: {message}")
+                # Organize progress: 85-95%
+                base_progress = 85 + int((progress / 100) * 10)
+                _update_execution_progress(ui_components, base_progress, f"🗂️ Organize: {message}")
                 
-                # Step progress untuk organize dengan latest integration
-                if 'update_progress' in ui_components:
-                    ui_components['update_progress']('step', progress, f"📁 {message}")
-                elif 'tracker' in ui_components:
-                    ui_components['tracker'].update('step', progress, f"📁 {message}")
-                
-                # Current progress untuk detail per split jika ada dengan latest integration
-                split_info = kwargs.get('split_info', {})
-                if split_info and 'current_split' in split_info:
-                    split_name = split_info['current_split']
-                    split_progress = split_info.get('split_progress', 0)
-                    if 'update_progress' in ui_components:
-                        ui_components['update_progress']('current', split_progress, f"📂 Memindahkan {split_name}")
-                    elif 'tracker' in ui_components:
-                        ui_components['tracker'].update('current', split_progress, f"📂 Memindahkan {split_name}")
-            
+                # Current progress untuk organize detail
+                if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+                    ui_components['update_progress']('current', progress, f"🗂️ {message}")
+                elif 'tracker' in ui_components and hasattr(ui_components['tracker'], 'update'):
+                    ui_components['tracker'].update('current', progress, f"🗂️ {message}")
+                    
             elif stage == 'verify':
-                # Verification stage: 95-100% overall
+                # Verify progress: 95-100%
                 base_progress = 95 + int((progress / 100) * 5)
-                _update_execution_progress(ui_components, base_progress, f"✅ Verifikasi: {message}")
+                _update_execution_progress(ui_components, base_progress, f"✅ Verify: {message}")
                 
-                # Step progress untuk verification dengan latest integration
-                if 'update_progress' in ui_components:
+                # Step progress untuk verify detail
+                if 'update_progress' in ui_components and callable(ui_components['update_progress']):
                     ui_components['update_progress']('step', progress, f"✅ {message}")
-                elif 'tracker' in ui_components:
+                elif 'tracker' in ui_components and hasattr(ui_components['tracker'], 'update'):
                     ui_components['tracker'].update('step', progress, f"✅ {message}")
             
-        except Exception:
+            else:
+                # Fallback untuk unknown stages
+                _update_execution_progress(ui_components, progress, f"{stage}: {message}")
+                
+            # Notify via observer jika tersedia
+            observer_manager = ui_components.get('observer_manager')
+            if observer_manager and hasattr(observer_manager, 'notify'):
+                try:
+                    observer_manager.notify('DOWNLOAD_PROGRESS', None, {
+                        'stage': stage,
+                        'progress': progress,
+                        'message': message,
+                        'timestamp': time.time(),
+                        **kwargs
+                    })
+                except Exception:
+                    pass  # Silent fail untuk observer notification
+                
+        except Exception as e:
+            logger = ui_components.get('logger')
+            if logger and hasattr(logger, 'error'):
+                logger.error(f"❌ Progress callback error: {str(e)}")
             # Silent fail untuk progress callback agar tidak mengganggu proses utama
             pass
     
@@ -177,14 +241,25 @@ def _create_stage_callback(progress_callback: Callable) -> Callable:
 
 def _update_execution_progress(ui_components: Dict[str, Any], progress: int, message: str, color: str = None) -> None:
     """Update execution progress dengan latest ProgressTracker integration."""
-    # Use latest progress tracking methods dengan fallback support
-    if 'update_progress' in ui_components:
-        ui_components['update_progress']('overall', progress, message, color or 'info')
-    elif 'tracker' in ui_components:
-        ui_components['tracker'].update('overall', progress, message, color)
-    else:
-        # Fallback untuk legacy progress widgets
-        _update_legacy_progress(ui_components, progress, message)
+    try:
+        # Use latest progress tracking methods dengan fallback support
+        if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+            ui_components['update_progress']('overall', progress, message, color or 'info')
+        elif 'tracker' in ui_components and hasattr(ui_components['tracker'], 'update'):
+            ui_components['tracker'].update('overall', progress, message, color)
+        else:
+            # Fallback untuk legacy progress widgets
+            _update_legacy_progress(ui_components, progress, message)
+            
+        # Log progress jika logger tersedia
+        logger = ui_components.get('logger')
+        if logger and hasattr(logger, 'debug'):
+            logger.debug(f"📊 Progress update: {progress}% - {message}")
+    except Exception as e:
+        # Silent fail untuk mencegah error progress mengganggu proses utama
+        logger = ui_components.get('logger')
+        if logger and hasattr(logger, 'debug'):
+            logger.debug(f"⚠️ Progress update error: {str(e)}")
 
 def _update_legacy_progress(ui_components: Dict[str, Any], progress: int, message: str) -> None:
     """Fallback update untuk legacy progress widgets."""
@@ -202,10 +277,18 @@ def _update_legacy_progress(ui_components: Dict[str, Any], progress: int, messag
             label = ui_components['overall_label']
             if hasattr(label, 'value'):
                 label.value = f"<div style='color: #007bff;'>{message}</div>"
+        
+        # Update step label jika tersedia
+        if 'step_label' in ui_components:
+            step_label = ui_components['step_label']
+            if hasattr(step_label, 'value'):
+                step_label.value = f"<div style='color: #6c757d;'>{message}</div>"
     
-    except Exception:
+    except Exception as e:
         # Silent fail untuk legacy updates
-        pass
+        logger = ui_components.get('logger')
+        if logger and hasattr(logger, 'debug'):
+            logger.debug(f"⚠️ Legacy progress update error: {str(e)}")
 
 def get_execution_status(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Get status execution handler untuk debugging."""

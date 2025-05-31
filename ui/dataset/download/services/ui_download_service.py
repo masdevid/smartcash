@@ -7,12 +7,13 @@ import time
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from smartcash.dataset.services.downloader.ui_roboflow_downloader import UIRoboflowDownloader
 from smartcash.ui.dataset.download.services.progress_bridge import ProgressBridge
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.common.environment import get_environment_manager
+from smartcash.components.notification import NotificationManager, get_notification_manager
 
 class UIDownloadService:
     """Download service dengan organizer integration tanpa redundant validation."""
@@ -30,6 +31,16 @@ class UIDownloadService:
             is_colab=self.env_manager.is_colab,
             is_drive_mounted=self.env_manager.is_drive_mounted
         )
+        
+        # Inisialisasi notification manager
+        self._notification_manager = None
+        try:
+            self._notification_manager = get_notification_manager(ui_components)
+            if self.logger and hasattr(self.logger, 'debug'):
+                self.logger.debug("🔔 NotificationManager berhasil diinisialisasi")
+        except Exception as e:
+            if self.logger and hasattr(self.logger, 'debug'):
+                self.logger.debug(f"⚠️ NotificationManager tidak tersedia: {str(e)}")
         
         # Enhanced progress bridge dengan dual tracking
         self.progress_bridge = ProgressBridge(
@@ -72,7 +83,17 @@ class UIDownloadService:
         self.progress_bridge.define_steps(steps)
         
         try:
-            # 🚀 Initialize
+            # 🚀 Initialize dengan NotificationManager jika tersedia
+            if self._notification_manager:
+                self._notification_manager.notify_process_start(
+                    "download", 
+                    "Memulai download dan organisasi dataset",
+                    workspace=params.get('workspace'),
+                    project=params.get('project'),
+                    version=params.get('version')
+                )
+            
+            # Fallback ke progress bridge jika NotificationManager tidak tersedia
             self.progress_bridge.notify_start("Memulai download dan organisasi dataset")
             
             # Step 1: Validate parameters
@@ -122,6 +143,18 @@ class UIDownloadService:
                 self.logger.info("🎯 Dataset sudah siap untuk digunakan")
                 self._log_final_structure(organize_result)
             
+            # Notify complete dengan NotificationManager jika tersedia
+            if self._notification_manager:
+                self._notification_manager.notify_process_complete(
+                    "download",
+                    f"Dataset berhasil didownload dan diorganisir dalam {duration:.1f} detik",
+                    stats=organize_result,
+                    workspace=params.get('workspace'),
+                    project=params.get('project'),
+                    version=params.get('version'),
+                    path=str(download_path)
+                )
+            
             return {
                 'status': 'success',
                 'output_dir': self.paths['data_root'],
@@ -135,14 +168,30 @@ class UIDownloadService:
             
         except Exception as e:
             duration = time.time() - start_time
-            error_msg = str(e)
+            error_message = str(e)
             
-            self.progress_bridge.notify_error(f"Proses gagal: {error_msg}")
+            # Notify error dengan NotificationManager jika tersedia
+            if self._notification_manager:
+                self._notification_manager.notify_process_error(
+                    "download",
+                    error_message,
+                    exception=e,
+                    workspace=params.get('workspace'),
+                    project=params.get('project'),
+                    version=params.get('version')
+                )
             
-            if self.logger:
-                self.logger.error(f"❌ Download error setelah {duration:.1f}s: {error_msg}")
+            # Fallback ke progress bridge jika NotificationManager tidak tersedia
+            self.progress_bridge.notify_error(error_message)
             
-            return {'status': 'error', 'message': error_msg, 'duration': duration}
+            if self.logger and hasattr(self.logger, 'error'):
+                self.logger.error(f"❌ Download error: {error_message}")
+            
+            return {
+                'status': 'error',
+                'message': error_message,
+                'duration': duration
+            }
     
     def _suppress_console_output(self):
         """Context manager untuk suppress console output dari backend."""
@@ -183,11 +232,32 @@ class UIDownloadService:
         if step in ['download', 'extract']:
             step_progress = int((current / total) * 100) if total > 0 else 0
             self.progress_bridge.notify_step_progress(step_progress, message)
+            
+            # Update progress via NotificationManager jika tersedia
+            if self._notification_manager:
+                self._notification_manager.update_progress(
+                    "download",
+                    current,
+                    total,
+                    message,
+                    step=step
+                )
     
     def _organizer_progress_callback(self, step: str, current: int, total: int, message: str) -> None:
         """Callback dari organizer untuk update step progress."""
         if step == 'organize':
+            # Update progress via bridge
             self.progress_bridge.notify_step_progress(current, message)
+            
+            # Update progress via NotificationManager jika tersedia
+            if self._notification_manager:
+                self._notification_manager.update_progress(
+                    "organize",
+                    current,
+                    total,
+                    message,
+                    step=step
+                )
     
     def _validate_params(self, params: Dict[str, Any]) -> None:
         """Enhanced parameter validation."""

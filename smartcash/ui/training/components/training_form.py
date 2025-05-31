@@ -20,7 +20,7 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         # Progress tracking dengan proper container
         progress_components = create_progress_tracking_container()
         
-        # Log components dengan safe fallback
+        # Log components dengan existing log_accordion
         log_components = create_log_accordion('training', height='250px')
         
         # Status panel untuk training feedback
@@ -61,47 +61,51 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def create_training_control_buttons() -> Dict[str, Any]:
-    """Create training control buttons dengan specific functions"""
+    """Create training control buttons using existing action_buttons"""
+    from smartcash.ui.components.action_buttons import create_action_buttons
     
-    # Main training buttons
-    start_button = widgets.Button(
-        description="🚀 Mulai Training",
-        button_style='success',
-        tooltip='Mulai training EfficientNet-B4',
-        layout=widgets.Layout(width='160px', height='40px', margin='2px')
+    # Primary button (Start Training)
+    primary_buttons = create_action_buttons(
+        primary_label="🚀 Mulai Training",
+        primary_icon="",
+        primary_style='success',
+        secondary_buttons=[],
+        cleanup_enabled=False,
+        button_width='160px'
     )
     
+    # Secondary control buttons
     stop_button = widgets.Button(
         description="⏹️ Stop Training",
         button_style='danger',
         tooltip='Hentikan training dan simpan checkpoint',
         disabled=True,
-        layout=widgets.Layout(width='140px', height='40px', margin='2px')
+        layout=widgets.Layout(width='140px', height='35px', margin='2px')
     )
     
     reset_button = widgets.Button(
-        description="🔄 Reset Metrics",
+        description="🔄 Reset Metrics", 
         button_style='warning',
         tooltip='Reset training metrics dan chart',
-        layout=widgets.Layout(width='140px', height='40px', margin='2px')
+        layout=widgets.Layout(width='140px', height='35px', margin='2px')
     )
     
     validate_button = widgets.Button(
         description="🔍 Cek Model",
-        button_style='info',
+        button_style='info', 
         tooltip='Validasi model readiness',
-        layout=widgets.Layout(width='130px', height='40px', margin='2px')
+        layout=widgets.Layout(width='130px', height='35px', margin='2px')
     )
     
     cleanup_button = widgets.Button(
         description="🧹 Cleanup GPU",
-        button_style='secondary',
+        button_style='',
         tooltip='Bersihkan GPU memory',
-        layout=widgets.Layout(width='130px', height='40px', margin='2px')
+        layout=widgets.Layout(width='130px', height='35px', margin='2px')
     )
     
-    # Container dengan responsive layout
-    buttons_row_1 = widgets.HBox([start_button, stop_button, reset_button])
+    # Container layout
+    buttons_row_1 = widgets.HBox([primary_buttons['download_button'], stop_button, reset_button])
     buttons_row_2 = widgets.HBox([validate_button, cleanup_button])
     
     button_container = widgets.VBox([
@@ -113,9 +117,9 @@ def create_training_control_buttons() -> Dict[str, Any]:
     ))
     
     return {
-        'start_button': start_button,
+        'start_button': primary_buttons['download_button'],  # Map to start_button
         'stop_button': stop_button,
-        'reset_button': reset_button,
+        'reset_button': reset_button, 
         'validate_button': validate_button,
         'cleanup_button': cleanup_button,
         'button_container': button_container

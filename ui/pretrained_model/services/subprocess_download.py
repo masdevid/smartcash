@@ -17,6 +17,7 @@ from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, 
 from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
+from smartcash.ui.pretrained_model.config.model_config import get_model_config
 
 # Gunakan logger dari utils
 logger = get_module_logger()
@@ -29,6 +30,10 @@ class DownloadProcess:
         self.ui_components = ui_components
         self.process = None
         self.is_running = False
+        self.success_count = 0  # Counter untuk model yang berhasil diunduh
+        self.failed_count = 0   # Counter untuk model yang gagal diunduh
+        self.total_models = 0   # Total model yang akan diunduh
+        self.current_model_progress = 0  # Progress untuk model yang sedang diunduh (0-100)
         self.observer_manager = ui_components.get('observer_manager')
         self.progress_tracker = ui_components.get('progress_bar')  # Alias untuk progress_tracker
         self.log_func = ui_components.get('log_message', lambda msg, level="info": log_message(self.ui_components, msg, level))
@@ -36,15 +41,29 @@ class DownloadProcess:
     
     def _update_progress(self, progress: float, message: str) -> None:
         """Update progress tracker dengan nilai dan pesan"""
+        # Simpan progress model saat ini
+        self.current_model_progress = progress
+        
+        # Hitung progress keseluruhan berdasarkan model yang sudah selesai dan progress model saat ini
+        if self.total_models > 0:
+            # Bobot untuk model saat ini dan model yang sudah selesai
+            completed_weight = self.success_count / self.total_models * 100
+            current_weight = 1 / self.total_models * progress
+            
+            # Progress keseluruhan adalah jumlah dari progress model yang sudah selesai dan sebagian dari model saat ini
+            overall_progress = completed_weight + current_weight
+        else:
+            overall_progress = progress
+            
         # Gunakan API update_progress jika tersedia (API baru)
         if 'update_progress' in self.ui_components and callable(self.ui_components['update_progress']):
-            self.ui_components['update_progress'](progress, message)
+            self.ui_components['update_progress'](overall_progress, message)
         # Gunakan progress_tracker langsung jika tersedia
         elif self.progress_tracker and hasattr(self.progress_tracker, 'update'):
-            self.progress_tracker.update(progress, message)
+            self.progress_tracker.update(overall_progress, message)
         # Fallback ke update_progress_ui
         else:
-            update_progress_ui(self.ui_components, int(progress), 100, message)
+            update_progress_ui(self.ui_components, int(overall_progress), 100, message)
     
     def _notify_observer(self, event_type: str, data: Dict[str, Any]) -> None:
         """Notifikasi ke observer jika tersedia"""
@@ -79,7 +98,8 @@ class DownloadProcess:
         
         try:
             # Mulai download dengan streaming untuk progress bar
-            self.log_func(f"📥 Mengunduh {model_name} dari {model_url}", "info")
+            model_source = model_info.get('source', '') if model_info else get_model_config(model_name).get('source', '')
+            self.log_func(f"📥 Mengunduh {model_name} dari {model_source}", "info")
             
             # Buat koneksi dengan streaming
             response = requests.get(model_url, stream=True)
@@ -87,6 +107,10 @@ class DownloadProcess:
             
             # Dapatkan ukuran file jika tersedia
             total_size = int(response.headers.get('content-length', 0))
+            
+            # Jika ukuran tidak tersedia dari header, gunakan ukuran dari konfigurasi model
+            if total_size == 0 and model_info and 'size' in model_info:
+                total_size = model_info.get('size', 0)
             
             # Download langsung ke file tujuan (tanpa temporary file)
             downloaded = 0
@@ -165,55 +189,52 @@ class DownloadProcess:
                          [{'name': 'nama_model', 'url': 'url_model', 'path': 'path_target'}]
         """
         if self.is_running:
-            self.log_func("⚠️ Proses download sudah berjalan", "warning")
+            self.log_func("🔄 Proses download sedang berjalan", "warning")
             return
-        
-        self.is_running = True
-        
-        # Reset progress tracking
-        if 'reset_progress_bar' in self.ui_components and callable(self.ui_components['reset_progress_bar']):
-            self.ui_components['reset_progress_bar'](0, "Memulai download model...")
             
+        if not models_info:
+            self.log_func("⚠️ Tidak ada model yang perlu diunduh", "warning")
+            return
+            
+        # Set flag running dan reset counters
+        self.is_running = True
+        self.success_count = 0
+        self.failed_count = 0
+        self.total_models = len(models_info)
+        self.current_model_progress = 0
+        
+        # Reset progress
+        self._update_progress(0, "Memulai download...")
+        
         # Notify start
         self._notify_observer('MODEL_DOWNLOAD_START', {
             'message': f"Memulai download {len(models_info)} model",
-            'models_count': len(models_info),
-            'models': [model['name'] for model in models_info]
+            'models': [model.get('name', '') for model in models_info]
         })
         
-        # Log start
-        self.log_func(f"🚀 Memulai download {len(models_info)} model...", "info")
-        
-        # Jalankan download langsung (tanpa threading)
-        self._download_models(models_info)
+        # Jalankan download di thread terpisah
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(self._download_models, models_info)
     
     def _download_models(self, models_info: List[Dict[str, Any]]) -> None:
         """Fungsi untuk menjalankan download model secara berurutan"""
         try:
-            # Gunakan tqdm untuk progress tracking di CLI
-            total_models = len(models_info)
-            success_count = 0
-            failed_count = 0
-            
+            # Proses setiap model secara berurutan
             for i, model_info in enumerate(models_info):
                 if not self.is_running:
-                    self.log_func("🛑 Download dibatalkan oleh pengguna", "warning")
+                    self.log_func("🛑 Download dihentikan", "warning")
                     break
-                
-                # Ekstrak informasi model dengan nilai default yang aman
-                model_name = model_info.get('name', f"Model-{i+1}")
+                    
+                # Dapatkan informasi model
+                model_name = model_info.get('name', f"model_{i}")
                 model_url = model_info.get('url', '')
                 target_path = model_info.get('path', '')
                 
                 # Validasi informasi model
                 if not model_url or not target_path:
                     self.log_func(f"⚠️ Informasi model tidak lengkap untuk {model_name}", "warning")
-                    failed_count += 1
+                    self.failed_count += 1
                     continue
-                
-                # Update progress
-                progress_pct = (i / total_models) * 100
-                self._update_progress(progress_pct, f"Memulai download {model_name}...")
                 
                 # Panggil callback on_model_download_start jika tersedia
                 if self.on_model_download_start and callable(self.on_model_download_start):
@@ -231,20 +252,20 @@ class DownloadProcess:
                 
                 # Update counter berdasarkan hasil
                 if success:
-                    success_count += 1
+                    self.success_count += 1
                 else:
-                    failed_count += 1
+                    self.failed_count += 1
             
             # Update final progress jika proses masih berjalan
             if self.is_running:
                 self._update_progress(100, "Download selesai")
                 
                 # Log summary dengan emoji yang sesuai
-                if failed_count == 0:
-                    summary = f"✅ Download selesai: Semua {success_count} model berhasil diunduh"
+                if self.failed_count == 0:
+                    summary = f"✅ Download selesai: Semua {self.success_count} model berhasil diunduh"
                     log_level = "success"
                 else:
-                    summary = f"⚠️ Download selesai: {success_count}/{total_models} berhasil, {failed_count} gagal"
+                    summary = f"⚠️ Download selesai: {self.success_count}/{self.total_models} berhasil, {self.failed_count} gagal"
                     log_level = "warning"
                     
                 self.log_func(summary, log_level)
@@ -252,9 +273,9 @@ class DownloadProcess:
                 # Notify complete dengan informasi lengkap
                 self._notify_observer('MODEL_DOWNLOAD_COMPLETE', {
                     'message': summary,
-                    'total': total_models,
-                    'success': success_count,
-                    'failed': failed_count
+                    'total': self.total_models,
+                    'success': self.success_count,
+                    'failed': self.failed_count
                 })
         
         except Exception as e:

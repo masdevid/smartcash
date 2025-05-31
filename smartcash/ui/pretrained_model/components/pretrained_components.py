@@ -36,7 +36,7 @@ def create_pretrained_ui() -> Dict[str, Any]:
         
         # Buat tombol download & sync dengan layout di tengah
         download_sync_button = widgets.Button(
-            description="Download & Sync Model",
+            description="Download & Sync",
             button_style='primary',
             icon='download',
             tooltip='Download dan sinkronisasi model pretrained',

@@ -5,7 +5,6 @@ Deskripsi: Handler UI untuk komponen model pretrained
 
 from typing import Dict, Any
 from IPython.display import display, HTML
-import threading
 
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.common.logger import get_logger
@@ -94,7 +93,5 @@ def handle_download_sync_button(b, ui_components: Dict[str, Any]) -> None:
             b.description = "Download & Sync Model"
             b.icon = ICONS.get('download', '📥')
     
-    # Mulai thread untuk proses download
-    thread = threading.Thread(target=run_process)
-    thread.daemon = True
-    thread.start()
+    # Jalankan proses download langsung (tanpa threading)
+    run_process()

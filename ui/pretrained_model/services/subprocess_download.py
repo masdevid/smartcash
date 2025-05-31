@@ -11,14 +11,14 @@ import urllib.request
 import tempfile
 from typing import Dict, Any, List, Tuple, Optional, Callable, Union
 import concurrent.futures
-import threading
 import json
 
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
 
-logger = get_logger(__name__)
+logger = get_logger(PRETRAINED_MODEL_LOGGER_NAMESPACE)
 
 class DownloadProcess:
     """Kelas untuk mengelola proses download model dengan subprocess"""
@@ -28,7 +28,6 @@ class DownloadProcess:
         self.ui_components = ui_components
         self.process = None
         self.is_running = False
-        self.download_thread = None
         self.observer_manager = ui_components.get('observer_manager')
         self.progress_tracker = ui_components.get('progress_bar')  # Alias untuk progress_tracker
         self.log_func = ui_components.get('log_message', self._default_log)
@@ -174,7 +173,7 @@ class DownloadProcess:
         # Reset progress tracking
         if 'reset_progress_bar' in self.ui_components and callable(self.ui_components['reset_progress_bar']):
             self.ui_components['reset_progress_bar'](0, "Memulai download model...")
-        
+            
         # Notify start
         self._notify_observer('MODEL_DOWNLOAD_START', {
             'message': f"Memulai download {len(models_info)} model",
@@ -185,16 +184,11 @@ class DownloadProcess:
         # Log start
         self.log_func(f"🚀 Memulai download {len(models_info)} model...", "info")
         
-        # Jalankan download dalam thread terpisah
-        self.download_thread = threading.Thread(
-            target=self._download_thread_func,
-            args=(models_info,)
-        )
-        self.download_thread.daemon = True
-        self.download_thread.start()
+        # Jalankan download langsung (tanpa threading)
+        self._download_models(models_info)
     
-    def _download_thread_func(self, models_info: List[Dict[str, Any]]) -> None:
-        """Fungsi thread untuk menjalankan download"""
+    def _download_models(self, models_info: List[Dict[str, Any]]) -> None:
+        """Fungsi untuk menjalankan download"""
         try:
             total_models = len(models_info)
             success_count = 0
@@ -272,10 +266,6 @@ class DownloadProcess:
         self._notify_observer('MODEL_DOWNLOAD_STOP', {
             'message': "Proses download dihentikan oleh pengguna"
         })
-        
-        # Wait for thread to finish
-        if self.download_thread and self.download_thread.is_alive():
-            self.download_thread.join(timeout=1.0)
         
         # Reset progress
         if 'reset_progress_bar' in self.ui_components and callable(self.ui_components['reset_progress_bar']):

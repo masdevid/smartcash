@@ -38,7 +38,7 @@ class PretrainedModelInitializer(CommonInitializer):
             'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
             'models': {
                 'yolov5s': {'path': '/content/models/yolov5s.pt', 'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt', 'size': 14*1024*1024},
-                'efficientnet-b4': {'path': '/content/models/efficientnet-b4_notop.h5', 'url': 'https://github.com/qubvel/efficientnet/releases/download/v0.6.0/efficientnet-b4_notop.h5', 'size': 75*1024*1024}
+                'efficientnet-b4': {'path': '/content/models/efficientnet-b4_notop.h5', 'url': 'https://github.com/tensorflow/models/raw/master/research/slim/nets/mobilenet/mobilenet_v3_large.h5', 'size': 75*1024*1024}
             }
         }
     

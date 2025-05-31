@@ -99,22 +99,29 @@ def update_validation_progress(ui_components: Dict[str, Any], current: int, tota
 
 def show_operation_progress(ui_components: Dict[str, Any], operation: str):
     """Show progress container untuk specific operation"""
+    # Get progress container dan tracker
+    progress_container = ui_components.get('progress_container')
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
-    if progress_tracker and hasattr(progress_tracker, 'show'):
-        # Initialize bars untuk operation
-        operation_configs = {
-            'training': "🚀 Training Progress",
-            'validation': "🔍 Model Validation", 
-            'checkpoint': "💾 Checkpoint Operations",
-            'model_loading': "🧠 Model Initialization"
-        }
-        
-        title = operation_configs.get(operation, f"📊 {operation.title()} Progress")
-        progress_tracker.show(operation)
-        
-        # Update header jika ada
-        if hasattr(progress_tracker, '_update_header'):
-            progress_tracker._update_header(title)
+    
+    # Return jika tidak ada tracker
+    if not progress_tracker:
+        return
+    
+    # Make progress container visible
+    if progress_container and hasattr(progress_container, 'layout'):
+        progress_container.layout.display = 'block'  # Tampilkan container
+    
+    # Operation-specific messaging
+    operation_messages = {
+        'training': " Memulai training model...",
+        'validation': " Memvalidasi model...",
+        'checkpoint': " Menyimpan checkpoint...",
+        'loading': " Memuat komponen model...",
+        'evaluation': " Mengevaluasi performa model..."
+    }
+    
+    message = operation_messages.get(operation, f"Operation: {operation}")
+    progress_tracker.show(message)
 
 
 def complete_operation_progress(ui_components: Dict[str, Any], message: str = "Operation completed!", show_summary: bool = True):

@@ -150,18 +150,28 @@ class TrainingInitializer(CommonInitializer):
                 if model_config:
                     merged_config['model'] = model_config
                 
+                # Training config (penting untuk UI training)
+                training_config = config_manager.get_config('training')
+                if training_config:
+                    merged_config['training'] = training_config
+                
+                # Detector config
+                detector_config = config_manager.get_config('detector')
+                if detector_config:
+                    merged_config['detector'] = detector_config
+                
                 # Hyperparameters config
-                hyperparams_config = config_manager.get_module_config('hyperparameters')
+                hyperparams_config = config_manager.get_config('hyperparameters')
                 if hyperparams_config:
                     merged_config['hyperparameters'] = hyperparams_config
                 
                 # Training strategy config
-                training_strategy_config = config_manager.get_module_config('training_strategy')
+                training_strategy_config = config_manager.get_config('training_strategy')
                 if training_strategy_config:
                     merged_config['training_strategy'] = training_strategy_config
                 
                 # Paths config
-                paths_config = config_manager.get_module_config('paths')
+                paths_config = config_manager.get_config('paths')
                 if paths_config:
                     merged_config['paths'] = paths_config
                 
@@ -173,10 +183,19 @@ class TrainingInitializer(CommonInitializer):
                 if 'config_tabs' in ui_components:
                     update_config_tabs(ui_components['config_tabs'], merged_config)
                 
-                self.logger.info("🔄 Configuration updated in training UI")
+                # Pastikan logger memanggil info
+                if hasattr(self, 'logger') and self.logger:
+                    self.logger.info("🔄 Configuration updated in training UI")
+                elif 'logger' in ui_components and ui_components['logger']:
+                    ui_components['logger'].info("🔄 Configuration updated in training UI")
                 
             except Exception as e:
-                self.logger.warning(f"⚠️ Config callback error: {str(e)}")
+                # Catat error dan pastikan logger dipanggil
+                error_msg = f"⚠️ Config callback error: {str(e)}"
+                if hasattr(self, 'logger') and self.logger:
+                    self.logger.warning(error_msg)
+                elif 'logger' in ui_components and ui_components['logger']:
+                    ui_components['logger'].warning(error_msg)
         
         # Register callback
         self.config_update_callbacks.append(config_update_callback)

@@ -50,16 +50,19 @@ def create_training_control_buttons() -> Dict[str, Any]:
         layout=widgets.Layout(width='130px', height='35px', margin='2px')
     )
     
-    # Container layout
-    buttons_row_1 = widgets.HBox([primary_buttons['download_button'], stop_button, reset_button])
-    buttons_row_2 = widgets.HBox([validate_button, cleanup_button])
-    
-    button_container = widgets.VBox([
-        buttons_row_1, buttons_row_2
+    # Container layout - Semua button dalam satu baris
+    button_container = widgets.HBox([
+        primary_buttons['download_button'], 
+        stop_button, 
+        reset_button,
+        validate_button, 
+        cleanup_button
     ], layout=widgets.Layout(
         margin='5px 0',
         padding='5px',
-        width='100%'
+        width='100%',
+        justify_content='flex-start',
+        align_items='center'
     ))
     
     return {

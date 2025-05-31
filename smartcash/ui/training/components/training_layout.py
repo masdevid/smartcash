@@ -95,10 +95,18 @@ def create_control_section(form_components: Dict[str, Any]) -> widgets.VBox:
 
 
 def create_progress_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create progress section dengan status panel"""
+    """Create progress section dengan status panel (default hidden)"""
+    # Ambil progress container dan set default hidden
+    progress_container = form_components.get('progress_container', widgets.HTML("Progress tidak tersedia"))
+    
+    # Set visibility ke hidden by default jika adalah widget yang valid
+    if hasattr(progress_container, 'layout'):
+        progress_container.layout.display = 'none'
+    
+    # Return layout
     return widgets.VBox([
         widgets.HTML("<h4>📊 Progress Training</h4>"),
-        form_components.get('progress_container', widgets.HTML("Progress tidak tersedia")),
+        progress_container,
         form_components.get('status_panel', widgets.HTML("Status tidak tersedia"))
     ], layout=widgets.Layout(margin='10px 0'))
 

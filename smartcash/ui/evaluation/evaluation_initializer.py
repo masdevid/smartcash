@@ -5,20 +5,27 @@ Deskripsi: Initializer untuk model evaluation dengan checkpoint selection dan te
 
 from typing import Dict, Any, List
 import ipywidgets as widgets
+from IPython.display import display
+
 from smartcash.ui.utils.common_initializer import CommonInitializer
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.ui_logger_namespace import EVALUATION_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+from smartcash.common.environment import get_environment_manager
 from smartcash.ui.evaluation.components.evaluation_form import create_evaluation_form
 from smartcash.ui.evaluation.components.evaluation_layout import create_evaluation_layout
 from smartcash.ui.evaluation.handlers.checkpoint_handler import setup_checkpoint_handlers
 from smartcash.ui.evaluation.handlers.evaluation_handler import setup_evaluation_handlers
 from smartcash.ui.evaluation.handlers.metrics_handler import setup_metrics_handlers
 
+# Gunakan logger dari utils
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES.get(EVALUATION_LOGGER_NAMESPACE, 'evaluation')
+logger = None  # Akan diinisialisasi nanti jika diperlukan
+
 class EvaluationInitializer(CommonInitializer):
     """Initializer untuk model evaluation dengan Common Initializer pattern"""
     
-    def __init__(self, module_name=None, logger_namespace=None):
-        module_name = module_name or 'evaluation'
-        logger_namespace = logger_namespace or 'smartcash.ui.evaluation'
-        super().__init__(module_name, logger_namespace)
+    def __init__(self):
+        super().__init__(module_name=MODULE_LOGGER_NAME, logger_namespace=EVALUATION_LOGGER_NAMESPACE)
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat komponen UI untuk evaluation dengan one-liner style"""
@@ -69,8 +76,18 @@ class EvaluationInitializer(CommonInitializer):
         """Komponen critical untuk evaluation"""
         return ['main_container', 'checkpoint_selector', 'evaluate_button', 
                 'metrics_table', 'log_output', 'progress_container']
+                
+    def _get_return_value(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Custom return value untuk modul evaluation - one-liner style"""
+        return ui_components
 
-def initialize_evaluation_ui(env=None, config=None, **kwargs):
+def initialize_evaluation_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
     """Factory function untuk initialize evaluation UI dengan auto-display"""
-    from smartcash.ui.utils.ui_factory_utils import create_ui_with_suppression
-    return create_ui_with_suppression(EvaluationInitializer, 'evaluation', None, env, config, **kwargs)
+    initializer = EvaluationInitializer()
+    ui_components = initializer.initialize(env or get_environment_manager(), config, **kwargs)
+    
+    # Auto-display main container jika ada
+    if 'main_container' in ui_components:
+        display(ui_components['main_container'])
+    
+    return ui_components

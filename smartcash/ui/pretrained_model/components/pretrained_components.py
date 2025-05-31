@@ -88,7 +88,7 @@ def create_pretrained_ui() -> Dict[str, Any]:
                 <p style="margin:8px 0"><b>Model yang akan diunduh:</b></p>
                 <ul style="margin:5px 0">
                     <li><b>YOLOv5s</b> (14 MB) - <a href="https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt" target="_blank">ultralytics/yolov5</a></li>
-                    <li><b>EfficientNet-B4</b> (75 MB) - <a href="https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth" target="_blank">timm</a></li>
+                    <li><b>EfficientNet-B4</b> (75 MB) - <a href="https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin" target="_blank">timm (Hugging Face)</a></li>
                 </ul>
                 
                 <p style="margin:8px 0"><b>Lokasi penyimpanan model:</b></p>
@@ -149,8 +149,8 @@ def create_pretrained_ui() -> Dict[str, Any]:
                 'efficientnet-b4': {
                     'name': 'EfficientNet-B4',
                     'size': '75 MB',
-                    'url': 'https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth',
-                    'source': 'timm'
+                    'url': 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin',
+                    'source': 'timm (Hugging Face)'
                 }
             }
         }

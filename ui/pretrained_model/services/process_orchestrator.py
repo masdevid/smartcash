@@ -103,7 +103,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
             if drive_path.exists():
                 # Cek apakah file model ada di Drive
                 yolo_path = drive_path / "yolov5s.pt"
-                efficientnet_path = drive_path / "efficientnet_b4_ra2_288-7934f29e.pth"
+                efficientnet_path = drive_path / "efficientnet_b4_huggingface.bin"
                 
                 if yolo_path.exists() and efficientnet_path.exists():
                     log_ui(f"{ICONS.get('success', '✅')} Model ditemukan di Google Drive")
@@ -144,8 +144,8 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
                 },
                 {
                     "name": "efficientnet-b4",
-                    "url": "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth",
-                    "path": Path(models_dir) / "efficientnet_b4_ra2_288-7934f29e.pth",
+                    "url": "https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin",
+                    "path": Path(models_dir) / "efficientnet_b4_huggingface.bin",
                     "min_size": 50 * 1024 * 1024,  # 50MB
                     "size": 75*1024*1024,
                     "idx": 1,

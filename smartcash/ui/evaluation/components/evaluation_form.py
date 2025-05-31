@@ -1,23 +1,56 @@
 """
 File: smartcash/ui/evaluation/components/evaluation_form.py
-Deskripsi: Form components untuk model evaluation dengan checkpoint selection dan test configuration
+Deskripsi: Form components untuk model evaluation dengan checkpoint selection, test configuration, dan skenario pengujian
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any
+from typing import Dict, Any, List
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.action_buttons import create_action_buttons
 
 def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Buat form components untuk evaluation dengan one-liner style"""
-    
+    """Membuat form evaluasi dengan komponen UI"""
     checkpoint_config = config.get('checkpoint', {})
     test_config = config.get('test_data', {})
     eval_config = config.get('evaluation', {})
+    scenario_config = config.get('scenario', {})
+    
+    # Inisialisasi konfigurasi skenario jika belum ada
+    if 'scenario' not in config:
+        config['scenario'] = {
+            'selected_scenario': 'scenario_1',
+            'save_to_drive': True,
+            'drive_path': '/content/drive/MyDrive/SmartCash/evaluation_results',
+            'test_folder': '/content/drive/MyDrive/SmartCash/dataset/test'
+        }
     
     # One-liner component creation
     components = {
+        # Scenario Selection
+        'scenario_dropdown': widgets.Dropdown(
+            options=[
+                ('Skenario 1: YOLOv5 Default (CSPDarknet) - Variasi Posisi', 'scenario_1'),
+                ('Skenario 2: YOLOv5 Default (CSPDarknet) - Variasi Pencahayaan', 'scenario_2'),
+                ('Skenario 3: YOLOv5 dengan EfficientNet-B4 - Variasi Posisi', 'scenario_3'),
+                ('Skenario 4: YOLOv5 dengan EfficientNet-B4 - Variasi Pencahayaan', 'scenario_4')
+            ],
+            value=scenario_config.get('selected_scenario', 'scenario_1'),
+            description='Skenario Pengujian:',
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        ),
+        
+        'scenario_description': widgets.HTML(
+            value="<div style='padding: 10px; background-color: #f8f9fa; border-left: 3px solid #4CAF50; margin: 10px 0;'>"
+                  "<p><b>Skenario Pengujian:</b> Pilih skenario pengujian dari dropdown di atas</p>"
+                  "<p><b>Backbone:</b> -</p>"
+                  "<p><b>Tipe Augmentasi:</b> -</p>"
+                  "<p><small>Hasil prediksi akan disimpan ke drive sesuai dengan nama skenario</small></p>"
+                  "</div>",
+            layout=widgets.Layout(width='100%')
+        ),
+        
         # Checkpoint Selection
         'auto_select_checkbox': widgets.Checkbox(
             value=checkpoint_config.get('auto_select_best', True),
@@ -44,9 +77,11 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         
         # Test Data Configuration
         'test_folder_text': widgets.Text(
-            value=test_config.get('test_folder', 'data/test'),
-            description='Folder test data:',
-            style={'description_width': '120px'},
+            value=scenario_config.get('test_folder', '/content/drive/MyDrive/SmartCash/dataset/test'),
+            placeholder='Path ke folder test data',
+            description='Test folder:',
+            description_tooltip='Folder yang berisi gambar test untuk evaluasi model',
+            style={'description_width': '80px'},
             layout=widgets.Layout(width='100%')
         ),
         
@@ -98,6 +133,21 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
             value=eval_config.get('save_metrics', True),
             description='Simpan metrik evaluasi',
             style={'description_width': '150px'}
+        ),
+        
+        'save_to_drive_checkbox': widgets.Checkbox(
+            value=scenario_config.get('save_to_drive', True),
+            description='Simpan hasil ke Google Drive',
+            style={'description_width': '180px'}
+        ),
+        
+        'drive_path_text': widgets.Text(
+            value=scenario_config.get('drive_path', '/content/drive/MyDrive/SmartCash/evaluation_results'),
+            placeholder='Path ke folder Google Drive untuk menyimpan hasil',
+            description='Drive path:',
+            style={'description_width': '80px'},
+            layout=widgets.Layout(width='100%'),
+            disabled=scenario_config.get('save_to_drive', True)
         ),
         
         'confusion_matrix_checkbox': widgets.Checkbox(

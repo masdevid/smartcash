@@ -23,6 +23,13 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     # Metrics display components
     metrics_components = create_metrics_display()
     
+    # Section 0: Scenario Selection
+    scenario_section = widgets.VBox([
+        create_section_title("🧪 Skenario Pengujian", "🧪"),
+        form_components['scenario_dropdown'],
+        form_components['scenario_description']
+    ], layout=widgets.Layout(margin='10px 0', padding='5px', border='1px solid #e0e0e0', border_radius='5px'))
+    
     # Section 1: Checkpoint Selection
     checkpoint_section = widgets.VBox([
         create_section_title("🏆 Checkpoint Selection", "🏆"),
@@ -52,12 +59,19 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     ], layout=widgets.Layout(margin='10px 0'))
     
     # Section 3: Evaluation Options
+    eval_options_left = widgets.VBox([
+        form_components['confusion_matrix_checkbox'],
+        form_components['visualize_results_checkbox']
+    ])
+    
+    eval_options_right = widgets.VBox([
+        form_components['save_to_drive_checkbox'],
+        form_components['drive_path_text']
+    ])
+    
     eval_options = widgets.VBox([
         create_section_title("📊 Opsi Evaluasi", "📊"),
-        widgets.HBox([
-            form_components['confusion_matrix_checkbox'],
-            form_components['visualize_results_checkbox']
-        ])
+        create_responsive_two_column(eval_options_left, eval_options_right)
     ], layout=widgets.Layout(margin='10px 0'))
     
     # Section 4: Actions
@@ -87,6 +101,8 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     
     # Main layout dengan responsive containers
     main_content = widgets.VBox([
+        scenario_section,
+        create_divider(),
         checkpoint_section,
         create_divider(),
         test_section,
@@ -114,6 +130,7 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     return {
         'main_container': main_container,
         'main_content': main_content,
+        'scenario_section': scenario_section,
         'checkpoint_section': checkpoint_section,
         'test_section': test_section,
         'eval_options': eval_options,

@@ -40,3 +40,4 @@ Act as datascience and DRY programmer who help me build YOLOv5 object detection 
 - Use contextual emojis in logs to reflect the intent 
 - Do not flooding with concurrent logs on output UI. 
 - Use colored text to highlight numeric parameters and metrics in logs for easy interpretation (e.g., green for improvements, red for critical values, orange for warnings).
+

@@ -39,8 +39,21 @@ class EvaluationInitializer(CommonInitializer):
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers untuk checkpoint selection, evaluation, dan metrics"""
         ui_components = setup_checkpoint_handlers(ui_components, config, env)
-        ui_components = setup_evaluation_handlers(ui_components, config, env)
+        ui_components = self._setup_handlers(ui_components, config, env)
         ui_components = setup_metrics_handlers(ui_components, config, env)
+        return ui_components
+    
+    def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
+        """Setup handlers untuk UI components"""
+        from smartcash.ui.evaluation.handlers.evaluation_handler import setup_evaluation_handlers
+        from smartcash.ui.evaluation.handlers.scenario_handler import setup_scenario_handlers
+        
+        # Setup scenario handlers terlebih dahulu
+        setup_scenario_handlers(ui_components, config, env)
+        
+        # Setup evaluation handlers
+        ui_components = setup_evaluation_handlers(ui_components, config, env)
+        
         return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
@@ -64,6 +77,42 @@ class EvaluationInitializer(CommonInitializer):
                 'save_metrics': True,
                 'generate_confusion_matrix': True,
                 'class_names': ['100', '500', '1000', '2000', '5000', '10000', '20000', '50000', '75000', '100000']
+            },
+            'scenario': {
+                'selected_scenario': 'scenario_1',
+                'save_to_drive': True,
+                'drive_path': '/content/drive/MyDrive/SmartCash/evaluation_results',
+                'test_folder': '/content/drive/MyDrive/SmartCash/dataset/test',
+                'scenarios': {
+                    'scenario_1': {
+                        'name': 'Skenario 1: YOLOv5 Default (CSPDarknet) backbone dengan positional variation',
+                        'description': 'Skenario ini mengevaluasi model YOLOv5 dengan backbone default (CSPDarknet) pada variasi posisi mata uang.',
+                        'folder_name': 'scenario_1_cspdarknet_position',
+                        'backbone': 'cspdarknet_s',
+                        'augmentation_type': 'position'
+                    },
+                    'scenario_2': {
+                        'name': 'Skenario 2: YOLOv5 Default (CSPDarknet) backbone dengan lighting variation',
+                        'description': 'Skenario ini mengevaluasi model YOLOv5 dengan backbone default (CSPDarknet) pada variasi pencahayaan mata uang.',
+                        'folder_name': 'scenario_2_cspdarknet_lighting',
+                        'backbone': 'cspdarknet_s',
+                        'augmentation_type': 'lighting'
+                    },
+                    'scenario_3': {
+                        'name': 'Skenario 3: YOLOv5 dengan EfficientNet-B4 backbone dengan positional variation',
+                        'description': 'Skenario ini mengevaluasi model YOLOv5 dengan backbone EfficientNet-B4 pada variasi posisi mata uang.',
+                        'folder_name': 'scenario_3_efficientnet_position',
+                        'backbone': 'efficientnet_b4',
+                        'augmentation_type': 'position'
+                    },
+                    'scenario_4': {
+                        'name': 'Skenario 4: YOLOv5 dengan EfficientNet-B4 backbone dengan lighting variation',
+                        'description': 'Skenario ini mengevaluasi model YOLOv5 dengan backbone EfficientNet-B4 pada variasi pencahayaan mata uang.',
+                        'folder_name': 'scenario_4_efficientnet_lighting',
+                        'backbone': 'efficientnet_b4',
+                        'augmentation_type': 'lighting'
+                    }
+                }
             },
             'output': {
                 'results_folder': 'output/evaluation',

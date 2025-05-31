@@ -4,12 +4,14 @@ Deskripsi: Handler untuk perhitungan dan display metrics evaluasi dengan tabel d
 """
 
 import json
+import time
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from sklearn.metrics import confusion_matrix, classification_report
 from smartcash.ui.utils.logger_bridge import log_to_service
+from concurrent.futures import ThreadPoolExecutor
 
 def setup_metrics_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None):
     """Setup handlers untuk metrics calculation dan display"""
@@ -31,16 +33,25 @@ def calculate_and_save_metrics(predictions: List[Dict[str, Any]], labels_info: D
         class_names = config.get('evaluation', {}).get('class_names', [])
         save_metrics = ui_components.get('save_metrics_checkbox', {}).get('value', True)
         generate_cm = ui_components.get('confusion_matrix_checkbox', {}).get('value', True)
+        scenario_info = config.get('scenario', {})
         
         # Calculate detection metrics
         detection_metrics = calculate_detection_metrics(predictions, labels_info, class_names, logger)
-        ui_components.get('update_progress', lambda *args: None)('step', 30, "📈 Detection metrics calculated")
+        ui_components.get('update_progress', lambda *args: None)('step', 25, "📈 Detection metrics calculated")
+        
+        # Calculate mAP metrics
+        map_metrics = calculate_map_metrics(predictions, labels_info, class_names, logger)
+        ui_components.get('update_progress', lambda *args: None)('step', 40, "📏 mAP metrics calculated")
+        
+        # Calculate inference time metrics
+        inference_metrics = calculate_inference_time_metrics(predictions, logger)
+        ui_components.get('update_progress', lambda *args: None)('step', 50, "⏱️ Inference time metrics calculated")
         
         # Calculate classification metrics jika labels tersedia
         classification_metrics = {}
         if labels_info.get('available', False):
             classification_metrics = calculate_classification_metrics(predictions, labels_info, class_names, logger)
-            ui_components.get('update_progress', lambda *args: None)('step', 60, "🎯 Classification metrics calculated")
+            ui_components.get('update_progress', lambda *args: None)('step', 70, "🎯 Classification metrics calculated")
         
         # Generate confusion matrix
         confusion_data = {}
@@ -52,13 +63,16 @@ def calculate_and_save_metrics(predictions: List[Dict[str, Any]], labels_info: D
         all_metrics = {
             'detection': detection_metrics,
             'classification': classification_metrics,
+            'map': map_metrics,
+            'inference_time': inference_metrics,
             'confusion_matrix': confusion_data,
-            'summary': create_metrics_summary(detection_metrics, classification_metrics),
+            'summary': create_metrics_summary(detection_metrics, classification_metrics, map_metrics, inference_metrics),
             'metadata': {
                 'total_images': len(predictions),
                 'total_predictions': sum(len(p['predictions']) for p in predictions),
                 'has_ground_truth': labels_info.get('available', False),
-                'class_names': class_names
+                'class_names': class_names,
+                'scenario': scenario_info
             }
         }
         
@@ -334,31 +348,38 @@ def generate_confusion_matrix(predictions: List[Dict[str, Any]], labels_info: Di
         log_to_service(logger, f"⚠️ Error generating confusion matrix: {str(e)}", "warning")
         return {'available': False, 'error': str(e)}
 
-def create_metrics_summary(detection_metrics: Dict[str, Any], classification_metrics: Dict[str, Any]) -> Dict[str, Any]:
+def create_metrics_summary(detection_metrics: Dict[str, Any], classification_metrics: Dict[str, Any], 
+                         map_metrics: Dict[str, Any] = None, inference_metrics: Dict[str, Any] = None) -> Dict[str, Any]:
     """Create summary metrics untuk display dengan one-liner aggregations"""
     
     summary = {}
     
     # Detection summary
     if detection_metrics:
-        summary.update({
-            'Total Images': detection_metrics.get('total_images', 0),
-            'Total Predictions': detection_metrics.get('total_predictions', 0),
-            'Avg Predictions/Image': round(detection_metrics.get('detection_rate', 0), 2),
-            'Avg Confidence': round(detection_metrics.get('confidence_stats', {}).get('mean', 0), 3),
-            'Min Confidence': round(detection_metrics.get('confidence_stats', {}).get('min', 0), 3),
-            'Max Confidence': round(detection_metrics.get('confidence_stats', {}).get('max', 0), 3)
-        })
+        summary['total_predictions'] = detection_metrics.get('total_predictions', 0)
+        summary['avg_confidence'] = detection_metrics.get('avg_confidence', 0)
+        summary['avg_detections_per_image'] = detection_metrics.get('avg_detections_per_image', 0)
     
     # Classification summary
     if classification_metrics:
-        summary.update({
-            'Overall Accuracy': round(classification_metrics.get('accuracy', 0), 3),
-            'Weighted Precision': round(classification_metrics.get('precision_weighted', 0), 3),
-            'Weighted Recall': round(classification_metrics.get('recall_weighted', 0), 3),
-            'Weighted F1-Score': round(classification_metrics.get('f1_score_weighted', 0), 3),
-            'Total Matches': classification_metrics.get('total_matches', 0)
-        })
+        summary['accuracy'] = classification_metrics.get('accuracy', 0)
+        summary['precision'] = classification_metrics.get('precision', {}).get('macro', 0)
+        summary['recall'] = classification_metrics.get('recall', {}).get('macro', 0)
+        summary['f1_score'] = classification_metrics.get('f1_score', {}).get('macro', 0)
+    
+    # mAP metrics
+    if map_metrics:
+        summary['mAP50'] = map_metrics.get('mAP50', 0)
+        summary['mAP50_95'] = map_metrics.get('mAP50_95', 0)
+        summary['mAP_per_class'] = map_metrics.get('mAP_per_class', {})
+    
+    # Inference time metrics
+    if inference_metrics:
+        summary['avg_inference_time'] = inference_metrics.get('avg_inference_time', 0)
+        summary['min_inference_time'] = inference_metrics.get('min_inference_time', 0)
+        summary['max_inference_time'] = inference_metrics.get('max_inference_time', 0)
+        summary['total_inference_time'] = inference_metrics.get('total_inference_time', 0)
+        summary['fps'] = inference_metrics.get('fps', 0)
     
     return summary
 
@@ -452,12 +473,12 @@ def update_metrics_table(ui_components: Dict[str, Any], metrics: Dict[str, Any],
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
                     <h5 style="color: #28a745; margin-top: 0;">🎯 Detection Metrics</h5>
-                    {create_metrics_table_section(summary, ['Total Images', 'Total Predictions', 'Avg Predictions/Image', 'Avg Confidence'])}
+                    {create_metrics_table_section(summary, ['total_predictions', 'avg_confidence', 'avg_detections_per_image'])}
                 </div>
                 
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff;">
                     <h5 style="color: #007bff; margin-top: 0;">📈 Classification Metrics</h5>
-                    {create_metrics_table_section(summary, ['Overall Accuracy', 'Weighted Precision', 'Weighted Recall', 'Weighted F1-Score']) if classification else '<p style="color: #666;">Tidak tersedia (tidak ada ground truth)</p>'}
+                    {create_metrics_table_section(summary, ['accuracy', 'precision', 'recall', 'f1_score']) if classification else '<p style="color: #666;">Tidak tersedia (tidak ada ground truth)</p>'}
                 </div>
             </div>
             
@@ -491,26 +512,44 @@ def create_metrics_table_section(summary: Dict[str, Any], keys: List[str]) -> st
 def create_full_metrics_table(summary: Dict[str, Any]) -> str:
     """Create comprehensive metrics table dengan all available metrics"""
     
-    if not summary:
-        return "<p style='color: #666;'>No summary data available</p>"
+    # Detection metrics section
+    detection_section = create_metrics_table_section(
+        summary, 
+        ['total_predictions', 'avg_confidence', 'avg_detections_per_image']
+    )
     
-    rows = [f"""
-    <tr>
-        <td style='padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: 500;'>{key}</td>
-        <td style='padding: 8px; border-bottom: 1px solid #dee2e6; text-align: right; font-family: monospace;'>{value}</td>
-    </tr>
-    """ for key, value in summary.items()]
+    # Classification metrics section
+    classification_section = create_metrics_table_section(
+        summary, 
+        ['accuracy', 'precision', 'recall', 'f1_score']
+    )
     
+    # mAP metrics section
+    map_section = create_metrics_table_section(
+        summary, 
+        ['mAP50', 'mAP50_95']
+    )
+    
+    # Inference time metrics section
+    inference_section = create_metrics_table_section(
+        summary, 
+        ['avg_inference_time', 'min_inference_time', 'max_inference_time', 'fps']
+    )
+    
+    # Combine all sections
     return f"""
-    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
         <thead>
             <tr style="background-color: #f8f9fa;">
-                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Metric</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Value</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">Metric</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6;">Value</th>
             </tr>
         </thead>
         <tbody>
-            {''.join(rows)}
+            {detection_section}
+            {classification_section}
+            {map_section}
+            {inference_section}
         </tbody>
     </table>
     """
@@ -716,6 +755,161 @@ def create_predictions_summary_table(predictions: List[Dict[str, Any]]) -> str:
         </tbody>
     </table>
     """
+
+def calculate_map_metrics(predictions: List[Dict[str, Any]], labels_info: Dict[str, Any], 
+                        class_names: List[str], logger) -> Dict[str, Any]:
+    """Calculate mAP metrics untuk object detection"""
+    
+    try:
+        if not labels_info.get('available', False):
+            return {'mAP50': 0, 'mAP50_95': 0, 'mAP_per_class': {}}
+        
+        log_to_service(logger, "📏 Calculating mAP metrics...", "info")
+        
+        # Match predictions dengan ground truth
+        matches = match_predictions_with_labels(predictions, labels_info, class_names)
+        
+        # Calculate mAP@0.5 (IoU threshold = 0.5)
+        ap_per_class_50 = calculate_ap_per_class(matches, class_names, iou_threshold=0.5)
+        mAP50 = np.mean(list(ap_per_class_50.values())) if ap_per_class_50 else 0
+        
+        # Calculate mAP@0.5:0.95 (IoU thresholds from 0.5 to 0.95 with step 0.05)
+        ap_all_thresholds = []
+        for iou_threshold in np.arange(0.5, 1.0, 0.05):
+            ap_per_class = calculate_ap_per_class(matches, class_names, iou_threshold=iou_threshold)
+            if ap_per_class:
+                ap_all_thresholds.append(np.mean(list(ap_per_class.values())))
+        
+        mAP50_95 = np.mean(ap_all_thresholds) if ap_all_thresholds else 0
+        
+        # Format mAP per class untuk display
+        mAP_per_class = {}
+        for i, class_name in enumerate(class_names):
+            mAP_per_class[class_name] = ap_per_class_50.get(i, 0)
+        
+        log_to_service(logger, f"✅ mAP calculation completed: mAP@0.5={mAP50:.4f}, mAP@0.5:0.95={mAP50_95:.4f}", "success")
+        
+        return {
+            'mAP50': mAP50,
+            'mAP50_95': mAP50_95,
+            'mAP_per_class': mAP_per_class,
+            'ap_per_class_50': ap_per_class_50
+        }
+        
+    except Exception as e:
+        log_to_service(logger, f"❌ Error calculating mAP: {str(e)}", "error")
+        return {'mAP50': 0, 'mAP50_95': 0, 'mAP_per_class': {}}
+
+def calculate_ap_per_class(matches: List[Dict[str, Any]], class_names: List[str], iou_threshold: float = 0.5) -> Dict[int, float]:
+    """Calculate Average Precision per class dengan precision-recall curve"""
+    
+    ap_per_class = {}
+    
+    for class_idx, class_name in enumerate(class_names):
+        # Collect all predictions dan ground truths untuk class ini
+        all_predictions = []
+        all_ground_truths = []
+        
+        for match in matches:
+            # Add predictions untuk class ini
+            for pred in match['predictions']:
+                if pred['class_idx'] == class_idx:
+                    all_predictions.append({
+                        'confidence': pred['confidence'],
+                        'matched': pred.get('matched', False),
+                        'match_iou': pred.get('match_iou', 0),
+                        'image_idx': match['image_idx']
+                    })
+            
+            # Count ground truths untuk class ini
+            for gt in match['ground_truths']:
+                if gt['class_idx'] == class_idx:
+                    all_ground_truths.append({
+                        'matched': gt.get('matched', False),
+                        'image_idx': match['image_idx']
+                    })
+        
+        # Skip jika tidak ada ground truth untuk class ini
+        if not all_ground_truths:
+            continue
+        
+        # Sort predictions berdasarkan confidence (descending)
+        all_predictions.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        # Calculate precision dan recall pada setiap threshold
+        tp = np.zeros(len(all_predictions))
+        fp = np.zeros(len(all_predictions))
+        
+        for i, pred in enumerate(all_predictions):
+            if pred['matched'] and pred['match_iou'] >= iou_threshold:
+                tp[i] = 1
+            else:
+                fp[i] = 1
+        
+        # Cumulative sum untuk mendapatkan cumulative TP dan FP
+        tp_cumsum = np.cumsum(tp)
+        fp_cumsum = np.cumsum(fp)
+        
+        # Calculate precision dan recall
+        precision = tp_cumsum / (tp_cumsum + fp_cumsum + 1e-10)
+        recall = tp_cumsum / (len(all_ground_truths) + 1e-10)
+        
+        # Add sentinel values untuk memastikan kurva dimulai dari 0 recall
+        precision = np.concatenate(([1], precision))
+        recall = np.concatenate(([0], recall))
+        
+        # Calculate area under precision-recall curve (AP)
+        ap = np.trapz(precision, recall)
+        ap_per_class[class_idx] = ap
+    
+    return ap_per_class
+
+def calculate_inference_time_metrics(predictions: List[Dict[str, Any]], logger) -> Dict[str, Any]:
+    """Calculate inference time metrics dari predictions"""
+    
+    try:
+        inference_times = []
+        for pred in predictions:
+            if 'inference_time' in pred:
+                inference_times.append(pred['inference_time'])
+        
+        if not inference_times:
+            log_to_service(logger, "⚠️ No inference time data found in predictions", "warning")
+            return {
+                'avg_inference_time': 0,
+                'min_inference_time': 0,
+                'max_inference_time': 0,
+                'total_inference_time': 0,
+                'fps': 0
+            }
+        
+        # Calculate metrics
+        avg_inference_time = np.mean(inference_times)
+        min_inference_time = np.min(inference_times)
+        max_inference_time = np.max(inference_times)
+        total_inference_time = np.sum(inference_times)
+        fps = 1.0 / avg_inference_time if avg_inference_time > 0 else 0
+        
+        log_to_service(logger, f"⏱️ Inference metrics: Avg={avg_inference_time*1000:.2f}ms, FPS={fps:.2f}", "info")
+        
+        return {
+            'avg_inference_time': avg_inference_time,
+            'min_inference_time': min_inference_time,
+            'max_inference_time': max_inference_time,
+            'total_inference_time': total_inference_time,
+            'fps': fps,
+            'inference_times': inference_times
+        }
+        
+    except Exception as e:
+        log_to_service(logger, f"❌ Error calculating inference time metrics: {str(e)}", "error")
+        return {
+            'avg_inference_time': 0,
+            'min_inference_time': 0,
+            'max_inference_time': 0,
+            'total_inference_time': 0,
+            'fps': 0
+        }
 
 def setup_metrics_display_handlers(ui_components: Dict[str, Any]) -> None:
     """Setup handlers untuk metrics display interactions"""

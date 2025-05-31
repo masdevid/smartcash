@@ -6,6 +6,7 @@ Deskripsi: Extended augmentation utils dengan inference-specific pipeline dan no
 import albumentations as A
 import cv2
 import numpy as np
+import torch
 from typing import Dict, Any, List, Tuple, Optional
 
 
@@ -265,8 +266,6 @@ def preprocess_image_for_yolo(image: np.ndarray, img_size: int = 416,
     Returns:
         Tuple of (preprocessed tensor, metadata untuk post-processing)
     """
-    import torch
-    
     # Store original dimensions
     original_shape = image.shape[:2]  # (height, width)
     
@@ -277,21 +276,29 @@ def preprocess_image_for_yolo(image: np.ndarray, img_size: int = 416,
     else:
         image_rgb = image.copy()
     
-    # Create augmentation pipeline
-    pipeline = create_inference_augmentation_pipeline(img_size, normalize)
+    # Padding ke persegi
+    height, width = image_rgb.shape[:2]
+    max_dim = max(height, width)
+    square_img = np.zeros((max_dim, max_dim, 3), dtype=np.uint8)
+    y_offset, x_offset = (max_dim - height) // 2, (max_dim - width) // 2
+    square_img[y_offset:y_offset+height, x_offset:x_offset+width] = image_rgb
     
-    # Apply preprocessing
-    augmented = pipeline(image=image_rgb)
-    processed_image = augmented['image']
+    # Resize ke target size
+    resized_img = cv2.resize(square_img, (img_size, img_size))
+    
+    # Normalisasi gambar
+    if normalize:
+        # Normalisasi 0-255 -> 0-1
+        normalized_img = resized_img.astype(np.float32) / 255.0
+        # Normalisasi dengan mean dan std ImageNet
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        normalized_img = (normalized_img - mean) / std
+    else:
+        normalized_img = resized_img.astype(np.float32) / 255.0
     
     # Convert ke tensor
-    if isinstance(processed_image, np.ndarray):
-        tensor = torch.from_numpy(processed_image).permute(2, 0, 1).float()
-    else:
-        tensor = processed_image
-    
-    # Add batch dimension
-    tensor = tensor.unsqueeze(0)
+    tensor = torch.from_numpy(normalized_img).permute(2, 0, 1).float().unsqueeze(0)
     
     # Metadata untuk post-processing
     metadata = {

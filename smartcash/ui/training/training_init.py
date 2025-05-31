@@ -1,7 +1,4 @@
-"""
-File: smartcash/ui/training/training_init.py
-Deskripsi: Fixed training initializer dengan proper config callback integration dan error handling
-"""
+"""\nFile: smartcash/ui/training/training_init.py\nDeskripsi: Training initializer dengan integrasi refresh konfigurasi dan pencegahan tampilan ganda\n"""
 
 from typing import Dict, Any, List
 from IPython.display import display
@@ -11,11 +8,12 @@ from smartcash.ui.utils.logging_utils import suppress_all_outputs
 
 
 class TrainingInitializer(CommonInitializer):
-    """Fixed training UI initializer dengan config callback integration"""
+    """Training UI initializer dengan config callback integration"""
     
     def __init__(self, module_name: str, logger_namespace: str):
         super().__init__(module_name, logger_namespace)
         self.config_update_callbacks = []
+        self._ui_displayed = False  # Flag untuk mencegah tampilan ganda
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components dengan safe error handling"""
@@ -86,62 +84,94 @@ class TrainingInitializer(CommonInitializer):
             
         except Exception as e:
             self.logger.error(f"❌ Model services error: {str(e)}")
-            ui_components.update({'model_manager': None, 'training_service': None, 'checkpoint_manager': None})
-        
+            
         return ui_components
     
     def _create_model_manager(self, training_config: Dict[str, Any], model_type: str):
         """Create model manager dengan proper config"""
-        from smartcash.model.manager import ModelManager
-        
-        model_config = {
-            'backbone': training_config.get('backbone', 'efficientnet_b4'),
-            'detection_layers': training_config.get('detection_layers', ['banknote']),
-            'num_classes': training_config.get('num_classes', 7),
-            'img_size': (training_config.get('image_size', 640), training_config.get('image_size', 640))
-        }
-        
-        return ModelManager(config=model_config, model_type=model_type, logger=self.logger)
+        try:
+            from smartcash.model.manager import ModelManager
+            
+            # Create model manager dengan training config
+            model_manager = ModelManager(
+                model_type=model_type,
+                backbone=training_config.get('backbone', 'efficientnet_b4'),
+                batch_size=training_config.get('batch_size', 16),
+                learning_rate=training_config.get('learning_rate', 0.001)
+            )
+            
+            return model_manager
+            
+        except Exception as e:
+            self.logger.error(f"❌ Model manager error: {str(e)}")
+            return None
     
-    def _create_training_services(self, model_manager, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_training_services(self, model_manager, config: Dict[str, Any]):
         """Create training services dengan progress callback integration"""
-        from smartcash.model.manager_checkpoint import ModelCheckpointManager
-        from smartcash.model.services.training_service import ModelTrainingService
-        
-        # Checkpoint manager dengan progress callback
-        checkpoint_manager = ModelCheckpointManager(
-            model_manager=model_manager,
-            checkpoint_dir=config.get('paths', {}).get('checkpoint_dir', 'runs/train/checkpoints'),
-            logger=self.logger
-        )
-        
-        # Training service
-        training_service = ModelTrainingService(model_manager, config)
-        
-        # Link checkpoint manager
-        model_manager.checkpoint_manager = checkpoint_manager
-        
-        return {
-            'checkpoint_manager': checkpoint_manager,
-            'training_service': training_service
-        }
+        try:
+            from smartcash.training.services.training_service import TrainingService
+            from smartcash.training.services.metrics_service import MetricsService
+            from smartcash.training.services.checkpoint_service import CheckpointService
+            
+            # Create primary services
+            training_service = TrainingService(model_manager)
+            metrics_service = MetricsService()
+            checkpoint_service = CheckpointService(
+                checkpoint_dir=config.get('paths', {}).get('checkpoint_dir', 'runs/train/checkpoints')
+            )
+            
+            # Return services map
+            return {
+                'training_service': training_service,
+                'metrics_service': metrics_service,
+                'checkpoint_service': checkpoint_service
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Services error: {str(e)}")
+            return {}
     
     def _setup_config_callback(self, ui_components: Dict[str, Any]):
-        """Setup callback untuk config updates"""
+        """Setup callback untuk config updates dengan integrasi dari berbagai modul"""
+        from smartcash.common.config.manager import ConfigManager
+        from smartcash.ui.training.components.config_tabs import create_config_tabs, update_config_tabs
+        
         def config_update_callback(new_config: Dict[str, Any]):
             """Handle config updates dan refresh info display"""
             try:
-                # Update info display
-                info_display = ui_components.get('info_display')
-                if info_display and hasattr(info_display, 'value'):
-                    from smartcash.ui.training.components.training_form import update_info_display
-                    update_info_display(info_display, new_config)
+                # Gabungkan config dari berbagai modul
+                merged_config = {}
                 
-                # Update training config display
-                training_config_display = ui_components.get('training_config_display')
-                if training_config_display:
-                    from smartcash.ui.training.utils.training_display_utils import update_training_info
-                    update_training_info(ui_components, new_config)
+                # Get config manager singleton
+                config_manager = ConfigManager.get_instance()
+                
+                # Model config dari backbone
+                model_config = config_manager.get_module_config('backbone')
+                if model_config:
+                    merged_config['model'] = model_config
+                
+                # Hyperparameters config
+                hyperparams_config = config_manager.get_module_config('hyperparameters')
+                if hyperparams_config:
+                    merged_config['hyperparameters'] = hyperparams_config
+                
+                # Training strategy config
+                training_strategy_config = config_manager.get_module_config('training_strategy')
+                if training_strategy_config:
+                    merged_config['training_strategy'] = training_strategy_config
+                
+                # Paths config
+                paths_config = config_manager.get_module_config('paths')
+                if paths_config:
+                    merged_config['paths'] = paths_config
+                
+                # Tambahkan config baru
+                if new_config:
+                    merged_config.update(new_config)
+                
+                # Update tabs jika sudah ada di ui_components
+                if 'config_tabs' in ui_components:
+                    update_config_tabs(ui_components['config_tabs'], merged_config)
                 
                 self.logger.info("🔄 Configuration updated in training UI")
                 
@@ -163,7 +193,7 @@ class TrainingInitializer(CommonInitializer):
     
     def _create_fallback_components(self, error_msg: str) -> Dict[str, Any]:
         """Create minimal fallback components"""
-        from smartcash.ui.training.components.training_form import create_fallback_training_form
+        from smartcash.ui.training.components.fallback_component import create_fallback_training_form
         return create_fallback_training_form(error_msg)
     
     def _get_default_config(self) -> Dict[str, Any]:
@@ -199,32 +229,42 @@ class TrainingInitializer(CommonInitializer):
 
 
 def initialize_training_ui(env=None, config=None, **kwargs):
-    """Factory function untuk training UI dengan proper error handling"""
+    """Factory function untuk training UI dengan pencegahan tampilan ganda"""
     suppress_all_outputs()
     
     try:
-        # Create initializer
-        initializer = TrainingInitializer('training', 'smartcash.ui.training')
+        # Check apakah sudah ada initializer yang aktif
+        initializer = None
+        for obj in globals().values():
+            if isinstance(obj, TrainingInitializer) and hasattr(obj, '_ui_displayed') and obj._ui_displayed:
+                initializer = obj
+                break
+        
+        # Jika belum ada, buat yang baru
+        if not initializer:
+            initializer = TrainingInitializer('training', 'smartcash.ui.training')
         
         # Initialize UI
         result = initializer.initialize(env, config, **kwargs)
         
+        # Set flag untuk mencegah tampilan ganda
+        initializer._ui_displayed = True
+        
         # Auto-display dengan single display check
-        if hasattr(result, 'children') or hasattr(result, 'layout'):
-            # Hanya display jika bukan dari notebook yang sudah auto-display
-            if not getattr(result, '_already_displayed', False):
+        if not getattr(result, '_displayed', False):
+            if hasattr(result, 'children') or hasattr(result, 'layout'):
                 display(result)
-                result._already_displayed = True
-        elif isinstance(result, dict) and 'ui' in result:
-            ui_widget = result['ui']
-            if not getattr(ui_widget, '_already_displayed', False):
-                display(ui_widget)
-                ui_widget._already_displayed = True
-        elif isinstance(result, dict) and 'main_container' in result:
-            main_widget = result['main_container']
-            if not getattr(main_widget, '_already_displayed', False):
-                display(main_widget)
-                main_widget._already_displayed = True
+                result._displayed = True
+            elif isinstance(result, dict) and 'ui' in result:
+                ui_widget = result['ui']
+                if not getattr(ui_widget, '_displayed', False):
+                    display(ui_widget)
+                    ui_widget._displayed = True
+            elif isinstance(result, dict) and 'main_container' in result:
+                main_widget = result['main_container']
+                if not getattr(main_widget, '_displayed', False):
+                    display(main_widget)
+                    main_widget._displayed = True
         
         return result
         

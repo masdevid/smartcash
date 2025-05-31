@@ -1,7 +1,4 @@
-"""
-File: smartcash/ui/training/components/training_layout.py
-Deskripsi: Fixed layout arrangement dengan proper container creation dan error handling
-"""
+"""\nFile: smartcash/ui/training/components/training_layout.py\nDeskripsi: Layout arrangement dengan tabs untuk konfigurasi dan accordion untuk metrics\n"""
 
 import ipywidgets as widgets
 from typing import Dict, Any
@@ -13,7 +10,7 @@ def create_training_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         # Header section
         header = create_header_section()
         
-        # Info section dengan config display
+        # Info section dengan config tabs
         info_section = create_info_section(form_components)
         
         # Control section dengan buttons
@@ -22,7 +19,7 @@ def create_training_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         # Progress section
         progress_section = create_progress_section(form_components)
         
-        # Metrics section
+        # Metrics section dengan accordion
         metrics_section = create_metrics_section(form_components)
         
         # Log section
@@ -43,6 +40,12 @@ def create_training_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         ], layout=widgets.Layout(
             width='100%', padding='15px', overflow_y='auto'
         ))
+        
+        # Cek tampilan duplikat
+        if hasattr(main_container, '_displayed') and main_container._displayed:
+            return form_components
+        
+        main_container._displayed = True
         
         # Update form components
         form_components.update({
@@ -76,10 +79,10 @@ def create_header_section() -> widgets.HTML:
 
 
 def create_info_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create info section dengan config display"""
+    """Create info section dengan config tabs"""
     return widgets.VBox([
         widgets.HTML("<h4>ℹ️ Informasi Konfigurasi</h4>"),
-        form_components.get('info_display', widgets.HTML("Info tidak tersedia"))
+        form_components.get('config_tabs', form_components.get('info_display', widgets.HTML("Info tidak tersedia")))
     ], layout=widgets.Layout(margin='10px 0'))
 
 
@@ -101,11 +104,12 @@ def create_progress_section(form_components: Dict[str, Any]) -> widgets.VBox:
 
 
 def create_metrics_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create metrics section dengan chart dan metrics display"""
+    """Create metrics section dengan metrics accordion"""
     return widgets.VBox([
-        widgets.HTML("<h4>📈 Metrik & Visualisasi</h4>"),
-        form_components.get('chart_output', widgets.Output()),
-        form_components.get('metrics_output', widgets.Output())
+        form_components.get('metrics_accordion', widgets.VBox([
+            form_components.get('chart_output', widgets.Output()),
+            form_components.get('metrics_output', widgets.Output())
+        ]))
     ], layout=widgets.Layout(margin='10px 0'))
 
 

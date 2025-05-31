@@ -12,9 +12,11 @@ import tempfile
 from typing import Dict, Any, List, Tuple, Optional, Callable, Union
 import concurrent.futures
 import json
+import shutil
 
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message, format_log_message_html
+from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
 
 # Gunakan logger dari utils
@@ -61,7 +63,7 @@ class DownloadProcess:
             except Exception:
                 pass  # Silent fail untuk observer notification
     
-    def download_model(self, model_url: str, target_path: Union[str, Path], model_name: str) -> None:
+    def download_model(self, model_url: str, target_path: Union[str, Path], model_name: str, model_info: Dict[str, Any] = None) -> bool:
         """
         Download model menggunakan urllib dengan progress tracking
         
@@ -69,6 +71,10 @@ class DownloadProcess:
             model_url: URL model untuk diunduh
             target_path: Path tujuan untuk menyimpan model
             model_name: Nama model untuk ditampilkan
+            model_info: Informasi tambahan tentang model (opsional)
+            
+        Returns:
+            bool: True jika berhasil, False jika gagal
         """
         if isinstance(target_path, str):
             target_path = Path(target_path)
@@ -105,19 +111,39 @@ class DownloadProcess:
             # Download file
             urllib.request.urlretrieve(model_url, temp_path, reporthook=report_progress)
             
-            # Setelah download selesai, pindahkan ke target
-            temp_path.rename(target_path)
+            # Pindahkan file dari temporary ke target
+            shutil.move(temp_path, target_path)
             
-            # Log sukses
+            # Update metadata model jika tersedia
+            if model_info:
+                try:
+                    # Inisialisasi ModelManager untuk metadata
+                    model_manager = ModelManager(str(target_path.parent))
+                    
+                    # Dapatkan informasi model
+                    model_id = model_info.get('id', f"{model_name}_downloaded")
+                    version = model_info.get('version', '1.0')
+                    source = model_info.get('source', model_url)
+                    
+                    # Update metadata
+                    metadata = model_manager.update_model_metadata(target_path, model_id, version, source)
+                    self.log_func(f"📋 Metadata untuk {model_name} berhasil diperbarui", "info")
+                except Exception as e:
+                    self.log_func(f"⚠️ Gagal memperbarui metadata: {str(e)}", "warning")
+            
+            # Log sukses dengan styling yang konsisten
             size_mb = target_path.stat().st_size / (1024 * 1024)
-            self.log_func(f"{model_name} berhasil diunduh (<span style='color:{COLORS.get('alert_success_text', '#155724')}'>{size_mb:.1f} MB</span>)", "success")
+            success_msg = f"✅ {model_name} berhasil diunduh ({size_mb:.1f} MB)"
+            self.log_func(success_msg, "success")
             
-            # Notify observer
+            # Update progress ke 100%
+            self._update_progress(100, f"Selesai mengunduh {model_name}")
+            
+            # Notify success
             self._notify_observer('MODEL_DOWNLOAD_SUCCESS', {
-                'message': f"{model_name} berhasil diunduh ({size_mb:.1f} MB)",
                 'model_name': model_name,
-                'file_size': size_mb,
-                'target_path': str(target_path)
+                'model_path': str(target_path),
+                'size_mb': size_mb
             })
             
             return True
@@ -197,8 +223,15 @@ class DownloadProcess:
                 if self.on_model_download_start and callable(self.on_model_download_start):
                     self.on_model_download_start(model_name)
                 
-                # Download model
-                success = self.download_model(model_url, target_path, model_name)
+                # Siapkan metadata model
+                model_metadata = {
+                    'id': model_info.get('id', f"{model_name}_downloaded"),
+                    'version': model_info.get('version', '1.0'),
+                    'source': model_info.get('source', model_url)
+                }
+                
+                # Download model dengan metadata
+                success = self.download_model(model_url, target_path, model_name, model_metadata)
                 
                 if success:
                     success_count += 1

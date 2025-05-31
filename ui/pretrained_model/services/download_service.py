@@ -5,20 +5,22 @@ Deskripsi: Layanan untuk mengunduh model pretrained untuk SmartCash
 
 from typing import Dict, Any, Callable, Optional, Union
 from pathlib import Path
-import tempfile
 import urllib.request
 import concurrent.futures
+import os
 
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
 from smartcash.ui.pretrained_model.utils.download_utils import check_model_exists
+from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
 
 # Gunakan logger dari utils
 logger = get_module_logger()
 
 def download_with_progress(url: str, target_path: Union[str, Path], log_func: Callable, 
-                           ui_components: Dict[str, Any], model_idx: int, total_models: int) -> None:
+                           ui_components: Dict[str, Any], model_idx: int, total_models: int,
+                           model_info: Dict[str, Any] = None) -> None:
     """
     Download file dengan progress tracking menggunakan ThreadPoolExecutor agar tidak blocking
     
@@ -29,19 +31,21 @@ def download_with_progress(url: str, target_path: Union[str, Path], log_func: Ca
         ui_components: Komponen UI dengan progress bar
         model_idx: Indeks model dalam daftar
         total_models: Total jumlah model
+        model_info: Informasi tambahan tentang model (opsional)
     """
     # Konversi target_path ke Path jika string
     if isinstance(target_path, str):
         target_path = Path(target_path)
     
     # Buat direktori target terlebih dahulu
-    if isinstance(target_path, str):
-        target_path = Path(target_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Fungsi untuk melakukan download langsung ke target path
     def download_task():
         try:
+            # Inisialisasi ModelManager untuk metadata
+            model_manager = ModelManager(str(target_path.parent))
+            
             # Dapatkan ukuran file
             file_size = 0
             try:
@@ -70,14 +74,20 @@ def download_with_progress(url: str, target_path: Union[str, Path], log_func: Ca
                     
                     # Hitung progress global berdasarkan indeks model dan kemajuan saat ini
                     global_progress = (model_idx + (percent/100)) / total_models
-                    global_progress = min(1.0, max(0.0, global_progress)) * 100  # Pastikan dalam range 0-100
                     
                     # Update UI dengan progress
-                    update_progress_ui(ui_components, global_progress, 100, message)
+                    update_progress_ui(ui_components, global_progress, message)
             
             # Download file langsung ke target path
             logger.info(f"🔄 Mulai mengunduh {target_path.name} dari {url}")
             urllib.request.urlretrieve(url, target_path, reporthook=report_progress)
+            
+            # Update metadata model jika info tersedia
+            if model_info:
+                model_id = model_info.get('id', f"{target_path.name}_downloaded")
+                version = model_info.get('version', '1.0')
+                source = model_info.get('source', url)
+                model_manager.update_model_metadata(target_path, model_id, version, source)
             
             # Log sukses dengan styling yang konsisten
             size_mb = target_path.stat().st_size / (1024 * 1024)
@@ -86,8 +96,8 @@ def download_with_progress(url: str, target_path: Union[str, Path], log_func: Ca
             log_func(success_msg, "success")
             
             # Update progress ke 100% untuk model ini
-            global_progress = (model_idx + 1) / total_models * 100
-            update_progress_ui(ui_components, global_progress, 100, f"Selesai mengunduh {target_path.name}")
+            global_progress = (model_idx + 1) / total_models
+            update_progress_ui(ui_components, global_progress, f"Selesai mengunduh {target_path.name}")
             
             return True
             
@@ -97,8 +107,8 @@ def download_with_progress(url: str, target_path: Union[str, Path], log_func: Ca
             log_func(error_msg, "error")
             
             # Update progress untuk menunjukkan error
-            global_progress = (model_idx + 0.5) / total_models * 100
-            update_progress_ui(ui_components, global_progress, 100, f"Error: {target_path.name}")
+            global_progress = (model_idx + 0.5) / total_models
+            update_progress_ui(ui_components, global_progress, f"Error: {target_path.name}")
             
             return False
     

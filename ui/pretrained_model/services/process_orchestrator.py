@@ -9,13 +9,15 @@ from pathlib import Path
 from IPython.display import display, HTML
 from enum import Enum
 
-from smartcash.ui.utils.constants import ICONS, COLORS
+from smartcash.ui.pretrained_model.utils.download_utils import prepare_model_info, check_models_in_drive, get_models_to_download
 from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
+from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
 from smartcash.ui.pretrained_model.pretrained_initializer import is_drive_mounted, mount_drive
 from smartcash.ui.pretrained_model.services.sync_service import sync_drive_to_local, sync_local_to_drive
 from smartcash.ui.pretrained_model.services.subprocess_download import download_models
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
 from smartcash.ui.pretrained_model.utils.download_utils import prepare_model_info, check_model_exists, check_models_in_drive, get_models_to_download
+from smartcash.ui.utils.constants import ICONS, COLORS
 
 # Definisi tahapan proses sebagai Enum untuk tracking progress
 class ProcessStage(Enum):
@@ -47,6 +49,9 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
     log_output = ui_components.get('log')
     models_dir = ui_components.get('models_dir', '/content/models')
     drive_models_dir = ui_components.get('drive_models_dir', '/content/drive/MyDrive/SmartCash/models')
+    
+    # Inisialisasi ModelManager untuk pengelolaan metadata model
+    model_manager = ModelManager(models_dir)
     
     # Inisialisasi progress tracking dengan tahapan proses
     if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
@@ -138,18 +143,25 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
             log_message(f"{ICONS.get('download', '📥')} Model tidak ditemukan di Drive, memulai download...")
             
             # Download model dengan progress bar - one-liner style
+            # Definisi model yang akan diunduh
             model_info = [
                 {
                     "name": "yolov5s.pt",
-                    "url": "https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt",
+                    "url": "https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt",
                     "min_size": 10 * 1024 * 1024,  # 10MB
-                    "idx": 0
+                    "idx": 0,
+                    "id": "yolov5s_v6.2",
+                    "version": "v6.2",
+                    "source": "ultralytics/yolov5"
                 },
                 {
                     "name": "efficientnet-b4_notop.h5",
                     "url": "https://storage.googleapis.com/keras-applications/efficientnet/efficientnet-b4_notop.h5",
                     "min_size": 50 * 1024 * 1024,  # 50MB
-                    "idx": 1
+                    "idx": 1,
+                    "id": "efficientnet_b4_keras-1.0",
+                    "version": "keras-1.0",
+                    "source": "keras-applications"
                 }
             ]
             

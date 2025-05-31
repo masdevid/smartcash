@@ -10,7 +10,8 @@ from smartcash.ui.utils.common_initializer import CommonInitializer
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger
+from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
+from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
 
 # Gunakan logger dari utils
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
@@ -33,20 +34,26 @@ class PretrainedModelInitializer(CommonInitializer):
         return setup_model_cleanup_handler(setup_model_handlers(ui_components, env, config), self.module_name, config, env)
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Mendapatkan konfigurasi default untuk model pretrained - one-liner style"""
+        """Mendapatkan konfigurasi default untuk model pretrained"""
         return {
             'models_dir': '/content/models',
             'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
             'models': {
-                'yolov5s': {
+                'yolov5': {
                     'path': '/content/models/yolov5s.pt', 
-                    'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt', 
-                    'size': 14*1024*1024
+                    'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt', 
+                    'size': 14*1024*1024,
+                    'id': 'yolov5s_v6.2',
+                    'version': 'v6.2',
+                    'source': 'ultralytics/yolov5'
                 },
                 'efficientnet-b4': {
                     'path': '/content/models/efficientnet-b4_notop.h5', 
                     'url': 'https://storage.googleapis.com/keras-applications/efficientnet/efficientnet-b4_notop.h5', 
-                    'size': 75*1024*1024
+                    'size': 75*1024*1024,
+                    'id': 'efficientnet_b4_keras-1.0',
+                    'version': 'keras-1.0',
+                    'source': 'keras-applications'
                 }
             }
         }

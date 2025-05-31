@@ -209,13 +209,22 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         # Initialize UI
         result = initializer.initialize(env, config, **kwargs)
         
-        # Auto-display dengan safe handling
+        # Auto-display dengan single display check
         if hasattr(result, 'children') or hasattr(result, 'layout'):
-            display(result)
+            # Hanya display jika bukan dari notebook yang sudah auto-display
+            if not getattr(result, '_already_displayed', False):
+                display(result)
+                result._already_displayed = True
         elif isinstance(result, dict) and 'ui' in result:
-            display(result['ui'])
+            ui_widget = result['ui']
+            if not getattr(ui_widget, '_already_displayed', False):
+                display(ui_widget)
+                ui_widget._already_displayed = True
         elif isinstance(result, dict) and 'main_container' in result:
-            display(result['main_container'])
+            main_widget = result['main_container']
+            if not getattr(main_widget, '_already_displayed', False):
+                display(main_widget)
+                main_widget._already_displayed = True
         
         return result
         

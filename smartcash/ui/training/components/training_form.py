@@ -174,20 +174,99 @@ def create_display_components() -> Dict[str, Any]:
 
 
 def create_info_display(config: Dict[str, Any]) -> widgets.HTML:
-    """Create info display untuk configuration summary"""
+    """Create comprehensive info display untuk configuration summary dengan detailed monitoring"""
     training_config = config.get('training', {})
-    model_type = training_config.get('model_type', 'efficient_optimized')
+    model_config = config.get('model', {})
+    model_optimization = config.get('model_optimization', {})
+    paths_config = config.get('paths', {})
+    data_config = config.get('data', {})
+    augmentation_config = config.get('augmentation', {})
+    
+    # Current timestamp untuk tracking updates
+    import datetime
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     info_html = f"""
-    <div style="padding: 12px; background-color: #f8f9fa; border-radius: 6px;">
-        <h5>🧠 Model Configuration</h5>
-        <ul style="margin: 10px 0;">
-            <li><b>Model Type:</b> {model_type}</li>
-            <li><b>Backbone:</b> {training_config.get('backbone', 'efficientnet_b4')}</li>
-            <li><b>Epochs:</b> {training_config.get('epochs', 100)}</li>
-            <li><b>Batch Size:</b> {training_config.get('batch_size', 16)}</li>
-            <li><b>Learning Rate:</b> {training_config.get('learning_rate', 0.001)}</li>
-        </ul>
+    <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+        <h4 style="color: #495057; margin: 0 0 15px 0;">🧠 Training Configuration Monitor</h4>
+        <p style="font-size: 11px; color: #6c757d; margin: 0 0 15px 0;">Last Updated: {timestamp}</p>
+        
+        <!-- Model Configuration -->
+        <div style="margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-radius: 6px;">
+            <h5 style="margin: 0 0 8px 0; color: #1976d2;">🏗️ Model Architecture</h5>
+            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                <li><b>Model Type:</b> <span style="color: #1976d2;">{training_config.get('model_type', 'efficient_optimized')}</span></li>
+                <li><b>Backbone:</b> <span style="color: #1976d2;">{training_config.get('backbone', model_config.get('backbone', 'efficientnet_b4'))}</span></li>
+                <li><b>Detection Layers:</b> <span style="color: #1976d2;">{', '.join(training_config.get('detection_layers', ['banknote']))}</span></li>
+                <li><b>Total Classes:</b> <span style="color: #1976d2;">{training_config.get('num_classes', model_config.get('num_classes', 7))}</span></li>
+                <li><b>Image Size:</b> <span style="color: #1976d2;">{training_config.get('image_size', model_config.get('input_size', [640, 640]))}</span></li>
+            </ul>
+        </div>
+        
+        <!-- Training Parameters -->
+        <div style="margin-bottom: 15px; padding: 10px; background: #e8f5e8; border-radius: 6px;">
+            <h5 style="margin: 0 0 8px 0; color: #2e7d32;">⚙️ Training Parameters</h5>
+            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                <li><b>Epochs:</b> <span style="color: #2e7d32;">{training_config.get('epochs', 100)}</span></li>
+                <li><b>Batch Size:</b> <span style="color: #2e7d32;">{training_config.get('batch_size', 16)}</span></li>
+                <li><b>Learning Rate:</b> <span style="color: #2e7d32;">{training_config.get('learning_rate', 0.001)}</span></li>
+                <li><b>Optimizer:</b> <span style="color: #2e7d32;">{training_config.get('optimizer', 'Adam')}</span></li>
+                <li><b>Weight Decay:</b> <span style="color: #2e7d32;">{training_config.get('weight_decay', 0.0005)}</span></li>
+                <li><b>Use Mixed Precision:</b> <span style="color: #2e7d32;">{training_config.get('use_mixed_precision', True)}</span></li>
+            </ul>
+        </div>
+        
+        <!-- Model Optimizations -->
+        <div style="margin-bottom: 15px; padding: 10px; background: #fff3e0; border-radius: 6px;">
+            <h5 style="margin: 0 0 8px 0; color: #ef6c00;">🚀 Model Optimizations</h5>
+            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                <li><b>FeatureAdapter:</b> <span style="color: {'#2e7d32' if model_optimization.get('use_attention', True) else '#d32f2f'};">{'✅ Enabled' if model_optimization.get('use_attention', True) else '❌ Disabled'}</span></li>
+                <li><b>ResidualAdapter:</b> <span style="color: {'#2e7d32' if model_optimization.get('use_residual', True) else '#d32f2f'};">{'✅ Enabled' if model_optimization.get('use_residual', True) else '❌ Disabled'}</span></li>
+                <li><b>CIoU Loss:</b> <span style="color: {'#2e7d32' if model_optimization.get('use_ciou', True) else '#d32f2f'};">{'✅ Enabled' if model_optimization.get('use_ciou', True) else '❌ Disabled'}</span></li>
+                <li><b>Transfer Learning:</b> <span style="color: {'#2e7d32' if model_config.get('transfer_learning', True) else '#d32f2f'};">{'✅ Enabled' if model_config.get('transfer_learning', True) else '❌ Disabled'}</span></li>
+                <li><b>Pretrained Weights:</b> <span style="color: {'#2e7d32' if model_config.get('pretrained', True) else '#d32f2f'};">{'✅ Used' if model_config.get('pretrained', True) else '❌ Not Used'}</span></li>
+            </ul>
+        </div>
+        
+        <!-- Data Configuration -->
+        <div style="margin-bottom: 15px; padding: 10px; background: #f3e5f5; border-radius: 6px;">
+            <h5 style="margin: 0 0 8px 0; color: #7b1fa2;">📊 Data Configuration</h5>
+            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                <li><b>Data Source:</b> <span style="color: #7b1fa2;">{data_config.get('source', 'roboflow')}</span></li>
+                <li><b>Train Split:</b> <span style="color: #7b1fa2;">{data_config.get('split_ratios', {}).get('train', 0.7) * 100:.0f}%</span></li>
+                <li><b>Valid Split:</b> <span style="color: #7b1fa2;">{data_config.get('split_ratios', {}).get('valid', 0.15) * 100:.0f}%</span></li>
+                <li><b>Test Split:</b> <span style="color: #7b1fa2;">{data_config.get('split_ratios', {}).get('test', 0.15) * 100:.0f}%</span></li>
+                <li><b>Stratified Split:</b> <span style="color: {'#2e7d32' if data_config.get('stratified_split', True) else '#d32f2f'};">{'✅ Yes' if data_config.get('stratified_split', True) else '❌ No'}</span></li>
+            </ul>
+        </div>
+        
+        <!-- Augmentation Configuration -->
+        <div style="margin-bottom: 15px; padding: 10px; background: #fce4ec; border-radius: 6px;">
+            <h5 style="margin: 0 0 8px 0; color: #c2185b;">🔄 Augmentation Settings</h5>
+            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                <li><b>Augmentation:</b> <span style="color: {'#2e7d32' if augmentation_config.get('enabled', True) else '#d32f2f'};">{'✅ Enabled' if augmentation_config.get('enabled', True) else '❌ Disabled'}</span></li>
+                <li><b>Variations:</b> <span style="color: #c2185b;">{augmentation_config.get('num_variations', 2)}</span></li>
+                <li><b>Types:</b> <span style="color: #c2185b;">{', '.join(augmentation_config.get('types', ['position', 'lighting']))}</span></li>
+                <li><b>Process Bboxes:</b> <span style="color: {'#2e7d32' if augmentation_config.get('process_bboxes', True) else '#d32f2f'};">{'✅ Yes' if augmentation_config.get('process_bboxes', True) else '❌ No'}</span></li>
+            </ul>
+        </div>
+        
+        <!-- Paths Configuration -->
+        <div style="margin-bottom: 10px; padding: 10px; background: #e0f2f1; border-radius: 6px;">
+            <h5 style="margin: 0 0 8px 0; color: #00695c;">📁 Paths & Storage</h5>
+            <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
+                <li><b>Data YAML:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('data_yaml', 'data/currency_dataset.yaml')}</span></li>
+                <li><b>Checkpoint Dir:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('checkpoint_dir', 'runs/train/checkpoints')}</span></li>
+                <li><b>Tensorboard Dir:</b> <span style="color: #00695c; font-family: monospace;">{paths_config.get('tensorboard_dir', 'runs/tensorboard')}</span></li>
+            </ul>
+        </div>
+        
+        <!-- Config Source Info -->
+        <div style="padding: 8px; background: #fff8e1; border-radius: 4px; border-left: 4px solid #ff8f00;">
+            <small style="color: #e65100; font-weight: 500;">
+                💡 Configuration akan otomatis update saat config modules lain diubah
+            </small>
+        </div>
     </div>
     """
     

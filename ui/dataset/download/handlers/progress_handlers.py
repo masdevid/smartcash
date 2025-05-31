@@ -4,6 +4,7 @@ Deskripsi: Progress handlers dengan direct ProgressTracker integration
 """
 
 from typing import Dict, Any, Optional
+from smartcash.components.observer.base_observer import BaseObserver
 
 def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Setup progress tracking handlers dengan ProgressTracker integration."""
@@ -36,7 +37,7 @@ def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
 def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
     """Setup observers dengan BaseObserver inheritance."""
     try:
-        from smartcash.components.observer import EventDispatcher, BaseObserver
+        from smartcash.components.observer import EventDispatcher
         from smartcash.components.observer.manager_observer import get_observer_manager
         
         # Pastikan observer_manager tersedia di ui_components

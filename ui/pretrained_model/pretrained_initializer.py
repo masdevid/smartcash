@@ -48,12 +48,12 @@ class PretrainedModelInitializer(CommonInitializer):
                     'source': 'ultralytics/yolov5'
                 },
                 'efficientnet-b4': {
-                    'path': '/content/models/efficientnet-b4_notop.h5', 
-                    'url': 'https://storage.googleapis.com/keras-applications/efficientnet/efficientnet-b4_notop.h5', 
+                    'path': '/content/models/efficientnet_b4_ra2_288-7934f29e.pth', 
+                    'url': 'https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth', 
                     'size': 75*1024*1024,
-                    'id': 'efficientnet_b4_keras-1.0',
-                    'version': 'keras-1.0',
-                    'source': 'keras-applications'
+                    'id': 'efficientnet_b4_timm-1.0',
+                    'version': 'timm-1.0',
+                    'source': 'timm'
                 }
             }
         }

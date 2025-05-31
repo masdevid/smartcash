@@ -4,19 +4,18 @@ Deskripsi: Layanan untuk mengunduh model pretrained menggunakan subprocess
 """
 
 import subprocess
-import sys
+import os
 import time
-from pathlib import Path
-import urllib.request
-import tempfile
-from typing import Dict, Any, List, Tuple, Optional, Callable, Union
-import concurrent.futures
-import json
 import shutil
+import requests
+from pathlib import Path
+from typing import Dict, Any, List, Callable, Optional, Tuple
+from tqdm.notebook import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
-from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message, format_log_message_html
+from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
 from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
+from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
 
 # Gunakan logger dari utils
@@ -32,13 +31,8 @@ class DownloadProcess:
         self.is_running = False
         self.observer_manager = ui_components.get('observer_manager')
         self.progress_tracker = ui_components.get('progress_bar')  # Alias untuk progress_tracker
-        self.log_func = ui_components.get('log_message', self._default_log)
+        self.log_func = ui_components.get('log_message', lambda msg, level="info": log_message(self.ui_components, msg, level))
         self.on_model_download_start = ui_components.get('on_model_download_start')  # Callback untuk update tahapan proses
-    
-    def _default_log(self, message: str, level: str = "info") -> None:
-        """Fungsi log default jika tidak ada log_func yang diberikan"""
-        # Gunakan fungsi log_message dari utils untuk mengurangi redundansi
-        log_message(self.ui_components, message, level)
     
     def _update_progress(self, progress: float, message: str) -> None:
         """Update progress tracker dengan nilai dan pesan"""
@@ -63,9 +57,9 @@ class DownloadProcess:
             except Exception:
                 pass  # Silent fail untuk observer notification
     
-    def download_model(self, model_url: str, target_path: Union[str, Path], model_name: str, model_info: Dict[str, Any] = None) -> bool:
+    def download_model(self, model_url: str, target_path: Path, model_name: str, model_info: Dict[str, Any] = None) -> bool:
         """
-        Download model menggunakan urllib dengan progress tracking
+        Download model menggunakan requests dengan progress tracking
         
         Args:
             model_url: URL model untuk diunduh
@@ -76,49 +70,46 @@ class DownloadProcess:
         Returns:
             bool: True jika berhasil, False jika gagal
         """
+        # Konversi target_path ke Path jika string
         if isinstance(target_path, str):
             target_path = Path(target_path)
             
         # Buat direktori jika belum ada
         target_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Buat temporary file untuk download
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            temp_path = Path(temp_file.name)
-        
         try:
-            # Dapatkan ukuran file
-            file_size = 0
-            try:
-                with urllib.request.urlopen(model_url) as response:
-                    file_size = int(response.info().get('Content-Length', 0))
-            except Exception as e:
-                self.log_func(f"⚠️ Tidak dapat mendapatkan ukuran file: {str(e)}", "warning")
-                file_size = 0
+            # Mulai download dengan streaming untuk progress bar
+            self.log_func(f"📥 Mengunduh {model_name} dari {model_url}", "info")
             
-            # Fungsi untuk melaporkan progress download
-            def report_progress(block_num, block_size, total_size):
-                if not self.is_running:
-                    raise Exception("Download dibatalkan")
-                    
-                downloaded = block_num * block_size
-                percent = min(100, int(100 * downloaded / total_size if total_size > 0 else 0))
-                message = f"Mengunduh {model_name}: {percent}% ({downloaded/(1024*1024):.1f}/{total_size/(1024*1024):.1f} MB)"
-                
-                # Update progress tracking
-                self._update_progress(percent, message)
+            # Buat koneksi dengan streaming
+            response = requests.get(model_url, stream=True)
+            response.raise_for_status()  # Raise exception jika status bukan 200 OK
             
-            # Download file
-            urllib.request.urlretrieve(model_url, temp_path, reporthook=report_progress)
+            # Dapatkan ukuran file jika tersedia
+            total_size = int(response.headers.get('content-length', 0))
             
-            # Pindahkan file dari temporary ke target
-            shutil.move(temp_path, target_path)
+            # Download langsung ke file tujuan (tanpa temporary file)
+            downloaded = 0
+            with open(target_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if not self.is_running:
+                        raise Exception("Download dibatalkan")
+                        
+                    if chunk:  # Filter out keep-alive chunks
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        
+                        # Update progress tracking
+                        if total_size > 0:
+                            percent = min(100, int(100 * downloaded / total_size))
+                            message = f"Mengunduh {model_name}: {percent}% ({downloaded/(1024*1024):.1f}/{total_size/(1024*1024):.1f} MB)"
+                            self._update_progress(percent, message)
             
             # Update metadata model jika tersedia
             if model_info:
                 try:
                     # Inisialisasi ModelManager untuk metadata
-                    model_manager = ModelManager(str(target_path.parent))
+                    model_manager = ModelManager(target_path.parent)
                     
                     # Dapatkan informasi model
                     model_id = model_info.get('id', f"{model_name}_downloaded")
@@ -126,7 +117,7 @@ class DownloadProcess:
                     source = model_info.get('source', model_url)
                     
                     # Update metadata
-                    metadata = model_manager.update_model_metadata(target_path, model_id, version, source)
+                    model_manager.update_model_metadata(target_path, model_id, version, source)
                     self.log_func(f"📋 Metadata untuk {model_name} berhasil diperbarui", "info")
                 except Exception as e:
                     self.log_func(f"⚠️ Gagal memperbarui metadata: {str(e)}", "warning")
@@ -149,7 +140,7 @@ class DownloadProcess:
             return True
             
         except Exception as e:
-            error_msg = f"Gagal mengunduh {model_name}: {str(e)}"
+            error_msg = f"❌ Gagal mengunduh {model_name}: {str(e)}"
             self.log_func(error_msg, "error")
             
             # Notify observer
@@ -159,8 +150,9 @@ class DownloadProcess:
                 'error': str(e)
             })
             
-            if temp_path.exists():
-                temp_path.unlink()  # Hapus file temporary jika terjadi error
+            # Hapus file yang tidak lengkap jika ada
+            if target_path.exists():
+                target_path.unlink()
             
             return False
     
@@ -196,20 +188,24 @@ class DownloadProcess:
         self._download_models(models_info)
     
     def _download_models(self, models_info: List[Dict[str, Any]]) -> None:
-        """Fungsi untuk menjalankan download"""
+        """Fungsi untuk menjalankan download model secara berurutan"""
         try:
+            # Gunakan tqdm untuk progress tracking di CLI
             total_models = len(models_info)
             success_count = 0
             failed_count = 0
             
             for i, model_info in enumerate(models_info):
                 if not self.is_running:
+                    self.log_func("🛑 Download dibatalkan oleh pengguna", "warning")
                     break
                 
+                # Ekstrak informasi model dengan nilai default yang aman
                 model_name = model_info.get('name', f"Model-{i+1}")
                 model_url = model_info.get('url', '')
                 target_path = model_info.get('path', '')
                 
+                # Validasi informasi model
                 if not model_url or not target_path:
                     self.log_func(f"⚠️ Informasi model tidak lengkap untuk {model_name}", "warning")
                     failed_count += 1
@@ -223,7 +219,7 @@ class DownloadProcess:
                 if self.on_model_download_start and callable(self.on_model_download_start):
                     self.on_model_download_start(model_name)
                 
-                # Siapkan metadata model
+                # Siapkan metadata model dengan semua field yang diperlukan
                 model_metadata = {
                     'id': model_info.get('id', f"{model_name}_downloaded"),
                     'version': model_info.get('version', '1.0'),
@@ -233,20 +229,27 @@ class DownloadProcess:
                 # Download model dengan metadata
                 success = self.download_model(model_url, target_path, model_name, model_metadata)
                 
+                # Update counter berdasarkan hasil
                 if success:
                     success_count += 1
                 else:
                     failed_count += 1
             
-            # Update final progress
+            # Update final progress jika proses masih berjalan
             if self.is_running:
                 self._update_progress(100, "Download selesai")
                 
-                # Log summary
-                summary = f"✅ Download selesai: {success_count}/{total_models} berhasil, {failed_count} gagal"
-                self.log_func(summary, "success" if failed_count == 0 else "warning")
+                # Log summary dengan emoji yang sesuai
+                if failed_count == 0:
+                    summary = f"✅ Download selesai: Semua {success_count} model berhasil diunduh"
+                    log_level = "success"
+                else:
+                    summary = f"⚠️ Download selesai: {success_count}/{total_models} berhasil, {failed_count} gagal"
+                    log_level = "warning"
+                    
+                self.log_func(summary, log_level)
                 
-                # Notify complete
+                # Notify complete dengan informasi lengkap
                 self._notify_observer('MODEL_DOWNLOAD_COMPLETE', {
                     'message': summary,
                     'total': total_models,
@@ -255,16 +258,17 @@ class DownloadProcess:
                 })
         
         except Exception as e:
-            error_msg = f"Error dalam proses download: {str(e)}"
+            error_msg = f"❌ Error dalam proses download: {str(e)}"
             self.log_func(error_msg, "error")
             
-            # Notify error
+            # Notify error dengan detail
             self._notify_observer('MODEL_DOWNLOAD_ERROR', {
                 'message': error_msg,
                 'error': str(e)
             })
         
         finally:
+            # Pastikan flag is_running diatur ke False
             self.is_running = False
     
     def stop_download(self) -> None:

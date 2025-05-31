@@ -44,6 +44,22 @@ def create_pretrained_ui() -> Dict[str, Any]:
             tooltip='Download dan sinkronisasi model pretrained',
             layout=widgets.Layout(
                 margin='15px auto',  # Auto margin untuk centering
+                width='200px',
+                display='flex',
+                justify_content='center',  # Rata tengah horizontal
+                align_items='center'  # Rata tengah vertikal
+            )
+        )
+        
+        # Buat tombol reset UI untuk membersihkan log dan progress
+        reset_ui_button = widgets.Button(
+            description="Reset UI",
+            button_style='info',
+            icon='refresh',
+            tooltip='Reset UI, bersihkan log dan progress',
+            layout=widgets.Layout(
+                margin='15px auto',  # Auto margin untuk centering
+                width='120px',
                 display='flex',
                 justify_content='center',  # Rata tengah horizontal
                 align_items='center'  # Rata tengah vertikal
@@ -57,29 +73,43 @@ def create_pretrained_ui() -> Dict[str, Any]:
             icon=ICONS.get('brain', '🧠')
         )
         
-        # Buat info panel
+        # Definisikan direktori untuk model
+        models_dir = '/content/models'
+        drive_models_dir = '/content/drive/MyDrive/SmartCash/models'
+        
+        # Buat info panel dengan informasi lokasi model dan sumber download
         info_html = widgets.HTML(
             f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
                  color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
                  border-left:4px solid {COLORS['alert_info_text']}">
                 <p style="margin:5px 0">{ICONS.get('info', 'ℹ️')} Klik tombol <b>Download & Sync Model</b> untuk memeriksa, 
                 mengunduh, dan menyinkronkan model pre-trained yang diperlukan.</p>
-                <p style="margin:5px 0">Model yang akan diunduh:</p>
-                <ul>
-                    <li>YOLOv5s (14 MB)</li>
-                    <li>EfficientNet-B4 (75 MB)</li>
+                
+                <p style="margin:8px 0"><b>Model yang akan diunduh:</b></p>
+                <ul style="margin:5px 0">
+                    <li><b>YOLOv5s</b> (14 MB) - <a href="https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt" target="_blank">ultralytics/yolov5</a></li>
+                    <li><b>EfficientNet-B4</b> (75 MB) - <a href="https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth" target="_blank">timm</a></li>
                 </ul>
+                
+                <p style="margin:8px 0"><b>Lokasi penyimpanan model:</b></p>
+                <ul style="margin:5px 0">
+                    <li>Lokal: <code>{models_dir}</code></li>
+                    <li>Google Drive: <code>{drive_models_dir}</code></li>
+                </ul>
+                
                 <p style="margin:5px 0">Jika model sudah ada di Google Drive, akan langsung disinkronkan tanpa mengunduh ulang.</p>
+                <p style="margin:5px 0; font-size:0.9em">Gunakan tombol <b>Reset UI</b> untuk membersihkan log dan progress.</p>
             </div>"""
         )
         
         # Buat container untuk tombol agar rata tengah
         button_container = widgets.HBox(
-            [download_sync_button],
+            [download_sync_button, reset_ui_button],
             layout=widgets.Layout(
                 display='flex',
                 justify_content='center',  # Rata tengah horizontal
-                width='100%'
+                width='100%',
+                gap='10px'  # Jarak antar tombol
             )
         )
         
@@ -95,10 +125,6 @@ def create_pretrained_ui() -> Dict[str, Any]:
                         layout=widgets.Layout(margin='10px 0'))
         ], layout=widgets.Layout(padding='10px'))
         
-        # Definisikan direktori untuk model
-        models_dir = '/content/models'
-        drive_models_dir = '/content/drive/MyDrive/SmartCash/models'
-        
         # Kumpulkan komponen UI dengan progress tracking dan log accordion
         ui_components = {
             'main_container': main_container,
@@ -106,11 +132,27 @@ def create_pretrained_ui() -> Dict[str, Any]:
             'log': log_output,
             'log_accordion': log_accordion['log_accordion'],
             'download_sync_button': download_sync_button,
+            'reset_ui_button': reset_ui_button,
             'models_dir': models_dir,
             'drive_models_dir': drive_models_dir,
             # Tambahkan alias untuk kompatibilitas dengan kode lama
             'progress_bar': progress_tracking['tracker'],
-            'progress_label': progress_tracking['status_widget']
+            'progress_label': progress_tracking['status_widget'],
+            # Tambahkan informasi model untuk ditampilkan di UI
+            'model_info': {
+                'yolov5': {
+                    'name': 'YOLOv5s',
+                    'size': '14 MB',
+                    'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
+                    'source': 'ultralytics/yolov5'
+                },
+                'efficientnet-b4': {
+                    'name': 'EfficientNet-B4',
+                    'size': '75 MB',
+                    'url': 'https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth',
+                    'source': 'timm'
+                }
+            }
         }
         
         # Tambahkan komponen progress tracking dan log accordion lengkap

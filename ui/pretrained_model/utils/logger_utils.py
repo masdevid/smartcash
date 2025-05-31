@@ -99,3 +99,16 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         logger.error(message)
     else:
         logger.info(message)
+        
+def clear_log_output(log_output) -> None:
+    """
+    Membersihkan output log dari komponen UI
+    
+    Args:
+        log_output: Komponen output log yang akan dibersihkan
+    """
+    if hasattr(log_output, 'clear_output'):
+        log_output.clear_output()
+    
+    # Log ke logger bahwa log telah dibersihkan
+    logger.info(f"{ICONS.get('cleanup', '🧹')} Log output telah dibersihkan")

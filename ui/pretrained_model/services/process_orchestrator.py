@@ -9,14 +9,12 @@ from pathlib import Path
 from IPython.display import display, HTML
 from enum import Enum
 
-from smartcash.ui.pretrained_model.utils.download_utils import prepare_model_info, check_models_in_drive, get_models_to_download
+from smartcash.ui.pretrained_model.utils.download_utils import prepare_model_info, check_models_in_drive, get_models_to_download, check_model_exists
 from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
 from smartcash.ui.pretrained_model.utils.model_utils import ModelManager
 from smartcash.ui.pretrained_model.pretrained_initializer import is_drive_mounted, mount_drive
 from smartcash.ui.pretrained_model.services.sync_service import sync_drive_to_local, sync_local_to_drive
 from smartcash.ui.pretrained_model.services.subprocess_download import download_models
-from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
-from smartcash.ui.pretrained_model.utils.download_utils import prepare_model_info, check_model_exists, check_models_in_drive, get_models_to_download
 from smartcash.ui.utils.constants import ICONS, COLORS
 
 # Definisi tahapan proses sebagai Enum untuk tracking progress
@@ -63,25 +61,15 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
             ui_components['progress_bar'].value = stage.progress
         if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'value'):
             ui_components['progress_label'].value = stage.description
-        log_message(f"Tahap: {stage.description}", "info")
+        log_ui(f"Tahap: {stage.description}", "info")
         return stage.progress
     
     # Bersihkan log output jika tersedia
     if log_output: log_output.clear_output(wait=True)
     
-    # Gunakan fungsi log_message dari utils dengan tambahan timestamp
-    def log_message(message: str, message_type='info'):
-        # Tambahkan emoji berdasarkan tipe pesan
-        emoji_map = {'info': '📝', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'download': '📥', 'sync': '🔄'}
-        emoji = emoji_map.get(message_type, emoji_map['info'])
-        
-        # Format timestamp dan pesan
-        timestamp = time.strftime("%H:%M:%S")
-        formatted_message = f"[{timestamp}] {emoji} {message}"
-        
-        # Gunakan log_message dari utils dengan UI components
-        from smartcash.ui.pretrained_model.utils.logger_utils import log_message as utils_log_message
-        utils_log_message(ui_components, formatted_message, message_type)
+    # Alias untuk fungsi log_message dari utils untuk kemudahan penggunaan
+    def log_ui(message: str, message_type='info'):
+        log_message(ui_components, message, message_type)
     
     try:
         # Cek apakah di Colab dengan mencoba mengimpor google.colab
@@ -100,9 +88,9 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
         
         # Jika di Colab tapi Drive belum ter-mount, coba mount
         if in_colab and not is_drive_mounted_val:
-            log_message(f"{ICONS.get('sync', '🔄')} Mounting Google Drive...")
+            log_ui(f"{ICONS.get('sync', '🔄')} Mounting Google Drive...")
             success, message = mount_drive()
-            log_message(message)
+            log_ui(message)
             is_drive_mounted_val = is_drive_mounted()
             
         # Update progress: Memeriksa model yang tersedia
@@ -115,18 +103,18 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
             if drive_path.exists():
                 # Cek apakah file model ada di Drive
                 yolo_path = drive_path / "yolov5s.pt"
-                efficientnet_path = drive_path / "efficientnet-b4_notop.h5"
+                efficientnet_path = drive_path / "efficientnet_b4_ra2_288-7934f29e.pth"
                 
                 if yolo_path.exists() and efficientnet_path.exists():
-                    log_message(f"{ICONS.get('success', '✅')} Model ditemukan di Google Drive")
+                    log_ui(f"{ICONS.get('success', '✅')} Model ditemukan di Google Drive")
                     drive_models_exist = True
                     
                     # Update progress: Sinkronisasi dari Drive ke lokal
                     update_stage(ProcessStage.SYNC_FROM_DRIVE)
                     
                     # Sinkronkan dari Drive ke lokal
-                    log_message(f"{ICONS.get('download', '📥')} Menyinkronkan model dari Drive ke lokal...")
-                    sync_drive_to_local(drive_models_dir, models_dir, log_message, ui_components)
+                    log_ui(f"{ICONS.get('download', '📥')} Menyinkronkan model dari Drive ke lokal...")
+                    sync_drive_to_local(drive_models_dir, models_dir, log_ui, ui_components)
                     
                     # Update status
                     if status_panel:
@@ -140,7 +128,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
         
         # Jika model tidak ada di Drive, download dan sinkronkan
         if not drive_models_exist:
-            log_message(f"{ICONS.get('download', '📥')} Model tidak ditemukan di Drive, memulai download...")
+            log_ui(f"{ICONS.get('download', '📥')} Model tidak ditemukan di Drive, memulai download...")
             
             # Download model dengan progress bar - one-liner style
             # Definisi model yang akan diunduh
@@ -155,13 +143,15 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
                     "source": "ultralytics/yolov5"
                 },
                 {
-                    "name": "efficientnet-b4_notop.h5",
-                    "url": "https://storage.googleapis.com/keras-applications/efficientnet/efficientnet-b4_notop.h5",
+                    "name": "efficientnet-b4",
+                    "url": "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/efficientnet_b4_ra2_288-7934f29e.pth",
+                    "path": Path(models_dir) / "efficientnet_b4_ra2_288-7934f29e.pth",
                     "min_size": 50 * 1024 * 1024,  # 50MB
+                    "size": 75*1024*1024,
                     "idx": 1,
-                    "id": "efficientnet_b4_keras-1.0",
-                    "version": "keras-1.0",
-                    "source": "keras-applications"
+                    "id": "efficientnet_b4_timm-1.0",
+                    "version": "timm-1.0",
+                    "source": "timm"
                 }
             ]
             
@@ -178,7 +168,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
                 
                 # Periksa apakah model sudah ada dan ukurannya sesuai
                 if not model_path.exists() or model_path.stat().st_size < model["min_size"]:
-                    log_message(f"Model {model['name']} perlu diunduh", "info")
+                    log_ui(f"Model {model['name']} perlu diunduh", "info")
                     download_list.append({
                         "name": model["name"],
                         "url": model["url"],
@@ -206,10 +196,10 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
             
             # Jalankan download jika ada model yang perlu diunduh
             if download_list:
-                log_message(f"Mengunduh {len(download_list)} model...", "download")
+                log_ui(f"Mengunduh {len(download_list)} model...", "download")
                 
                 # Tambahkan fungsi log dan update_stage ke ui_components
-                ui_components['log_message'] = log_message
+                ui_components['log_message'] = log_ui
                 
                 # Update progress berdasarkan model yang akan diunduh
                 yolo_download = any(model['name'] == 'yolov5s' for model in download_list)
@@ -232,16 +222,16 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
                 # Gunakan subprocess download
                 download_models(download_list, ui_components)
             else:
-                log_message("Semua model sudah tersedia", "success")
+                log_ui("Semua model sudah tersedia", "success")
         
         # Update progress: Sinkronisasi ke Google Drive
         update_stage(ProcessStage.SYNC_TO_DRIVE)
         
         # Sinkronkan ke Drive jika tersedia
         if is_drive_mounted_val:
-            log_message(f"{ICONS.get('sync', '🔄')} Menyinkronkan model ke Google Drive...")
+            log_ui(f"{ICONS.get('sync', '🔄')} Menyinkronkan model ke Google Drive...")
             model_info_dict = {"models": model_data}
-            sync_local_to_drive(models_dir, drive_models_dir, model_info_dict, log_message, ui_components)
+            sync_local_to_drive(models_dir, drive_models_dir, model_info_dict, log_ui, ui_components)
         
         # Update status
         if status_panel:
@@ -279,7 +269,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
         
         # Update progress: Proses selesai
         update_stage(ProcessStage.COMPLETE)
-        log_message("Proses download dan sinkronisasi selesai", "success")
+        log_ui("Proses download dan sinkronisasi selesai", "success")
                     
     except Exception as e:
         logger.error(f"Error dalam proses download dan sinkronisasi: {str(e)}")

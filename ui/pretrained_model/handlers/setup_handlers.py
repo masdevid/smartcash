@@ -22,15 +22,24 @@ def setup_model_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         Dictionary komponen UI yang diperbarui
     """
     # Import handler yang diperlukan
-    from smartcash.ui.pretrained_model.handlers.ui_handlers import handle_download_sync_button
+    from smartcash.ui.pretrained_model.handlers.ui_handlers import handle_download_sync_button, handle_reset_ui_button
     
     # Register handler untuk tombol download & sync - one-liner style
     if 'download_sync_button' in ui_components and ui_components['download_sync_button']:
         ui_components['download_sync_button'].on_click(lambda b: handle_download_sync_button(b, ui_components))
         logger.debug(f"{ICONS.get('link', '🔗')} Handler untuk tombol download & sync terdaftar")
     
+    # Register handler untuk tombol reset UI
+    if 'reset_ui_button' in ui_components and ui_components['reset_ui_button']:
+        ui_components['reset_ui_button'].on_click(lambda b: handle_reset_ui_button(b, ui_components))
+        logger.debug(f"{ICONS.get('link', '🔗')} Handler untuk tombol reset UI terdaftar")
+    
     # Definisikan fungsi reset_progress_bar untuk progress tracking dengan parameter show_progress
     ui_components['reset_progress_bar'] = lambda value=0, message="", show_progress=True: reset_progress_bar(ui_components, value, message, show_progress)
+    
+    # Definisikan fungsi log_message untuk digunakan di berbagai tempat
+    from smartcash.ui.pretrained_model.utils.logger_utils import log_message
+    ui_components['log_message'] = lambda message, level="info": log_message(ui_components, message, level)
     
     return ui_components
 

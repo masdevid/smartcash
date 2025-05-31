@@ -10,12 +10,15 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         from smartcash.ui.components.progress_tracking import create_progress_tracking_container
         from smartcash.ui.components.log_accordion import create_log_accordion
         from smartcash.ui.components.status_panel import create_status_panel
-        from smartcash.ui.training.components.control_buttons import create_training_control_buttons
+        from smartcash.ui.training.components.control_buttons import create_training_control_buttons, create_non_training_buttons
         from smartcash.ui.training.components.config_tabs import create_config_tabs
         from smartcash.ui.training.components.metrics_accordion import create_metrics_accordion
         
         # Training control buttons
         control_buttons = create_training_control_buttons()
+        
+        # Non-training utility buttons
+        utility_buttons = create_non_training_buttons()
         
         # Progress tracking dengan proper container
         progress_components = create_progress_tracking_container()
@@ -36,6 +39,10 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
             # Control buttons
             **control_buttons,
             'control_buttons': control_buttons,  # Explicit key for container access
+            
+            # Utility buttons
+            **utility_buttons,
+            'utility_buttons': utility_buttons,  # Explicit key for container access
             
             # Progress tracking
             'progress_container': progress_components.get('container'),

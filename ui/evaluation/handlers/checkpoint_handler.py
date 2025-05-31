@@ -18,7 +18,8 @@ def setup_checkpoint_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     handlers = {
         'check_button': lambda b: check_available_checkpoints(ui_components, config, logger),
         'auto_select_checkbox': lambda change: toggle_checkpoint_selection(ui_components, change, logger),
-        'checkpoint_path_text': lambda change: validate_custom_checkpoint(ui_components, change, logger)
+        'checkpoint_path_text': lambda change: validate_custom_checkpoint(ui_components, change, logger),
+        'scenario_dropdown': lambda change: scenario_changed(ui_components, change, config, logger)
     }
     
     # Register handlers dengan safe checking
@@ -30,11 +31,33 @@ def setup_checkpoint_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     
     return ui_components
 
+def scenario_changed(ui_components: Dict[str, Any], change: Dict[str, Any], config: Dict[str, Any], logger) -> None:
+    """Handler untuk perubahan skenario, otomatis update checkpoint terbaik"""
+    if 'new' not in change or change['new'] == change.get('old'):
+        return  # Skip jika tidak ada perubahan
+    
+    new_scenario = change['new']
+    log_to_service(logger, f"🔄 Skenario berubah ke: {new_scenario}", "info")
+    log_to_service(logger, "🔍 Mencari checkpoint terbaik untuk skenario ini...", "info")
+    
+    # Pastikan auto-select diaktifkan
+    if 'auto_select_checkbox' in ui_components and not ui_components['auto_select_checkbox'].value:
+        ui_components['auto_select_checkbox'].value = True
+    
+    # Cari checkpoint terbaik untuk skenario ini
+    check_available_checkpoints(ui_components, config, logger)
+
 def check_available_checkpoints(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Check dan display available checkpoints dengan metrics"""
+    """Check dan display available checkpoints dengan metrics sesuai model dan backbone"""
     log_to_service(logger, "🔍 Mencari checkpoint yang tersedia...", "info")
     
     try:
+        # Dapatkan model dan backbone dari scenario dropdown
+        selected_scenario = ui_components.get('scenario_dropdown', {}).value if 'scenario_dropdown' in ui_components else None
+        model_type, backbone = get_model_info_from_scenario(selected_scenario)
+        
+        log_to_service(logger, f"🧠 Mencari checkpoint untuk model: {model_type}, backbone: {backbone}", "info")
+        
         # Checkpoint paths untuk search
         checkpoint_paths = [
             "runs/train/*/weights/best.pt",
@@ -53,6 +76,17 @@ def check_available_checkpoints(ui_components: Dict[str, Any], config: Dict[str,
         
         # Get checkpoint info dengan metrics
         checkpoint_info = [get_checkpoint_info(cp) for cp in checkpoints]
+        
+        # Filter checkpoint berdasarkan model dan backbone jika tersedia
+        if model_type and backbone:
+            filtered_checkpoints = filter_checkpoints_by_model(checkpoint_info, model_type, backbone)
+            if filtered_checkpoints:
+                log_to_service(logger, f"✅ Ditemukan {len(filtered_checkpoints)} checkpoint yang sesuai dengan {model_type} ({backbone})", "success")
+                checkpoint_info = filtered_checkpoints
+            else:
+                log_to_service(logger, f"⚠️ Tidak ditemukan checkpoint untuk {model_type} ({backbone}). Menampilkan semua checkpoint.", "warning")
+        
+        # Pilih checkpoint terbaik
         best_checkpoint = get_best_checkpoint(checkpoint_info)
         
         # Display results dalam log
@@ -220,6 +254,64 @@ def validate_custom_checkpoint(ui_components: Dict[str, Any], change: Dict[str, 
             
     except Exception as e:
         log_to_service(logger, f"❌ Error validasi checkpoint: {str(e)}", "error")
+
+def get_model_info_from_scenario(scenario_name: str) -> Tuple[Optional[str], Optional[str]]:
+    """Ekstrak informasi model dan backbone dari nama skenario"""
+    if not scenario_name:
+        return None, None
+    
+    # Mapping skenario ke model dan backbone
+    scenario_mapping = {
+        'efficientnet_b4': ('yolov5', 'efficientnet_b4'),
+        'efficientnet_optimized': ('yolov5', 'efficientnet_b4'),
+        'csp_darknet': ('yolov5', 'csp_darknet'),
+        'yolov5s': ('yolov5', 'csp_darknet'),
+        'yolov5m': ('yolov5', 'csp_darknet'),
+        'yolov5l': ('yolov5', 'csp_darknet'),
+        'yolov5x': ('yolov5', 'csp_darknet')
+    }
+    
+    # Cari match berdasarkan substring dalam nama skenario
+    for key, (model, backbone) in scenario_mapping.items():
+        if key.lower() in scenario_name.lower():
+            return model, backbone
+    
+    # Default jika tidak ada yang cocok
+    return 'yolov5', 'efficientnet_b4'
+
+def filter_checkpoints_by_model(checkpoints: List[Dict[str, Any]], model_type: str, backbone: str) -> List[Dict[str, Any]]:
+    """Filter checkpoint berdasarkan model dan backbone"""
+    filtered = []
+    
+    for cp in checkpoints:
+        # Cek dari nama checkpoint atau folder
+        checkpoint_name = cp.get('name', '').lower()
+        folder_name = cp.get('folder', '').lower()
+        path = cp.get('path', '').lower()
+        
+        # Cek dari model_info jika tersedia
+        model_info = cp.get('model_info', {})
+        yaml_config = model_info.get('yaml', {})
+        
+        # Cek backbone dari yaml config atau nama
+        has_backbone = False
+        if isinstance(yaml_config, dict) and 'backbone' in yaml_config:
+            has_backbone = backbone.lower() in str(yaml_config['backbone']).lower()
+        else:
+            has_backbone = backbone.lower() in checkpoint_name or backbone.lower() in folder_name or backbone.lower() in path
+        
+        # Cek model type dari yaml config atau nama
+        has_model = False
+        if isinstance(yaml_config, dict) and 'model_type' in yaml_config:
+            has_model = model_type.lower() in str(yaml_config['model_type']).lower()
+        else:
+            has_model = model_type.lower() in checkpoint_name or model_type.lower() in folder_name or model_type.lower() in path
+        
+        # Tambahkan ke hasil jika cocok
+        if has_model or has_backbone:  # Cukup salah satu yang cocok
+            filtered.append(cp)
+    
+    return filtered
 
 def auto_load_checkpoint_info(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
     """Auto-load checkpoint info saat initialization"""

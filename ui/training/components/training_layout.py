@@ -79,11 +79,22 @@ def create_header_section() -> widgets.HTML:
 
 
 def create_info_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create info section dengan config tabs"""
-    return widgets.VBox([
+    """Create info section dengan config tabs dan non-training buttons"""
+    # Ambil utility container jika tersedia
+    utility_container = form_components.get('utility_container', None)
+    
+    # Buat komponen untuk section
+    components = [
         widgets.HTML("<h4>ℹ️ Informasi Konfigurasi</h4>"),
         form_components.get('config_tabs', form_components.get('info_display', widgets.HTML("Info tidak tersedia")))
-    ], layout=widgets.Layout(margin='10px 0'))
+    ]
+    
+    # Tambahkan utility buttons jika tersedia
+    if utility_container is not None:
+        components.append(widgets.HTML("<p style='margin-top:10px; margin-bottom:5px;'><small>🛠️ Utilitas Tambahan:</small></p>"))
+        components.append(utility_container)
+    
+    return widgets.VBox(components, layout=widgets.Layout(margin='10px 0'))
 
 
 def create_control_section(form_components: Dict[str, Any]) -> widgets.VBox:

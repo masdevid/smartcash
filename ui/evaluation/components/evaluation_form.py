@@ -163,21 +163,16 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         )
     }
     
-    # Action buttons dengan one-liner
+    # Action buttons untuk menjalankan evaluasi sesuai skenario
     action_buttons = create_action_buttons(
-        primary_label="🚀 Evaluasi Model",
-        primary_icon="evaluate",
-        secondary_buttons=[("🔍 Cek Checkpoint", "search", "info"), ("🧹 Reset Config", "reset", "warning")],
+        primary_text="Jalankan Evaluasi",
+        secondary_text="Batal",
+        primary_tooltip="Jalankan evaluasi model sesuai skenario yang dipilih",
+        secondary_tooltip="Batalkan proses evaluasi yang sedang berjalan",
+        primary_icon="play",
+        secondary_icon="stop",
         cleanup_enabled=False,
         primary_style='success'
-    )
-    
-    # Save reset buttons
-    save_reset_buttons = create_save_reset_buttons(
-        save_tooltip="Simpan konfigurasi evaluasi",
-        reset_tooltip="Reset ke konfigurasi default",
-        with_sync_info=True,
-        sync_message="Konfigurasi evaluasi akan disimpan untuk sesi berikutnya."
     )
     
     # Buat checkpoint_selector container untuk mengelompokkan elemen-elemen terkait checkpoint
@@ -190,9 +185,8 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
     # Merge dengan action buttons dan tambahkan checkpoint_selector
     components.update({
         **action_buttons,
-        **save_reset_buttons,
-        'evaluate_button': action_buttons['download_button'],  # Alias untuk consistency
-        'check_button': action_buttons['check_button'],
+        'evaluate_button': action_buttons['primary_button'],  # Tombol utama untuk evaluasi
+        'cancel_button': action_buttons['secondary_button'],  # Tombol untuk membatalkan evaluasi
         'checkpoint_selector': checkpoint_selector  # Tambahkan checkpoint_selector sebagai komponen tunggal
     })
     

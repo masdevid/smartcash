@@ -36,6 +36,30 @@ def create_training_control_buttons() -> Dict[str, Any]:
         layout=widgets.Layout(width='140px', height='35px', margin='2px')
     )
     
+    # Container layout - Hanya tombol training dalam satu baris
+    button_container = widgets.HBox([
+        primary_buttons['download_button'], 
+        stop_button, 
+        reset_button
+    ], layout=widgets.Layout(
+        margin='5px 0',
+        padding='5px',
+        width='100%',
+        justify_content='flex-start',
+        align_items='center'
+    ))
+    
+    return {
+        'start_button': primary_buttons['download_button'],
+        'stop_button': stop_button,
+        'reset_button': reset_button,
+        'button_container': button_container
+    }
+
+
+def create_non_training_buttons() -> Dict[str, Any]:
+    """Create non-training utility buttons untuk ditempatkan di bawah config tabs"""
+    # Utility buttons
     validate_button = widgets.Button(
         description="🔍 Cek Model",
         button_style='info', 
@@ -57,11 +81,8 @@ def create_training_control_buttons() -> Dict[str, Any]:
         layout=widgets.Layout(width='130px', height='35px', margin='2px')
     )
     
-    # Container layout - Semua button dalam satu baris
-    button_container = widgets.HBox([
-        primary_buttons['download_button'], 
-        stop_button, 
-        reset_button,
+    # Container layout untuk utility buttons
+    utility_container = widgets.HBox([
         validate_button, 
         cleanup_button,
         refresh_button
@@ -74,13 +95,10 @@ def create_training_control_buttons() -> Dict[str, Any]:
     ))
     
     return {
-        'start_button': primary_buttons['download_button'],
-        'stop_button': stop_button,
-        'reset_button': reset_button,
         'validate_button': validate_button,
         'cleanup_button': cleanup_button,
         'refresh_button': refresh_button,
-        'button_container': button_container
+        'utility_container': utility_container
     }
 
 # One-liner utilities

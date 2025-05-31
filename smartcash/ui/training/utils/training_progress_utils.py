@@ -1,123 +1,225 @@
 """
 File: smartcash/ui/training/utils/training_progress_utils.py
-Deskripsi: Progress utilities dengan 3-bar progress tracking system
+Deskripsi: Enhanced progress utilities dengan detailed step-by-step progress tracking
 """
 
 from typing import Dict, Any
 
 
 def update_training_progress(ui_components: Dict[str, Any], epoch: int, total_epochs: int, metrics: Dict[str, float]):
-    """Update training progress dengan 3-bar system"""
+    """Update training progress dengan detailed 3-bar system"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    # Overall progress (epochs)
+    # Overall progress (epochs) dengan enhanced messaging
     overall_progress = int((epoch / total_epochs) * 100)
-    progress_tracker.update('overall', overall_progress, f"Epoch {epoch+1}/{total_epochs}")
+    epoch_msg = f"Epoch {epoch+1}/{total_epochs} ({overall_progress}%)"
+    progress_tracker.update('overall', overall_progress, epoch_msg, color='success' if overall_progress > 80 else 'info')
     
-    # Step progress (based on loss improvement)
+    # Step progress (loss improvement) dengan adaptive coloring
     step_progress = _calculate_step_progress(metrics)
-    progress_tracker.update('step', step_progress, f"Loss: {metrics.get('train_loss', 0):.4f}")
+    loss_msg = f"Loss: {metrics.get('train_loss', 0):.4f} | Val: {metrics.get('val_loss', 0):.4f}"
+    step_color = 'success' if step_progress > 75 else 'warning' if step_progress > 50 else 'info'
+    progress_tracker.update('step', step_progress, loss_msg, color=step_color)
     
-    # Current operation progress (based on metrics quality)
+    # Current operation (metrics quality) dengan performance indicators
     current_progress = _calculate_current_progress(metrics)
-    progress_tracker.update('current', current_progress, f"mAP: {metrics.get('map', 0):.4f}")
+    metrics_msg = f"mAP: {metrics.get('map', 0):.4f} | F1: {metrics.get('f1', 0):.4f}"
+    current_color = 'success' if current_progress > 70 else 'warning' if current_progress > 40 else 'info'
+    progress_tracker.update('current', current_progress, metrics_msg, color=current_color)
 
 
 def update_checkpoint_progress(ui_components: Dict[str, Any], current: int, total: int, message: str):
-    """Update checkpoint operation progress"""
+    """Update checkpoint operation dengan detailed steps"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    # Use current bar untuk checkpoint operations
     checkpoint_progress = int((current / total) * 100) if total > 0 else 0
-    progress_tracker.update('current', checkpoint_progress, message)
+    
+    # Enhanced checkpoint messaging
+    step_messages = {
+        0: "🔄 Preparing checkpoint...",
+        1: "📦 Collecting model state...", 
+        2: "💾 Writing to disk...",
+        3: "✅ Checkpoint saved!"
+    }
+    
+    enhanced_message = step_messages.get(current, message)
+    color = 'success' if current == total else 'info'
+    
+    progress_tracker.update('current', checkpoint_progress, enhanced_message, color=color)
 
 
 def update_model_loading_progress(ui_components: Dict[str, Any], current: int, total: int, message: str):
-    """Update model loading progress"""
+    """Update model loading dengan detailed initialization steps"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    # Use step bar untuk model operations
     loading_progress = int((current / total) * 100) if total > 0 else 0
-    progress_tracker.update('step', loading_progress, message)
+    
+    # Enhanced model loading steps
+    step_details = {
+        1: "📋 Parsing configuration and validating parameters...",
+        2: "🧠 Building EfficientNet-B4 architecture...",
+        3: "💾 Setting up checkpoint manager...",
+        4: "🚀 Initializing training services..."
+    }
+    
+    detailed_message = step_details.get(current, message)
+    color = 'success' if current == total else 'info'
+    
+    progress_tracker.update('step', loading_progress, detailed_message, color=color)
 
 
 def update_validation_progress(ui_components: Dict[str, Any], current: int, total: int, message: str):
-    """Update validation progress"""
+    """Update validation progress dengan comprehensive checks"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    # Use overall bar untuk validation operations
     validation_progress = int((current / total) * 100) if total > 0 else 0
-    progress_tracker.update('overall', validation_progress, message)
+    
+    # Validation step details
+    validation_steps = {
+        1: "🔍 Checking model manager status...",
+        2: "📦 Validating pre-trained weights...",
+        3: "⚙️ Verifying training configuration...", 
+        4: "🖥️ Checking GPU availability...",
+        5: "📊 Validating detection layers..."
+    }
+    
+    step_message = validation_steps.get(current, message)
+    color = 'success' if current == total else 'warning' if 'error' in message.lower() else 'info'
+    
+    progress_tracker.update('overall', validation_progress, step_message, color=color)
 
 
-def reset_all_progress(ui_components: Dict[str, Any]):
-    """Reset semua progress bars"""
+def show_operation_progress(ui_components: Dict[str, Any], operation: str):
+    """Show progress container untuk specific operation"""
+    progress_tracker = ui_components.get('progress_container', {}).get('tracker')
+    if progress_tracker and hasattr(progress_tracker, 'show'):
+        # Initialize bars untuk operation
+        operation_configs = {
+            'training': "🚀 Training Progress",
+            'validation': "🔍 Model Validation", 
+            'checkpoint': "💾 Checkpoint Operations",
+            'model_loading': "🧠 Model Initialization"
+        }
+        
+        title = operation_configs.get(operation, f"📊 {operation.title()} Progress")
+        progress_tracker.show(operation)
+        
+        # Update header jika ada
+        if hasattr(progress_tracker, '_update_header'):
+            progress_tracker._update_header(title)
+
+
+def complete_operation_progress(ui_components: Dict[str, Any], message: str = "Operation completed!", show_summary: bool = True):
+    """Complete operation dengan summary"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    progress_tracker.update('overall', 0, "Siap memulai...")
-    progress_tracker.update('step', 0, "Menunggu...")
-    progress_tracker.update('current', 0, "Standby...")
+    if show_summary:
+        # Get final metrics dari tracker jika ada
+        final_metrics = _extract_final_metrics(progress_tracker)
+        summary_msg = f"{message} {final_metrics}" if final_metrics else message
+        progress_tracker.complete(summary_msg)
+    else:
+        progress_tracker.complete(message)
 
 
-def complete_all_progress(ui_components: Dict[str, Any], message: str = "Selesai!"):
-    """Complete semua progress bars"""
+def error_operation_progress(ui_components: Dict[str, Any], error_message: str, show_details: bool = True):
+    """Set error state dengan detailed error info"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    progress_tracker.complete(message)
+    if show_details:
+        detailed_error = f"❌ {error_message} - Check logs untuk detail"
+        progress_tracker.error(detailed_error)
+    else:
+        progress_tracker.error(error_message)
 
 
-def error_all_progress(ui_components: Dict[str, Any], message: str = "Error occurred"):
-    """Set error state untuk semua progress bars"""
+def reset_all_progress(ui_components: Dict[str, Any], initial_message: str = "Ready to start..."):
+    """Reset progress dengan enhanced initial state"""
     progress_tracker = ui_components.get('progress_container', {}).get('tracker')
     if not progress_tracker:
         return
     
-    progress_tracker.error(message)
+    # Reset dengan informative messages
+    progress_tracker.update('overall', 0, f"🎯 {initial_message}")
+    progress_tracker.update('step', 0, "⏳ Awaiting operation...")
+    progress_tracker.update('current', 0, "💤 Standby mode")
 
 
 def _calculate_step_progress(metrics: Dict[str, float]) -> int:
-    """Calculate step progress based on loss improvement"""
+    """Enhanced step progress calculation based on loss convergence"""
     train_loss = metrics.get('train_loss', 1.0)
+    val_loss = metrics.get('val_loss', 1.0)
     
-    # Loss progression: dari ~2.0 ke ~0.05
-    if train_loss > 1.5:
-        return 10
-    elif train_loss > 1.0:
-        return 25
-    elif train_loss > 0.5:
+    # Combined loss assessment
+    avg_loss = (train_loss + val_loss) / 2
+    
+    # Progressive improvement curve
+    if avg_loss > 2.0:
+        return 5
+    elif avg_loss > 1.5:
+        return 15
+    elif avg_loss > 1.0:
+        return 30
+    elif avg_loss > 0.5:
         return 50
-    elif train_loss > 0.2:
+    elif avg_loss > 0.2:
         return 75
-    elif train_loss > 0.1:
+    elif avg_loss > 0.1:
         return 90
     else:
         return 100
 
 
 def _calculate_current_progress(metrics: Dict[str, float]) -> int:
-    """Calculate current progress based on mAP quality"""
+    """Enhanced current progress based on multiple metrics"""
     map_score = metrics.get('map', 0.0)
+    f1_score = metrics.get('f1', 0.0)
+    precision = metrics.get('precision', 0.0)
+    recall = metrics.get('recall', 0.0)
     
-    # mAP progression: 0 to ~0.9
-    return min(100, int(map_score * 100))
+    # Weighted average of performance metrics
+    weights = {'map': 0.4, 'f1': 0.3, 'precision': 0.15, 'recall': 0.15}
+    weighted_score = (
+        map_score * weights['map'] + 
+        f1_score * weights['f1'] + 
+        precision * weights['precision'] + 
+        recall * weights['recall']
+    )
+    
+    return min(100, int(weighted_score * 100))
+
+
+def _extract_final_metrics(progress_tracker) -> str:
+    """Extract final metrics summary dari progress tracker"""
+    try:
+        # Attempt to get last displayed metrics
+        if hasattr(progress_tracker, '_last_metrics'):
+            metrics = progress_tracker._last_metrics
+            return f"(mAP: {metrics.get('map', 0):.3f}, Loss: {metrics.get('train_loss', 0):.3f})"
+    except Exception:
+        pass
+    return ""
 
 
 # One-liner utilities untuk specific operations
-update_epoch_progress = lambda ui, epoch, total, msg="": update_training_progress(ui, epoch, total, {'train_loss': 0.5, 'map': epoch/total})
-update_batch_progress = lambda ui, batch, total, msg="": update_checkpoint_progress(ui, batch, total, msg or f"Batch {batch}/{total}")
-update_save_progress = lambda ui, step, total, msg="": update_checkpoint_progress(ui, step, total, msg or f"Saving {step}/{total}")
-update_load_progress = lambda ui, step, total, msg="": update_model_loading_progress(ui, step, total, msg or f"Loading {step}/{total}")
-show_training_progress = lambda ui: ui.get('progress_container', {}).get('tracker', {}).get('show', lambda x: None)('training')
-hide_training_progress = lambda ui: ui.get('progress_container', {}).get('tracker', {}).get('hide', lambda: None)()
+update_epoch_progress = lambda ui, epoch, total, metrics: update_training_progress(ui, epoch, total, metrics)
+update_batch_progress = lambda ui, batch, total: update_checkpoint_progress(ui, batch, total, f"Processing batch {batch}/{total}")
+update_save_progress = lambda ui, step, total: update_checkpoint_progress(ui, step, total, f"Saving checkpoint {step}/{total}")
+update_load_progress = lambda ui, step, total: update_model_loading_progress(ui, step, total, f"Loading component {step}/{total}")
+show_training_progress = lambda ui: show_operation_progress(ui, 'training')
+show_validation_progress = lambda ui: show_operation_progress(ui, 'validation')
+hide_progress = lambda ui: ui.get('progress_container', {}).get('tracker', {}).get('hide', lambda: None)()
+complete_training = lambda ui, msg="Training completed!": complete_operation_progress(ui, msg, show_summary=True)
+error_training = lambda ui, msg="Training failed": error_operation_progress(ui, msg, show_details=True)

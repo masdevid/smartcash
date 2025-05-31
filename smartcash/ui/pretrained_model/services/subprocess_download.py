@@ -14,13 +14,11 @@ import concurrent.futures
 import json
 
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.common.logger import get_logger
-from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message, format_log_message_html
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
 
-# Gunakan namespace yang benar untuk logger
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
-logger = get_logger(PRETRAINED_MODEL_LOGGER_NAMESPACE)
+# Gunakan logger dari utils
+logger = get_module_logger()
 
 class DownloadProcess:
     """Kelas untuk mengelola proses download model dengan subprocess"""
@@ -37,49 +35,8 @@ class DownloadProcess:
     
     def _default_log(self, message: str, level: str = "info") -> None:
         """Fungsi log default jika tidak ada log_func yang diberikan"""
-        if 'log' in self.ui_components and hasattr(self.ui_components['log'], 'append_display_data'):
-            from IPython.display import display, HTML
-            from smartcash.ui.utils.ui_logger_namespace import create_namespace_badge
-            from smartcash.ui.utils.logging_utils import format_log_message_html
-            
-            # Gunakan format_log_message_html jika tersedia di ui_components
-            if 'format_log_message_html' in self.ui_components and callable(self.ui_components['format_log_message_html']):
-                html_message = self.ui_components['format_log_message_html'](message, level)
-                with self.ui_components['log']:
-                    display(HTML(html_message))
-            else:
-                # Gunakan styling yang konsisten dengan namespace badge
-                namespace_badge = create_namespace_badge("PRETRAIN")
-                
-                level_icon = {
-                    "info": ICONS.get('info', 'ℹ️'),
-                    "success": ICONS.get('success', '✅'),
-                    "warning": ICONS.get('warning', '⚠️'),
-                    "error": ICONS.get('error', '❌')
-                }.get(level, 'ℹ️')
-                
-                # Styling yang konsisten dengan modul lain
-                with self.ui_components['log']:
-                    display(HTML(f"""
-                    <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
-                               background-color:rgba(248,249,250,0.8);
-                               border-left:3px solid #D7BDE2;">
-                        <span style="margin-right:5px;">{namespace_badge}</span>
-                        <span>{level_icon} {message}</span>
-                    </div>
-                    """))
-        else:
-            # Gunakan logger dengan namespace yang benar
-            if level == "info":
-                logger.info(f"{message}")
-            elif level == "success":
-                logger.info(f"✅ {message}")
-            elif level == "warning":
-                logger.warning(f"{message}")
-            elif level == "error":
-                logger.error(f"{message}")
-            else:
-                logger.info(f"{message}")
+        # Gunakan fungsi log_message dari utils untuk mengurangi redundansi
+        log_message(self.ui_components, message, level)
     
     def _update_progress(self, progress: float, message: str) -> None:
         """Update progress tracker dengan nilai dan pesan"""

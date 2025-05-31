@@ -9,11 +9,12 @@ from IPython.display import display
 from smartcash.ui.utils.common_initializer import CommonInitializer
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
-from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
+from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger
 
-logger = get_logger(__name__)
+# Gunakan logger dari utils
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
+logger = get_module_logger()
 
 class PretrainedModelInitializer(CommonInitializer):
     """Implementasi CommonInitializer untuk modul pretrained model"""
@@ -37,8 +38,16 @@ class PretrainedModelInitializer(CommonInitializer):
             'models_dir': '/content/models',
             'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
             'models': {
-                'yolov5s': {'path': '/content/models/yolov5s.pt', 'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt', 'size': 14*1024*1024},
-                'efficientnet-b4': {'path': '/content/models/efficientnet-b4_notop.h5', 'url': 'https://github.com/tensorflow/models/raw/master/research/slim/nets/mobilenet/mobilenet_v3_large.h5', 'size': 75*1024*1024}
+                'yolov5s': {
+                    'path': '/content/models/yolov5s.pt', 
+                    'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5s.pt', 
+                    'size': 14*1024*1024
+                },
+                'efficientnet-b4': {
+                    'path': '/content/models/efficientnet-b4_notop.h5', 
+                    'url': 'https://storage.googleapis.com/keras-applications/efficientnet/efficientnet-b4_notop.h5', 
+                    'size': 75*1024*1024
+                }
             }
         }
     

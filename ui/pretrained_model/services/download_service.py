@@ -10,10 +10,12 @@ import urllib.request
 import concurrent.futures
 
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.common.logger import get_logger
+from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
+from smartcash.ui.pretrained_model.utils.download_utils import check_model_exists
 
-logger = get_logger(__name__)
+# Gunakan logger dari utils
+logger = get_module_logger()
 
 def download_with_progress(url: str, target_path: Union[str, Path], log_func: Callable, 
                            ui_components: Dict[str, Any], model_idx: int, total_models: int) -> None:
@@ -32,11 +34,12 @@ def download_with_progress(url: str, target_path: Union[str, Path], log_func: Ca
     if isinstance(target_path, str):
         target_path = Path(target_path)
     
-    # Buat temporary file untuk download
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_path = Path(temp_file.name)
+    # Buat direktori target terlebih dahulu
+    if isinstance(target_path, str):
+        target_path = Path(target_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Fungsi untuk melakukan download secara asynchronous
+    # Fungsi untuk melakukan download langsung ke target path
     def download_task():
         try:
             # Dapatkan ukuran file
@@ -54,45 +57,48 @@ def download_with_progress(url: str, target_path: Union[str, Path], log_func: Ca
                 
                 # Update progress tracking di UI jika tersedia
                 if 'progress_bar' in ui_components and 'progress_label' in ui_components:
-                    percent = min(100, int(100 * downloaded / total_size if total_size > 0 else 0))
-                    message = f"Mengunduh {target_path.name}: {percent}% ({downloaded/(1024*1024):.1f}/{total_size/(1024*1024):.1f} MB)"
-                    
-                    # Jika ada update_progress_bar, gunakan itu
-                    if 'update_progress_ui' in ui_components and callable(ui_components['update_progress_ui']):
-                        ui_components['update_progress_ui'](
-                            ui_components,
-                            model_idx + (percent/100), 
-                            total_models, 
-                            message
-                        )
+                    # Hitung persentase dengan aman
+                    if total_size > 0:
+                        percent = min(100, int(100 * downloaded / total_size))
                     else:
-                        # Update komponen secara langsung
-                        if hasattr(ui_components['progress_bar'], 'value'):
-                            ui_components['progress_bar'].value = model_idx + (percent/100)
-                            ui_components['progress_bar'].max = total_models
-                        if hasattr(ui_components['progress_label'], 'value'):
-                            ui_components['progress_label'].value = message
+                        percent = 0
+                        
+                    # Format pesan dengan ukuran yang diunduh
+                    downloaded_mb = downloaded/(1024*1024)
+                    total_mb = total_size/(1024*1024) if total_size > 0 else 0
+                    message = f"Mengunduh {target_path.name}: {percent}% ({downloaded_mb:.1f}/{total_mb:.1f} MB)"
+                    
+                    # Hitung progress global berdasarkan indeks model dan kemajuan saat ini
+                    global_progress = (model_idx + (percent/100)) / total_models
+                    global_progress = min(1.0, max(0.0, global_progress)) * 100  # Pastikan dalam range 0-100
+                    
+                    # Update UI dengan progress
+                    update_progress_ui(ui_components, global_progress, 100, message)
             
-            # Download file
-            urllib.request.urlretrieve(url, temp_path, reporthook=report_progress)
+            # Download file langsung ke target path
+            logger.info(f"🔄 Mulai mengunduh {target_path.name} dari {url}")
+            urllib.request.urlretrieve(url, target_path, reporthook=report_progress)
             
-            # Setelah download selesai, pindahkan ke target
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path.rename(target_path)
-            
-            # Log sukses
+            # Log sukses dengan styling yang konsisten
             size_mb = target_path.stat().st_size / (1024 * 1024)
-            log_func(f"{target_path.name} berhasil diunduh (<span style='color:{COLORS.get('alert_success_text', '#155724')}'>{size_mb:.1f} MB</span>)", "success")
+            success_msg = f"✅ {target_path.name} berhasil diunduh ({size_mb:.1f} MB)"
+            logger.info(success_msg)
+            log_func(success_msg, "success")
+            
+            # Update progress ke 100% untuk model ini
+            global_progress = (model_idx + 1) / total_models * 100
+            update_progress_ui(ui_components, global_progress, 100, f"Selesai mengunduh {target_path.name}")
             
             return True
             
         except Exception as e:
-            error_msg = f"Gagal mengunduh {target_path.name}: {str(e)}"
+            error_msg = f"❌ Gagal mengunduh {target_path.name}: {str(e)}"
             logger.error(error_msg)
             log_func(error_msg, "error")
             
-            if temp_path.exists():
-                temp_path.unlink()  # Hapus file temporary jika terjadi error
+            # Update progress untuk menunjukkan error
+            global_progress = (model_idx + 0.5) / total_models * 100
+            update_progress_ui(ui_components, global_progress, 100, f"Error: {target_path.name}")
             
             return False
     

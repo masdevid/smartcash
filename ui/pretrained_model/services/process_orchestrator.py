@@ -10,12 +10,12 @@ from IPython.display import display, HTML
 from enum import Enum
 
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.common.logger import get_logger
-from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE
+from smartcash.ui.pretrained_model.utils.logger_utils import get_module_logger, log_message
 from smartcash.ui.pretrained_model.pretrained_initializer import is_drive_mounted, mount_drive
 from smartcash.ui.pretrained_model.services.sync_service import sync_drive_to_local, sync_local_to_drive
 from smartcash.ui.pretrained_model.services.subprocess_download import download_models
 from smartcash.ui.pretrained_model.utils.progress import update_progress_ui
+from smartcash.ui.pretrained_model.utils.download_utils import prepare_model_info, check_model_exists, check_models_in_drive, get_models_to_download
 
 # Definisi tahapan proses sebagai Enum untuk tracking progress
 class ProcessStage(Enum):
@@ -32,7 +32,8 @@ class ProcessStage(Enum):
         self.progress = progress
         self.description = description
 
-logger = get_logger(PRETRAINED_MODEL_LOGGER_NAMESPACE)
+# Gunakan logger dari utils
+logger = get_module_logger()
 
 def process_download_sync(ui_components: Dict[str, Any]) -> None:
     """
@@ -63,7 +64,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
     # Bersihkan log output jika tersedia
     if log_output: log_output.clear_output(wait=True)
     
-    # Fungsi untuk logging dengan timestamp dan emoji kontekstual
+    # Gunakan fungsi log_message dari utils dengan tambahan timestamp
     def log_message(message: str, message_type='info'):
         # Tambahkan emoji berdasarkan tipe pesan
         emoji_map = {'info': '📝', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'download': '📥', 'sync': '🔄'}
@@ -73,14 +74,9 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
         timestamp = time.strftime("%H:%M:%S")
         formatted_message = f"[{timestamp}] {emoji} {message}"
         
-        # Tampilkan di log output jika tersedia
-        if log_output:
-            with log_output:
-                display(HTML(f"<p>{formatted_message}</p>"))
-        
-        # Log ke logger sesuai tipe pesan
-        log_func = getattr(logger, message_type if message_type in ['info', 'warning', 'error'] else 'info')
-        log_func(message)
+        # Gunakan log_message dari utils dengan UI components
+        from smartcash.ui.pretrained_model.utils.logger_utils import log_message as utils_log_message
+        utils_log_message(ui_components, formatted_message, message_type)
     
     try:
         # Cek apakah di Colab dengan mencoba mengimpor google.colab
@@ -151,7 +147,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
                 },
                 {
                     "name": "efficientnet-b4_notop.h5",
-                    "url": "https://github.com/qubvel/efficientnet/releases/download/v0.6.0/efficientnet-b4_notop.h5",
+                    "url": "https://storage.googleapis.com/keras-applications/efficientnet/efficientnet-b4_notop.h5",
                     "min_size": 50 * 1024 * 1024,  # 50MB
                     "idx": 1
                 }

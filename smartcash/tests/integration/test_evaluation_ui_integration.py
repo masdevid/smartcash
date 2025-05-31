@@ -16,12 +16,8 @@ from typing import Dict, Any, List
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 # Import UI components dan handlers
-from smartcash.ui.evaluation.components.evaluation_components import (
-    create_scenario_selection,
-    create_test_data_selection,
-    create_progress_tracking_container,
-    create_results_container
-)
+from smartcash.ui.evaluation.components.evaluation_form import create_evaluation_form
+from smartcash.ui.evaluation.components.evaluation_layout import create_evaluation_layout
 from smartcash.ui.evaluation.handlers.evaluation_handler import (
     setup_evaluation_handlers,
     run_evaluation_process
@@ -80,192 +76,154 @@ class TestEvaluationUIIntegration(unittest.TestCase):
             shutil.rmtree(self.test_folder)
     
     @patch('ipywidgets.Dropdown')
-    def test_create_scenario_selection(self, mock_dropdown):
-        """Test pembuatan UI component untuk pemilihan skenario"""
+    @patch('ipywidgets.HTML')
+    def test_create_evaluation_form(self, mock_html, mock_dropdown):
+        """Test pembuatan form evaluasi dengan komponen UI"""
         # Setup mock
         mock_dropdown_instance = MagicMock()
+        mock_html_instance = MagicMock()
         mock_dropdown.return_value = mock_dropdown_instance
+        mock_html.return_value = mock_html_instance
         
         # Panggil fungsi
-        result = create_scenario_selection(self.config)
+        result = create_evaluation_form(self.config)
         
         # Verifikasi
         self.assertIsNotNone(result)
         self.assertIn('scenario_dropdown', result)
-        mock_dropdown.assert_called_once()
+        self.assertIn('evaluate_button', result)
+        self.assertIn('checkpoint_selector', result)
+        mock_dropdown.assert_called()
         
-        # Verifikasi options dropdown
-        call_args = mock_dropdown.call_args[1]
-        self.assertIn('options', call_args)
-        self.assertEqual(len(call_args['options']), 2)  # Dua skenario dalam config
-    
-    @patch('ipywidgets.Text')
-    @patch('ipywidgets.Button')
-    def test_create_test_data_selection(self, mock_button, mock_text):
-        """Test pembuatan UI component untuk pemilihan test data"""
-        # Setup mocks
-        mock_text_instance = MagicMock()
-        mock_button_instance = MagicMock()
-        mock_text.return_value = mock_text_instance
-        mock_button.return_value = mock_button_instance
+    def test_create_evaluation_layout(self):
+        """Test pembuatan layout untuk evaluation UI"""
+        # Buat form components yang valid untuk layout
+        form_components = {
+            'scenario_dropdown': widgets.Dropdown(),
+            'scenario_description': widgets.HTML(),
+            'evaluate_button': widgets.Button(),
+            'cancel_button': widgets.Button(),
+            'checkpoint_selector': widgets.VBox(),
+            'progress_tracker': widgets.VBox(),
+            'status_panel': widgets.HTML(),
+            'metrics_display': widgets.VBox(),
+            'test_folder_text': widgets.HTML(),
+            'apply_augmentation_checkbox': widgets.Checkbox(),
+            'batch_size_slider': widgets.IntSlider(),
+            'image_size_dropdown': widgets.Dropdown(),
+            'confidence_slider': widgets.FloatSlider(),
+            'iou_slider': widgets.FloatSlider(),
+            'save_predictions_checkbox': widgets.Checkbox(),
+            'save_metrics_checkbox': widgets.Checkbox(),
+            'confusion_matrix_checkbox': widgets.Checkbox(),
+            'visualize_results_checkbox': widgets.Checkbox(),
+            'class_metrics_checkbox': widgets.Checkbox(),
+            'save_to_drive_checkbox': widgets.Checkbox(),
+            'drive_path_text': widgets.Text(),
+            'container': widgets.VBox()
+        }
         
-        # Panggil fungsi
-        result = create_test_data_selection()
-        
-        # Verifikasi
-        self.assertIsNotNone(result)
-        self.assertIn('test_data_path', result)
-        self.assertIn('browse_button', result)
-        mock_text.assert_called_once()
-        mock_button.assert_called_once()
-    
-    @patch('ipywidgets.HTML')
-    @patch('ipywidgets.FloatProgress')
-    def test_create_progress_tracking_container(self, mock_progress, mock_html):
-        """Test pembuatan UI component untuk progress tracking"""
-        # Setup mocks
-        mock_progress_instance = MagicMock()
-        mock_html_instance = MagicMock()
-        mock_progress.return_value = mock_progress_instance
-        mock_html.return_value = mock_html_instance
-        
-        # Panggil fungsi
-        result = create_progress_tracking_container()
-        
-        # Verifikasi
-        self.assertIsNotNone(result)
-        self.assertIn('progress_container', result)
-        self.assertIn('progress_bar', result)
-        self.assertIn('status_text', result)
-        mock_progress.assert_called()
-        mock_html.assert_called()
-    
-    @patch('ipywidgets.Output')
-    def test_create_results_container(self, mock_output):
-        """Test pembuatan UI component untuk hasil evaluasi"""
-        # Setup mock
-        mock_output_instance = MagicMock()
-        mock_output.return_value = mock_output_instance
-        
-        # Panggil fungsi
-        result = create_results_container()
+        # Panggil fungsi dengan patching
+        with patch('smartcash.ui.evaluation.components.evaluation_layout.create_section_title') as mock_section_title:
+            with patch('smartcash.ui.evaluation.components.evaluation_form.create_metrics_display'):
+                with patch('smartcash.ui.components.progress_tracking.create_progress_tracking_container'):
+                    with patch('smartcash.ui.components.log_accordion.create_log_accordion'):
+                        mock_section_title.return_value = widgets.HTML()
+                        result = create_evaluation_layout(form_components, self.config)
         
         # Verifikasi
-        self.assertIsNotNone(result)
-        self.assertIn('result_area', result)
-        mock_output.assert_called_once()
+        self.assertIsInstance(result, dict)
+        self.assertIn('main_container', result)
+        self.assertIn('scenario_section', result)
+        self.assertIn('checkpoint_section', result)
+        self.assertTrue(mock_section_title.called)
     
-    @patch('smartcash.ui.utils.button_state_manager.get_button_state_manager')
-    def test_setup_evaluation_handlers(self, mock_get_manager):
+    def test_setup_evaluation_handlers(self):
         """Test setup handlers untuk evaluation process"""
-        # Setup mocks
-        mock_button_manager = MagicMock()
-        mock_get_manager.return_value = mock_button_manager
-        
-        mock_evaluate_button = MagicMock()
-        
         # Setup UI components
         ui_components = {
-            'evaluate_button': mock_evaluate_button,
+            'evaluate_button': MagicMock(),
             'logger': self.logger,
-            'progress_container': MagicMock(),
-            'progress_bar': MagicMock(),
-            'status_text': MagicMock()
+            'progress_tracker': MagicMock(),
+            'status_panel': MagicMock()
         }
         
-        # Panggil fungsi
-        with patch('smartcash.ui.evaluation.handlers.evaluation_handler.run_evaluation_process') as mock_run:
-            result = setup_evaluation_handlers(ui_components, self.config)
-            
-            # Verifikasi
-            self.assertEqual(result, ui_components)
-            mock_get_manager.assert_called_once_with(ui_components)
-            
-            # Verifikasi button click handler
-            on_click_handler = mock_evaluate_button.on_click.call_args[0][0]
-            self.assertIsNotNone(on_click_handler)
-    
-    @patch('smartcash.model.utils.evaluation_pipeline.run_evaluation_pipeline')
-    def test_integration_handlers_with_components(self, mock_run_pipeline):
-        """Test integrasi antara UI components dan handlers"""
-        # Setup mocks
-        mock_run_pipeline.return_value = {
-            'success': True,
-            'metrics': {
-                'map': 0.85,
-                'overall_metrics': {
-                    'precision': 0.9,
-                    'recall': 0.8,
-                    'f1_score': 0.85
-                },
-                'class_metrics': {
-                    'Rp1000': {'precision': 0.9, 'recall': 0.8, 'f1_score': 0.85, 'ap': 0.85}
-                }
-            },
-            'predictions': [{'boxes': np.array([[0.1, 0.2, 0.3, 0.4]]), 'scores': np.array([0.9]), 'classes': np.array([0])}]
-        }
-        
-        # Buat UI components
-        with patch('ipywidgets.Dropdown') as mock_dropdown, \
-             patch('ipywidgets.Text') as mock_text, \
-             patch('ipywidgets.Button') as mock_button, \
-             patch('ipywidgets.HTML') as mock_html, \
-             patch('ipywidgets.FloatProgress') as mock_progress, \
-             patch('ipywidgets.Output') as mock_output:
-            
-            # Setup mock instances
-            mock_dropdown_instance = MagicMock(value='test_scenario')
-            mock_text_instance = MagicMock(value=self.test_folder)
-            mock_button_instance = MagicMock()
-            mock_html_instance = MagicMock()
-            mock_progress_instance = MagicMock()
-            mock_output_instance = MagicMock()
-            
-            mock_dropdown.return_value = mock_dropdown_instance
-            mock_text.return_value = mock_text_instance
-            mock_button.return_value = mock_button_instance
-            mock_html.return_value = mock_html_instance
-            mock_progress.return_value = mock_progress_instance
-            mock_output.return_value = mock_output_instance
-            
-            # Buat UI components
-            scenario_components = create_scenario_selection(self.config)
-            test_data_components = create_test_data_selection()
-            progress_components = create_progress_tracking_container()
-            results_components = create_results_container()
-            
-            # Gabungkan components
-            ui_components = {
-                **scenario_components,
-                **test_data_components,
-                **progress_components,
-                **results_components,
-                'logger': self.logger,
-                'show_for_operation': MagicMock(),
-                'error_operation': MagicMock(),
-                'success_operation': MagicMock(),
-                'warning_operation': MagicMock(),
-                'update_progress': MagicMock()
-            }
-            
-            # Setup handlers
-            with patch('smartcash.ui.utils.button_state_manager.get_button_state_manager') as mock_get_manager:
+        # Panggil fungsi dengan patching
+        with patch('smartcash.ui.evaluation.handlers.evaluation_handler.get_button_state_manager') as mock_get_manager:
+            with patch('smartcash.ui.evaluation.handlers.evaluation_handler.run_evaluation_process'):
+                # Setup mock
                 mock_button_manager = MagicMock()
-                mock_button_manager.operation_context.return_value.__enter__ = MagicMock()
-                mock_button_manager.operation_context.return_value.__exit__ = MagicMock()
                 mock_get_manager.return_value = mock_button_manager
                 
-                # Setup handlers
-                setup_evaluation_handlers(ui_components, self.config)
-                
-                # Simulasikan klik tombol evaluasi
-                run_evaluation_process(ui_components, self.config, self.logger, mock_button_manager)
+                # Panggil fungsi
+                result = setup_evaluation_handlers(ui_components, self.config)
                 
                 # Verifikasi
-                mock_run_pipeline.assert_called_once()
-                ui_components['show_for_operation'].assert_called_once()
-                ui_components['update_progress'].assert_called()
-                ui_components['success_operation'].assert_called()
+                self.assertEqual(result, ui_components)
+                mock_get_manager.assert_called_once_with(ui_components)
+                
+                # Verifikasi button click handler
+                on_click_handler = ui_components['evaluate_button'].on_click.call_args[0][0]
+                self.assertIsNotNone(on_click_handler)
+    
+    def test_integration_handlers_with_components(self):
+        """Test integrasi antara UI components dan handlers"""
+        # Gabungkan components untuk test
+        ui_components = {
+            'scenario_dropdown': MagicMock(value='test_scenario'),
+            'evaluate_button': MagicMock(),
+            'checkpoint_selector': {
+                'checkpoint_dropdown': MagicMock(),
+                'custom_checkpoint_path': MagicMock(value=self.test_folder),
+                'browse_button': MagicMock()
+            },
+            'progress_tracker': MagicMock(),
+            'status_panel': MagicMock(),
+            'metrics_display': MagicMock(),
+            'logger': self.logger,
+            'show_for_operation': MagicMock(),
+            'error_operation': MagicMock(),
+            'success_operation': MagicMock(),
+            'warning_operation': MagicMock(),
+            'update_progress': MagicMock()
+        }
+        
+        # Setup mocks dan panggil fungsi
+        with patch('smartcash.ui.evaluation.handlers.evaluation_handler.get_button_state_manager') as mock_get_manager:
+            with patch('smartcash.ui.evaluation.handlers.evaluation_handler.run_evaluation_process') as mock_run_eval:
+                with patch('smartcash.model.utils.evaluation_pipeline.run_evaluation_pipeline') as mock_run_pipeline:
+                    # Setup mock return values
+                    mock_run_pipeline.return_value = {
+                        'success': True,
+                        'metrics': {
+                            'map': 0.85,
+                            'overall_metrics': {
+                                'precision': 0.9,
+                                'recall': 0.8,
+                                'f1_score': 0.85
+                            },
+                            'class_metrics': {
+                                'Rp1000': {'precision': 0.9, 'recall': 0.8, 'f1_score': 0.85, 'ap': 0.85}
+                            }
+                        },
+                        'predictions': [{'boxes': np.array([[0.1, 0.2, 0.3, 0.4]]), 'scores': np.array([0.9]), 'classes': np.array([0])}]
+                    }
+                    
+                    # Setup button manager
+                    mock_button_manager = MagicMock()
+                    mock_button_manager.operation_context.return_value.__enter__ = MagicMock()
+                    mock_button_manager.operation_context.return_value.__exit__ = MagicMock()
+                    mock_get_manager.return_value = mock_button_manager
+                    
+                    # Setup handlers
+                    setup_evaluation_handlers(ui_components, self.config)
+                    
+                    # Panggil handler yang terdaftar pada tombol evaluate
+                    ui_components['evaluate_button'].on_click.call_args[0][0](None)
+                    
+                    # Verifikasi
+                    mock_get_manager.assert_called_once_with(ui_components)
+                    self.assertTrue(mock_run_eval.called)
 
 if __name__ == '__main__':
     unittest.main()

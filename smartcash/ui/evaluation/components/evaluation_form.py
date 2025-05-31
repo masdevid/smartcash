@@ -165,12 +165,9 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Action buttons untuk menjalankan evaluasi sesuai skenario
     action_buttons = create_action_buttons(
-        primary_text="Jalankan Evaluasi",
-        secondary_text="Batal",
-        primary_tooltip="Jalankan evaluasi model sesuai skenario yang dipilih",
-        secondary_tooltip="Batalkan proses evaluasi yang sedang berjalan",
+        primary_label="Jalankan Evaluasi",
         primary_icon="play",
-        secondary_icon="stop",
+        secondary_buttons=[("Batal", "stop", "")],
         cleanup_enabled=False,
         primary_style='success'
     )
@@ -185,8 +182,8 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
     # Merge dengan action buttons dan tambahkan checkpoint_selector
     components.update({
         **action_buttons,
-        'evaluate_button': action_buttons['primary_button'],  # Tombol utama untuk evaluasi
-        'cancel_button': action_buttons['secondary_button'],  # Tombol untuk membatalkan evaluasi
+        'evaluate_button': action_buttons['download_button'],  # Tombol utama untuk evaluasi (menggunakan download_button sebagai primary)
+        'cancel_button': action_buttons['check_button'],  # Tombol untuk membatalkan evaluasi (menggunakan check_button sebagai secondary)
         'checkpoint_selector': checkpoint_selector  # Tambahkan checkpoint_selector sebagai komponen tunggal
     })
     

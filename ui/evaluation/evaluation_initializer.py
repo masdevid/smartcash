@@ -15,8 +15,10 @@ from smartcash.ui.evaluation.handlers.metrics_handler import setup_metrics_handl
 class EvaluationInitializer(CommonInitializer):
     """Initializer untuk model evaluation dengan Common Initializer pattern"""
     
-    def __init__(self):
-        super().__init__('evaluation', 'smartcash.ui.evaluation')
+    def __init__(self, module_name=None, logger_namespace=None):
+        module_name = module_name or 'evaluation'
+        logger_namespace = logger_namespace or 'smartcash.ui.evaluation'
+        super().__init__(module_name, logger_namespace)
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat komponen UI untuk evaluation dengan one-liner style"""

@@ -7,13 +7,15 @@ import ipywidgets as widgets
 from typing import Dict, Any
 from IPython.display import display, clear_output
 
+from smartcash.ui.pretrained_model.pretrained_initializer import MODULE_LOGGER_NAME
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.components.progress_tracking import create_progress_tracking
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.common.logger import get_logger
-
-logger = get_logger(__name__)
+from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
+logger = get_logger(PRETRAINED_MODEL_LOGGER_NAMESPACE)
 
 def create_pretrained_ui() -> Dict[str, Any]:
     """
@@ -31,18 +33,20 @@ def create_pretrained_ui() -> Dict[str, Any]:
         progress_tracking = create_progress_tracking()
         
         # Buat log accordion untuk menampilkan log dengan lebih terorganisir
-        log_accordion = create_log_accordion(module_name="pretrained_model", height="200px")
+        log_accordion = create_log_accordion(module_name=MODULE_LOGGER_NAME, height="200px")
         log_output = log_accordion['log_output']
         
         # Buat tombol download & sync dengan layout di tengah
         download_sync_button = widgets.Button(
-            description="Download & Sync",
+            description="Download & Sync Model",
             button_style='primary',
             icon='download',
             tooltip='Download dan sinkronisasi model pretrained',
             layout=widgets.Layout(
                 margin='15px auto',  # Auto margin untuk centering
-                display='flex'
+                display='flex',
+                justify_content='center',  # Rata tengah horizontal
+                align_items='center'  # Rata tengah vertikal
             )
         )
         
@@ -69,11 +73,21 @@ def create_pretrained_ui() -> Dict[str, Any]:
             </div>"""
         )
         
+        # Buat container untuk tombol agar rata tengah
+        button_container = widgets.HBox(
+            [download_sync_button],
+            layout=widgets.Layout(
+                display='flex',
+                justify_content='center',  # Rata tengah horizontal
+                width='100%'
+            )
+        )
+        
         # Buat container utama dengan semua komponen
         main_container = widgets.VBox([
             header, 
             info_html,
-            download_sync_button,
+            button_container,  # Gunakan button_container untuk posisi rata tengah
             status_panel,
             widgets.VBox([progress_tracking['container']], 
                         layout=widgets.Layout(margin='10px 0')),

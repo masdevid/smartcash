@@ -165,8 +165,8 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
             download_list = []
             
             # Periksa model mana yang perlu diunduh
-            for model in models_to_download:
-                model_path = model["path"]
+            for model in model_info:
+                model_path = Path(models_dir) / model["name"]
                 
                 # Periksa apakah model sudah ada dan ukurannya sesuai
                 if not model_path.exists() or model_path.stat().st_size < model["min_size"]:
@@ -239,7 +239,7 @@ def process_download_sync(ui_components: Dict[str, Any]) -> None:
         if status_panel:
             status_panel.clear_output(wait=True)
             with status_panel:
-                if len(model_data) == len(models_to_download):
+                if len(model_data) == len(model_info):
                     display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
                             color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
                             border-left:4px solid {COLORS['alert_success_text']}">

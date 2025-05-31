@@ -6,7 +6,7 @@ Deskripsi: Komponen tabs konfigurasi untuk training UI
 import ipywidgets as widgets
 from typing import Dict, Any, List, Tuple
 
-def create_config_tabs(config: Dict[str, Any]) -> Dict[str, Any]:
+def create_config_tabs(config: Dict[str, Any]) -> widgets.Tab:
     """Create tabbed configuration display untuk menghemat tempat"""
     from smartcash.ui.components.tab_factory import create_tab_widget as create_tabs
     
@@ -79,10 +79,20 @@ def create_config_tabs(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def update_config_tabs(tabs_widget: widgets.Tab, config: Dict[str, Any]) -> widgets.Tab:
     """Update existing tabs dengan config baru"""
+    # Buat tab baru dengan config yang diperbarui
     new_tabs = create_config_tabs(config)
     
-    # Copy selected index
+    # Simpan selected index
     selected_index = tabs_widget.selected_index
-    new_tabs.selected_index = selected_index
     
-    return new_tabs
+    # Update children dan titles dengan aman
+    tabs_widget.children = new_tabs.children
+    
+    # Update titles untuk setiap tab
+    for i in range(len(tabs_widget.children)):
+        tabs_widget.set_title(i, new_tabs.titles[i])
+    
+    # Kembalikan selected index
+    tabs_widget.selected_index = selected_index
+    
+    return tabs_widget

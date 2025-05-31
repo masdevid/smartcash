@@ -180,12 +180,20 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         sync_message="Konfigurasi evaluasi akan disimpan untuk sesi berikutnya."
     )
     
-    # Merge dengan action buttons
+    # Buat checkpoint_selector container untuk mengelompokkan elemen-elemen terkait checkpoint
+    checkpoint_selector = widgets.VBox([
+        components['auto_select_checkbox'],
+        components['checkpoint_path_text'],
+        widgets.HBox([components['validation_metrics_select']])
+    ], layout=widgets.Layout(margin='10px 0px'))
+    
+    # Merge dengan action buttons dan tambahkan checkpoint_selector
     components.update({
         **action_buttons,
         **save_reset_buttons,
         'evaluate_button': action_buttons['download_button'],  # Alias untuk consistency
-        'check_button': action_buttons['check_button']
+        'check_button': action_buttons['check_button'],
+        'checkpoint_selector': checkpoint_selector  # Tambahkan checkpoint_selector sebagai komponen tunggal
     })
     
     return components

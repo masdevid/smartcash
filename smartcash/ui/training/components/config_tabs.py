@@ -67,7 +67,7 @@ def create_config_tabs(config: Dict[str, Any]) -> Dict[str, Any]:
     </div>
     """
     
-    # Create tabs
+    # Create tabs dengan memastikan semua item adalah widget
     tabs = create_tabs([
         ('Model', widgets.HTML(model_html)),
         ('Hyperparameters', widgets.HTML(hyperparams_html)),

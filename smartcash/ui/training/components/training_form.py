@@ -63,5 +63,14 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         return create_fallback_training_form(str(e))
 
 
-# One-liner utilities
-update_config_tabs = lambda tabs_widget, config: setattr(tabs_widget, 'children', create_config_tabs(config).children)
+# One-liner utilities untuk update config tabs dengan proper title handling
+def update_config_tabs(tabs_widget, config):
+    """Update tab widget dengan config baru dan mempertahankan titles"""
+    new_tabs = create_config_tabs(config)
+    # Copy children dan update titles
+    tabs_widget.children = new_tabs.children
+    # Pastikan titles diperbarui dengan benar
+    for i in range(len(tabs_widget.children)):
+        if i < len(new_tabs.titles):
+            tabs_widget.set_title(i, new_tabs.titles[i])
+    return tabs_widget

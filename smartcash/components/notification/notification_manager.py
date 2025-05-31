@@ -3,11 +3,12 @@ File: smartcash/components/notification/notification_manager.py
 Deskripsi: Manager untuk notifikasi UI dengan integrasi observer pattern dan progress tracking
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List, Union
 import time
 import threading
 from smartcash.components.observer import notify, EventTopics
 from smartcash.components.observer.manager_observer import get_observer_manager
+from smartcash.components.notification.notification_observer import create_notification_observer
 
 class NotificationManager:
     """
@@ -348,10 +349,31 @@ class NotificationManager:
                 
             self._notification_status['in_progress'] = True
             
-            # Coba notifikasi via observer_manager
-            if self.observer_manager and hasattr(self.observer_manager, 'notify'):
-                self.observer_manager.notify(event_type, None, **kwargs)
-                return
+            # Coba notifikasi via observer_manager dengan NotificationObserver
+            if self.observer_manager and hasattr(self.observer_manager, 'register'):
+                # Buat callback untuk event ini
+                def notification_callback(event_type, sender, **event_kwargs):
+                    # Hanya log untuk debugging
+                    if self.logger and hasattr(self.logger, 'debug'):
+                        self.logger.debug(f"🔔 Notification event: {event_type}")
+                
+                # Buat observer yang valid dengan adapter
+                observer = create_notification_observer(
+                    event_type=event_type,
+                    callback=notification_callback,
+                    name=f"NotificationManager_{event_type}",
+                    priority=10
+                )
+                
+                # Register observer ke manager
+                try:
+                    self.observer_manager.register(observer, event_type)
+                    # Notify langsung setelah register
+                    self.observer_manager.notify(event_type, None, **kwargs)
+                    return
+                except Exception as e:
+                    if self.logger and hasattr(self.logger, 'debug'):
+                        self.logger.debug(f"⚠️ Observer register error: {str(e)}")
             
             # Fallback ke EventDispatcher
             try:

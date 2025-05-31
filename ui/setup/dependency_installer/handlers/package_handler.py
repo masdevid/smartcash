@@ -46,22 +46,43 @@ def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
     return list(dict.fromkeys(missing_packages))  # Remove duplicates
 
 def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
-    """Jalankan instalasi batch untuk package dengan progress tracking yang lebih informatif"""
+    """Jalankan instalasi batch untuk package dengan progress tracking yang lebih informatif dan observer pattern"""
     if not packages:
         return True, {'total': 0, 'success': 0, 'failed': 0, 'duration': 0, 'errors': []}
     
-    # Get progress tracker
+    # Get progress tracker dan observer manager
     progress_tracker = ui_components.get('progress_tracker')
+    observer_manager = ui_components.get('observer_manager')
     
     # Initialize stats
     stats = {'total': len(packages), 'success': 0, 'failed': 0, 'duration': 0, 'errors': []}
     start_time = time.time()
     
+    # Notify start via observer
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            observer_manager.notify('DEPENDENCY_INSTALL_START', None, {
+                'message': f"Memulai instalasi {len(packages)} package",
+                'timestamp': time.time(),
+                'total_packages': len(packages)
+            })
+        except Exception as e:
+            # Silent fail untuk observer notification
+            pass
+    
     # Update progress step - Persiapan
     if progress_tracker:
-        progress_tracker.update('step', 75, "Mempersiapkan instalasi...", "#007bff")
+        progress_tracker.update('step', 25, "Mempersiapkan instalasi...", "#007bff")
+    elif 'update_progress' in ui_components:
+        ui_components['update_progress']('step', 25, "Mempersiapkan instalasi...", "#007bff")
     
     log_message(ui_components, f"🚀 Memulai instalasi {len(packages)} package...", "info")
+    
+    # Update progress step - Instalasi
+    if progress_tracker:
+        progress_tracker.update('step', 50, "Memulai instalasi packages...", "#007bff")
+    elif 'update_progress' in ui_components:
+        ui_components['update_progress']('step', 50, "Memulai instalasi packages...", "#007bff")
     
     # Install each package
     for i, package in enumerate(packages):
@@ -71,7 +92,23 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
         if progress_tracker:
             progress_tracker.update('overall', progress_pct, f"Progress: {i+1}/{len(packages)} ({progress_pct}%)", "#007bff")
             progress_tracker.update('current', 0, f"Installing {package}...", "#ffc107")
-            # Tidak perlu update step di sini karena sudah di tahap instalasi
+        elif 'update_progress' in ui_components:
+            ui_components['update_progress']('overall', progress_pct, f"Progress: {i+1}/{len(packages)} ({progress_pct}%)", "#007bff")
+            ui_components['update_progress']('current', 0, f"Installing {package}...", "#ffc107")
+        
+        # Notify progress via observer
+        if observer_manager and hasattr(observer_manager, 'notify'):
+            try:
+                observer_manager.notify('DEPENDENCY_INSTALL_PROGRESS', None, {
+                    'message': f"Installing {package}... ({i+1}/{len(packages)})",
+                    'timestamp': time.time(),
+                    'progress': progress_pct,
+                    'current_package': package,
+                    'current_index': i+1,
+                    'total_packages': len(packages)
+                })
+            except Exception:
+                pass  # Silent fail untuk observer notification
         
         log_message(ui_components, f"📦 Installing {package}... ({i+1}/{len(packages)})", "info")
         
@@ -85,6 +122,8 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
                 log_message(ui_components, f"✅ Berhasil install {package}", "success")
                 if progress_tracker:
                     progress_tracker.update('current', 100, f"✅ {package} berhasil diinstall", "#28a745")
+                elif 'update_progress' in ui_components:
+                    ui_components['update_progress']('current', 100, f"✅ {package} berhasil diinstall", "#28a745")
             else:
                 stats['failed'] += 1
                 error_msg = result.stderr.strip() or "Unknown error"
@@ -92,6 +131,20 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
                 log_message(ui_components, f"❌ Gagal install {package}: {error_msg}", "error")
                 if progress_tracker:
                     progress_tracker.update('current', 100, f"❌ {package} gagal diinstall", "#dc3545")
+                elif 'update_progress' in ui_components:
+                    ui_components['update_progress']('current', 100, f"❌ {package} gagal diinstall", "#dc3545")
+                
+                # Notify error via observer
+                if observer_manager and hasattr(observer_manager, 'notify'):
+                    try:
+                        observer_manager.notify('DEPENDENCY_INSTALL_ERROR', None, {
+                            'message': f"Gagal install {package}: {error_msg}",
+                            'timestamp': time.time(),
+                            'package': package,
+                            'error': error_msg
+                        })
+                    except Exception:
+                        pass  # Silent fail untuk observer notification
         
         except Exception as e:
             stats['failed'] += 1
@@ -99,14 +152,48 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
             log_message(ui_components, f"💥 Error install {package}: {str(e)}", "error")
             if progress_tracker:
                 progress_tracker.update('current', 100, f"💥 {package} error: {str(e)}", "#dc3545")
+            elif 'update_progress' in ui_components:
+                ui_components['update_progress']('current', 100, f"💥 {package} error: {str(e)}", "#dc3545")
+            
+            # Notify error via observer
+            if observer_manager and hasattr(observer_manager, 'notify'):
+                try:
+                    observer_manager.notify('DEPENDENCY_INSTALL_ERROR', None, {
+                        'message': f"Error install {package}: {str(e)}",
+                        'timestamp': time.time(),
+                        'package': package,
+                        'error': str(e)
+                    })
+                except Exception:
+                    pass  # Silent fail untuk observer notification
     
     # Final progress update
     if progress_tracker:
         progress_tracker.update('overall', 100, "Instalasi selesai", "#28a745")
         progress_tracker.update('step', 100, "Instalasi selesai", "#28a745")
+    elif 'update_progress' in ui_components:
+        ui_components['update_progress']('overall', 100, "Instalasi selesai", "#28a745")
+        ui_components['update_progress']('step', 100, "Instalasi selesai", "#28a745")
     
     stats['duration'] = time.time() - start_time
     
-    log_message(ui_components, f"📊 Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal ({stats['duration']:.1f}s)", "success")
+    # Format pesan dengan highlight parameter numerik
+    success_message = f"📊 Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal ({stats['duration']:.1f}s)"
+    log_message(ui_components, success_message, "success")
+    
+    # Notify complete via observer
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            observer_manager.notify('DEPENDENCY_INSTALL_COMPLETE', None, {
+                'message': success_message,
+                'timestamp': time.time(),
+                'duration': stats['duration'],
+                'success': stats['success'],
+                'failed': stats['failed'],
+                'total': stats['total'],
+                'stats': stats
+            })
+        except Exception:
+            pass  # Silent fail untuk observer notification
     
     return stats['failed'] == 0, stats

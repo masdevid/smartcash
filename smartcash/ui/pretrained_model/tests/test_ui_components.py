@@ -35,9 +35,19 @@ class TestPretrainedUI(unittest.TestCase):
         self.mock_progress_tracking = self.progress_tracking_patch.start()
         self.mock_log_accordion = self.log_accordion_patch.start()
         
-        # Setup mock returns
+        # Setup mock returns dengan API baru
+        mock_tracker = MagicMock()
+        mock_tracker.reset = MagicMock()
+        mock_tracker.update = MagicMock()
+        
         self.mock_progress_tracking.return_value = {
             'container': widgets.VBox(),
+            'progress_container': widgets.VBox(),
+            'status_widget': widgets.HTML("Siap"),
+            'tracker': mock_tracker,
+            'update_progress': MagicMock(),
+            'reset_all': MagicMock(),
+            # Untuk kompatibilitas dengan test
             'progress_bar': widgets.FloatProgress(value=0, min=0, max=1),
             'progress_label': widgets.HTML("Siap")
         }

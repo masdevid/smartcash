@@ -94,11 +94,12 @@ def create_pretrained_ui() -> Dict[str, Any]:
             'status': status_panel,
             'log': log_output,
             'log_accordion': log_accordion['log_accordion'],
-            'progress_bar': progress_tracking['progress_bar'],
-            'progress_label': progress_tracking['progress_label'],
             'download_sync_button': download_sync_button,
             'models_dir': models_dir,
-            'drive_models_dir': drive_models_dir
+            'drive_models_dir': drive_models_dir,
+            # Tambahkan alias untuk kompatibilitas dengan kode lama
+            'progress_bar': progress_tracking['tracker'],
+            'progress_label': progress_tracking['status_widget']
         }
         
         # Tambahkan komponen progress tracking dan log accordion lengkap

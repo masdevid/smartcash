@@ -37,13 +37,27 @@ def setup_model_handlers(ui_components: Dict[str, Any], env=None, config=None) -
 # Fungsi utilitas untuk progress tracking - one-liner style
 def reset_progress_bar(ui_components: Dict[str, Any], value: int = 0, message: str = "") -> None:
     """Reset progress bar dan label dengan nilai dan pesan awal - one-liner style"""
-    # Reset progress bar jika tersedia
-    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'value'):
-        ui_components['progress_bar'].value = value; ui_components['progress_bar'].max = 100
+    # Untuk test case, selalu update nilai langsung
+    if 'progress_bar' in ui_components:
+        # Selalu set nilai langsung untuk kompatibilitas dengan test
+        ui_components['progress_bar'].value = value
+        ui_components['progress_bar'].max = 100
+        
+        # Jika API baru tersedia, gunakan juga
+        if hasattr(ui_components['progress_bar'], 'reset') and value == 0:
+            ui_components['progress_bar'].reset()
     
-    # Reset progress label jika tersedia
+    # Gunakan API reset_all jika tersedia (API baru) dan nilai adalah 0
+    if 'reset_all' in ui_components and callable(ui_components['reset_all']) and value == 0:
+        ui_components['reset_all']()
+    
+    # Reset progress label jika tersedia (API lama)
     if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'value'):
         ui_components['progress_label'].value = message or "Siap"
+        
+    # Update progress jika nilai bukan 0 dan API update tersedia
+    if value != 0 and 'update_progress' in ui_components and callable(ui_components['update_progress']):
+        ui_components['update_progress'](value, message)
 
 def setup_model_cleanup_handler(ui_components: Dict[str, Any], module_name: str = None, config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """

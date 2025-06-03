@@ -152,97 +152,150 @@ def get_package_categories() -> List[Dict[str, Any]]:
 
 def analyze_installed_packages(ui_components: Dict[str, Any]) -> None:
     """
-    Analisis package yang sudah terinstall dan update UI.
+    Analisis package yang sudah terinstall dan update UI dengan penanganan error yang lebih baik.
     
     Args:
         ui_components: Dictionary berisi komponen UI
     """
-    from smartcash.ui.utils.constants import COLORS
-    
-    # Log info ke UI
-    log_to_ui(ui_components, "Menganalisis paket yang terinstal...", "info", "🔍")
-    
-    # Dapatkan package groups
-    package_groups = get_package_groups()
-    
-    # Dapatkan package categories untuk UI
-    package_categories = get_package_categories()
-    
-    # Cek setiap kategori dan package
-    for category in package_categories:
-        for package_info in category['packages']:
-            package_key = package_info['key']
-            
-            # Dapatkan daftar package untuk key ini
-            packages_to_check = package_groups.get(package_key, [])
-            if callable(packages_to_check):
-                packages_to_check = packages_to_check()
-            
-            # Status widget untuk package ini
-            status_widget = ui_components.get(f"{package_key}_status")
-            if not status_widget:
-                continue
-            
-            # Cek apakah semua package terinstall
-            all_installed = True
-            missing_packages = []
-            
-            for package_req in packages_to_check:
-                # Parse package name dan versi
-                package_name = package_req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
+    try:
+        # Get package groups dan categories
+        package_groups = get_package_groups()
+        package_categories = get_package_categories()
+        
+        # Get installed packages dengan penanganan error yang lebih baik
+        installed_packages = get_installed_packages()
+        
+        # Inisialisasi counter untuk statistik
+        total_packages = 0
+        total_installed = 0
+        total_missing = 0
+        all_missing_packages = []
+        
+        # Analisis setiap kategori dan package
+        for category in package_categories:
+            for package_info in category['packages']:
+                package_key = package_info['key']
+                package_name = package_info['name']
+                package_description = package_info['description']
                 
-                # Cek apakah package terinstall
+                # Get packages untuk key ini dengan penanganan error
                 try:
-                    importlib.import_module(package_name)
-                except ImportError:
-                    try:
-                        # Coba cek dengan pkg_resources
-                        pkg_resources.get_distribution(package_name)
-                    except pkg_resources.DistributionNotFound:
-                        all_installed = False
-                        missing_packages.append(package_name)
-            
-            # Update status widget
-            if all_installed:
-                status_widget.value = f"<div style='width:100px;color:{COLORS['success']}'>✅ Terinstall</div>"
+                    packages_to_check = package_groups.get(package_key, [])
+                    if callable(packages_to_check):
+                        packages_to_check = packages_to_check()
+                    
+                    # Tambahkan ke total packages
+                    total_packages += len(packages_to_check)
+                    
+                    # Cek apakah semua package sudah terinstall dengan penanganan error yang lebih baik
+                    missing_packages = check_missing_packages(packages_to_check, installed_packages)
+                    total_missing += len(missing_packages)
+                    total_installed += len(packages_to_check) - len(missing_packages)
+                    all_missing_packages.extend(missing_packages)
+                    
+                    # Update UI status
+                    if package_key in ui_components:
+                        # Update tooltip dengan informasi package
+                        tooltip = f"{package_description}\n\nPackages: {', '.join(packages_to_check)}"
+                        if missing_packages:
+                            tooltip += f"\n\nMissing: {', '.join(missing_packages)}"
+                        
+                        # Update status icon dan warna
+                        if not missing_packages:
+                            # Semua package terinstall
+                            status_icon = "✅"
+                            status_color = "#28a745"  # green
+                            status_text = f"{package_name} (Terinstall)"
+                        else:
+                            # Ada package yang belum terinstall
+                            status_icon = "❌"
+                            status_color = "#dc3545"  # red
+                            status_text = f"{package_name} ({len(missing_packages)}/{len(packages_to_check)} perlu diinstall)"
+                        
+                        # Update UI components dengan penanganan error
+                        try:
+                            if hasattr(ui_components[package_key], 'description'):
+                                ui_components[package_key].description = status_text
+                            
+                            # Update tooltip jika ada
+                            tooltip_key = f"{package_key}_tooltip"
+                            if tooltip_key in ui_components:
+                                ui_components[tooltip_key].value = tooltip
+                            
+                            # Update status icon jika ada
+                            status_key = f"{package_key}_status"
+                            if status_key in ui_components:
+                                ui_components[status_key].value = status_icon
+                            
+                            # Update warna jika ada
+                            color_key = f"{package_key}_color"
+                            if color_key in ui_components:
+                                ui_components[color_key].value = status_color
+                        except Exception as ui_error:
+                            # Log error update UI tapi jangan gagalkan analisis
+                            if 'log_message' in ui_components and callable(ui_components['log_message']):
+                                ui_components['log_message'](f"⚠️ Error update UI untuk {package_key}: {str(ui_error)}", "warning")
+                except Exception as pkg_error:
+                    # Log error analisis package tapi jangan gagalkan seluruh analisis
+                    if 'log_message' in ui_components and callable(ui_components['log_message']):
+                        ui_components['log_message'](f"⚠️ Error analisis package {package_key}: {str(pkg_error)}", "warning")
+        
+        # Log ringkasan ke UI dengan penanganan error
+        try:
+            if total_missing > 0:
+                # Gunakan log_message jika tersedia untuk memastikan log hanya muncul di UI
+                if 'log_message' in ui_components and callable(ui_components['log_message']):
+                    ui_components['log_message'](f"📊 Analisis selesai: {total_installed}/{total_packages} paket terinstal, {total_missing} paket perlu diinstal", "info")
+                else:
+                    log_to_ui(ui_components, f"📊 Analisis selesai: {total_installed}/{total_packages} paket terinstal, {total_missing} paket perlu diinstal", "info", "📊")
+                
+                # Update progress jika tersedia
+                if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+                    ui_components['update_progress']('overall', 0, f"📊 Analisis selesai: {total_missing} paket perlu diinstal")
             else:
-                status_widget.value = f"<div style='width:100px;color:{COLORS['warning']}'>⚠️ Belum lengkap</div>"
-                # Log info ke UI tentang paket yang belum terinstal
-                if missing_packages:
-                    log_to_ui(ui_components, f"Paket yang belum terinstal untuk {package_info['name']}: {', '.join(missing_packages)}", "warning", "⚠️")
-
-    # Log ringkasan analisis
-    total_packages = 0
-    total_installed = 0
-    total_missing = 0
-    
-    for category in package_categories:
-        for package_info in category['packages']:
-            package_key = package_info['key']
-            packages_to_check = package_groups.get(package_key, [])
-            if callable(packages_to_check):
-                packages_to_check = packages_to_check()
-            
-            total_packages += len(packages_to_check)
-            
-            # Hitung paket yang terinstal dan yang belum
-            for package_req in packages_to_check:
-                package_name = package_req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
-                try:
-                    importlib.import_module(package_name)
-                    total_installed += 1
-                except ImportError:
-                    try:
-                        pkg_resources.get_distribution(package_name)
-                        total_installed += 1
-                    except pkg_resources.DistributionNotFound:
-                        total_missing += 1
-    
-    # Log ringkasan ke UI
-    if total_missing > 0:
-        log_to_ui(ui_components, f"Analisis selesai: {total_installed}/{total_packages} paket terinstal, {total_missing} paket perlu diinstal", "info", "📊")
-    else:
-        log_to_ui(ui_components, f"Semua paket ({total_packages}) sudah terinstal dengan baik", "success", "✅")
+                # Gunakan log_message jika tersedia untuk memastikan log hanya muncul di UI
+                if 'log_message' in ui_components and callable(ui_components['log_message']):
+                    ui_components['log_message'](f"✅ Semua paket ({total_packages}) sudah terinstal dengan baik", "success")
+                else:
+                    log_to_ui(ui_components, f"✅ Semua paket ({total_packages}) sudah terinstal dengan baik", "success", "✅")
+                
+                # Update progress jika tersedia
+                if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+                    ui_components['update_progress']('overall', 100, "✅ Semua paket sudah terinstal")
+        except Exception as log_error:
+            # Fallback ke logging biasa jika gagal log ke UI
+            logging.error(f"Error logging ringkasan: {str(log_error)}")
+        
+        # Return untuk testing dan debugging
+        return {
+            'total_packages': total_packages,
+            'total_installed': total_installed,
+            'total_missing': total_missing,
+            'missing_packages': all_missing_packages
+        }
+    except Exception as e:
+        # Tangkap semua error dan log ke UI
+        error_message = f"❌ Gagal mendeteksi package: {str(e)}"
+        
+        # Gunakan log_message jika tersedia untuk memastikan log hanya muncul di UI
+        if 'log_message' in ui_components and callable(ui_components['log_message']):
+            ui_components['log_message'](error_message, "error")
+        else:
+            # Fallback ke log_to_ui
+            log_to_ui(ui_components, error_message, "error", "❌")
+        
+        # Update progress jika tersedia
+        if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+            ui_components['update_progress']('overall', 0, error_message)
+        
+        # Return untuk testing dan debugging
+        return {
+            'total_packages': 0,
+            'total_installed': 0,
+            'total_missing': 0,
+            'missing_packages': [],
+            'error': str(e)
+        }
 
 
 def parse_custom_packages(custom_packages_text: str) -> List[str]:
@@ -270,62 +323,124 @@ def parse_custom_packages(custom_packages_text: str) -> List[str]:
 
 def get_installed_packages() -> Set[str]:
     """
-    Dapatkan daftar package yang sudah terinstall.
+    Dapatkan daftar package yang sudah terinstall dengan metode yang lebih robust.
     
     Returns:
         Set nama package yang terinstall
     """
     installed_packages = set()
     
-    # Metode 1: Gunakan pkg_resources
+    # Metode 1: Gunakan pkg_resources (paling akurat)
     try:
-        installed_packages.update([pkg.key for pkg in pkg_resources.working_set])
+        installed_packages.update([pkg.key.lower() for pkg in pkg_resources.working_set])
     except Exception:
         pass
     
-    # Metode 2: Cek sys.modules untuk package yang sudah diimport
+    # Metode 2: Gunakan importlib untuk cek package umum
     common_packages = {
-        'numpy', 'pandas', 'matplotlib', 'torch', 'tensorflow', 'sklearn', 
-        'scipy', 'cv2', 'opencv_python', 'pillow', 'pil', 'requests', 
-        'bs4', 'beautifulsoup4', 'seaborn', 'plotly', 'ipywidgets', 'tqdm'
+        'numpy', 'pandas', 'matplotlib', 'torch', 'torchvision', 'torchaudio', 'tensorflow', 'sklearn', 
+        'scikit-learn', 'scipy', 'cv2', 'opencv-python', 'opencv_python', 'pillow', 'pil', 'requests', 
+        'bs4', 'beautifulsoup4', 'seaborn', 'plotly', 'ipywidgets', 'tqdm', 'albumentations',
+        'roboflow', 'ultralytics', 'termcolor', 'pyyaml', 'yaml'
     }
     
+    # Tambahkan alias package
+    package_aliases = {
+        'opencv-python': ['cv2', 'opencv_python'],
+        'pillow': ['pil', 'PIL'],
+        'scikit-learn': ['sklearn'],
+        'beautifulsoup4': ['bs4'],
+        'pyyaml': ['yaml']
+    }
+    
+    # Cek package dengan importlib
     for pkg in common_packages:
-        if pkg in sys.modules:
-            installed_packages.add(pkg)
+        try:
+            # Coba import package
+            importlib.import_module(pkg)
+            installed_packages.add(pkg.lower())
+            
+            # Tambahkan alias jika ada
+            for main_pkg, aliases in package_aliases.items():
+                if pkg.lower() == main_pkg.lower() or pkg.lower() in [alias.lower() for alias in aliases]:
+                    installed_packages.add(main_pkg.lower())
+                    for alias in aliases:
+                        installed_packages.add(alias.lower())
+        except ImportError:
+            # Gagal import, coba metode lain
+            pass
+    
+    # Metode 3: Cek sys.modules untuk package yang sudah diimport
+    for pkg in sys.modules:
+        pkg_base = pkg.split('.')[0].lower()
+        installed_packages.add(pkg_base)
     
     return installed_packages
 
 
 def check_missing_packages(required_packages: List[str], installed_packages: Set[str]) -> List[str]:
     """
-    Cek package yang belum terinstall.
+    Cek package yang belum terinstall dengan metode yang lebih robust.
     
     Args:
         required_packages: List package yang dibutuhkan
-        installed_packages: Set package yang sudah terinstall
+        installed_packages: Set package yang sudah terinstall (lowercase)
         
     Returns:
         List package yang belum terinstall
     """
     missing_packages = []
     
+    # Definisi mapping package untuk menangani nama modul yang berbeda dari nama package
+    package_module_map = {
+        'opencv-python': ['cv2', 'opencv_python', 'opencv-python'],
+        'pillow': ['pil', 'PIL', 'pillow'],
+        'beautifulsoup4': ['bs4', 'beautifulsoup4'],
+        'scikit-learn': ['sklearn', 'scikit-learn', 'scikit_learn'],
+        'pyyaml': ['yaml', 'pyyaml'],
+        'matplotlib': ['matplotlib', 'matplotlib.pyplot', 'mpl'],
+        'torchvision': ['torchvision', 'torch'],
+        'torchaudio': ['torchaudio', 'torch'],
+        'ipywidgets': ['ipywidgets', 'ipython', 'IPython']
+    }
+    
     for pkg_req in required_packages:
-        # Parse package name (tanpa versi)
-        pkg_name = pkg_req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
-        pkg_name = pkg_name.lower()
-        
-        # Cek apakah package sudah terinstall
-        if pkg_name not in installed_packages:
-            # Cek alias umum
-            if pkg_name == 'opencv-python' and ('cv2' in installed_packages or 'opencv_python' in installed_packages):
-                continue
-            if pkg_name == 'pillow' and 'pil' in installed_packages:
-                continue
-            if pkg_name == 'beautifulsoup4' and 'bs4' in installed_packages:
-                continue
+        try:
+            # Parse package name (tanpa versi)
+            pkg_name = pkg_req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
+            pkg_name_lower = pkg_name.lower()
+            
+            # Cek apakah package atau aliasnya sudah terinstall
+            is_installed = False
+            
+            # Cek langsung di installed_packages
+            if pkg_name_lower in installed_packages:
+                is_installed = True
+            else:
+                # Cek dengan package_module_map
+                for main_pkg, aliases in package_module_map.items():
+                    if pkg_name_lower == main_pkg.lower():
+                        # Jika package utama ada di map, cek semua aliasnya
+                        for alias in aliases:
+                            if alias.lower() in installed_packages:
+                                is_installed = True
+                                break
+                    elif pkg_name_lower in [alias.lower() for alias in aliases]:
+                        # Jika package adalah alias, cek package utama dan alias lainnya
+                        if main_pkg.lower() in installed_packages:
+                            is_installed = True
+                            break
+                        for alias in aliases:
+                            if alias.lower() in installed_packages:
+                                is_installed = True
+                                break
             
             # Tambahkan ke daftar missing jika belum terinstall
+            if not is_installed:
+                missing_packages.append(pkg_req)
+        except Exception as e:
+            # Jika ada error saat parsing, tambahkan ke missing packages untuk aman
+            logging.debug(f"Error saat cek package {pkg_req}: {str(e)}")
             missing_packages.append(pkg_req)
     
     return missing_packages

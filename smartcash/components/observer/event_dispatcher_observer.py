@@ -103,11 +103,35 @@ class EventDispatcher:
     @classmethod
     def unregister_all(cls, event_type: Optional[str] = None) -> None:
         """Membatalkan registrasi semua observer untuk event tertentu atau semua event."""
-        EventRegistry().unregister_all(event_type)
+        registry = EventRegistry()
+        registry.unregister_all(event_type)
         
         if cls._logging_enabled:
-            message = "🧹 Semua observer dibersihkan" + (f" dari event '{event_type}'" if event_type else "")
-            cls._logger.debug(message)
+            if event_type is None:
+                cls._logger.debug(f"🔌 Semua observer dibatalkan dari semua event")
+            else:
+                cls._logger.debug(f"🔌 Semua observer dibatalkan dari event '{event_type}'")
+                
+    @classmethod
+    def remove_all_observers_for_event(cls, event_type: str) -> None:
+        """Membatalkan registrasi semua observer untuk event tertentu dengan nama yang spesifik.
+        
+        Args:
+            event_type: Tipe event yang akan dibersihkan
+        """
+        registry = EventRegistry()
+        
+        # Gunakan lock untuk thread-safety
+        with registry._lock:
+            if event_type in registry._observers:
+                # Hapus semua observer untuk event_type
+                registry._observers[event_type] = {}
+                
+        if cls._logging_enabled:
+            cls._logger.debug(f"🔌 Semua observer dibatalkan dari event '{event_type}'")
+            
+        # Bersihkan referensi yang tidak valid
+        registry.clean_references()
     
     @classmethod
     def notify(cls, event_type: str, sender: Any, async_mode: bool = False, **kwargs) -> Optional[List[concurrent.futures.Future]]:

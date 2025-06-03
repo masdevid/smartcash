@@ -1,103 +1,95 @@
 """
 File: smartcash/ui/setup/dependency_installer/handlers/analyzer_handler.py
-Deskripsi: Enhanced handler untuk analisis package yang terinstall dengan integrasi observer pattern
+Deskripsi: Enhanced handler untuk analisis package yang terinstall dengan integrasi observer pattern dan pendekatan DRY
 """
 
 from typing import Dict, Any, List
 import time
+from smartcash.ui.setup.dependency_installer.utils.observer_helper import (
+    notify_analyze_start, notify_analyze_progress, notify_analyze_error, notify_analyze_complete
+)
+from smartcash.ui.setup.dependency_installer.utils.progress_helper import (
+    update_progress_step, start_operation, complete_operation, handle_item_error
+)
+from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
 
 def setup_analyzer_handler(ui_components: Dict[str, Any]) -> None:
     """
-    Setup handler untuk analisis package dengan integrasi observer pattern
+    Setup handler untuk analisis package dengan integrasi observer pattern dan pendekatan one-liner
     
     Args:
         ui_components: Dictionary UI components
     """
     # Import utils
     from smartcash.ui.setup.dependency_installer.utils.package_utils import analyze_installed_packages
-    from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
-    # Wrap analyze_installed_packages dengan progress tracking dan observer notification
+    # Wrap analyze_installed_packages dengan progress tracking dan observer notification menggunakan pendekatan DRY
     def enhanced_analyze_installed_packages() -> List[str]:
-        # Get observer manager
-        observer_manager = ui_components.get('observer_manager')
-        progress_tracker = ui_components.get('progress_tracker')
+        # Mulai operasi dengan progress tracking dan logging menggunakan pendekatan DRY
+        start_operation(ui_components, "analisis packages", 0)
         
-        # Notify start via observer
-        if observer_manager and hasattr(observer_manager, 'notify'):
-            try:
-                observer_manager.notify('DEPENDENCY_ANALYZE_START', None, {
-                    'message': "Memulai analisis packages terinstall",
-                    'timestamp': time.time()
-                })
-            except Exception:
-                pass  # Silent fail untuk observer notification
+        # Update status panel dengan pendekatan one-liner
+        if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+            ui_components['update_status_panel']("info", "Memulai analisis packages terinstall")
         
-        # Tampilkan progress tracker untuk analisis
-        if 'show_for_operation' in ui_components:
-            ui_components['show_for_operation']('analyze')
-        
-        # Update progress
-        if progress_tracker:
-            progress_tracker.update('step', 0, "Menganalisis packages terinstall...", "#007bff")
-        elif 'update_progress' in ui_components:
-            ui_components['update_progress']('step', 0, "Menganalisis packages terinstall...", "#007bff")
-        
-        # Log start
-        log_message(ui_components, "🔍 Memulai analisis packages terinstall...", "info")
+        # Notify start via observer dengan pendekatan DRY
+        notify_analyze_start(ui_components)
         
         try:
-            # Jalankan analisis
+            # Jalankan analisis dengan timing
             start_time = time.time()
             result = analyze_installed_packages(ui_components)
             duration = time.time() - start_time
             
-            # Update progress selesai
-            if progress_tracker:
-                progress_tracker.update('step', 100, "Analisis packages selesai", "#28a745")
-            elif 'update_progress' in ui_components:
-                ui_components['update_progress']('step', 100, "Analisis packages selesai", "#28a745")
+            # Selesaikan operasi dengan progress tracking dan logging menggunakan pendekatan DRY
+            stats = {
+                'duration': duration,
+                'success': True,
+                'total': 1,
+                'result': result
+            }
+            complete_operation(ui_components, "analisis packages", stats)
             
-            # Log success
-            log_message(ui_components, f"✅ Berhasil menganalisis packages terinstall ({duration:.1f}s)", "success")
+            # Update status panel dengan pendekatan one-liner
+            if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+                ui_components['update_status_panel']("success", "Analisis selesai")
             
-            # Notify complete via observer
-            if observer_manager and hasattr(observer_manager, 'notify'):
-                try:
-                    observer_manager.notify('DEPENDENCY_ANALYZE_COMPLETE', None, {
-                        'message': f"Analisis packages selesai ({duration:.1f}s)",
-                        'timestamp': time.time(),
-                        'duration': duration,
-                        'result': result
-                    })
-                except Exception:
-                    pass  # Silent fail untuk observer notification
+            # Notify complete via observer dengan pendekatan DRY
+            notify_analyze_complete(ui_components, duration, result)
             
             return result
             
         except Exception as e:
-            # Update progress error
-            if progress_tracker:
-                progress_tracker.update('step', 100, f"Analisis packages gagal: {str(e)}", "#dc3545")
-            elif 'update_progress' in ui_components:
-                ui_components['update_progress']('step', 100, f"Analisis packages gagal: {str(e)}", "#dc3545")
+            # Handle error dengan pendekatan DRY
+            error_msg = str(e)
+            error_message = f"Gagal menganalisis packages: {error_msg}"
+            handle_item_error(ui_components, "analisis packages", error_msg)
             
-            # Log error
-            log_message(ui_components, f"⚠️ Gagal menganalisis packages: {str(e)}", "error")
+            # Update status panel dengan pendekatan one-liner
+            if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+                ui_components['update_status_panel']("error", error_message)
             
-            # Notify error via observer
-            if observer_manager and hasattr(observer_manager, 'notify'):
-                try:
-                    observer_manager.notify('DEPENDENCY_ANALYZE_ERROR', None, {
-                        'message': f"Gagal menganalisis packages: {str(e)}",
-                        'timestamp': time.time(),
-                        'error': str(e)
-                    })
-                except Exception:
-                    pass  # Silent fail untuk observer notification
+            # Notify error via observer dengan pendekatan DRY
+            notify_analyze_error(ui_components, error_msg)
             
             # Re-raise exception
             raise
     
     # Expose enhanced function
     ui_components['analyze_installed_packages'] = enhanced_analyze_installed_packages
+    
+    # Setup handler untuk tombol analyze dengan pendekatan one-liner
+    def on_analyze_click(b, ui_components=ui_components):
+        """Handler untuk tombol analyze dengan integrasi observer pattern dan progress tracking menggunakan pendekatan one-liner"""
+        try:
+            # Jalankan analisis packages dengan enhanced function
+            enhanced_analyze_installed_packages()
+        except Exception:
+            # Error sudah ditangani di enhanced_analyze_installed_packages
+            pass
+    
+    # Register handler jika tombol analyze tersedia
+    if 'analyze_button' in ui_components:
+        ui_components['analyze_button'].on_click(on_analyze_click)
+
+# Fungsi on_analyze_click sudah diimplementasikan di dalam setup_analyzer_handler

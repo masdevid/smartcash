@@ -10,7 +10,6 @@ from typing import Optional, Dict, Tuple
 
 import torch
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.manager import ModelManager
 
 logger = SmartCashLogger(__name__)
 
@@ -51,22 +50,18 @@ def check_pretrained_model_in_drive(backbone: str) -> Optional[str]:
         logger.info(f"📄 File model {model_filename} tidak ditemukan di drive")
         return None
         
-    # Validasi model menggunakan ModelManager
-    model_manager = ModelManager()
-    model_id = backbone
-    
+    # Validasi sederhana: periksa ukuran file
     try:
-        # Coba validasi model, tetapi tetap gunakan model meskipun validasi gagal
-        if model_manager.validate_model(model_path, model_id):
-            logger.success(f"✅ Pretrained model untuk {backbone} ditemukan dan valid di drive")
+        file_size = model_path.stat().st_size
+        if file_size > 0:
+            logger.success(f"✅ Pretrained model untuk {backbone} ditemukan di drive (ukuran: {file_size/1024/1024:.2f} MB)")
             return str(model_path)
         else:
-            logger.warning(f"⚠️ Pretrained model untuk {backbone} ditemukan di drive tetapi tidak valid")
-            # Tetap gunakan model meskipun validasi gagal
-            return str(model_path)
+            logger.warning(f"⚠️ Pretrained model untuk {backbone} ditemukan di drive tetapi ukurannya 0 bytes")
+            return None
     except Exception as e:
         logger.warning(f"⚠️ Gagal memvalidasi pretrained model untuk {backbone}: {str(e)}")
-        # Tetap gunakan model meskipun validasi gagal
+        # Tetap gunakan model jika file ada meskipun validasi gagal
         return str(model_path)
 
 def load_pretrained_model(model, path: str, device: str) -> torch.nn.Module:

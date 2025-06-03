@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained_model/pretrained_initializer.py
-Deskripsi: Initializer pretrained model yang terintegrasi dengan architecture yang konsisten
+Deskripsi: Fixed initializer dengan proper inheritance dan imports
 """
 
 from typing import Dict, Any, List
@@ -8,12 +8,10 @@ from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.ui.utils.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
-
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
-
-# Import components
 from smartcash.ui.pretrained_model.components.ui_components import create_pretrained_main_ui
 from smartcash.ui.pretrained_model.handlers.pretrained_handlers import setup_pretrained_handlers
+
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
 
 class PretrainedModelInitializer(CommonInitializer):
     """Initializer pretrained model terintegrasi dengan architecture yang konsisten"""
@@ -37,20 +35,11 @@ class PretrainedModelInitializer(CommonInitializer):
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Default config dengan constants dari single source"""
-        try:
-            from smartcash.ui.pretrained_model.constants.model_constants import DEFAULT_MODELS_DIR, DEFAULT_DRIVE_MODELS_DIR
-            env_manager = get_environment_manager()
-            paths = get_paths_for_environment(env_manager.is_colab, env_manager.is_drive_mounted)
-            return {
-                'models_dir': DEFAULT_MODELS_DIR,
-                'drive_models_dir': DEFAULT_DRIVE_MODELS_DIR
-            }
-        except Exception:
-            from smartcash.ui.pretrained_model.constants.model_constants import DEFAULT_MODELS_DIR, DEFAULT_DRIVE_MODELS_DIR
-            return {
-                'models_dir': DEFAULT_MODELS_DIR,
-                'drive_models_dir': DEFAULT_DRIVE_MODELS_DIR
-            }
+        from smartcash.ui.pretrained_model.constants.model_constants import DEFAULT_MODELS_DIR, DEFAULT_DRIVE_MODELS_DIR
+        return {
+            'models_dir': DEFAULT_MODELS_DIR,
+            'drive_models_dir': DEFAULT_DRIVE_MODELS_DIR
+        }
     
     def _get_critical_components(self) -> List[str]:
         return [

@@ -77,13 +77,24 @@ class TestDependencyInstallerUIComponents(unittest.TestCase):
         # Panggil fungsi yang diuji
         ui_components = create_dependency_installer_ui()
         
-        # Verifikasi hasil
+        # Verifikasi hasil - pastikan semua komponen kritis tersedia
         self.assertIsNotNone(ui_components)
-        self.assertIn('ui', ui_components)
-        self.assertIn('status', ui_components)
-        self.assertIn('log_output', ui_components)
-        self.assertIn('status_panel', ui_components)
-        self.assertIn('install_button', ui_components)
+        
+        # Komponen kritis yang harus ada - sesuai dengan DependencyInstallerInitializer._get_critical_components
+        critical_components = [
+            'ui', 
+            'install_button', 
+            'status', 
+            'log_output', 
+            'progress_container',
+            'status_panel'
+        ]
+        
+        # Verifikasi semua komponen kritis ada
+        for component in critical_components:
+            self.assertIn(component, ui_components, f"Komponen kritis '{component}' tidak ditemukan")
+        
+        # Verifikasi komponen tambahan
         self.assertIn('custom_packages', ui_components)
         self.assertIn('progress_tracker', ui_components)
         
@@ -91,27 +102,8 @@ class TestDependencyInstallerUIComponents(unittest.TestCase):
         # Catatan: Ini tidak diverifikasi di sini karena ditambahkan oleh DependencyInstallerInitializer,
         # bukan oleh create_dependency_installer_ui
     
-    def test_assemble_ui_components(self):
-        """Test assemble_ui_components dengan pendekatan one-liner style."""
-        from smartcash.ui.setup.dependency_installer.components.ui_components import assemble_ui_components
-        
-        # Panggil fungsi yang diuji
-        ui_components = assemble_ui_components()
-        
-        # Verifikasi hasil
-        self.assertIsNotNone(ui_components)
-        self.assertIn('main_container', ui_components)
-        self.assertIn('header', ui_components)
-        self.assertIn('log_output', ui_components)
-        self.assertIn('install_button', ui_components)
-        self.assertIn('analyze_button', ui_components)
-        self.assertIn('reset_button', ui_components)
-        self.assertIn('progress_container', ui_components)
-        self.assertIn('progress_bar', ui_components)
-        self.assertIn('progress_label', ui_components)
-        self.assertIn('status_container', ui_components)
-        self.assertIn('status_widget', ui_components)
-        self.assertIn('error_widget', ui_components)
+    # Test assemble_ui_components dihapus karena file ui_components.py sudah tidak ada lagi
+    # Implementasi sekarang sepenuhnya ada di dependency_installer_component.py
     
     def test_create_category_box(self):
         """Test create_category_box dengan pendekatan one-liner style."""

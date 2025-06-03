@@ -22,12 +22,8 @@ def get_observer_manager():
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Setup handlers untuk dependency installer dengan integrasi notification observer dan pendekatan one-liner"""
-    # Import logger untuk keperluan logging
-    from smartcash.common.logger import get_logger
-    import logging
-    
-    # Setup logger
-    logger = logging.getLogger('dependency_installer')
+    # Setup logger menggunakan logger_helper
+    logger = get_module_logger()
     logger.info("Setting up dependency installer handlers")
     
     # Jika ada error di ui_components, kembalikan tanpa modifikasi
@@ -83,28 +79,58 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         # Buat fungsi analisis yang dapat digunakan baik langsung maupun sebagai delayed function
         def run_package_analysis():
             try:
+                # Gunakan logger dari logger_helper
+                logger = get_module_logger()
+                
+                # Log bahwa analisis dimulai
+                logger.info("Starting package analysis")
+                
+                # Reset UI logs jika ada
+                if 'reset_ui_logs' in ui_components and callable(ui_components['reset_ui_logs']):
+                    ui_components['reset_ui_logs'](ui_components)
+                    logger.info("UI logs reset before analysis")
+                
+                # Pastikan progress container terlihat dengan memaksa visibilitas
+                if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                    prev_visibility = ui_components['progress_container'].layout.visibility
+                    ui_components['progress_container'].layout.visibility = 'visible'
+                    logger.info(f"Progress container visibility set to visible (was: {prev_visibility})")
+                
                 # Tampilkan progress tracker untuk analisis dengan pendekatan DRY
                 if 'show_for_operation' in ui_components and callable(ui_components['show_for_operation']):
                     ui_components['show_for_operation']('analyze')
+                    logger.info("Show for operation 'analyze' called")
+                else:
+                    logger.warning("show_for_operation function not available")
                 
-                if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-                    ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+                # Gunakan reset_progress_bar dari logger_helper
+                reset_progress_bar(ui_components, 0, "🔍 Menganalisis packages terinstall...", True)
+                logger.info("Progress bar reset for analysis")
                 
-                # Jalankan analisis
+                # Log pesan ke UI menggunakan log_message dari logger_helper
+                log_message(ui_components, "🔍 Memulai analisis package...", "info")
+                
+                # Update status panel menggunakan update_status_panel dari logger_helper
+                update_status_panel("info", "🔍 Menganalisis packages terinstall...", ui_components)
+                
+                # Jalankan analisis dengan delay kecil untuk memastikan UI terupdate terlebih dahulu
+                import time
+                time.sleep(0.5)  # Delay kecil untuk memastikan UI terupdate
                 analyze_installed_packages(ui_components)
                 
                 # Sembunyikan progress container setelah analisis selesai jika tidak ada instalasi otomatis
                 if not config.get('auto_install', False) and 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
                     ui_components['progress_container'].layout.visibility = 'hidden'
+                    logger.info("Progress container hidden after analysis")
                     
                 # Jalankan instalasi otomatis jika dikonfigurasi
                 if config.get('auto_install', False) and 'install_button' in ui_components and hasattr(ui_components['install_button'], 'click'):
+                    logger.info("Auto-install triggered")
                     ui_components['install_button'].click()
             except Exception as e:
-                # Log error
+                # Log error menggunakan logger_helper
                 logger.error(f"Error during package analysis: {str(e)}")
-                if 'log_message' in ui_components and callable(ui_components['log_message']):
-                    ui_components['log_message'](f"❌ Error saat analisis: {str(e)}", "error")
+                log_message(ui_components, f"❌ Error saat analisis: {str(e)}", "error")
         
         # Tambahkan fungsi analisis ke ui_components
         ui_components['run_delayed_analysis'] = run_package_analysis
@@ -130,6 +156,16 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         
         # Jalankan analisis package jika delay_analysis tidak diset atau False
         if not config.get('delay_analysis', False):
+            # Pastikan progress container terlihat sebelum menjalankan analisis
+            if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                ui_components['progress_container'].layout.visibility = 'visible'
+                logger.info("Progress container visibility set to visible before initial analysis")
+            
+            # Tambahkan delay kecil untuk memastikan UI terender terlebih dahulu
+            import time
+            time.sleep(0.5)  # Delay kecil untuk memastikan UI terender
+            
+            # Jalankan analisis
             run_package_analysis()
     except Exception as e:
         # Silent fail untuk setup handlers

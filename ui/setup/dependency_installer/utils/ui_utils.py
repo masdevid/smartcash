@@ -14,8 +14,34 @@ def show_for_operation(ui_components: Dict[str, Any], operation: str) -> None:
         ui_components: Dictionary komponen UI
         operation: Jenis operasi ('analyze', 'install', 'validate')
     """
-    if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']): ui_components['reset_progress_bar'](0, "", True)
-    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'): ui_components['progress_container'].layout.visibility = 'visible'
+    # Import logger untuk keperluan logging
+    from smartcash.common.logger import get_logger
+    logger = get_logger('dependency_installer')
+    
+    # Log operasi yang sedang dijalankan
+    logger.info(f"Showing UI for operation: {operation}")
+    
+    # Reset progress bar dengan pesan yang sesuai dengan operasi
+    if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+        operation_messages = {
+            'analyze': "🔍 Memulai analisis package...",
+            'install': "📦 Memulai instalasi package...",
+            'validate': "✅ Memulai validasi package..."
+        }
+        message = operation_messages.get(operation, "Memulai operasi...")
+        ui_components['reset_progress_bar'](0, message, True)
+    
+    # Pastikan progress container terlihat
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        # Simpan status visibilitas sebelumnya untuk debugging
+        prev_visibility = ui_components['progress_container'].layout.visibility
+        ui_components['progress_container'].layout.visibility = 'visible'
+        
+        # Log perubahan visibilitas
+        if prev_visibility != 'visible':
+            logger.info(f"Progress container visibility changed from {prev_visibility} to visible")
+    else:
+        logger.warning("Progress container not found or doesn't have layout attribute")
 
 def reset_ui_logs(ui_components: Dict[str, Any]) -> None:
     """Reset log output, status panel, dan hasil analisis
@@ -82,22 +108,63 @@ def error_operation(ui_components: Dict[str, Any], error_message: str) -> None:
     if 'log_message' in ui_components and callable(ui_components['log_message']):
         ui_components['log_message'](error_message, "error")
 
-def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = "ℹ️") -> None:
+def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
     """Fungsi helper untuk logging ke UI dengan icon dan level yang sesuai
     
     Args:
         ui_components: Dictionary komponen UI
         message: Pesan yang akan ditampilkan
         level: Level log (info, success, warning, error)
-        icon: Icon untuk pesan
+        icon: Icon untuk pesan (opsional, akan menggunakan default sesuai level jika None)
     """
-    # Fungsi ini hanya digunakan sebagai implementasi internal, bukan dipanggil langsung dari ui_components['log_message']
+    # Import logger untuk keperluan logging
+    from smartcash.common.logger import get_logger
+    logger = get_logger('dependency_installer')
+    
+    # Tentukan icon default berdasarkan level jika tidak disediakan
+    if icon is None:
+        icon_map = {
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌",
+            "danger": "🚫"
+        }
+        icon = icon_map.get(level, "ℹ️")
+    
+    # Tentukan warna berdasarkan level
+    color_map = {
+        "info": "#17a2b8", 
+        "success": "#28a745", 
+        "warning": "#ffc107", 
+        "error": "#dc3545",
+        "danger": "#dc3545"
+    }
+    color = color_map.get(level, color_map["info"])
+    
+    # Format pesan dengan style yang konsisten
+    formatted_message = f"{icon} {message}"
+    
+    # Log ke console untuk debugging
+    logger.debug(f"UI Log ({level}): {formatted_message}")
+    
+    # Tampilkan ke UI jika log_output tersedia
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_display_data'):
-        from IPython.display import display, HTML
-        color_map = {"info": "#17a2b8", "success": "#28a745", "warning": "#ffc107", "error": "#dc3545"}
-        color = color_map.get(level, color_map["info"])
-        html = f"<div style='color: {color};'>{icon} {message}</div>"
-        ui_components['log_output'].append_display_data(HTML(html))
+        try:
+            from IPython.display import display, HTML
+            
+            # Format HTML dengan style yang konsisten dengan modul UI lainnya
+            html = f"""<div style='margin:4px 0;padding:4px 8px;color:{color};font-family:sans-serif;'>
+                <span style='font-weight:bold;margin-right:6px;'>{icon}</span>
+                <span>{message}</span>
+            </div>"""
+            
+            # Tampilkan ke log output
+            ui_components['log_output'].append_display_data(HTML(html))
+        except Exception as e:
+            logger.error(f"Error displaying log to UI: {str(e)}")
+    else:
+        logger.warning("Log output component not available or doesn't have append_display_data method")
     
 def update_status_panel(status_type: str, message: str, ui_components: Dict[str, Any] = None) -> None:
     """Update status panel dengan tipe dan pesan tertentu

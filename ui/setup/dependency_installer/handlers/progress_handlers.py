@@ -22,32 +22,41 @@ def update_progress(ui_components: Dict[str, Any], progress_type: str, value: in
         message: Pesan yang akan ditampilkan
         color: Warna progress bar (opsional)
     """
+    # Import logger_helper untuk logging yang konsisten
+    from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message, get_module_logger
+    logger = get_module_logger()
+    
+    # Update progress bar jika tersedia
     if 'progress_bar' in ui_components: 
         ui_components['progress_bar'].value = value
         if color and hasattr(ui_components['progress_bar'], 'style'): ui_components['progress_bar'].style.bar_color = color
+        logger.debug(f"Progress bar updated: {value}% - {message}")
     
-    if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'value'): ui_components['progress_label'].value = message
-    if 'status_widget' in ui_components and hasattr(ui_components['status_widget'], 'value'): ui_components['status_widget'].value = message
+    # Update label jika tersedia
+    if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'value'): 
+        ui_components['progress_label'].value = message
     
-    if progress_type == 'step' and 'log_message' in ui_components and callable(ui_components['log_message']): 
+    # Update status widget jika tersedia
+    if 'status_widget' in ui_components and hasattr(ui_components['status_widget'], 'value'): 
+        ui_components['status_widget'].value = message
+    
+    # Log pesan ke UI jika step progress
+    if progress_type == 'step': 
         level, icon = ("success", "✅") if value == 100 else ("info", "🔄")
-        ui_components['log_message'](message, level, icon)
+        log_message(ui_components, message, level, icon)
 
-def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = "ℹ️") -> None:
+def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
     """Fungsi untuk logging ke UI dengan icon dan level yang sesuai
     
     Args:
         ui_components: Dictionary komponen UI
         message: Pesan yang akan ditampilkan
         level: Level log (info, success, warning, error)
-        icon: Icon untuk pesan
+        icon: Icon untuk pesan (opsional, akan menggunakan default sesuai level jika None)
     """
-    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_display_data'):
-        from IPython.display import display, HTML
-        color_map = {"info": "#17a2b8", "success": "#28a745", "warning": "#ffc107", "error": "#dc3545"}
-        color = color_map.get(level, color_map["info"])
-        html = f"<div style='color: {color};'>{icon} {message}</div>"
-        ui_components['log_output'].append_display_data(HTML(html))
+    # Gunakan fungsi log_message dari logger_helper
+    from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message as helper_log_message
+    helper_log_message(ui_components, message, level, icon)
 
 def setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
     """Setup fungsi-fungsi untuk progress tracking
@@ -72,23 +81,58 @@ def reset_progress_bar(ui_components: Dict[str, Any], value: int = 0, message: s
         message: Pesan yang akan ditampilkan
         show_progress: True untuk menampilkan progress, False untuk menyembunyikan
     """
+    # Import logger_helper untuk logging yang konsisten
+    from smartcash.ui.setup.dependency_installer.utils.logger_helper import get_module_logger, reset_progress_bar as helper_reset_progress_bar
+    logger = get_module_logger()
+    
+    # Gunakan fungsi reset_progress_bar dari logger_helper jika tersedia
+    try:
+        # Coba gunakan fungsi dari logger_helper
+        helper_reset_progress_bar(ui_components, value, message, show_progress)
+        logger.debug(f"Reset progress bar menggunakan helper: {value}% - {message} - show: {show_progress}")
+        return
+    except Exception as e:
+        # Fallback ke implementasi lokal jika helper gagal
+        logger.debug(f"Fallback ke implementasi lokal reset_progress_bar: {str(e)}")
+    
+    # Implementasi lokal sebagai fallback
     if 'progress_bar' in ui_components:
         ui_components['progress_bar'].value = value
         ui_components['progress_bar'].max = 100
-        if hasattr(ui_components['progress_bar'], 'layout'): ui_components['progress_bar'].layout.visibility = 'visible' if show_progress else 'hidden'
-        if hasattr(ui_components['progress_bar'], 'reset') and value == 0: ui_components['progress_bar'].reset()
+        prev_visibility = ui_components['progress_bar'].layout.visibility if hasattr(ui_components['progress_bar'], 'layout') else 'unknown'
+        if hasattr(ui_components['progress_bar'], 'layout'): 
+            ui_components['progress_bar'].layout.visibility = 'visible' if show_progress else 'hidden'
+            logger.debug(f"Progress bar visibility changed from {prev_visibility} to {'visible' if show_progress else 'hidden'}")
+        if hasattr(ui_components['progress_bar'], 'reset') and value == 0: 
+            ui_components['progress_bar'].reset()
+            logger.debug("Progress bar reset to 0")
     
+    # Reset tracker jika tersedia
     if 'reset_all' in ui_components and callable(ui_components['reset_all']) and value == 0:
         ui_components['reset_all']()
+        logger.debug("Called reset_all function")
         if 'tracker' in ui_components and hasattr(ui_components['tracker'], 'show') and hasattr(ui_components['tracker'], 'hide'):
-            ui_components['tracker'].show() if show_progress else ui_components['tracker'].hide()
+            if show_progress:
+                ui_components['tracker'].show()
+                logger.debug("Tracker shown")
+            else:
+                ui_components['tracker'].hide()
+                logger.debug("Tracker hidden")
     
+    # Update progress label
     if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'value'):
         ui_components['progress_label'].value = message or "Siap"
-        if hasattr(ui_components['progress_label'], 'layout'): ui_components['progress_label'].layout.visibility = 'visible'
+        if hasattr(ui_components['progress_label'], 'layout'): 
+            ui_components['progress_label'].layout.visibility = 'visible'
+            logger.debug(f"Progress label updated: {message or 'Siap'}")
     
+    # Update status widget
     if 'status_widget' in ui_components and hasattr(ui_components['status_widget'], 'value'):
         ui_components['status_widget'].value = message or "Siap"
-        if hasattr(ui_components['status_widget'], 'layout'): ui_components['status_widget'].layout.visibility = 'visible'
+        if hasattr(ui_components['status_widget'], 'layout'): 
+            ui_components['status_widget'].layout.visibility = 'visible'
+            logger.debug(f"Status widget updated: {message or 'Siap'}")
+    
+    logger.debug(f"Reset progress bar completed: {value}% - {message} - show: {show_progress}")
     
     if value != 0 and 'update_progress' in ui_components and callable(ui_components['update_progress']): ui_components['update_progress']('overall', value, message)

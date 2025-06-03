@@ -81,8 +81,13 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
             layout=widgets.Layout(margin='10px 0')
         )
         
-        # Progress tracking container
+        # Progress tracking container dengan visibilitas yang selalu terlihat
         progress_components = create_progress_tracking_container()
+        
+        # Pastikan progress container selalu terlihat saat diinisialisasi
+        if hasattr(progress_components['container'], 'layout'):
+            progress_components['container'].layout.visibility = 'visible'
+            logger.info("Progress container visibility set to visible during initialization")
         
         # Log accordion untuk output
         log_components = create_log_accordion(

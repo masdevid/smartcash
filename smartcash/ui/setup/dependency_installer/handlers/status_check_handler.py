@@ -50,7 +50,7 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Step 3: Get comprehensive package status
         ctx.stepped_progress('STATUS_PACKAGE_CHECK', "Checking package status...")
-        package_status = _get_comprehensive_package_status_with_utils(ctx)
+        package_status = _get_comprehensive_package_status_with_utils(ui_components, ctx)
         
         # Step 4: Generate detailed report
         ctx.stepped_progress('STATUS_REPORT', "Generating report...")
@@ -74,7 +74,7 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
         log_message_safe(ui_components, f"💥 Status check failed: {str(e)}", "error")
         raise
 
-def _get_comprehensive_package_status_with_utils(ctx) -> Dict[str, Dict[str, Any]]:
+def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], ctx) -> Dict[str, Dict[str, Any]]:
     """Get comprehensive status menggunakan consolidated utils"""
     
     package_status = {}

@@ -63,8 +63,12 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
         log_message_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages", "info")
         
+        # Use log_message_safe untuk logger dalam installation process
+        def safe_logger_func(msg):
+            log_message_safe(ui_components, msg, "info")
+        
         installation_results = _install_packages_parallel_with_utils(
-            packages_to_install, ui_components, config, ctx
+            packages_to_install, ui_components, config, safe_logger_func
         )
         
         # Step 4: Finalize dan generate report
@@ -72,7 +76,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         duration = time.time() - start_time
         
         # Update all package status
-        _finalize_installation_results(ui_components, installation_results, duration, ctx)
+        _finalize_installation_results(ui_components, installation_results, duration)
         
         ctx.stepped_progress('INSTALL_FINALIZE', "Instalasi selesai", "overall")
         
@@ -81,7 +85,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
-                                         config: Dict[str, Any], ctx) -> Dict[str, bool]:
+                                         config: Dict[str, Any], logger_func) -> Dict[str, bool]:
     """Install packages dengan parallel processing dan consolidated progress tracking"""
     
     results = {}
@@ -107,7 +111,7 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         
         # Log progress
         status_emoji = "✅" if success else "❌"
-        log_message_safe(ui_components, f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})", "info")
+        logger_func(f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})")
     
     # Parallel installation
     max_workers = min(len(packages), config.get('installation', {}).get('parallel_workers', 3))
@@ -129,18 +133,18 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
                     results[package] = success
                     update_installation_progress(package, success)
                 except Exception as e:
-                    log_message_safe(ui_components, f"💥 Error installing {package}: {str(e)}", "error")
+                    logger_func(f"💥 Error installing {package}: {str(e)}")
                     results[package] = False
                     update_installation_progress(package, False)
         
         return results
         
     except Exception as e:
-        log_message_safe(ui_components, f"💥 Installation process failed: {str(e)}", "error")
+        logger_func(f"💥 Installation process failed: {str(e)}")
         return {package: False for package in packages}
 
 def _finalize_installation_results(ui_components: Dict[str, Any], installation_results: Dict[str, bool], 
-                                  duration: float, ctx):
+                                  duration: float):
     """Finalize installation results dengan comprehensive reporting"""
     
     success_count = sum(1 for result in installation_results.values() if result)

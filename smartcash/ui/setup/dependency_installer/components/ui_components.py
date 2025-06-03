@@ -55,21 +55,21 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         custom_packages
     ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
-    # Action buttons dengan 3 buttons
+    # Action buttons dengan 3 buttons yang jelas
     action_buttons = create_action_buttons(
         primary_label="Install Packages",
-        primary_icon="download",
-        secondary_buttons=[("Analyze Packages", "search", "info")],
+        primary_icon="download", 
+        secondary_buttons=[("Analyze Status", "search", "info")],
         cleanup_enabled=True,
         button_width='140px'
     )
     
-    # Custom button untuk Check Packages (repurpose cleanup button)
+    # Custom button untuk System Check (repurpose cleanup button)
     if action_buttons.get('cleanup_button'):
-        action_buttons['cleanup_button'].description = "Check Packages"
-        action_buttons['cleanup_button'].tooltip = "Check comprehensive package status"
-        action_buttons['cleanup_button'].icon = 'search'
-        action_buttons['cleanup_button'].button_style = 'info'
+        action_buttons['cleanup_button'].description = "System Check"
+        action_buttons['cleanup_button'].tooltip = "Check system compatibility and detailed package status"
+        action_buttons['cleanup_button'].icon = 'info'
+        action_buttons['cleanup_button'].button_style = ''
     
     # Auto-analyze checkbox dengan better spacing
     auto_analyze_checkbox = widgets.Checkbox(
@@ -94,14 +94,22 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
     # Progress tracking
     progress_components = create_progress_tracking_container()
     
-    # Help panel dengan improved content
+    # Help panel dengan penjelasan button functions
     help_content = """
     <div style="padding: 10px; background: #ffffff; line-height: 1.5;">
         <p style="margin: 8px 0; font-size: 13px; color: #495057;">
             Installer akan menganalisis dan menginstall packages yang dibutuhkan untuk SmartCash.
         </p>
         <div style="margin: 12px 0;">
-            <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Kategori Package:</strong>
+            <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Action Buttons:</strong>
+            <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
+                <li style="margin: 3px 0;"><strong>Install Packages:</strong> Install packages yang dipilih (skip yang sudah terinstall)</li>
+                <li style="margin: 3px 0;"><strong>Analyze Status:</strong> Cek status instalasi packages yang dipilih saja</li>
+                <li style="margin: 3px 0;"><strong>System Check:</strong> Comprehensive check sistem + semua package details</li>
+            </ul>
+        </div>
+        <div style="margin: 12px 0;">
+            <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Package Categories:</strong>
             <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
                 <li style="margin: 3px 0;"><strong>Core Requirements:</strong> Package inti untuk SmartCash (IPython, widgets)</li>
                 <li style="margin: 3px 0;"><strong>ML/AI Libraries:</strong> PyTorch, YOLO, computer vision frameworks</li>
@@ -110,7 +118,7 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         </div>
         <div style="margin-top: 12px; padding: 8px; background: #e7f3ff; border-radius: 4px; font-size: 12px; border-left: 3px solid #007bff;">
             <strong>💡 Tips:</strong> Package yang sudah terinstall akan dilewati secara otomatis. 
-            Gunakan "Analyze Packages" untuk cek status terkini.
+            Gunakan "Analyze Status" untuk cek package yang dipilih, atau "System Check" untuk detail lengkap.
         </div>
     </div>
     """
@@ -171,11 +179,11 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         'custom_packages': custom_packages,
         'auto_analyze_checkbox': auto_analyze_checkbox,
         
-        # Action buttons - mapping to expected names dengan 3 buttons
+        # Action buttons - mapping dengan button labels yang jelas
         'action_buttons': action_buttons,
-        'install_button': action_buttons['download_button'],
-        'analyze_button': action_buttons['check_button'],  # Analyze Packages button
-        'check_button': action_buttons.get('cleanup_button'),  # Check Packages button (cleanup button repurposed)
+        'install_button': action_buttons['download_button'],        # Install Packages
+        'analyze_button': action_buttons['check_button'],           # Analyze Status  
+        'check_button': action_buttons.get('cleanup_button'),       # System Check
         
         # Save/reset buttons
         'save_reset_buttons': save_reset_buttons,

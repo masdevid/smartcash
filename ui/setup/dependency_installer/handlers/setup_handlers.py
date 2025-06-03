@@ -6,6 +6,7 @@ Deskripsi: Enhanced setup handlers dengan integrasi notification observer dan pr
 from typing import Dict, Any
 from smartcash.components.observer.manager_observer import ObserverManager
 from smartcash.components.notification.notification_observer import create_notification_observer
+from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message, reset_progress_bar, update_status_panel, get_module_logger
 
 def get_observer_manager():
     """Get observer manager untuk dependency installer dengan singleton pattern"""
@@ -20,7 +21,6 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     from smartcash.ui.setup.dependency_installer.handlers.install_handler import setup_install_handler
     from smartcash.ui.setup.dependency_installer.handlers.analyzer_handler import setup_analyzer_handler
     from smartcash.ui.setup.dependency_installer.utils.package_utils import analyze_installed_packages
-    from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message, reset_progress_bar, update_status_panel, get_module_logger
     from smartcash.common.logger import get_logger
     
     # Setup progress tracking menggunakan existing component

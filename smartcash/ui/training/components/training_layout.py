@@ -1,187 +1,203 @@
-"""\nFile: smartcash/ui/training/components/training_layout.py\nDeskripsi: Layout arrangement dengan tabs untuk konfigurasi dan accordion untuk metrics\n"""
+"""
+File: smartcash/ui/training/components/training_layout.py
+Deskripsi: Enhanced responsive training layout dengan YAML config integration
+"""
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
-
 def create_training_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Create responsive training layout dengan safe container handling"""
+    """Create responsive training layout dengan YAML config awareness"""
     try:
-        # Header section
-        header = create_header_section()
+        config = form_components.get('config', {})
         
-        # Info section dengan config tabs
-        info_section = create_info_section(form_components)
+        # Header dengan dynamic model info
+        header = _create_dynamic_header(config)
         
-        # Control section dengan buttons
-        control_section = create_control_section(form_components)
+        # Sections dengan enhanced components
+        sections = [
+            _create_config_section(form_components),
+            _create_control_section(form_components),
+            _create_progress_section(form_components),
+            _create_metrics_section(form_components),
+            _create_log_section(form_components)
+        ]
         
-        # Progress section
-        progress_section = create_progress_section(form_components)
-        
-        # Metrics section dengan accordion
-        metrics_section = create_metrics_section(form_components)
-        
-        # Log section
-        log_section = create_log_section(form_components)
-        
-        # Main container dengan safe layout
+        # Main container dengan responsive layout
         main_container = widgets.VBox([
             header,
-            info_section,
-            create_divider(),
-            control_section,
-            create_divider(),
-            progress_section,
-            create_divider(),
-            metrics_section,
-            create_divider(),
-            log_section
-        ], layout=widgets.Layout(
-            width='100%', padding='15px', overflow_y='auto'
-        ))
+            *[section for section in sections if section],  # Filter None sections
+            _create_footer()
+        ], layout=widgets.Layout(width='100%', padding='15px', max_width='1200px'))
         
-        # Cek tampilan duplikat
-        if hasattr(main_container, '_displayed') and main_container._displayed:
-            return form_components
-        
-        main_container._displayed = True
-        
-        # Update form components
-        form_components.update({
-            'main_container': main_container,
-            'ui': main_container,
-            'header': header,
-            'info_section': info_section,
-            'control_section': control_section,
-            'progress_section': progress_section,
-            'metrics_section': metrics_section,
-            'log_section': log_section
-        })
+        # Prevent duplicate display
+        if not getattr(main_container, '_displayed', False):
+            main_container._displayed = True
+            form_components.update({
+                'main_container': main_container,
+                'ui': main_container,
+                'header': header
+            })
         
         return form_components
         
     except Exception as e:
-        return create_fallback_layout(form_components, str(e))
+        return _create_simple_fallback_layout(form_components, str(e))
 
-
-def create_header_section() -> widgets.HTML:
-    """Create header section dengan description"""
+def _create_dynamic_header(config: Dict[str, Any]) -> widgets.HTML:
+    """Create dynamic header berdasarkan YAML config"""
+    model_config = config.get('model', {})
+    model_type = model_config.get('type', 'efficient_basic')
+    backbone = model_config.get('backbone', 'efficientnet_b4')
+    epochs = config.get('epochs', 100)
+    
+    # Dynamic title berdasarkan model type
+    model_descriptions = {
+        'efficient_basic': f'{backbone.upper()} Basic Detection',
+        'efficient_optimized': f'{backbone.upper()} + Feature Optimization',
+        'efficient_advanced': f'{backbone.upper()} + Full Optimization Suite',
+        'yolov5s': 'YOLOv5s Baseline Model'
+    }
+    
+    model_desc = model_descriptions.get(model_type, f'{backbone.upper()} Custom Model')
+    
     return widgets.HTML(f"""
-    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+    <div style="text-align: center; padding: 20px; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                 border-radius: 10px; margin-bottom: 20px; color: white;">
-        <h2 style="margin: 0; font-size: 24px; font-weight: bold;">🚀 Model Training</h2>
+        <h2 style="margin: 0; font-size: 24px; font-weight: bold;">🚀 {model_desc}</h2>
         <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 14px;">
-            Latih model YOLOv5 dengan EfficientNet-B4 backbone untuk deteksi mata uang
+            Training untuk {epochs} epochs dengan optimasi currency detection
         </p>
+        <div style="margin-top: 10px; opacity: 0.8; font-size: 12px;">
+            <span>💡 {model_type.replace('_', ' ').title()}</span> • 
+            <span>🔧 Mixed Precision: {'✅' if config.get('training_utils', {}).get('mixed_precision', True) else '❌'}</span> • 
+            <span>📊 Layer Mode: {config.get('training_utils', {}).get('layer_mode', 'single').title()}</span>
+        </div>
     </div>
     """)
 
-
-def create_info_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create info section dengan config tabs dan non-training buttons"""
-    # Ambil utility container jika tersedia
-    utility_container = form_components.get('utility_container', None)
-    
-    # Buat komponen untuk section
-    components = [
-        widgets.HTML("<h4>ℹ️ Informasi Konfigurasi</h4>"),
-        form_components.get('config_tabs', form_components.get('info_display', widgets.HTML("Info tidak tersedia")))
-    ]
-    
-    # Tambahkan utility buttons jika tersedia
-    if utility_container is not None:
-        components.append(widgets.HTML("<p style='margin-top:10px; margin-bottom:5px;'><small>🛠️ Utilitas Tambahan:</small></p>"))
-        components.append(utility_container)
-    
-    return widgets.VBox(components, layout=widgets.Layout(margin='10px 0'))
-
-
-def create_control_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create control section dengan buttons"""
+def _create_config_section(form_components: Dict[str, Any]) -> widgets.VBox:
+    """Create config section dengan YAML integration"""
+    config_tabs = form_components.get('config_tabs')
+    if not config_tabs:
+        return None
+        
     return widgets.VBox([
-        widgets.HTML("<h4>⚙️ Kontrol Training</h4>"),
-        form_components.get('button_container', widgets.HTML("Buttons tidak tersedia"))
+        widgets.HTML("<h4 style='margin: 15px 0 10px 0; color: #333;'>ℹ️ YAML Configuration</h4>"),
+        config_tabs
     ], layout=widgets.Layout(margin='10px 0'))
 
+def _create_control_section(form_components: Dict[str, Any]) -> widgets.VBox:
+    """Create enhanced control section"""
+    button_container = form_components.get('button_container')
+    if not button_container:
+        return None
+        
+    return widgets.VBox([
+        widgets.HTML("<h4 style='margin: 15px 0 10px 0; color: #333;'>⚙️ Training Controls</h4>"),
+        button_container,
+        form_components.get('status_panel', widgets.HTML(""))
+    ], layout=widgets.Layout(margin='10px 0'))
 
-def create_progress_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create progress section dengan status panel (default hidden)"""
-    # Ambil progress container dan set default hidden
-    progress_container = form_components.get('progress_container', widgets.HTML("Progress tidak tersedia"))
+def _create_progress_section(form_components: Dict[str, Any]) -> widgets.VBox:
+    """Create progress section dengan default hidden state"""
+    progress_container = form_components.get('progress_container')
+    if not progress_container:
+        return None
     
-    # Set visibility ke hidden by default jika adalah widget yang valid
-    if hasattr(progress_container, 'layout'):
-        progress_container.layout.display = 'none'
+    # Set default hidden untuk progress
+    hasattr(progress_container, 'layout') and setattr(progress_container.layout, 'display', 'none')
     
-    # Return layout
     return widgets.VBox([
-        widgets.HTML("<h4>📊 Progress Training</h4>"),
-        progress_container,
-        form_components.get('status_panel', widgets.HTML("Status tidak tersedia"))
+        widgets.HTML("<h4 style='margin: 15px 0 10px 0; color: #333;'>📊 Training Progress</h4>"),
+        progress_container
     ], layout=widgets.Layout(margin='10px 0'))
 
-
-def create_metrics_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create metrics section dengan metrics accordion"""
+def _create_metrics_section(form_components: Dict[str, Any]) -> widgets.VBox:
+    """Create metrics section dengan responsive chart layout"""
+    chart_output = form_components.get('chart_output')
+    metrics_output = form_components.get('metrics_output')
+    
+    if not chart_output and not metrics_output:
+        return None
+    
+    # Create accordion untuk metrics
+    from smartcash.ui.components.info_accordion import create_info_accordion
+    
+    # Chart container dengan proper sizing
+    chart_container = widgets.VBox([
+        chart_output or widgets.HTML("Chart akan muncul saat training dimulai")
+    ], layout=widgets.Layout(width='100%', max_height='400px'))
+    
+    # Metrics container
+    metrics_container = widgets.VBox([
+        metrics_output or widgets.HTML("Metrics akan muncul saat training berjalan")
+    ], layout=widgets.Layout(width='100%', max_height='150px'))
+    
+    # Combined container
+    metrics_accordion = create_info_accordion(
+        title="Training Metrics & Visualization",
+        content=widgets.VBox([chart_container, metrics_container]),
+        icon="chart",
+        open_by_default=False
+    )
+    
     return widgets.VBox([
-        form_components.get('metrics_accordion', widgets.VBox([
-            form_components.get('chart_output', widgets.Output()),
-            form_components.get('metrics_output', widgets.Output())
-        ]))
+        metrics_accordion['container']
     ], layout=widgets.Layout(margin='10px 0'))
 
-
-def create_log_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create log section dengan training logs"""
+def _create_log_section(form_components: Dict[str, Any]) -> widgets.VBox:
+    """Create log section dengan proper accordion"""
+    log_accordion = form_components.get('log_accordion')
+    log_output = form_components.get('log_output')
+    
+    if not log_accordion and not log_output:
+        return None
+        
     return widgets.VBox([
-        widgets.HTML("<h4>📋 Training Logs</h4>"),
-        form_components.get('log_accordion', form_components.get('log_output', widgets.Output()))
+        widgets.HTML("<h4 style='margin: 15px 0 10px 0; color: #333;'>📋 Training Logs</h4>"),
+        log_accordion or log_output
     ], layout=widgets.Layout(margin='10px 0'))
 
-
-def create_divider() -> widgets.HTML:
-    """Create visual divider"""
+def _create_footer() -> widgets.HTML:
+    """Create simple footer dengan training info"""
     return widgets.HTML("""
-    <div style="height: 1px; background: linear-gradient(to right, transparent, #ddd, transparent); 
-                margin: 15px 0;"></div>
+    <div style="text-align: center; padding: 15px; margin-top: 20px; 
+                background: #f8f9fa; border-radius: 5px; color: #666; font-size: 12px;">
+        <p style="margin: 0;">💰 <b>SmartCash Training Module</b> • 
+        Powered by EfficientNet-B4 + YOLOv5 • 
+        <span style="color: #007bff;">YAML Config Driven</span></p>
+    </div>
     """)
 
-
-def create_fallback_layout(form_components: Dict[str, Any], error_msg: str) -> Dict[str, Any]:
-    """Create fallback layout untuk error cases"""
+def _create_simple_fallback_layout(form_components: Dict[str, Any], error_msg: str) -> Dict[str, Any]:
+    """Simple fallback layout tanpa excessive error handling"""
     
-    # Simple error display
     error_display = widgets.HTML(f"""
-    <div style="padding: 20px; background: #ffeaea; border-radius: 8px; text-align: center;">
-        <h3>❌ Layout Error</h3>
-        <p>Error creating training layout: {error_msg}</p>
-        <p>Using basic fallback layout...</p>
+    <div style="padding: 20px; background: #ffeaea; border-radius: 8px; text-align: center; margin: 10px 0;">
+        <h3 style="color: #d32f2f; margin: 0 0 10px 0;">❌ Layout Error</h3>
+        <p style="margin: 0; color: #666;">{error_msg}</p>
     </div>
     """)
     
-    # Basic vertical layout dari form components
+    # Simple vertical layout dengan available components
     available_components = [error_display]
-    
-    # Add available components safely
     safe_components = ['button_container', 'status_panel', 'log_output', 'chart_output']
     [available_components.append(form_components[comp]) for comp in safe_components if comp in form_components]
     
-    # Simple container
-    main_container = widgets.VBox(available_components, layout=widgets.Layout(
-        width='100%', padding='15px'
-    ))
+    main_container = widgets.VBox(available_components, layout=widgets.Layout(width='100%', padding='15px'))
     
     form_components.update({
         'main_container': main_container,
         'ui': main_container,
-        'error': error_msg
+        'layout_error': error_msg
     })
     
     return form_components
 
-
-# One-liner utilities
-get_layout_height = lambda: "800px"
-create_responsive_width = lambda: "100%"
-safe_get_component = lambda form_components, key, fallback=None: form_components.get(key, fallback or widgets.HTML(f"{key} tidak tersedia"))
+# One-liner utilities untuk layout management
+create_section_divider = lambda: widgets.HTML('<div style="height: 1px; background: linear-gradient(to right, transparent, #ddd, transparent); margin: 15px 0;"></div>')
+get_responsive_width = lambda: "100%"
+create_section_header = lambda title, icon="📋": widgets.HTML(f"<h4 style='margin: 15px 0 10px 0; color: #333;'>{icon} {title}</h4>")
+safe_get_layout_component = lambda form_components, key: form_components.get(key) if form_components.get(key) else None

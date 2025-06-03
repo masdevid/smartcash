@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/training/components/control_buttons.py
-Deskripsi: Komponen button kontrol untuk training UI
+Deskripsi: Komponen button kontrol untuk training UI (updated - removed validate & cleanup)
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 def create_training_control_buttons() -> Dict[str, Any]:
-    """Create training control buttons using existing action_buttons"""
+    """Create training control buttons - hanya tombol training utama"""
     from smartcash.ui.components.action_buttons import create_action_buttons
     
     # Primary button (Start Training)
@@ -56,49 +56,20 @@ def create_training_control_buttons() -> Dict[str, Any]:
         'button_container': button_container
     }
 
-
-def create_non_training_buttons() -> Dict[str, Any]:
-    """Create non-training utility buttons untuk ditempatkan di bawah config tabs"""
-    # Utility buttons
-    validate_button = widgets.Button(
-        description="🔍 Cek Model",
-        button_style='info', 
-        tooltip='Validasi model readiness',
-        layout=widgets.Layout(width='130px', height='35px', margin='2px')
-    )
-    
+def create_refresh_config_button() -> Dict[str, Any]:
+    """Create refresh config button untuk ditempatkan di tabs"""
     refresh_button = widgets.Button(
-        description="🔄 Refresh Config",
+        description="🔄 Refresh",
         button_style='info',
-        tooltip='Perbarui informasi konfigurasi dari modul lain',
-        layout=widgets.Layout(width='130px', height='35px', margin='2px')
+        tooltip='Refresh konfigurasi dari semua modul',
+        layout=widgets.Layout(width='80px', height='28px', margin='2px')
     )
-    
-    cleanup_button = widgets.Button(
-        description="🧹 Cleanup GPU",
-        button_style='',
-        tooltip='Bersihkan GPU memory',
-        layout=widgets.Layout(width='130px', height='35px', margin='2px')
-    )
-    
-    # Container layout untuk utility buttons
-    utility_container = widgets.HBox([
-        validate_button, 
-        cleanup_button,
-        refresh_button
-    ], layout=widgets.Layout(
-        margin='5px 0',
-        padding='5px',
-        width='100%',
-        justify_content='flex-start',
-        align_items='center'
-    ))
     
     return {
-        'validate_button': validate_button,
-        'cleanup_button': cleanup_button,
         'refresh_button': refresh_button,
-        'utility_container': utility_container
+        'refresh_container': widgets.HBox([refresh_button], 
+                                        layout=widgets.Layout(justify_content='flex-end', 
+                                                             width='100%', margin='0'))
     }
 
 # One-liner utilities

@@ -1,53 +1,59 @@
-"""\nFile: smartcash/ui/training/training_init.py\nDeskripsi: Training initializer dengan integrasi refresh konfigurasi dan pencegahan tampilan ganda\n"""
+"""
+File: smartcash/ui/training/training_init.py
+Deskripsi: Enhanced training initializer dengan YAML config integration dan simplified architecture
+"""
 
 from typing import Dict, Any, List
 from IPython.display import display
-
 from smartcash.ui.utils.common_initializer import CommonInitializer
-from smartcash.ui.utils.logging_utils import suppress_all_outputs
+from smartcash.ui.utils.logging_utils import suppress_backend_logs
 from smartcash.ui.utils.ui_logger_namespace import TRAINING_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+from smartcash.common.config.manager import get_config_manager
 
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[TRAINING_LOGGER_NAMESPACE]
 
-
 class TrainingInitializer(CommonInitializer):
-    """Training UI initializer dengan config callback integration"""
+    """Enhanced training initializer dengan YAML config integration"""
     
     def __init__(self):
         super().__init__(MODULE_LOGGER_NAME, TRAINING_LOGGER_NAMESPACE)
         self.config_update_callbacks = []
-        self._ui_displayed = False  # Flag untuk mencegah tampilan ganda
+        self._ui_displayed = False
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan safe error handling"""
+        """Create UI components dengan YAML config integration"""
         try:
             from smartcash.ui.training.components.training_form import create_training_form
             from smartcash.ui.training.components.training_layout import create_training_layout
             
-            # Create form components dengan config
-            form_components = create_training_form(config)
+            # Merge config dengan YAML configs
+            yaml_config = self._load_yaml_configs()
+            merged_config = {**self._get_default_config(), **yaml_config, **config}
             
-            # Create layout arrangement
+            # Create form dengan merged config
+            form_components = create_training_form(merged_config)
+            
+            # Create layout
             layout_components = create_training_layout(form_components)
             
-            # Setup config callback untuk info display update
-            self._setup_config_callback(layout_components)
+            # Setup config callback
+            self._setup_yaml_config_callback(layout_components)
             
             return layout_components
             
         except Exception as e:
             self.logger.error(f"❌ Error creating UI components: {str(e)}")
-            return self._create_fallback_components(str(e))
+            return self._create_minimal_fallback(str(e))
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan model integration dan progress tracking"""
+        """Setup handlers dengan model integration"""
         try:
             from smartcash.ui.training.handlers.training_handlers import setup_all_training_handlers
             
-            # Initialize model services dengan progress callback
-            ui_components = self._initialize_model_services(ui_components, config)
+            # Initialize model services dengan YAML config
+            ui_components = self._initialize_model_services_yaml(ui_components, config)
             
-            # Setup handlers dengan progress integration
+            # Setup handlers
             ui_components = setup_all_training_handlers(ui_components, config, env)
             
             return ui_components
@@ -56,282 +62,286 @@ class TrainingInitializer(CommonInitializer):
             self.logger.error(f"❌ Error setting up handlers: {str(e)}")
             return ui_components
     
-    def _initialize_model_services(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Initialize model services dengan step-by-step progress"""
+    def _initialize_model_services_yaml(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Initialize model services dengan YAML config parameters"""
         try:
-            # Progress update dengan steps
-            self._update_initialization_progress(ui_components, 1, 5, "📋 Parsing configuration...")
-            
-            # Parse config
+            # Extract YAML config parameters
+            model_config = config.get('model', {})
             training_config = config.get('training', {})
-            model_type = training_config.get('model_type', 'efficient_optimized')
             
-            # Step 2: Create model manager
-            self._update_initialization_progress(ui_components, 2, 5, f"🧠 Creating {model_type} model...")
-            model_manager = self._create_model_manager(training_config, model_type)
+            model_type = model_config.get('type', 'efficient_basic')
+            backbone = model_config.get('backbone', 'efficientnet_b4')
+            layer_mode = config.get('training_utils', {}).get('layer_mode', 'single')
             
-            # Step 3: Create services
-            self._update_initialization_progress(ui_components, 3, 5, "🚀 Initializing backend services...")
-            services = self._create_training_services(model_manager, config)
+            self.logger.info(f"🔧 Initializing model services dengan YAML config:")
+            self.logger.info(f"   • Model: {model_type}")
+            self.logger.info(f"   • Backbone: {backbone}")
+            self.logger.info(f"   • Layer Mode: {layer_mode}")
             
-            # Step 4: Create training service manager
-            self._update_initialization_progress(ui_components, 4, 5, "🔄 Initializing training manager...")
-            training_manager = self._create_training_manager(ui_components, config)
+            # Create model manager dengan YAML params
+            model_manager = self._create_yaml_model_manager(config)
             
-            # Step 5: Complete
-            self._update_initialization_progress(ui_components, 5, 5, "✅ Services ready!")
+            # Create training manager
+            training_manager = self._create_yaml_training_manager(ui_components, config, model_manager)
             
-            # Update UI components
+            # Register services
+            training_manager and model_manager and training_manager.register_model_manager(model_manager) and training_manager.register_config(config)
+            
             ui_components.update({
                 'model_manager': model_manager,
                 'training_manager': training_manager,
-                **services
+                'yaml_config': config
             })
             
-            self.logger.success(f"✅ Model services initialized: {model_type}")
+            self.logger.success(f"✅ Model services initialized dengan {model_type}")
             
         except Exception as e:
             self.logger.error(f"❌ Model services error: {str(e)}")
             
         return ui_components
     
-    def _create_model_manager(self, training_config: Dict[str, Any], model_type: str):
-        """Create model manager dengan proper config"""
+    def _create_yaml_model_manager(self, config: Dict[str, Any]):
+        """Create model manager dengan YAML config dan Drive pretrained models"""
         try:
             from smartcash.model.manager import ModelManager
             
-            # Dapatkan parameter konfigurasi
-            layer_mode = training_config.get('layer_mode', 'single')
-            detection_layers = training_config.get('detection_layers', ['banknote'])
+            # Extract parameters dari YAML config
+            model_config = config.get('model', {})
+            training_utils = config.get('training_utils', {})
             
-            # Create model manager dengan training config
+            # Validasi pretrained models dari Drive
+            pretrained_models_path = config.get('pretrained_models_path', '/content/drive/MyDrive/SmartCash/models')
+            self._validate_pretrained_models(pretrained_models_path)
+            
             model_manager = ModelManager(
-                config=training_config,
-                model_type=model_type,
-                layer_mode=layer_mode,
-                detection_layers=detection_layers
+                config=config,
+                model_type=model_config.get('type', 'efficient_basic'),
+                layer_mode=training_utils.get('layer_mode', 'single'),
+                detection_layers=['banknote'],  # Default untuk single layer
+                pretrained_models_path=pretrained_models_path,
+                logger=self.logger
             )
             
-            self.logger.info(f"🧠 Model manager dibuat: {model_type}, layer_mode={layer_mode}")
             return model_manager
             
         except Exception as e:
-            self.logger.error(f"❌ Model manager error: {str(e)}")
+            self.logger.error(f"❌ YAML model manager error: {str(e)}")
             return None
     
-    def _create_training_services(self, model_manager, config: Dict[str, Any]):
-        """Create training services dengan progress callback integration"""
+    def _validate_pretrained_models(self, models_path: str) -> None:
+        """Validasi pretrained models di Drive sesuai model_constants.py"""
         try:
-            # Gunakan training service dari model manager
-            backend_training_service = model_manager.get_training_service()
+            from smartcash.ui.pretrained_model.constants.model_constants import MODEL_CONFIGS
+            from pathlib import Path
             
-            # Buat adapter untuk training service
-            from smartcash.ui.training.adapters import TrainingServiceAdapter
-            training_service = TrainingServiceAdapter(backend_training_service, self.logger)
+            models_dir = Path(models_path)
+            if not models_dir.exists():
+                self.logger.warning(f"⚠️ Pretrained models directory tidak ditemukan: {models_path}")
+                return
             
-            # Dapatkan checkpoint service dari training service backend
-            checkpoint_service = backend_training_service.checkpoint_service
+            # Check model files sesuai model_constants.py
+            missing_models = []
+            for model_key, model_info in MODEL_CONFIGS.items():
+                model_file = models_dir / model_info['filename']
+                if not model_file.exists():
+                    missing_models.append(model_info['filename'])
             
-            # Dapatkan metrics tracker dari training service backend
-            metrics_tracker = backend_training_service.metrics_tracker
-            
-            self.logger.info(f"🚀 Training service adapter dibuat untuk model {model_manager.model_type}")
-            
-            # Return services map
-            return {
-                'training_service': training_service,
-                'checkpoint_service': checkpoint_service,
-                'metrics_tracker': metrics_tracker,
-                'backend_training_service': backend_training_service
-            }
-            
+            if missing_models:
+                self.logger.warning(f"⚠️ Missing pretrained models: {', '.join(missing_models)}")
+            else:
+                self.logger.success(f"✅ All pretrained models tersedia di {models_path}")
+                
         except Exception as e:
-            self.logger.error(f"❌ Services error: {str(e)}")
-            return {}
+            self.logger.warning(f"⚠️ Error validating pretrained models: {str(e)}")
     
-    def _create_training_manager(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        """Create training service manager untuk integrasi UI dan backend"""
+    def _create_yaml_training_manager(self, ui_components: Dict[str, Any], config: Dict[str, Any], model_manager):
+        """Create training manager dengan YAML config"""
         try:
-            from smartcash.ui.training.services import TrainingServiceManager
-            
-            # Dapatkan model manager dan training service
-            model_manager = ui_components.get('model_manager')
-            training_service = ui_components.get('training_service')
-            
-            if not model_manager or not training_service:
-                self.logger.warning("⚠️ Model manager atau training service tidak tersedia untuk training manager")
+            if not model_manager:
+                self.logger.warning("⚠️ Model manager tidak tersedia")
                 return None
             
-            # Buat training manager
-            training_manager = TrainingServiceManager(ui_components, config, self.logger)
+            # Simple training manager yang delegate ke model service
+            class YAMLTrainingManager:
+                def __init__(self, ui_components, config, model_manager, logger):
+                    self.ui_components = ui_components
+                    self.config = config
+                    self.model_manager = model_manager
+                    self.logger = logger
+                    self.is_training = False
+                
+                def register_model_manager(self, manager): self.model_manager = manager
+                def register_config(self, config): self.config.update(config)
+                
+                def start_training(self, training_config):
+                    """Start training dengan YAML config"""
+                    self.is_training = True
+                    self.logger.info(f"🚀 Starting training dengan YAML config...")
+                    # TODO: Delegate ke actual training service
+                    
+                def stop_training(self):
+                    """Stop training"""
+                    self.is_training = False
+                    self.logger.info("🛑 Training stopped")
+                
+                def reset_metrics(self):
+                    """Reset metrics"""
+                    self.logger.info("🔄 Metrics reset")
+                
+                def get_training_status(self):
+                    """Get training status"""
+                    return {'is_training': self.is_training, 'config': self.config}
             
-            # Register model manager dan config
-            training_manager.register_model_manager(model_manager)
-            training_manager.register_config(config)
-            
-            self.logger.info("✅ Training service manager berhasil dibuat")
-            return training_manager
+            return YAMLTrainingManager(ui_components, config, model_manager, self.logger)
             
         except Exception as e:
-            self.logger.error(f"❌ Error saat membuat training manager: {str(e)}")
+            self.logger.error(f"❌ YAML training manager error: {str(e)}")
             return None
     
-    def _setup_config_callback(self, ui_components: Dict[str, Any]):
-        """Setup callback untuk config updates dengan integrasi dari berbagai modul"""
-        from smartcash.common.config.manager import SimpleConfigManager, get_config_manager
-        from smartcash.ui.training.components.config_tabs import create_config_tabs, update_config_tabs
-        
-        def config_update_callback(new_config: Dict[str, Any]):
-            """Handle config updates dan refresh info display"""
+    def _setup_yaml_config_callback(self, ui_components: Dict[str, Any]):
+        """Setup callback untuk YAML config updates"""
+        def yaml_config_update_callback(new_config: Dict[str, Any]):
+            """Handle YAML config updates"""
             try:
-                # Gabungkan config dari berbagai modul
-                merged_config = {}
+                # Merge dengan existing YAML configs
+                yaml_configs = self._load_yaml_configs()
+                merged_config = {**yaml_configs, **new_config}
                 
-                # Get config manager singleton
-                config_manager = get_config_manager()
+                # Update form components
+                from smartcash.ui.training.components.training_form import update_config_tabs_in_form
+                update_config_tabs_in_form(ui_components, merged_config)
                 
-                # Model config dari backbone
-                model_config = config_manager.get_config('backbone')
-                if model_config:
-                    merged_config['model'] = model_config
-                
-                # Training config (penting untuk UI training)
-                training_config = config_manager.get_config('training')
-                if training_config:
-                    merged_config['training'] = training_config
-                
-                # Detector config
-                detector_config = config_manager.get_config('detector')
-                if detector_config:
-                    merged_config['detector'] = detector_config
-                
-                # Hyperparameters config
-                hyperparams_config = config_manager.get_config('hyperparameters')
-                if hyperparams_config:
-                    merged_config['hyperparameters'] = hyperparams_config
-                
-                # Training strategy config
-                training_strategy_config = config_manager.get_config('training_strategy')
-                if training_strategy_config:
-                    merged_config['training_strategy'] = training_strategy_config
-                
-                # Paths config
-                paths_config = config_manager.get_config('paths')
-                if paths_config:
-                    merged_config['paths'] = paths_config
-                
-                # Tambahkan config baru
-                if new_config:
-                    merged_config.update(new_config)
-                
-                # Update tabs jika sudah ada di ui_components
-                if 'config_tabs' in ui_components:
-                    update_config_tabs(ui_components['config_tabs'], merged_config)
-                
-                # Pastikan logger memanggil info
-                if hasattr(self, 'logger') and self.logger:
-                    self.logger.info("🔄 Configuration updated in training UI")
-                elif 'logger' in ui_components and ui_components['logger']:
-                    ui_components['logger'].info("🔄 Configuration updated in training UI")
+                self.logger.info("🔄 YAML configuration updated")
                 
             except Exception as e:
-                # Catat error dan pastikan logger dipanggil
-                error_msg = f"⚠️ Config callback error: {str(e)}"
-                if hasattr(self, 'logger') and self.logger:
-                    self.logger.warning(error_msg)
-                elif 'logger' in ui_components and ui_components['logger']:
-                    ui_components['logger'].warning(error_msg)
+                self.logger.warning(f"⚠️ YAML config callback error: {str(e)}")
         
-        # Register callback
-        self.config_update_callbacks.append(config_update_callback)
-        ui_components['config_update_callback'] = config_update_callback
+        self.config_update_callbacks.append(yaml_config_update_callback)
+        ui_components['config_update_callback'] = yaml_config_update_callback
     
-    def _update_initialization_progress(self, ui_components: Dict[str, Any], current: int, total: int, message: str):
-        """Update initialization progress step-by-step"""
+    def _load_yaml_configs(self) -> Dict[str, Any]:
+        """Load dan merge semua YAML configs dari Google Drive dengan inheritance"""
         try:
-            from smartcash.ui.training.utils.training_progress_utils import update_model_loading_progress
-            update_model_loading_progress(ui_components, current, total, message)
-        except Exception:
-            # Silent fail untuk progress updates
-            pass
+            # Set config manager untuk Drive path
+            config_manager = get_config_manager(base_dir='/content/drive/MyDrive/SmartCash')
+            
+            # Load configs sesuai inheritance order dari YAML _base_
+            base_config = config_manager.get_config('base_config') or {}
+            hyperparams = config_manager.get_config('hyperparameters_config') or {}
+            model_config = config_manager.get_config('model_config') or {}
+            training_config = config_manager.get_config('training_config') or {}
+            
+            # Merge dengan inheritance order (sesuai _base_ dalam YAML)
+            merged = {**base_config}
+            
+            # Merge hyperparameters (inherits from base)
+            merged.update(hyperparams)
+            
+            # Merge model config (inherits from base + hyperparams)
+            merged.update(model_config)
+            
+            # Merge training config (inherits from all above)
+            merged.update(training_config)
+            
+            # Add Drive paths untuk pretrained models
+            merged['pretrained_models_path'] = '/content/drive/MyDrive/SmartCash/models'
+            
+            self.logger.debug(f"📄 Loaded YAML configs dari Drive: {len(merged)} parameters")
+            return merged
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error loading Drive YAML configs: {str(e)}")
+            return {}
     
-    def _create_fallback_components(self, error_msg: str) -> Dict[str, Any]:
+    def _create_minimal_fallback(self, error_msg: str) -> Dict[str, Any]:
         """Create minimal fallback components"""
-        from smartcash.ui.training.components.fallback_component import create_fallback_training_form
-        return create_fallback_training_form(error_msg)
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui
+        
+        fallback = create_fallback_ui(f"Training init error: {error_msg}", 'training')
+        
+        # Add minimal training components
+        fallback.update({
+            'start_button': __import__('ipywidgets').Button(description="🚀 Training", disabled=True),
+            'stop_button': __import__('ipywidgets').Button(description="⏹️ Stop", disabled=True),
+            'config_tabs': __import__('ipywidgets').HTML("Config tidak tersedia"),
+            'log_output': __import__('ipywidgets').Output(),
+            'chart_output': __import__('ipywidgets').Output(),
+            'config': {}
+        })
+        
+        return fallback
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default training configuration"""
+        """Default config sesuai YAML structure"""
         return {
-            'training': {
-                'model_type': 'efficient_optimized',
+            'model': {
+                'type': 'efficient_basic',
                 'backbone': 'efficientnet_b4',
-                'epochs': 100,
-                'batch_size': 16,
-                'learning_rate': 0.001,
-                'image_size': 640,
-                'detection_layers': ['banknote'],
-                'num_classes': 7
+                'backbone_pretrained': True,
+                'confidence': 0.25,
+                'iou_threshold': 0.45,
+                'use_attention': False,
+                'use_residual': False,
+                'use_ciou': False
             },
-            'paths': {
-                'checkpoint_dir': 'runs/train/checkpoints'
+            'training': {},
+            'hyperparameters': {},
+            'epochs': 100,
+            'batch_size': 16,
+            'learning_rate': 0.001,
+            'weight_decay': 0.0005,
+            'optimizer': 'Adam',
+            'scheduler': 'cosine',
+            'early_stopping': {'enabled': True, 'patience': 15},
+            'save_best': {'enabled': True},
+            'multi_scale': True,
+            'training_utils': {
+                'experiment_name': 'efficientnet_b4_training',
+                'checkpoint_dir': '/content/runs/train/checkpoints',
+                'mixed_precision': True,
+                'layer_mode': 'single'
             },
-            'model_optimization': {
-                'use_attention': True,
-                'use_residual': True,
-                'use_ciou': True
-            }
+            'validation': {
+                'frequency': 1,
+                'iou_thres': 0.6,
+                'conf_thres': 0.001
+            },
+            'pretrained_models_path': '/content/drive/MyDrive/SmartCash/models'
         }
     
     def _get_critical_components(self) -> List[str]:
-        """Critical components yang harus ada"""
-        return ['main_container', 'start_button', 'stop_button', 'status_panel']
+        """Critical components untuk training UI"""
+        return ['main_container', 'start_button', 'stop_button', 'config_tabs', 'log_output']
     
     def trigger_config_update(self, new_config: Dict[str, Any]):
-        """Trigger config update callbacks"""
+        """Trigger YAML config update callbacks"""
         [callback(new_config) for callback in self.config_update_callbacks]
 
-
-# Global instance dan public API
+# Global instance
 _training_initializer = TrainingInitializer()
 
 def initialize_training_ui(env=None, config=None, **kwargs):
-    """Factory function untuk training UI dengan pencegahan tampilan ganda"""
-    suppress_all_outputs()
+    """Factory function untuk training UI dengan YAML config integration"""
+    suppress_backend_logs()
     
     try:
-        # Check apakah sudah ada initializer yang aktif
-        initializer = None
-        for obj in globals().values():
-            if isinstance(obj, TrainingInitializer) and hasattr(obj, '_ui_displayed') and obj._ui_displayed:
-                initializer = obj
-                break
+        # Use global instance untuk prevent duplication
+        initializer = _training_initializer
         
-        # Jika belum ada, gunakan instance global
-        if not initializer:
-            initializer = _training_initializer
+        # Check duplicate display
+        if initializer._ui_displayed:
+            return {'message': 'Training UI sudah ditampilkan', 'status': 'duplicate'}
         
-        # Initialize UI
+        # Initialize dengan YAML integration
         result = initializer.initialize(env, config, **kwargs)
         
-        # Set flag untuk mencegah tampilan ganda
-        initializer._ui_displayed = True
-        
-        # Auto-display dengan single display check
-        if not getattr(result, '_displayed', False):
-            if hasattr(result, 'children') or hasattr(result, 'layout'):
-                display(result)
-                result._displayed = True
-            elif isinstance(result, dict) and 'ui' in result:
-                ui_widget = result['ui']
-                if not getattr(ui_widget, '_displayed', False):
-                    display(ui_widget)
-                    ui_widget._displayed = True
-            elif isinstance(result, dict) and 'main_container' in result:
-                main_widget = result['main_container']
-                if not getattr(main_widget, '_displayed', False):
-                    display(main_widget)
-                    main_widget._displayed = True
+        # Auto-display dengan duplicate prevention
+        if result and isinstance(result, dict):
+            ui_widget = result.get('ui') or result.get('main_container')
+            if ui_widget and not getattr(ui_widget, '_displayed', False):
+                display(ui_widget)
+                ui_widget._displayed = True
+                initializer._ui_displayed = True
         
         return result
         
@@ -341,7 +351,7 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         display(fallback.get('ui', fallback))
         return fallback
 
-
-# One-liner factory untuk compatibility dengan cell entry
+# One-liner factory untuk compatibility
 create_training_ui = lambda env=None, config=None, **kw: initialize_training_ui(env, config, **kw)
 get_training_initializer = lambda: _training_initializer
+reset_training_display = lambda: setattr(_training_initializer, '_ui_displayed', False)

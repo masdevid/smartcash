@@ -1,34 +1,26 @@
 """
 File: smartcash/model/service/training_service.py
-Deskripsi: Implementasi training service untuk model YOLOv5 + EfficientNet
+Deskripsi: Simplified training service dengan UI integration dan progress tracking
 """
 
-import os
 import torch
 import time
 import numpy as np
-from typing import Dict, List, Optional, Union, Any, Callable, Tuple
+from typing import Dict, Optional, Any, Callable
 from pathlib import Path
-from tqdm.auto import tqdm
-from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import ModelTrainingError
 from smartcash.model.service.progress_tracker import ProgressTracker
 from smartcash.model.service.metrics_tracker import MetricsTracker
 from smartcash.model.service.checkpoint_service import CheckpointService
-from smartcash.model.service.callback_interfaces import TrainingCallback, CallbackType
+from smartcash.model.service.callback_interfaces import CallbackType
 
 class TrainingService:
-    """Training service untuk model YOLOv5 + EfficientNet dengan progress tracking dan UI integration"""
+    """Simplified training service dengan UI integration dan one-liner style"""
     
-    def __init__(
-        self,
-        model_manager = None,
-        checkpoint_service: Optional[CheckpointService] = None,
-        logger = None,
-        callback: Optional[CallbackType] = None
-    ):
+    def __init__(self, model_manager=None, checkpoint_service: Optional[CheckpointService] = None, 
+                 logger=None, callback: Optional[CallbackType] = None):
         self.model_manager = model_manager
         self.checkpoint_service = checkpoint_service
         self.logger = logger or get_logger(__name__)
@@ -36,577 +28,314 @@ class TrainingService:
         self.metrics_tracker = MetricsTracker()
         self.set_callback(callback)
         
-        # Training state
-        self.is_training = False
-        self.should_stop = False
-        self.current_epoch = 0
+        # Training state dengan one-liner initialization
+        self.is_training = self.should_stop = False
+        self.current_epoch = self.best_epoch = 0
         self.best_metric = float('inf')
-        self.best_epoch = -1
         self.start_time = 0
         
         self.logger.info("✨ TrainingService initialized")
     
     def set_callback(self, callback: Optional[CallbackType]) -> None:
-        """Set callback untuk training, progress, dan metrics tracking"""
-        if callback is None: return
+        """Set callback untuk semua trackers dengan one-liner delegation"""
+        if not callback: return
         
-        # Set callback untuk progress tracker
-        if hasattr(callback, 'update_progress'):
-            self.progress_tracker.set_callback(callback)
-        elif isinstance(callback, dict) and 'progress' in callback:
-            self.progress_tracker.set_callback(callback)
+        # Set callbacks untuk semua trackers
+        hasattr(callback, 'update_progress') and self.progress_tracker.set_callback(callback)
+        hasattr(callback, 'update_metrics') and self.metrics_tracker.set_callback(callback)
+        self.checkpoint_service and hasattr(callback, 'update_progress') and self.checkpoint_service.set_progress_callback(callback)
         
-        # Set callback untuk metrics tracker
-        if hasattr(callback, 'update_metrics'):
-            self.metrics_tracker.set_callback(callback)
-        elif isinstance(callback, dict) and 'metrics' in callback:
-            self.metrics_tracker.set_callback(callback)
-        
-        # Set callback untuk checkpoint service
-        if self.checkpoint_service:
-            if hasattr(callback, 'update_progress'):
-                self.checkpoint_service.set_progress_callback(callback)
-            elif isinstance(callback, dict) and 'progress' in callback:
-                self.checkpoint_service.set_progress_callback(callback)
-        
-        # Simpan callback lengkap
         self._callback = callback
         self.logger.debug(f"🔄 Callback diatur: {type(callback).__name__}")
     
-    def train(
-        self,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: Optional[torch.utils.data.DataLoader] = None,
-        epochs: int = 100,
-        learning_rate: float = 0.001,
-        weight_decay: float = 0.0005,
-        lr_scheduler: str = "cosine",
-        early_stopping: bool = True,
-        patience: int = 10,
-        min_delta: float = 0.001,
-        save_best: bool = True,
-        save_interval: int = 0,
-        checkpoint_dir: str = "runs/train/checkpoints",
-        resume_from: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Train model dengan progress tracking dan UI integration"""
+    def train(self, train_loader, val_loader=None, epochs: int = 100, learning_rate: float = 0.001,
+              weight_decay: float = 0.0005, early_stopping: bool = True, patience: int = 10,
+              save_best: bool = True, save_interval: int = 0, checkpoint_dir: str = "runs/train/checkpoints",
+              resume_from: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Simplified training loop dengan progress tracking"""
+        
+        # Validation dan initialization
+        self.model_manager or self._raise_error("❌ Model manager tidak tersedia")
+        self.model_manager.model or self.model_manager.build_model()
+        
+        # Initialize training state
+        self.is_training, self.should_stop = True, False
+        self.current_epoch = self.best_epoch = 0
+        self.best_metric, self.start_time = float('inf'), time.time()
+        
+        # Setup training configuration
+        full_config = {'epochs': epochs, 'learning_rate': learning_rate, 'weight_decay': weight_decay, 
+                      'early_stopping': early_stopping, 'patience': patience, 'save_best': save_best,
+                      'save_interval': save_interval, 'checkpoint_dir': checkpoint_dir, **(config or {})}
+        
         try:
-            # Validasi model manager
-            if self.model_manager is None:
-                raise ModelTrainingError("❌ Model manager tidak tersedia untuk training")
-            
-            # Validasi model
-            if not hasattr(self.model_manager, 'model') or self.model_manager.model is None:
-                self.logger.info("🔄 Model belum diinisialisasi, membangun model...")
-                self.model_manager.build_model()
-            
-            # Inisialisasi state training
-            self.is_training = True
-            self.should_stop = False
-            self.current_epoch = 0
-            self.best_metric = float('inf')
-            self.best_epoch = -1
-            self.start_time = time.time()
-            
-            # Gabungkan config
-            full_config = {
-                "epochs": epochs,
-                "learning_rate": learning_rate,
-                "weight_decay": weight_decay,
-                "lr_scheduler": lr_scheduler,
-                "early_stopping": early_stopping,
-                "patience": patience,
-                "min_delta": min_delta,
-                "save_best": save_best,
-                "save_interval": save_interval,
-                "checkpoint_dir": checkpoint_dir
-            }
-            if config:
-                full_config.update(config)
-            
-            # Update progress
+            # Progress initialization
             self.progress_tracker.update(0, 100, "🔄 Mempersiapkan training...")
             self.progress_tracker.update_stage("preparation")
             
-            # Inisialisasi checkpoint service jika belum ada
-            if self.checkpoint_service is None:
-                self.checkpoint_service = CheckpointService(
-                    checkpoint_dir=checkpoint_dir,
-                    save_best=save_best,
-                    save_interval=save_interval,
-                    metric_name="val_loss",
-                    mode="min",
-                    logger=self.logger
-                )
-                if hasattr(self._callback, 'update_progress'):
-                    self.checkpoint_service.set_progress_callback(self._callback)
-            
-            # Siapkan model, optimizer, dan scheduler
+            # Setup components
             model = self.model_manager.model
             device = next(model.parameters()).device
+            optimizer = self.model_manager.get_optimizer(learning_rate, weight_decay)
+            scheduler = self.model_manager.get_scheduler(optimizer, epochs)
             
-            # Buat optimizer
-            optimizer = self.model_manager.get_optimizer(
-                learning_rate=learning_rate,
-                weight_decay=weight_decay
-            )
-            
-            # Buat scheduler
-            scheduler = self.model_manager.get_scheduler(
-                optimizer=optimizer,
-                epochs=epochs
+            # Initialize checkpoint service
+            self.checkpoint_service = self.checkpoint_service or CheckpointService(
+                checkpoint_dir=checkpoint_dir, save_best=save_best, save_interval=save_interval,
+                metric_name="val_loss", mode="min", logger=self.logger
             )
             
             # Resume dari checkpoint jika diperlukan
-            start_epoch = 0
-            if resume_from:
-                self.logger.info(f"🔄 Melanjutkan training dari checkpoint: {resume_from}")
-                self.progress_tracker.update_status(f"Melanjutkan dari checkpoint: {Path(resume_from).name}")
-                
-                # Load checkpoint
-                _, metadata = self.checkpoint_service.load_checkpoint(
-                    path=resume_from,
-                    model=model,
-                    optimizer=optimizer,
-                    scheduler=scheduler
-                )
-                
-                # Update start epoch
-                if metadata and "epoch" in metadata:
-                    start_epoch = metadata["epoch"] + 1
-                    self.current_epoch = start_epoch
-                    self.logger.info(f"🔄 Melanjutkan dari epoch {start_epoch}")
+            start_epoch = self._handle_resume(resume_from, model, optimizer, scheduler) if resume_from else 0
+            self.current_epoch = start_epoch
             
-            # Notifikasi awal training
+            # Training notification
             self._notify_training_start(epochs, len(train_loader), full_config)
             
-            # Training loop
+            # Main training loop
             no_improve_count = 0
             for epoch in range(start_epoch, epochs):
-                if self.should_stop:
-                    self.logger.info("🛑 Training dihentikan oleh pengguna")
-                    break
+                if self.should_stop: break
                 
-                # Update state
                 self.current_epoch = epoch
-                
-                # Notifikasi awal epoch
                 self._notify_epoch_start(epoch, epochs)
                 
-                # Training epoch
-                train_metrics = self._train_epoch(
-                    model=model,
-                    train_loader=train_loader,
-                    optimizer=optimizer,
-                    epoch=epoch,
-                    epochs=epochs
-                )
+                # Training dan validation
+                train_metrics = self._train_epoch(model, train_loader, optimizer, epoch, epochs)
+                val_metrics = self._validate_epoch(model, val_loader, epoch, epochs) if val_loader else {}
                 
-                # Validation epoch jika val_loader tersedia
-                val_metrics = {}
-                if val_loader:
-                    self._notify_validation_start(epoch)
-                    val_metrics = self._validate_epoch(
-                        model=model,
-                        val_loader=val_loader,
-                        epoch=epoch,
-                        epochs=epochs
-                    )
+                # Learning rate update
+                scheduler and scheduler.step() and self.metrics_tracker.update_learning_rate(optimizer.param_groups[0]['lr'])
                 
-                # Update learning rate
-                if scheduler:
-                    scheduler.step()
-                    current_lr = optimizer.param_groups[0]['lr']
-                    self.metrics_tracker.update_learning_rate(current_lr)
+                # Combined metrics dan best model checking
+                epoch_metrics = {**train_metrics, **{f"val_{k}": v for k, v in val_metrics.items()}}
+                is_best, no_improve_count = self._check_best_model(val_metrics, epoch, no_improve_count)
                 
-                # Gabungkan metrics
-                epoch_metrics = {**train_metrics}
-                if val_metrics:
-                    epoch_metrics.update({f"val_{k}": v for k, v in val_metrics.items()})
-                
-                # Check apakah ini best model
-                is_best = False
-                if val_metrics and "loss" in val_metrics:
-                    val_loss = val_metrics["loss"]
-                    if val_loss < self.best_metric:
-                        improvement = (self.best_metric - val_loss) / self.best_metric * 100 if self.best_metric != float('inf') else 100
-                        self.best_metric = val_loss
-                        self.best_epoch = epoch
-                        is_best = True
-                        no_improve_count = 0
-                        self.logger.info(f"🏆 New best model: val_loss = {val_loss:.4f} (improved by {improvement:.2f}%)")
-                    else:
-                        no_improve_count += 1
-                
-                # Notifikasi akhir epoch
+                # Epoch end notification
                 self._notify_epoch_end(epoch, epoch_metrics, is_best)
                 
-                # Simpan checkpoint
-                if is_best and save_best:
-                    self.checkpoint_service.save_checkpoint(
-                        model=model,
-                        path=f"epoch_{epoch:03d}.pt",
-                        optimizer=optimizer,
-                        scheduler=scheduler,
-                        epoch=epoch,
-                        metrics=epoch_metrics,
-                        is_best=True
-                    )
-                elif save_interval > 0 and (epoch + 1) % save_interval == 0:
-                    self.checkpoint_service.save_checkpoint(
-                        model=model,
-                        path=f"epoch_{epoch:03d}.pt",
-                        optimizer=optimizer,
-                        scheduler=scheduler,
-                        epoch=epoch,
-                        metrics=epoch_metrics
-                    )
+                # Checkpoint saving
+                self._save_checkpoints(model, optimizer, scheduler, epoch, epoch_metrics, is_best, save_best, save_interval)
                 
-                # Early stopping
+                # Early stopping check
                 if early_stopping and no_improve_count >= patience:
-                    self.logger.info(f"🛑 Early stopping triggered after {patience} epochs tanpa peningkatan")
-                    self.progress_tracker.update_status(f"Early stopping triggered (no improvement for {patience} epochs)")
+                    self.logger.info(f"🛑 Early stopping: {patience} epochs tanpa peningkatan")
                     break
             
-            # Simpan checkpoint terakhir
-            self.checkpoint_service.save_checkpoint(
-                model=model,
-                path=f"epoch_{self.current_epoch:03d}.pt",
-                optimizer=optimizer,
-                scheduler=scheduler,
-                epoch=self.current_epoch,
-                metrics=epoch_metrics
-            )
-            
-            # Notifikasi akhir training
+            # Final checkpoint dan completion
+            self._save_final_checkpoint(model, optimizer, scheduler, epoch_metrics)
             total_time = time.time() - self.start_time
             final_metrics = self.metrics_tracker.get_metrics_summary()
             self._notify_training_end(final_metrics, total_time)
             
-            # Update state
             self.is_training = False
-            
-            # Return hasil training
-            return {
-                "best_epoch": self.best_epoch,
-                "best_metric": self.best_metric,
-                "total_epochs": self.current_epoch + 1,
-                "total_time": total_time,
-                "metrics": final_metrics,
-                "best_checkpoint": self.checkpoint_service.get_best_checkpoint_path(),
-                "last_checkpoint": self.checkpoint_service.get_last_checkpoint_path()
-            }
+            return self._create_training_result(total_time, final_metrics)
             
         except Exception as e:
-            error_msg = f"❌ Error during training: {str(e)}"
+            error_msg = f"❌ Training error: {str(e)}"
             self.logger.error(error_msg)
             self.progress_tracker.error(error_msg, "training")
             self._notify_training_error(error_msg, "training")
             self.is_training = False
             raise ModelTrainingError(error_msg)
     
-    def _train_epoch(
-        self,
-        model: torch.nn.Module,
-        train_loader: torch.utils.data.DataLoader,
-        optimizer: torch.optim.Optimizer,
-        epoch: int,
-        epochs: int
-    ) -> Dict[str, float]:
-        """Train satu epoch"""
-        # Set model ke mode training
+    def _train_epoch(self, model, train_loader, optimizer, epoch, epochs) -> Dict[str, float]:
+        """Train single epoch dengan progress tracking"""
         model.train()
-        
-        # Inisialisasi metrics
-        metrics = {"loss": 0.0}
         batch_losses = []
         
-        # Update progress
         self.progress_tracker.update(0, len(train_loader), f"🔄 Training epoch {epoch+1}/{epochs}")
-        self.progress_tracker.update_stage("training", f"epoch_{epoch+1}")
         
-        # Training loop
         for batch_idx, (data, targets) in enumerate(train_loader):
-            if self.should_stop:
-                break
+            if self.should_stop: break
             
-            # Pindahkan data ke device
+            # Device transfer dan forward pass
             device = next(model.parameters()).device
-            data = data.to(device)
-            if isinstance(targets, torch.Tensor):
-                targets = targets.to(device)
-            elif isinstance(targets, dict):
-                targets = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in targets.items()}
+            data, targets = data.to(device), self._transfer_targets_to_device(targets, device)
             
-            # Forward pass
+            # Training step
             optimizer.zero_grad()
             outputs = model(data)
+            loss_dict = self._compute_loss(model, outputs, targets)
+            loss = loss_dict.get('loss', loss_dict.get('total_loss', list(loss_dict.values())[0]))
             
-            # Hitung loss
-            if hasattr(model, 'compute_loss'):
-                loss_dict = model.compute_loss(outputs, targets)
-                loss = loss_dict['loss']
-                loss_items = {k: v.item() for k, v in loss_dict.items() if k != 'loss'}
-            else:
-                # Fallback untuk model tanpa compute_loss
-                criterion = getattr(model, 'loss_function', torch.nn.CrossEntropyLoss())
-                loss = criterion(outputs, targets)
-                loss_items = {}
-            
-            # Backward pass
             loss.backward()
             optimizer.step()
             
-            # Update metrics
+            # Metrics tracking
             batch_loss = loss.item()
             batch_losses.append(batch_loss)
+            batch_metrics = {"loss": batch_loss, **{k: v.item() if hasattr(v, 'item') else v for k, v in loss_dict.items() if k != 'loss'}}
             
-            # Update batch metrics
-            batch_metrics = {"loss": batch_loss, **loss_items}
             self.metrics_tracker.update(batch_metrics, "train_batch")
-            
-            # Update loss breakdown
-            if loss_items:
-                self.metrics_tracker.update_loss_breakdown(loss_items)
-            
-            # Notifikasi batch end
             self._notify_batch_end(batch_idx, len(train_loader), batch_metrics)
             
-            # Update progress setiap beberapa batch
-            if batch_idx % max(1, len(train_loader) // 20) == 0:
-                progress_pct = (batch_idx + 1) / len(train_loader) * 100
-                self.progress_tracker.update(
-                    batch_idx + 1, 
-                    len(train_loader), 
-                    f"🔄 Training epoch {epoch+1}/{epochs} - {progress_pct:.1f}% (loss: {batch_loss:.4f})"
-                )
+            # Progress update
+            batch_idx % max(1, len(train_loader) // 20) == 0 and self.progress_tracker.update(
+                batch_idx + 1, len(train_loader), f"🔄 Epoch {epoch+1}/{epochs} - {((batch_idx + 1) / len(train_loader) * 100):.1f}% (loss: {batch_loss:.4f})"
+            )
         
-        # Hitung rata-rata metrics
-        metrics["loss"] = np.mean(batch_losses)
-        
-        # Update epoch metrics
+        # Epoch metrics
+        metrics = {"loss": np.mean(batch_losses)}
         self.metrics_tracker.update(metrics, "train_epoch")
-        
-        # Update progress
-        self.progress_tracker.update(
-            len(train_loader), 
-            len(train_loader), 
-            f"✅ Epoch {epoch+1}/{epochs} selesai (loss: {metrics['loss']:.4f})"
-        )
-        
+        self.progress_tracker.update(len(train_loader), len(train_loader), f"✅ Epoch {epoch+1}/{epochs} selesai (loss: {metrics['loss']:.4f})")
         return metrics
     
-    def _validate_epoch(
-        self,
-        model: torch.nn.Module,
-        val_loader: torch.utils.data.DataLoader,
-        epoch: int,
-        epochs: int
-    ) -> Dict[str, float]:
-        """Validate satu epoch"""
-        # Set model ke mode eval
+    def _validate_epoch(self, model, val_loader, epoch, epochs) -> Dict[str, float]:
+        """Validate single epoch dengan progress tracking"""
         model.eval()
-        
-        # Inisialisasi metrics
-        metrics = {"loss": 0.0}
         batch_losses = []
         
-        # Update progress
         self.progress_tracker.update(0, len(val_loader), f"🔄 Validating epoch {epoch+1}/{epochs}")
-        self.progress_tracker.update_stage("validation", f"epoch_{epoch+1}")
         
-        # Validation loop
         with torch.no_grad():
             for batch_idx, (data, targets) in enumerate(val_loader):
-                if self.should_stop:
-                    break
+                if self.should_stop: break
                 
-                # Pindahkan data ke device
                 device = next(model.parameters()).device
-                data = data.to(device)
-                if isinstance(targets, torch.Tensor):
-                    targets = targets.to(device)
-                elif isinstance(targets, dict):
-                    targets = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in targets.items()}
+                data, targets = data.to(device), self._transfer_targets_to_device(targets, device)
                 
-                # Forward pass
                 outputs = model(data)
+                loss_dict = self._compute_loss(model, outputs, targets)
+                loss = loss_dict.get('loss', loss_dict.get('total_loss', list(loss_dict.values())[0]))
+                batch_losses.append(loss.item())
                 
-                # Hitung loss
-                if hasattr(model, 'compute_loss'):
-                    loss_dict = model.compute_loss(outputs, targets)
-                    loss = loss_dict['loss']
-                    loss_items = {k: v.item() for k, v in loss_dict.items() if k != 'loss'}
-                else:
-                    # Fallback untuk model tanpa compute_loss
-                    criterion = getattr(model, 'loss_function', torch.nn.CrossEntropyLoss())
-                    loss = criterion(outputs, targets)
-                    loss_items = {}
-                
-                # Update metrics
-                batch_loss = loss.item()
-                batch_losses.append(batch_loss)
-                
-                # Update progress setiap beberapa batch
-                if batch_idx % max(1, len(val_loader) // 10) == 0:
-                    progress_pct = (batch_idx + 1) / len(val_loader) * 100
-                    self.progress_tracker.update(
-                        batch_idx + 1, 
-                        len(val_loader), 
-                        f"🔄 Validating epoch {epoch+1}/{epochs} - {progress_pct:.1f}% (loss: {batch_loss:.4f})"
-                    )
+                # Progress update
+                batch_idx % max(1, len(val_loader) // 10) == 0 and self.progress_tracker.update(
+                    batch_idx + 1, len(val_loader), f"🔄 Validation {epoch+1}/{epochs} - {((batch_idx + 1) / len(val_loader) * 100):.1f}%"
+                )
         
-        # Hitung rata-rata metrics
-        metrics["loss"] = np.mean(batch_losses)
-        
-        # Update epoch metrics
+        metrics = {"loss": np.mean(batch_losses)}
         self.metrics_tracker.update(metrics, "val")
-        
-        # Update progress
-        self.progress_tracker.update(
-            len(val_loader), 
-            len(val_loader), 
-            f"✅ Validation epoch {epoch+1}/{epochs} selesai (loss: {metrics['loss']:.4f})"
-        )
-        
-        # Notifikasi validation end
+        self.progress_tracker.update(len(val_loader), len(val_loader), f"✅ Validation {epoch+1}/{epochs} selesai (loss: {metrics['loss']:.4f})")
         self._notify_validation_end(epoch, metrics)
-        
         return metrics
     
-    def stop_training(self) -> None:
-        """Hentikan training yang sedang berjalan"""
-        if not self.is_training:
-            self.logger.warning("⚠️ Tidak ada training yang sedang berjalan")
-            return
+    def _check_best_model(self, val_metrics, epoch, no_improve_count):
+        """Check dan update best model dengan one-liner logic"""
+        if not val_metrics or "loss" not in val_metrics: return False, no_improve_count
         
-        self.should_stop = True
-        self.logger.info("🛑 Menghentikan training...")
-        self.progress_tracker.update_status("Menghentikan training...")
+        val_loss = val_metrics["loss"]
+        if val_loss < self.best_metric:
+            improvement = (self.best_metric - val_loss) / self.best_metric * 100 if self.best_metric != float('inf') else 100
+            self.best_metric, self.best_epoch = val_loss, epoch
+            self.logger.info(f"🏆 New best model: val_loss={val_loss:.4f} (improvement: {improvement:.2f}%)")
+            return True, 0
+        return False, no_improve_count + 1
     
-    def is_training_running(self) -> bool:
-        """Check apakah training sedang berjalan"""
-        return self.is_training
+    def _save_checkpoints(self, model, optimizer, scheduler, epoch, metrics, is_best, save_best, save_interval):
+        """Save checkpoints berdasarkan kondisi"""
+        save_conditions = [
+            (is_best and save_best, f"epoch_{epoch:03d}.pt", True),
+            (save_interval > 0 and (epoch + 1) % save_interval == 0, f"epoch_{epoch:03d}.pt", False)
+        ]
+        
+        [self.checkpoint_service.save_checkpoint(model, path, optimizer, scheduler, epoch, metrics, is_best=is_best_flag)
+         for condition, path, is_best_flag in save_conditions if condition]
+    
+    def _handle_resume(self, resume_path, model, optimizer, scheduler):
+        """Handle resume dari checkpoint"""
+        self.logger.info(f"🔄 Melanjutkan dari: {Path(resume_path).name}")
+        _, metadata = self.checkpoint_service.load_checkpoint(resume_path, model, optimizer, scheduler)
+        start_epoch = metadata.get("epoch", 0) + 1 if metadata else 0
+        self.logger.info(f"🔄 Melanjutkan dari epoch {start_epoch}")
+        return start_epoch
+    
+    def _compute_loss(self, model, outputs, targets):
+        """Compute loss dengan error handling"""
+        if hasattr(model, 'compute_loss'): return model.compute_loss(outputs, targets)[1] if isinstance(model.compute_loss(outputs, targets), tuple) else {'loss': model.compute_loss(outputs, targets)}
+        return {'loss': getattr(model, 'loss_function', torch.nn.CrossEntropyLoss())(outputs, targets)}
+    
+    def _transfer_targets_to_device(self, targets, device):
+        """Transfer targets ke device dengan type handling"""
+        if isinstance(targets, torch.Tensor): return targets.to(device)
+        if isinstance(targets, dict): return {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in targets.items()}
+        return targets
+    
+    def _save_final_checkpoint(self, model, optimizer, scheduler, metrics):
+        """Save final checkpoint"""
+        self.checkpoint_service.save_checkpoint(model, f"epoch_{self.current_epoch:03d}.pt", optimizer, scheduler, self.current_epoch, metrics)
+    
+    def _create_training_result(self, total_time, final_metrics):
+        """Create training result dictionary"""
+        return {
+            "best_epoch": self.best_epoch, "best_metric": self.best_metric, "total_epochs": self.current_epoch + 1,
+            "total_time": total_time, "metrics": final_metrics,
+            "best_checkpoint": self.checkpoint_service.get_best_checkpoint_path(),
+            "last_checkpoint": self.checkpoint_service.get_last_checkpoint_path()
+        }
+    
+    def stop_training(self) -> None:
+        """Stop training yang sedang berjalan"""
+        not self.is_training and self.logger.warning("⚠️ Tidak ada training yang sedang berjalan") or (
+            setattr(self, 'should_stop', True), 
+            self.logger.info("🛑 Menghentikan training..."),
+            self.progress_tracker.update_status("Menghentikan training...")
+        )
     
     def get_training_progress(self) -> Dict[str, Any]:
-        """Dapatkan progress training saat ini"""
+        """Get current training progress dengan status lengkap"""
         return {
-            "is_training": self.is_training,
-            "current_epoch": self.current_epoch,
-            "best_epoch": self.best_epoch,
-            "best_metric": self.best_metric,
-            "progress": self.progress_tracker.get_status(),
+            "is_training": self.is_training, "current_epoch": self.current_epoch, "best_epoch": self.best_epoch,
+            "best_metric": self.best_metric, "progress": self.progress_tracker.get_status(),
             "metrics": self.metrics_tracker.get_metrics_summary(),
             "elapsed_time": time.time() - self.start_time if self.is_training else 0
         }
     
-    # Notifikasi callback
-    def _notify_training_start(self, total_epochs: int, total_batches: int, config: Dict[str, Any]) -> None:
-        """Notifikasi awal training"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    # Notification methods dengan one-liner delegation ke callback
+    def _notify_training_start(self, total_epochs, total_batches, config):
+        """Notify training start dengan error protection"""
         try:
-            if hasattr(self._callback, 'on_training_start'):
-                self._callback.on_training_start(total_epochs, total_batches, config)
-            elif isinstance(self._callback, dict) and 'training_start' in self._callback:
-                self._callback['training_start'](total_epochs, total_batches, config)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil training_start callback: {str(e)}")
+            hasattr(self._callback, 'on_training_start') and self._callback.on_training_start(total_epochs, total_batches, config)
+            isinstance(self._callback, dict) and 'training_start' in self._callback and self._callback['training_start'](total_epochs, total_batches, config)
+        except Exception as e: self.logger.warning(f"⚠️ Training start callback error: {str(e)}")
     
-    def _notify_epoch_start(self, epoch: int, total_epochs: int) -> None:
-        """Notifikasi awal epoch"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    def _notify_epoch_start(self, epoch, total_epochs):
+        """Notify epoch start"""
         try:
-            if hasattr(self._callback, 'on_epoch_start'):
-                self._callback.on_epoch_start(epoch, total_epochs)
-            elif isinstance(self._callback, dict) and 'epoch_start' in self._callback:
-                self._callback['epoch_start'](epoch, total_epochs)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil epoch_start callback: {str(e)}")
+            hasattr(self._callback, 'on_epoch_start') and self._callback.on_epoch_start(epoch, total_epochs)
+            isinstance(self._callback, dict) and 'epoch_start' in self._callback and self._callback['epoch_start'](epoch, total_epochs)
+        except Exception as e: self.logger.warning(f"⚠️ Epoch start callback error: {str(e)}")
     
-    def _notify_batch_end(self, batch: int, total_batches: int, metrics: Dict[str, float]) -> None:
-        """Notifikasi akhir batch"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    def _notify_batch_end(self, batch, total_batches, metrics):
+        """Notify batch end"""
         try:
-            if hasattr(self._callback, 'on_batch_end'):
-                self._callback.on_batch_end(batch, total_batches, metrics)
-            elif isinstance(self._callback, dict) and 'batch_end' in self._callback:
-                self._callback['batch_end'](batch, total_batches, metrics)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil batch_end callback: {str(e)}")
+            hasattr(self._callback, 'on_batch_end') and self._callback.on_batch_end(batch, total_batches, metrics)
+            isinstance(self._callback, dict) and 'batch_end' in self._callback and self._callback['batch_end'](batch, total_batches, metrics)
+        except Exception as e: self.logger.warning(f"⚠️ Batch end callback error: {str(e)}")
     
-    def _notify_epoch_end(self, epoch: int, metrics: Dict[str, float], is_best: bool = False) -> None:
-        """Notifikasi akhir epoch"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    def _notify_epoch_end(self, epoch, metrics, is_best=False):
+        """Notify epoch end"""
         try:
-            if hasattr(self._callback, 'on_epoch_end'):
-                self._callback.on_epoch_end(epoch, metrics, is_best)
-            elif isinstance(self._callback, dict) and 'epoch_end' in self._callback:
-                self._callback['epoch_end'](epoch, metrics, is_best)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil epoch_end callback: {str(e)}")
+            hasattr(self._callback, 'on_epoch_end') and self._callback.on_epoch_end(epoch, metrics, is_best)
+            isinstance(self._callback, dict) and 'epoch_end' in self._callback and self._callback['epoch_end'](epoch, metrics, is_best)
+        except Exception as e: self.logger.warning(f"⚠️ Epoch end callback error: {str(e)}")
     
-    def _notify_validation_start(self, epoch: int) -> None:
-        """Notifikasi awal validation"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    def _notify_validation_end(self, epoch, metrics):
+        """Notify validation end"""
         try:
-            if hasattr(self._callback, 'on_validation_start'):
-                self._callback.on_validation_start(epoch)
-            elif isinstance(self._callback, dict) and 'validation_start' in self._callback:
-                self._callback['validation_start'](epoch)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil validation_start callback: {str(e)}")
+            hasattr(self._callback, 'on_validation_end') and self._callback.on_validation_end(epoch, metrics)
+            isinstance(self._callback, dict) and 'validation_end' in self._callback and self._callback['validation_end'](epoch, metrics)
+        except Exception as e: self.logger.warning(f"⚠️ Validation end callback error: {str(e)}")
     
-    def _notify_validation_end(self, epoch: int, metrics: Dict[str, float]) -> None:
-        """Notifikasi akhir validation"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    def _notify_training_end(self, final_metrics, total_time):
+        """Notify training end"""
         try:
-            if hasattr(self._callback, 'on_validation_end'):
-                self._callback.on_validation_end(epoch, metrics)
-            elif isinstance(self._callback, dict) and 'validation_end' in self._callback:
-                self._callback['validation_end'](epoch, metrics)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil validation_end callback: {str(e)}")
+            hasattr(self._callback, 'on_training_end') and self._callback.on_training_end(final_metrics, total_time)
+            isinstance(self._callback, dict) and 'training_end' in self._callback and self._callback['training_end'](final_metrics, total_time)
+        except Exception as e: self.logger.warning(f"⚠️ Training end callback error: {str(e)}")
     
-    def _notify_training_end(self, final_metrics: Dict[str, float], total_time: float) -> None:
-        """Notifikasi akhir training"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
+    def _notify_training_error(self, error_message, phase):
+        """Notify training error"""
         try:
-            if hasattr(self._callback, 'on_training_end'):
-                self._callback.on_training_end(final_metrics, total_time)
-            elif isinstance(self._callback, dict) and 'training_end' in self._callback:
-                self._callback['training_end'](final_metrics, total_time)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil training_end callback: {str(e)}")
+            hasattr(self._callback, 'on_training_error') and self._callback.on_training_error(error_message, phase)
+            isinstance(self._callback, dict) and 'training_error' in self._callback and self._callback['training_error'](error_message, phase)
+        except Exception as e: self.logger.warning(f"⚠️ Training error callback error: {str(e)}")
     
-    def _notify_training_error(self, error_message: str, phase: str) -> None:
-        """Notifikasi error training"""
-        if not hasattr(self, '_callback') or self._callback is None:
-            return
-        
-        try:
-            if hasattr(self._callback, 'on_training_error'):
-                self._callback.on_training_error(error_message, phase)
-            elif isinstance(self._callback, dict) and 'training_error' in self._callback:
-                self._callback['training_error'](error_message, phase)
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error memanggil training_error callback: {str(e)}")
+    def _raise_error(self, message): raise ModelTrainingError(message)
     
-    # One-liner utilities
+    # One-liner utilities dan properties
+    is_training_running = lambda self: self.is_training
     get_current_epoch = lambda self: self.current_epoch
     get_best_epoch = lambda self: self.best_epoch
     get_best_metric = lambda self: self.best_metric

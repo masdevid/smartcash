@@ -17,19 +17,54 @@ def extract_backbone_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi backbone
     """
     # One-liner extraction dengan safe get dan fallback values
+    backbone_value = getattr(ui_components.get('backbone_dropdown'), 'value', 'efficientnet_b4')
+    model_type_value = getattr(ui_components.get('model_type_dropdown'), 'value', 'efficient_basic')
+    
+    # Dapatkan nilai dari UI atau gunakan default
     model_config = {
-        'backbone': getattr(ui_components.get('backbone_dropdown'), 'value', 'efficientnet_b4'),
-        'model_type': getattr(ui_components.get('model_type_dropdown'), 'value', 'efficient_basic'),
+        # Type model
+        'type': model_type_value,
+        
+        # Backbone model
+        'backbone': backbone_value,
+        'backbone_pretrained': True,
+        'backbone_weights': '',
+        'backbone_freeze': False,
+        'backbone_unfreeze_epoch': 5,
+        
+        # Ukuran input dan preprocessing
+        'input_size': [640, 640],
+        
+        # Thresholds
+        'confidence': 0.25,
+        'iou_threshold': 0.45,
+        'max_detections': 100,
+        
+        # Transfer learning
+        'transfer_learning': True,
+        'pretrained': True,
+        'pretrained_weights': '',
+        
+        # Feature optimization dari UI
         'use_attention': getattr(ui_components.get('use_attention_checkbox'), 'value', True),
         'use_residual': getattr(ui_components.get('use_residual_checkbox'), 'value', True),
         'use_ciou': getattr(ui_components.get('use_ciou_checkbox'), 'value', False),
-        'pretrained': True,  # Always use pretrained
-        'freeze_backbone': False,
-        'freeze_bn': False,
-        'dropout': 0.2,
-        'activation': 'relu',
-        'normalization': {'type': 'batch_norm', 'momentum': 0.1},
-        'weights': {'path': '', 'strict': True}
+        
+        # Processing dan spesifikasi model default
+        'anchors': [10,13, 16,30, 33,23, 30,61, 62,45, 59,119, 116,90, 156,198, 373,326],
+        'strides': [8, 16, 32],
+        'workers': 4,
+        'depth_multiple': 0.67,
+        'width_multiple': 0.75,
+        
+        # Integrasi khusus SmartCash
+        'use_efficient_blocks': True,
+        'use_adaptive_anchors': True,
+        
+        # Optimasi model
+        'quantization': False,
+        'quantization_aware_training': False,
+        'fp16_training': True
     }
     
     return {

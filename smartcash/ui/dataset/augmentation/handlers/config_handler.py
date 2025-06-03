@@ -52,41 +52,90 @@ def _extract_ui_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         return _manual_extraction(ui_components)
 
 def _manual_extraction(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Manual extraction dengan research parameters dan preprocessing normalization"""
+    """Manual extraction dengan research parameters sesuai dengan augmentation_config.yaml"""
     from smartcash.dataset.augmentor.utils.path_operations import get_best_data_location
+    from datetime import datetime
     
+    # Extract augmentation types dari UI
     aug_types = _extract_aug_types(ui_components)
+    
+    # Parameter dasar
     basic_params = {
-        'num_variations': _get_widget_value_safe(ui_components, 'num_variations', 2),
+        'enabled': True,
+        'num_variations': _get_widget_value_safe(ui_components, 'num_variations', 3),
         'target_count': _get_widget_value_safe(ui_components, 'target_count', 500),
-        'target_split': _get_widget_value_safe(ui_components, 'target_split', 'train'),
-        'output_prefix': _get_widget_value_safe(ui_components, 'output_prefix', 'aug_'),
-        'balance_classes': _get_widget_value_safe(ui_components, 'balance_classes', True)
+        'output_prefix': _get_widget_value_safe(ui_components, 'output_prefix', 'aug'),
+        'process_bboxes': True,
+        'output_dir': 'data/augmented',
+        'validate_results': True,
+        'resume': False,
+        'num_workers': _get_widget_value_safe(ui_components, 'num_workers', 4),
+        'balance_classes': _get_widget_value_safe(ui_components, 'balance_classes', True),
+        'move_to_preprocessed': True
     }
     
-    advanced_params = {
+    # Parameter augmentasi posisi
+    position_params = {
         'fliplr': _get_widget_value_safe(ui_components, 'fliplr', 0.5),
-        'degrees': _get_widget_value_safe(ui_components, 'degrees', 10),
-        'translate': _get_widget_value_safe(ui_components, 'translate', 0.1),
-        'scale': _get_widget_value_safe(ui_components, 'scale', 0.1),
-        'hsv_h': _get_widget_value_safe(ui_components, 'hsv_h', 0.015),
-        'hsv_s': _get_widget_value_safe(ui_components, 'hsv_s', 0.7),
-        'brightness': _get_widget_value_safe(ui_components, 'brightness', 0.2),
-        'contrast': _get_widget_value_safe(ui_components, 'contrast', 0.2)
+        'degrees': _get_widget_value_safe(ui_components, 'degrees', 15),
+        'translate': _get_widget_value_safe(ui_components, 'translate', 0.15),
+        'scale': _get_widget_value_safe(ui_components, 'scale', 0.15),
+        'shear_max': _get_widget_value_safe(ui_components, 'shear_max', 10)
     }
     
-    # Load preprocessing config untuk normalization sync
-    preprocessing_config = _load_preprocessing_config_safe()
+    # Parameter augmentasi pencahayaan
+    lighting_params = {
+        'hsv_h': _get_widget_value_safe(ui_components, 'hsv_h', 0.025),
+        'hsv_s': _get_widget_value_safe(ui_components, 'hsv_s', 0.7),
+        'hsv_v': _get_widget_value_safe(ui_components, 'hsv_v', 0.4),
+        'contrast': [0.7, 1.3],  # Default from YAML
+        'brightness': [0.7, 1.3],  # Default from YAML
+        'blur': _get_widget_value_safe(ui_components, 'blur', 0.2),
+        'noise': _get_widget_value_safe(ui_components, 'noise', 0.1)
+    }
     
+    # Pengaturan cleanup
+    cleanup_params = {
+        'backup_enabled': _get_widget_value_safe(ui_components, 'backup_enabled', True),
+        'backup_dir': 'data/backup/augmentation',
+        'backup_count': _get_widget_value_safe(ui_components, 'backup_count', 5),
+        'patterns': ['aug_*', '*_augmented*']
+    }
+    
+    # Pengaturan visualisasi
+    visualization_params = {
+        'enabled': _get_widget_value_safe(ui_components, 'visualization_enabled', True),
+        'sample_count': _get_widget_value_safe(ui_components, 'sample_count', 5),
+        'save_visualizations': _get_widget_value_safe(ui_components, 'save_visualizations', True),
+        'vis_dir': 'visualizations/augmentation',
+        'show_original': True,
+        'show_bboxes': True
+    }
+    
+    # Pengaturan performa
+    performance_params = {
+        'num_workers': _get_widget_value_safe(ui_components, 'num_workers', 4),
+        'batch_size': _get_widget_value_safe(ui_components, 'batch_size', 16),
+        'use_gpu': _get_widget_value_safe(ui_components, 'use_gpu', True)
+    }
+    
+    # Metadata
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Struktur config sesuai dengan augmentation_config.yaml
     return {
-        'data': {'dir': get_best_data_location()},
-        'augmentation': {'types': aug_types, 'intensity': 0.7, 'output_dir': 'data/augmented', **basic_params, **advanced_params},
-        'preprocessing': {
-            'output_dir': 'data/preprocessed',
-            'normalization': {
-                'scaler': preprocessing_config.get('normalization', {}).get('scaler', 'minmax')
-            }
-        }
+        'config_version': '1.0',
+        'updated_at': current_time,
+        '_base_': 'base_config.yaml',
+        'augmentation': {
+            'types': aug_types,
+            **basic_params,
+            'position': position_params,
+            'lighting': lighting_params
+        },
+        'cleanup': cleanup_params,
+        'visualization': visualization_params,
+        'performance': performance_params
     }
 
 def _extract_aug_types(ui_components: Dict[str, Any]) -> list:
@@ -130,50 +179,147 @@ def _validate_config(config: Dict[str, Any]) -> bool:
         return False
 
 def _get_default_config() -> Dict[str, Any]:
-    """Default config dengan research optimization dan preprocessing normalization"""
-    preprocessing_config = _load_preprocessing_config_safe()
+    """Default config sesuai dengan augmentation_config.yaml"""
+    from datetime import datetime
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     return {
-        'data': {'dir': 'data'},
+        'config_version': '1.0',
+        'updated_at': current_time,
+        '_base_': 'base_config.yaml',
+        
+        # Konfigurasi augmentasi utama
         'augmentation': {
-            'types': ['combined'], 'num_variations': 2, 'target_count': 500, 'target_split': 'train',
-            'intensity': 0.7, 'output_prefix': 'aug_', 'balance_classes': True, 'output_dir': 'data/augmented',
-            'fliplr': 0.5, 'degrees': 10, 'translate': 0.1, 'scale': 0.1,
-            'hsv_h': 0.015, 'hsv_s': 0.7, 'brightness': 0.2, 'contrast': 0.2
-        },
-        'preprocessing': {
-            'output_dir': 'data/preprocessed',
-            'normalization': {
-                'scaler': preprocessing_config.get('normalization', {}).get('scaler', 'minmax')
+            # Parameter dasar
+            'enabled': True,
+            'types': ['combined', 'position', 'lighting'],
+            'num_variations': 3,
+            'target_count': 1000,
+            'output_prefix': 'aug',
+            'process_bboxes': True,
+            'output_dir': 'data/augmented',
+            'validate_results': True,
+            'resume': False,
+            'balance_classes': True,
+            'move_to_preprocessed': True,
+            
+            # Parameter augmentasi posisi
+            'position': {
+                'fliplr': 0.5,
+                'degrees': 15,
+                'translate': 0.15,
+                'scale': 0.15,
+                'shear_max': 10
+            },
+            
+            # Parameter augmentasi pencahayaan
+            'lighting': {
+                'hsv_h': 0.025,
+                'hsv_s': 0.7,
+                'hsv_v': 0.4,
+                'contrast': [0.7, 1.3],
+                'brightness': [0.7, 1.3],
+                'blur': 0.2,
+                'noise': 0.1
             }
+        },
+        
+        # Pengaturan pengelolaan data augmentasi
+        'cleanup': {
+            'backup_enabled': True,
+            'backup_dir': 'data/backup/augmentation',
+            'backup_count': 5,
+            'patterns': ['aug_*', '*_augmented*']
+        },
+        
+        # Pengaturan visualisasi
+        'visualization': {
+            'enabled': True,
+            'sample_count': 5,
+            'save_visualizations': True,
+            'vis_dir': 'visualizations/augmentation',
+            'show_original': True,
+            'show_bboxes': True
+        },
+        
+        # Pengaturan performa
+        'performance': {
+            'num_workers': 4,
+            'batch_size': 16,
+            'use_gpu': True
         }
     }
 
 def _apply_config_to_ui(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Apply config ke UI dengan parameter alignment"""
+    """Apply config ke UI dengan parameter alignment sesuai dengan struktur augmentation_config.yaml"""
     aug_config = config.get('augmentation', {})
+    position_config = aug_config.get('position', {})
+    lighting_config = aug_config.get('lighting', {})
+    cleanup_config = config.get('cleanup', {})
+    visualization_config = config.get('visualization', {})
+    performance_config = config.get('performance', {})
     
+    # Ekstraksi parameter dasar dari config
     basic_mappings = {
-        'num_variations': aug_config.get('num_variations', 2),
-        'target_count': aug_config.get('target_count', 500),
-        'target_split': aug_config.get('target_split', 'train'),
-        'output_prefix': aug_config.get('output_prefix', 'aug_'),
-        'balance_classes': aug_config.get('balance_classes', False)
+        'num_variations': aug_config.get('num_variations', 3),
+        'target_count': aug_config.get('target_count', 1000),
+        'output_prefix': aug_config.get('output_prefix', 'aug'),
+        'balance_classes': aug_config.get('balance_classes', True),
+        'num_workers': performance_config.get('num_workers', 4),
+        'batch_size': performance_config.get('batch_size', 16),
+        'use_gpu': performance_config.get('use_gpu', True)
     }
     
-    advanced_mappings = {
-        'fliplr': aug_config.get('fliplr', 0.5), 'degrees': aug_config.get('degrees', 10),
-        'translate': aug_config.get('translate', 0.1), 'scale': aug_config.get('scale', 0.1),
-        'hsv_h': aug_config.get('hsv_h', 0.015), 'hsv_s': aug_config.get('hsv_s', 0.7),
-        'brightness': aug_config.get('brightness', 0.2), 'contrast': aug_config.get('contrast', 0.2)
+    # Ekstraksi parameter posisi dari config
+    position_mappings = {
+        'fliplr': position_config.get('fliplr', 0.5),
+        'degrees': position_config.get('degrees', 15),
+        'translate': position_config.get('translate', 0.15),
+        'scale': position_config.get('scale', 0.15),
+        'shear_max': position_config.get('shear_max', 10)
     }
     
-    all_mappings = {**basic_mappings, **advanced_mappings}
+    # Ekstraksi parameter pencahayaan dari config
+    lighting_mappings = {
+        'hsv_h': lighting_config.get('hsv_h', 0.025),
+        'hsv_s': lighting_config.get('hsv_s', 0.7),
+        'hsv_v': lighting_config.get('hsv_v', 0.4),
+        'blur': lighting_config.get('blur', 0.2),
+        'noise': lighting_config.get('noise', 0.1)
+    }
+    
+    # Ekstraksi parameter cleanup dari config
+    cleanup_mappings = {
+        'backup_enabled': cleanup_config.get('backup_enabled', True),
+        'backup_count': cleanup_config.get('backup_count', 5)
+    }
+    
+    # Ekstraksi parameter visualisasi dari config
+    visualization_mappings = {
+        'visualization_enabled': visualization_config.get('enabled', True),
+        'sample_count': visualization_config.get('sample_count', 5),
+        'save_visualizations': visualization_config.get('save_visualizations', True)
+    }
+    
+    # Gabungkan semua parameter untuk diaplikasikan ke UI
+    all_mappings = {
+        **basic_mappings,
+        **position_mappings,
+        **lighting_mappings,
+        **cleanup_mappings,
+        **visualization_mappings
+    }
+    
+    # Terapkan semua parameter ke UI components
     for widget_key, value in all_mappings.items():
         _set_widget_value_safe(ui_components, widget_key, value)
     
+    # Set jenis augmentasi
     aug_types = aug_config.get('types', ['combined'])
     _set_augmentation_types(ui_components, aug_types)
+    
+    # Log info untuk user
+    log_to_ui(ui_components, f'Konfigurasi augmentasi berhasil dimuat dengan {len(all_mappings)} parameter', 'info', '📊 ')
 
 def _update_cache(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update cache dengan new config"""

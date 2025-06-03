@@ -8,9 +8,10 @@ from typing import Dict, Any
 
 def update_split_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update UI components dari config dengan one-liner updates"""
-    split_ratios = config.get('data', {}).get('split_ratios', {})
-    split_settings = config.get('split_settings', {})
     data_config = config.get('data', {})
+    split_ratios = data_config.get('split_ratios', {})
+    validation_config = data_config.get('validation', {})
+    backup_config = config.get('dataset', {}).get('backup', {})
     
     # One-liner component update dengan safe access
     safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
@@ -18,14 +19,24 @@ def update_split_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
     # Update ratio sliders
     [safe_update(f'{ratio}_slider', split_ratios.get(ratio, default)) for ratio, default in [('train', 0.7), ('valid', 0.15), ('test', 0.15)]]
     
-    # Update form fields dengan mapping approach
+    # Update form fields dengan mapping approach - sesuai dengan dataset_config.yaml
     field_mappings = [
+        # Data validation settings
         ('stratified_checkbox', data_config, 'stratified_split', True),
         ('random_seed', data_config, 'random_seed', 42),
-        ('backup_checkbox', split_settings, 'backup_before_split', True),
-        ('backup_dir', split_settings, 'backup_dir', 'data/splits_backup'),
-        ('dataset_path', split_settings, 'dataset_path', 'data'),
-        ('preprocessed_path', split_settings, 'preprocessed_path', 'data/preprocessed')
+        
+        # Validation settings
+        ('validation_enabled', validation_config, 'enabled', True),
+        ('fix_issues', validation_config, 'fix_issues', True),
+        ('move_invalid', validation_config, 'move_invalid', True),
+        ('invalid_dir', validation_config, 'invalid_dir', 'data/invalid'),
+        ('visualize_issues', validation_config, 'visualize_issues', False),
+        
+        # Backup settings
+        ('backup_checkbox', backup_config, 'enabled', True),
+        ('backup_dir', backup_config, 'dir', 'data/backup/dataset'),
+        ('backup_count', backup_config, 'count', 3),
+        ('auto_backup', backup_config, 'auto', False)
     ]
     
     [safe_update(component_key, source_config.get(config_key, default_value)) for component_key, source_config, config_key, default_value in field_mappings]

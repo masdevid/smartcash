@@ -97,11 +97,20 @@ class SimpleConfigManager:
         if config_name is None:
             config_name = self.config_file
         
-        if not (config_name.endswith('.yaml') or config_name.endswith('.yml')):
-            if not config_name.endswith('_config'):
-                config_name = f"{config_name}_config.yaml"
-            else:
-                config_name = f"{config_name}.yaml"
+        # Jika nama file sudah lengkap dengan ekstensi, gunakan apa adanya
+        if config_name.endswith('.yaml') or config_name.endswith('.yml'):
+            return self.config_dir / config_name
+        
+        # Tambahkan _config jika tidak ada dan bukan dari file config spesial
+        special_configs = ['model', 'hyperparameters', 'training', 'dataset', 'base']
+        if config_name in special_configs:
+            config_name = f"{config_name}_config.yaml"
+        # Jika sudah berakhiran _config, tambahkan ekstensi saja
+        elif config_name.endswith('_config'):
+            config_name = f"{config_name}.yaml"
+        # Selain itu, tambahkan _config.yaml
+        else:
+            config_name = f"{config_name}_config.yaml"
         
         return self.config_dir / config_name
     

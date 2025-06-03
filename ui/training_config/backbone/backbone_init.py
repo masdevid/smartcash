@@ -9,7 +9,7 @@ from smartcash.ui.utils.config_cell_initializer import ConfigCellInitializer, cr
 class BackboneConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk backbone model configuration"""
     
-    def __init__(self, module_name='backbone', config_filename='backbone'):
+    def __init__(self, module_name='backbone', config_filename='model'):
         super().__init__(module_name, config_filename)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
@@ -55,4 +55,4 @@ def initialize_backbone_config(env=None, config=None, **kwargs) -> Any:
     Returns:
         UI components atau fallback UI
     """
-    return create_config_cell(BackboneConfigInitializer, 'backbone', 'backbone_config', env, config, **kwargs)
+    return create_config_cell(BackboneConfigInitializer, 'backbone', 'model', env, config, **kwargs)

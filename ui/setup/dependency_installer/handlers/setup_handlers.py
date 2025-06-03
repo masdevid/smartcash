@@ -47,13 +47,11 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     ui_components['update_status_panel'] = lambda level="info", message="": update_status_panel(ui_components, level, message)
     
     # Set default suppress_logs jika tidak ada
-    if 'suppress_logs' not in ui_components:
-        ui_components['suppress_logs'] = config.get('suppress_logs', False) if config else False
+    if 'suppress_logs' not in ui_components: ui_components['suppress_logs'] = config.get('suppress_logs', False) if config else False
         
     # Sembunyikan progress container jika diminta
     if config and config.get('hide_progress', False) and 'progress_container' in ui_components:
-        if hasattr(ui_components['progress_container'], 'layout'):
-            ui_components['progress_container'].layout.visibility = 'hidden'
+        if hasattr(ui_components['progress_container'], 'layout'): ui_components['progress_container'].layout.visibility = 'hidden'
     
     try:
         # Setup observer manager untuk notifikasi
@@ -74,25 +72,50 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
         # Tangkap error tapi jangan gagalkan setup (silent fail)
         ui_components['log_message'](f"⚠️ Handler setup error: {str(e)}", "warning")
     
-    # Deteksi packages yang sudah terinstall dengan progress tracking
-    try:
-        # Tampilkan progress tracker untuk analisis dengan pendekatan one-liner
-        ui_components['show_for_operation']('analyze')
-        ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+    # Deteksi packages yang sudah terinstall dengan progress tracking jika tidak delay_analysis
+    if not config.get('delay_analysis', False):
+        try:
+            # Tampilkan progress tracker untuk analisis dengan pendekatan one-liner
+            ui_components['show_for_operation']('analyze')
+            ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+            
+            # Jalankan analisis
+            analyze_installed_packages(ui_components)
+            
+            # Update progress selesai dengan pendekatan one-liner
+            ui_components['update_progress']('step', 100, "Analisis packages selesai", "#28a745")
+            ui_components['log_message'](f"✅ Berhasil mendeteksi packages terinstall", "success")
+            ui_components['update_status_panel']("success", "Analisis packages selesai")
+        except Exception as e:
+            # Handle error dengan pendekatan one-liner
+            error_message = f"Gagal mendeteksi packages: {str(e)}"
+            ui_components['log_message'](f"⚠️ {error_message}", "warning")
+            ui_components['error_operation'](error_message)
+            ui_components['update_status_panel']("warning", error_message)
+    else:
+        # Simpan fungsi analisis untuk dijalankan nanti
+        def run_delayed_analysis():
+            try:
+                # Tampilkan progress tracker untuk analisis dengan pendekatan one-liner
+                ui_components['show_for_operation']('analyze')
+                ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+                
+                # Jalankan analisis
+                analyze_installed_packages(ui_components)
+                
+                # Update progress selesai dengan pendekatan one-liner
+                ui_components['update_progress']('step', 100, "Analisis packages selesai", "#28a745")
+                ui_components['log_message'](f"✅ Berhasil mendeteksi packages terinstall", "success")
+                ui_components['update_status_panel']("success", "Analisis packages selesai")
+            except Exception as e:
+                # Handle error dengan pendekatan one-liner
+                error_message = f"Gagal mendeteksi packages: {str(e)}"
+                ui_components['log_message'](f"⚠️ {error_message}", "warning")
+                ui_components['error_operation'](error_message)
+                ui_components['update_status_panel']("warning", error_message)
         
-        # Jalankan analisis
-        analyze_installed_packages(ui_components)
-        
-        # Update progress selesai dengan pendekatan one-liner
-        ui_components['update_progress']('step', 100, "Analisis packages selesai", "#28a745")
-        ui_components['log_message'](f"✅ Berhasil mendeteksi packages terinstall", "success")
-        ui_components['update_status_panel']("success", "Analisis packages selesai")
-    except Exception as e:
-        # Handle error dengan pendekatan one-liner
-        error_message = f"Gagal mendeteksi packages: {str(e)}"
-        ui_components['log_message'](f"⚠️ {error_message}", "warning")
-        ui_components['error_operation'](error_message)
-        ui_components['update_status_panel']("warning", error_message)
+        # Simpan fungsi analisis untuk dijalankan nanti
+        ui_components['run_delayed_analysis'] = run_delayed_analysis
     
     # Tandai sebagai diinisialisasi
     ui_components['dependency_installer_initialized'] = True

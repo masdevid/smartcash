@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer/dependency_installer_initializer.py
-Deskripsi: Fixed dependency installer menggunakan CommonInitializer pattern
+Deskripsi: Fixed dependency installer menggunakan CommonInitializer pattern dengan pengecekan instalasi setelah UI terender
 """
 
 from typing import Dict, Any, List
@@ -16,27 +16,32 @@ from smartcash.common.environment import get_environment_manager as _get_environ
 
 
 class DependencyInstallerInitializer(CommonInitializer):
-    """Fixed dependency installer menggunakan CommonInitializer pattern"""
+    """Fixed dependency installer menggunakan CommonInitializer pattern dengan pengecekan instalasi setelah UI terender"""
     
     def __init__(self):
         super().__init__(MODULE_LOGGER_NAME, DEPENDENCY_INSTALLER_LOGGER_NAMESPACE)
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default configuration untuk dependency installer"""
+        """Mendapatkan konfigurasi default untuk dependency installer dengan pendekatan one-liner"""
         return {
             'auto_install': False,
             'selected_packages': ['yolov5_req', 'smartcash_req', 'torch_req'],
             'custom_packages': '',
-            'validate_after_install': True
+            'validate_after_install': True,
+            'delay_analysis': True,  # Flag untuk menunda analisis sampai UI terender
+            'suppress_logs': True,  # Tekan log selama inisialisasi
+            'hide_progress': True,  # Sembunyikan progress selama inisialisasi
         }
     
     def _get_critical_components(self) -> List[str]:
         """Critical component keys yang harus ada"""
-        return ['ui', 'install_button', 'status']
+        return ['ui', 'install_button', 'status', 'log_output', 'progress_container']
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk dependency installer"""
-        return create_dependency_installer_ui(env, config)
+        ui_components = create_dependency_installer_ui(env, config)
+        ui_components.update({'module_name': 'DEPS', 'dependency_installer_initialized': False})
+        return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers untuk dependency installer dengan penanganan error yang lebih baik"""
@@ -61,76 +66,37 @@ class DependencyInstallerInitializer(CommonInitializer):
             else:
                 # Fallback ke logger jika log_message tidak tersedia
                 logger = ui_components.get('logger', self.logger)
-                if logger:
-                    logger.error(error_message)
+                if logger: logger.error(error_message)
             
             # Tandai setup gagal tapi jangan gagalkan inisialisasi
             ui_components['handlers_setup'] = False
         
         return ui_components
     
-    def _additional_validation(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Validation untuk dependency installer"""
-        button_keys = ['install_button']
-        functional_buttons = [key for key in button_keys if ui_components.get(key) and hasattr(ui_components[key], 'on_click')]
+    def _additional_validation(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+        """Validasi tambahan untuk memastikan install button berfungsi dengan pendekatan one-liner"""
+        # Validasi komponen UI dengan pendekatan one-liner
+        return all([
+            'install_button' in ui_components,
+            hasattr(ui_components['install_button'], 'on_click'),
+            ui_components['install_button']._click_handlers.callbacks,
+            'log_output' in ui_components,
+            'progress_container' in ui_components,
+        ])
         
-        if not functional_buttons:
-            return {'valid': False, 'message': 'Install button tidak functional'}
+    def _post_initialization_hook(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Hook yang dijalankan setelah inisialisasi selesai untuk setup UI dan reset handler"""
+        from IPython.display import display
         
-        return {'valid': True, 'functional_buttons': functional_buttons}
+        # Tampilkan UI
+        if 'ui' in ui_components: display(ui_components['ui'])
         
-    def _get_return_value(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Override _get_return_value untuk mengembalikan ui_components dictionary, bukan hanya UI widget"""
-        # Pastikan ui_components adalah dictionary dan bukan widget
-        return ui_components
-
-
-# Global instance
-_dependency_installer_initializer = DependencyInstallerInitializer()
-_config_manager = None
-
-# Public API
-# Variabel global untuk menyimpan instance UI components
-_ui_components_instance = None
-
-def initialize_dependency_installer(env=None, config=None):
-    """Inisialisasi dan tampilkan UI dependency installer"""
-    from IPython.display import display, clear_output, HTML
-    import ipywidgets as widgets
-    import sys
-    import types
-    global _ui_components_instance
-    
-    # Clear output terlebih dahulu untuk menghindari masalah rendering
-    clear_output(wait=True)
-    
-    # Siapkan config dasar
-    config = config or {}
-    config['suppress_logs'] = True  # Tambahkan flag untuk menekan log selama inisialisasi
-    
-    # Inisialisasi UI components tanpa menampilkan progress
-    config['hide_progress'] = True
-    ui_components = _dependency_installer_initializer.initialize(env=env, config=config)
-    
-    # Sembunyikan progress container saat inisialisasi
-    if isinstance(ui_components, dict) and 'progress_container' in ui_components:
-        if hasattr(ui_components['progress_container'], 'layout'):
-            ui_components['progress_container'].layout.visibility = 'hidden'
-    
-    # Tampilkan UI
-    if isinstance(ui_components, dict) and 'ui' in ui_components:
-        display(ui_components['ui'])
-    
-    # Aktifkan log setelah UI terender
-    if isinstance(ui_components, dict):
+        # Aktifkan log setelah UI terender
         ui_components['suppress_logs'] = False
         
         # Setup reset log dan tampilkan progress handler untuk tombol instalasi
         if 'install_button' in ui_components and hasattr(ui_components['install_button'], 'on_click'):
-            original_handler = None
-            for handler in ui_components['install_button']._click_handlers.callbacks:
-                original_handler = handler
-                break
+            original_handler = next(iter(ui_components['install_button']._click_handlers.callbacks), None)
             
             if original_handler:
                 # Hapus handler asli
@@ -154,34 +120,44 @@ def initialize_dependency_installer(env=None, config=None):
         # Log status inisialisasi jika tersedia
         if 'log_message' in ui_components and callable(ui_components['log_message']):
             ui_components['log_message']("✅ Dependency installer UI berhasil diinisialisasi", "success")
-    else:
-        # Fallback jika UI tidak dapat diinisialisasi
-        print("❌ Error: Komponen UI dependency installer tidak dapat diinisialisasi dengan benar.")
-    
-    # Simpan instance untuk referensi global
-    _ui_components_instance = ui_components
-    
-    # Kembalikan fungsi dummy untuk mencegah output dictionary
-    def dummy_function():
-        pass
-    
-    # Tambahkan atribut khusus ke fungsi dummy
-    dummy_function.ui_components = ui_components
-    
-    # Override __repr__ dari fungsi dummy
-    def custom_repr(self):
-        return ""
-    
-    dummy_function.__repr__ = types.MethodType(custom_repr, dummy_function)
-    
-    return dummy_function
+        
+        # Jalankan analisis tertunda jika ada
+        if config.get('delay_analysis', True) and 'run_delayed_analysis' in ui_components and callable(ui_components['run_delayed_analysis']):
+            # Tampilkan progress container untuk analisis
+            if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                ui_components['progress_container'].layout.visibility = 'visible'
+            
+            # Jalankan analisis tertunda
+            ui_components['run_delayed_analysis']()
+            
+            # Sembunyikan progress container setelah analisis selesai jika tidak ada instalasi otomatis
+            if not config.get('auto_install', False) and 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                ui_components['progress_container'].layout.visibility = 'hidden'
+            
+        return ui_components
+        
+    def _get_return_value(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Mendapatkan nilai return yang akan ditampilkan di notebook dengan pendekatan one-liner"""
+        from smartcash.ui.utils.silent_wrapper import SilentDictWrapper
+        
+        # Bungkus ui_components dengan SilentDictWrapper untuk mencegah output otomatis
+        return SilentDictWrapper(ui_components)
 
-def get_config_manager():
-    """Mendapatkan instance ConfigManager untuk dependency installer dengan pendekatan singleton"""
-    # Menggunakan fungsi get_config_manager yang sudah diimpor dari smartcash.common.config.manager
-    return _get_config_manager()
 
-def get_environment_manager():
-    """Mendapatkan instance EnvironmentManager untuk dependency installer dengan pendekatan singleton"""
-    # Menggunakan fungsi get_environment_manager yang sudah diimpor dari smartcash.common.environment
-    return _get_environment_manager()
+# Public API
+def initialize_dependency_installer(config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
+    """Inisialisasi dan tampilkan UI dependency installer dengan pendekatan one-liner"""
+    from IPython.display import clear_output
+    
+    # Clear output terlebih dahulu untuk menghindari masalah rendering
+    clear_output(wait=True)
+    
+    # Siapkan config dasar dengan pendekatan one-liner
+    config = config or {}
+    config.update({'suppress_logs': True, 'hide_progress': True})  # Tambahkan flag untuk menekan log dan progress
+    
+    # Inisialisasi UI dengan CommonInitializer pattern dan pendekatan one-liner
+    return DependencyInstallerInitializer().initialize(config, env)
+
+# Alias fungsi yang sudah ada untuk konsistensi API dengan pendekatan one-liner
+get_config_manager, get_environment_manager = _get_config_manager, _get_environment_manager

@@ -20,7 +20,9 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         progress_components = create_progress_tracking_container()
         
         # Status panel dengan model-specific message
+        # Hanya mendukung model: yolov5s, efficient_basic, efficient_optimized, efficient_advanced
         model_type = config.get('model', {}).get('type', 'efficient_basic')
+        # Hanya mendukung backbone: efficientnet_b4, cspdarknet_s
         backbone = config.get('model', {}).get('backbone', 'efficientnet_b4')
         status_message = f"🧠 {backbone.upper()} ({model_type}) siap untuk training"
         status_panel = create_status_panel(status_message, "info")
@@ -57,6 +59,7 @@ def _create_enhanced_control_buttons(config: Dict[str, Any]) -> Dict[str, Any]:
     from smartcash.ui.components.action_buttons import create_action_buttons
     
     # Ambil info dari YAML config untuk button labels
+    # Hanya mendukung model: yolov5s, efficient_basic, efficient_optimized, efficient_advanced
     model_type = config.get('model', {}).get('type', 'efficient_basic')
     epochs = config.get('epochs', 100)
     
@@ -112,8 +115,8 @@ def _create_yaml_config_tabs(config: Dict[str, Any]) -> widgets.Tab:
             <h5 style="margin: 0; color: #1976d2;">🧠 Model Configuration</h5>
         </div>
         <ul style="font-size: 13px; margin: 5px 0; padding-left: 20px;">
-            <li><b>Type:</b> <span style="color: #1976d2;">{model_config.get('type', 'efficient_basic')}</span></li>
-            <li><b>Backbone:</b> <span style="color: #1976d2;">{model_config.get('backbone', 'efficientnet_b4')}</span></li>
+            <li><b>Type:</b> <span style="color: #1976d2;">{model_config.get('type', 'efficient_basic')} (Didukung: yolov5s, efficient_basic, efficient_optimized, efficient_advanced)</span></li>
+            <li><b>Backbone:</b> <span style="color: #1976d2;">{model_config.get('backbone', 'efficientnet_b4')} (Didukung: efficientnet_b4, cspdarknet_s)</span></li>
             <li><b>Pretrained:</b> <span style="color: {'#2e7d32' if model_config.get('backbone_pretrained', True) else '#d32f2f'};">{'✅' if model_config.get('backbone_pretrained', True) else '❌'}</span></li>
             <li><b>Confidence:</b> <span style="color: #1976d2;">{model_config.get('confidence', 0.25)}</span></li>
             <li><b>IoU Threshold:</b> <span style="color: #1976d2;">{model_config.get('iou_threshold', 0.45)}</span></li>

@@ -33,16 +33,11 @@ LAYER_CONFIG = {
 }
 
 # Daftar variasi model EfficientNet yang didukung
-SUPPORTED_EFFICIENTNET_MODELS = ['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5']
+SUPPORTED_EFFICIENTNET_MODELS = ['efficientnet_b4']
 
 # Definisi channel output untuk setiap stage EfficientNet
 EFFICIENTNET_CHANNELS = {
-    'efficientnet_b0': [24, 48, 208],  # P3, P4, P5 stages
-    'efficientnet_b1': [32, 88, 320],
-    'efficientnet_b2': [32, 112, 352], 
-    'efficientnet_b3': [40, 112, 384],
     'efficientnet_b4': [56, 160, 448],
-    'efficientnet_b5': [64, 176, 512],
 }
 
 # Output channels standar yang digunakan YOLOv5 untuk feature maps
@@ -58,59 +53,11 @@ YOLOV5_CONFIG = {
         'feature_indices': [4, 6, 9],  # P3, P4, P5 layers
         'expected_channels': [128, 256, 512],
         'expected_shapes': [(80, 80), (40, 40), (20, 20)],  # untuk input 640x640
-    },
-    'yolov5m': {
-        'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5m.pt',
-        'feature_indices': [4, 6, 9],
-        'expected_channels': [192, 384, 768],
-        'expected_shapes': [(80, 80), (40, 40), (20, 20)],
-    },
-    'yolov5l': {
-        'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5l.pt',
-        'feature_indices': [4, 6, 9],
-        'expected_channels': [256, 512, 1024],
-        'expected_shapes': [(80, 80), (40, 40), (20, 20)],
     }
 }
 
 # Enum untuk backbone yang didukung
 SUPPORTED_BACKBONES = {
-    'efficientnet_b0': {
-        'type': 'efficientnet', 
-        'variant': 'efficientnet_b0',
-        'stride': 32,
-        'width_coefficient': 1.0,
-        'depth_coefficient': 1.0,
-        'features': 1280,
-        'stages': [24, 40, 112, 1280]
-    },
-    'efficientnet_b1': {
-        'type': 'efficientnet', 
-        'variant': 'efficientnet_b1',
-        'stride': 32,
-        'width_coefficient': 1.0,
-        'depth_coefficient': 1.1,
-        'features': 1280,
-        'stages': [24, 40, 112, 1280]
-    },
-    'efficientnet_b2': {
-        'type': 'efficientnet', 
-        'variant': 'efficientnet_b2',
-        'stride': 32,
-        'width_coefficient': 1.1,
-        'depth_coefficient': 1.2,
-        'features': 1408,
-        'stages': [24, 48, 120, 1408]
-    },
-    'efficientnet_b3': {
-        'type': 'efficientnet', 
-        'variant': 'efficientnet_b3',
-        'stride': 32,
-        'width_coefficient': 1.2,
-        'depth_coefficient': 1.4,
-        'features': 1536,
-        'stages': [32, 48, 136, 1536]
-    },
     'efficientnet_b4': {
         'type': 'efficientnet', 
         'variant': 'efficientnet_b4',
@@ -120,15 +67,6 @@ SUPPORTED_BACKBONES = {
         'features': 1792,
         'stages': [32, 56, 160, 1792]
     },
-    'efficientnet_b5': {
-        'type': 'efficientnet', 
-        'variant': 'efficientnet_b5',
-        'stride': 32,
-        'width_coefficient': 1.6,
-        'depth_coefficient': 2.2,
-        'features': 2048,
-        'stages': [40, 64, 176, 2048]
-    },
     'cspdarknet_s': {
         'type': 'cspdarknet', 
         'variant': 'yolov5s',
@@ -137,33 +75,6 @@ SUPPORTED_BACKBONES = {
         'depth_coefficient': 1.0,
         'features': 1024,
         'stages': [64, 128, 256, 1024]
-    },
-    'cspdarknet_m': {
-        'type': 'cspdarknet', 
-        'variant': 'yolov5m',
-        'stride': 32,
-        'width_coefficient': 1.0,
-        'depth_coefficient': 1.0,
-        'features': 1024,
-        'stages': [96, 192, 384, 1024]
-    },
-    'cspdarknet_l': {
-        'type': 'cspdarknet', 
-        'variant': 'yolov5l',
-        'stride': 32,
-        'width_coefficient': 1.0,
-        'depth_coefficient': 1.0,
-        'features': 1024,
-        'stages': [128, 256, 512, 1024]
-    },
-    'cspdarknet_x': {
-        'type': 'cspdarknet', 
-        'variant': 'yolov5l', # Menggunakan yolov5l karena yolov5x tidak didukung
-        'stride': 32,
-        'width_coefficient': 1.0,
-        'depth_coefficient': 1.0,
-        'features': 1024,
-        'stages': [160, 320, 640, 1024]
     }
 }
 

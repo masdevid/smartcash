@@ -14,7 +14,7 @@ from smartcash.ui.setup.dependency_installer.utils.package_utils import (
 )
 from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import (
     create_operation_context, ProgressSteps, update_package_status_by_name,
-    update_status_panel
+    update_status_panel, log_message_safe
 )
 from smartcash.ui.setup.dependency_installer.utils.report_generator_utils import (
     generate_comprehensive_status_report, generate_system_compatibility_report
@@ -40,13 +40,13 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
     try:
         # Step 1: Initialize check
         ctx.stepped_progress('STATUS_INIT', "Memulai status check...")
-        ctx.logger_bridge['info']("🔍 Memulai comprehensive status check")
+        log_message_safe(ui_components, "🔍 Memulai comprehensive status check", "info")
         
         # Step 2: Get system information
         ctx.stepped_progress('STATUS_SYSTEM_INFO', "Mengumpulkan informasi sistem...")
         system_info = get_comprehensive_system_info()
         system_requirements = check_system_requirements()
-        ctx.logger_bridge['info']("💻 System information collected")
+        log_message_safe(ui_components, "💻 System information collected", "info")
         
         # Step 3: Get comprehensive package status
         ctx.stepped_progress('STATUS_PACKAGE_CHECK', "Checking package status...")
@@ -65,13 +65,13 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
         installed_packages = sum(1 for status in package_status.values() if status['installed'])
         
         summary_msg = f"📊 Status Check: {installed_packages}/{total_packages} packages terinstall"
-        ctx.logger_bridge['success'](f"✅ {summary_msg}")
+        log_message_safe(ui_components, f"✅ {summary_msg}", "success")
         update_status_panel(ui_components, summary_msg, "success")
         
         ctx.stepped_progress('STATUS_COMPLETE', "Status check selesai")
         
     except Exception as e:
-        ctx.logger_bridge['error'](f"💥 Status check failed: {str(e)}")
+        log_message_safe(ui_components, f"💥 Status check failed: {str(e)}", "error")
         raise
 
 def _get_comprehensive_package_status_with_utils(ctx) -> Dict[str, Dict[str, Any]]:
@@ -84,7 +84,7 @@ def _get_comprehensive_package_status_with_utils(ctx) -> Dict[str, Dict[str, Any
     installed_packages = get_installed_packages_dict()
     
     for category in package_categories:
-        ctx.logger_bridge['info'](f"🔍 Checking {category['name']} category...")
+        log_message_safe(ui_components, f"🔍 Checking {category['name']} category...", "info")
         
         for package in category['packages']:
             package_key = package['key']
@@ -179,17 +179,17 @@ def _log_status_summary_with_utils(package_status: Dict[str, Dict[str, Any]],
     # Log category summaries
     for category, stats in category_summary.items():
         coverage = (stats['installed'] / stats['total'] * 100) if stats['total'] > 0 else 0
-        ctx.logger_bridge['info'](f"📋 {category}: {stats['installed']}/{stats['total']} ({coverage:.1f}%)")
+        log_message_safe(ui_components, f"📋 {category}: {stats['installed']}/{stats['total']} ({coverage:.1f}%)", "info")
     
     # Log system requirements
     if not system_requirements.get('all_requirements_met', True):
-        ctx.logger_bridge['warning']("⚠️ Some system requirements not met")
+        log_message_safe(ui_components, "⚠️ Some system requirements not met", "warning")
         if not system_requirements.get('python_version_ok'):
-            ctx.logger_bridge['warning']("   • Python version < 3.7")
+            log_message_safe(ui_components, "   • Python version < 3.7", "warning")
         if not system_requirements.get('memory_sufficient'):
-            ctx.logger_bridge['warning']("   • Memory < 2GB")
+            log_message_safe(ui_components, "   • Memory < 2GB", "warning")
         if not system_requirements.get('platform_supported'):
-            ctx.logger_bridge['warning']("   • Platform not officially supported")
+            log_message_safe(ui_components, "   • Platform not officially supported", "warning")
 
 def _update_ui_status_from_check_with_utils(ui_components: Dict[str, Any], package_status: Dict[str, Dict[str, Any]]):
     """Update UI package status menggunakan batch utils"""

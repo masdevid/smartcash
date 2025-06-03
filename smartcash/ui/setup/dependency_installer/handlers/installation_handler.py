@@ -12,7 +12,7 @@ from smartcash.ui.setup.dependency_installer.utils.package_utils import (
 )
 from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import (
     create_operation_context, ProgressSteps, update_package_status_by_name,
-    batch_update_package_status, update_status_panel
+    batch_update_package_status, update_status_panel, log_message_safe
 )
 from smartcash.ui.setup.dependency_installer.utils.report_generator_utils import (
     generate_installation_summary_report
@@ -38,7 +38,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
     try:
         # Step 1: Get selected packages
         ctx.stepped_progress('INSTALL_INIT', "Mempersiapkan instalasi...")
-        ctx.logger_bridge['info']("🚀 Memulai proses instalasi packages")
+        log_message_safe(ui_components, "🚀 Memulai proses instalasi packages", "info")
         
         selected_packages = get_selected_packages(ui_components)
         if not selected_packages:
@@ -47,16 +47,21 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Step 2: Filter uninstalled packages
         ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
-        packages_to_install = filter_uninstalled_packages(selected_packages, ctx.logger_bridge['info'])
+        
+        # Use log_message_safe for logger dalam filter function
+        def safe_logger_func(msg):
+            log_message_safe(ui_components, msg, "info")
+        
+        packages_to_install = filter_uninstalled_packages(selected_packages, safe_logger_func)
         
         if not packages_to_install:
-            ctx.logger_bridge['success']("✅ Semua packages sudah terinstall dengan benar")
+            log_message_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar", "success")
             update_status_panel(ui_components, "✅ Semua packages sudah terinstall", "success")
             return
         
         # Step 3: Install packages dengan parallel processing
         ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
-        ctx.logger_bridge['info'](f"📦 Installing {len(packages_to_install)} packages")
+        log_message_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages", "info")
         
         installation_results = _install_packages_parallel_with_utils(
             packages_to_install, ui_components, config, ctx
@@ -72,7 +77,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         ctx.stepped_progress('INSTALL_FINALIZE', "Instalasi selesai", "overall")
         
     except Exception as e:
-        ctx.logger_bridge['error'](f"💥 Installation failed: {str(e)}")
+        log_message_safe(ui_components, f"💥 Installation failed: {str(e)}", "error")
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
@@ -102,7 +107,7 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         
         # Log progress
         status_emoji = "✅" if success else "❌"
-        ctx.logger_bridge['info'](f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})")
+        log_message_safe(ui_components, f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})", "info")
     
     # Parallel installation
     max_workers = min(len(packages), config.get('installation', {}).get('parallel_workers', 3))
@@ -124,14 +129,14 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
                     results[package] = success
                     update_installation_progress(package, success)
                 except Exception as e:
-                    ctx.logger_bridge['error'](f"💥 Error installing {package}: {str(e)}")
+                    log_message_safe(ui_components, f"💥 Error installing {package}: {str(e)}", "error")
                     results[package] = False
                     update_installation_progress(package, False)
         
         return results
         
     except Exception as e:
-        ctx.logger_bridge['error'](f"💥 Installation process failed: {str(e)}")
+        log_message_safe(ui_components, f"💥 Installation process failed: {str(e)}", "error")
         return {package: False for package in packages}
 
 def _finalize_installation_results(ui_components: Dict[str, Any], installation_results: Dict[str, bool], 
@@ -152,12 +157,12 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     # Update status panel
     if success_count == total_count:
         status_msg = f"✅ Instalasi berhasil: {success_count}/{total_count} packages"
-        ctx.logger_bridge['success'](f"🎉 Instalasi selesai: {success_count}/{total_count} packages berhasil")
+        log_message_safe(ui_components, f"🎉 Instalasi selesai: {success_count}/{total_count} packages berhasil", "success")
         update_status_panel(ui_components, status_msg, "success")
     else:
         failed_count = total_count - success_count
         status_msg = f"⚠️ Instalasi selesai: {success_count}/{total_count} berhasil, {failed_count} gagal"
-        ctx.logger_bridge['warning'](f"⚠️ Instalasi selesai dengan {failed_count} packages gagal")
+        log_message_safe(ui_components, f"⚠️ Instalasi selesai dengan {failed_count} packages gagal", "warning")
         update_status_panel(ui_components, status_msg, "warning")
     
     # Update package status berdasarkan results

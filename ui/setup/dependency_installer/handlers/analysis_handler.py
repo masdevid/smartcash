@@ -11,7 +11,7 @@ from smartcash.ui.setup.dependency_installer.utils.package_utils import (
 )
 from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import (
     create_operation_context, ProgressSteps, update_package_status_by_name,
-    update_status_panel
+    update_status_panel, log_message_safe
 )
 from smartcash.ui.setup.dependency_installer.utils.report_generator_utils import (
     generate_analysis_summary_report
@@ -41,17 +41,20 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
     try:
         # Step 1: Initialize analysis
         ctx.stepped_progress('ANALYSIS_INIT', "Memulai analisis...")
-        ctx.logger_bridge['info']("🔍 Memulai analisis packages terinstall")
+        log_message_safe(ui_components, "🔍 Memulai analisis packages terinstall", "info")
         
         # Step 2: Get installed packages
         ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "Mendapatkan daftar packages...")
         installed_packages = get_installed_packages_dict()
-        ctx.logger_bridge['info'](f"📦 Found {len(installed_packages)} installed packages")
+        log_message_safe(ui_components, f"📦 Found {len(installed_packages)} installed packages", "info")
         
-        # Step 3: Get package categories
+        # Step 3: Get package categories dan reset status ke checking
         ctx.stepped_progress('ANALYSIS_CATEGORIES', "Menganalisis categories...")
         package_categories = get_package_categories()
         total_packages = sum(len(category['packages']) for category in package_categories)
+        
+        # Reset semua package status ke checking sebelum analysis
+        _reset_all_package_status_to_checking(ui_components, package_categories)
         
         # Step 4: Analyze packages status
         ctx.stepped_progress('ANALYSIS_CHECK', "Checking package status...")
@@ -66,7 +69,7 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai")
         
     except Exception as e:
-        ctx.logger_bridge['error'](f"💥 Analysis failed: {str(e)}")
+        log_message_safe(ui_components, f"💥 Analysis failed: {str(e)}", "error")
         raise
 
 def _analyze_packages_with_utils(package_categories: list, installed_packages: Dict[str, str], 
@@ -124,17 +127,29 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
         elif status_info['status'] == 'upgrade':
             analysis_results['upgrade_needed'].append(package_key)
         
-        # Update UI status immediately
+        # Update UI status immediately dengan proper logging dan debug
         ui_status = _map_status_to_ui(status_info['status'])
         update_package_status(ui_components, package_key, ui_status)
         
-        ctx.logger_bridge['debug'](f"📋 {package['name']}: {status_info['status']}")
+        # Debug logging untuk troubleshooting
+        log_message_safe(ui_components, f"📋 {package['name']}: {status_info['status']} -> UI: {ui_status}", "debug")
     
     return analysis_results
 
+def _reset_all_package_status_to_checking(ui_components: Dict[str, Any], package_categories: list):
+    """Reset semua package status ke checking sebelum analysis"""
+    for category in package_categories:
+        for package in category['packages']:
+            update_package_status(ui_components, package['key'], 'checking')
+
 def _map_status_to_ui(status: str) -> str:
-    """Map analysis status ke UI status - one-liner mapping"""
-    return {'installed': 'installed', 'missing': 'missing', 'upgrade': 'upgrade'}.get(status, 'checking')
+    """Map analysis status ke UI status - one-liner mapping dengan better mapping"""
+    return {
+        'installed': 'installed', 
+        'missing': 'missing', 
+        'upgrade': 'upgrade',
+        'error': 'error'
+    }.get(status, 'checking')
 
 def _finalize_analysis_results(ui_components: Dict[str, Any], analysis_results: Dict[str, Any], ctx):
     """Finalize analysis results dengan comprehensive reporting"""
@@ -153,10 +168,10 @@ def _finalize_analysis_results(ui_components: Dict[str, Any], analysis_results: 
             display(HTML(report_html))
     
     # Log summary
-    ctx.logger_bridge['info'](f"📊 Analysis Summary:")
-    ctx.logger_bridge['info'](f"   ✅ Installed: {installed_count}/{total_count}")
-    ctx.logger_bridge['info'](f"   ❌ Missing: {missing_count}/{total_count}")
-    ctx.logger_bridge['info'](f"   ⚠️ Need Upgrade: {upgrade_count}/{total_count}")
+    log_message_safe(ui_components, f"📊 Analysis Summary:", "info")
+    log_message_safe(ui_components, f"   ✅ Installed: {installed_count}/{total_count}", "info")
+    log_message_safe(ui_components, f"   ❌ Missing: {missing_count}/{total_count}", "info")
+    log_message_safe(ui_components, f"   ⚠️ Need Upgrade: {upgrade_count}/{total_count}", "info")
     
     # Update status panel
     if missing_count == 0 and upgrade_count == 0:

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer/components/package_selector.py
-Deskripsi: Package selector grid component dengan kategori packages
+Deskripsi: Package selector grid dengan improved spacing dan justify alignment
 """
 
 import ipywidgets as widgets
@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import COLORS, ICONS
 
 def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create package selector grid dengan kategori"""
+    """Create package selector grid dengan improved spacing dan justify alignment"""
     
     # Package categories dan definitions
     package_categories = get_package_categories()
@@ -16,13 +16,13 @@ def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dic
     checkboxes = {}
     category_widgets = []
     
-    # Create category boxes
+    # Create category boxes dengan improved spacing
     for category in package_categories:
-        category_widget, category_checkboxes = _create_category_widget(category)
+        category_widget, category_checkboxes = _create_category_widget_improved(category)
         category_widgets.append(category_widget)
         checkboxes.update(category_checkboxes)
     
-    # Grid container dengan responsive layout
+    # Grid container dengan responsive layout dan better spacing
     grid_container = widgets.HBox(
         category_widgets,
         layout=widgets.Layout(
@@ -31,8 +31,11 @@ def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dic
             justify_content='space-between',
             align_items='stretch',
             width='100%',
-            margin='10px 0',
-            overflow='hidden'
+            margin='15px 0',
+            padding='0 5px',
+            gap='15px',  # CSS gap untuk better spacing
+            overflow='hidden',
+            box_sizing='border-box'
         )
     )
     
@@ -43,50 +46,71 @@ def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dic
         'category_widgets': category_widgets
     }
 
-def _create_category_widget(category: Dict[str, Any]) -> tuple[widgets.VBox, Dict[str, Any]]:
-    """Create single category widget dengan packages"""
+def _create_category_widget_improved(category: Dict[str, Any]) -> tuple[widgets.VBox, Dict[str, Any]]:
+    """Create single category widget dengan improved spacing dan justify alignment"""
     
-    # Header kategori
+    # Header kategori dengan better styling
     header = widgets.HTML(f"""
-    <div style="padding:8px 0; border-bottom:1px solid {COLORS.get('border', '#ddd')}; margin-bottom:8px; text-align:center;">
-        <h4 style="margin:0; color:{COLORS.get('primary', '#007bff')}">{category['icon']} {category['name']}</h4>
-        <small style="color:{COLORS.get('muted', '#666')}">{category['description']}</small>
+    <div style="padding: 12px 8px; border-bottom: 2px solid {COLORS.get('primary', '#007bff')}; 
+                margin-bottom: 12px; text-align: center; background: linear-gradient(45deg, {COLORS.get('light', '#f8f9fa')}, #ffffff);">
+        <h4 style="margin: 0 0 4px 0; color: {COLORS.get('primary', '#007bff')}; font-size: 15px; font-weight: 600;">
+            {category['icon']} {category['name']}
+        </h4>
+        <small style="color: {COLORS.get('muted', '#666')}; font-size: 11px; line-height: 1.3;">
+            {category['description']}
+        </small>
     </div>
     """)
     
-    # Package checkboxes dan status widgets
+    # Package checkboxes dan status widgets dengan improved layout
     package_widgets = []
     category_checkboxes = {}
     
     for package in category['packages']:
         package_key = package['key']
         
-        # Status widget untuk setiap package
+        # Status widget untuk setiap package dengan better styling
         status_widget = widgets.HTML(
-            f"<span style='color:{COLORS.get('info', '#17a2b8')};font-size:11px;'>🔍 Checking...</span>",
-            layout=widgets.Layout(width='90px', margin='0')
+            f"""<span style='color: {COLORS.get('info', '#17a2b8')}; font-size: 11px; 
+                        padding: 2px 6px; background: #f8f9fa; border-radius: 3px; 
+                        border: 1px solid #e9ecef; white-space: nowrap;'>
+                🔍 Checking...
+                </span>""",
+            layout=widgets.Layout(width='110px', margin='0', flex='0 0 auto')
         )
         
-        # Checkbox untuk package
+        # Checkbox untuk package dengan improved styling
         checkbox = widgets.Checkbox(
             description=package['name'],
             value=package.get('default', True),
-            tooltip=package.get('description', ''),
-            layout=widgets.Layout(width='calc(100% - 80px)', margin='2px 0')
+            tooltip=f"{package.get('description', '')} | {package.get('pip_name', '')}",
+            layout=widgets.Layout(
+                width='auto', 
+                margin='0', 
+                flex='1 1 auto',
+                max_width='calc(100% - 120px)'
+            ),
+            style={'description_width': 'initial'}
         )
         
-        # Row container
+        # Row container dengan justify space-between dan proper alignment
         row = widgets.HBox(
             [checkbox, status_widget], 
             layout=widgets.Layout(
-                width='90%',
+                width='100%',
                 justify_content='space-between',
                 align_items='center',
-                margin='3px 0',
-                padding='0',
-                overflow='hidden'
+                margin='6px 0',
+                padding='4px 6px',
+                border_radius='4px',
+                background_color='transparent',
+                overflow='hidden',
+                box_sizing='border-box'
             )
         )
+        
+        # Add hover effect dengan CSS-like styling
+        row.add_class('package-row')
         
         package_widgets.append(row)
         
@@ -94,16 +118,18 @@ def _create_category_widget(category: Dict[str, Any]) -> tuple[widgets.VBox, Dic
         category_checkboxes[package_key] = checkbox
         category_checkboxes[f"{package_key}_status"] = status_widget
     
-    # Category container
+    # Category container dengan improved styling
     category_container = widgets.VBox(
         [header] + package_widgets, 
         layout=widgets.Layout(
             width='32%',
             max_width='32%',
+            min_height='300px',
             margin='0',
-            padding='10px',
+            padding='12px',
             border=f'1px solid {COLORS.get("border", "#ddd")}',
-            border_radius='6px',
+            border_radius='8px',
+            background_color='#fafbfc',
             overflow='hidden',
             box_sizing='border-box',
             flex_grow='1',
@@ -115,7 +141,7 @@ def _create_category_widget(category: Dict[str, Any]) -> tuple[widgets.VBox, Dic
     return category_container, category_checkboxes
 
 def get_package_categories() -> list[Dict[str, Any]]:
-    """Get package categories dengan definisi packages"""
+    """Get package categories dengan updated descriptions"""
     return [
         {
             'name': 'Core Requirements',
@@ -125,7 +151,7 @@ def get_package_categories() -> list[Dict[str, Any]]:
                 {
                     'key': 'smartcash_core',
                     'name': 'SmartCash Core',
-                    'description': 'Core utilities dan helpers',
+                    'description': 'Core utilities dan helpers untuk UI',
                     'pip_name': 'ipywidgets>=7.6.0',
                     'default': True
                 },
@@ -142,6 +168,13 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'description': 'Path handling dan file operations',
                     'pip_name': 'pathlib2>=2.3.0',
                     'default': True
+                },
+                {
+                    'key': 'yaml_parser',
+                    'name': 'YAML Parser',
+                    'description': 'Configuration file parsing',
+                    'pip_name': 'pyyaml>=5.4.0',
+                    'default': True
                 }
             ]
         },
@@ -153,7 +186,7 @@ def get_package_categories() -> list[Dict[str, Any]]:
                 {
                     'key': 'pytorch',
                     'name': 'PyTorch',
-                    'description': 'Deep learning framework',
+                    'description': 'Deep learning framework utama',
                     'pip_name': 'torch>=1.9.0',
                     'default': True
                 },
@@ -174,7 +207,7 @@ def get_package_categories() -> list[Dict[str, Any]]:
                 {
                     'key': 'ultralytics',
                     'name': 'Ultralytics',
-                    'description': 'YOLO implementation',
+                    'description': 'YOLO implementation terbaru',
                     'pip_name': 'ultralytics>=8.0.0',
                     'default': False
                 }
@@ -195,7 +228,7 @@ def get_package_categories() -> list[Dict[str, Any]]:
                 {
                     'key': 'numpy',
                     'name': 'NumPy',
-                    'description': 'Numerical computing',
+                    'description': 'Numerical computing foundation',
                     'pip_name': 'numpy>=1.21.0',
                     'default': True
                 },
@@ -209,7 +242,7 @@ def get_package_categories() -> list[Dict[str, Any]]:
                 {
                     'key': 'pillow',
                     'name': 'Pillow',
-                    'description': 'Image processing library',
+                    'description': 'Python Imaging Library',
                     'pip_name': 'Pillow>=8.0.0',
                     'default': True
                 },
@@ -225,26 +258,71 @@ def get_package_categories() -> list[Dict[str, Any]]:
     ]
 
 def update_package_status(ui_components: Dict[str, Any], package_key: str, status: str, message: str = None):
-    """Update status widget untuk package tertentu"""
+    """Update status widget untuk package dengan improved styling"""
     status_widget_key = f"{package_key}_status"
     
     if status_widget_key in ui_components:
         status_widget = ui_components[status_widget_key]
         
-        # Status icons dan colors
+        # Status icons dan colors dengan improved styling
         status_config = {
-            'checking': {'icon': '🔍', 'color': COLORS.get('info', '#17a2b8'), 'text': 'Checking...'},
-            'installed': {'icon': '✅', 'color': COLORS.get('success', '#28a745'), 'text': 'Terinstall'},
-            'missing': {'icon': '❌', 'color': COLORS.get('danger', '#dc3545'), 'text': 'Tidak terinstall'},
-            'upgrade': {'icon': '⚠️', 'color': COLORS.get('warning', '#ffc107'), 'text': 'Perlu update'},
-            'installing': {'icon': '⏳', 'color': COLORS.get('info', '#17a2b8'), 'text': 'Installing...'},
-            'error': {'icon': '💥', 'color': COLORS.get('danger', '#dc3545'), 'text': 'Error'}
+            'checking': {
+                'icon': '🔍', 
+                'color': COLORS.get('info', '#17a2b8'), 
+                'bg_color': '#e3f2fd',
+                'border_color': '#90caf9',
+                'text': 'Checking...'
+            },
+            'installed': {
+                'icon': '✅', 
+                'color': COLORS.get('success', '#28a745'), 
+                'bg_color': '#e8f5e9',
+                'border_color': '#81c784',
+                'text': 'Terinstall'
+            },
+            'missing': {
+                'icon': '❌', 
+                'color': COLORS.get('danger', '#dc3545'), 
+                'bg_color': '#ffebee',
+                'border_color': '#e57373',
+                'text': 'Tidak terinstall'
+            },
+            'upgrade': {
+                'icon': '⚠️', 
+                'color': COLORS.get('warning', '#ffc107'), 
+                'bg_color': '#fff8e1',
+                'border_color': '#ffb74d',
+                'text': 'Perlu update'
+            },
+            'installing': {
+                'icon': '⏳', 
+                'color': COLORS.get('info', '#17a2b8'), 
+                'bg_color': '#e1f5fe',
+                'border_color': '#4fc3f7',
+                'text': 'Installing...'
+            },
+            'error': {
+                'icon': '💥', 
+                'color': COLORS.get('danger', '#dc3545'), 
+                'bg_color': '#ffebee',
+                'border_color': '#f44336',
+                'text': 'Error'
+            }
         }
         
         config = status_config.get(status, status_config['checking'])
         display_text = message or config['text']
         
-        status_widget.value = f"<span style='color:{config['color']};font-size:11px;'>{config['icon']} {display_text}</span>"
+        # Improved status widget dengan better styling
+        status_widget.value = f"""
+        <span style='color: {config['color']}; font-size: 11px; font-weight: 500;
+                     padding: 3px 8px; background: {config['bg_color']}; 
+                     border-radius: 4px; border: 1px solid {config['border_color']}; 
+                     white-space: nowrap; display: inline-block; text-align: center;
+                     box-shadow: 0 1px 3px rgba(0,0,0,0.1);'>
+            {config['icon']} {display_text}
+        </span>
+        """
 
 def get_selected_packages(ui_components: Dict[str, Any]) -> list[str]:
     """Get list package yang dipilih untuk diinstall"""
@@ -280,7 +358,7 @@ def reset_package_selections(ui_components: Dict[str, Any]):
                 if checkbox:
                     checkbox.value = package.get('default', True)
             
-            # Reset status
+            # Reset status ke checking
             update_package_status(ui_components, package_key, 'checking')
     
     # Clear custom packages

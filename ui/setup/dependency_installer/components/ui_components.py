@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer/components/ui_components.py
-Deskripsi: UI components dependency installer yang terintegrasi tanpa duplikasi
+Deskripsi: UI components dependency installer dengan improved spacing dan justify alignment
 """
 
 import ipywidgets as widgets
@@ -17,7 +17,7 @@ from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from .package_selector import create_package_selector_grid
 
 def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create dependency installer UI dengan integrated components"""
+    """Create dependency installer UI dengan improved spacing dan alignment"""
     
     get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
     get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
@@ -31,64 +31,86 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
     # Status panel
     status_panel = create_status_panel("Pilih packages yang akan diinstall dan klik tombol install", "info")
     
-    # Package selector grid
+    # Package selector grid dengan improved spacing
     package_selector = create_package_selector_grid(config)
     
-    # Custom packages input
+    # Custom packages input dengan better styling
     custom_packages = widgets.Textarea(
-        placeholder='Package tambahan (satu per baris)',
-        layout=widgets.Layout(width='100%', height='80px', margin='5px 0')
+        placeholder='Package tambahan (satu per baris)\ncontoh: numpy>=1.21.0\nopencv-python>=4.5.0',
+        layout=widgets.Layout(
+            width='100%', 
+            height='90px', 
+            margin='8px 0',
+            border='1px solid #ddd',
+            border_radius='4px'
+        )
     )
     
     custom_section = widgets.VBox([
-        widgets.HTML(f"<h4 style='color: {get_color('dark', '#333')}; margin: 8px 0;'>{get_icon('edit', '📝')} Custom Packages</h4>"),
+        widgets.HTML(f"""
+        <h4 style='color: {get_color('dark', '#333')}; margin: 12px 0 8px 0; font-size: 15px;'>
+            {get_icon('edit', '📝')} Custom Packages
+        </h4>
+        """),
         custom_packages
-    ], layout=widgets.Layout(width='100%', margin='8px 0'))
+    ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
-    # Action buttons
+    # Action buttons dengan 3 buttons
     action_buttons = create_action_buttons(
         primary_label="Install Packages",
         primary_icon="download",
-        secondary_buttons=[("Analyze Packages", "search", "info"), ("Check Status", "check", "")],
-        cleanup_enabled=False,
+        secondary_buttons=[("Analyze Packages", "search", "info")],
+        cleanup_enabled=True,
         button_width='140px'
     )
     
-    # Auto-analyze checkbox untuk control
+    # Custom button untuk Check Packages (repurpose cleanup button)
+    if action_buttons.get('cleanup_button'):
+        action_buttons['cleanup_button'].description = "Check Packages"
+        action_buttons['cleanup_button'].tooltip = "Check comprehensive package status"
+        action_buttons['cleanup_button'].icon = 'search'
+        action_buttons['cleanup_button'].button_style = 'info'
+    
+    # Auto-analyze checkbox dengan better spacing
     auto_analyze_checkbox = widgets.Checkbox(
         value=True,
         description="Auto-analyze setelah render",
         tooltip="Otomatis analisis packages setelah UI dimuat",
-        layout=widgets.Layout(width='auto', margin='5px 0')
+        layout=widgets.Layout(width='auto', margin='8px 0'),
+        style={'description_width': 'initial'}
     )
     
-    # Save & reset buttons
+    # Save & reset buttons dengan improved layout
     save_reset_buttons = create_save_reset_buttons(
         save_label="Simpan", reset_label="Reset",
         save_tooltip="Simpan konfigurasi packages",
-        reset_tooltip="Reset pilihan ke default"
+        reset_tooltip="Reset pilihan ke default",
+        button_width='100px'
     )
     
-    # Log accordion
-    log_components = create_log_accordion(module_name='dependency', height='250px')
+    # Log accordion dengan better height
+    log_components = create_log_accordion(module_name='dependency', height='280px')
     
     # Progress tracking
     progress_components = create_progress_tracking_container()
     
-    # Help panel
+    # Help panel dengan improved content
     help_content = """
-    <div style="padding: 8px; background: #ffffff;">
-        <p style="margin: 6px 0; font-size: 13px;">Installer akan menganalisis dan menginstall packages yang dibutuhkan untuk SmartCash.</p>
-        <div style="margin: 8px 0;">
-            <strong style="color: #495057; font-size: 13px;">Kategori Package:</strong>
-            <ul style="margin: 4px 0; padding-left: 18px; color: #495057; font-size: 12px;">
-                <li><strong>Core Requirements:</strong> Package inti untuk SmartCash</li>
-                <li><strong>ML/AI Libraries:</strong> PyTorch, YOLO, computer vision</li>
-                <li><strong>Data Processing:</strong> Pandas, NumPy, image processing</li>
+    <div style="padding: 10px; background: #ffffff; line-height: 1.5;">
+        <p style="margin: 8px 0; font-size: 13px; color: #495057;">
+            Installer akan menganalisis dan menginstall packages yang dibutuhkan untuk SmartCash.
+        </p>
+        <div style="margin: 12px 0;">
+            <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Kategori Package:</strong>
+            <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
+                <li style="margin: 3px 0;"><strong>Core Requirements:</strong> Package inti untuk SmartCash (IPython, widgets)</li>
+                <li style="margin: 3px 0;"><strong>ML/AI Libraries:</strong> PyTorch, YOLO, computer vision frameworks</li>
+                <li style="margin: 3px 0;"><strong>Data Processing:</strong> Pandas, NumPy, OpenCV untuk manipulasi data</li>
             </ul>
         </div>
-        <div style="margin-top: 8px; padding: 6px; background: #e7f3ff; border-radius: 3px; font-size: 12px;">
-            <strong>💡 Tips:</strong> Package yang sudah terinstall akan dilewati secara otomatis.
+        <div style="margin-top: 12px; padding: 8px; background: #e7f3ff; border-radius: 4px; font-size: 12px; border-left: 3px solid #007bff;">
+            <strong>💡 Tips:</strong> Package yang sudah terinstall akan dilewati secara otomatis. 
+            Gunakan "Analyze Packages" untuk cek status terkini.
         </div>
     </div>
     """
@@ -97,43 +119,63 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
     help_panel.set_title(0, "💡 Info Installation")
     help_panel.selected_index = None
     
-    # Section headers
+    # Section headers dengan improved styling
     packages_header = widgets.HTML(f"""
-        <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 8px 0; font-size: 16px;'>
-            {get_icon('config', '⚙️')} Pilih Packages
-        </h4>
+    <h4 style='color: {get_color('dark', '#333')}; margin: 18px 0 12px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('primary', '#007bff')}; padding-bottom: 6px;'>
+        {get_icon('config', '⚙️')} Pilih Packages untuk Installation
+    </h4>
     """)
     
     action_header = widgets.HTML(f"""
-        <h4 style='color: {get_color('dark', '#333')}; margin: 12px 0 8px 0; font-size: 16px;'>
-            {get_icon('play', '▶️')} Installation Actions
-        </h4>
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Installation Actions
+    </h4>
     """)
     
-    # Main UI assembly
+    # Main UI assembly dengan improved spacing dan layout
     ui = widgets.VBox([
-        header, status_panel, packages_header, package_selector['container'],
-        custom_section, auto_analyze_checkbox, save_reset_buttons['container'],
-        create_divider(), action_header, action_buttons['container'],
-        progress_components['container'], log_components['log_accordion'], 
-        create_divider(), help_panel
-    ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
+        header, 
+        status_panel, 
+        packages_header, 
+        package_selector['container'],
+        custom_section, 
+        widgets.HBox([auto_analyze_checkbox], layout=widgets.Layout(justify_content='flex-start', margin='5px 0')),
+        save_reset_buttons['container'],
+        create_divider(margin="20px 0", color="#e0e0e0"), 
+        action_header, 
+        widgets.HBox([action_buttons['container']], layout=widgets.Layout(justify_content='center', margin='10px 0')),
+        progress_components['container'], 
+        log_components['log_accordion'], 
+        create_divider(margin="15px 0", color="#f0f0f0"), 
+        help_panel
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%',
+        padding='10px', 
+        margin='0',
+        overflow='hidden',
+        box_sizing='border-box'
+    ))
     
     # Compile components
     ui_components = {
         # Main UI
-        'ui': ui, 'header': header, 'status_panel': status_panel,
+        'ui': ui, 
+        'header': header, 
+        'status_panel': status_panel,
         
         # Package selector
         'package_selector': package_selector,
         'custom_packages': custom_packages,
         'auto_analyze_checkbox': auto_analyze_checkbox,
         
-        # Action buttons - mapping to expected names
+        # Action buttons - mapping to expected names dengan 3 buttons
         'action_buttons': action_buttons,
         'install_button': action_buttons['download_button'],
-        'analyze_button': action_buttons['check_button'],
-        'check_button': action_buttons.get('cleanup_button') or action_buttons['check_button'],
+        'analyze_button': action_buttons['check_button'],  # Analyze Packages button
+        'check_button': action_buttons.get('cleanup_button'),  # Check Packages button (cleanup button repurposed)
         
         # Save/reset buttons
         'save_reset_buttons': save_reset_buttons,

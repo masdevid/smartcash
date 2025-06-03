@@ -78,14 +78,30 @@ def _create_dynamic_header(config: Dict[str, Any]) -> widgets.HTML:
     """)
 
 def _create_config_section(form_components: Dict[str, Any]) -> widgets.VBox:
-    """Create config section dengan YAML integration"""
+    """Create config section dengan YAML integration dan tombol refresh di bawah tabs"""
+    from smartcash.ui.training.components.control_buttons import create_refresh_config_button
+    
     config_tabs = form_components.get('config_tabs')
     if not config_tabs:
         return None
-        
+    
+    # Buat refresh button
+    refresh_components = create_refresh_config_button()
+    refresh_button = refresh_components['refresh_button']
+    
+    # Styling untuk refresh button
+    refresh_container = widgets.HBox(
+        [widgets.HTML('<span style="font-size: 12px; color: #666;">Refresh dari YAML:</span>'), refresh_button],
+        layout=widgets.Layout(justify_content='flex-end', width='100%', margin='5px 0')
+    )
+    
+    # Simpan referensi refresh button untuk handler
+    form_components['refresh_button'] = refresh_button
+    
     return widgets.VBox([
         widgets.HTML("<h4 style='margin: 15px 0 10px 0; color: #333;'>ℹ️ YAML Configuration</h4>"),
-        config_tabs
+        config_tabs,
+        refresh_container
     ], layout=widgets.Layout(margin='10px 0'))
 
 def _create_control_section(form_components: Dict[str, Any]) -> widgets.VBox:

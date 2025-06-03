@@ -7,9 +7,8 @@ import ipywidgets as widgets
 from typing import Dict, Any, List, Tuple
 
 def create_config_tabs(config: Dict[str, Any]) -> widgets.Tab:
-    """Create tabbed configuration display dengan refresh button di kanan atas"""
+    """Create tabbed configuration display dengan konten dari YAML"""
     from smartcash.ui.components.tab_factory import create_tab_widget as create_tabs
-    from smartcash.ui.training.components.control_buttons import create_refresh_config_button
     
     # Extract config sections
     training_config = config.get('training', {})
@@ -17,16 +16,9 @@ def create_config_tabs(config: Dict[str, Any]) -> widgets.Tab:
     hyperparameters = config.get('hyperparameters', {})
     paths_config = config.get('paths', {})
     
-    # Create refresh button
-    refresh_components = create_refresh_config_button()
-    refresh_container = refresh_components['refresh_container']
-    
-    # Tab 1: Model Configuration dengan refresh button
+    # Tab 1: Model Configuration tanpa refresh button (sudah dipindahkan ke bawah tabs)
     model_html = f"""
-    <div style="padding: 10px; position: relative;">
-        <div style="position: absolute; top: 5px; right: 5px; z-index: 10;">
-            <!-- Refresh button container akan ditempatkan di sini -->
-        </div>
+    <div style="padding: 10px;">
         <h5 style="margin: 0 0 10px 0; color: #1976d2;">🧠 Model Configuration</h5>
         <ul style="margin: 5px 0; padding-left: 20px; font-size: 13px;">
             <li><b>Model Type:</b> <span style="color: #1976d2;">{model_config.get('model_type', training_config.get('model_type', 'efficient_optimized'))}</span></li>
@@ -75,27 +67,18 @@ def create_config_tabs(config: Dict[str, Any]) -> widgets.Tab:
     </div>
     """
     
-    # Create tabs dengan memastikan semua item adalah widget
-    # Model tab dengan refresh button embedded
-    model_widget = widgets.VBox([
-        refresh_container,
-        widgets.HTML(model_html)
-    ])
-    
+    # Create tabs dengan semua item sebagai widgets.HTML
     tabs = create_tabs([
-        ('Model', model_widget),
+        ('Model', widgets.HTML(model_html)),
         ('Hyperparameters', widgets.HTML(hyperparams_html)),
         ('Strategy', widgets.HTML(strategy_html)),
         ('Paths', widgets.HTML(paths_html))
     ])
     
-    # Store refresh button reference untuk handler
-    setattr(tabs, '_refresh_button', refresh_components['refresh_button'])
-    
     return tabs
 
 def update_config_tabs(tabs_widget: widgets.Tab, config: Dict[str, Any]) -> widgets.Tab:
-    """Update existing tabs dengan config baru"""
+    """Update existing tabs dengan config baru dari YAML"""
     # Buat tab baru dengan config yang diperbarui
     new_tabs = create_config_tabs(config)
     
@@ -109,15 +92,7 @@ def update_config_tabs(tabs_widget: widgets.Tab, config: Dict[str, Any]) -> widg
     for i in range(len(tabs_widget.children)):
         tabs_widget.set_title(i, new_tabs.titles[i])
     
-    # Copy refresh button reference
-    if hasattr(new_tabs, '_refresh_button'):
-        setattr(tabs_widget, '_refresh_button', new_tabs._refresh_button)
-    
     # Kembalikan selected index
     tabs_widget.selected_index = selected_index
     
     return tabs_widget
-
-def get_refresh_button_from_tabs(tabs_widget: widgets.Tab) -> widgets.Button:
-    """Get refresh button dari tabs widget"""
-    return getattr(tabs_widget, '_refresh_button', None)

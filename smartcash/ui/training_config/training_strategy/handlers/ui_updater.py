@@ -1,48 +1,43 @@
 """
 File: smartcash/ui/training_config/training_strategy/handlers/ui_updater.py
-Deskripsi: Update UI dari config dengan one-liner style yang DRY
+Deskripsi: Update UI dari config dengan one-liner style yang DRY sesuai struktur YAML
 """
 
 from typing import Dict, Any
 
 
 def update_training_strategy_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI components dari config dengan one-liner style"""
+    """Update UI components dari config dengan one-liner style sesuai struktur training_config.yaml"""
     
-    # One-liner safe setter
+    # One-liner safe setter untuk memastikan keamanan akses UI components
     set_val = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
     
     # Extract nested configs dengan fallbacks
     validation = config.get('validation', {})
-    multi_scale = config.get('multi_scale', {})
+    multi_scale = config.get('multi_scale', True)  # Multi-scale adalah boolean di YAML
     training_utils = config.get('training_utils', {})
     
-    # Update komponen validation UI
-    set_val('validation_enabled_checkbox', validation.get('enabled', True))
+    # Update komponen validation UI dengan field yang sesuai YAML
     set_val('validation_frequency_slider', validation.get('frequency', 1))
-    set_val('iou_threshold_slider', validation.get('iou_threshold', 0.6))
-    set_val('conf_threshold_slider', validation.get('conf_threshold', 0.001))
-    set_val('max_detections_slider', validation.get('max_detections', 300))
-    set_val('save_val_results_checkbox', validation.get('save_val_results', True))
-    set_val('val_results_dir_text', validation.get('val_results_dir', '/content/runs/val/results'))
-    set_val('visualize_val_results_checkbox', validation.get('visualize_val_results', True))
+    set_val('iou_threshold_slider', validation.get('iou_thres', 0.6))  # Field name dari YAML
+    set_val('conf_threshold_slider', validation.get('conf_thres', 0.001))  # Field name dari YAML
     
-    # Update komponen multi-scale UI
-    set_val('multi_scale_checkbox', multi_scale.get('enabled', True))
-    set_val('min_scale_slider', multi_scale.get('min_scale', 0.5))
-    set_val('max_scale_slider', multi_scale.get('max_scale', 1.5))
-    set_val('multi_scale_frequency_slider', multi_scale.get('frequency', 10))
-    set_val('apply_to_val_checkbox', multi_scale.get('apply_to_val', False))
+    # Update komponen multi-scale UI (hanya boolean di YAML)
+    set_val('multi_scale_checkbox', multi_scale)  # Langsung gunakan nilai boolean
     
-    # Update komponen training utils UI
-    set_val('experiment_name_text', training_utils.get('experiment_name', 'efficientnet_b4_train'))
+    # Update komponen training utils UI sesuai field di YAML
+    set_val('experiment_name_text', training_utils.get('experiment_name', 'efficientnet_b4_training'))
     set_val('checkpoint_dir_text', training_utils.get('checkpoint_dir', '/content/runs/train/checkpoints'))
-    set_val('tensorboard_dir_text', training_utils.get('tensorboard_dir', '/content/runs/train/tensorboard'))
+    set_val('tensorboard_checkbox', training_utils.get('tensorboard', True))
     set_val('log_metrics_every_slider', training_utils.get('log_metrics_every', 10))
     set_val('visualize_batch_every_slider', training_utils.get('visualize_batch_every', 100))
-    set_val('device_dropdown', training_utils.get('device', 'cuda'))
-    set_val('num_workers_slider', training_utils.get('num_workers', 4))
-    set_val('mixed_precision_checkbox', training_utils.get('mixed_precision', True))
     set_val('gradient_clipping_slider', training_utils.get('gradient_clipping', 1.0))
-    set_val('sync_bn_checkbox', training_utils.get('sync_bn', False))
-    set_val('advanced_augmentation_checkbox', training_utils.get('advanced_augmentation', False))
+    set_val('mixed_precision_checkbox', training_utils.get('mixed_precision', True))
+    set_val('layer_mode_dropdown', training_utils.get('layer_mode', 'single'))
+    
+    # Logging untuk informasi
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import update_status_panel
+        update_status_panel(ui_components['status_panel'], f"📊 UI training strategy berhasil diperbarui", "info")
+    # Parameter lainnya sudah diatur di atas, tidak perlu diulang atau ditambahkan 
+    # yang tidak ada di struktur YAML

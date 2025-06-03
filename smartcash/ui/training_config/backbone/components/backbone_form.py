@@ -29,8 +29,13 @@ def create_backbone_form(config: Dict[str, Any]) -> Dict[str, Any]:
             style={'description_width': '120px'}
         ),
         'model_type_dropdown': widgets.Dropdown(
-            options=[('EfficientNet Basic', 'efficient_basic'), ('YOLOv5s', 'yolov5s')], 
-            value=model_config.get('model_type', 'efficient_basic'),
+            options=[
+                ('EfficientNet Basic', 'efficient_basic'), 
+                ('EfficientNet Optimized', 'efficient_optimized'),
+                ('EfficientNet Advanced', 'efficient_advanced'),
+                ('YOLOv5s', 'yolov5s')
+            ], 
+            value=model_config.get('model_type', 'efficient_optimized'),  # Default ke optimized
             description='Model Type:', 
             style={'description_width': '120px'}
         ),

@@ -125,25 +125,38 @@ def setup_training_button_handlers(ui_components: Dict[str, Any], config: Dict[s
             ui_components['logger'].error(f"❌ Error validasi model: {str(e)}")
     
     def handle_refresh_config(button):
-        """Handler untuk refresh konfigurasi dari semua modul"""
+        """Handler untuk refresh konfigurasi dari semua modul dari YAML files"""
         try:
-            # Reset log output
+            # Reset log output jika tersedia
             ui_components.get('log_output') and ui_components['log_output'].clear_output(wait=True)
             
-            ui_components['logger'].info("🔄 Refreshing configuration dari semua modul...")
+            ui_components['logger'].info("🔄 Memuat ulang konfigurasi dari file YAML...")
+            
+            # Force reload configurations dari file YAML asli
+            from smartcash.common.config.manager import get_config_manager
+            config_manager = get_config_manager()
+            config_manager.reload_all_configs(force_reload=True)  # Force reload dari disk
             
             # Trigger config update callback jika ada
             config_callback = ui_components.get('config_update_callback')
             if config_callback:
-                # Load fresh config
+                # Load fresh config dari YAML yang diperbarui
                 fresh_config = _load_all_configs()
                 config_callback(fresh_config)
-                ui_components['logger'].success("✅ Konfigurasi berhasil direfresh")
+                ui_components['logger'].success("✅ Konfigurasi berhasil diperbarui dari YAML files")
             else:
-                ui_components['logger'].warning("⚠️ Config callback tidak tersedia")
+                ui_components['logger'].warning("⚠️ Config update callback tidak tersedia")
+                
+            # Update status panel jika ada
+            if 'status_panel' in ui_components:
+                from smartcash.ui.utils.alert_utils import update_status_panel
+                update_status_panel(ui_components['status_panel'], f"📚 Konfigurasi berhasil dimuat dari YAML files", "success")
                 
         except Exception as e:
-            ui_components['logger'].error(f"❌ Error refresh config: {str(e)}")
+            ui_components['logger'].error(f"❌ Error saat refresh config dari YAML: {str(e)}")
+            if 'status_panel' in ui_components:
+                from smartcash.ui.utils.alert_utils import update_status_panel
+                update_status_panel(ui_components['status_panel'], f"⚠️ Error: {str(e)}", "error")
     
     # Register handlers dengan one-liner
     ui_components.get('start_button') and ui_components['start_button'].on_click(handle_start_training)
@@ -191,23 +204,32 @@ def _load_training_config() -> Dict[str, Any]:
         }
 
 def _load_all_configs() -> Dict[str, Any]:
-    """Load semua konfigurasi dari berbagai modul"""
+    """Load semua konfigurasi dari berbagai modul berdasarkan struktur YAML terbaru"""
     try:
         from smartcash.common.config.manager import get_config_manager
         config_manager = get_config_manager()
         
-        # Load all configs
+        # Load semua configs dari YAML sesuai struktur yang sudah dipisahkan
+        # Berdasarkan memory: hyperparameters_config.yaml, model_config.yaml, training_config.yaml
         configs = {
+            # Config utama
             'model': config_manager.get_config('model') or {},
-            'training': config_manager.get_config('training') or {},
             'hyperparameters': config_manager.get_config('hyperparameters') or {},
+            'training': config_manager.get_config('training') or {},
+            
+            # Modul-modul spesifik dari training_config.yaml
+            'training_strategy': config_manager.get_config('training_strategy') or {},
+            
+            # Config lainnya
             'backbone': config_manager.get_config('backbone') or {},
             'detector': config_manager.get_config('detector') or {},
-            'training_strategy': config_manager.get_config('training_strategy') or {},
-            'paths': config_manager.get_config('paths') or {}
+            'paths': config_manager.get_config('paths') or {},
+            'augmentation': config_manager.get_config('augmentation') or {}
         }
         
         return configs
         
-    except Exception:
+    except Exception as e:
+        # Log error jika diperlukan untuk debugging
+        print(f"Error saat loading configs: {str(e)}")
         return {}

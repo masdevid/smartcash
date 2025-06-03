@@ -1,142 +1,151 @@
 """
 File: smartcash/ui/pretrained_model/utils/model_utils.py
-Deskripsi: Utilitas untuk mengelola model pretrained dengan metadata dan validasi
+Deskripsi: Reusable utilities untuk reduce duplication dalam model operations
 """
 
-import os
-import json
-import hashlib
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List, Tuple
+from smartcash.ui.pretrained_model.constants.model_constants import MODEL_CONFIGS, DEFAULT_MODELS_DIR, PROGRESS_STEPS
 
-class ModelManager:
-    """Kelas untuk mengelola model pretrained dengan metadata dan validasi."""
+class ModelUtils:
+    """Utility class untuk common model operations"""
     
-    def __init__(self, models_dir: str = '/content/models'):
-        """
-        Inisialisasi manager model pretrained.
-        
-        Args:
-            models_dir: Direktori untuk menyimpan model
-        """
-        self.models_dir = Path(models_dir)
-        self.models_dir.mkdir(exist_ok=True, parents=True)
-        self.metadata_file = self.models_dir / 'model_metadata.json'
-        self.metadata = self._load_metadata()
-        
-    def _load_metadata(self) -> Dict[str, Any]:
-        """Load metadata dari file JSON."""
-        if self.metadata_file.exists():
-            try:
-                with open(self.metadata_file, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                pass
-        return {}
+    @staticmethod
+    def get_model_config(model_name: str) -> Dict[str, Any]:
+        """Get model config dari constants - single source"""
+        return MODEL_CONFIGS.get(model_name, {})
     
-    def _save_metadata(self) -> bool:
-        """Simpan metadata ke file JSON."""
-        try:
-            with open(self.metadata_file, 'w') as f:
-                json.dump(self.metadata, f, indent=2)
-            return True
-        except Exception:
+    @staticmethod
+    def get_all_model_names() -> List[str]:
+        """Get semua model names - single source"""
+        return list(MODEL_CONFIGS.keys())
+    
+    @staticmethod
+    def validate_model_file(file_path: Path, model_name: str) -> bool:
+        """Validate model file existence dan size"""
+        if not file_path.exists():
             return False
+        
+        config = ModelUtils.get_model_config(model_name)
+        min_size = config.get('min_size_mb', 1) * 1024 * 1024
+        return file_path.stat().st_size >= min_size
     
-    def _calculate_hash(self, file_path: Path) -> str:
-        """Hitung hash SHA-256 dari file."""
-        sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
+    @staticmethod
+    def get_model_file_path(model_name: str, models_dir: str = None) -> Path:
+        """Get full path untuk model file"""
+        models_dir = models_dir or DEFAULT_MODELS_DIR
+        config = ModelUtils.get_model_config(model_name)
+        filename = config.get('filename', f'{model_name}.pt')
+        return Path(models_dir) / filename
     
-    def validate_model(self, model_path: Path, model_id: str) -> bool:
-        """
-        Validasi model berdasarkan hash yang tersimpan di metadata.
-        
-        Args:
-            model_path: Path ke file model
-            model_id: ID model dalam metadata
-            
-        Returns:
-            True jika model valid, False jika tidak
-        """
-        if not model_path.exists() or model_id not in self.metadata:
-            return False
-            
-        stored_hash = self.metadata.get(model_id, {}).get('hash')
-        if not stored_hash:
-            return False
-            
-        current_hash = self._calculate_hash(model_path)
-        return current_hash == stored_hash
+    @staticmethod
+    def format_file_size(size_bytes: int) -> str:
+        """Format file size dalam MB dengan 1 decimal"""
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
     
-    def update_model_metadata(self, model_path: Path, model_id: str, 
-                              version: str, source: str) -> Dict[str, Any]:
-        """
-        Update metadata untuk model yang baru diunduh.
-        
-        Args:
-            model_path: Path ke file model
-            model_id: ID unik untuk model
-            version: Versi model
-            source: Sumber model
-            
-        Returns:
-            Dict berisi metadata model yang diupdate
-        """
-        if not model_path.exists():
-            return {}
-            
-        model_hash = self._calculate_hash(model_path)
-        self.metadata[model_id] = {
-            'path': str(model_path),
-            'version': version,
-            'source': source,
-            'hash': model_hash,
-            'date_downloaded': str(model_path.stat().st_mtime),
-            'size_mb': round(model_path.stat().st_size / (1024 * 1024), 2)
-        }
-        self._save_metadata()
-        
-        return self.metadata[model_id]
+    @staticmethod
+    def get_progress_step(step_name: str) -> Tuple[int, str]:
+        """Get progress step dari constants"""
+        return PROGRESS_STEPS.get(step_name, (0, 'Unknown step'))
+
+class ProgressTracker:
+    """Utility untuk step-by-step progress tracking"""
     
-    def get_model_info(self, model_id: str) -> Dict[str, Any]:
-        """
-        Dapatkan informasi tentang model tertentu.
-        
-        Args:
-            model_id: ID model dalam metadata
-            
-        Returns:
-            Dict berisi informasi model
-        """
-        return self.metadata.get(model_id, {})
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+        self.current_step = 0
+        self.total_steps = 0
     
-    def get_all_models_info(self) -> Dict[str, Any]:
-        """
-        Dapatkan informasi semua model yang tersedia.
+    def start_process(self, process_name: str, total_steps: int = 7):
+        """Start process dengan initial progress"""
+        self.total_steps = total_steps
+        self.current_step = 0
+        self._update_progress('INIT', f"Memulai {process_name}")
+    
+    def next_step(self, step_name: str, custom_message: str = None):
+        """Move ke next step dengan progress update"""
+        self.current_step += 1
+        progress, message = ModelUtils.get_progress_step(step_name)
         
-        Returns:
-            Dict berisi informasi semua model
-        """
-        info = {
-            'models_dir': str(self.models_dir),
-            'models': {}
-        }
+        # Override message jika ada custom message
+        if custom_message:
+            message = custom_message
         
-        for model_id, metadata in self.metadata.items():
-            model_path = Path(metadata.get('path', ''))
-            if model_path.exists():
-                model_name = model_path.name
-                info['models'][model_name] = {
-                    'path': str(model_path),
-                    'size_mb': metadata.get('size_mb', 0),
-                    'version': metadata.get('version', ''),
-                    'source': metadata.get('source', ''),
-                    'date_downloaded': metadata.get('date_downloaded', ''),
-                    'is_valid': self.validate_model(model_path, model_id)
-                }
+        # Update progress dengan step info
+        final_message = f"Step {self.current_step}/{self.total_steps}: {message}"
+        self._update_progress_value(progress, final_message)
+    
+    def update_current_step(self, sub_progress: int, sub_message: str):
+        """Update progress dalam step yang sama"""
+        # Hitung progress berdasarkan current step + sub progress
+        base_progress = (self.current_step - 1) / self.total_steps * 100
+        step_progress = sub_progress / self.total_steps
+        total_progress = min(100, base_progress + step_progress)
         
-        return info
+        self._update_progress_value(int(total_progress), sub_message)
+    
+    def complete_process(self, message: str = "Proses selesai"):
+        """Complete process dengan 100% progress"""
+        self._update_progress('COMPLETE', message)
+        self.ui_components.get('complete_operation', lambda x: None)(message)
+    
+    def error_process(self, error_message: str):
+        """Handle process error"""
+        self.ui_components.get('error_operation', lambda x: None)(error_message)
+    
+    def _update_progress(self, step_name: str, message: str):
+        """Update progress menggunakan step constants"""
+        progress, _ = ModelUtils.get_progress_step(step_name)
+        self._update_progress_value(progress, message)
+    
+    def _update_progress_value(self, progress: int, message: str):
+        """Update progress dengan nilai dan message"""
+        self.ui_components.get('update_progress', lambda *a: None)('overall', progress, message)
+
+class StatusUpdater:
+    """Utility untuk consistent status panel updates"""
+    
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+    
+    def update(self, message: str, status_type: str = "info"):
+        """Update status panel dengan formatting konsisten"""
+        from smartcash.ui.components.status_panel import update_status_panel
+        if 'status_panel' in self.ui_components:
+            update_status_panel(self.ui_components['status_panel'], message, status_type)
+    
+    def success(self, message: str):
+        """Update dengan success status"""
+        self.update(message, "success")
+    
+    def error(self, message: str):
+        """Update dengan error status"""
+        self.update(message, "error")
+    
+    def info(self, message: str):
+        """Update dengan info status"""
+        self.update(message, "info")
+    
+    def warning(self, message: str):
+        """Update dengan warning status"""
+        self.update(message, "warning")
+
+class UILogger:
+    """Utility untuk UI logger operations"""
+    
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+    
+    def reset(self):
+        """Reset UI logger dan clear outputs"""
+        for key in ['log_output', 'status']:
+            widget = self.ui_components.get(key)
+            if widget and hasattr(widget, 'clear_output'):
+                widget.clear_output(wait=True)
+        self.ui_components.get('reset_all', lambda: None)()
+    
+    def log(self, message: str, level: str = "info"):
+        """Log message dengan level"""
+        logger = self.ui_components.get('logger')
+        if logger:
+            getattr(logger, level, logger.info)(message)

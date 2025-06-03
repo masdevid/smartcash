@@ -55,7 +55,7 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         custom_packages
     ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
-    # Action buttons dengan labels yang tepat
+    # Action buttons dengan labels yang tepat - force button descriptions
     action_buttons = create_action_buttons(
         primary_label="Install Packages",
         primary_icon="download", 
@@ -64,12 +64,30 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         button_width='140px'
     )
     
+    # Force update button labels (override component defaults)
+    action_buttons['download_button'].description = "Install Packages"
+    action_buttons['download_button'].tooltip = "Install packages yang dipilih"
+    action_buttons['download_button'].icon = 'download'
+    action_buttons['download_button'].button_style = 'primary'
+    
+    action_buttons['check_button'].description = "Check Status"  
+    action_buttons['check_button'].tooltip = "Analyze status packages yang dipilih"
+    action_buttons['check_button'].icon = 'search'
+    action_buttons['check_button'].button_style = 'info'
+    
     # Custom button untuk System Report (repurpose cleanup button)
     if action_buttons.get('cleanup_button'):
         action_buttons['cleanup_button'].description = "System Report"
         action_buttons['cleanup_button'].tooltip = "Generate comprehensive system and package report"
         action_buttons['cleanup_button'].icon = 'clipboard'
         action_buttons['cleanup_button'].button_style = ''
+    
+    # Debug: Verify button labels are set correctly
+    print(f"🔧 Button Labels Debug:")
+    print(f"   Install Button: {action_buttons['download_button'].description}")
+    print(f"   Check Button: {action_buttons['check_button'].description}")
+    if action_buttons.get('cleanup_button'):
+        print(f"   System Report Button: {action_buttons['cleanup_button'].description}")
     
     # Auto-analyze checkbox dengan better spacing
     auto_analyze_checkbox = widgets.Checkbox(

@@ -5,34 +5,80 @@ Deskripsi: Fixed action buttons dengan one-liner style dan preserved original st
 
 import ipywidgets as widgets
 from smartcash.ui.utils.constants import COLORS, ICONS
-
 def create_action_buttons(primary_label: str = "Download Dataset", primary_icon: str = "download", 
                          secondary_buttons: list = None, cleanup_enabled: bool = True,
                          button_width: str = '140px', container_width: str = '100%',
                          primary_style: str = '') -> dict:
-    """Create action buttons dengan one-liner style dan preserved original styling."""
+    """Create action buttons dengan flexible secondary button support"""
     secondary_buttons = secondary_buttons or [("Check Dataset", "search", "info")]
     
-    # One-liner button creation dengan preserved styling
-    download_button = widgets.Button(description=primary_label, button_style=primary_style, 
-                                   tooltip=f'Klik untuk {primary_label.lower()}', icon='download' if primary_icon == 'download' else '',
-                                   layout=widgets.Layout(width=button_width, height='35px'))
-    setattr(download_button, '_original_style', primary_style), setattr(download_button, '_original_description', primary_label)
+    # Primary button (biasanya download/install)
+    download_button = widgets.Button(
+        description=primary_label, 
+        button_style=primary_style or 'primary', 
+        tooltip=f'Klik untuk {primary_label.lower()}',
+        icon=primary_icon if primary_icon in ['download', 'save', 'search'] else '',
+        layout=widgets.Layout(width=button_width, height='35px')
+    )
+    setattr(download_button, '_original_style', primary_style or 'primary')
+    setattr(download_button, '_original_description', primary_label)
     
-    check_button = widgets.Button(description="Check Dataset", button_style='info', tooltip='Periksa status dataset yang sudah ada',
-                                icon='search', layout=widgets.Layout(width=button_width, height='35px'))
-    setattr(check_button, '_original_style', 'info'), setattr(check_button, '_original_description', "Check Dataset")
+    # Secondary button (dari parameter dengan flexible handling)
+    if secondary_buttons and len(secondary_buttons) > 0:
+        secondary_label, secondary_icon, secondary_style = secondary_buttons[0]
+    else:
+        secondary_label, secondary_icon, secondary_style = ("Check", "search", "info")
     
-    cleanup_button = (widgets.Button(description="Cleanup Dataset", button_style='warning', tooltip='Hapus dataset yang sudah ada',
-                                    icon='trash', layout=widgets.Layout(width=button_width, height='35px')) if cleanup_enabled else None)
-    cleanup_button and (setattr(cleanup_button, '_original_style', 'warning'), setattr(cleanup_button, '_original_description', "Cleanup Dataset"))
+    check_button = widgets.Button(
+        description=secondary_label,
+        button_style=secondary_style,
+        tooltip=f'Klik untuk {secondary_label.lower()}',
+        icon=secondary_icon if secondary_icon in ['search', 'info', 'check', 'clipboard'] else '',
+        layout=widgets.Layout(width=button_width, height='35px')
+    )
+    setattr(check_button, '_original_style', secondary_style)
+    setattr(check_button, '_original_description', secondary_label)
     
-    button_list = [download_button, check_button] + ([cleanup_button] if cleanup_button else [])
-    container = widgets.HBox(button_list, layout=widgets.Layout(width=container_width, justify_content='flex-start', 
-                                                               align_items='center', margin='10px 0'))
+    # Optional cleanup/third button
+    cleanup_button = None
+    if cleanup_enabled:
+        cleanup_button = widgets.Button(
+            description="Cleanup Dataset",
+            button_style='warning',
+            tooltip='Hapus dataset yang sudah ada',
+            icon='trash',
+            layout=widgets.Layout(width=button_width, height='35px')
+        )
+        setattr(cleanup_button, '_original_style', 'warning')
+        setattr(cleanup_button, '_original_description', "Cleanup Dataset")
     
-    result = {'container': container, 'download_button': download_button, 'check_button': check_button, 'buttons': button_list}
-    cleanup_button and result.update({'cleanup_button': cleanup_button})
+    # Button list untuk container
+    button_list = [download_button, check_button]
+    if cleanup_button:
+        button_list.append(cleanup_button)
+    
+    # Container dengan proper spacing
+    container = widgets.HBox(
+        button_list,
+        layout=widgets.Layout(
+            width=container_width,
+            justify_content='flex-start',
+            align_items='center',
+            margin='10px 0',
+            gap='8px'  # Space between buttons
+        )
+    )
+    
+    result = {
+        'container': container,
+        'download_button': download_button,
+        'check_button': check_button,
+        'buttons': button_list
+    }
+    
+    if cleanup_button:
+        result['cleanup_button'] = cleanup_button
+    
     return result
 
 def create_save_reset_action_buttons(save_label: str = "Simpan", reset_label: str = "Reset", 

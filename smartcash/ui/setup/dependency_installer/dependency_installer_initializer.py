@@ -199,11 +199,16 @@ class DependencyInstallerInitializer(CommonInitializer):
             # Buat widget error sederhana untuk ditampilkan
             try:
                 import ipywidgets as widgets
+                from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config
+                
+                # Dapatkan konfigurasi untuk level error
+                error_config = get_status_config('error')
+                
                 error_widget = widgets.HTML(
                     value=f"""
-                    <div style="padding:10px; background-color:#f8d7da; color:#721c24; border-radius:4px; margin:10px 0;
-                            border-left:4px solid #dc3545;">
-                        <h3 style="margin-top:0;">❌ Error: {ui_components['error']}</h3>
+                    <div style="padding:10px; background-color:{error_config['bg']}; color:{error_config['color']}; border-radius:4px; margin:10px 0;
+                            border-left:4px solid {error_config['border']};">
+                        <h3 style="margin-top:0;">{error_config['emoji']} Error: {ui_components['error']}</h3>
                         <p>{ui_components.get('details', '')}</p>
                         <p>Silakan restart kernel dan coba lagi, atau hubungi developer untuk bantuan.</p>
                     </div>

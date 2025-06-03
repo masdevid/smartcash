@@ -26,13 +26,19 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         # Header
         header = create_header(f"📦 {MODULE_LOGGER_NAME}", "Setup package yang diperlukan untuk SmartCash")
         
-        # Status panel
+        # Import konstanta terpusat
+        from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config
+        
+        # Dapatkan konfigurasi untuk level info
+        info_config = get_status_config('info')
+        
+        # Status panel dengan style dari konstanta terpusat
         status_panel = widgets.HTML(
             value=f"""
-            <div style="padding:8px 12px; background-color:#d1ecf1; 
-                       color:#0c5460; border-radius:4px; margin:10px 0;
-                       border-left:4px solid #17a2b8;">
-                <p style="margin:3px 0">ℹ️ Pilih packages yang akan diinstall dan klik "Mulai Instalasi"</p>
+            <div style="padding:8px 12px; background-color:{info_config['bg']}; 
+                       color:{info_config['color']}; border-radius:4px; margin:10px 0;
+                       border-left:4px solid {info_config['border']};">
+                <p style="margin:3px 0">{info_config['emoji']} Pilih packages yang akan diinstall dan klik "Mulai Instalasi"</p>
             </div>
             """,
             layout=widgets.Layout(width='100%', margin='10px 0')

@@ -4,9 +4,13 @@ Deskripsi: Helper functions untuk progress tracking dengan pendekatan one-liner 
 """
 
 from typing import Dict, Any, Optional
+from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config
 
 def update_progress_step(ui_components: Dict[str, Any], step_value: int, message: str, 
-                        color: str = "#007bff") -> None:
+                        color: str = None) -> None:
+    # Gunakan warna default dari info jika tidak disediakan
+    if color is None:
+        color = get_status_config('info')['border']
     """
     Update progress step dengan pendekatan one-liner
     
@@ -20,7 +24,10 @@ def update_progress_step(ui_components: Dict[str, Any], step_value: int, message
         ui_components['update_progress']('step', step_value, message, color)
 
 def update_overall_progress(ui_components: Dict[str, Any], progress_value: int, message: str, 
-                           color: str = "#007bff") -> None:
+                           color: str = None) -> None:
+    # Gunakan warna default dari info jika tidak disediakan
+    if color is None:
+        color = get_status_config('info')['border']
     """
     Update overall progress dengan pendekatan one-liner
     
@@ -34,7 +41,10 @@ def update_overall_progress(ui_components: Dict[str, Any], progress_value: int, 
         ui_components['update_progress']('overall', progress_value, message, color)
 
 def update_current_progress(ui_components: Dict[str, Any], progress_value: int, message: str, 
-                           color: str = "#007bff") -> None:
+                           color: str = None) -> None:
+    # Gunakan warna default dari info jika tidak disediakan
+    if color is None:
+        color = get_status_config('info')['border']
     """
     Update current progress dengan pendekatan one-liner
     
@@ -81,14 +91,15 @@ def start_operation(ui_components: Dict[str, Any], operation_name: str, total_it
     if 'show_for_operation' in ui_components and callable(ui_components['show_for_operation']):
         ui_components['show_for_operation'](operation_name)
     
-    # Update progress step
-    update_progress_step(ui_components, 25, f"Mempersiapkan {operation_name}...", "#007bff")
+    # Update progress step dengan warna info
+    info_config = get_status_config('info')
+    update_progress_step(ui_components, 25, f"Mempersiapkan {operation_name}...", info_config['border'])
     
     # Log message
     log_message(ui_components, f"🚀 Memulai {operation_name} dengan {total_items} item", "info")
     
-    # Update progress step
-    update_progress_step(ui_components, 50, f"Memulai {operation_name}...", "#007bff")
+    # Update progress step dengan warna info
+    update_progress_step(ui_components, 50, f"Memulai {operation_name}...", info_config['border'])
 
 def complete_operation(ui_components: Dict[str, Any], operation_name: str, stats: Dict[str, Any]) -> None:
     """
@@ -101,9 +112,10 @@ def complete_operation(ui_components: Dict[str, Any], operation_name: str, stats
     """
     from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
-    # Update progress
-    update_overall_progress(ui_components, 100, f"{operation_name} selesai", "#28a745")
-    update_progress_step(ui_components, 100, f"{operation_name} selesai", "#28a745")
+    # Update progress dengan warna success
+    success_config = get_status_config('success')
+    update_overall_progress(ui_components, 100, f"{operation_name} selesai", success_config['border'])
+    update_progress_step(ui_components, 100, f"{operation_name} selesai", success_config['border'])
     
     # Format success message
     success_message = f"📊 {operation_name} selesai: "
@@ -132,8 +144,9 @@ def handle_item_error(ui_components: Dict[str, Any], item_name: str, error_msg: 
     """
     from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
-    # Update progress
-    update_current_progress(ui_components, 100, f"❌ {item_name} gagal", "#dc3545")
+    # Update progress dengan warna error
+    error_config = get_status_config('error')
+    update_current_progress(ui_components, 100, f"{error_config['emoji']} {item_name} gagal", error_config['border'])
     
     # Log message
     log_message(ui_components, f"Gagal memproses {item_name}: {error_msg}", "error")
@@ -153,12 +166,13 @@ def handle_item_success(ui_components: Dict[str, Any], item_name: str, message: 
     """
     from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
-    # Update progress
-    success_message = f"✅ {item_name} berhasil"
+    # Update progress dengan warna success
+    success_config = get_status_config('success')
+    success_message = f"{success_config['emoji']} {item_name} berhasil"
     if message:
         success_message += f": {message}"
     
-    update_current_progress(ui_components, 100, success_message, "#28a745")
+    update_current_progress(ui_components, 100, success_message, success_config['border'])
     
     # Log message
     log_message(ui_components, f"Berhasil memproses {item_name}", "success")

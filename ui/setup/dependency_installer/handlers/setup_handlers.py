@@ -4,6 +4,7 @@ Deskripsi: Enhanced setup handlers dengan integrasi notification observer dan pr
 """
 
 from typing import Dict, Any
+import logging
 from smartcash.components.observer.manager_observer import ObserverManager
 from smartcash.components.notification.notification_observer import create_notification_observer
 from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message, reset_progress_bar, update_status_panel, get_module_logger
@@ -12,6 +13,7 @@ from smartcash.ui.setup.dependency_installer.handlers.progress_handlers import s
 from smartcash.ui.setup.dependency_installer.handlers.button_handlers import setup_install_button_handler, setup_reset_button_handler
 from smartcash.ui.setup.dependency_installer.utils.analyzer_utils import analyze_installed_packages
 from smartcash.ui.setup.dependency_installer.utils.package_installer import install_required_packages
+from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config, get_package_status
 
 def get_observer_manager():
     """Get observer manager untuk dependency installer dengan singleton pattern"""
@@ -110,8 +112,11 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 # Log pesan ke UI menggunakan log_message dari logger_helper
                 log_message(ui_components, "🔍 Memulai analisis package...", "info")
                 
+                # Dapatkan konfigurasi untuk level info
+                info_config = get_status_config('info')
+                
                 # Update status panel menggunakan update_status_panel dari logger_helper
-                update_status_panel("info", "🔍 Menganalisis packages terinstall...", ui_components)
+                update_status_panel(ui_components, "info", f"{info_config['emoji']} Menganalisis packages terinstall...")
                 
                 # Jalankan analisis dengan delay kecil untuk memastikan UI terupdate terlebih dahulu
                 import time

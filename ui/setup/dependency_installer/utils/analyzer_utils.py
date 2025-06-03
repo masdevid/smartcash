@@ -7,9 +7,14 @@ from typing import Dict, Any, List, Tuple, Set
 import pkg_resources
 import re
 import sys
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from smartcash.ui.setup.dependency_installer.utils.package_utils import get_project_requirements, get_installed_packages
 from smartcash.ui.setup.dependency_installer.utils.ui_utils import update_status_panel, update_package_status
+from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config, get_package_status
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 def get_installed_package_versions() -> Dict[str, str]:
     """Mendapatkan daftar package yang terinstall dengan versinya
@@ -130,12 +135,17 @@ def analyze_installed_packages(ui_components: Dict[str, Any]) -> Dict[str, Dict[
     
     # Log analisis dimulai dengan emoji dan format yang jelas
     if 'log_message' in ui_components and callable(ui_components['log_message']) and not ui_components.get('suppress_logs', False):
-        ui_components['log_message']("🔍 Menganalisis packages terinstall...", "info")
-    
-    # Inisialisasi progress untuk overall dan step
-    if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-        ui_components['update_progress']('overall', 0, "Memulai analisis packages", "#17a2b8")
-        ui_components['update_progress']('step', 10, "Mendapatkan daftar package terinstall...", "#17a2b8")
+        # Dapatkan konfigurasi untuk level info
+        info_config = get_status_config('info')
+        
+        # Reset progress bar jika tersedia
+        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+            ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+        
+        # Inisialisasi progress untuk overall dan step
+        if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+            ui_components['update_progress']('overall', 0, "Memulai analisis packages", info_config['border'])
+            ui_components['update_progress']('step', 0, "Mempersiapkan analisis...", info_config['border'])
     
     try:
         # Dapatkan daftar package terinstall menggunakan fungsi dari package_utils.py
@@ -144,36 +154,39 @@ def analyze_installed_packages(ui_components: Dict[str, Any]) -> Dict[str, Dict[
         
         # Update progress untuk step dan overall
         if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-            ui_components['update_progress']('overall', 25, "Mendapatkan daftar package terinstall", "#17a2b8")
-            ui_components['update_progress']('step', 30, "Mendapatkan requirements...", "#17a2b8")
+            ui_components['update_progress']('overall', 25, "Mendapatkan daftar package terinstall", info_config['border'])
+            ui_components['update_progress']('step', 20, "Mendapatkan daftar requirements...", info_config['border'])
             
             # Update current progress jika tersedia
             if 'current' in ui_components.get('active_bars', []):
-                ui_components['update_progress']('current', 100, "✅ Daftar package terinstall berhasil didapatkan", "#28a745")
+                # Dapatkan konfigurasi untuk level success
+                from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config
+                success_config = get_status_config('success')
+                ui_components['update_progress']('current', 100, f"{success_config['emoji']} Daftar package terinstall berhasil didapatkan", success_config['border'])
         
         # Dapatkan requirements menggunakan fungsi dari package_utils.py
         requirements = get_project_requirements('smartcash')
         
         # Update progress untuk step dan overall
         if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-            ui_components['update_progress']('overall', 50, "Mendapatkan requirements", "#17a2b8")
-            ui_components['update_progress']('step', 50, "Menganalisis requirements...", "#17a2b8")
+            ui_components['update_progress']('overall', 50, "Mendapatkan requirements", info_config['border'])
+            ui_components['update_progress']('step', 40, "Menganalisis requirements...", info_config['border'])
             
             # Update current progress jika tersedia
             if 'current' in ui_components.get('active_bars', []):
-                ui_components['update_progress']('current', 100, "✅ Requirements berhasil didapatkan", "#28a745")
+                ui_components['update_progress']('current', 100, f"{success_config['emoji']} Requirements berhasil didapatkan", success_config['border'])
         
         # Analisis requirements
         analysis_result = analyze_requirements(requirements, installed_versions)
         
         # Update progress untuk step dan overall
         if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-            ui_components['update_progress']('overall', 75, "Menganalisis requirements", "#17a2b8")
-            ui_components['update_progress']('step', 70, "Menyimpan hasil analisis...", "#17a2b8")
+            ui_components['update_progress']('overall', 75, "Menganalisis requirements", info_config['border'])
+            ui_components['update_progress']('step', 60, "Memproses hasil analisis...", info_config['border'])
             
             # Update current progress jika tersedia
             if 'current' in ui_components.get('active_bars', []):
-                ui_components['update_progress']('current', 100, "✅ Requirements berhasil dianalisis", "#28a745")
+                ui_components['update_progress']('current', 100, f"{success_config['emoji']} Requirements berhasil dianalisis", success_config['border'])
         
         # Simpan hasil analisis ke ui_components
         ui_components['analysis_result'] = analysis_result
@@ -222,17 +235,25 @@ def analyze_installed_packages(ui_components: Dict[str, Any]) -> Dict[str, Dict[
         
         # Update progress untuk step dan overall
         if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-            ui_components['update_progress']('overall', 90, "Menyimpan hasil analisis", "#17a2b8")
-            ui_components['update_progress']('step', 90, "Menampilkan hasil analisis...", "#17a2b8")
+            ui_components['update_progress']('overall', 90, "Menyimpan hasil analisis", info_config['border'])
+            ui_components['update_progress']('step', 90, "Menampilkan hasil analisis...", info_config['border'])
             
+            # Dapatkan konfigurasi untuk level success
+            success_config = get_status_config('success')
+        
             # Update current progress jika tersedia
             if 'current' in ui_components.get('active_bars', []):
-                ui_components['update_progress']('current', 100, "✅ Hasil analisis berhasil disimpan", "#28a745")
+                ui_components['update_progress']('current', 100, f"{success_config['emoji']} Hasil analisis berhasil disimpan", success_config['border'])
         
         # Log hasil analisis dengan emoji dan format yang jelas
         if 'log_message' in ui_components and callable(ui_components['log_message']) and not ui_components.get('suppress_logs', False):
+            # Dapatkan konfigurasi untuk level status
             level = "success" if not missing_packages and not upgrade_packages else "warning"
-            icon = "✅" if not missing_packages and not upgrade_packages else "⚠️"
+            success_config = get_status_config('success')
+            warning_config = get_status_config('warning')
+            info_config = get_status_config('info')
+            
+            icon = success_config['emoji'] if not missing_packages and not upgrade_packages else warning_config['emoji']
             ui_components['log_message'](
                 f"{icon} Hasil analisis: {installed_packages_count}/{total_packages} terinstall, {compatible_packages}/{total_packages} kompatibel",
                 level
@@ -240,47 +261,57 @@ def analyze_installed_packages(ui_components: Dict[str, Any]) -> Dict[str, Dict[
             
             # Log detail package yang perlu diinstall atau diupgrade
             if missing_packages:
-                ui_components['log_message'](f"📦 {len(missing_packages)} package perlu diinstall: {', '.join(missing_packages[:5])}{' dan lainnya' if len(missing_packages) > 5 else ''}", "info")
+                ui_components['log_message'](f"{info_config['emoji']} {len(missing_packages)} package perlu diinstall: {', '.join(missing_packages[:5])}{' dan lainnya' if len(missing_packages) > 5 else ''}", "info")
             
             if upgrade_packages:
-                ui_components['log_message'](f"🔄 {len(upgrade_packages)} package perlu diupgrade: {', '.join(upgrade_packages[:5])}{' dan lainnya' if len(upgrade_packages) > 5 else ''}", "info")
+                ui_components['log_message'](f"{info_config['emoji']} {len(upgrade_packages)} package perlu diupgrade: {', '.join(upgrade_packages[:5])}{' dan lainnya' if len(upgrade_packages) > 5 else ''}", "info")
         
         # Update status panel dengan pesan yang jelas
         if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+            # Dapatkan konfigurasi untuk level status
+            warning_config = get_status_config('warning')
+            success_config = get_status_config('success')
+            
             if missing_packages or upgrade_packages:
                 status_type = "warning"
-                message = f"⚠️ Ada {len(missing_packages)} package yang belum terinstall dan {len(upgrade_packages)} package yang perlu diupgrade"
+                message = f"{warning_config['emoji']} Ada {len(missing_packages)} package yang belum terinstall dan {len(upgrade_packages)} package yang perlu diupgrade"
             else:
                 status_type = "success"
-                message = f"✅ Semua {len(ok_packages)} package sudah terinstall dengan benar"
+                message = f"{success_config['emoji']} Semua {len(ok_packages)} package sudah terinstall dengan benar"
             
-            # Gunakan fungsi update_status_panel yang telah diperbarui dengan urutan parameter yang benar
-            update_status_panel(status_type, message, ui_components)
+            # Gunakan fungsi update_status_panel dengan urutan parameter yang benar
+            ui_components['update_status_panel'](level=status_type, message=message)
         
         # Complete operation jika semua package sudah terinstall dan kompatibel, atau update progress selesai
         if not missing_packages and not upgrade_packages and 'complete_operation' in ui_components and callable(ui_components['complete_operation']):
             ui_components['complete_operation'](f"Semua {len(ok_packages)} package sudah terinstall dengan benar")
         elif 'update_progress' in ui_components and callable(ui_components['update_progress']):
+            # Dapatkan konfigurasi untuk level success
+            success_config = get_status_config('success')
+            
             # Update step progress selesai
-            ui_components['update_progress']('step', 100, "Analisis selesai", "#28a745")
+            ui_components['update_progress']('step', 100, "Analisis selesai", success_config['border'])
             # Update overall progress selesai
-            ui_components['update_progress']('overall', 100, "Analisis selesai", "#28a745")
+            ui_components['update_progress']('overall', 100, "Analisis selesai", success_config['border'])
             # Update current progress jika tersedia
             if 'current' in ui_components.get('active_bars', []):
-                ui_components['update_progress']('current', 100, "✅ Analisis selesai", "#28a745")
+                ui_components['update_progress']('current', 100, f"{success_config['emoji']} Analisis selesai", success_config['border'])
         
         return analysis_result
     
     except Exception as e:
+        # Dapatkan konfigurasi untuk level error
+        error_config = get_status_config('error')
+        
         # Log error dengan format yang jelas
         error_message = f"Gagal menganalisis packages: {str(e)}"
         
         if 'log_message' in ui_components and callable(ui_components['log_message']) and not ui_components.get('suppress_logs', False):
-            ui_components['log_message'](f"❌ {error_message}", "error")
+            ui_components['log_message'](f"{error_config['emoji']} {error_message}", "error")
         
         # Update status panel dengan pesan error
         if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-            ui_components['update_status_panel']("danger", f"❌ {error_message}")
+            ui_components['update_status_panel']("error", f"{error_config['emoji']} {error_message}")
         
         # Tandai error pada progress tracker
         if 'error_operation' in ui_components and callable(ui_components['error_operation']):

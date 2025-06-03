@@ -6,8 +6,15 @@ Deskripsi: Utilitas untuk menginstal package yang dibutuhkan
 from typing import Dict, Any, List, Set
 import subprocess
 import sys
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Import fungsi UI dan konstanta terpusat
 from smartcash.ui.setup.dependency_installer.utils.ui_utils import update_status_panel, update_package_status
+from smartcash.ui.setup.dependency_installer.utils.constants import get_status_config, get_package_status
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 def install_package(package: str, ui_components: Dict[str, Any] = None) -> bool:
     """Install package dengan pip
@@ -20,9 +27,14 @@ def install_package(package: str, ui_components: Dict[str, Any] = None) -> bool:
         True jika berhasil, False jika gagal
     """
     try:
+        # Dapatkan konfigurasi untuk level info
+        info_config = get_status_config('info')
+        success_config = get_status_config('success')
+        error_config = get_status_config('error')
+        
         # Log instalasi
         if ui_components and 'log_message' in ui_components and callable(ui_components['log_message']):
-            ui_components['log_message'](f"📦 Menginstall {package}...", "info")
+            ui_components['log_message'](f"{info_config['emoji']} Menginstall {package}...", "info")
         
         # Jalankan pip install
         process = subprocess.Popen(
@@ -37,17 +49,18 @@ def install_package(package: str, ui_components: Dict[str, Any] = None) -> bool:
         # Cek hasil instalasi
         if process.returncode == 0:
             if ui_components and 'log_message' in ui_components and callable(ui_components['log_message']):
-                ui_components['log_message'](f"✅ Berhasil menginstall {package}", "success")
+                ui_components['log_message'](f"{success_config['emoji']} Berhasil menginstall {package}", "success")
             return True
         else:
             if ui_components and 'log_message' in ui_components and callable(ui_components['log_message']):
-                ui_components['log_message'](f"❌ Gagal menginstall {package}: {stderr}", "error")
+                ui_components['log_message'](f"{error_config['emoji']} Gagal menginstall {package}: {stderr}", "error")
             return False
     
     except Exception as e:
         # Log error
         if ui_components and 'log_message' in ui_components and callable(ui_components['log_message']):
-            ui_components['log_message'](f"❌ Error saat menginstall {package}: {str(e)}", "error")
+            error_config = get_status_config('error')
+            ui_components['log_message'](f"{error_config['emoji']} Error saat menginstall {package}: {str(e)}", "error")
         return False
 
 def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any], max_workers: int = 3) -> Dict[str, bool]:
@@ -64,9 +77,15 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
     results = {}
     total_packages = len(packages)
     
+    # Dapatkan konfigurasi untuk level info
+    info_config = get_status_config('info')
+    success_config = get_status_config('success')
+    warning_config = get_status_config('warning')
+    error_config = get_status_config('error')
+    
     # Log mulai instalasi dengan emoji dan highlight
     if 'log_message' in ui_components and callable(ui_components['log_message']):
-        ui_components['log_message'](f"🚀 Memulai instalasi {total_packages} packages...", "info")
+        ui_components['log_message'](f"{info_config['emoji']} Memulai instalasi {total_packages} packages...", "info")
     
     # Tampilkan progress tracker untuk operasi install
     if 'show_for_operation' in ui_components and callable(ui_components['show_for_operation']):
@@ -78,8 +97,8 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
     
     # Inisialisasi progress untuk overall dan step
     if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-        ui_components['update_progress']('overall', 0, f"Memulai instalasi {total_packages} packages", "#17a2b8")
-        ui_components['update_progress']('step', 0, "Mempersiapkan instalasi...", "#17a2b8")
+        ui_components['update_progress']('overall', 0, f"Memulai instalasi {total_packages} packages", info_config['border'])
+        ui_components['update_progress']('step', 0, "Mempersiapkan instalasi...", info_config['border'])
     
     try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -97,10 +116,6 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
                     success = future.result()
                     results[package] = success
                     
-                    # Update progress untuk step dan overall
-                    completed += 1
-                    progress_percent = int((completed / total_packages) * 100)
-                    
                     # Update status package di UI
                     # Cari package_key berdasarkan nama package
                     for category in ui_components.get('categories', []):
@@ -111,9 +126,13 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
                                 message = "Terinstall" if success else "Gagal install"
                                 update_package_status(ui_components, pkg['key'], status_type, message)
                     
+                    # Update progress overall
+                    completed += 1
+                    progress_percent = int((completed / total_packages) * 100)
+                    
                     if 'update_progress' in ui_components and callable(ui_components['update_progress']):
                         # Update step progress dengan warna sesuai status
-                        color = "#28a745" if success else "#dc3545"
+                        color = success_config['border'] if success else error_config['border']
                         ui_components['update_progress'](
                             'step', 
                             progress_percent, 
@@ -126,7 +145,7 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
                             'overall',
                             progress_percent,
                             f"Progress instalasi: {completed}/{total_packages}",
-                            "#17a2b8"
+                            info_config['border']
                         )
                         
                         # Jika ada current progress, update juga
@@ -159,18 +178,18 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
         
         # Update status panel dengan pesan yang jelas menggunakan fungsi yang telah diperbarui
         if success_count == total_packages:
-            update_status_panel("success", f"✅ Semua {total_packages} packages berhasil diinstall", ui_components)
+            update_status_panel(ui_components, "success", f"✅ Semua {total_packages} packages berhasil diinstall")
         else:
-            update_status_panel("warning", f"⚠️ {success_count}/{total_packages} packages berhasil diinstall", ui_components)
+            update_status_panel(ui_components, "warning", f"⚠️ {success_count}/{total_packages} packages berhasil diinstall")
         
         # Complete operation jika semua berhasil, atau update progress selesai
         if success_count == total_packages and 'complete_operation' in ui_components and callable(ui_components['complete_operation']):
             ui_components['complete_operation'](f"Semua {total_packages} packages berhasil diinstall")
         elif 'update_progress' in ui_components and callable(ui_components['update_progress']):
             # Update step progress selesai
-            ui_components['update_progress']('step', 100, "Instalasi selesai", "#28a745")
+            ui_components['update_progress']('step', 100, "Instalasi selesai", success_config['border'])
             # Update overall progress selesai
-            ui_components['update_progress']('overall', 100, f"{success_count}/{total_packages} packages berhasil diinstall", "#28a745")
+            ui_components['update_progress']('overall', 100, f"{success_count}/{total_packages} packages berhasil diinstall", success_config['border'])
         
         return results
     
@@ -182,7 +201,7 @@ def install_packages_parallel(packages: List[str], ui_components: Dict[str, Any]
             ui_components['log_message'](f"❌ {error_message}", "error")
         
         # Update status panel dengan pesan error menggunakan fungsi yang telah diperbarui
-        update_status_panel("error", f"❌ {error_message}", ui_components)
+        update_status_panel(ui_components, "error", f"❌ {error_message}")
         
         # Update status semua package yang belum diproses menjadi error
         for category in ui_components.get('categories', []):
@@ -210,26 +229,31 @@ def install_required_packages(ui_components: Dict[str, Any]) -> None:
     
     # Log mulai proses dengan format yang jelas
     if 'log_message' in ui_components and callable(ui_components['log_message']):
-        ui_components['log_message']("🔍 Memeriksa package yang perlu diinstall...", "info")
+        info_config = get_status_config('info')
+        ui_components['log_message'](f"{info_config['emoji']} 🔍 Memeriksa package yang perlu diinstall...", "info")
     
     # Jika hasil analisis tidak ada atau telah direset, jalankan analisis terlebih dahulu
     if 'analysis_result' not in ui_components or not ui_components['analysis_result']:
         if 'log_message' in ui_components and callable(ui_components['log_message']):
-            ui_components['log_message']("🔄 Menjalankan analisis ulang untuk memastikan status terbaru...", "info")
+            info_config = get_status_config('info')
+            ui_components['log_message'](f"{info_config['emoji']} 🔄 Menjalankan analisis ulang untuk memastikan status terbaru...", "info")
         
         # Update status panel
-        update_status_panel("info", "🔄 Menjalankan analisis ulang...", ui_components)
+        update_status_panel(ui_components, "info", f"{info_config['emoji']} 🔄 Menjalankan analisis ulang...")
         
         # Jalankan analisis package
         try:
             analyze_installed_packages(ui_components)
         except Exception as e:
-            error_message = f"❌ Gagal menjalankan analisis: {str(e)}"
+            # Dapatkan konfigurasi untuk level error
+            error_config = get_status_config('error')
+            
+            error_message = f"{error_config['emoji']} Gagal menjalankan analisis: {str(e)}"
             if 'log_message' in ui_components and callable(ui_components['log_message']):
                 ui_components['log_message'](error_message, "error")
             
             # Update status panel dengan pesan error
-            update_status_panel("error", error_message, ui_components)
+            update_status_panel(ui_components, "error", error_message)
             
             # Tandai error pada progress tracker
             if 'error_operation' in ui_components and callable(ui_components['error_operation']):
@@ -239,12 +263,15 @@ def install_required_packages(ui_components: Dict[str, Any]) -> None:
     
     # Cek apakah ada hasil analisis setelah menjalankan analisis ulang
     if 'analysis_result' not in ui_components or not ui_components['analysis_result']:
-        error_message = "❌ Tidak ada hasil analisis. Silakan jalankan analisis terlebih dahulu."
+        # Dapatkan konfigurasi untuk level error
+        error_config = get_status_config('error')
+        
+        error_message = f"{error_config['emoji']} Tidak ada hasil analisis. Silakan jalankan analisis terlebih dahulu."
         if 'log_message' in ui_components and callable(ui_components['log_message']):
             ui_components['log_message'](error_message, "error")
         
         # Update status panel dengan pesan error
-        update_status_panel("error", error_message, ui_components)
+        update_status_panel(ui_components, "error", error_message)
         
         # Tandai error pada progress tracker
         if 'error_operation' in ui_components and callable(ui_components['error_operation']):
@@ -258,13 +285,16 @@ def install_required_packages(ui_components: Dict[str, Any]) -> None:
     
     # Jika tidak ada package yang perlu diinstall
     if not packages_to_install:
-        success_message = "✅ Semua package sudah terinstall dengan benar"
+        # Dapatkan konfigurasi untuk level success
+        success_config = get_status_config('success')
+        
+        success_message = f"{success_config['emoji']} Semua package sudah terinstall dengan benar"
         # Tidak ada package yang perlu diinstall
         if 'log_message' in ui_components and callable(ui_components['log_message']):
             ui_components['log_message'](success_message, "success")
         
         # Update status panel dengan pesan sukses menggunakan fungsi yang telah diperbarui
-        update_status_panel("success", success_message, ui_components)
+        update_status_panel(ui_components, "success", success_message)
         
         # Update status semua package menjadi sukses
         for category in ui_components.get('categories', []):
@@ -281,8 +311,11 @@ def install_required_packages(ui_components: Dict[str, Any]) -> None:
     package_count = len(packages_to_install)
     logger.info(f"Installing {package_count} packages")
     
+    # Dapatkan konfigurasi untuk level info
+    info_config = get_status_config('info')
+    
     if 'log_message' in ui_components and callable(ui_components['log_message']):
-        ui_components['log_message'](f"📦 Menemukan {package_count} package yang perlu diinstall", "info")
+        ui_components['log_message'](f"{info_config['emoji']} Menemukan {package_count} package yang perlu diinstall", "info")
     
     # Tampilkan progress tracker untuk operasi install
     if 'show_for_operation' in ui_components and callable(ui_components['show_for_operation']):

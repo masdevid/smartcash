@@ -98,7 +98,10 @@ class SimpleConfigManager:
             config_name = self.config_file
         
         if not (config_name.endswith('.yaml') or config_name.endswith('.yml')):
-            config_name = f"{config_name}_config.yaml"
+            if not config_name.endswith('_config'):
+                config_name = f"{config_name}_config.yaml"
+            else:
+                config_name = f"{config_name}.yaml"
         
         return self.config_dir / config_name
     

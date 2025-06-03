@@ -97,13 +97,28 @@ def initialize_dependency_installer(env=None, config=None):
     # Clear output terlebih dahulu untuk menghindari masalah rendering
     clear_output(wait=True)
     
-    # Inisialisasi UI components
+    # Siapkan config dasar tanpa inisialisasi penuh
+    config = config or {}
+    config['suppress_logs'] = True  # Tambahkan flag untuk menekan log selama inisialisasi
+    
+    # Inisialisasi UI components dasar terlebih dahulu
+    ui_components_basic = _dependency_installer_initializer._create_ui_components(config)
+    
+    # Tampilkan UI dasar terlebih dahulu
+    if isinstance(ui_components_basic, dict) and 'ui' in ui_components_basic:
+        display(ui_components_basic['ui'])
+    
+    # Sekarang lakukan inisialisasi penuh setelah UI ditampilkan
     ui_components = _dependency_installer_initializer.initialize(env=env, config=config)
     
-    # Tampilkan UI secara otomatis jika ada komponen 'ui'
-    if isinstance(ui_components, dict) and 'ui' in ui_components:
-        # Pastikan komponen UI dirender dengan benar
+    # Update UI jika berbeda dari yang dasar
+    if isinstance(ui_components, dict) and 'ui' in ui_components and ui_components['ui'] != ui_components_basic.get('ui'):
+        clear_output(wait=True)
         display(ui_components['ui'])
+    
+    # Aktifkan log setelah UI terender
+    if isinstance(ui_components, dict):
+        ui_components['suppress_logs'] = False
         
         # Log status inisialisasi jika tersedia
         if 'log_message' in ui_components and callable(ui_components['log_message']):

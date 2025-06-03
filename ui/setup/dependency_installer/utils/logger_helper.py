@@ -29,6 +29,10 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
     if _is_logging:
         return
     
+    # Periksa apakah log harus ditekan (suppress_logs)
+    if ui_components.get('suppress_logs', False):
+        return
+    
     try:
         # Set flag untuk mencegah rekursi
         _is_logging = True

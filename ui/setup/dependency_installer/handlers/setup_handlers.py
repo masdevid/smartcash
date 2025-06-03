@@ -46,6 +46,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     ui_components['reset_progress_bar'] = lambda value=0, message="", show_progress=True: reset_progress_bar(ui_components, value, message, show_progress)
     ui_components['update_status_panel'] = lambda level="info", message="": update_status_panel(ui_components, level, message)
     
+    # Set default suppress_logs jika tidak ada
+    if 'suppress_logs' not in ui_components:
+        ui_components['suppress_logs'] = config.get('suppress_logs', False) if config else False
+    
     try:
         # Setup observer manager untuk notifikasi
         observer_manager = get_observer_manager()
@@ -145,9 +149,8 @@ def _setup_dependency_installer_observers(ui_components: Dict[str, Any], observe
     try:
         # Import observer components
         from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
-        from smartcash.components.notification.notification_observer import NotificationObserver, create_notification_observer
+        from smartcash.components.notification.notification_observer import NotificationObserver
         from smartcash.components.observer.base_observer import BaseObserver
-        from smartcash.components.observer.manager_observer import ObserverManager
         
         # Definisikan event_types secara eksplisit sebagai string, bukan dict
         # Gunakan nama event yang sama dengan yang digunakan di observer_helper.py
@@ -183,8 +186,8 @@ def _setup_dependency_installer_observers(ui_components: Dict[str, Any], observe
                 
                 # Verifikasi observer adalah instance dari BaseObserver
                 if isinstance(observer, BaseObserver):
-                    # Register observer dengan observer manager
-                    ui_components['observer_manager'].register_observer(observer)
+                    # Register observer langsung ke EventDispatcher
+                    EventDispatcher.register(event_type, observer)
                     registered_observers.append(observer)
                     
                     # Log success
@@ -193,9 +196,6 @@ def _setup_dependency_installer_observers(ui_components: Dict[str, Any], observe
                     log_message(ui_components, f"Observer bukan instance dari BaseObserver: {type(observer)}", "error", "❌")
             except Exception as e:
                 log_message(ui_components, f"Gagal setup observer untuk {event_type}: {str(e)}", "error", "❌")
-        
-        # Tambahkan observer ke event dispatcher
-        ui_components['event_dispatcher'].add_observer_manager(ui_components['observer_manager'])
         
         # Log success
         log_message(ui_components, "Observer setup berhasil", "success", "✅")

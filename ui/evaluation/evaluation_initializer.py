@@ -68,7 +68,7 @@ class EvaluationInitializer(CommonInitializer):
                 'test_folder': 'data/test',
                 'apply_augmentation': True,
                 'batch_size': 16,
-                'image_size': 416,
+                'image_size': 640,
                 'confidence_threshold': 0.25,
                 'iou_threshold': 0.45
             },

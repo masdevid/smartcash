@@ -6,7 +6,7 @@ Deskripsi: Utilities untuk training display dan UI updates
 import threading
 from typing import Dict, Any
 from IPython.display import display, HTML
-from smartcash.ui.training.handlers.training_button_handlers import set_state
+from smartcash.ui.training.handlers.training_button_handlers import get_state, set_state
 from smartcash.ui.training.utils.training_status_utils import update_training_status
 
 

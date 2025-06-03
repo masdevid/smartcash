@@ -49,32 +49,34 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
         overflow_x='hidden'
     ))
     
-    # Section 2: Test Configuration dengan flex layout
+    # Section 2: Test Configuration dengan flex layout yang lebih baik
     test_config_left = widgets.VBox([
         form_components['test_folder_text'],
         form_components['batch_size_slider']
-    ], layout=widgets.Layout(flex='1', min_width='250px', overflow_x='hidden'))
+    ], layout=widgets.Layout(flex='1 1 300px', min_width='250px', overflow_x='hidden', padding='5px'))
     
     test_config_right = widgets.VBox([
         form_components['image_size_dropdown'],
         form_components['confidence_slider'],
         form_components['iou_slider']
-    ], layout=widgets.Layout(flex='1', min_width='250px', overflow_x='hidden'))
+    ], layout=widgets.Layout(flex='1 1 300px', min_width='250px', overflow_x='hidden', padding='5px'))
     
     # Checkbox dikelompokkan terpisah agar rata kiri dan teks lengkap terlihat
     test_config_checkboxes = widgets.VBox([
         form_components['apply_augmentation_checkbox']
-    ], layout=widgets.Layout(width='100%', margin='5px 0'))
+    ], layout=widgets.Layout(width='100%', margin='10px 0', padding='5px'))
     
-    # Gunakan HBox dengan flex layout untuk mencegah horizontal scrollbar
+    # Gunakan HBox dengan flex layout yang lebih baik untuk mencegah horizontal scrollbar
     test_config_container = widgets.HBox(
         [test_config_left, test_config_right],
         layout=widgets.Layout(
             display='flex',
             flex_flow='row wrap',
             justify_content='space-between',
+            align_items='flex-start',
             width='100%',
-            overflow_x='hidden'
+            overflow_x='hidden',
+            gap='10px'
         )
     )
     

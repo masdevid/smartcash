@@ -92,14 +92,25 @@ _config_manager = None
 # Public API
 def initialize_dependency_installer(env=None, config=None):
     """Inisialisasi dan tampilkan UI dependency installer"""
-    from IPython.display import display
+    from IPython.display import display, clear_output
+    
+    # Clear output terlebih dahulu untuk menghindari masalah rendering
+    clear_output(wait=True)
     
     # Inisialisasi UI components
     ui_components = _dependency_installer_initializer.initialize(env=env, config=config)
     
     # Tampilkan UI secara otomatis jika ada komponen 'ui'
     if isinstance(ui_components, dict) and 'ui' in ui_components:
+        # Pastikan komponen UI dirender dengan benar
         display(ui_components['ui'])
+        
+        # Log status inisialisasi jika tersedia
+        if 'log_message' in ui_components and callable(ui_components['log_message']):
+            ui_components['log_message']("✅ Dependency installer UI berhasil diinisialisasi", "success")
+    else:
+        # Fallback jika UI tidak dapat diinisialisasi
+        print("❌ Error: Komponen UI dependency installer tidak dapat diinisialisasi dengan benar.")
     
     # Tetap kembalikan ui_components untuk digunakan jika diperlukan
     return ui_components

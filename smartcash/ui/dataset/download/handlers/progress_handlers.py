@@ -39,11 +39,13 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
     try:
         from smartcash.components.observer import EventDispatcher
         from smartcash.components.observer.manager_observer import get_observer_manager
+        from smartcash.components.notification.notification_observer import create_notification_observer
         
         # Pastikan observer_manager tersedia di ui_components
         if 'observer_manager' not in ui_components:
             ui_components['observer_manager'] = get_observer_manager()
         
+        # Buat ProgressObserver yang merupakan instance dari BaseObserver
         progress_observer = ProgressObserver(ui_components)
         
         download_events = [
@@ -53,17 +55,37 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
         ]
         
         registered_events = []
+        observer_manager = ui_components.get('observer_manager')
         
         # Coba register melalui observer_manager terlebih dahulu
-        observer_manager = ui_components.get('observer_manager')
         if observer_manager and hasattr(observer_manager, 'register'):
-            for event in download_events:
-                try:
-                    observer_manager.register(event, progress_observer)
-                    registered_events.append(event)
-                except Exception as e:
-                    logger = ui_components.get('logger')
-                    logger and logger.debug(f"⚠️ Could not register event via manager {event}: {str(e)}")
+            # Pastikan progress_observer memiliki event_types untuk registrasi
+            progress_observer.event_types = download_events
+            
+            try:
+                # Register semua event sekaligus
+                observer_manager.register(progress_observer, download_events)
+                registered_events.extend(download_events)
+                logger = ui_components.get('logger')
+                logger and logger.debug(f"✅ Registered all events via manager")
+            except Exception as e:
+                logger = ui_components.get('logger')
+                logger and logger.debug(f"⚠️ Batch registration failed: {str(e)}")
+                
+                # Fallback: register satu per satu dengan adapter
+                for event in download_events:
+                    try:
+                        # Gunakan adapter untuk memastikan observer adalah BaseObserver
+                        adapter = create_notification_observer(
+                            event, 
+                            lambda event_type, sender, **kwargs: progress_observer.update(event_type, sender, **kwargs),
+                            f"ProgressAdapter_{event}"
+                        )
+                        observer_manager.register(adapter, event)
+                        registered_events.append(event)
+                    except Exception as e_inner:
+                        logger = ui_components.get('logger')
+                        logger and logger.debug(f"⚠️ Could not register event via adapter {event}: {str(e_inner)}")
         # Fallback ke EventDispatcher
         else:
             for event in download_events:
@@ -82,9 +104,9 @@ def _setup_progress_observers(ui_components: Dict[str, Any]) -> None:
             with ui_components['log_output']:
                 logger.info(f"📡 Observers registered for {len(registered_events)} events")
         
-    except ImportError:
+    except ImportError as ie:
         logger = ui_components.get('logger')
-        logger and logger.warning("⚠️ Observer system tidak tersedia")
+        logger and logger.warning(f"⚠️ Observer system tidak tersedia: {str(ie)}")
     except Exception as e:
         logger = ui_components.get('logger')
         logger and logger.warning(f"⚠️ Observer setup error: {str(e)}")

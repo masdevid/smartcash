@@ -79,11 +79,15 @@ def _create_category_widget_improved(category: Dict[str, Any]) -> tuple[widgets.
             layout=widgets.Layout(width='110px', margin='0', flex='0 0 auto')
         )
         
-        # Checkbox untuk package dengan improved styling
+        # Checkbox untuk package dengan improved styling dan essential indicator
+        package_name_display = package['name']
+        if package.get('default', True):
+            package_name_display = f"⭐ {package['name']}"  # Star untuk essential packages
+        
         checkbox = widgets.Checkbox(
-            description=package['name'],
+            description=package_name_display,
             value=package.get('default', True),
-            tooltip=f"{package.get('description', '')} | {package.get('pip_name', '')}",
+            tooltip=f"{'[ESSENTIAL] ' if package.get('default', True) else '[OPTIONAL] '}{package.get('description', '')} | {package.get('pip_name', '')}",
             layout=widgets.Layout(
                 width='auto', 
                 margin='0', 
@@ -141,7 +145,7 @@ def _create_category_widget_improved(category: Dict[str, Any]) -> tuple[widgets.
     return category_container, category_checkboxes
 
 def get_package_categories() -> list[Dict[str, Any]]:
-    """Get package categories dengan updated descriptions"""
+    """Get package categories dengan updated defaults (semua essential packages checked)"""
     return [
         {
             'name': 'Core Requirements',
@@ -153,28 +157,28 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'name': 'SmartCash Core',
                     'description': 'Core utilities dan helpers untuk UI',
                     'pip_name': 'ipywidgets>=7.6.0',
-                    'default': True
+                    'default': True  # Essential
                 },
                 {
                     'key': 'notebook_deps',
                     'name': 'Notebook Dependencies',
                     'description': 'IPython dan Jupyter dependencies',
                     'pip_name': 'ipython>=7.0.0',
-                    'default': True
+                    'default': True  # Essential
                 },
                 {
                     'key': 'file_utils',
                     'name': 'File Utilities',
                     'description': 'Path handling dan file operations',
                     'pip_name': 'pathlib2>=2.3.0',
-                    'default': True
+                    'default': True  # Essential
                 },
                 {
                     'key': 'yaml_parser',
                     'name': 'YAML Parser',
                     'description': 'Configuration file parsing',
                     'pip_name': 'pyyaml>=5.4.0',
-                    'default': True
+                    'default': True  # Essential
                 }
             ]
         },
@@ -188,28 +192,28 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'name': 'PyTorch',
                     'description': 'Deep learning framework utama',
                     'pip_name': 'torch>=1.9.0',
-                    'default': True
+                    'default': True  # Essential untuk ML
                 },
                 {
                     'key': 'torchvision',
                     'name': 'TorchVision',
                     'description': 'Computer vision untuk PyTorch',
                     'pip_name': 'torchvision>=0.10.0',
-                    'default': True
+                    'default': True  # Essential untuk computer vision
                 },
                 {
                     'key': 'yolov5',
                     'name': 'YOLOv5',
                     'description': 'Object detection model',
                     'pip_name': 'yolov5>=6.0.0',
-                    'default': True
+                    'default': True  # Essential untuk SmartCash detection
                 },
                 {
                     'key': 'ultralytics',
                     'name': 'Ultralytics',
                     'description': 'YOLO implementation terbaru',
                     'pip_name': 'ultralytics>=8.0.0',
-                    'default': False
+                    'default': False  # Optional (alternative)
                 }
             ]
         },
@@ -223,35 +227,35 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'name': 'Pandas',
                     'description': 'Data manipulation dan analysis',
                     'pip_name': 'pandas>=1.3.0',
-                    'default': True
+                    'default': True  # Essential untuk data processing
                 },
                 {
                     'key': 'numpy',
                     'name': 'NumPy',
                     'description': 'Numerical computing foundation',
                     'pip_name': 'numpy>=1.21.0',
-                    'default': True
+                    'default': True  # Essential untuk numerical computing
                 },
                 {
                     'key': 'opencv',
                     'name': 'OpenCV',
                     'description': 'Computer vision library',
                     'pip_name': 'opencv-python>=4.5.0',
-                    'default': True
+                    'default': True  # Essential untuk image processing
                 },
                 {
                     'key': 'pillow',
                     'name': 'Pillow',
                     'description': 'Python Imaging Library',
                     'pip_name': 'Pillow>=8.0.0',
-                    'default': True
+                    'default': True  # Essential untuk image manipulation
                 },
                 {
                     'key': 'matplotlib',
                     'name': 'Matplotlib',
                     'description': 'Plotting dan visualization',
                     'pip_name': 'matplotlib>=3.4.0',
-                    'default': False
+                    'default': True  # Essential untuk visualization
                 }
             ]
         }

@@ -48,7 +48,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         # Step 2: Filter uninstalled packages
         ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
         
-        # Use log_message_safe for logger dalam filter function
+        # Use safe logger function untuk filter
         def safe_logger_func(msg):
             log_message_safe(ui_components, msg, "info")
         
@@ -62,8 +62,6 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         # Step 3: Install packages dengan parallel processing
         ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
         log_message_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages", "info")
-        
-        # Gunakan fungsi safe_logger_func yang sudah didefinisikan sebelumnya
         
         installation_results = _install_packages_parallel_with_utils(
             packages_to_install, ui_components, config, safe_logger_func

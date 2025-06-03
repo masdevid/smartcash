@@ -55,20 +55,20 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         custom_packages
     ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
-    # Action buttons dengan 3 buttons yang jelas
+    # Action buttons dengan labels yang tepat
     action_buttons = create_action_buttons(
         primary_label="Install Packages",
         primary_icon="download", 
-        secondary_buttons=[("Analyze Status", "search", "info")],
+        secondary_buttons=[("Check Status", "search", "info")],
         cleanup_enabled=True,
         button_width='140px'
     )
     
-    # Custom button untuk System Check (repurpose cleanup button)
+    # Custom button untuk System Report (repurpose cleanup button)
     if action_buttons.get('cleanup_button'):
-        action_buttons['cleanup_button'].description = "System Check"
-        action_buttons['cleanup_button'].tooltip = "Check system compatibility and detailed package status"
-        action_buttons['cleanup_button'].icon = 'info'
+        action_buttons['cleanup_button'].description = "System Report"
+        action_buttons['cleanup_button'].tooltip = "Generate comprehensive system and package report"
+        action_buttons['cleanup_button'].icon = 'clipboard'
         action_buttons['cleanup_button'].button_style = ''
     
     # Auto-analyze checkbox dengan better spacing
@@ -94,31 +94,31 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
     # Progress tracking
     progress_components = create_progress_tracking_container()
     
-    # Help panel dengan penjelasan button functions
+    # Help panel dengan penjelasan button functions yang tepat
     help_content = """
     <div style="padding: 10px; background: #ffffff; line-height: 1.5;">
         <p style="margin: 8px 0; font-size: 13px; color: #495057;">
-            Installer akan menganalisis dan menginstall packages yang dibutuhkan untuk SmartCash.
+            Dependency installer untuk setup packages yang dibutuhkan SmartCash secara otomatis.
         </p>
         <div style="margin: 12px 0;">
             <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Action Buttons:</strong>
             <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
-                <li style="margin: 3px 0;"><strong>Install Packages:</strong> Install packages yang dipilih (skip yang sudah terinstall)</li>
-                <li style="margin: 3px 0;"><strong>Analyze Status:</strong> Cek status instalasi packages yang dipilih saja</li>
-                <li style="margin: 3px 0;"><strong>System Check:</strong> Comprehensive check sistem + semua package details</li>
+                <li style="margin: 3px 0;"><strong>Install Packages:</strong> Install packages yang dipilih (auto-skip yang sudah terinstall)</li>
+                <li style="margin: 3px 0;"><strong>Check Status:</strong> Analisis status packages yang dipilih</li>
+                <li style="margin: 3px 0;"><strong>System Report:</strong> Generate laporan lengkap sistem dan semua packages</li>
             </ul>
         </div>
         <div style="margin: 12px 0;">
             <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Package Categories:</strong>
             <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
-                <li style="margin: 3px 0;"><strong>Core Requirements:</strong> Package inti untuk SmartCash (IPython, widgets)</li>
-                <li style="margin: 3px 0;"><strong>ML/AI Libraries:</strong> PyTorch, YOLO, computer vision frameworks</li>
-                <li style="margin: 3px 0;"><strong>Data Processing:</strong> Pandas, NumPy, OpenCV untuk manipulasi data</li>
+                <li style="margin: 3px 0;"><strong>Core Requirements:</strong> Package inti SmartCash (IPython, widgets, YAML)</li>
+                <li style="margin: 3px 0;"><strong>ML/AI Libraries:</strong> PyTorch, YOLOv5, computer vision frameworks</li>
+                <li style="margin: 3px 0;"><strong>Data Processing:</strong> Pandas, NumPy, OpenCV, Matplotlib</li>
             </ul>
         </div>
         <div style="margin-top: 12px; padding: 8px; background: #e7f3ff; border-radius: 4px; font-size: 12px; border-left: 3px solid #007bff;">
-            <strong>💡 Tips:</strong> Package yang sudah terinstall akan dilewati secara otomatis. 
-            Gunakan "Analyze Status" untuk cek package yang dipilih, atau "System Check" untuk detail lengkap.
+            <strong>💡 Tips:</strong> Semua packages essential sudah dipilih secara default. 
+            Package yang sudah terinstall akan dilewati otomatis saat install.
         </div>
     </div>
     """
@@ -127,18 +127,21 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
     help_panel.set_title(0, "💡 Info Installation")
     help_panel.selected_index = None
     
-    # Section headers dengan improved styling
+    # Section headers dengan improved styling dan penjelasan
     packages_header = widgets.HTML(f"""
-    <h4 style='color: {get_color('dark', '#333')}; margin: 18px 0 12px 0; font-size: 16px; 
+    <h4 style='color: {get_color('dark', '#333')}; margin: 18px 0 8px 0; font-size: 16px; 
                border-bottom: 2px solid {get_color('primary', '#007bff')}; padding-bottom: 6px;'>
         {get_icon('config', '⚙️')} Pilih Packages untuk Installation
     </h4>
+    <p style='color: {get_color('muted', '#666')}; margin: 5px 0 10px 0; font-size: 12px; font-style: italic;'>
+        ⭐ = Essential packages (direkomendasikan), packages lainnya optional
+    </p>
     """)
     
     action_header = widgets.HTML(f"""
     <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
                border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
-        {get_icon('play', '▶️')} Installation Actions
+        {get_icon('play', '▶️')} Actions
     </h4>
     """)
     
@@ -179,11 +182,11 @@ def create_dependency_installer_main_ui(config: Optional[Dict[str, Any]] = None)
         'custom_packages': custom_packages,
         'auto_analyze_checkbox': auto_analyze_checkbox,
         
-        # Action buttons - mapping dengan button labels yang jelas
+        # Action buttons - mapping dengan button labels yang tepat
         'action_buttons': action_buttons,
         'install_button': action_buttons['download_button'],        # Install Packages
-        'analyze_button': action_buttons['check_button'],           # Analyze Status  
-        'check_button': action_buttons.get('cleanup_button'),       # System Check
+        'analyze_button': action_buttons['check_button'],           # Check Status  
+        'check_button': action_buttons.get('cleanup_button'),       # System Report
         
         # Save/reset buttons
         'save_reset_buttons': save_reset_buttons,

@@ -99,8 +99,8 @@ def check_package_installation_status(package_name: str, version_spec: str = "",
         'required_version': version_spec
     }
 
-def filter_uninstalled_packages(selected_packages: List[str], logger=None) -> List[str]:
-    """Filter packages yang belum terinstall untuk skip installed ones - one-liner approach"""
+def filter_uninstalled_packages(selected_packages: List[str], logger_func=None) -> List[str]:
+    """Filter packages yang belum terinstall untuk skip installed ones dengan logger function"""
     
     installed_packages = get_installed_packages_dict()
     packages_to_install = []
@@ -110,10 +110,11 @@ def filter_uninstalled_packages(selected_packages: List[str], logger=None) -> Li
         status_info = check_package_installation_status(package_name, version_spec, installed_packages)
         
         if status_info['installed']:
-            logger and logger.info(f"⏭️ {package_name} sudah terinstall v{status_info['version']}, dilewati")
+            version_info = status_info.get('version', 'unknown')
+            logger_func and logger_func(f"⏭️ {package_name} sudah terinstall v{version_info}, dilewati")
         else:
             packages_to_install.append(package)
-            logger and logger.info(f"📦 {package_name} akan diinstall")
+            logger_func and logger_func(f"📦 {package_name} akan diinstall")
     
     return packages_to_install
 

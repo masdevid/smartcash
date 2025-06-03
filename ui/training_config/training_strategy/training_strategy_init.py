@@ -47,8 +47,8 @@ class TrainingStrategyConfigInitializer(ConfigCellInitializer):
         
         # Memastikan juga memuat hyperparameters_config dan model_config terbaru
         # untuk mengatasi masalah inheritance yang tidak selalu terupdate
-        hyperparameter_config = config_manager.get_config('hyperparameters_config')
-        model_config = config_manager.get_config('model_config')
+        hyperparameter_config = config_manager.get_config('hyperparameters')
+        model_config = config_manager.get_config('model')
         
         # Jika tidak ada konfigurasi, gunakan default
         if not training_config:

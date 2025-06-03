@@ -250,7 +250,7 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         try:
             _clear_outputs(ui_components)
             params = _extract_processing_params(ui_components)
-            save_success = config_manager.save_config({'preprocessing': params}, 'preprocessing')
+            save_success = config_manager.save_config({'preprocessing': params}, 'preprocessing_config')
             status = "✅ Konfigurasi tersimpan" if save_success else "❌ Gagal simpan konfigurasi"
             _update_status_panel(ui_components, status, "success" if save_success else "error")
         except Exception as e:

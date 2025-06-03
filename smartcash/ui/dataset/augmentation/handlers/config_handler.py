@@ -17,7 +17,7 @@ def save_configuration(ui_components: Dict[str, Any]):
             return
         
         config_manager = get_config_manager()
-        success = config_manager.save_config(config, 'augmentation_config.yaml')
+        success = config_manager.save_config(config, 'augmentation_config')
         
         if success:
             _update_cache(ui_components, config)
@@ -35,7 +35,7 @@ def reset_configuration(ui_components: Dict[str, Any]):
         _apply_config_to_ui(ui_components, default_config)
         
         config_manager = get_config_manager()
-        config_manager.save_config(default_config, 'augmentation_config.yaml')
+        config_manager.save_config(default_config, 'augmentation_config')
         _update_cache(ui_components, default_config)
         
         log_to_ui(ui_components, 'Config direset ke research defaults', 'success', '🔄 ')
@@ -219,7 +219,7 @@ def _load_preprocessing_config_safe() -> Dict[str, Any]:
     """Load preprocessing config dengan fallback ke default scaler structure"""
     try:
         config_manager = get_config_manager()
-        preprocessing_config = config_manager.get_config('preprocessing_config.yaml')
+        preprocessing_config = config_manager.get_config('preprocessing_config')
         
         if preprocessing_config and 'preprocessing' in preprocessing_config:
             return preprocessing_config['preprocessing']

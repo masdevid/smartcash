@@ -14,7 +14,7 @@ from smartcash.ui.training_config.hyperparameters.handlers.defaults import get_d
 class HyperparametersConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk hyperparameters dengan clean pattern"""
     
-    def __init__(self, module_name='hyperparameters', config_filename='hyperparameters_config'):
+    def __init__(self, module_name='hyperparameters', config_filename='hyperparameters'):
         super().__init__(module_name, config_filename)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:

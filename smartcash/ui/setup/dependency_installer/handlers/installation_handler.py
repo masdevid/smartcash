@@ -80,7 +80,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         log_message_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages", "info")
         
         installation_results = _install_packages_parallel_with_utils(
-            packages_to_install, ui_components, config, safe_logger_func
+            packages_to_install, ui_components, config, safe_logger_func, ctx
         )
         
         # Step 4: Finalize dan generate report
@@ -98,7 +98,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
-                                         config: Dict[str, Any], logger_func) -> Dict[str, bool]:
+                                         config: Dict[str, Any], logger_func, ctx) -> Dict[str, bool]:
     """Install packages dengan parallel processing dan consolidated progress tracking"""
     
     results = {}

@@ -10,7 +10,7 @@ from typing import Optional, Dict, Tuple
 
 import torch
 from smartcash.common.logger import SmartCashLogger
-from smartcash.ui.pretrained_model.utils.model_utils import ModelManager as PretrainedModelManager
+from smartcash.model.manager import ModelManager
 
 logger = SmartCashLogger(__name__)
 
@@ -51,8 +51,8 @@ def check_pretrained_model_in_drive(backbone: str) -> Optional[str]:
         logger.info(f"📄 File model {model_filename} tidak ditemukan di drive")
         return None
         
-    # Validasi model menggunakan ModelManager dari pretrained_model
-    model_manager = PretrainedModelManager()
+    # Validasi model menggunakan ModelManager
+    model_manager = ModelManager()
     model_id = backbone
     
     try:

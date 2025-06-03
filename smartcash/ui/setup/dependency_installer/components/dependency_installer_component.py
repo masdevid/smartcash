@@ -14,7 +14,6 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.setup.dependency_installer.utils.package_utils import get_package_categories
     from smartcash.ui.components.progress_tracking import create_progress_tracking_container
     from smartcash.ui.components.log_accordion import create_log_accordion
-    from smartcash.ui.setup.dependency_installer.components.ui_components import assemble_ui_components
     
     # Header
     header = create_header("📦 Instalasi Dependencies", "Setup package yang diperlukan untuk SmartCash")
@@ -107,6 +106,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         'install_button': install_button,
         'custom_packages': custom_packages,
         'progress_tracker': progress_components['tracker'],
+        'progress_container': progress_components['container'],
         'module_name': 'dependency_installer',
         **checkboxes
     }

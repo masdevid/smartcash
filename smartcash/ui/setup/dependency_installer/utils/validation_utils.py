@@ -14,12 +14,14 @@ def validate_ui_components(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary dengan hasil validasi
     """
-    # Komponen kritis yang harus ada
+    # Komponen kritis yang harus ada - sesuai dengan DependencyInstallerInitializer._get_critical_components
     critical_components = [
-        'main_container', 
+        'ui', 
         'install_button', 
+        'status', 
         'log_output', 
-        'progress_container'
+        'progress_container',
+        'status_panel'
     ]
     
     # Validasi keberadaan komponen kritis

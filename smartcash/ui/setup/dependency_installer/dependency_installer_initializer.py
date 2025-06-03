@@ -22,16 +22,9 @@ class DependencyInstallerInitializer(CommonInitializer):
         super().__init__(MODULE_LOGGER_NAME, DEPENDENCY_INSTALLER_LOGGER_NAMESPACE)
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Mendapatkan konfigurasi default untuk dependency installer dengan pendekatan one-liner"""
-        return {
-            'auto_install': False,
-            'selected_packages': ['yolov5_req', 'smartcash_req', 'torch_req'],
-            'custom_packages': '',
-            'validate_after_install': True,
-            'delay_analysis': True,  # Flag untuk menunda analisis sampai UI terender
-            'suppress_logs': True,  # Tekan log selama inisialisasi
-            'hide_progress': True,  # Sembunyikan progress selama inisialisasi
-        }
+        """Mendapatkan konfigurasi default untuk dependency installer dengan pendekatan modular dan DRY"""
+        from smartcash.ui.setup.dependency_installer.utils.validation_utils import get_default_config
+        return get_default_config()
     
     def _get_critical_components(self) -> List[str]:
         """Critical component keys yang harus ada"""
@@ -40,7 +33,7 @@ class DependencyInstallerInitializer(CommonInitializer):
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk dependency installer"""
         ui_components = create_dependency_installer_ui(env, config)
-        ui_components.update({'module_name': 'DEPS', 'dependency_installer_initialized': False})
+        ui_components.update({'module_name': MODULE_LOGGER_NAME, 'dependency_installer_initialized': False})
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
@@ -50,7 +43,7 @@ class DependencyInstallerInitializer(CommonInitializer):
             ui_components['dependency_installer_initialized'] = True
             
             # Setup handlers dengan penanganan error yang lebih baik
-            ui_components = setup_dependency_installer_handlers(ui_components, env, config)
+            ui_components = setup_dependency_installer_handlers(ui_components, config)
             ui_components['handlers_setup'] = True
             
             # Gunakan log_message jika tersedia untuk memastikan log hanya muncul di UI
@@ -73,16 +66,10 @@ class DependencyInstallerInitializer(CommonInitializer):
         
         return ui_components
     
-    def _additional_validation(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-        """Validasi tambahan untuk memastikan install button berfungsi dengan pendekatan one-liner"""
-        # Validasi komponen UI dengan pendekatan one-liner
-        return all([
-            'install_button' in ui_components,
-            hasattr(ui_components['install_button'], 'on_click'),
-            ui_components['install_button']._click_handlers.callbacks,
-            'log_output' in ui_components,
-            'progress_container' in ui_components,
-        ])
+    def _additional_validation(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Validasi tambahan untuk memastikan install button berfungsi dengan pendekatan modular dan DRY"""
+        from smartcash.ui.setup.dependency_installer.utils.validation_utils import validate_ui_components
+        return validate_ui_components(ui_components)
         
     def _post_initialization_hook(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
         """Hook yang dijalankan setelah inisialisasi selesai untuk setup UI dan reset handler"""
@@ -93,29 +80,6 @@ class DependencyInstallerInitializer(CommonInitializer):
         
         # Aktifkan log setelah UI terender
         ui_components['suppress_logs'] = False
-        
-        # Setup reset log dan tampilkan progress handler untuk tombol instalasi
-        if 'install_button' in ui_components and hasattr(ui_components['install_button'], 'on_click'):
-            original_handler = next(iter(ui_components['install_button']._click_handlers.callbacks), None)
-            
-            if original_handler:
-                # Hapus handler asli
-                ui_components['install_button']._click_handlers.callbacks.clear()
-                
-                # Tambahkan handler baru yang mereset log dan menampilkan progress
-                def enhanced_click_handler(b):
-                    # Reset log output
-                    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-                        ui_components['log_output'].clear_output()
-                    
-                    # Tampilkan progress container
-                    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-                        ui_components['progress_container'].layout.visibility = 'visible'
-                    
-                    # Panggil handler asli
-                    original_handler(b)
-                
-                ui_components['install_button'].on_click(enhanced_click_handler)
         
         # Log status inisialisasi jika tersedia
         if 'log_message' in ui_components and callable(ui_components['log_message']):
@@ -133,7 +97,7 @@ class DependencyInstallerInitializer(CommonInitializer):
             # Sembunyikan progress container setelah analisis selesai jika tidak ada instalasi otomatis
             if not config.get('auto_install', False) and 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
                 ui_components['progress_container'].layout.visibility = 'hidden'
-            
+        
         return ui_components
         
     def _get_return_value(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:

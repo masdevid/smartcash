@@ -7,13 +7,14 @@ import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
-    """Create UI components untuk dependency installer"""
+    """Create UI components untuk dependency installer dengan pendekatan modular dan DRY"""
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.info_boxes.dependencies_info import get_dependencies_info
     from smartcash.ui.setup.dependency_installer.utils.package_utils import get_package_categories
     from smartcash.ui.components.progress_tracking import create_progress_tracking_container
     from smartcash.ui.components.log_accordion import create_log_accordion
+    from smartcash.ui.setup.dependency_installer.components.ui_components import assemble_ui_components
     
     # Header
     header = create_header("📦 Instalasi Dependencies", "Setup package yang diperlukan untuk SmartCash")

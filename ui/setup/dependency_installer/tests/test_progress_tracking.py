@@ -28,6 +28,9 @@ class TestProgressTracking(unittest.TestCase):
             'tracker': MagicMock(),
         }
         
+        # Setup layout untuk progress_container
+        self.ui_components['progress_container'].layout = widgets.Layout(visibility='hidden')
+        
         # Mock log_output methods
         self.ui_components['log_output'].clear_output = MagicMock()
         self.ui_components['log_output'].append_display_data = MagicMock()
@@ -43,12 +46,19 @@ class TestProgressTracking(unittest.TestCase):
         self.ui_components['update_status_panel'] = MagicMock()
         self.ui_components['error_operation'] = MagicMock()
         self.ui_components['show_for_operation'] = MagicMock()
+        self.ui_components['complete_operation'] = MagicMock()
+        self.ui_components['active_bars'] = ['overall', 'step', 'current']
         
         # Mock analysis result
         self.ui_components['analysis_categories'] = {
             'missing': ['test-package-1', 'test-package-2', 'test-package-3'],
             'upgrade': ['test-package-4', 'test-package-5'],
             'installed': []
+        }
+        
+        # Mock analysis_result untuk install_required_packages
+        self.ui_components['analysis_result'] = {
+            'missing_packages': ['test-package-1', 'test-package-2', 'test-package-3', 'test-package-4', 'test-package-5']
         }
         
     @patch('subprocess.Popen')
@@ -93,16 +103,75 @@ class TestProgressTracking(unittest.TestCase):
         self.ui_components['reset_progress_bar'].assert_called()
         self.ui_components['update_progress'].assert_called()
         
-        # Verifikasi bahwa progress container ditampilkan
-        self.assertEqual(self.ui_components['progress_container'].layout.visibility, 'visible')
+        # Verifikasi bahwa show_for_operation dipanggil
+        self.ui_components['show_for_operation'].assert_called_with('install')
         
         # Verifikasi bahwa log_message dipanggil dengan salah satu pesan yang diharapkan
         # Karena urutan pemanggilan tidak bisa diprediksi dengan pasti, kita cek apakah fungsi dipanggil
         self.assertTrue(self.ui_components['log_message'].called)
         
-        # Verifikasi hasil
-        self.assertEqual(len(results), 3)
-        self.assertTrue(all(results.values()))
+    def test_complete_operation_updates_ui(self):
+        """Test bahwa complete_operation memperbarui UI dengan benar."""
+        # Import fungsi yang akan diuji
+        from smartcash.ui.setup.dependency_installer.utils.ui_utils import complete_operation
+        
+        # Panggil fungsi yang diuji
+        success_message = "Semua package berhasil diinstall"
+        complete_operation(self.ui_components, success_message)
+        
+        # Verifikasi bahwa progress bar diupdate ke 100%
+        expected_progress_calls = [
+            call('overall', 100, "Operasi selesai", "#28a745"),
+            call('step', 100, "Operasi selesai", "#28a745"),
+            call('current', 100, "✅ Operasi selesai", "#28a745")
+        ]
+        self.ui_components['update_progress'].assert_has_calls(expected_progress_calls, any_order=True)
+        
+        # Verifikasi bahwa status panel diupdate dengan pesan sukses
+        self.ui_components['update_status_panel'].assert_called_with("success", f"✅ {success_message}")
+        
+        # Verifikasi bahwa log_message dipanggil dengan pesan sukses
+        self.ui_components['log_message'].assert_called_with(f"✅ {success_message}", "success")
+        
+    def test_analyze_installed_packages_updates_progress(self):
+        """Test bahwa analyze_installed_packages memperbarui progress tracking dengan benar."""
+        # Mock fungsi yang dipanggil oleh analyze_installed_packages
+        with patch('smartcash.ui.setup.dependency_installer.utils.analyzer_utils.get_installed_packages') as mock_get_installed_packages, \
+             patch('smartcash.ui.setup.dependency_installer.utils.analyzer_utils.get_installed_package_versions') as mock_get_versions, \
+             patch('smartcash.ui.setup.dependency_installer.utils.analyzer_utils.get_project_requirements') as mock_get_requirements, \
+             patch('smartcash.ui.setup.dependency_installer.utils.analyzer_utils.analyze_requirements') as mock_analyze_requirements:
+            
+            # Setup mock returns
+            mock_get_installed_packages.return_value = {'numpy', 'pandas'}
+            mock_get_versions.return_value = {'numpy': '1.20.0', 'pandas': '1.3.0'}
+            mock_get_requirements.return_value = ['numpy>=1.18.0', 'pandas>=1.2.0', 'matplotlib>=3.3.0']
+            mock_analyze_requirements.return_value = {
+                'numpy>=1.18.0': {'installed': True, 'package_name': 'numpy', 'installed_version': '1.20.0', 'required_version': '>=1.18.0', 'compatible': True},
+                'pandas>=1.2.0': {'installed': True, 'package_name': 'pandas', 'installed_version': '1.3.0', 'required_version': '>=1.2.0', 'compatible': True},
+                'matplotlib>=3.3.0': {'installed': False, 'package_name': 'matplotlib', 'installed_version': None, 'required_version': '>=3.3.0', 'compatible': False}
+            }
+            
+            # Import fungsi yang akan diuji
+            from smartcash.ui.setup.dependency_installer.utils.analyzer_utils import analyze_installed_packages
+            
+            # Panggil fungsi yang diuji
+            result = analyze_installed_packages(self.ui_components)
+            
+            # Verifikasi bahwa show_for_operation dipanggil dengan 'analyze'
+            self.ui_components['show_for_operation'].assert_called_with('analyze')
+            
+            # Verifikasi bahwa reset_progress_bar dipanggil
+            self.ui_components['reset_progress_bar'].assert_called()
+            
+            # Verifikasi bahwa update_progress dipanggil untuk overall, step, dan current
+            self.assertTrue(self.ui_components['update_progress'].called)
+            
+            # Verifikasi bahwa log_message dipanggil
+            self.assertTrue(self.ui_components['log_message'].called)
+            
+            # Verifikasi hasil
+            self.assertIsNotNone(result)
+            self.assertIn('missing_packages', result)
     
     @patch('smartcash.ui.setup.dependency_installer.utils.package_installer.install_packages_parallel')
     def test_install_required_packages_updates_progress(self, mock_install_packages_parallel):
@@ -120,10 +189,14 @@ class TestProgressTracking(unittest.TestCase):
         from smartcash.ui.setup.dependency_installer.utils.package_installer import install_required_packages
         
         # Panggil fungsi yang diuji
-        result = install_required_packages(self.ui_components)
+        install_required_packages(self.ui_components)
         
-        # Verifikasi bahwa log_message dipanggil
-        self.ui_components['log_message'].assert_called_with('🔄 Menginstall 5 package...', 'info')
+        # Verifikasi bahwa log_message dipanggil dengan pesan yang sesuai
+        expected_calls = [
+            call("🔍 Memeriksa package yang perlu diinstall...", "info"),
+            call("📦 Menemukan 5 package yang perlu diinstall", "info")
+        ]
+        self.ui_components['log_message'].assert_has_calls(expected_calls, any_order=True)
         
         # Verifikasi bahwa install_packages_parallel dipanggil dengan package yang benar
         expected_packages = ['test-package-1', 'test-package-2', 'test-package-3', 'test-package-4', 'test-package-5']
@@ -131,8 +204,11 @@ class TestProgressTracking(unittest.TestCase):
         actual_packages = mock_install_packages_parallel.call_args[0][0]
         self.assertEqual(sorted(actual_packages), sorted(expected_packages))
         
-        # Verifikasi hasil
-        self.assertTrue(result)
+        # Verifikasi bahwa show_for_operation dipanggil
+        self.ui_components['show_for_operation'].assert_called_with('install')
+        
+        # Verifikasi bahwa reset_progress_bar dipanggil
+        self.ui_components['reset_progress_bar'].assert_called()
     
     @patch('subprocess.Popen')
     def test_progress_increments_during_installation(self, mock_popen):

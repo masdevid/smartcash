@@ -48,14 +48,14 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
             category_box = create_category_box(category, checkboxes)
             category_boxes.append(category_box)
         
-        # Packages container - 3 columns full width dengan space-between
+        # Packages container - 3 columns full width dengan space-between dan tinggi yang sama
         packages_container = widgets.HBox(
             category_boxes,
             layout=widgets.Layout(
                 display='flex',
                 flex_flow='row nowrap',
                 justify_content='space-between',
-                align_items='flex-start',
+                align_items='stretch', # Mengubah dari flex-start ke stretch agar tinggi sama
                 width='100%',
                 margin='10px 0',
                 overflow='hidden'
@@ -191,10 +191,10 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
     package_widgets = []
     for package in category['packages']:
         try:
-            # Membuat status widget
+            # Membuat status widget dengan format yang konsisten dengan UI logger
             status_widget = widgets.HTML(
-                f"<span style='color:{COLORS['muted']};font-size:11px;white-space:nowrap;'>Checking...</span>",
-                layout=widgets.Layout(width='70px', margin='0')
+                f"<span style='color:{COLORS['info']};font-size:11px;white-space:nowrap;'>🔍 Checking...</span>",
+                layout=widgets.Layout(width='90px', margin='0')
             )
             
             # Cek apakah kunci 'default' ada, jika tidak, gunakan True sebagai default
@@ -241,7 +241,7 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
             )
             package_widgets.append(error_widget)
     
-    # Category container dengan proper responsive width
+    # Category container dengan proper responsive width dan flex-grow untuk tinggi yang sama
     return widgets.VBox([header] + package_widgets, 
                        layout=widgets.Layout(
                            width='32%',
@@ -251,5 +251,8 @@ def create_category_box(category: Dict[str, Any], checkboxes: Dict[str, Any]) ->
                            border=f'1px solid {COLORS["border"]}',
                            border_radius='6px',
                            overflow='hidden',
-                           box_sizing='border-box'
+                           box_sizing='border-box',
+                           flex_grow='1', # Menambahkan flex-grow agar tinggi sama
+                           display='flex',
+                           flex_direction='column'
                        ))

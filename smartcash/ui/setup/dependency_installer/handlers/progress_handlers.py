@@ -9,7 +9,7 @@ from IPython.display import display
 
 # Import fungsi dari ui_utils.py untuk menghindari duplikasi
 from smartcash.ui.setup.dependency_installer.utils.ui_utils import (
-    show_for_operation, error_operation, update_status_panel
+    show_for_operation, error_operation, update_status_panel, complete_operation
 )
 
 def update_progress(ui_components: Dict[str, Any], progress_type: str, value: int, message: str, color: str = None) -> None:
@@ -59,6 +59,7 @@ def setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
     ui_components['reset_progress_bar'] = lambda value=0, message="", show_progress=True: reset_progress_bar(ui_components, value, message, show_progress)
     ui_components['show_for_operation'] = lambda operation: show_for_operation(ui_components, operation)
     ui_components['error_operation'] = lambda error_message: error_operation(ui_components, error_message)
+    ui_components['complete_operation'] = lambda success_message: complete_operation(ui_components, success_message)
     ui_components['update_status_panel'] = lambda status_type, message: update_status_panel(ui_components, status_type, message)
     ui_components['log_message'] = lambda message, level="info", icon="ℹ️": log_message(ui_components, message, level, icon)
 

@@ -159,9 +159,9 @@ def _display_comprehensive_report_with_utils(ui_components: Dict[str, Any], syst
         display(HTML(combined_report))
     
     # Log summary
-    _log_status_summary_with_utils(package_status, system_requirements, ctx)
+    _log_status_summary_with_utils(ui_components, package_status, system_requirements, ctx)
 
-def _log_status_summary_with_utils(package_status: Dict[str, Dict[str, Any]], 
+def _log_status_summary_with_utils(ui_components: Dict[str, Any], package_status: Dict[str, Dict[str, Any]], 
                                  system_requirements: Dict[str, Any], ctx):
     """Log summary menggunakan consolidated approach"""
     

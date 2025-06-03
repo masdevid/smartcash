@@ -32,7 +32,7 @@ def setup_installation_handler(ui_components: Dict[str, Any], config: Dict[str, 
 
 def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict[str, Any], ctx):
     """Execute installation menggunakan consolidated utils"""
-    
+    import time
     start_time = time.time()
     
     try:

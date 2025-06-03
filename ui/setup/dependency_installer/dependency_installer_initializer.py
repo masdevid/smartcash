@@ -269,7 +269,7 @@ def initialize_dependency_installer(config: Optional[Dict[str, Any]] = None, env
         ui_components = initializer.initialize(config, env)
         
         # Langsung kembalikan ui_components tanpa silent wrapper
-        return ui_components
+        return display(ui_components['ui'])
     except Exception as e:
         error_details = traceback.format_exc()
         initializer.logger.error(f"Unexpected error in initialize_dependency_installer: {str(e)}\n{error_details}")

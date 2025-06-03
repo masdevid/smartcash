@@ -49,6 +49,11 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     # Set default suppress_logs jika tidak ada
     if 'suppress_logs' not in ui_components:
         ui_components['suppress_logs'] = config.get('suppress_logs', False) if config else False
+        
+    # Sembunyikan progress container jika diminta
+    if config and config.get('hide_progress', False) and 'progress_container' in ui_components:
+        if hasattr(ui_components['progress_container'], 'layout'):
+            ui_components['progress_container'].layout.visibility = 'hidden'
     
     try:
         # Setup observer manager untuk notifikasi

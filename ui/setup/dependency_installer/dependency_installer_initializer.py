@@ -90,85 +90,91 @@ _dependency_installer_initializer = DependencyInstallerInitializer()
 _config_manager = None
 
 # Public API
+# Variabel global untuk menyimpan instance UI components
+_ui_components_instance = None
+
 def initialize_dependency_installer(env=None, config=None):
     """Inisialisasi dan tampilkan UI dependency installer"""
-    from IPython.display import display, clear_output
-    import builtins
+    from IPython.display import display, clear_output, HTML
+    import ipywidgets as widgets
     import sys
-    from io import StringIO
+    import types
+    global _ui_components_instance
     
-    # Simpan stdout asli
-    original_stdout = sys.stdout
+    # Clear output terlebih dahulu untuk menghindari masalah rendering
+    clear_output(wait=True)
     
-    # Redirect stdout untuk mencegah pencetakan dictionary
-    sys.stdout = StringIO()
+    # Siapkan config dasar
+    config = config or {}
+    config['suppress_logs'] = True  # Tambahkan flag untuk menekan log selama inisialisasi
     
-    try:
-        # Clear output terlebih dahulu untuk menghindari masalah rendering
-        clear_output(wait=True)
+    # Inisialisasi UI components tanpa menampilkan progress
+    config['hide_progress'] = True
+    ui_components = _dependency_installer_initializer.initialize(env=env, config=config)
+    
+    # Sembunyikan progress container saat inisialisasi
+    if isinstance(ui_components, dict) and 'progress_container' in ui_components:
+        if hasattr(ui_components['progress_container'], 'layout'):
+            ui_components['progress_container'].layout.visibility = 'hidden'
+    
+    # Tampilkan UI
+    if isinstance(ui_components, dict) and 'ui' in ui_components:
+        display(ui_components['ui'])
+    
+    # Aktifkan log setelah UI terender
+    if isinstance(ui_components, dict):
+        ui_components['suppress_logs'] = False
         
-        # Siapkan config dasar tanpa inisialisasi penuh
-        config = config or {}
-        config['suppress_logs'] = True  # Tambahkan flag untuk menekan log selama inisialisasi
-        
-        # Inisialisasi UI components dasar terlebih dahulu
-        ui_components_basic = _dependency_installer_initializer._create_ui_components(config)
-        
-        # Tampilkan UI dasar terlebih dahulu
-        if isinstance(ui_components_basic, dict) and 'ui' in ui_components_basic:
-            display(ui_components_basic['ui'])
-        
-        # Sekarang lakukan inisialisasi penuh setelah UI ditampilkan
-        ui_components = _dependency_installer_initializer.initialize(env=env, config=config)
-        
-        # Update UI jika berbeda dari yang dasar
-        if isinstance(ui_components, dict) and 'ui' in ui_components and ui_components['ui'] != ui_components_basic.get('ui'):
-            clear_output(wait=True)
-            display(ui_components['ui'])
-        
-        # Aktifkan log setelah UI terender
-        if isinstance(ui_components, dict):
-            ui_components['suppress_logs'] = False
+        # Setup reset log dan tampilkan progress handler untuk tombol instalasi
+        if 'install_button' in ui_components and hasattr(ui_components['install_button'], 'on_click'):
+            original_handler = None
+            for handler in ui_components['install_button']._click_handlers.callbacks:
+                original_handler = handler
+                break
             
-            # Setup reset log handler untuk tombol instalasi
-            if 'install_button' in ui_components and hasattr(ui_components['install_button'], 'on_click'):
-                original_handler = None
-                for handler in ui_components['install_button']._click_handlers.callbacks:
-                    original_handler = handler
-                    break
+            if original_handler:
+                # Hapus handler asli
+                ui_components['install_button']._click_handlers.callbacks.clear()
                 
-                if original_handler:
-                    # Hapus handler asli
-                    ui_components['install_button']._click_handlers.callbacks.clear()
+                # Tambahkan handler baru yang mereset log dan menampilkan progress
+                def enhanced_click_handler(b):
+                    # Reset log output
+                    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+                        ui_components['log_output'].clear_output()
                     
-                    # Tambahkan handler baru yang mereset log terlebih dahulu
-                    def enhanced_click_handler(b):
-                        # Reset log output
-                        if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-                            ui_components['log_output'].clear_output()
-                        # Panggil handler asli
-                        original_handler(b)
+                    # Tampilkan progress container
+                    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                        ui_components['progress_container'].layout.visibility = 'visible'
                     
-                    ui_components['install_button'].on_click(enhanced_click_handler)
-            
-            # Log status inisialisasi jika tersedia
-            if 'log_message' in ui_components and callable(ui_components['log_message']):
-                ui_components['log_message']("✅ Dependency installer UI berhasil diinisialisasi", "success")
-        else:
-            # Fallback jika UI tidak dapat diinisialisasi
-            print("❌ Error: Komponen UI dependency installer tidak dapat diinisialisasi dengan benar.")
-    finally:
-        # Kembalikan stdout asli
-        sys.stdout = original_stdout
+                    # Panggil handler asli
+                    original_handler(b)
+                
+                ui_components['install_button'].on_click(enhanced_click_handler)
+        
+        # Log status inisialisasi jika tersedia
+        if 'log_message' in ui_components and callable(ui_components['log_message']):
+            ui_components['log_message']("✅ Dependency installer UI berhasil diinisialisasi", "success")
+    else:
+        # Fallback jika UI tidak dapat diinisialisasi
+        print("❌ Error: Komponen UI dependency installer tidak dapat diinisialisasi dengan benar.")
     
-    # Kembalikan ui_components untuk digunakan jika diperlukan tanpa mencetak ke konsol
-    class SuppressedReturn:
-        def __init__(self, obj):
-            self.obj = obj
-        def __repr__(self):
-            return ""
+    # Simpan instance untuk referensi global
+    _ui_components_instance = ui_components
     
-    return SuppressedReturn(ui_components).obj
+    # Kembalikan fungsi dummy untuk mencegah output dictionary
+    def dummy_function():
+        pass
+    
+    # Tambahkan atribut khusus ke fungsi dummy
+    dummy_function.ui_components = ui_components
+    
+    # Override __repr__ dari fungsi dummy
+    def custom_repr(self):
+        return ""
+    
+    dummy_function.__repr__ = types.MethodType(custom_repr, dummy_function)
+    
+    return dummy_function
 
 def get_config_manager():
     """Mendapatkan instance ConfigManager untuk dependency installer dengan pendekatan singleton"""

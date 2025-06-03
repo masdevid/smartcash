@@ -4,7 +4,7 @@ Deskripsi: Handler untuk tombol refresh konfigurasi pada modul training
 """
 
 from typing import Dict, Any
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import SimpleConfigManager as ConfigManager
 from smartcash.common.logger import get_logger
 
 logger = get_logger('smartcash.ui.training')
@@ -29,7 +29,7 @@ def _refresh_config(ui_components: Dict[str, Any]) -> None:
     """Async config refresh dengan proper error handling"""
     try:
         # Mendapatkan config manager
-        config_manager = ConfigManager.get_instance()
+        config_manager = ConfigManager()
         
         # Mendapatkan konfigurasi dari semua modul terkait
         backbone_config = config_manager.get_module_config('backbone')

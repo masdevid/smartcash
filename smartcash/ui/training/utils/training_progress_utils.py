@@ -230,3 +230,21 @@ show_validation_progress = lambda ui: show_operation_progress(ui, 'validation')
 hide_progress = lambda ui: ui.get('progress_container', {}).get('tracker', {}).get('hide', lambda: None)()
 complete_training = lambda ui, msg="Training completed!": complete_operation_progress(ui, msg, show_summary=True)
 error_training = lambda ui, msg="Training failed": error_operation_progress(ui, msg, show_details=True)
+
+# Complete all progress bars dengan satu panggilan
+complete_all_progress = lambda ui, msg="All operations completed!": (
+    progress_tracker := ui.get('progress_container', {}).get('tracker'),
+    progress_tracker.update('overall', 100, "✅ Complete", color='success'),
+    progress_tracker.update('step', 100, "✅ Complete", color='success'),
+    progress_tracker.update('current', 100, msg, color='success'),
+    progress_tracker.complete(msg)
+)[-1] if ui.get('progress_container', {}).get('tracker') else None
+
+# Set error state untuk semua progress bars
+error_all_progress = lambda ui, msg="Operation failed": (
+    progress_tracker := ui.get('progress_container', {}).get('tracker'),
+    progress_tracker.update('overall', 0, "❌ Failed", color='danger'),
+    progress_tracker.update('step', 0, "❌ Failed", color='danger'),
+    progress_tracker.update('current', 0, msg, color='danger'),
+    progress_tracker.error(msg)
+)[-1] if ui.get('progress_container', {}).get('tracker') else None

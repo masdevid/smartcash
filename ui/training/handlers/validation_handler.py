@@ -92,24 +92,14 @@ def _get_overall_validation_status(results: Dict[str, Any]) -> Dict[str, str]:
 
 def validate_model_before_training(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
     """Quick validation sebelum training dimulai"""
-    model_manager = ui_components.get('model_manager')
-    training_service = ui_components.get('training_service')
+    # Gunakan training manager jika tersedia
+    from smartcash.ui.training.services import TrainingServiceManager
+    training_manager = ui_components.get('training_manager')
     
-    # Basic checks
-    if not model_manager:
-        update_training_status(ui_components, "❌ Model manager tidak tersedia", 'error')
-        return False
-    
-    if not training_service:
-        update_training_status(ui_components, "❌ Training service tidak tersedia", 'error')
-        return False
-    
-    # Check if model is built
-    if not model_manager.model:
-        try:
-            model_manager.build_model()
-        except Exception as e:
-            update_training_status(ui_components, f"❌ Gagal build model: {str(e)}", 'error')
-            return False
-    
-    return True
+    # Buat training manager jika belum ada
+    if not training_manager:
+        training_manager = TrainingServiceManager(ui_components, config)
+        ui_components['training_manager'] = training_manager
+        
+    # Validasi kesiapan training menggunakan manager
+    return training_manager.validate_training_readiness()

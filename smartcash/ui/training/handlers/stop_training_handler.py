@@ -17,9 +17,15 @@ def handle_stop_training(ui_components: Dict[str, Any]):
     ui_components['stop_button'].disabled = True
     update_training_status(ui_components, "⏹️ Menghentikan training dan menyimpan checkpoint...", 'warning')
     
-    # Trigger stop pada training service
-    training_service = ui_components.get('training_service')
-    training_service and training_service.stop_training()
+    # Gunakan training manager jika tersedia
+    training_manager = ui_components.get('training_manager')
+    if training_manager:
+        training_manager.stop_training()
+    else:
+        # Fallback ke training service langsung
+        training_service = ui_components.get('training_service')
+        if training_service:
+            training_service.stop_training()
     
     logger = ui_components.get('logger')
     logger and logger.info("⏹️ Training stop requested dengan checkpoint saved")

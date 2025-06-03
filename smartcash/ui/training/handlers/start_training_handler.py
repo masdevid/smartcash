@@ -4,6 +4,7 @@ Deskripsi: Updated start training handler dengan full progress tracking integrat
 """
 
 from typing import Dict, Any, Callable
+from smartcash.common.logger import get_logger
 from smartcash.ui.training.handlers.training_button_handlers import get_state, set_state
 from smartcash.ui.training.utils.training_status_utils import update_training_status
 from smartcash.ui.training.utils.training_progress_utils import (
@@ -14,16 +15,26 @@ from smartcash.ui.training.utils.training_logging_utils import (
     log_training_start, log_training_complete, log_epoch_metrics, log_checkpoint_save
 )
 
+# Logger untuk training handler
+logger = get_logger("smartcash.ui.training.handlers.start_training")
+
 
 def handle_start_training(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Handle start training dengan full progress integration"""
+    """Handle start training dengan progress tracking, metrics, dan checkpoint callbacks"""
     if get_state()['active']:
         return
     
-    logger = ui_components.get('logger')
-    training_service = ui_components.get('training_service')
+    # Gunakan training service manager jika tersedia
+    from smartcash.ui.training.services import TrainingServiceManager
+    training_manager = ui_components.get('training_manager')
     
-    # Validate training service
+    # Buat training manager jika belum ada
+    if not training_manager:
+        training_manager = TrainingServiceManager(ui_components, config)
+        ui_components['training_manager'] = training_manager
+    
+    # Dapatkan training service
+    training_service = ui_components.get('training_service')
     if not training_service:
         update_training_status(ui_components, "❌ Training service tidak tersedia", 'error')
         error_all_progress(ui_components, "Training service tidak tersedia")
@@ -40,10 +51,10 @@ def handle_start_training(ui_components: Dict[str, Any], config: Dict[str, Any])
     # Log training start
     log_training_start(ui_components, config)
     
-    # Create comprehensive callbacks
-    progress_callback = _create_progress_callback(ui_components, training_service)
-    metrics_callback = _create_metrics_callback(ui_components)
-    checkpoint_callback = _create_checkpoint_callback(ui_components)
+    # Set callbacks untuk progress, metrics, dan checkpoint
+    progress_callback = lambda current, total, message: _update_progress(ui_components, current, total, message)
+    metrics_callback = lambda epoch, metrics: _update_metrics(ui_components, epoch, metrics)
+    checkpoint_callback = lambda current, total, message: _update_checkpoint_progress(ui_components, current, total, message)
     
     # Set callbacks ke training service
     training_service.set_progress_callbacks(progress_callback, metrics_callback, checkpoint_callback)

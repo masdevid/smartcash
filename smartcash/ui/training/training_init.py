@@ -5,13 +5,16 @@ from IPython.display import display
 
 from smartcash.ui.utils.common_initializer import CommonInitializer
 from smartcash.ui.utils.logging_utils import suppress_all_outputs
+from smartcash.ui.utils.ui_logger_namespace import TRAINING_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[TRAINING_LOGGER_NAMESPACE]
 
 
 class TrainingInitializer(CommonInitializer):
     """Training UI initializer dengan config callback integration"""
     
-    def __init__(self, module_name: str, logger_namespace: str):
-        super().__init__(module_name, logger_namespace)
+    def __init__(self):
+        super().__init__(MODULE_LOGGER_NAME, TRAINING_LOGGER_NAMESPACE)
         self.config_update_callbacks = []
         self._ui_displayed = False  # Flag untuk mencegah tampilan ganda
     
@@ -57,26 +60,31 @@ class TrainingInitializer(CommonInitializer):
         """Initialize model services dengan step-by-step progress"""
         try:
             # Progress update dengan steps
-            self._update_initialization_progress(ui_components, 1, 4, "📋 Parsing configuration...")
+            self._update_initialization_progress(ui_components, 1, 5, "📋 Parsing configuration...")
             
             # Parse config
             training_config = config.get('training', {})
             model_type = training_config.get('model_type', 'efficient_optimized')
             
             # Step 2: Create model manager
-            self._update_initialization_progress(ui_components, 2, 4, f"🧠 Creating {model_type} model...")
+            self._update_initialization_progress(ui_components, 2, 5, f"🧠 Creating {model_type} model...")
             model_manager = self._create_model_manager(training_config, model_type)
             
             # Step 3: Create services
-            self._update_initialization_progress(ui_components, 3, 4, "🚀 Initializing services...")
+            self._update_initialization_progress(ui_components, 3, 5, "🚀 Initializing backend services...")
             services = self._create_training_services(model_manager, config)
             
-            # Step 4: Complete
-            self._update_initialization_progress(ui_components, 4, 4, "✅ Services ready!")
+            # Step 4: Create training service manager
+            self._update_initialization_progress(ui_components, 4, 5, "🔄 Initializing training manager...")
+            training_manager = self._create_training_manager(ui_components, config)
+            
+            # Step 5: Complete
+            self._update_initialization_progress(ui_components, 5, 5, "✅ Services ready!")
             
             # Update UI components
             ui_components.update({
                 'model_manager': model_manager,
+                'training_manager': training_manager,
                 **services
             })
             
@@ -92,14 +100,19 @@ class TrainingInitializer(CommonInitializer):
         try:
             from smartcash.model.manager import ModelManager
             
+            # Dapatkan parameter konfigurasi
+            layer_mode = training_config.get('layer_mode', 'single')
+            detection_layers = training_config.get('detection_layers', ['banknote'])
+            
             # Create model manager dengan training config
             model_manager = ModelManager(
+                config=training_config,
                 model_type=model_type,
-                backbone=training_config.get('backbone', 'efficientnet_b4'),
-                batch_size=training_config.get('batch_size', 16),
-                learning_rate=training_config.get('learning_rate', 0.001)
+                layer_mode=layer_mode,
+                detection_layers=detection_layers
             )
             
+            self.logger.info(f"🧠 Model manager dibuat: {model_type}, layer_mode={layer_mode}")
             return model_manager
             
         except Exception as e:
@@ -109,27 +122,59 @@ class TrainingInitializer(CommonInitializer):
     def _create_training_services(self, model_manager, config: Dict[str, Any]):
         """Create training services dengan progress callback integration"""
         try:
-            from smartcash.training.services.training_service import TrainingService
-            from smartcash.training.services.metrics_service import MetricsService
-            from smartcash.training.services.checkpoint_service import CheckpointService
+            # Gunakan training service dari model manager
+            backend_training_service = model_manager.get_training_service()
             
-            # Create primary services
-            training_service = TrainingService(model_manager)
-            metrics_service = MetricsService()
-            checkpoint_service = CheckpointService(
-                checkpoint_dir=config.get('paths', {}).get('checkpoint_dir', 'runs/train/checkpoints')
-            )
+            # Buat adapter untuk training service
+            from smartcash.ui.training.adapters import TrainingServiceAdapter
+            training_service = TrainingServiceAdapter(backend_training_service, self.logger)
+            
+            # Dapatkan checkpoint service dari training service backend
+            checkpoint_service = backend_training_service.checkpoint_service
+            
+            # Dapatkan metrics tracker dari training service backend
+            metrics_tracker = backend_training_service.metrics_tracker
+            
+            self.logger.info(f"🚀 Training service adapter dibuat untuk model {model_manager.model_type}")
             
             # Return services map
             return {
                 'training_service': training_service,
-                'metrics_service': metrics_service,
-                'checkpoint_service': checkpoint_service
+                'checkpoint_service': checkpoint_service,
+                'metrics_tracker': metrics_tracker,
+                'backend_training_service': backend_training_service
             }
             
         except Exception as e:
             self.logger.error(f"❌ Services error: {str(e)}")
             return {}
+    
+    def _create_training_manager(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
+        """Create training service manager untuk integrasi UI dan backend"""
+        try:
+            from smartcash.ui.training.services import TrainingServiceManager
+            
+            # Dapatkan model manager dan training service
+            model_manager = ui_components.get('model_manager')
+            training_service = ui_components.get('training_service')
+            
+            if not model_manager or not training_service:
+                self.logger.warning("⚠️ Model manager atau training service tidak tersedia untuk training manager")
+                return None
+            
+            # Buat training manager
+            training_manager = TrainingServiceManager(ui_components, config, self.logger)
+            
+            # Register model manager dan config
+            training_manager.register_model_manager(model_manager)
+            training_manager.register_config(config)
+            
+            self.logger.info("✅ Training service manager berhasil dibuat")
+            return training_manager
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error saat membuat training manager: {str(e)}")
+            return None
     
     def _setup_config_callback(self, ui_components: Dict[str, Any]):
         """Setup callback untuk config updates dengan integrasi dari berbagai modul"""
@@ -294,6 +339,9 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         return fallback
 
 
+# Global instance dan public API
+_training_initializer = TrainingInitializer()
+
 # One-liner factory untuk compatibility dengan cell entry
 create_training_ui = lambda env=None, config=None, **kw: initialize_training_ui(env, config, **kw)
-get_training_initializer = lambda: TrainingInitializer('training', 'smartcash.ui.training')
+get_training_initializer = lambda: _training_initializer

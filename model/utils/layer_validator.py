@@ -1,87 +1,79 @@
 """
 File: smartcash/model/utils/layer_validator.py
-Deskripsi: Utilitas untuk validasi parameter layer mode dan detection layers
+Deskripsi: Shared layer validation utilities untuk training UI dan model manager
 """
 
-from typing import List, Dict, Tuple, Any
-from smartcash.common.logger import get_logger
-from smartcash.model.config.model_constants import DETECTION_LAYERS
+from typing import List, Tuple, Dict, Any
+from smartcash.model.config.model_constants import LAYER_CONFIG, DETECTION_LAYERS
 
-logger = get_logger(__name__)
-
-def validate_layer_params(
-    layer_mode: str, 
-    detection_layers: List[str]
-) -> Tuple[str, List[str]]:
+def validate_layer_params(layer_mode: str, detection_layers: List[str]) -> Tuple[str, List[str]]:
     """
-    Memvalidasi parameter layer_mode dan detection_layers dan memperbaiki jika tidak valid.
+    Unified layer parameter validation untuk training UI dan model manager.
     
     Args:
         layer_mode: Mode layer ('single' atau 'multilayer')
-        detection_layers: Daftar layer deteksi yang digunakan
+        detection_layers: List layer deteksi
         
     Returns:
-        Tuple berisi (layer_mode, detection_layers) yang sudah divalidasi
+        Tuple berisi (validated_layer_mode, validated_detection_layers)
     """
-    # Validasi detection_layers
-    valid_detection_layers = []
-    for layer in detection_layers:
-        if layer in DETECTION_LAYERS:
-            valid_detection_layers.append(layer)
+    # Validate dan filter detection layers
+    valid_layers = [layer for layer in detection_layers if layer in DETECTION_LAYERS]
     
-    # Jika tidak ada layer valid, gunakan default 'banknote'
-    if not valid_detection_layers:
-        logger.warning(f"⚠️ Tidak ada detection_layers valid, menggunakan default 'banknote'")
-        valid_detection_layers = ['banknote']
+    # Jika tidak ada layer valid, gunakan default
+    if not valid_layers: valid_layers = ['banknote']
     
-    # Validasi layer_mode berdasarkan jumlah detection_layers
-    valid_layer_mode = layer_mode
+    # Auto-correct mode berdasarkan jumlah layer
+    if layer_mode == 'multilayer' and len(valid_layers) < 2:
+        # Multilayer membutuhkan minimal 2 layer
+        corrected_mode = 'single'
+    elif layer_mode == 'single' and len(valid_layers) >= 2:
+        # Keep as single jika user explicitly choose single
+        corrected_mode = 'single'
+    else:
+        corrected_mode = layer_mode
     
-    # Kasus 1: Jika hanya satu detection_layer tapi mode multilayer, ubah ke single
-    if len(valid_detection_layers) == 1 and layer_mode == 'multilayer':
-        logger.warning(f"⚠️ Hanya satu detection_layer tetapi layer_mode adalah '{layer_mode}', mengubah ke 'single'")
-        valid_layer_mode = 'single'
-    
-    # Kasus 2: Jika banyak detection_layers dengan mode multilayer, tetap multilayer
-    elif len(valid_detection_layers) > 1 and layer_mode == 'multilayer':
-        valid_layer_mode = 'multilayer'
-    
-    # Kasus 3: Jika banyak detection_layers dengan mode single, tetap single
-    # tapi beri peringatan bahwa hanya layer pertama yang akan digunakan
-    elif len(valid_detection_layers) > 1 and layer_mode == 'single':
-        logger.warning(f"⚠️ Ada {len(valid_detection_layers)} detection_layers dengan mode 'single', hanya layer pertama yang akan digunakan")
-        valid_layer_mode = 'single'
-        
-    # Kasus 4: Jika satu detection_layer dengan mode single, tetap single
-    else:  # len(valid_detection_layers) == 1 and layer_mode == 'single'
-        valid_layer_mode = 'single'
-    
-    return valid_layer_mode, valid_detection_layers
+    return corrected_mode, valid_layers
 
 def get_num_classes_for_layers(detection_layers: List[str]) -> int:
-    """
-    Menghitung total jumlah kelas berdasarkan detection_layers yang digunakan.
+    """Get total number classes untuk multilayer mode."""
+    return sum(LAYER_CONFIG[layer]['num_classes'] for layer in detection_layers if layer in LAYER_CONFIG)
+
+def get_layer_info(layer_name: str) -> Dict[str, Any]:
+    """Get layer configuration info."""
+    return LAYER_CONFIG.get(layer_name, {})
+
+def is_valid_layer_combination(layer_mode: str, detection_layers: List[str]) -> bool:
+    """Check apakah kombinasi layer mode dan detection layers valid."""
+    valid_layers = [layer for layer in detection_layers if layer in DETECTION_LAYERS]
     
-    Args:
-        detection_layers: Daftar layer deteksi yang digunakan
-        
-    Returns:
-        Total jumlah kelas
-    """
-    # Jumlah kelas untuk setiap layer (sesuai dengan LAYER_CONFIG di model_constants.py)
-    layer_classes = {
-        'banknote': 7,  # 7 denominasi
-        'nominal': 7,   # 7 area nominal
-        'security': 3   # 3 fitur keamanan
-    }
+    if layer_mode == 'multilayer':
+        return len(valid_layers) >= 2
+    elif layer_mode == 'single':
+        return len(valid_layers) >= 1
     
-    total_classes = 0
+    return False
+
+def get_layer_offsets(detection_layers: List[str]) -> Dict[str, Tuple[int, int]]:
+    """Get class offset ranges untuk multilayer mode."""
+    offsets = {}
+    offset = 0
+    
     for layer in detection_layers:
-        if layer in layer_classes:
-            total_classes += layer_classes[layer]
+        if layer in LAYER_CONFIG:
+            layer_classes = LAYER_CONFIG[layer]['num_classes']
+            offsets[layer] = (offset, offset + layer_classes)
+            offset += layer_classes
     
-    # Jika tidak ada layer valid, gunakan default 7 (untuk banknote)
-    if total_classes == 0:
-        total_classes = 7
-        
-    return total_classes
+    return offsets
+
+def auto_determine_layer_mode(detection_layers: List[str]) -> str:
+    """Auto-determine layer mode berdasarkan detection layers."""
+    valid_layers = [layer for layer in detection_layers if layer in DETECTION_LAYERS]
+    return 'multilayer' if len(valid_layers) >= 2 else 'single'
+
+# One-liner utilities
+get_primary_layer = lambda detection_layers: detection_layers[0] if detection_layers else 'banknote'
+get_total_classes = lambda detection_layers: sum(LAYER_CONFIG.get(layer, {}).get('num_classes', 0) for layer in detection_layers)
+is_multilayer_capable = lambda detection_layers: len([l for l in detection_layers if l in DETECTION_LAYERS]) >= 2
+get_valid_layers_only = lambda detection_layers: [l for l in detection_layers if l in DETECTION_LAYERS]

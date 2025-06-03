@@ -24,78 +24,109 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
     """Setup handlers untuk dependency installer dengan integrasi notification observer dan pendekatan one-liner"""
     # Import logger untuk keperluan logging
     from smartcash.common.logger import get_logger
+    import logging
     
-    # Setup progress tracking menggunakan existing component
-    ui_components['log_message'] = lambda message, level="info", icon=None: log_message(ui_components, message, level, icon)
+    # Setup logger
+    logger = logging.getLogger('dependency_installer')
+    logger.info("Setting up dependency installer handlers")
     
-    # Tambahkan flag suppress_logs ke ui_components jika belum ada
-    if 'suppress_logs' not in ui_components:
-        ui_components['suppress_logs'] = config.get('suppress_logs', False)
+    # Jika ada error di ui_components, kembalikan tanpa modifikasi
+    if 'error' in ui_components:
+        logger.error(f"Skipping handler setup due to error: {ui_components.get('error', 'Unknown error')}")
+        return ui_components
     
-    # Setup status utils (update_status_panel, highlight_numeric_params)
-    setup_status_utils(ui_components)
+    # Simpan komponen kritis sebelum modifikasi
+    critical_components = ['ui', 'install_button', 'status', 'log_output', 'progress_container', 'status_panel']
+    original_components = {key: ui_components.get(key) for key in critical_components if key in ui_components}
     
-    # Setup progress tracking (update_progress, reset_progress_bar, show_for_operation)
-    setup_progress_tracking(ui_components)
-    
-    # Sembunyikan progress container saat inisialisasi jika diminta
-    if config.get('hide_progress', False) and 'progress_container' in ui_components:
-        if hasattr(ui_components['progress_container'], 'layout'):
-            ui_components['progress_container'].layout.visibility = 'hidden'
-    
-    # Setup observer manager dengan silent fail
     try:
-        observer_manager = get_observer_manager()
+        # Setup progress tracking menggunakan existing component
+        ui_components['log_message'] = lambda message, level="info", icon=None: log_message(ui_components, message, level, icon)
         
-        # Tambahkan observer untuk log_message
-        if 'log_message' in ui_components:
-            observer_manager.add_observer('dependency_installer_log', ui_components['log_message'])
+        # Tambahkan flag suppress_logs ke ui_components jika belum ada
+        if 'suppress_logs' not in ui_components:
+            ui_components['suppress_logs'] = config.get('suppress_logs', False)
         
-        # Tambahkan observer untuk reset_progress_bar
-        if 'reset_progress_bar' in ui_components:
-            observer_manager.add_observer('dependency_installer_reset_progress', ui_components['reset_progress_bar'])
+        # Setup status utils (update_status_panel, highlight_numeric_params)
+        setup_status_utils(ui_components)
         
-        # Tambahkan observer untuk update_status_panel
-        if 'update_status_panel' in ui_components:
-            observer_manager.add_observer('dependency_installer_update_status', ui_components['update_status_panel'])
-    except Exception as e:
-        # Silent fail untuk setup observer
-        pass
-    
-    # Buat fungsi analisis yang dapat digunakan baik langsung maupun sebagai delayed function
-    def run_package_analysis():
+        # Setup progress tracking (update_progress, reset_progress_bar, show_for_operation)
+        setup_progress_tracking(ui_components)
+        
+        # Sembunyikan progress container saat inisialisasi jika diminta
+        if config.get('hide_progress', False) and 'progress_container' in ui_components:
+            if hasattr(ui_components['progress_container'], 'layout'):
+                ui_components['progress_container'].layout.visibility = 'hidden'
+        
+        # Setup observer manager dengan silent fail
         try:
-            # Tampilkan progress tracker untuk analisis dengan pendekatan DRY
-            ui_components['show_for_operation']('analyze')
-            ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+            observer_manager = get_observer_manager()
             
-            # Jalankan analisis
-            analyze_installed_packages(ui_components)
+            # Tambahkan observer untuk log_message
+            if 'log_message' in ui_components:
+                observer_manager.add_observer('dependency_installer_log', ui_components['log_message'])
             
-            # Update progress selesai dengan pendekatan DRY
-            ui_components['update_progress']('step', 100, "Analisis packages selesai", "#28a745")
-            ui_components['log_message'](f"✅ Berhasil mendeteksi packages terinstall", "success")
-            ui_components['update_status_panel']("success", "Analisis packages selesai")
+            # Tambahkan observer untuk reset_progress_bar
+            if 'reset_progress_bar' in ui_components:
+                observer_manager.add_observer('dependency_installer_reset_progress', ui_components['reset_progress_bar'])
+            
+            # Tambahkan observer untuk update_status_panel
+            if 'update_status_panel' in ui_components:
+                observer_manager.add_observer('dependency_installer_update_status', ui_components['update_status_panel'])
+                
+            # Simpan observer_manager ke ui_components
+            ui_components['observer_manager'] = observer_manager
         except Exception as e:
-            # Handle error dengan pendekatan DRY
-            error_message = f"Gagal mendeteksi packages: {str(e)}"
-            ui_components['log_message'](f"⚠️ {error_message}", "warning")
-            ui_components['error_operation'](error_message)
-            ui_components['update_status_panel']("warning", error_message)
-    
-    # Setup handlers dengan silent fail
-    try:
-        # Setup install button handler
+            # Log error tapi jangan gagalkan setup
+            logger.warning(f"Failed to setup observer manager: {str(e)}")
+        
+        # Buat fungsi analisis yang dapat digunakan baik langsung maupun sebagai delayed function
+        def run_package_analysis():
+            try:
+                # Tampilkan progress tracker untuk analisis dengan pendekatan DRY
+                if 'show_for_operation' in ui_components and callable(ui_components['show_for_operation']):
+                    ui_components['show_for_operation']('analyze')
+                
+                if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+                    ui_components['reset_progress_bar'](0, "Menganalisis packages terinstall...", True)
+                
+                # Jalankan analisis
+                analyze_installed_packages(ui_components)
+                
+                # Sembunyikan progress container setelah analisis selesai jika tidak ada instalasi otomatis
+                if not config.get('auto_install', False) and 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                    ui_components['progress_container'].layout.visibility = 'hidden'
+                    
+                # Jalankan instalasi otomatis jika dikonfigurasi
+                if config.get('auto_install', False) and 'install_button' in ui_components and hasattr(ui_components['install_button'], 'click'):
+                    ui_components['install_button'].click()
+            except Exception as e:
+                # Log error
+                logger.error(f"Error during package analysis: {str(e)}")
+                if 'log_message' in ui_components and callable(ui_components['log_message']):
+                    ui_components['log_message'](f"❌ Error saat analisis: {str(e)}", "error")
+        
+        # Tambahkan fungsi analisis ke ui_components
+        ui_components['run_delayed_analysis'] = run_package_analysis
+        
+        # Setup handlers untuk tombol install
         setup_install_button_handler(ui_components)
         
-        # Setup analyze button handler
-        setup_analyze_button_handler(ui_components)
+        # Setup observers untuk dependency installer
+        _setup_dependency_installer_observers(ui_components, observer_manager)
         
-        # Setup reset button handler
-        setup_reset_button_handler(ui_components)
+        # Tandai bahwa handlers sudah disetup
+        ui_components['handlers_setup'] = True
         
-        # Simpan fungsi analisis untuk dijalankan langsung atau nanti
-        ui_components['run_delayed_analysis'] = lambda: run_package_analysis()
+        # Verifikasi bahwa komponen kritis masih ada
+        missing_after_setup = [comp for comp in critical_components if comp not in ui_components]
+        if missing_after_setup:
+            logger.error(f"Critical components missing after handler setup: {', '.join(missing_after_setup)}")
+            # Kembalikan komponen yang hilang
+            for key in missing_after_setup:
+                if key in original_components:
+                    ui_components[key] = original_components[key]
+                    logger.info(f"Restored missing component: {key}")
         
         # Jalankan analisis package jika delay_analysis tidak diset atau False
         if not config.get('delay_analysis', False):

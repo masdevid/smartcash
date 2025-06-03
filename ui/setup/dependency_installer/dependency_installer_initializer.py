@@ -27,6 +27,65 @@ class DependencyInstallerInitializer(CommonInitializer):
         """Mendapatkan daftar komponen kritis yang harus ada dalam UI components."""
         return ['ui', 'install_button', 'status', 'log_output', 'progress_container', 'status_panel']
         
+    def _create_fallback_ui(self, error_message: str, original_components: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Membuat UI fallback sederhana ketika validasi gagal
+        
+        Args:
+            error_message: Pesan error yang akan ditampilkan
+            original_components: Komponen asli yang berhasil dibuat sebelum error
+            
+        Returns:
+            Dictionary dengan UI components fallback minimal
+        """
+        import ipywidgets as widgets
+        
+        self.logger.info("Creating simple fallback UI components")
+        
+        # Buat widget output untuk menampilkan error dan log
+        status_output = widgets.Output(layout=widgets.Layout(
+            border='1px solid #ddd',
+            min_height='100px',
+            padding='10px',
+            width='100%'
+        ))
+        
+        # Buat container untuk UI fallback sederhana
+        fallback_container = widgets.VBox([
+            widgets.HTML(value=f'<h3>⚠️ {MODULE_LOGGER_NAME}</h3>'),
+            status_output
+        ], layout=widgets.Layout(padding='10px', width='100%'))
+        
+        # Buat tombol retry sederhana
+        install_button = widgets.Button(
+            description='Coba Lagi',
+            button_style='danger',
+            icon='refresh',
+            layout=widgets.Layout(margin='10px 0')
+        )
+        
+        # Tampilkan error di widget output
+        with status_output:
+            print(f"Error saat membuat UI components: {error_message}")
+            print("Silakan restart kernel dan coba lagi.")
+        
+        # Buat komponen kritis minimal untuk fallback
+        fallback_ui = {
+            'ui': fallback_container,
+            'main_container': fallback_container,
+            'install_button': install_button,
+            'status': status_output,
+            'log_output': status_output,
+            'progress_container': status_output,
+            'status_panel': status_output,
+            'error': f"{error_message}",
+            'module_name': MODULE_LOGGER_NAME,
+            'logger_namespace': DEPENDENCY_INSTALLER_LOGGER_NAMESPACE,
+            'dependency_installer_initialized': False
+        }
+        
+        self.logger.info("Simple fallback UI components created successfully")
+        return fallback_ui
+        
     def _get_default_config(self) -> Dict[str, Any]:
         """Mendapatkan konfigurasi default untuk dependency installer."""
         from smartcash.ui.setup.dependency_installer.utils.validation_utils import get_default_config
@@ -92,33 +151,44 @@ class DependencyInstallerInitializer(CommonInitializer):
             return ui_components
     
     def _validate_ui_components(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Validasi UI components untuk memastikan semua komponen kritis tersedia dengan penanganan error yang lebih baik."""
+        """Validasi UI components untuk memastikan semua komponen kritis tersedia dengan pendekatan sederhana."""
         try:
-            # Jika UI components sudah error, skip validasi
             if 'error' in ui_components:
                 self.logger.error(f"UI components validation skipped due to previous error: {ui_components['error']}")
-                return ui_components
-            
-            # Validasi komponen kritis
+                return self._create_fallback_ui(ui_components['error'])
+                
             self.logger.info("Validating critical UI components")
             critical_components = self._get_critical_components()
-            missing_components = []
             
-            for component in critical_components:
-                if component not in ui_components:
-                    missing_components.append(component)
-            
-            if missing_components:
-                error_msg = f"Missing critical components: {', '.join(missing_components)}\nAvailable components: {', '.join(ui_components.keys())}"
+            # Cek komponen yang hilang
+            missing = [comp for comp in critical_components if comp not in ui_components]
+            if missing:
+                error_msg = f"Critical components missing: {', '.join(missing)}"
                 self.logger.error(error_msg)
-                return {'error': 'Failed to create UI components', 'details': error_msg, 'available_components': list(ui_components.keys())}
-            
+                return self._create_fallback_ui(error_msg)
+                
             self.logger.info("All critical components validated successfully")
-            return validate_ui_components(ui_components)
+            
+            # Panggil fungsi validasi dari validation_utils
+            validation_result = validate_ui_components(ui_components)
+            
+            # Jika validasi mengembalikan error, gunakan fallback UI sederhana
+            if 'error' in validation_result:
+                error_msg = validation_result.get('details', 'Validation failed')
+                self.logger.error(f"Validation failed: {error_msg}")
+                return self._create_fallback_ui(error_msg)
+                
+            # Pastikan module_name dan logger_namespace sesuai
+            if 'module_name' not in validation_result:
+                validation_result['module_name'] = MODULE_LOGGER_NAME
+            if 'logger_namespace' not in validation_result:
+                validation_result['logger_namespace'] = DEPENDENCY_INSTALLER_LOGGER_NAMESPACE
+                
+            return validation_result
         except Exception as e:
-            error_details = traceback.format_exc()
-            self.logger.error(f"Failed to validate UI components: {str(e)}\n{error_details}")
-            return {'error': 'Failed to validate UI components', 'details': str(e), 'traceback': error_details}
+            error_msg = f"Failed to validate UI components: {str(e)}"
+            self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
+            return self._create_fallback_ui(error_msg)
     
     def _post_initialization_hook(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
         """Hook yang dijalankan setelah inisialisasi selesai dengan penanganan error yang lebih baik."""

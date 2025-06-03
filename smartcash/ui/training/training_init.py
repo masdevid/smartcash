@@ -292,6 +292,9 @@ class TrainingInitializer(CommonInitializer):
         [callback(new_config) for callback in self.config_update_callbacks]
 
 
+# Global instance dan public API
+_training_initializer = TrainingInitializer()
+
 def initialize_training_ui(env=None, config=None, **kwargs):
     """Factory function untuk training UI dengan pencegahan tampilan ganda"""
     suppress_all_outputs()
@@ -304,9 +307,9 @@ def initialize_training_ui(env=None, config=None, **kwargs):
                 initializer = obj
                 break
         
-        # Jika belum ada, buat yang baru
+        # Jika belum ada, gunakan instance global
         if not initializer:
-            initializer = TrainingInitializer('training', 'smartcash.ui.training')
+            initializer = _training_initializer
         
         # Initialize UI
         result = initializer.initialize(env, config, **kwargs)
@@ -338,9 +341,6 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         display(fallback.get('ui', fallback))
         return fallback
 
-
-# Global instance dan public API
-_training_initializer = TrainingInitializer()
 
 # One-liner factory untuk compatibility dengan cell entry
 create_training_ui = lambda env=None, config=None, **kw: initialize_training_ui(env, config, **kw)

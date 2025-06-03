@@ -52,7 +52,6 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     # Section 2: Test Configuration dengan flex layout
     test_config_left = widgets.VBox([
         form_components['test_folder_text'],
-        form_components['apply_augmentation_checkbox'],
         form_components['batch_size_slider']
     ], layout=widgets.Layout(flex='1', min_width='250px', overflow_x='hidden'))
     
@@ -61,6 +60,11 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
         form_components['confidence_slider'],
         form_components['iou_slider']
     ], layout=widgets.Layout(flex='1', min_width='250px', overflow_x='hidden'))
+    
+    # Checkbox dikelompokkan terpisah agar rata kiri dan teks lengkap terlihat
+    test_config_checkboxes = widgets.VBox([
+        form_components['apply_augmentation_checkbox']
+    ], layout=widgets.Layout(width='100%', margin='5px 0'))
     
     # Gunakan HBox dengan flex layout untuk mencegah horizontal scrollbar
     test_config_container = widgets.HBox(
@@ -77,10 +81,11 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     test_section = widgets.VBox([
         create_section_title("⚙️ Konfigurasi Testing"),
         test_config_container,
-        widgets.HBox([
+        test_config_checkboxes,
+        widgets.VBox([
             form_components['save_predictions_checkbox'],
             form_components['save_metrics_checkbox']
-        ], layout=widgets.Layout(margin='10px 0'))
+        ], layout=widgets.Layout(margin='10px 0', width='100%'))
     ], layout=widgets.Layout(
         margin='10px 0',
         padding='10px',
@@ -90,23 +95,23 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     ))
     
     # Section 3: Evaluation Options dengan flex layout
-    eval_options_left = widgets.VBox([
+    # Semua checkbox dikelompokkan dalam satu VBox agar rata kiri
+    eval_options_checkboxes = widgets.VBox([
         form_components['confusion_matrix_checkbox'],
-        form_components['visualize_results_checkbox']
-    ], layout=widgets.Layout(flex='1', min_width='250px', overflow_x='hidden'))
+        form_components['visualize_results_checkbox'],
+        form_components['inference_time_checkbox'],
+        form_components['save_to_drive_checkbox']
+    ], layout=widgets.Layout(width='100%', margin='5px 0'))
     
-    eval_options_right = widgets.VBox([
-        form_components['save_to_drive_checkbox'],
+    # Drive path dipisahkan agar tidak terpengaruh oleh pengelompokan checkbox
+    eval_options_drive = widgets.VBox([
         form_components['drive_path_text']
-    ], layout=widgets.Layout(flex='1', min_width='250px', overflow_x='hidden'))
+    ], layout=widgets.Layout(width='100%', margin='5px 0'))
     
-    # Gunakan HBox dengan flex layout
-    eval_options_container = widgets.HBox(
-        [eval_options_left, eval_options_right],
+    # Gunakan VBox untuk layout vertikal yang lebih konsisten
+    eval_options_container = widgets.VBox(
+        [eval_options_checkboxes, eval_options_drive],
         layout=widgets.Layout(
-            display='flex',
-            flex_flow='row wrap',
-            justify_content='space-between',
             width='100%',
             overflow_x='hidden'
         )

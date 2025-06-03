@@ -197,12 +197,12 @@ class ModelManager:
                 drive_model_path = check_pretrained_model_in_drive(self.config['backbone'])
                 if drive_model_path:
                     self.logger.info(f"🔄 Menggunakan pretrained model dari Google Drive: {drive_model_path}")
-                    self.load_model(drive_model_path)
+                    load_pretrained_model(self.model, drive_model_path, self.config.get('device', 'cpu'))
                     return self.model
                 
                 # Jika tidak ada di drive, load dari pretrained default
                 self.logger.info(f"🔄 Tidak ada pretrained model di Google Drive, menggunakan default pretrained")
-                load_pretrained_model(self.model, self.config['backbone'])
+                load_pretrained_model(self.model, self.config['backbone'], self.config.get('device', 'cpu'))
             
             self.logger.info(f"✅ Model berhasil dibangun dengan backbone {self.config['backbone']}")
             self.logger.info(f"   • Layer Mode: {self.config['layer_mode']}")

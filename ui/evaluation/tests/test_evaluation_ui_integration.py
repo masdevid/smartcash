@@ -118,6 +118,7 @@ class TestEvaluationUIIntegration(unittest.TestCase):
             'confusion_matrix_checkbox': widgets.Checkbox(),
             'visualize_results_checkbox': widgets.Checkbox(),
             'class_metrics_checkbox': widgets.Checkbox(),
+            'inference_time_checkbox': widgets.Checkbox(),
             'save_to_drive_checkbox': widgets.Checkbox(),
             'drive_path_text': widgets.Text(),
             'container': widgets.VBox()

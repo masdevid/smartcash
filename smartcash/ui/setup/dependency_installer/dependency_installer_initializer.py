@@ -90,7 +90,19 @@ _dependency_installer_initializer = DependencyInstallerInitializer()
 _config_manager = None
 
 # Public API
-initialize_dependency_installer = lambda env=None, config=None: _dependency_installer_initializer.initialize(env=env, config=config)
+def initialize_dependency_installer(env=None, config=None):
+    """Inisialisasi dan tampilkan UI dependency installer"""
+    from IPython.display import display
+    
+    # Inisialisasi UI components
+    ui_components = _dependency_installer_initializer.initialize(env=env, config=config)
+    
+    # Tampilkan UI secara otomatis jika ada komponen 'ui'
+    if isinstance(ui_components, dict) and 'ui' in ui_components:
+        display(ui_components['ui'])
+    
+    # Tetap kembalikan ui_components untuk digunakan jika diperlukan
+    return ui_components
 
 def get_config_manager():
     """Mendapatkan instance ConfigManager untuk dependency installer dengan pendekatan singleton"""

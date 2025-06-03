@@ -55,7 +55,8 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         'auto_select_checkbox': widgets.Checkbox(
             value=checkpoint_config.get('auto_select_best', True),
             description='Auto pilih checkpoint terbaik',
-            style={'description_width': '200px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'checkpoint_path_text': widgets.Text(
@@ -86,9 +87,10 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         ),
         
         'apply_augmentation_checkbox': widgets.Checkbox(
-            value=test_config.get('apply_augmentation', True),
-            description='Terapkan augmentasi untuk testing',
-            style={'description_width': '200px'}
+            value=test_config.get('apply_augmentation', False),
+            description='Terapkan augmentasi pada test data',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'batch_size_slider': widgets.IntSlider(
@@ -100,10 +102,11 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         ),
         
         'image_size_dropdown': widgets.Dropdown(
-            options=[320, 416, 512, 640],
-            value=test_config.get('image_size', 416),
+            options=[320, 416, 512, 640, 736, 832, 960, 1024, 1280],
+            value=test_config.get('image_size', 640),
             description='Image size:',
-            style={'description_width': '100px'}
+            style={'description_width': '100px'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'confidence_slider': widgets.FloatSlider(
@@ -126,19 +129,22 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         'save_predictions_checkbox': widgets.Checkbox(
             value=eval_config.get('save_predictions', True),
             description='Simpan hasil prediksi',
-            style={'description_width': '150px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'save_metrics_checkbox': widgets.Checkbox(
             value=eval_config.get('save_metrics', True),
             description='Simpan metrik evaluasi',
-            style={'description_width': '150px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'save_to_drive_checkbox': widgets.Checkbox(
             value=scenario_config.get('save_to_drive', True),
             description='Simpan hasil ke Google Drive',
-            style={'description_width': '180px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'drive_path_text': widgets.Text(
@@ -153,13 +159,22 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         'confusion_matrix_checkbox': widgets.Checkbox(
             value=eval_config.get('generate_confusion_matrix', True),
             description='Generate confusion matrix',
-            style={'description_width': '180px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         ),
         
         'visualize_results_checkbox': widgets.Checkbox(
             value=eval_config.get('visualize_results', True),
             description='Visualisasi hasil prediksi',
-            style={'description_width': '160px'}
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
+        ),
+        
+        'inference_time_checkbox': widgets.Checkbox(
+            value=eval_config.get('show_inference_time', True),
+            description='Tampilkan metrik waktu inferensi',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='100%')
         )
     }
     
@@ -167,7 +182,7 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
     action_buttons = create_action_buttons(
         primary_label="Jalankan Evaluasi",
         primary_icon="play",
-        secondary_buttons=[("Batal", "stop", "")],
+        secondary_buttons=[("Cek Checkpoint", "check", "")],
         cleanup_enabled=False,
         primary_style='success'
     )

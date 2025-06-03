@@ -435,7 +435,7 @@ def save_metrics_to_files(metrics: Dict[str, Any], ui_components: Dict[str, Any]
         return {}
 
 def update_results_ui(ui_components: Dict[str, Any], metrics: Dict[str, Any], 
-                     predictions: List[Dict[str, Any]], logger) -> None:
+                     predictions: List[Dict[str, Any]], config: Dict[str, Any], logger) -> None:
     """Update UI dengan hasil metrics dan predictions"""
     
     try:
@@ -447,6 +447,11 @@ def update_results_ui(ui_components: Dict[str, Any], metrics: Dict[str, Any],
         
         # Update sample predictions display
         update_predictions_display(ui_components, predictions, metrics, logger)
+        
+        # Update inference time display jika diaktifkan
+        from smartcash.ui.evaluation.handlers.inference_time_handler import display_inference_time_metrics
+        if metrics.get('inference_time') and config.get('evaluation', {}).get('show_inference_time', True):
+            display_inference_time_metrics(metrics.get('inference_time', {}), ui_components, config, logger)
         
         # Show results tabs
         if 'results_tabs' in ui_components:

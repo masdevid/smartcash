@@ -17,6 +17,8 @@ from smartcash.ui.evaluation.handlers.model_handler import get_model_for_scenari
 from smartcash.ui.evaluation.handlers.augmentation_handler import get_augmentation_pipeline, apply_augmentation_to_batch
 from smartcash.ui.evaluation.handlers.metrics_handler import calculate_and_save_metrics, update_results_ui
 from smartcash.ui.evaluation.handlers.scenario_handler import get_drive_path_for_scenario, save_results_to_drive
+from smartcash.ui.evaluation.handlers.inference_time_handler import setup_inference_time_handlers, display_inference_time_metrics
+from smartcash.ui.evaluation.handlers.checkpoint_handler import get_checkpoint_info
 
 def setup_evaluation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None):
     """Setup handlers untuk evaluation process dengan one-liner pattern"""
@@ -28,10 +30,109 @@ def setup_evaluation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         lambda b: run_evaluation_process(ui_components, config, logger, button_manager)
     )
     
+    # Setup handler untuk inference time checkbox
+    setup_inference_time_handlers(ui_components, config)
+    
+    # Handler untuk tombol cek checkpoint
+    if 'secondary_buttons' in ui_components and len(ui_components['secondary_buttons']) > 0:
+        ui_components['secondary_buttons'][0].on_click(
+            lambda b: check_checkpoint(ui_components, config, logger, button_manager)
+        )
+    
     # Progress tracking handlers
     setup_progress_handlers(ui_components)
     
+    log_to_service(logger, "✅ Evaluation handlers berhasil diinisialisasi", "info")
+    
     return ui_components
+
+def check_checkpoint(ui_components: Dict[str, Any], config: Dict[str, Any], logger, button_manager) -> None:
+    """Fungsi untuk memeriksa checkpoint model dan menampilkan informasinya"""
+    from smartcash.model.utils.checkpoint_utils import validate_checkpoint
+    
+    # Pastikan success_operation selalu dipanggil untuk kompatibilitas dengan test
+    success_operation = ui_components.get('success_operation', lambda x: None)
+    error_operation = ui_components.get('error_operation', lambda x: None)
+    update_progress = ui_components.get('update_progress', lambda *args: None)
+    show_for_operation = ui_components.get('show_for_operation', lambda x: None)
+    
+    with button_manager.operation_context('checkpoint_check'):
+        try:
+            # Show progress container
+            show_for_operation('checkpoint_check')
+            update_progress('overall', 0, "🔍 Memeriksa checkpoint model...")
+            
+            # Dapatkan path checkpoint dari UI
+            scenario_id = ui_components.get('scenario_dropdown', {}).value
+            auto_select = ui_components.get('auto_select_checkbox', {}).value
+            custom_checkpoint_path = ui_components.get('checkpoint_path_text', {}).value
+            
+            # Log informasi checkpoint yang akan diperiksa
+            log_to_service(logger, f"🔍 Memeriksa checkpoint untuk skenario {scenario_id}", "info")
+            if auto_select:
+                log_to_service(logger, "ℹ️ Mode auto-select checkpoint aktif", "info")
+            else:
+                log_to_service(logger, f"ℹ️ Menggunakan custom checkpoint: {custom_checkpoint_path}", "info")
+            
+            # Validasi checkpoint
+            update_progress('overall', 30, "🔍 Memvalidasi checkpoint...")
+            checkpoint_result = validate_checkpoint({
+                'scenario_id': scenario_id,
+                'auto_select': auto_select,
+                'custom_checkpoint_path': custom_checkpoint_path,
+                'config': config
+            })
+            
+            if checkpoint_result.get('valid', False):
+                # Checkpoint valid, tampilkan informasi
+                checkpoint_path = checkpoint_result.get('checkpoint_path', '')
+                checkpoint_info = get_checkpoint_info(checkpoint_path, logger)
+                
+                # Update progress
+                update_progress('overall', 70, f"✅ Checkpoint valid: {checkpoint_path}")
+                
+                # Tampilkan informasi checkpoint di UI
+                if 'checkpoint_info_output' in ui_components:
+                    with ui_components['checkpoint_info_output']:
+                        from IPython.display import display, clear_output
+                        import pandas as pd
+                        
+                        clear_output()
+                        
+                        # Buat DataFrame untuk tampilan tabel
+                        data = {
+                            'Properti': ['Path', 'Epoch', 'mAP@0.5', 'mAP@0.5:0.95', 'Ukuran Model', 'Backbone'],
+                            'Nilai': [
+                                checkpoint_path,
+                                checkpoint_info.get('epoch', 'N/A'),
+                                f"{checkpoint_info.get('map50', 0):.4f}",
+                                f"{checkpoint_info.get('map', 0):.4f}",
+                                f"{checkpoint_info.get('model_size', 0):.2f} MB",
+                                checkpoint_info.get('backbone', 'N/A')
+                            ]
+                        }
+                        df = pd.DataFrame(data)
+                        
+                        # Tampilkan tabel
+                        display(df.style.set_properties(**{'text-align': 'left'}))
+                
+                # Update progress dan tampilkan pesan sukses
+                update_progress('overall', 100, "✅ Pemeriksaan checkpoint selesai")
+                success_operation("✅ Checkpoint valid dan siap digunakan untuk evaluasi")
+                
+                # Log informasi checkpoint
+                log_to_service(logger, f"✅ Checkpoint valid: {checkpoint_path}", "success")
+                log_to_service(logger, f"ℹ️ Epoch: {checkpoint_info.get('epoch', 'N/A')}, mAP@0.5: {checkpoint_info.get('map50', 0):.4f}", "info")
+            else:
+                # Checkpoint tidak valid, tampilkan pesan error
+                error_msg = checkpoint_result.get('message', 'Checkpoint tidak valid')
+                update_progress('overall', 100, f"❌ {error_msg}")
+                error_operation(f"❌ {error_msg}")
+                log_to_service(logger, f"❌ {error_msg}", "error")
+        
+        except Exception as e:
+            error_operation(f"❌ Error dalam pemeriksaan checkpoint: {str(e)}")
+            log_to_service(logger, f"❌ Error dalam pemeriksaan checkpoint: {str(e)}", "error")
 
 def run_evaluation_process(ui_components: Dict[str, Any], config: Dict[str, Any], logger, button_manager) -> None:
     """Jalankan proses evaluasi dengan progress tracking dan error handling dengan one-liner style."""
@@ -78,7 +179,7 @@ def run_evaluation_process(ui_components: Dict[str, Any], config: Dict[str, Any]
             
             if result.get('success', False):
                 # Update UI with results dengan one-liner
-                update_results_ui(result.get('metrics', {}), ui_components, config)
+                update_results_ui(ui_components, result.get('metrics', {}), result.get('predictions', []), config, logger)
                 update_progress('overall', 100, "✅ Evaluasi selesai")
             else:
                 # Log error jika ada

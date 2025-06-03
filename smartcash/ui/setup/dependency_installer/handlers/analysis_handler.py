@@ -66,7 +66,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         ctx.stepped_progress('ANALYSIS_UPDATE_UI', "Updating UI...")
         _finalize_analysis_results(ui_components, analysis_results, ctx)
         
-        ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai")
+        ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai", "overall")
+        ctx.stepped_progress('ANALYSIS_COMPLETE', "Complete", "step")
         
     except Exception as e:
         log_message_safe(ui_components, f"💥 Analysis failed: {str(e)}", "error")

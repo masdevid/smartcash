@@ -68,7 +68,8 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
         log_message_safe(ui_components, f"✅ {summary_msg}", "success")
         update_status_panel(ui_components, summary_msg, "success")
         
-        ctx.stepped_progress('STATUS_COMPLETE', "Status check selesai")
+        ctx.stepped_progress('STATUS_COMPLETE', "Status check selesai", "overall")
+        ctx.stepped_progress('STATUS_COMPLETE', "Complete", "step")
         
     except Exception as e:
         log_message_safe(ui_components, f"💥 Status check failed: {str(e)}", "error")
@@ -159,9 +160,9 @@ def _display_comprehensive_report_with_utils(ui_components: Dict[str, Any], syst
         display(HTML(combined_report))
     
     # Log summary
-    _log_status_summary_with_utils(ui_components, package_status, system_requirements, ctx)
+    _log_status_summary_with_utils(package_status, system_requirements, ctx)
 
-def _log_status_summary_with_utils(ui_components: Dict[str, Any], package_status: Dict[str, Dict[str, Any]], 
+def _log_status_summary_with_utils(package_status: Dict[str, Dict[str, Any]], 
                                  system_requirements: Dict[str, Any], ctx):
     """Log summary menggunakan consolidated approach"""
     

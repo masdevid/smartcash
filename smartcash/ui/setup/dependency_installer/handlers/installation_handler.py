@@ -56,7 +56,23 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         if not packages_to_install:
             log_message_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar", "success")
+            
+            # Update progress ke 100% untuk semua packages sudah terinstall
+            ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
+            ui_components.get('update_progress', lambda *a: None)('step', 100, "Complete")
+            
+            # Complete operation dengan proper completion
+            ui_components.get('complete_operation', lambda x: None)("Semua packages sudah terinstall dengan benar")
             update_status_panel(ui_components, "✅ Semua packages sudah terinstall", "success")
+            
+            # Hide progress bars setelah complete dengan delay
+            import threading
+            import time
+            def hide_progress_delayed():
+                time.sleep(2)  # Wait 2 seconds
+                ui_components.get('reset_all', lambda: None)()
+            
+            threading.Thread(target=hide_progress_delayed, daemon=True).start()
             return
         
         # Step 3: Install packages dengan parallel processing
@@ -75,6 +91,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         _finalize_installation_results(ui_components, installation_results, duration)
         
         ctx.stepped_progress('INSTALL_FINALIZE', "Instalasi selesai", "overall")
+        ctx.stepped_progress('INSTALL_FINALIZE', "Complete", "step")
         
     except Exception as e:
         log_message_safe(ui_components, f"💥 Installation failed: {str(e)}", "error")

@@ -156,6 +156,10 @@ def create_stepped_progress_tracker(ui_components: Dict[str, Any], steps_class=P
         """Update progress menggunakan predefined steps"""
         step_value = getattr(steps_class, step_name.upper(), 0)
         update_progress_step(ui_components, progress_type, step_value, message)
+        
+        # Update both overall dan step jika overall dipilih
+        if progress_type == "overall":
+            update_progress_step(ui_components, "step", step_value, message)
     
     return step_progress
 

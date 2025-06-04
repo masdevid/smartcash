@@ -15,10 +15,11 @@ from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependen
 # Import components dan handlers (unchanged)
 from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
 from smartcash.ui.setup.dependency.handlers.dependency_handler import setup_dependency_handlers
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_LOGGER_NAMESPACE]
 
-class DependencyInstallerConfigHandler:
+class DependencyInstallerConfigHandler(ConfigHandler):
     """ConfigHandler untuk dependency installer dengan pattern CommonInitializer"""
     
     def __init__(self, module_name: str, parent_module: str = None):
@@ -37,12 +38,6 @@ class DependencyInstallerConfigHandler:
         """Get default config menggunakan defaults module - one-liner delegation"""
         return get_default_dependency_config()
         
-    def load_config(self) -> Dict[str, Any]:
-        """Load config from persistent storage - one-liner delegation"""
-        # Get config manager instance
-        config_manager = get_config_manager()
-        # Load config for this module
-        return config_manager.get_module_config(self.module_name, self.get_default_config())
 
 class DependencyInstallerInitializer(CommonInitializer):
     """Updated dependency installer initializer dengan CommonInitializer pattern dan built-in logger"""

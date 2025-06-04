@@ -13,6 +13,9 @@ Ketentuan refaktor:
 - Gunakan one-liner style code. 
 
 Catatan: Tidak semua shared components dan utils diunggah, tapi jika dibutuhkan minta saja. Tunjukkan file mana yang perlu diubah/dihapus. 
+
+Lanjutkan implementasi yang "missing" dibawah ini:
+
 Frontend:
 ```
 smartcash/ui/dataset/downloader/

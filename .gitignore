@@ -40,7 +40,10 @@ weights/
 *.hdf5
 *.pkl
 *.npz
-
+backup_*/
+*.sh
+hub/
+.cursor/
 # Notebooks
 .ipynb_checkpoints
 */.ipynb_checkpoints/*

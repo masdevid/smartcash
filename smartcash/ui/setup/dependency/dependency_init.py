@@ -39,6 +39,18 @@ class DependencyConfigHandler(ConfigHandler):
         """Get default config"""
         return get_default_dependency_config()
     
+    def load_config(self, config_name: str = None, use_base_config: bool = True) -> Dict[str, Any]:
+        """Load config dengan caching - required by CommonInitializer"""
+        try:
+            config = super().load_config(config_name, use_base_config)
+            self._current_config = config.copy()
+            return config
+        except Exception as e:
+            self.logger.warning(f"⚠️ Load config error: {str(e)}")
+            default_config = self.get_default_config()
+            self._current_config = default_config.copy()
+            return default_config
+    
     def get_current_config(self) -> Dict[str, Any]:
         """Public API untuk current config"""
         return self._current_config.copy()

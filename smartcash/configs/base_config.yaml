@@ -86,34 +86,22 @@ augmentation:
     - 'lighting'
     - 'combined'
   position:
-    fliplr: 0.5                   # Probabilitas flip horizontal
-    flipud: 0.0                   # Probabilitas flip vertical
-    degrees: 10                   # Derajat maksimum rotasi
-    translate: 0.1                # Maksimum translasi (fraksi)
-    scale: 0.1                    # Maksimum scaling (fraksi)
-    shear: 0.0                    # Maksimum shearing (0.0 = disabled)
-    rotation_prob: 0.5            # Probabilitas rotasi
-    max_angle: 10                 # Sudut maksimum
-    flip_prob: 0.5                # Probabilitas flip
-    scale_ratio: 0.1              # Rasio scaling
+    flip: true
+    rotate: true
+    rotate_max_deg: 15
+    translate: true
+    translate_percent: 0.2
+    shear: true
+    shear_max_deg: 10
   lighting:
-    hsv_h: 0.015                  # Hue shift (0-1)
-    hsv_s: 0.7                    # Saturation multiplication (0-1)
-    hsv_v: 0.4                    # Value (brightness) multiplication (0-1)
-    contrast: 0.3                 # Contrast adjustment (0-1)
-    brightness: 0.3               # Brightness adjustment (0-1)
-    compress: 0.0                 # Probabilitas efek blur
-    brightness_prob: 0.5          # Probabilitas perubahan brightness
-    brightness_limit: 0.3         # Batasan perubahan brightness
-    contrast_prob: 0.5            # Probabilitas perubahan contrast
-    contrast_limit: 0.3           # Batasan perubahan contrast
-  extreme:
-    rotation_min: 30              # Rotasi minimum (derajat)
-    rotation_max: 90              # Rotasi maksimum (derajat)
-    probability: 0.3              # Probabilitas
-  combined:
-    enabled: true
-    prob: 0.5
+    brightness: true
+    brightness_range: [0.8, 1.2]
+    contrast: true
+    contrast_range: [0.8, 1.2]
+    hue: true
+    hue_range: [-0.1, 0.1]
+    saturation: true
+    saturation_range: [0.8, 1.2]
 
 # Konfigurasi preprocessing
 preprocessing:

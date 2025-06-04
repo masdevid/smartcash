@@ -5,55 +5,39 @@
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Konfigurasi augmentasi utama
+# Override konfigurasi augmentasi dari base_config
 augmentation:
-  # Parameter dasar
-  enabled: true
-  num_variations: 3
-  output_prefix: 'aug'
-  process_bboxes: true
-  output_dir: 'data/augmented'
-  validate_results: true
-  resume: false
-  num_workers: 4
+  # Parameter yang di-override dari base_config
+  num_variations: 3  # Override dari base_config (2)
+  validate_results: true  # Override dari base_config (false)
+  
+  # Parameter tambahan yang tidak ada di base_config
   balance_classes: true
-  target_count: 1000
+  target_count: 500
   move_to_preprocessed: true
   
-  # Jenis augmentasi yang didukung
-  types: 
-    - 'combined'  # Kombinasi posisi dan pencahayaan (direkomendasikan)
-    - 'position'  # Variasi posisi seperti rotasi, flipping, dan scaling
-    - 'lighting'  # Variasi pencahayaan seperti brightness, contrast dan HSV
-  
-  # Parameter augmentasi posisi
+  # Parameter posisi yang di-override
   position:
-    fliplr: 0.5
-    degrees: 15
-    translate: 0.15
-    scale: 0.15
-    shear_max: 10
+    degrees: 15  # Override dari base_config (10)
+    translate: 0.15  # Override dari base_config (0.1)
+    scale: 0.15  # Override dari base_config (0.1)
+    shear_max: 10  # Parameter baru
   
-  # Parameter augmentasi pencahayaan
+  # Parameter pencahayaan yang di-override
   lighting:
-    hsv_h: 0.025
-    hsv_s: 0.7
-    hsv_v: 0.4
-    contrast: [0.7, 1.3]
-    brightness: [0.7, 1.3]
-    blur: 0.2
-    noise: 0.1
+    hsv_h: 0.025  # Override dari base_config (0.015)
+    blur: 0.2  # Parameter baru
+    noise: 0.1  # Parameter baru
 
-# Pengaturan pengelolaan data augmentasi
+# Override konfigurasi cleanup dari base_config
 cleanup:
-  backup_enabled: true
-  backup_dir: 'data/backup/augmentation'
-  backup_count: 5
-  patterns:
+  backup_dir: 'data/backup/augmentation'  # Override dari base_config (data/backup)
+  backup_count: 5  # Override dari base_config (3)
+  patterns:  # Parameter baru yang menggantikan augmentation_patterns
     - 'aug_*'
     - '*_augmented*'
 
-# Pengaturan visualisasi
+# Pengaturan visualisasi (parameter baru)
 visualization:
   enabled: true
   sample_count: 5
@@ -61,9 +45,3 @@ visualization:
   vis_dir: 'visualizations/augmentation'
   show_original: true
   show_bboxes: true
-
-# Pengaturan performa
-performance:
-  num_workers: 4
-  batch_size: 16
-  use_gpu: true

@@ -66,7 +66,7 @@ def _load_fresh_config() -> Dict[str, Any]:
             'hyperparameters': config_manager.get_config('hyperparameters') or _get_default_hyperparams_config(),
             'backbone': config_manager.get_config('backbone') or _get_default_backbone_config(),
             'detector': config_manager.get_config('detector') or {},
-            'training_strategy': config_manager.get_config('training_strategy') or _get_default_strategy_config(),
+            'strategy': config_manager.get_config('strategy') or _get_default_strategy_config(),
             'paths': config_manager.get_config('paths') or _get_default_paths_config()
         }
         
@@ -79,7 +79,7 @@ def _load_fresh_config() -> Dict[str, Any]:
             'training': _get_default_training_config(),
             'hyperparameters': _get_default_hyperparams_config(),
             'backbone': _get_default_backbone_config(),
-            'training_strategy': _get_default_strategy_config(),
+            'strategy': _get_default_strategy_config(),
             'paths': _get_default_paths_config()
         }
 

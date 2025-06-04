@@ -25,7 +25,7 @@ class ConfigCategory(Enum):
     HYPERPARAMETERS = "hyperparameters"
     BACKBONE = "backbone"
     DETECTOR = "detector"
-    TRAINING_STRATEGY = "training_strategy"
+    strategy = "strategy"
     PATHS = "paths"
     OPTIMIZATION = "optimization"
 
@@ -40,7 +40,7 @@ YAML_CONFIG_MAPPING = {
     'hyperparameter_config.yaml': ConfigCategory.HYPERPARAMETERS,
     'backbone_config.yaml': ConfigCategory.BACKBONE,
     'detector_config.yaml': ConfigCategory.DETECTOR,
-    'training_strategy_config.yaml': ConfigCategory.TRAINING_STRATEGY,
+    'strategy_config.yaml': ConfigCategory.strategy,
     'paths_config.yaml': ConfigCategory.PATHS
 }
 
@@ -80,7 +80,7 @@ OPTIONAL_CONFIG_KEYS = {
         'warmup_epochs': 3,
         'scheduler_type': 'cosine'
     },
-    ConfigCategory.TRAINING_STRATEGY: {
+    ConfigCategory.strategy: {
         'multi_scale': False,
         'mosaic': True,
         'mixup': False
@@ -337,7 +337,7 @@ DEFAULT_TRAINING_UI_CONFIG = {
         'tensorboard_dir': 'runs/tensorboard',
         'output_dir': 'output'
     },
-    ConfigCategory.TRAINING_STRATEGY: {
+    ConfigCategory.strategy: {
         'multi_scale': False,
         'mosaic': True,
         'mixup': False,

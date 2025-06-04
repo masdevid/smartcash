@@ -1,12 +1,12 @@
 """
-File: smartcash/ui/info_boxes/training_strategy_info.py
+File: smartcash/ui/info_boxes/strategy_info.py
 Deskripsi: Konten info box untuk konfigurasi strategi pelatihan
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
-def get_training_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
+def get_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
     """
     Mendapatkan info box untuk konfigurasi strategi pelatihan.
     
@@ -57,7 +57,7 @@ def get_training_strategy_info(open_by_default: bool = False) -> widgets.Accordi
     
     return create_info_accordion(TITLE, content, "info", ICONS.get('info', 'ℹ️'), open_by_default)
 
-def get_utils_training_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
+def get_utils_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
     """
     Mendapatkan info box untuk parameter utilitas training.
     
@@ -139,7 +139,7 @@ def get_utils_training_strategy_info(open_by_default: bool = False) -> widgets.A
     
     return create_info_accordion(TITLE, content, "info", ICONS.get('info', 'ℹ️'), open_by_default)
 
-def get_validation_training_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
+def get_validation_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
     """
     Mendapatkan info box untuk parameter validasi.
     
@@ -186,7 +186,7 @@ def get_validation_training_strategy_info(open_by_default: bool = False) -> widg
     
     return create_info_accordion(TITLE, content, "info", ICONS.get('info', 'ℹ️'), open_by_default)
 
-def get_multiscale_training_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
+def get_multiscale_strategy_info(open_by_default: bool = False) -> widgets.Accordion:
     """
     Mendapatkan info box untuk parameter multi-scale.
     

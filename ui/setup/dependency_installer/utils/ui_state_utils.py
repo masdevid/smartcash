@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer/utils/ui_state_utils.py
-Deskripsi: Consolidated UI state management utilities dengan DRY pattern
+Deskripsi: Cleaned UI state management utilities dengan removed duplicate logging
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -38,9 +38,10 @@ def error_operation_with_message(ui_components: Dict[str, Any], message: str):
     """Error operation dengan error message - one-liner"""
     ui_components.get('error_operation', lambda x: None)(message)
 
-def log_message_safe(ui_components: Dict[str, Any], message: str, level: str = "info"):
-    """Safe logging dengan fallback - one-liner"""
-    (logger := ui_components.get('logger')) and getattr(logger, level, logger.info)(message)
+# REMOVED: log_message_safe function (duplicate dengan built-in logger dari CommonInitializer)
+# Semua handlers sekarang menggunakan:
+# logger = ui_components.get('logger')
+# logger and logger.level(message)
 
 def update_package_status_by_name(ui_components: Dict[str, Any], package_name: str, status: str):
     """Update package status berdasarkan nama dengan category lookup"""
@@ -80,8 +81,9 @@ def create_progress_tracker(ui_components: Dict[str, Any]) -> Callable:
     return lambda progress_type, value, message="", color=None: update_progress_step(ui_components, progress_type, value, message, color)
 
 def create_logger_bridge(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
-    """Create logger bridge dengan multiple levels - one-liner mapping"""
-    return {level: lambda msg, lvl=level: log_message_safe(ui_components, msg, lvl) 
+    """Create logger bridge menggunakan built-in logger dari CommonInitializer - one-liner mapping"""
+    logger = ui_components.get('logger')
+    return {level: lambda msg, lvl=level, log=logger: log and getattr(log, lvl, log.info)(msg) 
             for level in ['info', 'success', 'warning', 'error', 'debug']}
 
 def setup_progress_callback(ui_components: Dict[str, Any]) -> Callable:
@@ -98,6 +100,8 @@ def setup_progress_callback(ui_components: Dict[str, Any]) -> Callable:
 def handle_operation_lifecycle(ui_components: Dict[str, Any], operation_name: str, 
                              operation_func: Callable, *args, **kwargs):
     """Handle complete operation lifecycle dengan error management"""
+    
+    logger = ui_components.get('logger')
     
     try:
         # Clear outputs dan setup
@@ -116,11 +120,11 @@ def handle_operation_lifecycle(ui_components: Dict[str, Any], operation_name: st
         return result
         
     except Exception as e:
-        # Error handling
+        # Error handling menggunakan built-in logger
         error_msg = f"{operation_name.title()} failed: {str(e)}"
         error_operation_with_message(ui_components, error_msg)
         update_status_panel(ui_components, f"❌ {error_msg}", "error")
-        log_message_safe(ui_components, f"💥 {error_msg}", "error")
+        logger and logger.error(f"💥 {error_msg}")
         raise
 
 class ProgressSteps:
@@ -185,6 +189,23 @@ def create_operation_context(ui_components: Dict[str, Any], operation_name: str)
                 error_msg = f"{self.operation_name} failed: {str(exc_val)}"
                 error_operation_with_message(self.ui_components, error_msg)
                 update_status_panel(self.ui_components, f"❌ {error_msg}", "error")
+                
+                # Use built-in logger untuk error logging
+                logger = self.ui_components.get('logger')
+                logger and logger.error(f"💥 {error_msg}")
             return False  # Don't suppress exceptions
     
     return OperationContext(ui_components, operation_name)
+
+# One-liner utilities menggunakan built-in logger
+def log_to_ui_safe(ui_components: Dict[str, Any], message: str, level: str = "info"):
+    """Safe logging menggunakan built-in logger dari CommonInitializer - one-liner"""
+    (logger := ui_components.get('logger')) and getattr(logger, level, logger.info)(message)
+
+def safe_execute_with_logging(ui_components: Dict[str, Any], func: Callable, error_msg: str = "Operation failed"):
+    """Safe execution dengan error logging - one-liner"""
+    try:
+        return func() if callable(func) else None
+    except Exception as e:
+        log_to_ui_safe(ui_components, f"{error_msg}: {str(e)}", "error")
+        return None

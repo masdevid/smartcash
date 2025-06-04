@@ -1,31 +1,61 @@
 """
 File: smartcash/ui/setup/dependency_installer/dependency_installer_initializer.py
-Deskripsi: Initializer dependency installer yang terintegrasi dengan common patterns
+Deskripsi: Updated dependency installer initializer menggunakan CommonInitializer pattern
 """
 
 from typing import Dict, Any, List
-from smartcash.ui.utils.common_initializer import CommonInitializer
+from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger_namespace import DEPENDENCY_INSTALLER_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_INSTALLER_LOGGER_NAMESPACE]
+# Import handlers yang sudah direfaktor
+from smartcash.ui.setup.dependency_installer.handlers.config_extractor import extract_dependency_installer_config
+from smartcash.ui.setup.dependency_installer.handlers.config_updater import update_dependency_installer_ui
+from smartcash.ui.setup.dependency_installer.handlers.defaults import get_default_dependency_config
 
-# Import components dan handlers
+# Import components dan handlers (unchanged)
 from smartcash.ui.setup.dependency_installer.components.ui_components import create_dependency_installer_main_ui
 from smartcash.ui.setup.dependency_installer.handlers.dependency_installer_handlers import setup_dependency_installer_handlers
 
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_INSTALLER_LOGGER_NAMESPACE]
+
+class DependencyInstallerConfigHandler:
+    """ConfigHandler untuk dependency installer dengan pattern CommonInitializer"""
+    
+    def __init__(self, module_name: str, parent_module: str = None):
+        self.module_name = module_name
+        self.parent_module = parent_module
+    
+    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract config menggunakan dedicated extractor - one-liner delegation"""
+        return extract_dependency_installer_config(ui_components)
+    
+    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI menggunakan dedicated updater - one-liner delegation"""
+        update_dependency_installer_ui(ui_components, config)
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default config menggunakan defaults module - one-liner delegation"""
+        return get_default_dependency_config()
+
 class DependencyInstallerInitializer(CommonInitializer):
-    """Initializer dependency installer dengan pattern yang konsisten"""
+    """Updated dependency installer initializer dengan CommonInitializer pattern dan built-in logger"""
     
     def __init__(self):
-        super().__init__(MODULE_LOGGER_NAME, DEPENDENCY_INSTALLER_LOGGER_NAMESPACE)
+        # CommonInitializer sudah handle logger setup, tidak perlu duplicate
+        super().__init__('dependency_installer', DependencyInstallerConfigHandler, 'setup')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components untuk dependency installer"""
+        """Create UI components untuk dependency installer dengan config integration"""
+        
+        # Create main UI menggunakan existing component
         ui_components = create_dependency_installer_main_ui(config)
+        
+        # Add module-specific flags dan metadata (logger sudah dihandle CommonInitializer)
         ui_components.update({
             'dependency_installer_initialized': True,
-            'auto_analyze_on_render': True  # Flag untuk auto-analisis setelah render
+            'auto_analyze_on_render': config.get('ui_settings', {}).get('auto_analyze_on_render', True)
         })
+        
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
@@ -33,27 +63,59 @@ class DependencyInstallerInitializer(CommonInitializer):
         return setup_dependency_installer_handlers(ui_components, config, env)
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default config untuk dependency installer"""
-        return {
-            'installation': {
-                'parallel_workers': 3,
-                'force_reinstall': False,
-                'use_cache': True,
-                'timeout': 300
-            },
-            'analysis': {
-                'check_compatibility': True,
-                'include_dev_deps': False
-            }
-        }
+        """Default config untuk dependency installer - one-liner delegation"""
+        return get_default_dependency_config()
     
     def _get_critical_components(self) -> List[str]:
-        """Komponen kritis yang harus ada"""
+        """Komponen kritis yang harus ada untuk dependency installer"""
         return [
             'ui', 'install_button', 'analyze_button', 'check_button',
             'save_button', 'reset_button', 'log_output', 'status_panel'
         ]
+    
+    def _extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract config menggunakan dedicated extractor - compatibility method"""
+        return extract_dependency_installer_config(ui_components)
+    
+    def _update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI menggunakan dedicated updater - compatibility method"""
+        update_dependency_installer_ui(ui_components, config)
 
-# Global instance dan public API
+# Global instance dan public API dengan updated pattern
 _dependency_installer_initializer = DependencyInstallerInitializer()
-initialize_dependency_installer_ui = lambda env=None, config=None: _dependency_installer_initializer.initialize(env=env, config=config)
+
+def initialize_dependency_installer_ui(env=None, config=None, **kwargs) -> Any:
+    """Public API untuk initialize dependency installer UI dengan CommonInitializer pattern"""
+    return _dependency_installer_initializer.initialize(env=env, config=config, **kwargs)
+
+def get_dependency_installer_config_handler() -> DependencyInstallerConfigHandler:
+    """Get config handler instance untuk external usage - one-liner factory"""
+    return DependencyInstallerConfigHandler('dependency_installer', 'setup')
+
+def validate_dependency_installer_setup(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate dependency installer setup dengan comprehensive check"""
+    
+    critical_components = [
+        'ui', 'install_button', 'analyze_button', 'check_button',
+        'save_button', 'reset_button', 'log_output', 'status_panel'
+    ]
+    
+    missing_components = [comp for comp in critical_components if comp not in ui_components]
+    
+    validation_result = {
+        'valid': len(missing_components) == 0,
+        'missing_components': missing_components,
+        'has_config_handler': 'config_handler' in ui_components,
+        'has_logger': 'logger' in ui_components,
+        'module_initialized': ui_components.get('dependency_installer_initialized', False)
+    }
+    
+    return validation_result
+
+def get_dependency_installer_status() -> Dict[str, Any]:
+    """Get status dependency installer module untuk debugging - one-liner"""
+    return _dependency_installer_initializer.get_module_status()
+
+# Backward compatibility aliases untuk existing code
+initialize_dependency_installer = initialize_dependency_installer_ui
+create_dependency_installer_ui = initialize_dependency_installer_ui

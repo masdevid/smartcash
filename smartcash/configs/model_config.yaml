@@ -5,83 +5,63 @@
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Konfigurasi detail model
+# Override konfigurasi model dari base_config
 model:
-  # Type model
+  # Parameter baru yang tidak ada di base_config
   type: 'efficient_basic'  # Tipe model: 'efficient_basic' atau 'yolov5s'
-  
-  # Backbone model
-  backbone: 'efficientnet_b4'  # Backbone yang didukung: 'efficientnet_b4' atau 'cspdarknet_s'
-  backbone_pretrained: true
-  backbone_weights: ''  # Path ke file weights kustom (kosong untuk menggunakan default pretrained)
-  backbone_freeze: false  # Freeze backbone selama training
+  backbone_weights: ''  # Path ke file weights kustom
   backbone_unfreeze_epoch: 5  # Unfreeze backbone setelah epoch ini
+  pretrained_weights: ''  # Path ke file weights YOLOv5
   
-  # Ukuran input dan preprocessing
-  input_size: [640, 640]
-  
-  # Thresholds
-  confidence: 0.25  # Confidence threshold untuk deteksi
-  iou_threshold: 0.45  # IoU threshold untuk NMS
-  max_detections: 100  # Jumlah maksimum deteksi yang dihasilkan
-  
-  # Transfer learning
-  transfer_learning: true
-  pretrained: true
-  pretrained_weights: ''  # Path ke file weights YOLOv5 (kosong untuk menggunakan default)
-  
-  # Processing
+  # Parameter processing yang baru
   anchors: [10,13, 16,30, 33,23, 30,61, 62,45, 59,119, 116,90, 156,198, 373,326]
   strides: [8, 16, 32]
-  workers: 4  # Jumlah worker untuk dataloader
   
-  # Spesifikasi model
-  depth_multiple: 0.67  # Faktor skala untuk kedalaman model (YOLOv5s)
-  width_multiple: 0.75  # Faktor skala untuk lebar model (YOLOv5s)
+  # Parameter spesifikasi model yang baru
+  depth_multiple: 0.67  # Faktor skala untuk kedalaman model
+  width_multiple: 0.75  # Faktor skala untuk lebar model
   
-  # Integrasi khusus untuk SmartCash
+  # Parameter integrasi khusus yang baru
   use_efficient_blocks: true  # Gunakan blok EfficientNet di FPN/PAN
   use_adaptive_anchors: true  # Adaptasi anchors berdasarkan dataset
   
-  # Optimasi model
+  # Parameter optimasi model yang baru
   quantization: false
-  quantization_aware_training: false  # Gunakan QAT untuk model lebih ringan
-  fp16_training: true  # Gunakan mixed precision untuk training
+  quantization_aware_training: false
+  fp16_training: true
   
-  # Fitur optimasi tambahan
-  use_attention: false  # Gunakan FeatureAdapter (Attention) untuk adaptasi feature maps
-  use_residual: false  # Gunakan ResidualAdapter untuk koneksi residual tambahan
-  use_ciou: false      # Gunakan CIoU Loss untuk bounding box regression
+  # Parameter fitur optimasi tambahan yang baru
+  use_attention: false
+  use_residual: false
+  use_ciou: false
 
-# EfficientNet-B4 specific parameters
+# Parameter khusus EfficientNet-B4 (parameter baru)
 efficientnet:
   width_coefficient: 1.4
   depth_coefficient: 1.8
   resolution: 380
   dropout_rate: 0.4
   
-# Transfer learning parameters
+# Parameter transfer learning (parameter baru)
 transfer_learning:
-  enabled: true
-  freeze_backbone: false
   freeze_batch_norm: false
   unfreeze_after_epochs: 10
-  
-# Regularisasi khusus model
+
+# Parameter regularisasi khusus model (parameter baru)
 regularization:
-  label_smoothing: 0.0  # Label smoothing untuk mengurangi overfitting
+  label_smoothing: 0.0
 
-# Konfigurasi kompilasi model untuk deployment
+# Konfigurasi kompilasi model untuk deployment (parameter baru)
 export:
-  formats: ['onnx', 'torchscript']  # Format export
-  dynamic_batch: true  # Dukung dynamic batch size untuk deployment
-  optimize: true  # Optimasi model saat ekspor
-  half_precision: true  # Gunakan half precision (FP16)
-  simplify: true  # Simplifikasi graph ONNX
+  formats: ['onnx', 'torchscript']
+  dynamic_batch: true
+  optimize: true
+  half_precision: true
+  simplify: true
 
-# Konfigurasi khusus untuk uji coba model
+# Konfigurasi khusus untuk uji coba model (parameter baru)
 experiments:
-  # Daftar backbone yang dibandingkan (sesuai SUPPORTED_BACKBONES)
+  # Daftar backbone yang dibandingkan
   backbones:
     - name: 'cspdarknet_s'
       description: 'YOLOv5s default backbone'
@@ -95,7 +75,7 @@ experiments:
         backbone: 'efficientnet_b4'
         pretrained: true
   
-  # Skenario uji coba (sesuai model yang didukung)
+  # Skenario uji coba
   scenarios:
     - name: 'yolov5s'
       description: 'YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)'
@@ -114,10 +94,19 @@ experiments:
         use_attention: false
         use_residual: false
         use_ciou: false
+    - name: 'efficient_optimized'
+      description: 'Model dasar dengan EfficientNet-B4 dengan optimasi FeatureAdapter'
+      config:
+        type: 'efficient_optimized'
+        backbone: 'efficientnet_b4'
+        use_attention: true
+        use_residual: false
+        use_ciou: false
     
     - name: 'efficient_advanced'
       description: 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU'
       config:
+        type: 'efficient_advanced'
         backbone: 'efficientnet_b4'
         use_attention: true
         use_residual: true

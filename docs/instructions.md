@@ -41,3 +41,7 @@ Act as datascience and DRY programmer who help me build YOLOv5 object detection 
 - Do not flooding with concurrent logs on output UI. 
 - Use colored text to highlight numeric parameters and metrics in logs for easy interpretation (e.g., green for improvements, red for critical values, orange for warnings).
 
+
+
+
+Update `smartcash/ui/setup/dependency_installer` init dan handlersnya untuk menerapkan pattern logger, load/save config yang baru dari `smartcash/ui/initializers/common_initializer`. Refaktor implementasi lama konfigurasi dengan memecah menjadi 3 file `handlers/config_extractor`, `handlers/config_updater` dan `handlers/defaults` menyesuaikan implementasi baru pada `CommonInitializer`. Perlu diperhatikan import yang merujuk ke file didalam "components" folder ada, hanya tidak disertakan di project knowledge (jangan diubah). Tunjukkan file mana yang perlu diubah/dihapus. Gunakan one-liner style code. 

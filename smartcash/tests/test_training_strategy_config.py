@@ -1,5 +1,5 @@
 """
-File: smartcash/tests/test_training_strategy_config.py
+File: smartcash/tests/test_strategy_config.py
 Deskripsi: Test untuk memverifikasi kesesuaian struktur config training strategy dengan training_config.yaml
 """
 
@@ -9,9 +9,9 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 
-from smartcash.ui.training_config.training_strategy.handlers.defaults import get_default_training_strategy_config
-from smartcash.ui.training_config.training_strategy.handlers.ui_extractor import extract_training_strategy_config
-from smartcash.ui.training_config.training_strategy.handlers.ui_updater import update_training_strategy_ui
+from smartcash.ui.training_config.strategy.handlers.defaults import get_default_strategy_config
+from smartcash.ui.training_config.strategy.handlers.ui_extractor import extract_strategy_config
+from smartcash.ui.training_config.strategy.handlers.ui_updater import update_strategy_ui
 
 
 class TestTrainingStrategyConfig(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestTrainingStrategyConfig(unittest.TestCase):
             self.yaml_config = yaml.safe_load(file)
         
         # Dapatkan default config dari handler
-        self.default_config = get_default_training_strategy_config()
+        self.default_config = get_default_strategy_config()
         
         # Mock UI components untuk testing
         self.mock_ui_components = {
@@ -54,7 +54,7 @@ class TestTrainingStrategyConfig(unittest.TestCase):
         }
         
         # Extract config dari mock UI components
-        self.extracted_config = extract_training_strategy_config(self.mock_ui_components)
+        self.extracted_config = extract_strategy_config(self.mock_ui_components)
 
     def test_default_config_structure(self):
         """Test struktur default config sesuai dengan training_config.yaml"""
@@ -196,7 +196,7 @@ class TestTrainingStrategyConfig(unittest.TestCase):
         }
         
         # Update UI components
-        update_training_strategy_ui(mock_ui_for_update, update_config)
+        update_strategy_ui(mock_ui_for_update, update_config)
         
         # Verifikasi bahwa UI components telah diupdate dengan benar
         self.assertEqual(mock_ui_for_update['validation_frequency_slider'].value, 1)

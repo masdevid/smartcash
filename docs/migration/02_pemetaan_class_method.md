@@ -1423,10 +1423,10 @@
   - `create_epochs_selector(env, config)`: Buat komponen pemilihan epochs
   - `create_optimization_options(env, config)`: Buat komponen opsi optimisasi
 
-#### Training Strategy Component (smartcash/components/training_config/training_strategy.py)
+#### Training Strategy Component (smartcash/components/training_config/strategy.py)
 - **Fungsi**: Komponen UI untuk strategi training
 - **Metode Utama**:
-  - `create_training_strategy_ui(env, config)`: Buat UI untuk strategi training
+  - `create_strategy_ui(env, config)`: Buat UI untuk strategi training
   - `create_scheduler_options(env, config)`: Buat komponen opsi scheduler
   - `create_early_stopping_options(env, config)`: Buat komponen opsi early stopping
   - `create_checkpoint_options(env, config)`: Buat komponen opsi checkpoint

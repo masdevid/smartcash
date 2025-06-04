@@ -5,43 +5,41 @@
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Parameter dasar
-batch_size: 16
-image_size: 640
-epochs: 100
+# Override parameter training dari base_config
+training:
+  epochs: 100  # Override dari base_config (30)
+  lr: 0.01  # Override dari base_config (0.001)
 
-# Parameter optimasi
-optimizer: 'Adam'
-learning_rate: 0.01
-weight_decay: 0.0005
-momentum: 0.937
+# Parameter penjadwalan (parameter baru)
+scheduler:
+  type: 'cosine'
+  warmup_epochs: 3
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
 
-# Parameter penjadwalan
-scheduler: 'cosine'
-warmup_epochs: 3
-warmup_momentum: 0.8
-warmup_bias_lr: 0.1
+# Parameter regularisasi (parameter baru)
+regularization:
+  augment: true
+  dropout: 0.0
 
-# Parameter regularisasi
-augment: true
-dropout: 0.0
+# Parameter loss (parameter baru)
+loss:
+  box_loss_gain: 0.05
+  cls_loss_gain: 0.5
+  obj_loss_gain: 1.0
 
-# Parameter loss
-box_loss_gain: 0.05
-cls_loss_gain: 0.5
-obj_loss_gain: 1.0
+# Parameter anchor (parameter baru)
+anchor:
+  anchor_t: 4.0
+  fl_gamma: 0.0
 
-# Parameter anchor
-anchor_t: 4.0
-fl_gamma: 0.0
-
-# Parameter early stopping
+# Override parameter early stopping
 early_stopping:
-  enabled: true
-  patience: 15
-  min_delta: 0.001
+  enabled: true  # Parameter baru
+  patience: 15  # Override dari base_config (10)
+  min_delta: 0.001  # Parameter baru
 
-# Parameter save best model
+# Parameter save best model (parameter baru)
 save_best:
   enabled: true
   metric: 'mAP_0.5'

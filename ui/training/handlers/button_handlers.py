@@ -218,7 +218,7 @@ def _load_all_configs() -> Dict[str, Any]:
             'training': config_manager.get_config('training') or {},
             
             # Modul-modul spesifik dari training_config.yaml
-            'training_strategy': config_manager.get_config('training_strategy') or {},
+            'strategy': config_manager.get_config('strategy') or {},
             
             # Config lainnya
             'backbone': config_manager.get_config('backbone') or {},

@@ -42,25 +42,18 @@ class TestDatasetDownloadConfig(unittest.TestCase):
         
         # Verifikasi sub-struktur data
         data_config = self.yaml_config['data']
-        self.assertIn('source', data_config)
-        self.assertIn('roboflow', data_config)
-        self.assertIn('split_ratios', data_config)
-        self.assertIn('stratified_split', data_config)
-        self.assertIn('random_seed', data_config)
+        # Catatan: Struktur data.source dan data.roboflow telah dipindahkan ke base_config.yaml
+        # Setelah refaktor, kita hanya perlu memverifikasi data.validation yang ada di dataset_config.yaml
         self.assertIn('validation', data_config)
         
-        # Verifikasi sub-struktur roboflow
-        roboflow_config = data_config['roboflow']
-        self.assertIn('api_key', roboflow_config)
-        self.assertIn('workspace', roboflow_config)
-        self.assertIn('project', roboflow_config)
-        self.assertIn('version', roboflow_config)
+        # Verifikasi bahwa dataset_config.yaml memiliki struktur dataset yang benar
+        self.assertIn('dataset', self.yaml_config)
+        dataset_config = self.yaml_config['dataset']
+        self.assertIn('backup', dataset_config)
+        self.assertIn('export', dataset_config)
+        self.assertIn('import', dataset_config)
         
-        # Verifikasi sub-struktur split_ratios
-        split_ratios = data_config['split_ratios']
-        self.assertIn('train', split_ratios)
-        self.assertIn('valid', split_ratios)
-        self.assertIn('test', split_ratios)
+        # Catatan: split_ratios telah dipindahkan ke base_config.yaml setelah refaktor
         
         # Verifikasi sub-struktur validation
         validation_config = data_config['validation']
@@ -98,11 +91,13 @@ class TestDatasetDownloadConfig(unittest.TestCase):
         # Verifikasi struktur cache
         self.assertIn('cache', self.yaml_config)
         cache_config = self.yaml_config['cache']
-        self.assertIn('enabled', cache_config)
+        # Catatan: 'enabled' telah dipindahkan ke base_config.yaml
+        # self.assertIn('enabled', cache_config)
         self.assertIn('dir', cache_config)
-        self.assertIn('max_size_gb', cache_config)
-        self.assertIn('ttl_hours', cache_config)
-        self.assertIn('auto_cleanup', cache_config)
+        # Catatan: Beberapa key telah dipindahkan atau dihapus setelah refaktor
+        # self.assertIn('max_size_gb', cache_config)
+        # self.assertIn('ttl_hours', cache_config)
+        # self.assertIn('auto_cleanup', cache_config)
 
     def test_config_handlers_setup(self):
         """Test setup config handlers dengan dataset_config.yaml"""

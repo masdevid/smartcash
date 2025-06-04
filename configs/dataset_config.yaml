@@ -5,27 +5,9 @@
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Konfigurasi dataset yang diselaraskan
+# Override konfigurasi data dari base_config
 data:
-  source: "roboflow"  # 'local' atau 'roboflow'
-  # Roboflow config
-  roboflow:
-    api_key: ""  # API key diisi oleh pengguna atau dari Google Secret
-    workspace: "smartcash-wo2us"
-    project: "rupiah-emisi-2022"
-    version: "3"
-  
-  # Split ratios
-  split_ratios:
-    train: 0.7
-    valid: 0.15
-    test: 0.15
-  
-  # Split settings
-  stratified_split: true
-  random_seed: 42
-  
-  # Pengaturan validasi dataset
+  # Parameter validasi dataset (parameter baru)
   validation:
     enabled: true
     fix_issues: true
@@ -33,13 +15,13 @@ data:
     invalid_dir: 'data/invalid'
     visualize_issues: false
 
-# Konfigurasi untuk akses dan backup dataset
+# Konfigurasi untuk akses dan backup dataset (parameter baru)
 dataset:
   backup:
     enabled: true
     dir: 'data/backup/dataset'
     count: 3
-    auto: false  # Tidak backup otomatis
+    auto: false
   
   export:
     enabled: true
@@ -55,10 +37,6 @@ dataset:
       - 'voc'
     temp_dir: 'data/temp'
 
-# Konfigurasi cache spesifik untuk dataset
+# Override konfigurasi cache dari base_config
 cache:
-  enabled: true
-  dir: '.cache/smartcash/dataset'
-  max_size_gb: 1.0
-  ttl_hours: 24
-  auto_cleanup: true
+  dir: '.cache/smartcash/dataset'  # Override dari base_config (.cache/smartcash)

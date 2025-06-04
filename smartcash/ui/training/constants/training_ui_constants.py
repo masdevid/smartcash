@@ -91,7 +91,7 @@ DEFAULT_TRAINING_PARAMS = {
 }
 
 # Early stopping & save best sesuai YAML
-TRAINING_STRATEGY_PARAMS = {
+strategy_PARAMS = {
     'early_stopping': {
         'enabled': True,
         'patience': 15,
@@ -304,7 +304,7 @@ def get_yaml_default_config() -> Dict[str, Any]:
     """Get default config sesuai YAML structure"""
     return {
         **DEFAULT_TRAINING_PARAMS,
-        **TRAINING_STRATEGY_PARAMS,
+        **strategy_PARAMS,
         **TRAINING_UTILS_PARAMS,
         'model': {
             'type': 'efficient_basic',
@@ -344,7 +344,7 @@ def is_loss_metric(metric_name: str) -> bool:
 # Export key constants
 __all__ = [
     'SUPPORTED_MODEL_TYPES', 'SUPPORTED_BACKBONES', 'DEFAULT_TRAINING_PARAMS',
-    'TRAINING_STRATEGY_PARAMS', 'TRAINING_UTILS_PARAMS', 'CRITICAL_UI_COMPONENTS',
+    'strategy_PARAMS', 'TRAINING_UTILS_PARAMS', 'CRITICAL_UI_COMPONENTS',
     'BUTTON_CONFIGS', 'CHART_CONFIG', 'METRICS_CONFIG', 'VALIDATION_RULES',
     'LOG_TEMPLATES', 'ERROR_CATEGORIES', 'get_model_type_info', 'get_backbone_info',
     'validate_yaml_params', 'get_yaml_default_config', 'get_button_config',

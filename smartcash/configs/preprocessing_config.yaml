@@ -5,78 +5,43 @@
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Konfigurasi preprocessing yang diselaraskan
+# Override konfigurasi preprocessing dari base_config
 preprocessing:
-  output_dir: 'data/preprocessed'  # Path relatif standar
-  save_visualizations: true
-  vis_dir: 'visualizations/preprocessing'  # Path relatif standar
-  sample_size: 500  # Jumlah sampel maksimum untuk analisis (0 = semua)
+  vis_dir: 'visualizations/preprocessing'  # Override dari base_config (visualizations)
+  sample_size: 500  # Override dari base_config (0)
   
-  # Validasi dataset selama preprocessing
+  # Override validasi dataset
   validate:
-    enabled: true
-    fix_issues: true
-    move_invalid: true
-    visualize: true
-    check_image_quality: true
-    check_labels: true
-    check_coordinates: true
+    visualize: true  # Override dari base_config (false)
 
-  # Opsi normalisasi
-  normalization:
-    enabled: true
-    method: 'minmax'  # minmax, zscore, atau whitening
-    target_size: [640, 640]  # Menggunakan list bukan tuple
-    preserve_aspect_ratio: true
-    normalize_pixel_values: true
-    pixel_range: [0, 1]  # Menggunakan list bukan tuple
-
-  # Opsi analisis dataset
+  # Override opsi analisis dataset
   analysis:
-    enabled: true
-    class_balance: true
-    image_size_distribution: true
-    bbox_statistics: true
-    layer_balance: true
-    
-  # Opsi balancing dataset
-  balance:
-    enabled: false
-    target_distribution: 'auto'  # auto, equal, atau dict
-    methods:
-      undersampling: false
-      oversampling: true
-      augmentation: true
-    min_samples_per_class: 100
-    max_samples_per_class: 1000
+    enabled: true  # Override dari base_config (false)
 
-# Referensi ke konfigurasi augmentasi terpisah
+# Parameter referensi ke konfigurasi augmentasi terpisah (parameter baru)
 augmentation_reference:
-  config_file: 'augmentation_config.yaml'  # Referensi ke file konfigurasi terpisah
-  use_for_preprocessing: true  # Gunakan augmentasi dalam preprocessing jika diperlukan
-  preprocessing_variations: 3  # Override jumlah variasi khusus untuk preprocessing
+  config_file: 'augmentation_config.yaml'
+  use_for_preprocessing: true
+  preprocessing_variations: 3
 
-# Konfigurasi cleanup dengan path relatif standar
+# Override konfigurasi cleanup dari base_config
 cleanup:
   augmentation_patterns:
     - 'aug_.*'
     - '.*_augmented.*'
     - '.*_modified.*'
     - '.*_processed.*'
-    - '.*_norm.*'
+    - '.*_norm.*'  # Pattern tambahan
   ignored_patterns:
     - '.*\.gitkeep'
     - '.*\.DS_Store'
-    - '.*\.gitignore'
-  backup_dir: 'data/backup/preprocessing'  # Path relatif standar
-  backup_enabled: true
-  auto_cleanup_preprocessed: false  # Jangan otomatis hapus hasil preprocessing
+    - '.*\.gitignore'  # Pattern tambahan
+  backup_dir: 'data/backup/preprocessing'  # Override dari base_config (data/backup)
 
-# Pengaturan performa preprocessing (tambahan)
+# Override pengaturan performa dari base_config
 performance:
-  num_workers: 8
-  batch_size: 32
-  use_gpu: true
-  compression_level: 90  # Kualitas JPEG untuk output (1-100)
-  max_memory_usage_gb: 4.0  # Batas penggunaan memori
-  use_mixed_precision: true  # Gunakan mixed precision jika GPU tersedia
+  num_workers: 4  # Override dari base_config (4)
+  batch_size: 32  # Override dari base_config (16)
+  compression_level: 90  # Parameter baru
+  max_memory_usage_gb: 4.0  # Override dari base_config
+  use_mixed_precision: true  # Override dari base_config (false)

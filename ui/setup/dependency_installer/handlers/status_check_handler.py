@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer/handlers/status_check_handler.py
-Deskripsi: SRP handler untuk status check dengan consolidated utils
+Deskripsi: Fixed status check handler dengan simplified logging menggunakan built-in logger dari CommonInitializer
 """
 
 from typing import Dict, Any
@@ -14,7 +14,7 @@ from smartcash.ui.setup.dependency_installer.utils.package_utils import (
 )
 from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import (
     create_operation_context, ProgressSteps, update_package_status_by_name,
-    update_status_panel, log_message_safe
+    update_status_panel  # removed log_message_safe
 )
 from smartcash.ui.setup.dependency_installer.utils.report_generator_utils import (
     generate_comprehensive_status_report, generate_system_compatibility_report
@@ -24,7 +24,7 @@ from smartcash.ui.setup.dependency_installer.components.package_selector import 
 )
 
 def setup_status_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup status check handler dengan consolidated utils"""
+    """Setup status check handler dengan simplified logging"""
     
     def execute_status_check(button=None):
         """Execute comprehensive status check dengan operation context"""
@@ -35,18 +35,21 @@ def setup_status_check_handler(ui_components: Dict[str, Any], config: Dict[str, 
     ui_components['check_button'].on_click(execute_status_check)
 
 def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict[str, Any], ctx):
-    """Execute status check menggunakan consolidated utils"""
+    """Execute status check menggunakan built-in logger dari CommonInitializer"""
+    
+    # Get built-in logger dari CommonInitializer
+    logger = ui_components.get('logger')
     
     try:
         # Step 1: Initialize check
         ctx.stepped_progress('STATUS_INIT', "Memulai status check...")
-        log_message_safe(ui_components, "🔍 Memulai comprehensive status check", "info")
+        logger and logger.info("🔍 Memulai comprehensive status check")
         
         # Step 2: Get system information
         ctx.stepped_progress('STATUS_SYSTEM_INFO', "Mengumpulkan informasi sistem...")
         system_info = get_comprehensive_system_info()
         system_requirements = check_system_requirements()
-        log_message_safe(ui_components, "💻 System information collected", "info")
+        logger and logger.info("💻 System information collected")
         
         # Step 3: Get comprehensive package status
         ctx.stepped_progress('STATUS_PACKAGE_CHECK', "Checking package status...")
@@ -65,19 +68,20 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
         installed_packages = sum(1 for status in package_status.values() if status['installed'])
         
         summary_msg = f"📊 Status Check: {installed_packages}/{total_packages} packages terinstall"
-        log_message_safe(ui_components, f"✅ {summary_msg}", "success")
+        logger and logger.success(f"✅ {summary_msg}")
         update_status_panel(ui_components, summary_msg, "success")
         
         ctx.stepped_progress('STATUS_COMPLETE', "Status check selesai", "overall")
         ctx.stepped_progress('STATUS_COMPLETE', "Complete", "step")
         
     except Exception as e:
-        log_message_safe(ui_components, f"💥 Status check failed: {str(e)}", "error")
+        logger and logger.error(f"💥 Status check failed: {str(e)}")
         raise
 
 def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], ctx) -> Dict[str, Dict[str, Any]]:
-    """Get comprehensive status menggunakan consolidated utils"""
+    """Get comprehensive status menggunakan simplified logging"""
     
+    logger = ui_components.get('logger')
     package_status = {}
     package_categories = get_package_categories()
     
@@ -85,7 +89,7 @@ def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], 
     installed_packages = get_installed_packages_dict()
     
     for category in package_categories:
-        log_message_safe(ui_components, f"🔍 Checking {category['name']} category...", "info")
+        logger and logger.info(f"🔍 Checking {category['name']} category...")
         
         for package in category['packages']:
             package_key = package['key']
@@ -164,7 +168,9 @@ def _display_comprehensive_report_with_utils(ui_components: Dict[str, Any], syst
 
 def _log_status_summary_with_utils(ui_components: Dict[str, Any], package_status: Dict[str, Dict[str, Any]], 
                                  system_requirements: Dict[str, Any], ctx):
-    """Log summary menggunakan consolidated approach"""
+    """Log summary menggunakan built-in logger"""
+    
+    logger = ui_components.get('logger')
     
     # Package summary by category
     category_summary = {}
@@ -180,17 +186,17 @@ def _log_status_summary_with_utils(ui_components: Dict[str, Any], package_status
     # Log category summaries
     for category, stats in category_summary.items():
         coverage = (stats['installed'] / stats['total'] * 100) if stats['total'] > 0 else 0
-        log_message_safe(ui_components, f"📋 {category}: {stats['installed']}/{stats['total']} ({coverage:.1f}%)", "info")
+        logger and logger.info(f"📋 {category}: {stats['installed']}/{stats['total']} ({coverage:.1f}%)")
     
     # Log system requirements
     if not system_requirements.get('all_requirements_met', True):
-        log_message_safe(ui_components, "⚠️ Some system requirements not met", "warning")
+        logger and logger.warning("⚠️ Some system requirements not met")
         if not system_requirements.get('python_version_ok'):
-            log_message_safe(ui_components, "   • Python version < 3.7", "warning")
+            logger and logger.warning("   • Python version < 3.7")
         if not system_requirements.get('memory_sufficient'):
-            log_message_safe(ui_components, "   • Memory < 2GB", "warning")
+            logger and logger.warning("   • Memory < 2GB")
         if not system_requirements.get('platform_supported'):
-            log_message_safe(ui_components, "   • Platform not officially supported", "warning")
+            logger and logger.warning("   • Platform not officially supported")
 
 def _update_ui_status_from_check_with_utils(ui_components: Dict[str, Any], package_status: Dict[str, Dict[str, Any]]):
     """Update UI package status menggunakan batch utils"""

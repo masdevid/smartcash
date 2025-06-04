@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/downloader/progress_tracker.py
-Deskripsi: Progress tracker dengan callback management untuk download process
+Deskripsi: Complete progress tracker dengan callback management untuk download process
 """
 
 import time
@@ -54,7 +54,11 @@ class DownloadProgressTracker:
             'organize': StepInfo('organize', 10, 'Organisir dataset')
         }
     
-    def set_progress_callback(self, callback: Callable[[str, int, str], None]) -> None:
+    def set_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
+        """Set callback untuk progress updates."""
+        self._progress_callback = callback
+    
+    def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
         """Set callback untuk overall progress updates."""
         self._progress_callback = callback
     
@@ -76,7 +80,7 @@ class DownloadProgressTracker:
             step.message = ""
             step.start_time = step.end_time = None
         
-        self._notify_progress("start", 0, message)
+        self._notify_progress("start", 0, 100, message)
     
     def start_step(self, step_name: str, message: str = "") -> None:
         """Start specific step."""
@@ -93,7 +97,7 @@ class DownloadProgressTracker:
         self._calculate_overall_progress()
         
         self._notify_step("step_start", step.progress, step.message)
-        self._notify_progress("progress", self.overall_progress, f"Memulai {step.description}")
+        self._notify_progress("progress", self.overall_progress, 100, f"Memulai {step.description}")
     
     def update_step(self, step_name: str, progress: int, message: str = "") -> None:
         """Update progress untuk specific step."""
@@ -107,7 +111,7 @@ class DownloadProgressTracker:
         
         self._calculate_overall_progress()
         self._notify_step("step_progress", step.progress, step.message)
-        self._notify_progress("progress", self.overall_progress, step.message)
+        self._notify_progress("progress", self.overall_progress, 100, step.message)
     
     def complete_step(self, step_name: str, message: str = "") -> None:
         """Complete specific step."""
@@ -127,7 +131,7 @@ class DownloadProgressTracker:
         complete_msg = f"{step.description} selesai ({duration:.1f}s)"
         
         self._notify_step("step_complete", 100, complete_msg)
-        self._notify_progress("progress", self.overall_progress, complete_msg)
+        self._notify_progress("progress", self.overall_progress, 100, complete_msg)
     
     def complete_process(self, message: str = "Download dataset selesai") -> None:
         """Complete seluruh download process."""
@@ -146,7 +150,7 @@ class DownloadProgressTracker:
         final_message = f"{message} ({total_duration:.1f}s)"
         
         self._notify_step("complete", 100, final_message)
-        self._notify_progress("complete", 100, final_message)
+        self._notify_progress("complete", 100, 100, final_message)
     
     def error_process(self, error_message: str, step_name: str = "") -> None:
         """Handle error dalam download process."""
@@ -157,7 +161,7 @@ class DownloadProgressTracker:
             step.message = error_message
         
         self._notify_step("error", 0, error_message)
-        self._notify_progress("error", 0, error_message)
+        self._notify_progress("error", 0, 100, error_message)
     
     def _calculate_overall_progress(self) -> None:
         """Calculate overall progress berdasarkan step weights."""
@@ -176,11 +180,11 @@ class DownloadProgressTracker:
         
         self.overall_progress = int((total_weighted_progress / total_weight) * 100) if total_weight > 0 else 0
     
-    def _notify_progress(self, event_type: str, progress: int, message: str) -> None:
+    def _notify_progress(self, event_type: str, progress: int, total: int, message: str) -> None:
         """Notify overall progress."""
         if self._progress_callback:
             try:
-                self._progress_callback(event_type, progress, message)
+                self._progress_callback(event_type, progress, total, message)
             except Exception:
                 pass  # Silent fail to prevent callback errors
     
@@ -233,12 +237,14 @@ class CallbackManager:
         self._callbacks: Dict[str, List[Callable]] = {}
     
     def register_callback(self, event_type: str, callback: Callable) -> None:
-        """Register callback untuk event type dengan one-liner."""
+        """Register callback untuk event type."""
         self._callbacks.setdefault(event_type, []).append(callback)
     
     def unregister_callback(self, event_type: str, callback: Callable) -> None:
-        """Unregister callback dengan one-liner."""
-        self._callbacks.get(event_type, []).remove(callback) if callback in self._callbacks.get(event_type, []) else None
+        """Unregister callback."""
+        callbacks = self._callbacks.get(event_type, [])
+        if callback in callbacks:
+            callbacks.remove(callback)
     
     def notify_callbacks(self, event_type: str, *args, **kwargs) -> None:
         """Notify semua callbacks untuk event type."""

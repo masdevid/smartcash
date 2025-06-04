@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/downloader/file_processor.py
-Deskripsi: Processor untuk file operations dataset dengan progress tracking
+Deskripsi: Complete file processor dengan proper path handling dan progress tracking
 """
 
 import shutil
@@ -16,13 +16,17 @@ class FileProcessor:
         self.logger = logger or get_logger()
         self._progress_callback: Optional[Callable] = None
     
-    def set_progress_callback(self, callback: Callable[[str, int, str], None]) -> None:
-        """Set progress callback dengan one-liner."""
+    def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
+        """Set progress callback."""
         self._progress_callback = callback
     
-    def _notify_progress(self, step: str, progress: int, message: str) -> None:
+    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
         """Notify progress dengan error handling."""
-        self._progress_callback and self._progress_callback(step, progress, message)
+        if self._progress_callback:
+            try:
+                self._progress_callback(step, current, total, message)
+            except Exception:
+                pass
     
     def extract_zip(self, zip_path: Path, extract_to: Path) -> Dict[str, Any]:
         """Extract ZIP file dengan progress tracking."""
@@ -30,7 +34,7 @@ class FileProcessor:
             if not zipfile.is_zipfile(zip_path):
                 return {'status': 'error', 'message': 'File bukan ZIP yang valid'}
             
-            self._notify_progress("extract", 0, "Memulai ekstraksi ZIP")
+            self._notify_progress("extract", 0, 100, "Memulai ekstraksi ZIP")
             
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 file_list = zip_ref.infolist()
@@ -50,13 +54,13 @@ class FileProcessor:
                         # Update progress setiap 10%
                         if i % max(1, total_files // 10) == 0:
                             progress = int((i / total_files) * 100)
-                            self._notify_progress("extract", progress, f"Ekstrak: {extracted_count}/{total_files}")
+                            self._notify_progress("extract", progress, 100, f"Ekstrak: {extracted_count}/{total_files}")
                     
                     except Exception as e:
                         self.logger.warning(f"⚠️ Gagal ekstrak {file_info.filename}: {str(e)}")
                         continue
                 
-                self._notify_progress("extract", 100, f"Ekstraksi selesai: {extracted_count} file")
+                self._notify_progress("extract", 100, 100, f"Ekstraksi selesai: {extracted_count} file")
                 
                 return {
                     'status': 'success',
@@ -74,7 +78,7 @@ class FileProcessor:
             if not source_dir.exists():
                 return {'status': 'error', 'message': f'Source tidak ditemukan: {source_dir}'}
             
-            self._notify_progress("organize", 0, "Memulai organisasi dataset")
+            self._notify_progress("organize", 0, 100, "Memulai organisasi dataset")
             
             # Detect dataset structure
             structure = self._detect_structure(source_dir)
@@ -92,7 +96,7 @@ class FileProcessor:
                 start_progress = (i * 80) // total_splits
                 end_progress = ((i + 1) * 80) // total_splits
                 
-                self._notify_progress("organize", start_progress, f"Mengorganisir split {split}")
+                self._notify_progress("organize", start_progress, 100, f"Mengorganisir split {split}")
                 
                 split_result = self._organize_split(source_dir, target_dir, split, start_progress, end_progress)
                 organized_stats[split] = split_result
@@ -103,7 +107,7 @@ class FileProcessor:
             total_images = sum(stats.get('images', 0) for stats in organized_stats.values())
             total_labels = sum(stats.get('labels', 0) for stats in organized_stats.values())
             
-            self._notify_progress("organize", 100, f"Organisasi selesai: {total_images} gambar")
+            self._notify_progress("organize", 100, 100, f"Organisasi selesai: {total_images} gambar")
             
             return {
                 'status': 'success',
@@ -117,7 +121,7 @@ class FileProcessor:
             return {'status': 'error', 'message': f'Error organisasi: {str(e)}'}
     
     def _detect_structure(self, source_dir: Path) -> Dict[str, Any]:
-        """Detect struktur dataset dengan one-liner detection."""
+        """Detect struktur dataset."""
         splits = []
         
         # Check standard splits
@@ -164,7 +168,7 @@ class FileProcessor:
                 # Update progress
                 if copied_files % max(1, total_files // 10) == 0:
                     progress = start_progress + int((copied_files / total_files) * (end_progress - start_progress))
-                    self._notify_progress("organize", progress, f"Copy {split}: {copied_files}/{total_files}")
+                    self._notify_progress("organize", progress, 100, f"Copy {split}: {copied_files}/{total_files}")
             
             # Copy labels
             for label_file in label_files:
@@ -174,7 +178,7 @@ class FileProcessor:
                 # Update progress
                 if copied_files % max(1, total_files // 10) == 0:
                     progress = start_progress + int((copied_files / total_files) * (end_progress - start_progress))
-                    self._notify_progress("organize", progress, f"Copy {split}: {copied_files}/{total_files}")
+                    self._notify_progress("organize", progress, 100, f"Copy {split}: {copied_files}/{total_files}")
             
             return {
                 'status': 'success',
@@ -185,19 +189,6 @@ class FileProcessor:
             
         except Exception as e:
             return {'status': 'error', 'message': f'Error split {split}: {str(e)}'}
-    
-    def _copy_additional_files(self, source_dir: Path, target_dir: Path) -> None:
-        """Copy file tambahan seperti data.yaml."""
-        additional_files = ['data.yaml', 'dataset.yaml', 'classes.txt', 'README.md']
-        
-        for filename in additional_files:
-            source_file = source_dir / filename
-            if source_file.exists():
-                try:
-                    shutil.copy2(source_file, target_dir / filename)
-                    self.logger.debug(f"📄 Copied {filename}")
-                except Exception as e:
-                    self.logger.warning(f"⚠️ Gagal copy {filename}: {str(e)}")
     
     def cleanup_temp_files(self, temp_dir: Path) -> Dict[str, Any]:
         """Cleanup temporary files dan directories."""
@@ -270,7 +261,7 @@ class FileProcessor:
             return {'valid': False, 'message': f'Error validasi: {str(e)}'}
     
     def get_file_stats(self, file_path: Path) -> Dict[str, Any]:
-        """Get statistik file dengan one-liner."""
+        """Get statistik file."""
         try:
             stat = file_path.stat()
             return {

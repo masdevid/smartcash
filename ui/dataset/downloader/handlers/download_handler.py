@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py
-Deskripsi: Download handler dengan progress callback integration dan error handling
+Deskripsi: Complete download handler dengan proper integration dan comprehensive error handling
 """
 
 from typing import Dict, Any, Callable

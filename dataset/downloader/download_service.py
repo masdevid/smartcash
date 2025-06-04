@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/downloader/download_service.py
-Deskripsi: Main download service dengan progress callback integration dan organized structure
+Deskripsi: Complete download service dengan proper integration dan error handling
 """
 
 import time
@@ -10,8 +10,8 @@ from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 from smartcash.dataset.downloader.roboflow_client import RoboflowClient
 from smartcash.dataset.downloader.file_processor import FileProcessor
-from smartcash.dataset.downloader.progress_tracker import ProgressTracker
-from smartcash.dataset.downloader.validators import DownloadValidator
+from smartcash.dataset.downloader.progress_tracker import DownloadProgressTracker
+from smartcash.dataset.downloader.validators import DatasetValidator
 
 class DownloadService:
     """Main download service dengan comprehensive features."""
@@ -21,11 +21,14 @@ class DownloadService:
         self.logger = logger or get_logger('downloader.service')
         self.env_manager = get_environment_manager()
         
-        # Initialize components
-        self.roboflow_client = RoboflowClient(config, logger)
-        self.file_processor = FileProcessor(config, logger)
-        self.validator = DownloadValidator(config, logger)
-        self.progress_tracker = ProgressTracker()
+        # Extract API key dari config
+        api_key = config.get('api_key', '')
+        
+        # Initialize components dengan proper parameters
+        self.roboflow_client = RoboflowClient(api_key, logger=logger)
+        self.file_processor = FileProcessor(logger)
+        self.validator = DatasetValidator(logger)
+        self.progress_tracker = DownloadProgressTracker()
         
         # Progress callback
         self._progress_callback: Optional[Callable] = None
@@ -48,21 +51,22 @@ class DownloadService:
         try:
             # Step 1: Validate parameters
             self._notify_progress('validate', 0, 100, "Validating parameters...")
-            validation_result = self.validator.validate_parameters(
-                workspace, project, version, api_key, output_format
-            )
+            validation_result = self._validate_parameters(workspace, project, version, api_key, output_format)
             
             if not validation_result['valid']:
-                return self._error_result(f"Validation failed: {', '.join(validation_result['errors'])}")
+                return self._error_result(f"Validation failed: {'; '.join(validation_result['errors'])}")
             
             self._notify_progress('validate', 100, 100, "Parameters validated")
             
             # Step 2: Get dataset metadata
             self._notify_progress('connect', 0, 100, "Connecting to Roboflow...")
-            metadata = self.roboflow_client.get_dataset_metadata(workspace, project, version, api_key, output_format)
+            metadata_result = self.roboflow_client.get_dataset_metadata(workspace, project, version, output_format)
             
-            if not metadata:
-                return self._error_result("Failed to get dataset metadata")
+            if metadata_result['status'] != 'success':
+                return self._error_result(f"Failed to get dataset metadata: {metadata_result['message']}")
+            
+            metadata = metadata_result['data']
+            download_url = metadata_result['download_url']
             
             self._notify_progress('connect', 100, 100, "Connected to Roboflow")
             
@@ -75,45 +79,52 @@ class DownloadService:
             
             # Step 5: Download dataset
             self._notify_progress('download', 0, 100, "Starting download...")
-            download_result = self.roboflow_client.download_dataset(
-                metadata['download_url'], paths['temp_dir']
-            )
+            download_result = self.roboflow_client.download_dataset(download_url, paths['temp_dir'] / 'dataset.zip')
             
-            if not download_result['success']:
+            if download_result['status'] != 'success':
                 return self._error_result(f"Download failed: {download_result['message']}")
             
             # Step 6: Extract dan process files
             self._notify_progress('extract', 0, 100, "Extracting dataset...")
-            extract_result = self.file_processor.extract_and_process(
-                download_result['zip_path'], paths['temp_dir']
+            extract_result = self.file_processor.extract_zip(
+                Path(download_result['file_path']), paths['temp_dir'] / 'extracted'
             )
             
-            if not extract_result['success']:
+            if extract_result['status'] != 'success':
                 return self._error_result(f"Extraction failed: {extract_result['message']}")
             
             # Step 7: Organize dataset structure jika diminta
             if organize_dataset:
                 self._notify_progress('organize', 0, 100, "Organizing dataset structure...")
-                organize_result = self.file_processor.organize_to_final_structure(
-                    paths['temp_dir'], paths['final_dir']
+                organize_result = self.file_processor.organize_dataset(
+                    paths['temp_dir'] / 'extracted', paths['final_dir']
                 )
                 
-                if not organize_result['success']:
+                if organize_result['status'] != 'success':
                     return self._error_result(f"Organization failed: {organize_result['message']}")
                 
-                final_stats = organize_result['stats']
+                final_stats = {
+                    'total_images': organize_result['total_images'],
+                    'total_labels': organize_result['total_labels'],
+                    'splits': organize_result['splits']
+                }
             else:
                 # Move ke final directory tanpa organize
-                move_result = self.file_processor.move_to_final(paths['temp_dir'], paths['final_dir'])
-                final_stats = move_result.get('stats', {})
+                import shutil
+                if paths['final_dir'].exists():
+                    shutil.rmtree(paths['final_dir'])
+                shutil.move(str(paths['temp_dir'] / 'extracted'), str(paths['final_dir']))
+                final_stats = {'total_images': 0, 'total_labels': 0, 'splits': {}}
             
             # Step 8: Validate hasil jika diminta
             if validate_download:
                 self._notify_progress('organize', 80, 100, "Validating download results...")
-                validate_result = self.validator.validate_downloaded_dataset(paths['final_dir'])
+                validate_result = self.validator.validate_extracted_dataset(paths['final_dir'])
                 
                 if not validate_result['valid']:
-                    self.logger.warning(f"⚠️ Validation warnings: {', '.join(validate_result['warnings'])}")
+                    self.logger.warning(f"⚠️ Validation warnings: {', '.join(validate_result.get('issues', []))}")
+                    if validate_result.get('issues'):
+                        final_stats.update(validate_result)
             
             # Cleanup temp files
             self._cleanup_temp_files(paths['temp_dir'])
@@ -145,6 +156,22 @@ class DownloadService:
                 'message': error_msg,
                 'duration': duration
             }
+    
+    def _validate_parameters(self, workspace: str, project: str, version: str, api_key: str, output_format: str) -> Dict[str, Any]:
+        """Validate download parameters dengan comprehensive checking."""
+        errors = []
+        
+        # Required fields
+        if not workspace: errors.append("Workspace tidak boleh kosong")
+        if not project: errors.append("Project tidak boleh kosong")  
+        if not version: errors.append("Version tidak boleh kosong")
+        if not api_key: errors.append("API key tidak boleh kosong")
+        
+        # API key format
+        if api_key and len(api_key) < 10:
+            errors.append("API key terlalu pendek")
+        
+        return {'valid': len(errors) == 0, 'errors': errors}
     
     def _setup_download_paths(self, workspace: str, project: str, version: str) -> Dict[str, Path]:
         """Setup download paths berdasarkan environment."""
@@ -182,7 +209,7 @@ class DownloadService:
         if self._has_existing_dataset(final_dir):
             self.logger.info("💾 Backing up existing dataset...")
             
-            backup_result = self.file_processor.backup_existing_dataset(final_dir)
+            backup_result = self._backup_existing_dataset(final_dir)
             
             if backup_result['success']:
                 self.logger.info(f"✅ Backup created: {backup_result['backup_path']}")
@@ -201,6 +228,29 @@ class DownloadService:
                 return True
         
         return False
+    
+    def _backup_existing_dataset(self, dataset_dir: Path) -> Dict[str, Any]:
+        """Backup existing dataset."""
+        try:
+            import shutil
+            from datetime import datetime
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = dataset_dir.parent / f"dataset_backup_{timestamp}"
+            
+            shutil.copytree(dataset_dir, backup_dir)
+            
+            return {
+                'success': True,
+                'backup_path': str(backup_dir),
+                'message': 'Backup berhasil'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"Backup gagal: {str(e)}"
+            }
     
     def _cleanup_temp_files(self, temp_dir: Path) -> None:
         """Cleanup temporary files."""

@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/downloader/roboflow_client.py
-Deskripsi: Client untuk API Roboflow dengan error handling dan progress callback
+Deskripsi: Fixed Roboflow client dengan proper constructor dan response handling
 """
 
 import requests
@@ -20,20 +20,24 @@ class RoboflowClient:
         self.base_url = "https://api.roboflow.com"
         self._progress_callback: Optional[Callable] = None
     
-    def set_progress_callback(self, callback: Callable[[str, int, str], None]) -> None:
-        """Set callback untuk progress updates dengan one-liner."""
+    def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
+        """Set callback untuk progress updates."""
         self._progress_callback = callback
     
-    def _notify_progress(self, step: str, progress: int, message: str) -> None:
+    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
         """Notify progress dengan error handling."""
-        self._progress_callback and self._progress_callback(step, progress, message)
+        if self._progress_callback:
+            try:
+                self._progress_callback(step, current, total, message)
+            except Exception:
+                pass
     
     def get_dataset_metadata(self, workspace: str, project: str, version: str, format: str = "yolov5pytorch") -> Dict[str, Any]:
-        """Get metadata dataset dari Roboflow API."""
+        """Get metadata dataset dari Roboflow API dengan proper response handling."""
         url = f"{self.base_url}/{workspace}/{project}/{version}/{format}"
         params = {'api_key': self.api_key}
         
-        self._notify_progress("metadata", 0, "Mengambil metadata dataset")
+        self._notify_progress("metadata", 0, 100, "Mengambil metadata dataset")
         
         for attempt in range(1, self.retry_count + 1):
             try:
@@ -46,7 +50,7 @@ class RoboflowClient:
                 if 'export' not in metadata or 'link' not in metadata['export']:
                     raise ValueError("Response metadata tidak lengkap")
                 
-                self._notify_progress("metadata", 100, "Metadata berhasil diperoleh")
+                self._notify_progress("metadata", 100, 100, "Metadata berhasil diperoleh")
                 
                 # Log dataset info
                 if 'project' in metadata:
@@ -58,7 +62,8 @@ class RoboflowClient:
                     'status': 'success',
                     'data': metadata,
                     'download_url': metadata['export']['link'],
-                    'size_mb': metadata.get('export', {}).get('size', 0)
+                    'size_mb': metadata.get('export', {}).get('size', 0),
+                    'message': 'Metadata berhasil diperoleh'
                 }
                 
             except requests.HTTPError as e:
@@ -82,7 +87,7 @@ class RoboflowClient:
     def download_dataset(self, download_url: str, output_path: Path, chunk_size: int = 8192) -> Dict[str, Any]:
         """Download dataset dengan progress tracking."""
         try:
-            self._notify_progress("download", 0, "Memulai download dataset")
+            self._notify_progress("download", 0, 100, "Memulai download dataset")
             
             response = requests.get(download_url, stream=True, timeout=self.timeout)
             response.raise_for_status()
@@ -105,16 +110,17 @@ class RoboflowClient:
                             if progress - last_progress >= 5 or downloaded - (last_progress * total_size / 100) >= 1024 * 1024:
                                 size_mb = downloaded / (1024 * 1024)
                                 total_mb = total_size / (1024 * 1024)
-                                self._notify_progress("download", progress, f"Download: {size_mb:.1f}/{total_mb:.1f} MB")
+                                self._notify_progress("download", progress, 100, f"Download: {size_mb:.1f}/{total_mb:.1f} MB")
                                 last_progress = progress
             
-            self._notify_progress("download", 100, "Download selesai")
+            self._notify_progress("download", 100, 100, "Download selesai")
             
             return {
                 'status': 'success',
                 'file_path': str(output_path),
                 'size_bytes': downloaded,
-                'size_mb': downloaded / (1024 * 1024)
+                'size_mb': downloaded / (1024 * 1024),
+                'message': 'Download berhasil'
             }
             
         except Exception as e:
@@ -152,48 +158,6 @@ class RoboflowClient:
         }
         
         return error_messages.get(status_code, f"HTTP Error {status_code}")
-    
-    def get_workspace_info(self, workspace: str) -> Dict[str, Any]:
-        """Get informasi workspace."""
-        url = f"{self.base_url}/{workspace}"
-        params = {'api_key': self.api_key}
-        
-        try:
-            response = requests.get(url, params=params, timeout=self.timeout)
-            response.raise_for_status()
-            
-            data = response.json()
-            return {
-                'status': 'success',
-                'workspace': workspace,
-                'projects': data.get('projects', []),
-                'project_count': len(data.get('projects', []))
-            }
-            
-        except Exception as e:
-            return {'status': 'error', 'message': f"Error workspace info: {str(e)}"}
-    
-    def get_project_versions(self, workspace: str, project: str) -> Dict[str, Any]:
-        """Get daftar versi project."""
-        url = f"{self.base_url}/{workspace}/{project}"
-        params = {'api_key': self.api_key}
-        
-        try:
-            response = requests.get(url, params=params, timeout=self.timeout)
-            response.raise_for_status()
-            
-            data = response.json()
-            versions = data.get('versions', [])
-            
-            return {
-                'status': 'success',
-                'project': project,
-                'versions': versions,
-                'latest_version': str(len(versions)) if versions else '1'
-            }
-            
-        except Exception as e:
-            return {'status': 'error', 'message': f"Error project versions: {str(e)}"}
 
 # Factory function
 def create_roboflow_client(api_key: str, logger=None) -> RoboflowClient:

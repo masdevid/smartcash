@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/downloader/validators.py
-Deskripsi: Validators untuk data validation dalam download process
+Deskripsi: Complete validators untuk data validation dalam download process
 """
 
 import zipfile
@@ -312,7 +312,7 @@ def create_file_validator(logger=None) -> FileValidator:
 
 # Utility functions
 def validate_image_file(file_path: Path) -> bool:
-    """Quick validation untuk image file dengan one-liner."""
+    """Quick validation untuk image file."""
     return file_path.exists() and file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp'] and file_path.stat().st_size > 0
 
 def validate_label_file(file_path: Path) -> Dict[str, Any]:

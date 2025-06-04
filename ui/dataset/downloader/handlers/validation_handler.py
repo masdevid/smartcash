@@ -9,39 +9,84 @@ from pathlib import Path
 from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
 
-def validate_download_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def validate_download_parameters(ui_components: Dict[str, Any], include_api_test: bool = False) -> Dict[str, Any]:
     """Validasi parameter download dengan comprehensive checking."""
+    logger = ui_components.get('logger')
     
     try:
         # Extract parameters
-        params = _extract_parameters(ui_components)
+        try:
+            params = _extract_parameters(ui_components)
+        except ValueError as e:
+            logger and logger.error(f"❌ {str(e)}")
+            return {
+                'valid': False,
+                'message': str(e),
+                'params': {}
+            }
         
         # Validate required fields
         required_validation = _validate_required_fields(params)
         if not required_validation['valid']:
+            logger and logger.error(f"❌ {required_validation['message']}")
             return required_validation
         
         # Validate API key
         api_validation = _validate_api_key(params['api_key'])
         if not api_validation['valid']:
+            logger and logger.error(f"❌ {api_validation['message']}")
             return api_validation
         
         # Validate paths
         path_validation = _validate_paths(params)
         if not path_validation['valid']:
+            logger and logger.error(f"❌ {path_validation['message']}")
             return path_validation
         
         # Environment-specific validation
         env_validation = _validate_environment(params)
         
+        # Test API connection jika diminta
+        if include_api_test:
+            logger and logger.info("🔍 Menguji koneksi API Roboflow...")
+            api_test = validate_workspace_project(
+                params['workspace'], 
+                params['project'], 
+                params['version'], 
+                params['api_key']
+            )
+            
+            if not api_test['valid']:
+                logger and logger.error(f"❌ {api_test['message']}")
+                return api_test
+            
+            # Tambahkan metadata dataset
+            params['dataset_metadata'] = api_test.get('metadata', {})
+            logger and logger.success(f"✅ Dataset ditemukan: {params['dataset_metadata'].get('images', 0)} gambar, {params['dataset_metadata'].get('classes', 0)} kelas")
+        
+        # Buat config untuk download
+        config = {
+            'workspace': params['workspace'],
+            'project': params['project'],
+            'version': params['version'],
+            'api_key': params['api_key'],
+            'output_dir': params['output_dir'],
+            'format': params['format'],
+            'backup_existing': params['backup_existing'],
+            'organize_files': params['organize_files']
+        }
+        
+        logger and logger.success(f"✅ Validasi berhasil - Storage: {env_validation.get('storage_type', 'Local')}")
         return {
             'valid': True,
             'params': params,
+            'config': config,
             'warnings': env_validation.get('warnings', []),
             'message': f"✅ Validasi berhasil - Storage: {env_validation.get('storage_type', 'Local')}"
         }
         
     except Exception as e:
+        logger and logger.error(f"❌ Error validasi: {str(e)}")
         return {
             'valid': False,
             'message': f"Error validasi: {str(e)}",
@@ -50,18 +95,30 @@ def validate_download_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any
 
 def _extract_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract parameter dari UI components dengan one-liner."""
+    # Validasi komponen yang diperlukan
+    required_components = ['workspace_field', 'project_field', 'version_field', 'api_key_field']
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    
+    if missing_components:
+        raise ValueError(f"Komponen tidak ditemukan: {', '.join(missing_components)}")
+    
     return {
-        'workspace': _safe_get_value(ui_components, 'workspace', '').strip(),
-        'project': _safe_get_value(ui_components, 'project', '').strip(),
-        'version': _safe_get_value(ui_components, 'version', '').strip(),
-        'api_key': _safe_get_value(ui_components, 'api_key', '').strip() or _detect_api_key(),
-        'output_dir': _safe_get_value(ui_components, 'output_dir', '').strip(),
-        'backup_existing': _safe_get_value(ui_components, 'backup_checkbox', False)
+        'workspace': _safe_get_value(ui_components, 'workspace_field', '').strip(),
+        'project': _safe_get_value(ui_components, 'project_field', '').strip(),
+        'version': _safe_get_value(ui_components, 'version_field', '').strip(),
+        'api_key': _safe_get_value(ui_components, 'api_key_field', '').strip() or _detect_api_key(),
+        'output_dir': _safe_get_value(ui_components, 'output_dir_field', '').strip(),
+        'format': _safe_get_value(ui_components, 'format_dropdown', 'yolov5pytorch'),
+        'backup_existing': _safe_get_value(ui_components, 'backup_checkbox', False),
+        'organize_files': _safe_get_value(ui_components, 'organize_checkbox', True)
     }
 
 def _safe_get_value(ui_components: Dict[str, Any], key: str, default: Any) -> Any:
     """Safely get value dari UI component dengan one-liner."""
-    return getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
+    component = ui_components.get(key)
+    if component is None:
+        return default
+    return getattr(component, 'value', default)
 
 def _validate_required_fields(params: Dict[str, Any]) -> Dict[str, Any]:
     """Validate required fields dengan one-liner."""
@@ -192,12 +249,19 @@ def get_validation_summary(validation_result: Dict[str, Any]) -> str:
     
     params = validation_result.get('params', {})
     warnings = validation_result.get('warnings', [])
+    metadata = params.get('dataset_metadata', {})
     
     summary = [
         f"✅ Parameter valid:",
         f"  • Dataset: {params.get('workspace', 'N/A')}/{params.get('project', 'N/A')}:{params.get('version', 'N/A')}",
+        f"  • Format: {params.get('format', 'yolov5pytorch')}",
         f"  • Output: {params.get('output_dir', 'N/A')}"
     ]
+    
+    # Tambahkan metadata jika tersedia
+    if metadata:
+        summary.append(f"  • Jumlah gambar: {metadata.get('images', 'N/A')}")
+        summary.append(f"  • Jumlah kelas: {metadata.get('classes', 'N/A')}")
     
     if warnings:
         summary.append("⚠️ Peringatan:")

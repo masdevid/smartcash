@@ -14,22 +14,29 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config: Dic
     """Setup download handlers dengan progress callback integration."""
     logger = ui_components.get('logger')
     
+    # Validasi komponen yang diperlukan
+    required_components = ['download_button', 'validate_button', 'workspace_field', 'project_field', 'version_field', 'api_key_field']
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    
+    if missing_components:
+        error_msg = f"Komponen tidak ditemukan: {', '.join(missing_components)}"
+        logger and logger.error(f"❌ {error_msg}")
+        return {'download_handlers': False, 'error': error_msg, 'missing_components': missing_components}
+    
     try:
         # Setup progress callback manager
         progress_manager = ProgressCallbackManager(ui_components)
         ui_components['progress_manager'] = progress_manager
         
         # Download button handler
-        if 'download_button' in ui_components:
-            ui_components['download_button'].on_click(
-                lambda b: _handle_download_click(ui_components, b, progress_manager)
-            )
+        ui_components['download_button'].on_click(
+            lambda b: _handle_download_click(ui_components, b, progress_manager)
+        )
         
         # Validate button handler
-        if 'validate_button' in ui_components:
-            ui_components['validate_button'].on_click(
-                lambda b: _handle_validate_click(ui_components, b)
-            )
+        ui_components['validate_button'].on_click(
+            lambda b: _handle_validate_click(ui_components, b)
+        )
         
         # Quick validate button handler
         if 'quick_validate_button' in ui_components:
@@ -37,7 +44,10 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config: Dic
                 lambda b: _handle_quick_validate_click(ui_components, b)
             )
         
-        logger and logger.debug("✅ Download handlers configured")
+        # Setup quick action handlers
+        setup_quick_action_handlers(ui_components)
+        
+        logger and logger.info("✅ Download handlers berhasil dikonfigurasi")
         return {'download_handlers': True}
         
     except Exception as e:
@@ -277,38 +287,58 @@ def _display_validation_results(ui_components: Dict[str, Any], validation_result
 
 def _show_status_message(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
     """Show status message pada status panel."""
-    if 'status_panel' in ui_components:
-        colors = {
-            'success': '#d4edda',
-            'error': '#f8d7da',
-            'warning': '#fff3cd',
-            'info': '#d1ecf1'
+    if 'status_panel' not in ui_components or ui_components['status_panel'] is None:
+        return
+    
+    # Log message juga
+    logger = ui_components.get('logger')
+    if logger:
+        log_methods = {
+            'success': logger.info,
+            'error': logger.error,
+            'warning': logger.warning,
+            'info': logger.info
         }
-        
-        text_colors = {
-            'success': '#155724',
-            'error': '#721c24',
-            'warning': '#856404',
-            'info': '#0c5460'
-        }
-        
-        bg_color = colors.get(status_type, colors['info'])
-        text_color = text_colors.get(status_type, text_colors['info'])
-        
-        status_html = f"""
-        <div style='padding:8px; background-color:{bg_color}; color:{text_color}; 
-                   border-radius:4px; border-left:4px solid {text_color};'>
-            {message}
-        </div>
-        """
+        log_method = log_methods.get(status_type, logger.info)
+        log_method(message)
+    
+    # Update status panel
+    colors = {
+        'success': '#d4edda',
+        'error': '#f8d7da',
+        'warning': '#fff3cd',
+        'info': '#d1ecf1'
+    }
+    
+    text_colors = {
+        'success': '#155724',
+        'error': '#721c24',
+        'warning': '#856404',
+        'info': '#0c5460'
+    }
+    
+    bg_color = colors.get(status_type, colors['info'])
+    text_color = text_colors.get(status_type, text_colors['info'])
+    
+    status_html = f"""
+    <div style='padding:8px; background-color:{bg_color}; color:{text_color}; 
+               border-radius:4px; border-left:4px solid {text_color};'>
+        {message}
+    </div>
+    """
+    
+    try:
         ui_components['status_panel'].value = status_html
+    except Exception as e:
+        if logger:
+            logger.warning(f"⚠️ Gagal memperbarui status panel: {str(e)}")
 
 def _clear_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear various output widgets."""
     output_widgets = ['log_output', 'confirmation_area', 'status_panel']
     
     for widget_key in output_widgets:
-        if widget_key in ui_components:
+        if widget_key in ui_components and ui_components[widget_key] is not None:
             widget = ui_components[widget_key]
             if hasattr(widget, 'clear_output'):
                 widget.clear_output(wait=True)
@@ -353,19 +383,21 @@ def _refresh_status_indicators(ui_components: Dict[str, Any]) -> None:
     
     try:
         # Update API status
-        if 'api_status' in ui_components:
-            api_key = ui_components.get('api_key_field', {}).get('value', '')
-            if api_key:
+        if 'api_status' in ui_components and ui_components['api_status'] is not None:
+            api_key = ui_components.get('api_key_field')
+            api_key_value = api_key.value if api_key and hasattr(api_key, 'value') else ''
+            
+            if api_key_value:
                 ui_components['api_status'].value = "<span style='color:#28a745;'>🔑 API: Key detected</span>"
             else:
                 ui_components['api_status'].value = "<span style='color:#ffc107;'>🔑 API: No key</span>"
         
         # Update dataset status (placeholder - could check existing dataset)
-        if 'dataset_status' in ui_components:
+        if 'dataset_status' in ui_components and ui_components['dataset_status'] is not None:
             ui_components['dataset_status'].value = "<span style='color:#17a2b8;'>📊 Dataset: Ready to download</span>"
         
         # Update connection status
-        if 'connection_status' in ui_components:
+        if 'connection_status' in ui_components and ui_components['connection_status'] is not None:
             if _is_drive_storage(ui_components):
                 ui_components['connection_status'].value = "<span style='color:#28a745;'>🌐 Connection: Drive connected</span>"
             else:
@@ -374,7 +406,7 @@ def _refresh_status_indicators(ui_components: Dict[str, Any]) -> None:
         logger and logger.debug("🔄 Status indicators refreshed")
         
     except Exception as e:
-        logger and logger.error(f"❌ Status refresh error: {str(e)}")
+        logger and logger.warning(f"⚠️ Status refresh warning: {str(e)}")
 
 def _clear_log_output(ui_components: Dict[str, Any]) -> None:
     """Clear log output widget."""

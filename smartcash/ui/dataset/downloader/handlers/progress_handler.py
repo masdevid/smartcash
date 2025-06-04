@@ -137,60 +137,98 @@ class ProgressCallbackManager:
         overall = int(completed_steps_progress + current_step_progress)
         return min(100, max(0, overall))
     
-    def _update_progress_display(self, step: str, current: int, total: int, 
-                               message: str, overall_progress: int) -> None:
+    def _update_progress_display(self, step: str, current: int, total: int, message: str, overall_progress: int) -> None:
         """Update progress display pada UI components."""
-        # Update overall progress
-        self._update_overall_progress(overall_progress, message)
-        
-        # Update step progress
-        step_progress = int((current / max(total, 1)) * 100)
-        self._update_step_display(step, step_progress, 100, message)
-        
-        # Update current operation progress (detail)
-        if self.ui_components.get('detailed_progress_checkbox', {}).get('value', False):
+        try:
+            # Update overall progress
+            self._update_overall_progress(overall_progress, f"{step}: {message}")
+            
+            # Update current step progress
+            self._update_step_display(step, current, total, message)
+            
+            # Update current operation progress (detailed)
             self._update_current_progress(current, total, message)
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal memperbarui progress display: {str(e)}")
     
     def _update_overall_progress(self, progress: int, message: str) -> None:
         """Update overall progress bar."""
-        if 'update_progress' in self.ui_components:
-            self.ui_components['update_progress']('overall', progress, f"📊 {message}")
-        elif 'tracker' in self.ui_components:
-            self.ui_components['tracker'].update('overall', progress, message)
+        try:
+            if 'update_progress' in self.ui_components and self.ui_components['update_progress'] is not None:
+                self.ui_components['update_progress']('overall', progress, f"💾 {message}")
+            elif 'progress_bar' in self.ui_components and self.ui_components['progress_bar'] is not None:
+                self.ui_components['progress_bar'].value = progress
+                
+                # Update status message jika ada status_panel
+                if 'status_panel' in self.ui_components and self.ui_components['status_panel'] is not None:
+                    self.ui_components['status_panel'].value = f"<div style='padding:5px'>💾 {message}</div>"
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal memperbarui overall progress: {str(e)}")
     
     def _update_step_display(self, step: str, progress: int, total: int, message: str) -> None:
         """Update step progress display."""
-        if 'update_progress' in self.ui_components:
-            self.ui_components['update_progress']('step', progress, f"🔄 {message}")
-        elif 'tracker' in self.ui_components:
-            self.ui_components['tracker'].update('step', progress, message)
+        try:
+            if 'update_progress' in self.ui_components and self.ui_components['update_progress'] is not None:
+                progress_pct = int((progress / max(total, 1)) * 100)
+                self.ui_components['update_progress']('step', progress_pct, f"📈 {step.capitalize()}: {message}")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal memperbarui step display: {str(e)}")
     
     def _update_current_progress(self, current: int, total: int, message: str) -> None:
         """Update current operation progress (detailed)."""
-        if 'update_progress' in self.ui_components:
-            progress = int((current / max(total, 1)) * 100)
-            self.ui_components['update_progress']('current', progress, f"⚡ {message}")
+        try:
+            if 'update_progress' in self.ui_components and self.ui_components['update_progress'] is not None:
+                progress_pct = int((current / max(total, 1)) * 100)
+                self.ui_components['update_progress']('current', progress_pct, f"⚡ {message}")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal memperbarui current progress: {str(e)}")
     
     def _update_progress_error(self, error_message: str) -> None:
         """Update progress dengan error state."""
-        if 'error_operation' in self.ui_components:
-            self.ui_components['error_operation'](error_message)
-        elif 'tracker' in self.ui_components:
-            self.ui_components['tracker'].error(error_message)
+        try:
+            if 'error_operation' in self.ui_components and self.ui_components['error_operation'] is not None:
+                self.ui_components['error_operation'](error_message)
+            elif 'tracker' in self.ui_components and self.ui_components['tracker'] is not None:
+                self.ui_components['tracker'].error(error_message)
+            elif 'status_panel' in self.ui_components and self.ui_components['status_panel'] is not None:
+                error_html = f"""<div style='padding:8px; background-color:#f8d7da; color:#721c24; 
+                               border-radius:4px; border-left:4px solid #721c24;'>
+                    {error_message}
+                </div>"""
+                self.ui_components['status_panel'].value = error_html
+        except Exception as e:
+            self.logger.error(f"❌ Gagal memperbarui error state: {str(e)}")
     
     def _complete_progress_tracking(self) -> None:
         """Complete progress tracking dengan success state."""
-        if 'complete_operation' in self.ui_components:
-            self.ui_components['complete_operation']("Download completed!")
-        elif 'tracker' in self.ui_components:
-            self.ui_components['tracker'].complete("Download completed!")
+        try:
+            if 'complete_operation' in self.ui_components and self.ui_components['complete_operation'] is not None:
+                self.ui_components['complete_operation']("Download completed!")
+            elif 'tracker' in self.ui_components and self.ui_components['tracker'] is not None:
+                self.ui_components['tracker'].complete("Download completed!")
+            elif 'status_panel' in self.ui_components and self.ui_components['status_panel'] is not None:
+                success_html = f"""<div style='padding:8px; background-color:#d4edda; color:#155724; 
+                                border-radius:4px; border-left:4px solid #155724;'>
+                    ✅ Download completed!
+                </div>"""
+                self.ui_components['status_panel'].value = success_html
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal menyelesaikan progress tracking: {str(e)}")
     
     def _show_progress_container(self) -> None:
         """Show progress container untuk download operation."""
-        if 'show_for_operation' in self.ui_components:
-            self.ui_components['show_for_operation']('download')
-        elif 'tracker' in self.ui_components:
-            self.ui_components['tracker'].show('download')
+        try:
+            if 'show_for_operation' in self.ui_components and self.ui_components['show_for_operation'] is not None:
+                self.ui_components['show_for_operation']('download')
+            elif 'tracker' in self.ui_components and self.ui_components['tracker'] is not None:
+                self.ui_components['tracker'].show('download')
+            
+            # Pastikan progress bar terlihat
+            if 'progress_container' in self.ui_components and self.ui_components['progress_container'] is not None:
+                if hasattr(self.ui_components['progress_container'], 'layout'):
+                    self.ui_components['progress_container'].layout.display = 'block'
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal menampilkan progress container: {str(e)}")
     
     def _log_progress(self, step: str, current: int, total: int, message: str) -> None:
         """Log progress dengan selective logging untuk avoid spam."""
@@ -212,18 +250,20 @@ def setup_progress_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Setup progress tracking handlers."""
     logger = get_logger('downloader.progress_setup')
     
+    # Validasi komponen yang diperlukan
+    required_components = ['progress_bar', 'status_panel']
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    
+    if missing_components:
+        error_msg = f"Komponen progress tidak ditemukan: {', '.join(missing_components)}"
+        logger.warning(f"⚠️ {error_msg}")
+    
     try:
-        # Ensure progress tracking components ada
-        if 'tracker' not in ui_components:
-            from smartcash.ui.components.progress_tracking import create_progress_tracking_container
-            progress_components = create_progress_tracking_container()
-            ui_components.update(progress_components)
-        
         # Setup progress callback manager
         progress_manager = ProgressCallbackManager(ui_components)
         ui_components['progress_manager'] = progress_manager
         
-        logger.debug("✅ Progress handlers configured")
+        logger.info("✅ Progress handlers berhasil dikonfigurasi")
         return {'progress_handlers': True, 'progress_manager': progress_manager}
         
     except Exception as e:
@@ -238,16 +278,23 @@ def create_simple_progress_callback(ui_components: Dict[str, Any]) -> Callable:
         try:
             progress = int((current / max(total, 1)) * 100)
             
-            if 'update_progress' in ui_components:
+            # Update progress dengan metode yang tersedia
+            if 'update_progress' in ui_components and ui_components['update_progress'] is not None:
                 ui_components['update_progress']('overall', progress, f"{step}: {message}")
+            elif 'progress_bar' in ui_components and ui_components['progress_bar'] is not None:
+                ui_components['progress_bar'].value = progress
+                
+                # Update status message jika ada
+                if 'status_panel' in ui_components and ui_components['status_panel'] is not None:
+                    ui_components['status_panel'].value = f"<div style='padding:5px'>{step}: {message} ({progress}%)</div>"
             
             # Log progress setiap 20%
-            if progress % 20 == 0:
+            if progress % 20 == 0 or progress == 100:
                 logger = ui_components.get('logger')
                 logger and logger.info(f"📈 {step}: {progress}% - {message}")
                 
         except Exception as e:
             logger = ui_components.get('logger')
-            logger and logger.error(f"❌ Simple progress callback error: {str(e)}")
+            logger and logger.warning(f"⚠️ Simple progress callback warning: {str(e)}")
     
     return simple_callback

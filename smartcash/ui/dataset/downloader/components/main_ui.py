@@ -34,6 +34,23 @@ def create_downloader_ui(config: Dict[str, Any], env=None) -> Dict[str, Any]:
     # Extract advanced options components dari accordion
     advanced_components = _extract_advanced_components(form_components.get('advanced_accordion'))
     
+    # Pastikan semua komponen kritis tersedia
+    critical_components = {
+        # Form fields
+        'workspace_field': form_components.get('workspace_field'),
+        'project_field': form_components.get('project_field'),
+        'version_field': form_components.get('version_field'),
+        'api_key_field': form_components.get('api_key_field'),
+        # Action buttons
+        'download_button': action_components.get('download_button'),
+        'validate_button': action_components.get('validate_button'),
+    }
+    
+    # Periksa komponen kritis
+    missing_components = [k for k, v in critical_components.items() if v is None]
+    if missing_components:
+        print(f"⚠️ Komponen kritis tidak tersedia: {', '.join(missing_components)}")
+    
     # Return all components dengan merge yang benar
     return {
         'ui': main_container,
@@ -70,11 +87,11 @@ def create_downloader_ui(config: Dict[str, Any], env=None) -> Dict[str, Any]:
         'env_status': form_components.get('env_status'),
         'advanced_accordion': form_components.get('advanced_accordion'),
         # Additional components from action buttons
-        'api_status': action_components.get('api_status'),
-        'dataset_status': action_components.get('dataset_status'),
-        'connection_status': action_components.get('connection_status'),
-        'refresh_status_button': action_components.get('refresh_status_button'),
-        'clear_logs_button': action_components.get('clear_logs_button')
+        'api_status': action_components.get('api_status') if 'api_status' in action_components else None,
+        'dataset_status': action_components.get('dataset_status') if 'dataset_status' in action_components else None,
+        'connection_status': action_components.get('connection_status') if 'connection_status' in action_components else None,
+        'refresh_status_button': action_components.get('refresh_status_button') if 'refresh_status_button' in action_components else None,
+        'clear_logs_button': action_components.get('clear_logs_button') if 'clear_logs_button' in action_components else None
     }
 
 def _get_environment_info(env) -> str:

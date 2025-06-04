@@ -22,8 +22,18 @@ class DownloaderInitializer(CommonInitializer):
             ui_components = create_downloader_ui(config, env)
             
             # Basic validation
-            if not isinstance(ui_components, dict) or 'ui' not in ui_components:
-                raise ValueError("Invalid UI components structure")
+            if not isinstance(ui_components, dict):
+                self.logger.error("❌ Invalid UI components structure - bukan dictionary")
+                return None
+                
+            if 'ui' not in ui_components:
+                self.logger.error("❌ Invalid UI components structure - tidak ada kunci 'ui'")
+                # Coba tambahkan main_container sebagai ui jika ada
+                if 'main_container' in ui_components:
+                    self.logger.info("🔧 Menggunakan main_container sebagai ui")
+                    ui_components['ui'] = ui_components['main_container']
+                else:
+                    return None
             
             # Log missing components as info instead of warnings
             required_components = ['workspace_field', 'project_field', 'version_field', 'api_key_field']
@@ -37,7 +47,7 @@ class DownloaderInitializer(CommonInitializer):
             
         except Exception as e:
             self.logger.error(f"❌ UI creation failed: {str(e)}")
-            raise  # Re-raise instead of fallback
+            return None  # Return None instead of re-raising to allow fallback UI
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers with streamlined validation."""
@@ -172,8 +182,10 @@ class DownloaderInitializer(CommonInitializer):
 _downloader_initializer = DownloaderInitializer()
 
 def initialize_downloader_ui(env=None, config=None, **kwargs):
-    """Streamlined initialization with essential error handling."""
+    """Streamlined initialization dengan error handling yang lebih baik."""
     from smartcash.common.logger import get_logger
+    from smartcash.ui.utils.fallback_utils import create_fallback_ui
+    
     logger = get_logger('downloader.initializer')
     
     try:
@@ -183,34 +195,55 @@ def initialize_downloader_ui(env=None, config=None, **kwargs):
                 from smartcash.ui.dataset.downloader.handlers.config_extractor import DownloaderConfigExtractor
                 validation = DownloaderConfigExtractor.validate_extracted_config(config)
                 if not validation.get('valid', False):
-                    logger.warning(f"Config issues detected, using defaults as fallback")
+                    logger.warning(f"⚠️ Config issues detected, using defaults as fallback")
                     config = None
-            except Exception:
-                logger.info("Config validation skipped, using provided config")
+            except Exception as e:
+                logger.info(f"ℹ️ Config validation skipped: {str(e)}")
         
-        # Initialize
+        # Initialize dengan debug info
+        logger.info(f"🔄 Initializing downloader UI dengan config: {config is not None}")
         result = _downloader_initializer.initialize(env=env, config=config, **kwargs)
         
-        # Basic result validation
-        if not isinstance(result, dict) or 'ui' not in result:
-            raise ValueError("Invalid initialization result")
+        # Debug info
+        if result is None:
+            logger.error("❌ Initialization result is None")
+            return create_fallback_ui("Gagal membuat UI components untuk downloader: hasil inisialisasi None", "downloader")
+            
+        # Basic result validation dengan debug info
+        if not isinstance(result, dict):
+            logger.info(f"🔍 Result bukan dictionary, tipe: {type(result)}")
+            # Jika result adalah widget, bungkus dalam dictionary
+            import ipywidgets as widgets
+            if isinstance(result, widgets.Widget):
+                logger.info("🔧 Membungkus widget dalam dictionary dengan kunci 'ui'")
+                return {'ui': result, 'version': '1.0.0'}
+            else:
+                logger.error(f"❌ Invalid initialization result type: {type(result)}")
+                return create_fallback_ui(f"Gagal membuat UI components untuk downloader: tipe hasil {type(result)}", "downloader")
         
+        # Debug info untuk keys
+        logger.info(f"🔍 Result keys: {', '.join(result.keys())}")
+            
+        if 'ui' not in result:
+            logger.error("❌ UI component missing from initialization result")
+            
+            # Coba perbaiki result jika ada main_container
+            if 'main_container' in result:
+                logger.info("🔧 Menggunakan main_container sebagai ui")
+                result['ui'] = result['main_container']
+            else:
+                return create_fallback_ui("Gagal membuat UI components untuk downloader: tidak ada UI component", "downloader")
+        
+        # Tambahkan versi
         result['version'] = result.get('downloader_version', '1.0.0')
         logger.success("✅ Downloader UI initialized successfully")
         return result
         
     except Exception as e:
-        logger.error(f"❌ Downloader initialization failed: {str(e)}")
-        
-        # Single fallback UI
-        import ipywidgets as widgets
-        error_ui = widgets.VBox([
-            widgets.HTML("<h3 style='color:red;'>⚠️ Downloader Initialization Failed</h3>"),
-            widgets.HTML(f"<p><strong>Error:</strong> {str(e)}</p>"),
-            widgets.HTML("<p><em>Please check logs and try restarting</em></p>")
-        ], layout=widgets.Layout(padding='20px', border='1px solid red', border_radius='5px'))
-        
-        return {'ui': error_ui, 'error': str(e)}
+        logger.error(f"❌ Downloader initialization error: {str(e)}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        return create_fallback_ui(f"Gagal membuat UI components untuk downloader: {str(e)}", "downloader")
 
 def get_downloader_status():
     """Get current downloader status."""

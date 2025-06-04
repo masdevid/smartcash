@@ -8,7 +8,7 @@ from typing import Dict, Any
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.layout_utils import create_responsive_container, create_responsive_two_column
 from smartcash.ui.components.progress_tracking import create_progress_tracking_container
-from smartcash.ui.dataset.downloader.components.form_fields import create_form_fields
+from smartcash.ui.dataset.downloader.components.form_fields import create_form_fields, _extract_advanced_fields
 from smartcash.ui.dataset.downloader.components.action_buttons import create_action_buttons
 
 def create_downloader_ui(config: Dict[str, Any], env=None) -> Dict[str, Any]:
@@ -32,7 +32,7 @@ def create_downloader_ui(config: Dict[str, Any], env=None) -> Dict[str, Any]:
     main_container = create_responsive_container([header, form_section, action_section, progress_section, status_section], container_type="vbox", max_width="100%", padding="10px")
     
     # Extract advanced options components dari accordion
-    advanced_components = _extract_advanced_components(form_components.get('advanced_accordion'))
+    advanced_components = _extract_advanced_fields(form_components.get('advanced_accordion'))
     
     # Pastikan semua komponen kritis tersedia
     critical_components = {
@@ -119,32 +119,4 @@ def _create_status_log_container() -> Dict[str, Any]:
         'status': log_output  # Alias untuk compatibility
     }
 
-def _extract_advanced_components(accordion: widgets.Accordion) -> Dict[str, Any]:
-    """Extract components dari advanced accordion."""
-    if not accordion or not hasattr(accordion, 'children') or len(accordion.children) == 0:
-        return {
-            'retry_field': None,
-            'timeout_field': None,
-            'chunk_size_field': None
-        }
-    
-    # Get container dari accordion
-    container = accordion.children[0] if accordion.children else None
-    if not container or not hasattr(container, 'children'):
-        return {
-            'retry_field': None,
-            'timeout_field': None,
-            'chunk_size_field': None
-        }
-    
-    # Extract fields berdasarkan urutan
-    components = {}
-    field_names = ['retry_field', 'timeout_field', 'chunk_size_field']
-    
-    for i, field_name in enumerate(field_names):
-        if i < len(container.children):
-            components[field_name] = container.children[i]
-        else:
-            components[field_name] = None
-    
-    return components
+# Fungsi _extract_advanced_components dihapus karena sudah menggunakan _extract_advanced_fields dari form_fields.py

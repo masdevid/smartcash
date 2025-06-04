@@ -51,7 +51,7 @@ class DownloaderConfigHandler(ConfigHandler):
         # Auto-detect API key after reset
         DownloaderConfigUpdater.update_ui_from_environment(ui_components)
         
-        self.logger.info(f"🔄 Reset to default config: {config.get('workspace')}/{config.get('project')}")
+        self.logger.info(f" Reset to default config: {config.get('workspace')}/{config.get('project')}")
     
     def load_config(self, config_name: str = None, use_base_config: bool = True) -> Dict[str, Any]:
         """Load config dengan downloader-specific handling."""
@@ -64,6 +64,8 @@ class DownloaderConfigHandler(ConfigHandler):
         if not loaded_config or len(loaded_config) < 3:
             default_config = self.get_default_config()
             loaded_config.update({k: v for k, v in default_config.items() if k not in loaded_config})
+        
+        return loaded_config
         
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate config dengan DownloaderConfigExtractor validation."""

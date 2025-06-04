@@ -17,8 +17,9 @@ class DownloaderInitializer(CommonInitializer):
         super().__init__('downloader', DownloaderConfigHandler, parent_module='dataset')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan essential validation."""
+        """Create UI components dengan essential validation dan auto-fix untuk komponen yang hilang."""
         try:
+            # Coba buat UI components
             ui_components = create_downloader_ui(config, env)
             
             # Basic validation
@@ -27,7 +28,7 @@ class DownloaderInitializer(CommonInitializer):
                 return None
                 
             if 'ui' not in ui_components:
-                self.logger.error("❌ Invalid UI components structure - tidak ada kunci 'ui'")
+                self.logger.warning("⚠️ Invalid UI components structure - tidak ada kunci 'ui'")
                 # Coba tambahkan main_container sebagai ui jika ada
                 if 'main_container' in ui_components:
                     self.logger.info("🔧 Menggunakan main_container sebagai ui")
@@ -35,19 +36,46 @@ class DownloaderInitializer(CommonInitializer):
                 else:
                     return None
             
-            # Log missing components as info instead of warnings
-            required_components = ['workspace_field', 'project_field', 'version_field', 'api_key_field']
-            missing = [comp for comp in required_components if comp not in ui_components]
-            if missing:
-                self.logger.info(f"Missing form components: {', '.join(missing)}")
+            # Pastikan semua komponen yang diperlukan tersedia
+            self._ensure_required_components(ui_components, config)
             
+            # Tambahkan logger
             ui_components['logger'] = self.logger
             self.logger.success("✅ UI components created successfully")
             return ui_components
             
         except Exception as e:
             self.logger.error(f"❌ UI creation failed: {str(e)}")
+            import traceback
+            self.logger.debug(f"Stack trace: {traceback.format_exc()}")
             return None  # Return None instead of re-raising to allow fallback UI
+    
+    def _ensure_required_components(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Pastikan semua komponen yang diperlukan tersedia."""
+        required_components = ['workspace_field', 'project_field', 'version_field', 'api_key_field', 'download_button']
+        missing_components = [comp for comp in required_components if comp not in ui_components]
+        
+        if missing_components:
+            self.logger.warning(f"⚠️ Komponen yang diperlukan hilang: {', '.join(missing_components)}")
+            
+            # Coba tambahkan komponen yang hilang
+            from smartcash.ui.dataset.downloader.components.form_fields import create_form_fields
+            from smartcash.ui.dataset.downloader.components.action_buttons import create_action_buttons
+            
+            if 'workspace_field' in missing_components:
+                ui_components['workspace_field'] = create_form_fields(config)['workspace_field']
+            
+            if 'project_field' in missing_components:
+                ui_components['project_field'] = create_form_fields(config)['project_field']
+            
+            if 'version_field' in missing_components:
+                ui_components['version_field'] = create_form_fields(config)['version_field']
+            
+            if 'api_key_field' in missing_components:
+                ui_components['api_key_field'] = create_form_fields(config)['api_key_field']
+            
+            if 'download_button' in missing_components:
+                ui_components['download_button'] = create_action_buttons()['download_button']
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers with streamlined validation."""
@@ -212,11 +240,61 @@ def initialize_downloader_ui(env=None, config=None, **kwargs):
         # Basic result validation dengan debug info
         if not isinstance(result, dict):
             logger.info(f"🔍 Result bukan dictionary, tipe: {type(result)}")
-            # Jika result adalah widget, bungkus dalam dictionary
+            # Jika result adalah widget, bungkus dalam dictionary dengan semua komponen yang diharapkan
             import ipywidgets as widgets
             if isinstance(result, widgets.Widget):
-                logger.info("🔧 Membungkus widget dalam dictionary dengan kunci 'ui'")
-                return {'ui': result, 'version': '1.0.0'}
+                logger.info("🔧 Membungkus widget dalam dictionary dengan komponen lengkap")
+                # Buat dictionary dengan semua komponen yang diharapkan
+                from smartcash.ui.dataset.downloader.components.form_fields import create_form_fields
+                from smartcash.ui.dataset.downloader.components.action_buttons import create_action_buttons
+                from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+                
+                # Buat komponen dasar
+                default_config = {}
+                try:
+                    from smartcash.ui.dataset.downloader.handlers.downloader_config_handler import DownloaderConfigHandler
+                    config_handler = DownloaderConfigHandler()
+                    default_config = config_handler.get_default_config()
+                except Exception as e:
+                    logger.warning(f"⚠️ Gagal mendapatkan default config: {str(e)}")
+                
+                # Buat komponen UI dasar
+                try:
+                    form_components = create_form_fields(default_config)
+                    action_components = create_action_buttons()
+                    progress_components = create_progress_tracking_container()
+                    
+                    # Buat dictionary hasil dengan semua komponen yang diharapkan
+                    complete_result = {
+                        'ui': result,  # Widget yang sudah dibuat
+                        'main_container': result,
+                        'version': '1.0.0',
+                        # Form fields
+                        'workspace_field': form_components.get('workspace_field'),
+                        'project_field': form_components.get('project_field'),
+                        'version_field': form_components.get('version_field'),
+                        'api_key_field': form_components.get('api_key_field'),
+                        # Action buttons
+                        'download_button': action_components.get('download_button'),
+                        'validate_button': action_components.get('validate_button'),
+                        'quick_validate_button': action_components.get('quick_validate_button'),
+                        'save_button': action_components.get('save_button'),
+                        'reset_button': action_components.get('reset_button'),
+                        # Progress components
+                        'progress_bar': progress_components.get('progress_bar'),
+                        'progress_text': progress_components.get('progress_text'),
+                        'progress_container': progress_components.get('container'),
+                        # Config handler
+                        'config_handler': config_handler if 'config_handler' in locals() else None
+                    }
+                    
+                    logger.success("✅ Berhasil membuat UI components lengkap")
+                    return complete_result
+                    
+                except Exception as e:
+                    logger.error(f"❌ Gagal membuat komponen UI dasar: {str(e)}")
+                    # Fallback ke dictionary sederhana
+                    return {'ui': result, 'version': '1.0.0'}
             else:
                 logger.error(f"❌ Invalid initialization result type: {type(result)}")
                 return create_fallback_ui(f"Gagal membuat UI components untuk downloader: tipe hasil {type(result)}", "downloader")

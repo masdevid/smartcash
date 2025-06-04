@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/components/form_fields.py
-Deskripsi: Fixed form fields dengan proper component naming dan one-liner style
+Deskripsi: Fixed form fields dengan advanced components yang dikembalikan dengan benar
 """
 
 import ipywidgets as widgets
@@ -8,11 +8,23 @@ from typing import Dict, Any
 from smartcash.ui.utils.layout_utils import create_responsive_container
 
 def create_form_fields(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create form fields dengan proper component keys."""
+    """Create form fields dengan semua components dikembalikan."""
     left_components = _create_dataset_info_panel(config)
     right_components = _create_options_panel(config)
     
-    return {**left_components, **right_components, 'left_panel': left_components['container'], 'right_panel': right_components['container']}
+    # Extract advanced components dari accordion
+    advanced_components = {}
+    if 'advanced_accordion' in right_components and right_components['advanced_accordion']:
+        advanced_components = _extract_advanced_fields(right_components['advanced_accordion'])
+    
+    # Merge all components
+    return {
+        **left_components,
+        **right_components,
+        **advanced_components,
+        'left_panel': left_components['container'],
+        'right_panel': right_components['container']
+    }
 
 def _create_dataset_info_panel(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create dataset info panel dengan proper field names."""
@@ -29,7 +41,15 @@ def _create_dataset_info_panel(config: Dict[str, Any]) -> Dict[str, Any]:
     container = create_responsive_container([header, workspace_field, project_field, version_field, api_key_field, format_dropdown, info_panel], padding='15px', max_width='100%')
     container.layout.border = '1px solid #ddd'; container.layout.border_radius = '8px'; container.layout.background_color = '#f8f9fa'
     
-    return {'container': container, 'workspace_field': workspace_field, 'project_field': project_field, 'version_field': version_field, 'api_key_field': api_key_field, 'format_dropdown': format_dropdown, 'info_panel': info_panel}
+    return {
+        'container': container,
+        'workspace_field': workspace_field,
+        'project_field': project_field,
+        'version_field': version_field,
+        'api_key_field': api_key_field,
+        'format_dropdown': format_dropdown,
+        'info_panel': info_panel
+    }
 
 def _create_options_panel(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create options panel dengan proper field names."""
@@ -41,24 +61,64 @@ def _create_options_panel(config: Dict[str, Any]) -> Dict[str, Any]:
     progress_checkbox = widgets.Checkbox(value=config.get('progress_enabled', True), description='Show progress tracking', layout=widgets.Layout(width='100%', margin='5px 0'), style={'description_width': 'initial'})
     detailed_progress_checkbox = widgets.Checkbox(value=config.get('show_detailed_progress', False), description='Show detailed step-by-step progress', layout=widgets.Layout(width='100%', margin='5px 0'), style={'description_width': 'initial'})
     
-    advanced_accordion = _create_advanced_options_accordion(config)
+    # Create advanced options dengan fields yang bisa diakses
+    advanced_accordion, advanced_fields = _create_advanced_options_accordion(config)
     env_status = _create_environment_status()
     
     container = create_responsive_container([header, validate_checkbox, organize_checkbox, backup_checkbox, progress_checkbox, detailed_progress_checkbox, advanced_accordion, env_status], padding='15px', max_width='100%')
     container.layout.border = '1px solid #ddd'; container.layout.border_radius = '8px'; container.layout.background_color = '#f8f9fa'
     
-    return {'container': container, 'validate_checkbox': validate_checkbox, 'organize_checkbox': organize_checkbox, 'backup_checkbox': backup_checkbox, 'progress_checkbox': progress_checkbox, 'detailed_progress_checkbox': detailed_progress_checkbox, 'advanced_accordion': advanced_accordion, 'env_status': env_status}
+    return {
+        'container': container,
+        'validate_checkbox': validate_checkbox,
+        'organize_checkbox': organize_checkbox,
+        'backup_checkbox': backup_checkbox,
+        'progress_checkbox': progress_checkbox,
+        'detailed_progress_checkbox': detailed_progress_checkbox,
+        'advanced_accordion': advanced_accordion,
+        'env_status': env_status,
+        **advanced_fields  # Include advanced fields directly
+    }
 
-def _create_advanced_options_accordion(config: Dict[str, Any]) -> widgets.Accordion:
-    """Create advanced options accordion."""
+def _create_advanced_options_accordion(config: Dict[str, Any]) -> tuple:
+    """Create advanced options accordion dan return both accordion dan fields."""
     retry_field = widgets.IntSlider(value=config.get('retry_attempts', 3), min=1, max=10, step=1, description='Retry:', layout=widgets.Layout(width='100%', margin='3px 0'), style={'description_width': '80px'})
     timeout_field = widgets.IntSlider(value=config.get('timeout_seconds', 30), min=10, max=300, step=10, description='Timeout (s):', layout=widgets.Layout(width='100%', margin='3px 0'), style={'description_width': '80px'})
     chunk_size_field = widgets.IntSlider(value=config.get('chunk_size_kb', 8), min=1, max=64, step=1, description='Chunk (KB):', layout=widgets.Layout(width='100%', margin='3px 0'), style={'description_width': '80px'})
     
     advanced_container = create_responsive_container([retry_field, timeout_field, chunk_size_field], padding='5px')
-    accordion = widgets.Accordion([advanced_container]); accordion.set_title(0, "🔧 Advanced Options"); accordion.selected_index = None; accordion.layout.margin = '5px 0'
+    accordion = widgets.Accordion([advanced_container])
+    accordion.set_title(0, "🔧 Advanced Options")
+    accordion.selected_index = None
+    accordion.layout.margin = '5px 0'
     
-    return accordion
+    # Return both accordion dan fields dictionary
+    fields = {
+        'retry_field': retry_field,
+        'timeout_field': timeout_field,
+        'chunk_size_field': chunk_size_field
+    }
+    
+    return accordion, fields
+
+def _extract_advanced_fields(accordion: widgets.Accordion) -> Dict[str, Any]:
+    """Extract fields dari advanced accordion untuk backward compatibility."""
+    if not accordion or not hasattr(accordion, 'children') or len(accordion.children) == 0:
+        return {}
+    
+    container = accordion.children[0]
+    if not container or not hasattr(container, 'children'):
+        return {}
+    
+    # Map fields berdasarkan posisi
+    fields = {}
+    field_names = ['retry_field', 'timeout_field', 'chunk_size_field']
+    
+    for i, name in enumerate(field_names):
+        if i < len(container.children):
+            fields[name] = container.children[i]
+    
+    return fields
 
 def _create_environment_status() -> widgets.HTML:
     """Create environment status indicator."""

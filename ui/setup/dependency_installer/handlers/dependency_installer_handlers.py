@@ -6,13 +6,14 @@ Deskripsi: Updated main handlers coordinator dengan CommonInitializer pattern in
 from typing import Dict, Any
 from smartcash.ui.utils.button_state_manager import get_button_state_manager
 
-# Import SRP handlers (unchanged)
+# Import SRP handlers
 from smartcash.ui.setup.dependency_installer.handlers.installation_handler import setup_installation_handler
 from smartcash.ui.setup.dependency_installer.handlers.analysis_handler import setup_analysis_handler
 from smartcash.ui.setup.dependency_installer.handlers.status_check_handler import setup_status_check_handler
 
 from smartcash.ui.setup.dependency_installer.handlers.config_extractor import extract_dependency_installer_config
 from smartcash.ui.setup.dependency_installer.handlers.config_updater import update_dependency_installer_ui, reset_dependency_installer_ui
+from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import log_to_ui_safe
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
     """Setup semua handlers untuk dependency installer dengan updated pattern dan check/uncheck buttons"""
@@ -260,9 +261,7 @@ def update_package_count_display(ui_components: Dict[str, Any]) -> None:
             update_check_uncheck_count(check_uncheck_components, ui_components, package_filter)
             
         except Exception as e:
-            logger = ui_components.get('logger')
-            logger and logger.warning(f"⚠️ Error updating package count: {str(e)}")
+            log_to_ui_safe(ui_components, f"⚠️ Error updating package count: {str(e)}", "warning")
 
-# One-liner utilities dengan simplified logging
-log_to_ui = lambda ui_components, message, level="info": ui_components.get('logger') and getattr(ui_components['logger'], level, ui_components['logger'].info)(message)
-safe_execute = lambda ui_components, func, error_msg="Operation failed": (lambda result: result if result else log_to_ui(ui_components, error_msg, "error"))(func() if callable(func) else None)
+# One-liner utilities dengan log_to_ui_safe
+safe_execute = lambda ui_components, func, error_msg="Operation failed": (lambda result: result if result else log_to_ui_safe(ui_components, error_msg, "error"))(func() if callable(func) else None)

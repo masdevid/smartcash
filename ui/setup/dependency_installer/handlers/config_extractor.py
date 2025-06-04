@@ -5,31 +5,41 @@ Deskripsi: Config extractor untuk dependency installer dengan CommonInitializer 
 
 from typing import Dict, Any
 from smartcash.ui.setup.dependency_installer.components.package_selector import get_selected_packages
+from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import log_to_ui_safe
 
 def extract_dependency_installer_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract konfigurasi dependency installer dari UI components dengan one-liner approach"""
     
-    # Get selected packages menggunakan package selector utils
-    selected_packages = get_selected_packages(ui_components)
+    log_to_ui_safe(ui_components, "🔍 Mengekstrak konfigurasi dari UI...")
     
-    # Extract UI settings dengan safe attribute access - one-liner
-    custom_packages_text = getattr(ui_components.get('custom_packages'), 'value', '').strip()
-    auto_analyze_enabled = getattr(ui_components.get('auto_analyze_checkbox'), 'value', True)
-    
-    # Extract installation settings dengan safe fallback - one-liner
-    installation_config = ui_components.get('config', {}).get('installation', _get_default_installation_config())
-    analysis_config = ui_components.get('config', {}).get('analysis', _get_default_analysis_config())
-    
-    return {
-        'selected_packages': selected_packages,
-        'custom_packages': custom_packages_text,
-        'auto_analyze': auto_analyze_enabled,
-        'installation': installation_config,
-        'analysis': analysis_config,
-        'module_name': 'dependency_installer',
-        'version': '1.0.0',
-        'extracted_at': _get_current_timestamp()
-    }
+    try:
+        # Get selected packages menggunakan package selector utils
+        selected_packages = get_selected_packages(ui_components)
+        
+        # Extract UI settings dengan safe attribute access - one-liner
+        custom_packages_text = getattr(ui_components.get('custom_packages'), 'value', '').strip()
+        auto_analyze_enabled = getattr(ui_components.get('auto_analyze_checkbox'), 'value', True)
+        
+        # Extract installation settings dengan safe fallback - one-liner
+        installation_config = ui_components.get('config', {}).get('installation', _get_default_installation_config())
+        analysis_config = ui_components.get('config', {}).get('analysis', _get_default_analysis_config())
+        
+        log_to_ui_safe(ui_components, "✅ Ekstraksi konfigurasi selesai")
+        
+        return {
+            'selected_packages': selected_packages,
+            'custom_packages': custom_packages_text,
+            'auto_analyze': auto_analyze_enabled,
+            'installation': installation_config,
+            'analysis': analysis_config,
+            'module_name': 'dependency_installer',
+            'version': '1.0.0',
+            'extracted_at': _get_current_timestamp()
+        }
+    except Exception as e:
+        log_to_ui_safe(ui_components, f"❌ Gagal mengekstrak konfigurasi: {str(e)}", "error")
+        return {}
+        
 
 def _get_default_installation_config() -> Dict[str, Any]:
     """Get default installation config - one-liner"""

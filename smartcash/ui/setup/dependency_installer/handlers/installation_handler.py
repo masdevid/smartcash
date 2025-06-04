@@ -12,7 +12,7 @@ from smartcash.ui.setup.dependency_installer.utils.package_utils import (
 )
 from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import (
     create_operation_context, ProgressSteps, update_package_status_by_name,
-    batch_update_package_status, update_status_panel
+    batch_update_package_status, update_status_panel, log_to_ui_safe
 )
 from smartcash.ui.setup.dependency_installer.utils.report_generator_utils import (
     generate_installation_summary_report
@@ -35,32 +35,29 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
     import time
     start_time = time.time()
     
-    # Get built-in logger dari CommonInitializer
-    logger = ui_components.get('logger')
-    
     try:
         # Step 1: Get selected packages
         ctx.stepped_progress('INSTALL_INIT', "Mempersiapkan instalasi...")
-        logger and logger.info("🚀 Memulai proses instalasi packages")
+        log_to_ui_safe(ui_components, "🚀 Memulai proses instalasi packages")
         
         selected_packages = get_selected_packages(ui_components)
         if not selected_packages:
             update_status_panel(ui_components, "❌ Tidak ada packages yang dipilih", "error")
-            logger and logger.warning("⚠️ Tidak ada packages yang dipilih untuk instalasi")
+            log_to_ui_safe(ui_components, "⚠️ Tidak ada packages yang dipilih untuk instalasi", "warning")
             return
         
         # Step 2: Filter uninstalled packages
         ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
-        logger and logger.info(f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
+        log_to_ui_safe(ui_components, f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
         
         # Create logger function untuk filter_uninstalled_packages
         def package_logger_func(msg):
-            logger and logger.info(msg)
+            log_to_ui_safe(ui_components, msg)
         
         packages_to_install = filter_uninstalled_packages(selected_packages, package_logger_func)
         
         if not packages_to_install:
-            logger and logger.success("✅ Semua packages sudah terinstall dengan benar")
+            log_to_ui_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar")
             
             # Update progress ke 100% untuk semua packages sudah terinstall
             ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
@@ -81,7 +78,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Step 3: Install packages dengan parallel processing
         ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
-        logger and logger.info(f"📦 Installing {len(packages_to_install)} packages dengan parallel processing")
+        log_to_ui_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages dengan parallel processing")
         
         installation_results = _install_packages_parallel_with_utils(
             packages_to_install, ui_components, config, package_logger_func, ctx
@@ -91,7 +88,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         ctx.stepped_progress('INSTALL_FINALIZE', "Finalisasi instalasi...")
         duration = time.time() - start_time
         
-        logger and logger.info(f"⏱️ Installation selesai dalam {duration:.1f} detik")
+        log_to_ui_safe(ui_components, f"⏱️ Installation selesai dalam {duration:.1f} detik")
         
         # Update all package status dan generate report
         _finalize_installation_results(ui_components, installation_results, duration)
@@ -100,7 +97,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         ctx.stepped_progress('INSTALL_FINALIZE', "Complete", "step")
         
     except Exception as e:
-        logger and logger.error(f"💥 Installation failed: {str(e)}")
+        log_to_ui_safe(ui_components, f"❌ Gagal menginstal dependensi: {str(e)}", "error")
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 

@@ -6,6 +6,7 @@ Deskripsi: Config updater untuk dependency installer dengan CommonInitializer pa
 from typing import Dict, Any
 import ipywidgets as widgets
 from smartcash.ui.setup.dependency_installer.components.package_selector import reset_package_selections
+from smartcash.ui.setup.dependency_installer.utils.ui_state_utils import log_to_ui_safe
 
 def update_dependency_installer_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update UI components dari config dengan comprehensive approach - one-liner style"""
@@ -32,13 +33,11 @@ def update_dependency_installer_ui(ui_components: Dict[str, Any], config: Dict[s
         _update_package_selections(ui_components, selected_packages)
         
         # Log update success menggunakan built-in logger dari CommonInitializer
-        logger = ui_components.get('logger')
-        logger and logger.info(f"📋 UI updated from config: {_get_update_summary(config)}")
+        log_to_ui_safe(ui_components, f"📋 UI updated from config: {_get_update_summary(config)}")
         
     except Exception as e:
-        # Log error menggunakan built-in logger dari CommonInitializer
-        logger = ui_components.get('logger')
-        logger and logger.warning(f"⚠️ Error updating UI from config: {str(e)}")
+        # Log error menggunakan built-in logger
+        log_to_ui_safe(ui_components, f"⚠️ Error updating UI from config: {str(e)}", "error")
 
 def _update_installation_settings(ui_components: Dict[str, Any], installation_config: Dict[str, Any]) -> None:
     """Update installation settings dengan safe widget updates - one-liner approach"""
@@ -85,7 +84,7 @@ def _update_package_selections(ui_components: Dict[str, Any], selected_packages:
             _manual_update_package_checkboxes(ui_components, selected_packages)
             
     except Exception as e:
-        log_message_safe(ui_components, f"⚠️ Error updating package selections: {str(e)}", "warning")
+        log_to_ui_safe(ui_components, f"⚠️ Error updating package selections: {str(e)}", "error")
 
 def _manual_update_package_checkboxes(ui_components: Dict[str, Any], selected_packages: list) -> None:
     """Manual update package checkboxes sebagai fallback - one-liner approach"""
@@ -109,9 +108,7 @@ def _manual_update_package_checkboxes(ui_components: Dict[str, Any], selected_pa
          if key.endswith('_checkbox') and hasattr(ui_components.get(key), 'value')]
         
     except Exception as e:
-                    # Log error menggunakan built-in logger
-            logger = ui_components.get('logger')
-            logger and logger.warning(f"⚠️ Manual package checkbox update failed: {str(e)}")
+        log_to_ui_safe(ui_components, f"⚠️ Manual package checkbox update failed: {str(e)}", "error")
 
 def reset_dependency_installer_ui(ui_components: Dict[str, Any]) -> None:
     """Reset UI ke default state dengan comprehensive approach - one-liner style"""
@@ -134,13 +131,11 @@ def reset_dependency_installer_ui(ui_components: Dict[str, Any]) -> None:
         _clear_ui_state(ui_components)
         
         # Log success menggunakan built-in logger
-        logger = ui_components.get('logger')
-        logger and logger.info("🔄 UI berhasil direset ke default state")
+        log_to_ui_safe(ui_components, "🔄 UI berhasil direset ke default state")
         
     except Exception as e:
         # Log error menggunakan built-in logger
-        logger = ui_components.get('logger')
-        logger and logger.warning(f"⚠️ Error resetting UI: {str(e)}")
+        log_to_ui_safe(ui_components, f"⚠️ Error resetting UI: {str(e)}", "error")
 
 def _reset_installation_settings(ui_components: Dict[str, Any]) -> None:
     """Reset installation settings ke default - one-liner approach"""

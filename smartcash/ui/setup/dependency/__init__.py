@@ -4,7 +4,7 @@ Deskripsi: Public API untuk dependency installer module
 """
 
 # Import main initializer
-from smartcash.ui.setup.dependency.dependency_initializer import (
+from smartcash.ui.setup.dependency.dependency_init import (
     initialize_dependency_ui,
     DependencyInstallerInitializer
 )
@@ -17,4 +17,3 @@ __all__ = [
 
 # Convenience aliases
 initialize_ui = initialize_dependency_ui
-create_dependency_ui = initialize_dependency_ui

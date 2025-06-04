@@ -5,6 +5,7 @@ Deskripsi: Updated dependency installer initializer menggunakan CommonInitialize
 
 from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
+from smartcash.ui.utils.logger_bridge import get_logger
 from smartcash.ui.utils.ui_logger_namespace import DEPENDENCY_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 
 # Import handlers yang sudah direfaktor
@@ -25,6 +26,7 @@ class DependencyInstallerConfigHandler(ConfigHandler):
     def __init__(self, module_name: str, parent_module: str = None):
         self.module_name = module_name
         self.parent_module = parent_module
+        self.logger = get_logger(MODULE_LOGGER_NAME)
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract config menggunakan dedicated extractor - one-liner delegation"""

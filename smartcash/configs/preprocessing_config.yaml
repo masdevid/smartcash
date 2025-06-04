@@ -12,7 +12,7 @@ preprocessing:
   
   # Override validasi dataset
   validate:
-    visualize: true  # Override dari base_config (false)
+    visualize: false  # Override dari base_config (false)
 
   # Override opsi analisis dataset
   analysis:

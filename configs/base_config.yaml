@@ -106,7 +106,7 @@ augmentation:
 # Konfigurasi preprocessing
 preprocessing:
   output_dir: 'data/preprocessed'  # Path relatif
-  save_visualizations: true
+  save_visualizations: false
   vis_dir: 'visualizations'        # Path relatif
   sample_size: 0                   # 0 = semua
   validate:
@@ -164,6 +164,7 @@ evaluation:
     - 'f1'
     - 'accuracy'
     - 'confusion_matrix'
+    - 'inference_time'
   test_batch_size: 8
   save_predictions: true
   visualize_results: true

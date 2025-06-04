@@ -7,6 +7,21 @@ _base_: 'base_config.yaml'
 
 # Override konfigurasi data dari base_config
 data:
+  dir: 'data'                    # Direktori utama data (path relatif)
+  preprocessed_dir: 'data/preprocessed'  # Direktori untuk hasil preprocessed (path relatif)
+  split_ratios:                  # Rasio split dataset
+    train: 0.7
+    valid: 0.15
+    test: 0.15
+  stratified_split: true         # Gunakan stratified split
+  random_seed: 42                # Random seed untuk reproduksibilitas
+  source: 'roboflow'             # Sumber dataset ('roboflow', 'local')
+  roboflow:                      # Konfigurasi Roboflow
+    api_key: ''                  # Diisi oleh user atau dari Google Secret
+    workspace: 'smartcash-wo2us'
+    project: 'rupiah-emisi-2022'
+    version: '3'
+    output_format: 'yolov5pytorch'
   # Parameter validasi dataset (parameter baru)
   validation:
     enabled: true
@@ -18,9 +33,9 @@ data:
 # Konfigurasi untuk akses dan backup dataset (parameter baru)
 dataset:
   backup:
-    enabled: true
+    enabled: false
     dir: 'data/backup/dataset'
-    count: 3
+    count: 2
     auto: false
   
   export:
@@ -34,7 +49,6 @@ dataset:
     allowed_formats:
       - 'yolo'
       - 'coco'
-      - 'voc'
     temp_dir: 'data/temp'
 
 # Override konfigurasi cache dari base_config

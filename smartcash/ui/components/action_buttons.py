@@ -3,6 +3,7 @@ File: smartcash/ui/components/action_buttons.py
 Deskripsi: Fixed action buttons dengan one-liner style dan preserved original styling
 """
 
+from typing import Dict, Any
 import ipywidgets as widgets
 from smartcash.ui.utils.constants import COLORS, ICONS
 def create_action_buttons(primary_label: str = "Download Dataset", primary_icon: str = "download", 
@@ -104,6 +105,54 @@ def restore_button_original_style(button):
 
 def set_button_processing_style(button, processing_text: str = "Processing...", processing_style: str = 'warning'):
     """Set button ke processing style dengan one-liner preserve original."""
-    not hasattr(button, '_original_style') and setattr(button, '_original_style', button.button_style)
-    not hasattr(button, '_original_description') and setattr(button, '_original_description', button.description)
-    setattr(button, 'disabled', True), setattr(button, 'description', processing_text), setattr(button, 'button_style', processing_style)
+    if not hasattr(button, '_original_style') or not hasattr(button, '_original_description'):
+        setattr(button, '_original_style', button.button_style)
+        setattr(button, '_original_description', button.description)
+    button.description = processing_text
+    button.button_style = processing_style
+
+def update_button_states(ui_components: Dict[str, Any], state: str = 'ready') -> None:
+    """
+    Update state untuk semua tombol aksi berdasarkan state yang diberikan.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        state: State yang diinginkan ('ready', 'downloading', 'validating', 'error')
+    """
+    # Daftar tombol yang akan di-update
+    button_mapping = {
+        'download_button': {'ready': ('Download', 'primary'),
+                          'downloading': ('Mengunduh...', 'warning'),
+                          'validating': ('Memvalidasi...', 'info'),
+                          'error': ('Coba Lagi', 'danger')},
+        'validate_button': {'ready': ('Validasi', 'info'),
+                           'downloading': ('Validasi', 'info', True),  # disabled
+                           'validating': ('Memvalidasi...', 'warning'),
+                           'error': ('Validasi Ulang', 'warning')},
+        'quick_validate_button': {'ready': ('Quick Check', 'info'),
+                                'downloading': ('Quick Check', 'info', True),  # disabled
+                                'validating': ('Memeriksa...', 'warning'),
+                                'error': ('Periksa Kembali', 'warning')}
+    }
+    
+    for button_name, states in button_mapping.items():
+        if button_name not in ui_components:
+            continue
+            
+        button = ui_components[button_name]
+        state_config = states.get(state, states['ready'])  # Default ke 'ready' jika state tidak ditemukan
+        
+        # Update teks dan style
+        button.description = state_config[0]
+        button.button_style = state_config[1]
+        
+        # Handle disabled state jika ada di config
+        if len(state_config) > 2 and state_config[2]:
+            button.disabled = True
+        else:
+            button.disabled = False
+            
+        # Simpan state asli jika belum ada
+        if not hasattr(button, '_original_style'):
+            setattr(button, '_original_style', state_config[1])
+            setattr(button, '_original_description', state_config[0])

@@ -23,3 +23,6 @@ __all__ = [
 
 # Convenience aliases
 initialize_ui = initialize_dependency_ui
+validate_setup = validate_dependency_setup
+get_config_handler = get_dependency_config_handler
+get_status = get_dependency_status

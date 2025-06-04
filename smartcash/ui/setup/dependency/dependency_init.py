@@ -23,7 +23,7 @@ class DependencyInstallerInitializer(CommonInitializer):
     
     def __init__(self):
         # CommonInitializer sudah handle logger setup, tidak perlu duplicate
-        super().__init__('dependency', DependencyInstallerConfigHandler, 'setup')
+        super().__init__('dependency', None, 'setup')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk dependency installer dengan config integration"""

@@ -18,12 +18,38 @@ from smartcash.ui.setup.dependency.handlers.dependency_handler import setup_depe
 
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_LOGGER_NAMESPACE]
 
+class DependencyInstallerConfigHandler:
+    """ConfigHandler untuk dependency installer dengan pattern CommonInitializer"""
+    
+    def __init__(self, module_name: str, parent_module: str = None):
+        self.module_name = module_name
+        self.parent_module = parent_module
+    
+    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract config menggunakan dedicated extractor - one-liner delegation"""
+        return extract_dependency_config(ui_components)
+    
+    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI menggunakan dedicated updater - one-liner delegation"""
+        update_dependency_ui(ui_components, config)
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default config menggunakan defaults module - one-liner delegation"""
+        return get_default_dependency_config()
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load config from persistent storage - one-liner delegation"""
+        # Get config manager instance
+        config_manager = get_config_manager()
+        # Load config for this module
+        return config_manager.get_module_config(self.module_name, self.get_default_config())
+
 class DependencyInstallerInitializer(CommonInitializer):
     """Updated dependency installer initializer dengan CommonInitializer pattern dan built-in logger"""
     
     def __init__(self):
         # CommonInitializer sudah handle logger setup, tidak perlu duplicate
-        super().__init__('dependency', None, 'setup')
+        super().__init__('dependency', DependencyInstallerConfigHandler, 'setup')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk dependency installer dengan config integration"""
@@ -69,6 +95,9 @@ def initialize_dependency_ui(env=None, config=None, **kwargs) -> Any:
     """Public API untuk initialize dependency installer UI dengan CommonInitializer pattern"""
     return _dependency_initializer.initialize(env=env, config=config, **kwargs)
 
+def get_dependency_config_handler() -> DependencyInstallerConfigHandler:
+    """Get config handler instance untuk external usage - one-liner factory"""
+    return DependencyInstallerConfigHandler('dependency', 'setup')
 
 def validate_dependency_setup(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Validate dependency installer setup dengan comprehensive check"""

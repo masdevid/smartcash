@@ -129,23 +129,8 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         progress_msg = f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})"
         logger_func(progress_msg)
         
-        # Update check/uncheck count display jika ada
-        if 'check_uncheck_container' in ui_components:
-            try:
-                from smartcash.ui.components.check_uncheck_buttons import update_check_uncheck_count
-                check_uncheck_components = {
-                    'target_prefix': 'package',
-                    'count_display': ui_components.get('package_count_display')
-                }
-                
-                def package_filter(key: str) -> bool:
-                    return (key.endswith('_checkbox') and 
-                           any(category in key for category in ['core', 'ml', 'data', 'ui', 'dev']) and
-                           key != 'auto_analyze_checkbox')
-                
-                update_check_uncheck_count(check_uncheck_components, ui_components, package_filter)
-            except Exception as e:
-                logger and logger.debug(f"🔍 Check/uncheck count update error: {str(e)}")
+        # Update check/uncheck count display removed
+        # Check/uncheck functionality removed
     
     # Get installation configuration
     max_workers = min(len(packages), config.get('installation', {}).get('parallel_workers', 3))

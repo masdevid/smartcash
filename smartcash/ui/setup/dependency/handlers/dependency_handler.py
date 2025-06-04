@@ -32,9 +32,6 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         log_to_ui_safe(ui_components, f"⚠️ Button manager error: {str(e)}", "warning")
         ui_components['button_manager'] = None
     
-    # Setup check/uncheck buttons dengan validation
-    _setup_package_check_uncheck_buttons(ui_components)
-    
     # Setup individual handlers dengan enhanced error handling
     _setup_handlers_with_validation(ui_components, config)
     
@@ -58,31 +55,7 @@ def _cleanup_existing_generators(ui_components: Dict[str, Any]) -> None:
     except Exception as e:
         log_to_ui_safe(ui_components, f"⚠️ Generator cleanup error: {str(e)}", "warning")
 
-def _setup_package_check_uncheck_buttons(ui_components: Dict[str, Any]) -> None:
-    """Setup check/uncheck buttons dengan enhanced validation"""
-    
-    try:
-        from smartcash.ui.components.check_uncheck_buttons import create_package_check_uncheck_buttons
-        
-        # Validate existing checkboxes sebelum create
-        existing_checkboxes = {k: v for k, v in ui_components.items() if k.endswith('_checkbox') and hasattr(v, 'value')}
-        
-        if len(existing_checkboxes) > 0:
-            check_uncheck_components = create_package_check_uncheck_buttons(ui_components, show_count=True)
-            
-            ui_components.update({
-                'check_uncheck_container': check_uncheck_components['container'],
-                'check_all_button': check_uncheck_components['check_all_button'],
-                'uncheck_all_button': check_uncheck_components['uncheck_all_button'],
-                'package_count_display': check_uncheck_components.get('count_display')
-            })
-            
-            log_to_ui_safe(ui_components, f"✅ Check/uncheck buttons setup untuk {len(existing_checkboxes)} checkboxes", "info")
-        else:
-            log_to_ui_safe(ui_components, "⚠️ No checkboxes found untuk check/uncheck buttons", "warning")
-        
-    except Exception as e:
-        log_to_ui_safe(ui_components, f"⚠️ Check/uncheck setup error: {str(e)}", "warning")
+
 
 def _setup_handlers_with_validation(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Setup handlers dengan enhanced validation dan error handling"""
@@ -289,8 +262,6 @@ def get_handlers_status(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         'button_manager': 'button_manager' in ui_components,
         'progress_callback': 'progress_callback' in ui_components,
         'auto_analyze_enabled': ui_components.get('auto_analyze_on_render', False),
-        'check_uncheck_buttons': 'check_uncheck_container' in ui_components,
-        'package_count_display': 'package_count_display' in ui_components,
         'generator_count': len([v for v in ui_components.values() if hasattr(v, '__next__')]),
         'button_binding_count': len([k for k, v in ui_components.items() if 'button' in k and hasattr(v, 'on_click')])
     }
@@ -321,24 +292,9 @@ def get_button_manager_safe(ui_components: Dict[str, Any]):
         return None
 
 def update_package_count_display(ui_components: Dict[str, Any]) -> None:
-    """Update package count dengan enhanced error handling"""
-    if 'check_uncheck_container' in ui_components:
-        try:
-            from smartcash.ui.components.check_uncheck_buttons import update_check_uncheck_count
-            
-            def package_filter(key: str) -> bool:
-                return (key.endswith('_checkbox') and 
-                       any(category in key for category in ['core', 'ml', 'data', 'ui', 'dev']) and
-                       key != 'auto_analyze_checkbox')
-            
-            check_uncheck_components = {
-                'target_prefix': 'package',
-                'count_display': ui_components.get('package_count_display')
-            }
-            
-            update_check_uncheck_count(check_uncheck_components, ui_components, package_filter)
-            
-        except Exception as e:
-            log_to_ui_safe(ui_components, f"⚠️ Package count update error: {str(e)}", "warning")
+    """Update package count - check/uncheck functionality removed"""
+    # Check/uncheck functionality removed from handlers
+    pass
 
+# Enhanced one-liner utilities
 safe_execute = lambda ui_components, func, error_msg="Operation failed": (lambda result: result if result else log_to_ui_safe(ui_components, error_msg, "error"))(func() if callable(func) else None)

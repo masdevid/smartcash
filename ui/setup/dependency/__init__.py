@@ -3,7 +3,7 @@ File: smartcash/ui/setup/dependency/__init__.py
 Deskripsi: Main dependency module exports dengan public API
 """
 
-from smartcash.ui.setup.dependency.dependency_init import (
+from .dependency_init import (
     initialize_dependency_ui,
     get_dependency_config,
     get_dependency_config_handler,

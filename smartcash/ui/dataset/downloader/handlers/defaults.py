@@ -29,20 +29,29 @@ DEFAULT_CONFIG = {
 }
 
 def get_default_api_key() -> str:
-    """Get API key dari environment dengan fallback."""
+    """Get API key dari Colab secrets dan environment dengan fallback."""
     import os
     
-    # Check environment variables
-    api_key = os.environ.get('ROBOFLOW_API_KEY', '')
-    if api_key:
-        return api_key
-    
-    # Try Colab userdata
+    # 1. First check Colab userdata (secrets)
     try:
         from google.colab import userdata
-        return userdata.get('ROBOFLOW_API_KEY', '')
-    except Exception:
-        return ''
+        for key_name in ['ROBOFLOW_API_KEY', 'roboflow_api_key', 'API_KEY']:
+            try:
+                api_key = userdata.get(key_name, '').strip()
+                if api_key and len(api_key) > 10:
+                    return api_key
+            except Exception:
+                continue
+    except ImportError:
+        pass
+    
+    # 2. Fallback to environment variables
+    for env_key in ['ROBOFLOW_API_KEY', 'ROBOFLOW_KEY', 'RF_API_KEY']:
+        api_key = os.environ.get(env_key, '').strip()
+        if api_key and len(api_key) > 10:
+            return api_key
+    
+    return ''
 
 def get_default_downloader_config() -> Dict[str, Any]:
     """Get default configuration dengan environment detection."""

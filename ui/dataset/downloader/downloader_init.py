@@ -1,18 +1,19 @@
 """
 File: smartcash/ui/dataset/downloader/downloader_init.py
-Deskripsi: Fixed downloader initializer yang langsung return UI widget
+Deskripsi: Improved downloader initializer dengan auto API key detection dan proper handlers
 """
 
 from typing import Dict, Any, List, Optional
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.utils.fallback_utils import create_fallback_ui, try_operation_safe, show_status_safe
 from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge, get_logger
-from smartcash.ui.utils.ui_logger_namespace import DOWNLOAD_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+from smartcash.ui.utils.ui_logger_namespace import DOWNLOAD_LOGGER_NAMESPACE, KNOWN_NAMESPACES, get_namespace_color
 from smartcash.ui.handlers.config_handlers import BaseConfigHandler
-from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
+from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config, get_default_api_key
+from smartcash.common.environment import get_environment_manager
 
 class DownloaderConfigHandler(BaseConfigHandler):
-    """Simple config handler untuk downloader dengan YAML structure preservation."""
+    """Config handler dengan auto API key detection dan YAML structure preservation."""
     
     def __init__(self, module_name: str = 'downloader', parent_module: str = 'dataset'):
         super().__init__(module_name, parent_module=parent_module)
@@ -28,14 +29,14 @@ class DownloaderConfigHandler(BaseConfigHandler):
                 'project': self._get_safe_value(ui_components, 'project_field', ''),
                 'version': self._get_safe_value(ui_components, 'version_field', '1'),
                 'api_key': self._get_safe_value(ui_components, 'api_key_field', ''),
-                'format': self._get_safe_value(ui_components, 'format_dropdown', 'yolov5pytorch')
+                'format': 'yolov5pytorch'  # Fixed format
             })
             
-            # Update local section
+            # Update local section - organize_dataset always TRUE
             config['local'].update({
                 'output_dir': self._get_safe_value(ui_components, 'output_dir_field', ''),
                 'backup_dir': self._get_safe_value(ui_components, 'backup_dir_field', ''),
-                'organize_dataset': self._get_safe_value(ui_components, 'organize_dataset', True),
+                'organize_dataset': True,  # Always TRUE
                 'backup_enabled': self._get_safe_value(ui_components, 'backup_checkbox', False)
             })
             
@@ -45,25 +46,31 @@ class DownloaderConfigHandler(BaseConfigHandler):
             return get_default_downloader_config()
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan YAML structure."""
+        """Update UI dengan YAML structure dan auto API key detection."""
         try:
             roboflow = config.get('roboflow', {})
             local = config.get('local', {})
+            
+            # Auto-detect API key dari Colab secrets jika belum ada
+            api_key = roboflow.get('api_key', '') or get_default_api_key()
             
             # Update fields dengan safe setting
             field_updates = [
                 ('workspace_field', roboflow.get('workspace', '')),
                 ('project_field', roboflow.get('project', '')),
                 ('version_field', roboflow.get('version', '1')),
-                ('api_key_field', roboflow.get('api_key', '')),
+                ('api_key_field', api_key),
                 ('output_dir_field', local.get('output_dir', '')),
                 ('backup_dir_field', local.get('backup_dir', '')),
-                ('organize_dataset', local.get('organize_dataset', True)),
                 ('backup_checkbox', local.get('backup_enabled', False))
             ]
             
             [self._set_safe_value(ui_components, field, value) for field, value in field_updates]
             
+            # Update status jika API key terdeteksi dari Colab secrets
+            if api_key and not roboflow.get('api_key'):
+                show_status_safe("🔑 API key terdeteksi dari Colab secrets", 'success', ui_components)
+                
         except Exception as e:
             self.logger.error(f"❌ Update UI error: {str(e)}")
     
@@ -85,26 +92,36 @@ class DownloaderConfigHandler(BaseConfigHandler):
         )
 
 class DownloaderInitializer(CommonInitializer):
-    """Fixed downloader initializer yang return UI widget langsung."""
+    """Fixed downloader initializer dengan proper action handlers."""
     
     def __init__(self):
         super().__init__('downloader', DownloaderConfigHandler, 'dataset')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan proper error handling."""
+        """Create UI components dengan auto API key detection."""
         try:
-            # Import UI creation functions
             from smartcash.ui.dataset.downloader.components.ui_layout import create_downloader_ui
             
-            # Create UI dengan config dan env
-            ui_components = create_downloader_ui(config, env)
+            # Auto-detect API key dari Colab secrets sebelum create UI
+            if not config.get('roboflow', {}).get('api_key'):
+                api_key = get_default_api_key()
+                if api_key:
+                    config.setdefault('roboflow', {})['api_key'] = api_key
             
-            # Add essential metadata
+            # Add environment manager
+            env_manager = get_environment_manager()
+            
+            ui_components = create_downloader_ui(config, env_manager)
             ui_components.update({
                 'downloader_initialized': True,
                 'config': config,
-                'module_name': 'downloader'
+                'module_name': 'downloader',
+                'env_manager': env_manager
             })
+            
+            # Add progress tracking components
+            progress_components = self._create_progress_components()
+            ui_components.update(progress_components)
             
             return ui_components
             
@@ -112,85 +129,62 @@ class DownloaderInitializer(CommonInitializer):
             self.logger.error(f"❌ Error creating UI components: {str(e)}")
             return create_fallback_ui(f"Error creating downloader UI: {str(e)}", 'downloader')
     
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan error handling."""
+    def _create_progress_components(self) -> Dict[str, Any]:
+        """Create progress tracking components."""
         try:
-            # Setup basic button handlers
-            self._setup_basic_handlers(ui_components, config)
-            return {'handlers_setup': True}
+            from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+            return create_progress_tracking_container()
+        except Exception:
+            return {}
+    
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Setup action handlers dengan proper confirmation dan logging."""
+        try:
+            # Import action handlers
+            from smartcash.ui.dataset.downloader.handlers.action_handlers import setup_download_action_handlers
+            
+            # Setup all action handlers
+            handler_result = setup_download_action_handlers(ui_components)
+            
+            if handler_result.get('status') == 'success':
+                self.logger.info("✅ Action handlers configured successfully")
+                return {'handlers_setup': True, 'handlers_count': handler_result.get('handlers_configured', 0)}
+            else:
+                self.logger.error(f"❌ Handler setup failed: {handler_result.get('message', 'Unknown error')}")
+                return {'handlers_setup': False, 'error': handler_result.get('message')}
+            
         except Exception as e:
             self.logger.error(f"❌ Error setting up handlers: {str(e)}")
             return {'handlers_setup': False, 'error': str(e)}
     
-    def _setup_basic_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Setup basic button handlers yang simple."""
-        logger = ui_components.get('logger', self.logger)
-        
-        # Download button handler
-        def handle_download(b):
-            show_status_safe("🚀 Download functionality akan segera tersedia", 'info', ui_components)
-            logger.info("🚀 Download button clicked")
-        
-        # Check button handler  
-        def handle_check(b):
-            show_status_safe("🔍 Check functionality akan segera tersedia", 'info', ui_components)
-            logger.info("🔍 Check button clicked")
-        
-        # Cleanup button handler
-        def handle_cleanup(b):
-            show_status_safe("🧹 Cleanup functionality akan segera tersedia", 'info', ui_components)
-            logger.info("🧹 Cleanup button clicked")
-        
-        # Bind handlers dengan safe checking
-        button_handlers = [
-            ('download_button', handle_download),
-            ('check_button', handle_check), 
-            ('cleanup_button', handle_cleanup)
-        ]
-        
-        [ui_components[btn].on_click(handler) for btn, handler in button_handlers 
-         if btn in ui_components and hasattr(ui_components[btn], 'on_click')]
-    
     def _get_default_config(self) -> Dict[str, Any]:
-        """Get default config."""
         return get_default_downloader_config()
     
     def _get_critical_components(self) -> List[str]:
-        """Critical components yang harus ada."""
-        return ['ui', 'download_button', 'workspace_field', 'project_field', 'status_panel']
+        return [
+            'ui', 'download_button', 'workspace_field', 'project_field', 
+            'status_panel', 'log_output', 'form_container'
+        ]
     
     def _get_return_value(self, ui_components: Dict[str, Any]):
-        """Return UI widget langsung, bukan dictionary."""
         return ui_components.get('ui', ui_components.get('main_container'))
 
 # Global instance
 _downloader_initializer = DownloaderInitializer()
 
 def initialize_downloader_ui(env=None, config=None, **kwargs):
-    """
-    Initialize downloader UI dan return widget langsung.
-    
-    Returns:
-        UI widget yang bisa langsung di-display
-    """
+    """Initialize downloader UI dengan auto API key detection."""
     try:
         return _downloader_initializer.initialize(env=env, config=config, **kwargs)
     except Exception as e:
         logger = get_logger('downloader.init')
         logger.error(f"❌ Initialization failed: {str(e)}")
-        
-        # Return fallback UI widget
         return create_fallback_ui(f"Gagal inisialisasi downloader: {str(e)}", 'downloader')['ui']
 
 def get_downloader_status() -> Dict[str, Any]:
-    """Get downloader status untuk debugging."""
-    return {
-        'module': 'downloader',
-        'initialized': True,
-        'status': 'ready',
-        'config_available': True
-    }
+    """Get downloader status."""
+    return {'module': 'downloader', 'initialized': True, 'status': 'ready', 'config_available': True}
 
 def setup_downloader(env=None, config=None, **kwargs):
-    """Main entry point - alias untuk initialize_downloader_ui."""
+    """Main entry point."""
     return initialize_downloader_ui(env=env, config=config, **kwargs)

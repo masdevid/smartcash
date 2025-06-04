@@ -111,8 +111,20 @@ def show_status_safe(message: str, status_type: str = 'info', ui_components: Dic
 
 
 def try_operation_safe(operation: Callable, fallback_value: Any = None, 
-                      logger=None, operation_name: str = "operasi") -> Any:
-    """Execute operation dengan safe error handling"""
+                      logger=None, operation_name: str = "operasi",
+                      on_error: Callable[[Exception], Any] = None) -> Any:
+    """Execute operation dengan safe error handling
+    
+    Args:
+        operation: Fungsi yang akan dijalankan
+        fallback_value: Nilai yang akan dikembalikan jika terjadi error
+        logger: Logger untuk mencatat log
+        operation_name: Nama operasi untuk keperluan logging
+        on_error: Callback yang akan dipanggil jika terjadi error
+        
+    Returns:
+        Hasil operasi atau fallback_value jika terjadi error
+    """
     try:
         result = operation()
         if logger and result: 
@@ -121,6 +133,12 @@ def try_operation_safe(operation: Callable, fallback_value: Any = None,
     except Exception as e:
         if logger: 
             logger.warning(f"⚠️ Error saat {operation_name}: {str(e)}")
+        if callable(on_error):
+            try:
+                return on_error(e)
+            except Exception as callback_error:
+                if logger:
+                    logger.error(f"⚠️ Error dalam callback on_error: {str(callback_error)}")
         return fallback_value
 
 

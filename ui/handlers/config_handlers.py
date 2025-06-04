@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/utils/config_handlers.py
-Deskripsi: Enhanced ConfigHandler dengan hooks dan SimpleConfigManager integration
+File: smartcash/ui/handlers/config_handlers.py
+Deskripsi: Fixed ConfigHandler dengan proper generator cleanup dan logger integration
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -10,13 +10,15 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.utils.fallback_utils import try_operation_safe, show_status_safe
 
 class ConfigHandler(ABC):
-    """Enhanced ConfigHandler dengan hooks dan lifecycle management"""
+    """Fixed ConfigHandler dengan automatic generator cleanup dan enhanced logging"""
     
-    def __init__(self, module_name: str):
+    def __init__(self, module_name: str, parent_module: str = None):
         self.module_name = module_name
-        self.logger = get_logger(f"smartcash.ui.{module_name}.config")
+        self.parent_module = parent_module
+        self.logger = get_logger(f"smartcash.ui.{parent_module}.{module_name}" if parent_module else f"smartcash.ui.{module_name}")
         self.config_manager = get_config_manager()
         self.callbacks = []
+        self._current_config = {}
         
     @abstractmethod
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -29,25 +31,19 @@ class ConfigHandler(ABC):
         pass
         
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default config dari defaults.py untuk reset scenarios"""
+        """Get default config dengan fallback handling"""
         try:
-            # Coba load dari defaults.py di folder handler module
-            if hasattr(self, 'parent_module') and self.parent_module:
-                module_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.defaults"
-            else:
-                module_path = f"smartcash.ui.{self.module_name}.defaults"
-            
+            module_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.defaults" if self.parent_module else f"smartcash.ui.{self.module_name}.defaults"
             module = __import__(module_path, fromlist=['DEFAULT_CONFIG'])
             default_config = getattr(module, 'DEFAULT_CONFIG', {})
             
             if default_config:
-                self.logger.info(f"📋 Loaded defaults.py for {self.module_name}")
+                self.logger.info(f"📋 Loaded defaults for {self.module_name}")
                 return default_config
             
         except (ImportError, AttributeError) as e:
-            self.logger.debug(f"🔍 defaults.py not found for {self.module_name}: {str(e)}")
+            self.logger.debug(f"🔍 No defaults found for {self.module_name}: {str(e)}")
         
-        # Fallback: minimal default structure
         return {
             'module_name': self.module_name,
             'version': '1.0.0',
@@ -55,179 +51,195 @@ class ConfigHandler(ABC):
             'settings': {}
         }
     
-    def save_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None) -> bool:
-        """Save config dengan lifecycle hooks"""
+    def _force_close_generators(self, ui_components: Dict[str, Any]) -> int:
+        """Force close all generators untuk prevent RuntimeError - one-liner batch close"""
         try:
+            generators = [v for v in ui_components.values() if hasattr(v, 'close') and hasattr(v, '__next__')]
+            [gen.close() for gen in generators]
+            count = len(generators)
+            count > 0 and self.logger.info(f"🧹 Closed {count} generators to prevent RuntimeError")
+            return count
+        except Exception as e:
+            self.logger.warning(f"⚠️ Generator cleanup error: {str(e)}")
+            return 0
+    
+    def save_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None) -> bool:
+        """Save config dengan comprehensive error handling dan generator cleanup"""
+        try:
+            self.logger.info(f"💾 Starting save config for {self.module_name}...")
+            
+            # Force close generators first
+            generator_count = self._force_close_generators(ui_components)
+            
             # Before save hook
             self.before_save(ui_components)
             
-            # Extract dan save config
-            config = self.extract_config(ui_components)
-            success = self.config_manager.save_config(config, config_name or self.module_name)
+            # Extract config dengan error handling
+            try:
+                config = self.extract_config(ui_components)
+                self.logger.debug(f"📊 Extracted config with {len(config)} keys")
+            except Exception as e:
+                self.logger.error(f"💥 Config extraction failed: {str(e)}")
+                self.after_save_failure(ui_components, f"Extraction error: {str(e)}")
+                return False
             
-            if success:
-                ui_components['config'] = config
-                self.after_save_success(ui_components, config)
-                [try_operation_safe(lambda cb=cb: cb(config)) for cb in self.callbacks]
-            else:
-                self.after_save_failure(ui_components, "Gagal menyimpan konfigurasi")
+            # Save config dengan error handling
+            try:
+                success = self.config_manager.save_config(config, config_name or self.module_name)
+                if not success:
+                    raise Exception("Config manager returned False")
+                    
+                self.logger.success(f"✅ Config saved successfully")
+            except Exception as e:
+                self.logger.error(f"💥 Config save failed: {str(e)}")
+                self.after_save_failure(ui_components, f"Save error: {str(e)}")
+                return False
             
-            return success
+            # Success handling
+            self._current_config = config
+            ui_components['config'] = config
+            self.after_save_success(ui_components, config)
+            [try_operation_safe(lambda cb=cb: cb(config)) for cb in self.callbacks]
+            
+            return True
             
         except Exception as e:
-            self.after_save_failure(ui_components, str(e))
+            self.logger.error(f"💥 Unexpected save error: {str(e)}")
+            self.after_save_failure(ui_components, f"Unexpected error: {str(e)}")
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None) -> bool:
-        """Reset config dengan lifecycle hooks"""
+        """Reset config dengan comprehensive error handling dan generator cleanup"""
         try:
+            self.logger.info(f"🔄 Starting reset config for {self.module_name}...")
+            
+            # Force close generators first
+            generator_count = self._force_close_generators(ui_components)
+            
             # Before reset hook
             self.before_reset(ui_components)
             
-            # Get default dan reset UI
-            default_config = self.get_default_config()
-            self.update_ui(ui_components, default_config)
+            # Get default config dengan error handling
+            try:
+                default_config = self.get_default_config()
+                self.logger.debug(f"📋 Got default config with {len(default_config)} keys")
+            except Exception as e:
+                self.logger.error(f"💥 Default config failed: {str(e)}")
+                self.after_reset_failure(ui_components, f"Default config error: {str(e)}")
+                return False
             
-            # Save default config
-            success = self.config_manager.save_config(default_config, config_name or self.module_name)
+            # Update UI dengan error handling
+            try:
+                self.update_ui(ui_components, default_config)
+                self.logger.debug(f"🔄 UI updated with default config")
+            except Exception as e:
+                self.logger.error(f"💥 UI update failed: {str(e)}")
+                self.after_reset_failure(ui_components, f"UI update error: {str(e)}")
+                return False
             
-            if success:
-                ui_components['config'] = default_config
-                self.after_reset_success(ui_components, default_config)
-                [try_operation_safe(lambda cb=cb: cb(default_config)) for cb in self.callbacks]
-            else:
-                self.after_reset_failure(ui_components, "Gagal menyimpan default config")
+            # Save default config dengan error handling
+            try:
+                success = self.config_manager.save_config(default_config, config_name or self.module_name)
+                if not success:
+                    raise Exception("Config manager returned False")
+                    
+                self.logger.success(f"✅ Config reset successfully")
+            except Exception as e:
+                self.logger.error(f"💥 Reset save failed: {str(e)}")
+                self.after_reset_failure(ui_components, f"Reset save error: {str(e)}")
+                return False
             
-            return success
+            # Success handling
+            self._current_config = default_config
+            ui_components['config'] = default_config
+            self.after_reset_success(ui_components, default_config)
+            [try_operation_safe(lambda cb=cb: cb(default_config)) for cb in self.callbacks]
+            
+            return True
             
         except Exception as e:
-            self.after_reset_failure(ui_components, str(e))
+            self.logger.error(f"💥 Unexpected reset error: {str(e)}")
+            self.after_reset_failure(ui_components, f"Unexpected error: {str(e)}")
             return False
     
-    def load_config(self, config_name: Optional[str] = None, use_base_config: bool = True) -> Dict[str, Any]:
-        """Load config dengan base_config.yaml fallback dan inheritance resolution"""
-        config_name = config_name or self.module_name
-        
-        try:
-            # 1. Coba load config spesifik terlebih dahulu
-            specific_config = self.config_manager.get_config(config_name)
-            
-            if specific_config:
-                # Jika ada config spesifik, resolve inheritance-nya
-                resolved_config = self._resolve_config_inheritance(specific_config, config_name)
-                self.logger.info(f"📄 Loaded specific config: {config_name}")
-                return resolved_config
-            
-            # 2. Fallback ke base_config.yaml jika tidak ada config spesifik
-            if use_base_config:
-                base_config = self.config_manager.get_config('base_config')
-                if base_config:
-                    resolved_base = self._resolve_config_inheritance(base_config, 'base_config')
-                    self.logger.info(f"📄 Loaded base_config.yaml for {config_name}")
-                    return resolved_base
-            
-            # 3. Final fallback ke defaults.py untuk reset scenarios
-            default_config = self.get_default_config()
-            self.logger.warning(f"⚠️ Using defaults.py for {config_name}")
-            return default_config
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Error loading config: {str(e)}")
-            return self.get_default_config()
+    def get_current_config(self) -> Dict[str, Any]:
+        """Public API untuk mendapatkan current config"""
+        return self._current_config.copy()
     
-    def _resolve_config_inheritance(self, config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
-        """Resolve config inheritance dengan _base_ support - menggunakan SimpleConfigManager untuk konsistensi"""
-        if not config or '_base_' not in config:
-            return config
-        
-        try:
-            base_configs = config.pop('_base_')
-            base_configs = [base_configs] if isinstance(base_configs, str) else base_configs
-            
-            # Merge semua base configs menggunakan ConfigManager
-            merged_config = {}
-            for base_name in base_configs:
-                base_config = self.config_manager.get_config(base_name)
-                if base_config:
-                    # Recursive resolution untuk nested inheritance
-                    resolved_base = self._resolve_config_inheritance(base_config, base_name)
-                    merged_config.update(resolved_base)
-                else:
-                    self.logger.warning(f"⚠️ Base config tidak ditemukan: {base_name}")
-            
-            # Apply current config over merged base configs
-            merged_config.update(config)
-            self.logger.info(f"🔗 Resolved inheritance for {config_name}: {len(base_configs)} base configs")
-            return merged_config
-            
-        except Exception as e:
-            self.logger.error(f"❌ Error resolving inheritance for {config_name}: {str(e)}")
-            return config
-    
-    # Lifecycle hooks dengan default implementation
+    # Lifecycle hooks dengan enhanced logging
     def before_save(self, ui_components: Dict[str, Any]) -> None:
-        """Hook sebelum save - default: clear outputs dan reset UI state"""
+        """Hook sebelum save dengan logging"""
+        self.logger.debug("🔧 Preparing for save...")
         self._clear_ui_outputs(ui_components)
         self._update_status_panel(ui_components, "💾 Menyimpan konfigurasi...", "info")
     
     def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Hook setelah save berhasil - default: update status dan log"""
-        self._update_status_panel(ui_components, "✅ Konfigurasi berhasil disimpan", "success")
-        self.logger.success(f"💾 Konfigurasi {self.module_name} berhasil disimpan")
+        """Hook setelah save berhasil dengan enhanced logging"""
+        success_msg = "✅ Konfigurasi berhasil disimpan"
+        self._update_status_panel(ui_components, success_msg, "success")
+        self.logger.success(f"💾 Save completed for {self.module_name}")
     
     def after_save_failure(self, ui_components: Dict[str, Any], error: str) -> None:
-        """Hook setelah save gagal - default: update status dan log error"""
-        self._update_status_panel(ui_components, f"❌ Gagal menyimpan: {error}", "error")
-        self.logger.error(f"💥 Error saving config: {error}")
+        """Hook setelah save gagal dengan enhanced logging"""
+        error_msg = f"❌ Gagal menyimpan: {error}"
+        self._update_status_panel(ui_components, error_msg, "error")
+        self.logger.error(f"💥 Save failed for {self.module_name}: {error}")
     
     def before_reset(self, ui_components: Dict[str, Any]) -> None:
-        """Hook sebelum reset - default: clear outputs dan reset UI state"""
+        """Hook sebelum reset dengan logging"""
+        self.logger.debug("🔧 Preparing for reset...")
         self._clear_ui_outputs(ui_components)
         self._reset_progress_bars(ui_components)
         self._update_status_panel(ui_components, "🔄 Mereset konfigurasi...", "info")
     
     def after_reset_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Hook setelah reset berhasil - default: update status dan log"""
-        self._update_status_panel(ui_components, "✅ Konfigurasi berhasil direset", "success")
-        self.logger.success(f"🔄 Konfigurasi {self.module_name} berhasil direset")
+        """Hook setelah reset berhasil dengan enhanced logging"""
+        success_msg = "✅ Konfigurasi berhasil direset"
+        self._update_status_panel(ui_components, success_msg, "success")
+        self.logger.success(f"🔄 Reset completed for {self.module_name}")
     
     def after_reset_failure(self, ui_components: Dict[str, Any], error: str) -> None:
-        """Hook setelah reset gagal - default: update status dan log error"""
-        self._update_status_panel(ui_components, f"❌ Gagal reset: {error}", "error")
-        self.logger.error(f"💥 Error resetting config: {error}")
+        """Hook setelah reset gagal dengan enhanced logging"""
+        error_msg = f"❌ Gagal reset: {error}"
+        self._update_status_panel(ui_components, error_msg, "error")
+        self.logger.error(f"💥 Reset failed for {self.module_name}: {error}")
     
-    # Helper methods dengan one-liner style
+    # Helper methods dengan enhanced error handling
     def _clear_ui_outputs(self, ui_components: Dict[str, Any]) -> None:
-        """Clear UI outputs dengan one-liner"""
-        [widget.clear_output(wait=True) for key in ['log_output', 'status', 'confirmation_area'] 
-         if (widget := ui_components.get(key)) and hasattr(widget, 'clear_output')]
+        """Clear UI outputs dengan error handling"""
+        try:
+            [widget.clear_output(wait=True) for key in ['log_output', 'status', 'confirmation_area'] 
+             if (widget := ui_components.get(key)) and hasattr(widget, 'clear_output')]
+        except Exception as e:
+            self.logger.warning(f"⚠️ Clear outputs error: {str(e)}")
     
     def _reset_progress_bars(self, ui_components: Dict[str, Any]) -> None:
-        """Reset progress bars dengan one-liner"""
-        [setattr(ui_components.get(key, type('', (), {'layout': type('', (), {'visibility': ''})()})()), 'layout.visibility', 'hidden')
-         for key in ['progress_bar', 'progress_container', 'current_progress']]
-        [setattr(ui_components.get(key, type('', (), {'value': 0})()), 'value', 0)
-         for key in ['progress_bar', 'current_progress']]
+        """Reset progress bars dengan error handling"""
+        try:
+            # Hide progress bars
+            [setattr(ui_components.get(key, type('', (), {'layout': type('', (), {'visibility': ''})()})()), 'layout.visibility', 'hidden')
+             for key in ['progress_bar', 'progress_container', 'current_progress']]
+            
+            # Reset values
+            [setattr(ui_components.get(key, type('', (), {'value': 0})()), 'value', 0)
+             for key in ['progress_bar', 'current_progress']]
+        except Exception as e:
+            self.logger.warning(f"⚠️ Progress reset error: {str(e)}")
     
     def _update_status_panel(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
-        """Update status panel dengan fallback - one-liner"""
-        show_status_safe(ui_components, message, status_type)
+        """Update status panel dengan error handling"""
+        try:
+            show_status_safe(ui_components, message, status_type)
+        except Exception as e:
+            self.logger.warning(f"⚠️ Status update error: {str(e)}")
     
-    # Callback management dengan one-liner
+    # Callback management
     add_callback = lambda self, cb: self.callbacks.append(cb) if cb not in self.callbacks else None
     remove_callback = lambda self, cb: self.callbacks.remove(cb) if cb in self.callbacks else None
-    
-    def get_config_summary(self, config: Dict[str, Any]) -> str:
-        """Get config summary untuk display - override untuk custom summary"""
-        return f"📊 {self.module_name}: {len(config)} konfigurasi dimuat"
-    
-    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate config - override untuk custom validation"""
-        return {'valid': True, 'errors': []}
 
 
 class BaseConfigHandler(ConfigHandler):
-    """Base implementation dengan parent module support dan extract/update yang fleksibel"""
+    """Base implementation dengan enhanced error handling"""
     
     def __init__(self, module_name: str, extract_fn: Optional[Callable] = None, 
                  update_fn: Optional[Callable] = None, parent_module: Optional[str] = None):
@@ -236,69 +248,52 @@ class BaseConfigHandler(ConfigHandler):
         self.update_fn = update_fn
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dengan fallback ke function atau method"""
+        """Extract config dengan enhanced error handling"""
         if self.extract_fn:
-            return self.extract_fn(ui_components)
+            try:
+                return self.extract_fn(ui_components)
+            except Exception as e:
+                self.logger.error(f"💥 Extract function error: {str(e)}")
+                raise
         
-        # Fallback: auto-extract dari widgets dengan 'value' attribute
+        # Fallback: auto-extract dari widgets
         config = {}
-        for key, widget in ui_components.items():
-            if hasattr(widget, 'value') and not key.startswith('_'):
-                config[key] = widget.value
+        try:
+            for key, widget in ui_components.items():
+                if hasattr(widget, 'value') and not key.startswith('_'):
+                    config[key] = widget.value
+        except Exception as e:
+            self.logger.warning(f"⚠️ Auto-extract error: {str(e)}")
+        
         return config
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan fallback ke function atau method"""
+        """Update UI dengan enhanced error handling"""
         if self.update_fn:
-            return self.update_fn(ui_components, config)
+            try:
+                return self.update_fn(ui_components, config)
+            except Exception as e:
+                self.logger.error(f"💥 Update function error: {str(e)}")
+                raise
         
-        # Fallback: auto-update widgets dengan 'value' attribute
-        [setattr(widget, 'value', config[key]) 
-         for key, widget in ui_components.items() 
-         if hasattr(widget, 'value') and key in config]
+        # Fallback: auto-update widgets
+        try:
+            [setattr(widget, 'value', config[key]) 
+             for key, widget in ui_components.items() 
+             if hasattr(widget, 'value') and key in config]
+        except Exception as e:
+            self.logger.warning(f"⚠️ Auto-update error: {str(e)}")
 
 
-class SimpleConfigHandler(BaseConfigHandler):
-    """Simple config handler dengan parent module support untuk kasus sederhana"""
-    
-    def __init__(self, module_name: str, config_mapping: Optional[Dict[str, str]] = None, 
-                 parent_module: Optional[str] = None):
-        super().__init__(module_name, parent_module=parent_module)
-        self.config_mapping = config_mapping or {}
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract dengan mapping atau auto-detection"""
-        if not self.config_mapping:
-            return super().extract_config(ui_components)
-        
-        return {config_key: getattr(ui_components.get(widget_key), 'value', None)
-                for config_key, widget_key in self.config_mapping.items()
-                if widget_key in ui_components}
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update dengan mapping atau auto-detection"""
-        if not self.config_mapping:
-            return super().update_ui(ui_components, config)
-        
-        [setattr(ui_components[widget_key], 'value', config.get(config_key))
-         for config_key, widget_key in self.config_mapping.items()
-         if widget_key in ui_components and config_key in config]
-
-
-# Factory functions dengan parent module support
+# Factory functions
 def create_config_handler(module_name: str, extract_fn: Callable = None, update_fn: Callable = None, 
                          parent_module: str = None) -> BaseConfigHandler:
-    """Factory untuk BaseConfigHandler dengan parent module support"""
+    """Factory untuk BaseConfigHandler"""
     return BaseConfigHandler(module_name, extract_fn, update_fn, parent_module)
-
-def create_simple_handler(module_name: str, mapping: Dict[str, str] = None, 
-                         parent_module: str = None) -> SimpleConfigHandler:
-    """Factory untuk SimpleConfigHandler dengan parent module support"""
-    return SimpleConfigHandler(module_name, mapping, parent_module)
 
 def get_or_create_handler(ui_components: Dict[str, Any], module_name: str, 
                          parent_module: str = None) -> ConfigHandler:
-    """Get existing handler atau create default dengan parent module support"""
+    """Get existing handler atau create default"""
     return (ui_components.get('config_handler') or 
             ui_components.setdefault('config_handler', 
                                    create_config_handler(module_name, parent_module=parent_module)))

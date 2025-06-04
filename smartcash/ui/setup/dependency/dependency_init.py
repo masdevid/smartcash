@@ -1,232 +1,250 @@
 """
-File: smartcash/ui/setup/dependency/dependency_init.py
-Deskripsi: Fixed dependency installer dengan generator cleanup dan public config API
+File: smartcash/ui/setup/dependency/handlers/installation_handler.py
+Deskripsi: Fixed installation handler dengan proper logger reference
 """
 
-from typing import Dict, Any, List
-from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.utils.logger_bridge import get_logger
-from smartcash.ui.utils.ui_logger_namespace import DEPENDENCY_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+from typing import Dict, Any
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Import handlers yang sudah direfaktor
-from smartcash.ui.setup.dependency.handlers.config_extractor import extract_dependency_config
-from smartcash.ui.setup.dependency.handlers.config_updater import update_dependency_ui
-from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependency_config
+from smartcash.ui.setup.dependency.utils.package_utils import (
+    filter_uninstalled_packages, install_single_package, get_installed_packages_dict
+)
+from smartcash.ui.setup.dependency.utils.ui_state_utils import (
+    create_operation_context, ProgressSteps, update_package_status_by_name,
+    batch_update_package_status, update_status_panel, log_to_ui_safe
+)
+from smartcash.ui.setup.dependency.utils.report_generator_utils import (
+    generate_installation_summary_report
+)
+from smartcash.ui.setup.dependency.components.package_selector import get_selected_packages
 
-# Import components dan handlers
-from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
-from smartcash.ui.setup.dependency.handlers.dependency_handler import setup_dependency_handlers
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_LOGGER_NAMESPACE]
-
-class DependencyConfigHandler(ConfigHandler):
-    """Fixed ConfigHandler dengan proper generator cleanup dan public config access"""
+def setup_installation_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
+    """Setup installation handler dengan fixed logger reference"""
     
-    def __init__(self, module_name: str, parent_module: str = None):
-        self.module_name = module_name
-        self.parent_module = parent_module
-        self.logger = get_logger(MODULE_LOGGER_NAME)
-        self._current_config = {}  # Public config storage
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dengan generator cleanup - one-liner delegation"""
-        self._current_config = extract_dependency_config(ui_components)
-        return self._current_config
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan generator cleanup - one-liner delegation"""
-        self._current_config = config
-        update_dependency_ui(ui_components, config)
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default config dengan caching - one-liner delegation"""
-        return get_default_dependency_config()
-    
-    def get_current_config(self) -> Dict[str, Any]:
-        """Public API untuk mendapatkan current config - one-liner"""
-        return self._current_config.copy()
-    
-    def save_config(self, ui_components: Dict[str, Any], config_name: str = None) -> bool:
-        """Fixed save dengan generator cleanup - one-liner override"""
-        try:
-            # Force close any open generators before save
-            [gen.close() for gen in ui_components.values() if hasattr(gen, 'close') and hasattr(gen, '__next__')]
-            return super().save_config(ui_components, config_name)
-        except RuntimeError as e:
-            self.logger.error(f"💥 Generator error in save: {str(e)}")
-            return False
-    
-    def reset_config(self, ui_components: Dict[str, Any], config_name: str = None) -> bool:
-        """Fixed reset dengan generator cleanup - one-liner override"""
-        try:
-            # Force close any open generators before reset
-            [gen.close() for gen in ui_components.values() if hasattr(gen, 'close') and hasattr(gen, '__next__')]
-            return super().reset_config(ui_components, config_name)
-        except RuntimeError as e:
-            self.logger.error(f"💥 Generator error in reset: {str(e)}")
-            return False
-
-class DependencyInitializer(CommonInitializer):
-    """Fixed dependency initializer dengan proper button binding dan public config API"""
-    
-    def __init__(self):
-        super().__init__('dependency', DependencyConfigHandler, 'setup')
-        self._config_handler_instance = None
-    
-    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan fixed button binding"""
+    def execute_installation(button=None):
+        """Execute package installation dengan operation context"""
         
-        # Create main UI
-        ui_components = create_dependency_main_ui(config)
-        
-        # Force rebind buttons jika ada masalah binding
-        self._ensure_button_binding(ui_components)
-        
-        # Add module-specific flags
-        ui_components.update({
-            'dependency_initialized': True,
-            'auto_analyze_on_render': config.get('ui_settings', {}).get('auto_analyze_on_render', True)
-        })
-        
-        return ui_components
+        with create_operation_context(ui_components, 'installation') as ctx:
+            _execute_installation_with_utils(ui_components, config, ctx)
     
-    def _ensure_button_binding(self, ui_components: Dict[str, Any]) -> None:
-        """Ensure semua buttons ter-bind dengan proper - one-liner check dan rebind"""
-        critical_buttons = ['install_button', 'analyze_button', 'check_button', 'save_button', 'reset_button']
-        [self._create_fallback_button(ui_components, btn_key) for btn_key in critical_buttons if btn_key not in ui_components or not hasattr(ui_components[btn_key], 'on_click')]
+    ui_components['install_button'].on_click(execute_installation)
+
+def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict[str, Any], ctx):
+    """Execute installation dengan fixed logger reference"""
     
-    def _create_fallback_button(self, ui_components: Dict[str, Any], button_key: str) -> None:
-        """Create fallback button jika button tidak ada atau rusak - one-liner factory"""
-        import ipywidgets as widgets
-        ui_components[button_key] = widgets.Button(
-            description=button_key.replace('_', ' ').title(),
-            button_style='primary' if 'install' in button_key else 'info' if 'analyze' in button_key else '',
-            tooltip=f"Action: {button_key.replace('_', ' ')}",
-            layout=widgets.Layout(width='140px', height='35px')
+    logger = ui_components.get('logger')  # Get logger from ui_components
+    start_time = time.time()
+    
+    try:
+        # Step 1: Get selected packages
+        ctx.stepped_progress('INSTALL_INIT', "Mempersiapkan instalasi...")
+        log_to_ui_safe(ui_components, "🚀 Memulai proses instalasi packages")
+        
+        selected_packages = get_selected_packages(ui_components)
+        if not selected_packages:
+            update_status_panel(ui_components, "❌ Tidak ada packages yang dipilih", "error")
+            log_to_ui_safe(ui_components, "⚠️ Tidak ada packages yang dipilih untuk instalasi", "warning")
+            return
+        
+        # Step 2: Filter uninstalled packages
+        ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
+        log_to_ui_safe(ui_components, f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
+        
+        def package_logger_func(msg):
+            log_to_ui_safe(ui_components, msg)
+        
+        packages_to_install = filter_uninstalled_packages(selected_packages, package_logger_func)
+        
+        if not packages_to_install:
+            log_to_ui_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar")
+            
+            # Complete operation
+            ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
+            ui_components.get('update_progress', lambda *a: None)('step', 100, "Complete")
+            ui_components.get('complete_operation', lambda x: None)("Semua packages sudah terinstall dengan benar")
+            update_status_panel(ui_components, "✅ Semua packages sudah terinstall", "success")
+            
+            # Hide progress bars setelah delay
+            import threading
+            def hide_progress_delayed():
+                time.sleep(2)
+                ui_components.get('reset_all', lambda: None)()
+            
+            threading.Thread(target=hide_progress_delayed, daemon=True).start()
+            return
+        
+        # Step 3: Install packages dengan parallel processing
+        ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
+        log_to_ui_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages dengan parallel processing")
+        
+        installation_results = _install_packages_parallel_with_utils(
+            packages_to_install, ui_components, config, package_logger_func, ctx, logger
         )
-    
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan fixed button binding"""
         
-        # Store config handler instance untuk public access
-        self._config_handler_instance = ui_components.get('config_handler')
+        # Step 4: Finalize dan generate report
+        ctx.stepped_progress('INSTALL_FINALIZE', "Finalisasi instalasi...")
+        duration = time.time() - start_time
         
-        # Setup handlers dengan error handling
-        try:
-            return setup_dependency_handlers(ui_components, config, env)
-        except Exception as e:
-            self.logger.error(f"💥 Error setting up handlers: {str(e)}")
-            return ui_components
-    
-    def _get_default_config(self) -> Dict[str, Any]:
-        """Default config - one-liner delegation"""
-        return get_default_dependency_config()
-    
-    def _get_critical_components(self) -> List[str]:
-        """Critical components yang harus ada"""
-        return [
-            'ui', 'install_button', 'analyze_button', 'check_button',
-            'save_button', 'reset_button', 'log_output', 'status_panel'
-        ]
-    
-    def get_current_config(self) -> Dict[str, Any]:
-        """Public API untuk mendapatkan current config - one-liner"""
-        return self._config_handler_instance.get_current_config() if self._config_handler_instance else {}
+        log_to_ui_safe(ui_components, f"⏱️ Installation selesai dalam {duration:.1f} detik")
+        
+        # Update all package status dan generate report
+        _finalize_installation_results(ui_components, installation_results, duration, logger)
+        
+        ctx.stepped_progress('INSTALL_FINALIZE', "Instalasi selesai", "overall")
+        ctx.stepped_progress('INSTALL_FINALIZE', "Complete", "step")
+        
+    except Exception as e:
+        log_to_ui_safe(ui_components, f"❌ Gagal menginstal dependensi: {str(e)}", "error")
+        logger and logger.error(f"💥 Installation error: {str(e)}")
+        raise
 
-# Global instance dan public API dengan enhanced config access
-_dependency_initializer = DependencyInitializer()
-
-def initialize_dependency_ui(env=None, config=None, **kwargs) -> Any:
-    """Public API untuk initialize dependency installer UI"""
-    return _dependency_initializer.initialize(env=env, config=config, **kwargs)
-
-def get_dependency_config() -> Dict[str, Any]:
-    """Public API untuk mendapatkan current dependency config - one-liner"""
-    return _dependency_initializer.get_current_config()
-
-def get_dependency_config_handler() -> DependencyConfigHandler:
-    """Get config handler instance - one-liner factory"""
-    return DependencyConfigHandler('dependency', 'setup')
-
-def update_dependency_config(config: Dict[str, Any]) -> bool:
-    """Public API untuk update dependency config - one-liner"""
-    return _dependency_initializer._config_handler_instance.update_ui({}, config) if _dependency_initializer._config_handler_instance else False
-
-def reset_dependency_config() -> bool:
-    """Public API untuk reset dependency config - one-liner"""
-    return _dependency_initializer._config_handler_instance.reset_config({}) if _dependency_initializer._config_handler_instance else False
-
-def validate_dependency_setup(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Enhanced validate dengan generator cleanup check"""
-    if ui_components is None:
-        return {
-            'valid': False,
-            'message': 'UI components tidak ditemukan',
-            'missing_components': ['all'],
-            'has_config_handler': False,
-            'has_logger': False,
-            'module_initialized': False,
-            'generator_issues': False
-        }
+def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
+                                         config: Dict[str, Any], logger_func, ctx, logger) -> Dict[str, bool]:
+    """Install packages dengan parallel processing dan detailed progress tracking"""
     
-    critical_components = [
-        'ui', 'install_button', 'analyze_button', 'check_button',
-        'save_button', 'reset_button', 'log_output', 'status_panel'
-    ]
+    results = {}
+    total_packages = len(packages)
+    completed_packages = 0
     
-    missing_components = [comp for comp in critical_components if comp not in ui_components]
+    def update_installation_progress(package: str, success: bool):
+        nonlocal completed_packages
+        completed_packages += 1
+        
+        # Calculate progress (20% start + 70% for installation)
+        installation_progress = int((completed_packages / total_packages) * 70)
+        overall_progress = ProgressSteps.INSTALL_START + installation_progress
+        
+        # Update progress
+        ctx.progress_tracker('overall', overall_progress, f"Installing package {completed_packages}/{total_packages}")
+        ctx.progress_tracker('step', int((completed_packages / total_packages) * 100), f"Package {completed_packages}/{total_packages}")
+        
+        # Update package status
+        package_name = package.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
+        status = 'installed' if success else 'error'
+        update_package_status_by_name(ui_components, package_name, status)
+        
+        # Log progress
+        status_emoji = "✅" if success else "❌"
+        progress_msg = f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})"
+        logger_func(progress_msg)
+        
+        # Update check/uncheck count display jika ada
+        if 'check_uncheck_container' in ui_components:
+            try:
+                from smartcash.ui.components.check_uncheck_buttons import update_check_uncheck_count
+                check_uncheck_components = {
+                    'target_prefix': 'package',
+                    'count_display': ui_components.get('package_count_display')
+                }
+                
+                def package_filter(key: str) -> bool:
+                    return (key.endswith('_checkbox') and 
+                           any(category in key for category in ['core', 'ml', 'data', 'ui', 'dev']) and
+                           key != 'auto_analyze_checkbox')
+                
+                update_check_uncheck_count(check_uncheck_components, ui_components, package_filter)
+            except Exception as e:
+                logger and logger.debug(f"🔍 Check/uncheck count update error: {str(e)}")
     
-    # Check untuk generator issues
-    generator_issues = any(hasattr(v, '__next__') and hasattr(v, 'close') for v in ui_components.values())
+    # Get installation configuration
+    max_workers = min(len(packages), config.get('installation', {}).get('parallel_workers', 3))
+    timeout = config.get('installation', {}).get('timeout', 300)
+    use_cache = config.get('installation', {}).get('use_cache', True)
+    force_reinstall = config.get('installation', {}).get('force_reinstall', False)
     
-    validation_result = {
-        'valid': len(missing_components) == 0 and not generator_issues,
-        'message': 'Setup valid' if not missing_components and not generator_issues else f'Issues: {missing_components + (["generators"] if generator_issues else [])}',
-        'missing_components': missing_components,
-        'has_config_handler': 'config_handler' in ui_components,
-        'has_logger': 'logger' in ui_components,
-        'module_initialized': ui_components.get('dependency_initialized', False),
-        'generator_issues': generator_issues
+    logger and logger.info(f"🔧 Installation config: {max_workers} workers, {timeout}s timeout, cache: {use_cache}, force: {force_reinstall}")
+    
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_package = {
+                executor.submit(install_single_package, package, timeout): package 
+                for package in packages
+            }
+            
+            logger and logger.info(f"🚀 Started parallel installation dengan {len(future_to_package)} tasks")
+            
+            # Process results
+            for future in as_completed(future_to_package):
+                package = future_to_package[future]
+                try:
+                    success, message = future.result()
+                    results[package] = success
+                    update_installation_progress(package, success)
+                    
+                    # Detailed logging
+                    if success:
+                        logger and logger.debug(f"✅ {package}: {message}")
+                    else:
+                        logger and logger.warning(f"⚠️ {package}: {message}")
+                        
+                except Exception as e:
+                    error_msg = f"💥 Error installing {package}: {str(e)}"
+                    logger_func(error_msg)
+                    logger and logger.error(error_msg)
+                    results[package] = False
+                    update_installation_progress(package, False)
+        
+        return results
+        
+    except Exception as e:
+        error_msg = f"💥 Installation process failed: {str(e)}"
+        logger_func(error_msg)
+        logger and logger.error(error_msg)
+        return {package: False for package in packages}
+
+def _finalize_installation_results(ui_components: Dict[str, Any], installation_results: Dict[str, bool], 
+                                  duration: float, logger):
+    """Finalize installation results dengan comprehensive reporting"""
+    
+    success_count = sum(1 for result in installation_results.values() if result)
+    total_count = len(installation_results)
+    failed_count = total_count - success_count
+    
+    # Log detailed summary
+    if logger:
+        logger.info("📊 Installation Summary:")
+        logger.info(f"   ✅ Successful: {success_count}/{total_count}")
+        logger.info(f"   ❌ Failed: {failed_count}/{total_count}")
+        logger.info(f"   ⏱️ Duration: {duration:.1f} seconds")
+        logger.info(f"   📈 Success Rate: {(success_count/total_count*100):.1f}%")
+    
+    # Log failed packages
+    if failed_count > 0:
+        failed_packages = [pkg for pkg, success in installation_results.items() if not success]
+        logger and logger.warning(f"⚠️ Failed packages: {', '.join(failed_packages[:5])}" + 
+                                 (f" and {len(failed_packages)-5} more" if len(failed_packages) > 5 else ""))
+    
+    # Generate dan display detailed report
+    report_html = generate_installation_summary_report(installation_results, duration)
+    
+    log_output = ui_components.get('log_output')
+    if log_output:
+        from IPython.display import display, HTML
+        with log_output:
+            display(HTML(report_html))
+    
+    # Update status panel
+    if success_count == total_count:
+        status_msg = f"✅ Instalasi berhasil: {success_count}/{total_count} packages"
+        logger and logger.success(f"🎉 Installation completed successfully: all {success_count} packages installed")
+        update_status_panel(ui_components, status_msg, "success")
+    elif success_count > 0:
+        status_msg = f"⚠️ Instalasi partial: {success_count}/{total_count} berhasil, {failed_count} gagal"
+        logger and logger.warning(f"⚠️ Partial installation: {failed_count} packages failed")
+        update_status_panel(ui_components, status_msg, "warning")
+    else:
+        status_msg = f"❌ Instalasi gagal: {failed_count}/{total_count} packages gagal"
+        logger and logger.error(f"💥 Installation failed: all {failed_count} packages failed")
+        update_status_panel(ui_components, status_msg, "error")
+    
+    # Update package status
+    status_mapping = {
+        package.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip(): 
+        'installed' if success else 'error'
+        for package, success in installation_results.items()
     }
     
-    return validation_result
-
-def get_dependency_status() -> Dict[str, Any]:
-    """Enhanced status dengan config info - one-liner"""
-    status = _dependency_initializer.get_module_status()
-    status['current_config'] = get_dependency_config()
-    status['config_keys'] = list(get_dependency_config().keys())
-    return status
-
-def cleanup_dependency_generators(ui_components: Dict[str, Any]) -> int:
-    """Public API untuk cleanup generators - one-liner dengan count"""
-    generators = [gen for gen in ui_components.values() if hasattr(gen, 'close') and hasattr(gen, '__next__')]
-    [gen.close() for gen in generators]
-    return len(generators)
-
-# Enhanced public config utilities
-def get_selected_packages_count() -> int:
-    """Get count selected packages - one-liner"""
-    config = get_dependency_config()
-    return len(config.get('selected_packages', []))
-
-def get_installation_settings() -> Dict[str, Any]:
-    """Get current installation settings - one-liner"""
-    config = get_dependency_config()
-    return config.get('installation', {})
-
-def get_analysis_settings() -> Dict[str, Any]:
-    """Get current analysis settings - one-liner"""
-    config = get_dependency_config()
-    return config.get('analysis', {})
-
-def is_auto_analyze_enabled() -> bool:
-    """Check if auto analyze enabled - one-liner"""
-    config = get_dependency_config()
-    return config.get('auto_analyze', True)
-
-# One-liner utilities untuk debugging
-debug_generator_count = lambda ui_components: len([v for v in ui_components.values() if hasattr(v, '__next__')])
-debug_button_status = lambda ui_components: {k: hasattr(v, 'on_click') for k, v in ui_components.items() if 'button' in k}
-debug_config_summary = lambda: f"Config keys: {len(get_dependency_config())} | Selected: {get_selected_packages_count()} | Auto-analyze: {is_auto_analyze_enabled()}"
+    batch_update_package_status(ui_components, status_mapping)
+    logger and logger.info(f"🔄 Updated UI status untuk {len(status_mapping)} packages")

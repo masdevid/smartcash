@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency/handlers/analysis_handler.py
-Deskripsi: Handler untuk analisis packages dengan log_to_ui_safe
+Deskripsi: Fixed analysis handler dengan proper logger reference
 """
 
 from typing import Dict, Any
@@ -21,19 +21,20 @@ from smartcash.ui.setup.dependency.components.package_selector import (
 )
 
 def setup_analysis_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup analysis handler tanpa log_message_safe dependency - one-liner style"""
+    """Setup analysis handler dengan fixed logger reference"""
     
     def execute_analysis(button=None):
         """Execute package analysis dengan operation context"""
         with create_operation_context(ui_components, 'analysis') as ctx:
             _execute_analysis_with_utils(ui_components, config, ctx)
     
-    # Register handler dan store trigger function
     ui_components['analyze_button'].on_click(execute_analysis)
     ui_components['trigger_analysis'] = lambda: execute_analysis()
 
 def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str, Any], ctx):
-    """Execute analysis menggunakan built-in logger dari CommonInitializer - one-liner style"""
+    """Execute analysis dengan fixed logger reference"""
+    
+    logger = ui_components.get('logger')  # Get logger from ui_components
     
     try:
         # Step 1: Initialize analysis
@@ -53,34 +54,35 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         # Step 4: Analyze packages status
         ctx.stepped_progress('ANALYSIS_CHECK', "Checking package status...")
         analysis_results = _analyze_packages_with_utils(
-            package_categories, installed_packages, ui_components, ctx
+            package_categories, installed_packages, ui_components, ctx, logger
         )
         
         # Step 5: Update UI dan generate report
         ctx.stepped_progress('ANALYSIS_UPDATE_UI', "Updating UI...")
-        _finalize_analysis_results(ui_components, analysis_results, ctx)
+        _finalize_analysis_results(ui_components, analysis_results, ctx, logger)
         
         ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai", "overall")
         ctx.stepped_progress('ANALYSIS_COMPLETE', "Complete", "step")
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menganalisis dependensi: {str(e)}", "error")
+        logger and logger.error(f"💥 Analysis error: {str(e)}")
         raise
 
 def _analyze_packages_with_utils(package_categories: list, installed_packages: Dict[str, str], 
-                                ui_components: Dict[str, Any], ctx) -> Dict[str, Any]:
-    """Analyze packages menggunakan batch utilities - one-liner approach"""
+                                ui_components: Dict[str, Any], ctx, logger) -> Dict[str, Any]:
+    """Analyze packages dengan fixed logger reference"""
     
     analysis_results = {'installed': [], 'missing': [], 'upgrade_needed': [], 'package_details': {}}
     total_packages = sum(len(category['packages']) for category in package_categories)
     current_package = 0
     
-    # Collect all packages untuk batch processing - one-liner
+    # Collect all packages untuk batch processing
     all_packages = [(package, category['name']) for category in package_categories for package in category['packages']]
     package_requirements = [pkg['pip_name'] for pkg, _ in all_packages]
     batch_status = batch_check_packages_status(package_requirements)
     
-    # Process results dengan one-liner categorization
+    # Process results
     for (package, category_name), requirement in zip(all_packages, package_requirements):
         current_package += 1
         progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
@@ -88,7 +90,7 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
         
         package_key, status_info = package['key'], batch_status[requirement]
         
-        # Store results - one-liner mapping
+        # Store results
         analysis_results['package_details'][package_key] = {
             'name': package['name'], 'pip_name': requirement, 'category': category_name,
             'package_name': extract_package_name_from_requirement(requirement),
@@ -97,55 +99,51 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
             'compatible': status_info.get('compatible', False)
         }
         
-        # Categorize dan update UI - one-liner
+        # Categorize dan update UI
         {'installed': analysis_results['installed'], 'missing': analysis_results['missing'], 
          'upgrade': analysis_results['upgrade_needed']}.get(status_info['status'], []).append(package_key)
         
         ui_status = _map_status_to_ui(status_info['status'])
         update_package_status(ui_components, package_key, ui_status)
         
-        # Log progress dengan consistent format
+        # Log progress
         status_emoji = "✅" if status_info['status'] == 'installed' else "❌" if status_info['status'] == 'missing' else "⚠️"
         logger and logger.debug(f"{status_emoji} {package['name']}: {status_info['status']} ({current_package}/{total_packages})")
     
     return analysis_results
 
 def _reset_all_package_status_to_checking(ui_components: Dict[str, Any], package_categories: list):
-    """Reset semua package status ke checking - one-liner"""
+    """Reset semua package status ke checking"""
     [update_package_status(ui_components, package['key'], 'checking') 
      for category in package_categories for package in category['packages']]
 
 def _map_status_to_ui(status: str) -> str:
-    """Map analysis status ke UI status - one-liner mapping"""
+    """Map analysis status ke UI status"""
     return {'installed': 'installed', 'missing': 'missing', 'upgrade': 'upgrade', 'error': 'error'}.get(status, 'checking')
 
 def _finalize_analysis_results(ui_components: Dict[str, Any], analysis_results: Dict[str, Any], ctx, logger):
-    """Finalize analysis results dengan comprehensive reporting - one-liner calculations"""
+    """Finalize analysis results dengan comprehensive reporting"""
     
     installed_count, missing_count, upgrade_count = len(analysis_results['installed']), len(analysis_results['missing']), len(analysis_results['upgrade_needed'])
     total_count = installed_count + missing_count + upgrade_count
     
     # Generate dan display report
     report_html = generate_analysis_summary_report(analysis_results)
-    ui_components.get('log_output') and (
-        lambda output: [__import__('IPython.display', fromlist=['display', 'HTML']).display(
-            __import__('IPython.display', fromlist=['HTML']).HTML(report_html)
-        ) for _ in [None] if True][0] if hasattr(output, 'clear_output') else None
-    )(ui_components['log_output']) or (
-        lambda: [None for _ in [None] if ui_components.get('log_output')]
-        and hasattr(ui_components['log_output'], 'clear_output')
-        and [exec(f"with ui_components['log_output']: __import__('IPython.display', fromlist=['display', 'HTML']).display(__import__('IPython.display', fromlist=['HTML']).HTML(report_html))")]
-    )()
+    log_output = ui_components.get('log_output')
     
-    # Log summary - one-liner
-    [logger.info(msg) for msg in [
-        "📊 Analysis Summary:",
-        f"   ✅ Installed: {installed_count}/{total_count}",
-        f"   ❌ Missing: {missing_count}/{total_count}",
-        f"   ⚠️ Need Upgrade: {upgrade_count}/{total_count}"
-    ] if logger]
+    if log_output and hasattr(log_output, 'clear_output'):
+        with log_output:
+            from IPython.display import display, HTML
+            display(HTML(report_html))
     
-    # Update status panel - one-liner conditional
+    # Log summary
+    if logger:
+        logger.info("📊 Analysis Summary:")
+        logger.info(f"   ✅ Installed: {installed_count}/{total_count}")
+        logger.info(f"   ❌ Missing: {missing_count}/{total_count}")
+        logger.info(f"   ⚠️ Need Upgrade: {upgrade_count}/{total_count}")
+    
+    # Update status panel
     status_msg, status_type = (
         (f"✅ Semua {installed_count} packages sudah terinstall dengan benar", "success")
         if missing_count == 0 and upgrade_count == 0

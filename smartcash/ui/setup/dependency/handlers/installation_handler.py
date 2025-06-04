@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency/handlers/installation_handler.py
-Deskripsi: Complete installation handler dengan built-in logger dari CommonInitializer
+Deskripsi: Fixed installation handler dengan proper logger reference
 """
 
 from typing import Dict, Any
@@ -20,7 +20,7 @@ from smartcash.ui.setup.dependency.utils.report_generator_utils import (
 from smartcash.ui.setup.dependency.components.package_selector import get_selected_packages
 
 def setup_installation_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup installation handler dengan built-in logger dari CommonInitializer"""
+    """Setup installation handler dengan fixed logger reference"""
     
     def execute_installation(button=None):
         """Execute package installation dengan operation context"""
@@ -31,8 +31,9 @@ def setup_installation_handler(ui_components: Dict[str, Any], config: Dict[str, 
     ui_components['install_button'].on_click(execute_installation)
 
 def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict[str, Any], ctx):
-    """Execute installation menggunakan built-in logger dari CommonInitializer"""
-    import time
+    """Execute installation dengan fixed logger reference"""
+    
+    logger = ui_components.get('logger')  # Get logger from ui_components
     start_time = time.time()
     
     try:
@@ -50,7 +51,6 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
         log_to_ui_safe(ui_components, f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
         
-        # Create logger function untuk filter_uninstalled_packages
         def package_logger_func(msg):
             log_to_ui_safe(ui_components, msg)
         
@@ -59,18 +59,16 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         if not packages_to_install:
             log_to_ui_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar")
             
-            # Update progress ke 100% untuk semua packages sudah terinstall
+            # Complete operation
             ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
             ui_components.get('update_progress', lambda *a: None)('step', 100, "Complete")
-            
-            # Complete operation dengan proper completion
             ui_components.get('complete_operation', lambda x: None)("Semua packages sudah terinstall dengan benar")
             update_status_panel(ui_components, "✅ Semua packages sudah terinstall", "success")
             
-            # Hide progress bars setelah complete dengan delay
+            # Hide progress bars setelah delay
             import threading
             def hide_progress_delayed():
-                time.sleep(2)  # Wait 2 seconds
+                time.sleep(2)
                 ui_components.get('reset_all', lambda: None)()
             
             threading.Thread(target=hide_progress_delayed, daemon=True).start()
@@ -81,7 +79,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         log_to_ui_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages dengan parallel processing")
         
         installation_results = _install_packages_parallel_with_utils(
-            packages_to_install, ui_components, config, package_logger_func, ctx
+            packages_to_install, ui_components, config, package_logger_func, ctx, logger
         )
         
         # Step 4: Finalize dan generate report
@@ -91,20 +89,20 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         log_to_ui_safe(ui_components, f"⏱️ Installation selesai dalam {duration:.1f} detik")
         
         # Update all package status dan generate report
-        _finalize_installation_results(ui_components, installation_results, duration)
+        _finalize_installation_results(ui_components, installation_results, duration, logger)
         
         ctx.stepped_progress('INSTALL_FINALIZE', "Instalasi selesai", "overall")
         ctx.stepped_progress('INSTALL_FINALIZE', "Complete", "step")
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menginstal dependensi: {str(e)}", "error")
+        logger and logger.error(f"💥 Installation error: {str(e)}")
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
-                                         config: Dict[str, Any], logger_func, ctx) -> Dict[str, bool]:
+                                         config: Dict[str, Any], logger_func, ctx, logger) -> Dict[str, bool]:
     """Install packages dengan parallel processing dan detailed progress tracking"""
     
-    logger = ui_components.get('logger')
     results = {}
     total_packages = len(packages)
     completed_packages = 0
@@ -117,16 +115,16 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         installation_progress = int((completed_packages / total_packages) * 70)
         overall_progress = ProgressSteps.INSTALL_START + installation_progress
         
-        # Update progress using utils
+        # Update progress
         ctx.progress_tracker('overall', overall_progress, f"Installing package {completed_packages}/{total_packages}")
         ctx.progress_tracker('step', int((completed_packages / total_packages) * 100), f"Package {completed_packages}/{total_packages}")
         
-        # Update package status using utils
+        # Update package status
         package_name = package.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
         status = 'installed' if success else 'error'
         update_package_status_by_name(ui_components, package_name, status)
         
-        # Log progress dengan consistent format
+        # Log progress
         status_emoji = "✅" if success else "❌"
         progress_msg = f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})"
         logger_func(progress_msg)
@@ -175,7 +173,7 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
                     results[package] = success
                     update_installation_progress(package, success)
                     
-                    # Detailed logging untuk troubleshooting
+                    # Detailed logging
                     if success:
                         logger and logger.debug(f"✅ {package}: {message}")
                     else:
@@ -197,23 +195,22 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         return {package: False for package in packages}
 
 def _finalize_installation_results(ui_components: Dict[str, Any], installation_results: Dict[str, bool], 
-                                  duration: float):
-    """Finalize installation results dengan comprehensive reporting dan logging"""
-    
-    logger = ui_components.get('logger')
+                                  duration: float, logger):
+    """Finalize installation results dengan comprehensive reporting"""
     
     success_count = sum(1 for result in installation_results.values() if result)
     total_count = len(installation_results)
     failed_count = total_count - success_count
     
     # Log detailed summary
-    logger and logger.info("📊 Installation Summary:")
-    logger and logger.info(f"   ✅ Successful: {success_count}/{total_count}")
-    logger and logger.info(f"   ❌ Failed: {failed_count}/{total_count}")
-    logger and logger.info(f"   ⏱️ Duration: {duration:.1f} seconds")
-    logger and logger.info(f"   📈 Success Rate: {(success_count/total_count*100):.1f}%")
+    if logger:
+        logger.info("📊 Installation Summary:")
+        logger.info(f"   ✅ Successful: {success_count}/{total_count}")
+        logger.info(f"   ❌ Failed: {failed_count}/{total_count}")
+        logger.info(f"   ⏱️ Duration: {duration:.1f} seconds")
+        logger.info(f"   📈 Success Rate: {(success_count/total_count*100):.1f}%")
     
-    # Log failed packages untuk debugging
+    # Log failed packages
     if failed_count > 0:
         failed_packages = [pkg for pkg, success in installation_results.items() if not success]
         logger and logger.warning(f"⚠️ Failed packages: {', '.join(failed_packages[:5])}" + 
@@ -222,12 +219,13 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     # Generate dan display detailed report
     report_html = generate_installation_summary_report(installation_results, duration)
     
-    if 'log_output' in ui_components:
+    log_output = ui_components.get('log_output')
+    if log_output:
         from IPython.display import display, HTML
-        with ui_components['log_output']:
+        with log_output:
             display(HTML(report_html))
     
-    # Update status panel dengan appropriate message
+    # Update status panel
     if success_count == total_count:
         status_msg = f"✅ Instalasi berhasil: {success_count}/{total_count} packages"
         logger and logger.success(f"🎉 Installation completed successfully: all {success_count} packages installed")
@@ -241,7 +239,7 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
         logger and logger.error(f"💥 Installation failed: all {failed_count} packages failed")
         update_status_panel(ui_components, status_msg, "error")
     
-    # Update package status berdasarkan installation results
+    # Update package status
     status_mapping = {
         package.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip(): 
         'installed' if success else 'error'
@@ -250,91 +248,3 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     
     batch_update_package_status(ui_components, status_mapping)
     logger and logger.info(f"🔄 Updated UI status untuk {len(status_mapping)} packages")
-    
-    # Trigger analysis setelah installation jika ada auto-analyze
-    auto_analyze_checkbox = ui_components.get('auto_analyze_checkbox')
-    if auto_analyze_checkbox and getattr(auto_analyze_checkbox, 'value', False):
-        logger and logger.info("🔍 Triggering auto-analysis after installation...")
-        
-        # Delay trigger analysis untuk allow UI updates
-        import threading
-        import time
-        
-        def delayed_analysis():
-            time.sleep(2)  # Wait 2 seconds
-            trigger_analysis = ui_components.get('trigger_analysis')
-            if trigger_analysis and callable(trigger_analysis):
-                trigger_analysis()
-                logger and logger.info("✅ Auto-analysis triggered successfully")
-        
-        threading.Thread(target=delayed_analysis, daemon=True).start()
-
-def get_installation_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Get installation summary untuk debugging - one-liner summary"""
-    
-    selected_packages = get_selected_packages(ui_components)
-    custom_packages_text = getattr(ui_components.get('custom_packages'), 'value', '').strip()
-    custom_packages = [pkg.strip() for pkg in custom_packages_text.split('\n') if pkg.strip()] if custom_packages_text else []
-    
-    return {
-        'selected_packages_count': len(selected_packages),
-        'custom_packages_count': len(custom_packages),
-        'total_packages': len(selected_packages) + len(custom_packages),
-        'auto_analyze_enabled': getattr(ui_components.get('auto_analyze_checkbox'), 'value', False),
-        'has_installation_config': 'config' in ui_components and 'installation' in ui_components.get('config', {}),
-        'installation_config': ui_components.get('config', {}).get('installation', {})
-    }
-
-def validate_installation_prerequisites(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate prerequisites untuk installation dengan comprehensive check"""
-    
-    logger = ui_components.get('logger')
-    validation_result = {
-        'valid': True,
-        'errors': [],
-        'warnings': [],
-        'info': []
-    }
-    
-    # Check selected packages
-    selected_packages = get_selected_packages(ui_components)
-    custom_packages_text = getattr(ui_components.get('custom_packages'), 'value', '').strip()
-    custom_packages = [pkg.strip() for pkg in custom_packages_text.split('\n') if pkg.strip()] if custom_packages_text else []
-    total_packages = len(selected_packages) + len(custom_packages)
-    
-    if total_packages == 0:
-        validation_result['errors'].append("Tidak ada packages yang dipilih")
-        validation_result['valid'] = False
-    else:
-        validation_result['info'].append(f"Total {total_packages} packages akan diproses")
-    
-    # Check installation config
-    installation_config = ui_components.get('config', {}).get('installation', {})
-    parallel_workers = installation_config.get('parallel_workers', 3)
-    timeout = installation_config.get('timeout', 300)
-    
-    if parallel_workers < 1 or parallel_workers > 10:
-        validation_result['warnings'].append(f"Parallel workers ({parallel_workers}) di luar range optimal 1-10")
-    
-    if timeout < 60:
-        validation_result['warnings'].append(f"Timeout ({timeout}s) terlalu rendah, minimal 60s")
-    elif timeout > 1800:
-        validation_result['warnings'].append(f"Timeout ({timeout}s) terlalu tinggi, maksimal 1800s")
-    
-    # Log validation result
-    if logger:
-        if validation_result['valid']:
-            logger.info(f"✅ Installation prerequisites validated: {total_packages} packages ready")
-        else:
-            logger.error(f"❌ Installation validation failed: {len(validation_result['errors'])} errors")
-        
-        for warning in validation_result['warnings']:
-            logger.warning(f"⚠️ {warning}")
-    
-    return validation_result
-
-# One-liner utilities untuk installation management
-get_selected_package_count = lambda ui_components: len(get_selected_packages(ui_components))
-has_custom_packages = lambda ui_components: bool(getattr(ui_components.get('custom_packages'), 'value', '').strip())
-is_auto_analyze_enabled = lambda ui_components: getattr(ui_components.get('auto_analyze_checkbox'), 'value', False)
-get_installation_config = lambda ui_components: ui_components.get('config', {}).get('installation', {})

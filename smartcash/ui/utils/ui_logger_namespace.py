@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 # Daftar namespace yang diketahui dan ID unik mereka
 KNOWN_NAMESPACES = {
     # Setup & Environment
-    "smartcash.setup.dependency_installer": "DEPS",
+    "smartcash.setup.dependency": "DEPS",
     "smartcash.ui.env_config": "ENV",
     "smartcash.setup.environment": "SETUP",
     
@@ -47,7 +47,7 @@ KNOWN_NAMESPACES = {
 }
 
 # Export konstanta untuk backward compatibility
-DEPENDENCY_INSTALLER_LOGGER_NAMESPACE = "smartcash.setup.dependency_installer"
+DEPENDENCY_LOGGER_NAMESPACE = "smartcash.setup.dependency"
 DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
 ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
 AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
@@ -101,7 +101,7 @@ def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
     
     # Cek flag spesifik yang disetel oleh inisializer
     flag_mapping = {
-        'dependency_installer_initialized': "smartcash.setup.dependency_installer",
+        'dependency_initialized': "smartcash.setup.dependency",
         'download_initialized': "smartcash.dataset.download",
         'env_config_initialized': "smartcash.ui.env_config",
         'augmentation_initialized': "smartcash.dataset.augmentation",

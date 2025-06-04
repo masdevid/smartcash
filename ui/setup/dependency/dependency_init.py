@@ -20,7 +20,7 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_LOGGER_NAMESPACE]
 
-class DependencyInstallerConfigHandler(ConfigHandler):
+class DependencyConfigHandler(ConfigHandler):
     """ConfigHandler untuk dependency installer dengan pattern CommonInitializer"""
     
     def __init__(self, module_name: str, parent_module: str = None):
@@ -41,12 +41,12 @@ class DependencyInstallerConfigHandler(ConfigHandler):
         return get_default_dependency_config()
         
 
-class DependencyInstallerInitializer(CommonInitializer):
+class DependencyInitializer(CommonInitializer):
     """Updated dependency installer initializer dengan CommonInitializer pattern dan built-in logger"""
     
     def __init__(self):
         # CommonInitializer sudah handle logger setup, tidak perlu duplicate
-        super().__init__('dependency', DependencyInstallerConfigHandler, 'setup')
+        super().__init__('dependency', DependencyConfigHandler, 'setup')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk dependency installer dengan config integration"""
@@ -86,18 +86,32 @@ class DependencyInstallerInitializer(CommonInitializer):
         update_dependency_ui(ui_components, config)
 
 # Global instance dan public API dengan updated pattern
-_dependency_initializer = DependencyInstallerInitializer()
+_dependency_initializer = DependencyInitializer()
 
 def initialize_dependency_ui(env=None, config=None, **kwargs) -> Any:
     """Public API untuk initialize dependency installer UI dengan CommonInitializer pattern"""
     return _dependency_initializer.initialize(env=env, config=config, **kwargs)
 
-def get_dependency_config_handler() -> DependencyInstallerConfigHandler:
+def get_dependency_config_handler() -> DependencyConfigHandler:
     """Get config handler instance untuk external usage - one-liner factory"""
-    return DependencyInstallerConfigHandler('dependency', 'setup')
+    return DependencyConfigHandler('dependency', 'setup')
 
-def validate_dependency_setup(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate dependency installer setup dengan comprehensive check"""
+def validate_dependency_setup(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Validate dependency installer setup dengan comprehensive check
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI. Jika None, akan mengembalikan
+                     status invalid dengan pesan error.
+    """
+    if ui_components is None:
+        return {
+            'valid': False,
+            'message': 'UI components tidak ditemukan',
+            'missing_components': ['all'],
+            'has_config_handler': False,
+            'has_logger': False,
+            'module_initialized': False
+        }
     
     critical_components = [
         'ui', 'install_button', 'analyze_button', 'check_button',
@@ -108,6 +122,7 @@ def validate_dependency_setup(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     
     validation_result = {
         'valid': len(missing_components) == 0,
+        'message': 'Setup valid' if not missing_components else f'Komponen yang hilang: {missing_components}',
         'missing_components': missing_components,
         'has_config_handler': 'config_handler' in ui_components,
         'has_logger': 'logger' in ui_components,

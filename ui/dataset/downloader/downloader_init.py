@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/downloader/downloader_initializer.py
+File: smartcash/ui/dataset/downloader/downloader_init.py
 Deskripsi: Downloader initializer yang menggunakan CommonInitializer pattern dengan config inheritance
 """
 

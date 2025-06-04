@@ -15,6 +15,9 @@ class DownloaderConfigHandler(ConfigHandler):
     def __init__(self, module_name: str = 'downloader', parent_module: str = 'dataset'):
         super().__init__(module_name)
         self.parent_module = parent_module
+        
+        # Set config filename untuk load_config
+        self.config_filename = f"{module_name}_config.yaml"
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract config menggunakan DownloaderConfigExtractor."""
@@ -50,6 +53,18 @@ class DownloaderConfigHandler(ConfigHandler):
         
         self.logger.info(f"🔄 Reset to default config: {config.get('workspace')}/{config.get('project')}")
     
+    def load_config(self, config_name: str = None, use_base_config: bool = True) -> Dict[str, Any]:
+        """Load config dengan downloader-specific handling."""
+        config_name = config_name or self.config_filename or 'downloader_config'
+        
+        # Gunakan parent method untuk loading
+        loaded_config = super().load_config(config_name, use_base_config)
+        
+        # Merge dengan defaults jika config kosong
+        if not loaded_config or len(loaded_config) < 3:
+            default_config = self.get_default_config()
+            loaded_config.update({k: v for k, v in default_config.items() if k not in loaded_config})
+        
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate config dengan DownloaderConfigExtractor validation."""
         return DownloaderConfigExtractor.validate_extracted_config(config)

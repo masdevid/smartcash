@@ -15,7 +15,7 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         from smartcash.ui.training.components.config_tabs import create_config_tabs
         
         # Control buttons dengan YAML-based model info
-        control_buttons = _create_enhanced_control_buttons(config)
+        control_buttons = _create_control_buttons(config)
         
         # Progress tracking dengan three level untuk training epochs, batches, dan metrics
         progress_components = create_three_progress_tracker()
@@ -62,7 +62,7 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         return _create_simple_fallback(str(e))
 
-def _create_enhanced_control_buttons(config: Dict[str, Any]) -> Dict[str, Any]:
+def _create_control_buttons(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create enhanced control buttons dengan YAML config awareness"""
     from smartcash.ui.components.action_buttons import create_action_buttons
     

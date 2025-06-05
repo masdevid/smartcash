@@ -17,14 +17,15 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Auto-detect API key saat UI creation
     detected_api_key = get_api_key_from_secrets()
     
-    ui_components = _create_enhanced_downloader_ui(config, roboflow, detected_api_key)
+    ui_components = _create_downloader_ui(config, roboflow, detected_api_key)
     ui_components['layout_order_fixed'] = True
     
     return ui_components
 
-def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
+def _create_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
     """Create enhanced downloader UI dengan fixed progress tracker integration"""
-    
+    get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
+    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
     # 1. Header dengan responsive design
     header = widgets.HTML(f"""
     <div style="background: linear-gradient(135deg, {get_namespace_color('DOWNLOAD')}, {get_namespace_color('DOWNLOAD')}CC); 
@@ -38,10 +39,10 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
     status_panel = widgets.HTML(_get_dynamic_status_html(), layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
     
     # 3. Enhanced form fields dengan backup/preprocessed dirs
-    form_fields = _create_enhanced_form_fields(roboflow, api_key, config)
+    form_fields = _create_form_fields(roboflow, api_key, config)
     
     # 4. Enhanced form container dengan path configuration
-    form_container = _create_enhanced_grid_form_container(form_fields)
+    form_container = _create_grid_form_container(form_fields)
     
     # 5. Save/Reset buttons
     save_reset_components = _create_fixed_save_reset_buttons()
@@ -144,7 +145,7 @@ def _get_dynamic_status_html() -> str:
     except ImportError:
         return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; margin-bottom: 15px; width: 100%; box-sizing: border-box;"><span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
 
-def _create_enhanced_form_fields(roboflow: Dict[str, Any], api_key: str, config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
+def _create_form_fields(roboflow: Dict[str, Any], api_key: str, config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
     """Create enhanced form fields dengan backup/preprocessed directories dan one-liner layout"""
     common_layout = widgets.Layout(width='100%', margin='2px 0')
     common_style = {'description_width': '100px'}
@@ -213,7 +214,7 @@ def _create_enhanced_form_fields(roboflow: Dict[str, Any], api_key: str, config:
         )
     }
 
-def _create_enhanced_grid_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.VBox:
+def _create_grid_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.VBox:
     """Create enhanced form container dengan 3-column layout untuk path config"""
     
     # Format info yang selalu ditampilkan
@@ -352,7 +353,7 @@ def validate_ui_layout(ui: Dict[str, Any]) -> bool:
                       'backup_dir_input', 'preprocessed_dir_input', 'progress_tracker', 'progress_container']
     return all(key in ui for key in required_fields)
 
-def get_enhanced_ui_status(ui: Dict[str, Any]) -> str:
+def get_ui_status(ui: Dict[str, Any]) -> str:
     """Get enhanced UI status dengan path config info"""
     component_count = len([k for k in ui.keys() if not k.startswith('_')])
     api_status = '✅' if detect_api_key() else '❌'

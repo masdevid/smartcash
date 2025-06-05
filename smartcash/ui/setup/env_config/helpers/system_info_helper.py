@@ -13,7 +13,7 @@ class SystemInfoHelper:
     """Helper untuk mengumpulkan informasi sistem yang komprehensif"""
     
     @staticmethod
-    def get_enhanced_system_info() -> Dict[str, Any]:
+    def get_system_info() -> Dict[str, Any]:
         """Dapatkan informasi sistem yang diperluas dengan detail yang berguna"""
         info = {}
         

@@ -62,7 +62,7 @@ class EnvConfigComponent:
             silent_env_manager = get_silent_environment_manager()
             
             # Get enhanced system info dengan silent mode
-            enhanced_info = SystemInfoHelper.get_enhanced_system_info()
+            enhanced_info = SystemInfoHelper.get_system_info()
             
             # Get system info dari silent environment manager
             env_system_info = silent_env_manager.get_system_info()

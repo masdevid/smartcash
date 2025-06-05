@@ -298,6 +298,6 @@ class DownloadConfigHandler(ConfigHandler):
         ))() if hasattr(log_output, '__enter__') else None
 
 # Factory function
-def create_enhanced_download_config_handler(parent_module: str = 'dataset') -> DownloadConfigHandler:
+def create_download_config_handler(parent_module: str = 'dataset') -> DownloadConfigHandler:
     """Factory untuk create enhanced download config handler dengan path support"""
     return DownloadConfigHandler('downloader', parent_module)

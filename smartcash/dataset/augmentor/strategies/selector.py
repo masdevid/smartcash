@@ -230,7 +230,7 @@ class SmartFileSelector(FileSelectionStrategy):
         if previous_results:
             self._update_scoring_from_results(previous_results)
         
-        return self._select_with_enhanced_scoring(class_needs, files_metadata)
+        return self._select_with_scoring(class_needs, files_metadata)
     
     def _update_scoring_from_results(self, results: List[Dict[str, Any]]) -> None:
         """Update scoring weights berdasarkan hasil"""
@@ -244,7 +244,7 @@ class SmartFileSelector(FileSelectionStrategy):
                 if len(self.file_scores_history[file_path]) > 5:
                     self.file_scores_history[file_path] = self.file_scores_history[file_path][-5:]
     
-    def _select_with_enhanced_scoring(self, class_needs: Dict[str, int], files_metadata: Dict[str, Dict[str, Any]]) -> List[str]:
+    def _select_with_scoring(self, class_needs: Dict[str, int], files_metadata: Dict[str, Dict[str, Any]]) -> List[str]:
         """Selection dengan enhanced scoring"""
         enhanced_metadata = {}
         

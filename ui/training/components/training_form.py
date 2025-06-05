@@ -64,13 +64,18 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
             'error_operation': progress_components['error_operation'],
             'reset_all': progress_components['reset_all'],
             'status_panel': status_panel,
-            'config_tabs': config_tabs,
+            'config_tabs': config_tabs,  # Pastikan config_tabs dimasukkan ke dalam dictionary
             'info_display': config_tabs,
             'log_output': log_components.get('log_output'),
             'log_accordion': log_components.get('log_accordion'),
             'chart_output': chart_output,
             'metrics_output': metrics_output,
             'refresh_button': refresh_button,  # External button
+            'container': widgets.VBox([  # Tambahkan container untuk komponen UI
+                status_panel,
+                config_tabs,
+                control_buttons['button_container']
+            ]),
             'config': config
         }
         

@@ -66,7 +66,27 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     log_components = create_log_accordion(module_name='pretrained_model', height='220px')
     
     # Progress tracking dengan dual level untuk overall dan step progress
-    progress_tracker = create_dual_progress_tracker()
+    progress_tracker_obj = create_dual_progress_tracker()
+    
+    # Membuat dictionary untuk backward compatibility
+    progress_tracker = {
+        'container': progress_tracker_obj.container,
+        'progress_container': progress_tracker_obj.container,
+        'status_widget': progress_tracker_obj.status_widget,
+        'step_info_widget': progress_tracker_obj.step_info_widget,
+        'tqdm_container': progress_tracker_obj.tqdm_container,
+        'tracker': progress_tracker_obj,
+        'show_container': progress_tracker_obj.show,
+        'hide_container': progress_tracker_obj.hide,
+        'show_for_operation': progress_tracker_obj.show,
+        'update_overall': progress_tracker_obj.update_overall,
+        'update_step': progress_tracker_obj.update_step,
+        'update_current': progress_tracker_obj.update_current,
+        'update_progress': progress_tracker_obj.update,
+        'complete_operation': progress_tracker_obj.complete,
+        'error_operation': progress_tracker_obj.error,
+        'reset_all': progress_tracker_obj.reset
+    }
     
     # Help panel
     help_content = """

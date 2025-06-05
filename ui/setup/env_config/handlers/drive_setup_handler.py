@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/handlers/drive_setup_handler.py
-Deskripsi: Drive setup dengan proper mount detection dan state management yang robust
+Deskripsi: Drive setup handler dengan constants dan utils integration
 """
 
 import os
@@ -10,197 +10,115 @@ from typing import Dict, Any, Tuple
 from pathlib import Path
 
 from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+from smartcash.ui.setup.env_config.constants import (
+    REQUIRED_FOLDERS, CONFIG_TEMPLATES, DRIVE_MOUNT_POINT, 
+    REPO_CONFIG_PATH, STATUS_MESSAGES, PROGRESS_MESSAGES, RETRY_CONFIG
+)
+from smartcash.ui.setup.env_config.utils import (
+    update_progress_safe, is_colab_environment, test_drive_readiness,
+    wait_for_drive_ready, create_folder_with_retry, validate_setup_integrity
+)
 
 class DriveSetupHandler:
-    """Drive setup dengan proper mount detection dan state management"""
+    """Drive setup handler dengan constants dan utils integration"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
-        self.logger = None  # Will be initialized when needed
-        self.required_folders = ['data', 'configs', 'exports', 'logs', 'models', 'output']
-        self.config_templates = [
-            'base_config.yaml', 'colab_config.yaml', 'dataset_config.yaml',
-            'model_config.yaml', 'training_config.yaml', 'augmentation_config.yaml',
-            'preprocessing_config.yaml', 'hyperparameters_config.yaml'
-        ]
+        self.logger = None
+        self.required_folders = REQUIRED_FOLDERS
+        self.config_templates = CONFIG_TEMPLATES
     
     def _ensure_logger(self):
-        """Ensure logger is initialized"""
+        """Initialize logger dengan one-liner"""
         if self.logger is None:
             self.logger = create_ui_logger_bridge(self.ui_components, "drive_setup")
     
     def ensure_drive_mounted(self) -> Tuple[bool, str]:
-        """Mount Drive dengan proper state management dan wait mechanism"""
+        """Mount Drive dengan constants dan utils integration"""
         self._ensure_logger()
         
-        if not self._is_colab():
+        if not is_colab_environment():
             return True, "Local environment"
         
-        # Check existing mount dengan comprehensive validation
-        if self._check_drive_ready_comprehensive():
-            return True, "Drive sudah terhubung dan siap"
+        if test_drive_readiness(Path(DRIVE_MOUNT_POINT)):
+            return True, STATUS_MESSAGES['drive_ready']
         
         try:
             from google.colab import drive
             self.logger.info("📱 Mounting Google Drive...")
-            drive.mount('/content/drive')
+            update_progress_safe(self.ui_components, 10, PROGRESS_MESSAGES['drive_mount'])
             
-            # Wait untuk mount completion dengan timeout dan state validation
-            return self._wait_for_drive_ready_comprehensive(max_wait=45)
+            drive.mount('/content/drive')
+            return wait_for_drive_ready(RETRY_CONFIG['drive_mount_timeout'], self.ui_components)
             
         except Exception as e:
             return False, f"Mount error: {str(e)}"
     
-    def _check_drive_ready_comprehensive(self) -> bool:
-        """Comprehensive check apakah Drive benar-benar ready dengan multiple validations"""
-        drive_path = Path('/content/drive/MyDrive')
-        
-        # Basic existence check
-        if not drive_path.exists():
-            return False
-        
-        # Directory accessibility check
-        try:
-            # Test basic listing
-            list(drive_path.iterdir())
-        except Exception:
-            return False
-        
-        # Write access test dengan retry
-        for attempt in range(3):
-            try:
-                test_file = drive_path / f'.smartcash_ready_test_{attempt}'
-                test_content = f'ready_test_{int(time.time())}'
-                
-                # Write test
-                test_file.write_text(test_content)
-                
-                # Immediate read test
-                read_content = test_file.read_text()
-                
-                # Cleanup
-                test_file.unlink()
-                
-                # Validate content
-                if read_content == test_content:
-                    return True
-                    
-            except Exception:
-                if attempt < 2:
-                    time.sleep(0.5)  # Brief delay before retry
-                continue
-        
-        return False
-    
-    def _wait_for_drive_ready_comprehensive(self, max_wait: int = 45) -> Tuple[bool, str]:
-        """Wait untuk Drive ready dengan comprehensive validation dan progress updates"""
-        self.logger.info("⏳ Menunggu Drive mount completion...")
-        
-        for i in range(max_wait):
-            if self._check_drive_ready_comprehensive():
-                self.logger.success(f"✅ Drive ready dalam {i+1} detik")
-                
-                # Additional settling time untuk stability
-                time.sleep(1)
-                
-                # Final validation
-                if self._check_drive_ready_comprehensive():
-                    return True, "Drive siap digunakan dan telah divalidasi"
-                
-            # Progress updates setiap 5 detik
-            if i % 5 == 0 and i > 0:
-                self.logger.info(f"⏳ Validating Drive state... ({i}s)")
-            
-            time.sleep(1)
-        
-        # Final attempt dengan extended validation
-        if self._check_drive_ready_comprehensive():
-            return True, "Drive ready setelah timeout (late detection)"
-        
-        return False, f"Timeout setelah {max_wait}s - Drive mungkin terpasang tapi tidak dapat divalidasi"
-    
     def create_drive_folders(self, drive_base_path: str) -> Dict[str, bool]:
-        """Create folders di Drive dengan comprehensive error handling"""
+        """Create folders dengan progress tracking dan utils"""
         self._ensure_logger()
+        update_progress_safe(self.ui_components, 30, PROGRESS_MESSAGES['folders_create'])
+        
         results = {}
         drive_base = Path(drive_base_path)
         
-        # Ensure base path exists dengan retry
-        for attempt in range(3):
-            try:
-                drive_base.mkdir(parents=True, exist_ok=True)
-                break
-            except Exception as e:
-                if attempt == 2:
-                    self.logger.error(f"❌ Gagal create base path: {str(e)}")
-                    return {folder: False for folder in self.required_folders}
-                time.sleep(1)
+        # Ensure base path dengan retry
+        if not create_folder_with_retry(drive_base):
+            self.logger.error("❌ Gagal create base path")
+            return {folder: False for folder in self.required_folders}
         
-        # Create each folder dengan individual error handling
-        for folder in self.required_folders:
+        # Create folders dengan progress tracking
+        total_folders = len(self.required_folders)
+        for idx, folder in enumerate(self.required_folders):
             folder_path = drive_base / folder
-            success = False
+            progress = 30 + (idx / total_folders) * 15  # 30-45% range
+            update_progress_safe(self.ui_components, int(progress), f"📁 Creating {folder}...")
             
-            for attempt in range(3):
-                try:
-                    if not folder_path.exists():
-                        folder_path.mkdir(parents=True, exist_ok=True)
-                        # Verify creation dengan delay
-                        time.sleep(0.2)
-                        success = folder_path.exists() and folder_path.is_dir()
-                    else:
-                        success = folder_path.is_dir()
-                    
-                    if success:
-                        break
-                        
-                except Exception as e:
-                    if attempt == 2:
-                        self.logger.error(f"❌ Folder {folder}: {str(e)}")
-                    else:
-                        time.sleep(0.5)
-            
+            success = create_folder_with_retry(folder_path, RETRY_CONFIG['drive_ready_attempts'])
             results[folder] = success
         
         success_count = sum(results.values())
+        update_progress_safe(self.ui_components, 45, f"📁 Created {success_count}/{total_folders} folders")
+        
         if success_count > 0:
-            self.logger.success(f"📁 Setup {success_count}/{len(self.required_folders)} folder di Drive")
+            self.logger.success(f"📁 Setup {success_count}/{total_folders} folder di Drive")
         
         return results
     
     def clone_config_templates(self, drive_base_path: str) -> Dict[str, bool]:
-        """Clone configs dengan comprehensive validation"""
+        """Clone configs dengan constants dan progress tracking"""
         self._ensure_logger()
+        update_progress_safe(self.ui_components, 50, PROGRESS_MESSAGES['configs_clone'])
+        
         results = {}
-        repo_config_path = Path('/content/smartcash/configs')
+        repo_config_path = Path(REPO_CONFIG_PATH)
         drive_config_path = Path(drive_base_path) / 'configs'
         
         # Ensure destination exists
-        try:
-            drive_config_path.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            self.logger.error(f"❌ Gagal create config directory: {str(e)}")
+        if not create_folder_with_retry(drive_config_path):
+            self.logger.error("❌ Gagal create config directory")
             return {config: False for config in self.config_templates}
         
         cloned_count = 0
-        for config_file in self.config_templates:
+        total_configs = len(self.config_templates)
+        
+        for idx, config_file in enumerate(self.config_templates):
             src_file = repo_config_path / config_file
             dst_file = drive_config_path / config_file
             success = False
             
+            progress = 50 + (idx / total_configs) * 15  # 50-65% range
+            update_progress_safe(self.ui_components, int(progress), f"📋 Copying {config_file}...")
+            
             try:
                 if src_file.exists():
                     if not dst_file.exists():
-                        # Copy dengan validation
                         shutil.copy2(src_file, dst_file)
-                        time.sleep(0.1)  # Brief settling time
-                        
-                        # Verify copy dengan content validation
-                        if dst_file.exists() and dst_file.stat().st_size > 0:
-                            success = True
+                        time.sleep(0.1)
+                        success = dst_file.exists() and dst_file.stat().st_size > 0
+                        if success:
                             cloned_count += 1
                     else:
-                        # File sudah ada, verify integrity
                         success = dst_file.exists() and dst_file.stat().st_size > 0
                 else:
                     self.logger.warning(f"⚠️ Source config tidak ditemukan: {config_file}")
@@ -210,75 +128,76 @@ class DriveSetupHandler:
             
             results[config_file] = success
         
+        update_progress_safe(self.ui_components, 65, f"📋 Cloned {cloned_count} config templates")
         if cloned_count > 0:
             self.logger.success(f"📋 Clone {cloned_count} config template")
         
         return results
     
     def create_symlinks(self, drive_base_path: str) -> Dict[str, bool]:
-        """Create symlinks dengan comprehensive validation dan cleanup"""
+        """Create symlinks dengan constants dan utils integration"""
         self._ensure_logger()
+        update_progress_safe(self.ui_components, 70, PROGRESS_MESSAGES['symlinks_create'])
         
-        if not self._is_colab():
+        if not is_colab_environment():
             return {folder: True for folder in self.required_folders}
         
         results = {}
         drive_base = Path(drive_base_path)
+        total_symlinks = len(self.required_folders)
         
-        for folder in self.required_folders:
+        for idx, folder in enumerate(self.required_folders):
             local_path = Path(f'/content/{folder}')
             drive_path = drive_base / folder
             success = False
             
+            progress = 70 + (idx / total_symlinks) * 20  # 70-90% range
+            update_progress_safe(self.ui_components, int(progress), f"🔗 Linking {folder}...")
+            
             try:
-                # Check jika symlink valid sudah ada
-                if (local_path.is_symlink() and 
-                    local_path.exists() and 
+                # Check existing valid symlink
+                if (local_path.is_symlink() and local_path.exists() and 
                     local_path.resolve() == drive_path.resolve()):
                     success = True
                     results[folder] = success
                     continue
                 
-                # Backup existing local directory jika ada
+                # Backup existing directory
                 if local_path.exists() and not local_path.is_symlink():
                     backup_path = Path(f'/content/{folder}_backup_{int(time.time())}')
                     try:
                         shutil.move(local_path, backup_path)
                         self.logger.info(f"📦 Backup {folder} ke {backup_path.name}")
-                    except Exception as e:
-                        self.logger.warning(f"⚠️ Gagal backup {folder}: {str(e)}")
-                        # Force remove jika backup gagal
+                    except Exception:
                         if local_path.is_dir():
                             shutil.rmtree(local_path)
                         else:
                             local_path.unlink()
                 
-                # Remove broken symlink jika ada
+                # Remove broken symlink
                 if local_path.is_symlink():
                     local_path.unlink()
                 
                 # Ensure drive path exists
                 if not drive_path.exists():
-                    drive_path.mkdir(parents=True, exist_ok=True)
+                    create_folder_with_retry(drive_path)
                 
                 # Create symlink dengan retry
-                for attempt in range(3):
+                for attempt in range(RETRY_CONFIG['symlink_attempts']):
                     try:
                         local_path.symlink_to(drive_path)
-                        time.sleep(0.2)  # Brief settling time
+                        time.sleep(0.2)
                         
-                        # Comprehensive validation
-                        if (local_path.exists() and 
-                            local_path.is_symlink() and 
+                        if (local_path.exists() and local_path.is_symlink() and 
                             local_path.resolve() == drive_path.resolve()):
                             success = True
                             break
                             
                     except Exception as e:
-                        if attempt == 2:
-                            self.logger.error(f"❌ Symlink {folder} (attempt {attempt+1}): {str(e)}")
+                        if attempt == RETRY_CONFIG['symlink_attempts'] - 1:
+                            self.logger.error(f"❌ Symlink {folder}: {str(e)}")
                         else:
-                            time.sleep(0.5)
+                            time.sleep(RETRY_CONFIG['symlink_delay'])
                 
             except Exception as e:
                 self.logger.error(f"❌ Symlink {folder}: {str(e)}")
@@ -286,62 +205,52 @@ class DriveSetupHandler:
             results[folder] = success
         
         success_count = sum(results.values())
+        update_progress_safe(self.ui_components, 90, f"🔗 Created {success_count}/{total_symlinks} symlinks")
+        
         if success_count > 0:
-            self.logger.success(f"🔗 Setup {success_count}/{len(self.required_folders)} symlink")
+            self.logger.success(f"🔗 Setup {success_count}/{total_symlinks} symlink")
         
         return results
     
     def perform_complete_setup(self, drive_base_path: str) -> Dict[str, Any]:
-        """Complete setup dengan proper sequencing dan state management"""
+        """Complete setup dengan constants/utils integration"""
         self._ensure_logger()
         
-        # Pre-setup validation
-        if not self._check_drive_ready_comprehensive():
+        if not test_drive_readiness(Path(DRIVE_MOUNT_POINT)):
             return {'success': False, 'error': 'Drive not ready for setup'}
         
         self.logger.info(f"🚀 Memulai setup lengkap di: {drive_base_path}")
+        update_progress_safe(self.ui_components, 5, "🚀 Starting complete setup...")
         
-        # Step 1: Create Drive folders
-        self._update_progress(0.3, "📁 Creating Drive folders...")
+        # Execute setup steps
         folder_results = self.create_drive_folders(drive_base_path)
-        
-        # Validate folder creation
-        folder_success_rate = sum(folder_results.values()) / len(folder_results)
-        if folder_success_rate < 0.5:
-            self.logger.warning("⚠️ Sebagian besar folder gagal dibuat")
-        
-        # Step 2: Clone configs
-        self._update_progress(0.5, "📋 Cloning configs...")
         config_results = self.clone_config_templates(drive_base_path)
         
-        # Validate config cloning
-        config_success_count = sum(config_results.values())
-        if config_success_count < 3:
-            self.logger.warning("⚠️ Config templates tidak lengkap")
-        
-        # Step 3: Create symlinks (most critical step)
-        self._update_progress(0.7, "🔗 Creating symlinks...")
-        
-        # Additional delay untuk memastikan Drive state stable
-        time.sleep(1)
-        
+        time.sleep(1)  # Settling time
         symlink_results = self.create_symlinks(drive_base_path)
         
-        # Comprehensive success evaluation
-        folder_success = sum(folder_results.values()) >= len(folder_results) * 0.8
-        config_success = config_success_count >= 3  # Minimal essential configs
-        symlink_success = sum(symlink_results.values()) >= len(symlink_results) * 0.8
+        # Evaluate success dengan utils
+        folder_success_rate = sum(folder_results.values()) / len(folder_results)
+        config_success_count = sum(config_results.values())
+        symlink_success_rate = sum(symlink_results.values()) / len(symlink_results)
+        
+        folder_success = folder_success_rate >= 0.8
+        config_success = config_success_count >= 5  # Essential configs
+        symlink_success = symlink_success_rate >= 0.8
         
         overall_success = folder_success and config_success and symlink_success
         
-        # Final validation setelah setup
-        self._update_progress(0.9, "✅ Validating setup...")
+        # Final validation
+        update_progress_safe(self.ui_components, 95, PROGRESS_MESSAGES['validation'])
         if overall_success:
-            # Quick validation test
-            validation_passed = self._validate_setup_integrity(drive_base_path)
+            validation_passed = validate_setup_integrity(drive_base_path)
             if not validation_passed:
                 self.logger.warning("⚠️ Setup validation menunjukkan beberapa issue")
                 overall_success = False
+        
+        # Complete progress
+        final_message = PROGRESS_MESSAGES['complete'] if overall_success else "⚠️ Setup completed with issues"
+        update_progress_safe(self.ui_components, 100, final_message)
         
         return {
             'folders': folder_results,
@@ -351,66 +260,6 @@ class DriveSetupHandler:
             'validation': {
                 'folder_success_rate': folder_success_rate,
                 'config_count': config_success_count,
-                'symlink_success_rate': sum(symlink_results.values()) / len(symlink_results)
+                'symlink_success_rate': symlink_success_rate
             }
         }
-    
-    def _validate_setup_integrity(self, drive_base_path: str) -> bool:
-        """Quick validation untuk memastikan setup integrity"""
-        try:
-            drive_base = Path(drive_base_path)
-            
-            # Check critical folders
-            critical_folders = ['data', 'configs']
-            for folder in critical_folders:
-                folder_path = drive_base / folder
-                if not folder_path.exists() or not folder_path.is_dir():
-                    return False
-            
-            # Check symlinks
-            critical_symlinks = ['data', 'configs']
-            for folder in critical_symlinks:
-                local_path = Path(f'/content/{folder}')
-                if not (local_path.exists() and local_path.is_symlink()):
-                    return False
-            
-            # Test write access
-            test_file = drive_base / 'data' / '.setup_validation_test'
-            test_file.write_text('validation')
-            content = test_file.read_text()
-            test_file.unlink()
-            
-            return content == 'validation'
-            
-        except Exception:
-            return False
-    
-    def _update_progress(self, value: float, message: str = ""):
-        """Update progress dengan error handling"""
-        try:
-            # Cek apakah progress_tracker tersedia
-            if 'progress_tracker' in self.ui_components and self.ui_components['progress_tracker']:
-                # Gunakan progress tracker baru
-                progress_tracker = self.ui_components['progress_tracker']
-                progress_tracker.update('level1', int(value * 100), message)
-            # Fallback ke progress bar lama
-            elif 'progress_bar' in self.ui_components:
-                from smartcash.ui.components.progress_tracker import update_progress
-                progress_bar = self.ui_components.get('progress_bar')
-                if progress_bar:
-                    progress_bar.value = int(value * 100)
-                    progress_bar.description = f"{int(value * 100)}%"
-                    
-                if 'progress_message' in self.ui_components and message:
-                    self.ui_components['progress_message'].value = message
-        except Exception as e:
-            # Silent failure untuk mencegah error pada proses utama
-            pass
-    
-    def _is_colab(self) -> bool:
-        """Check apakah berjalan di Colab"""
-        try:
-            import google.colab
-            return True
-        except ImportError:
-            return False

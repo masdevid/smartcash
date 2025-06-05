@@ -102,7 +102,7 @@ class SimpleConfigManager:
             return self.config_dir / config_name
         
         # Tambahkan _config jika tidak ada dan bukan dari file config spesial
-        special_configs = ['model', 'hyperparameters', 'training', 'dataset', 'base']
+        special_configs = ['model', 'hyperparameters', 'training', 'dataset', 'base', 'backbone', 'split']
         if config_name in special_configs:
             config_name = f"{config_name}_config.yaml"
         # Jika sudah berakhiran _config, tambahkan ekstensi saja

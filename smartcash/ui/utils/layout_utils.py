@@ -1,370 +1,170 @@
 """
 File: smartcash/ui/utils/layout_utils.py
-Deskripsi: Layout utilities dengan backward compatibility dan fitur responsive baru
+Deskripsi: Consolidated layout utilities with backward compatibility and responsive features
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
 # =============================================================================
-# BACKWARD COMPATIBILITY - Existing Layout Constants
+# CONSOLIDATED LAYOUT CONSTANTS
 # =============================================================================
 
-# Standard layouts (existing - unchanged)
-STANDARD_LAYOUTS = {
+# All-in-one layout dictionary combining standard and responsive layouts
+LAYOUTS = {
+    # Standard layouts (backward compatibility)
     'header': widgets.Layout(margin='0 0 15px 0'),
     'section': widgets.Layout(margin='15px 0 10px 0'),
     'container': widgets.Layout(width='100%', padding='10px'),
-    'output': widgets.Layout(
-        width='100%',
-        border='1px solid #ddd',
-        min_height='100px',
-        max_height='300px',
-        margin='10px 0',
-        overflow='auto'
-    ),
+    'output': widgets.Layout(width='100%', border='1px solid #ddd', min_height='100px', max_height='300px', margin='10px 0', overflow='auto'),
     'button': widgets.Layout(margin='10px 0'),
     'button_small': widgets.Layout(margin='5px'),
-    'hbox': widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        align_items='center',
-        width='100%'
-    ),
-    'vbox': widgets.Layout(
-        display='flex',
-        flex_flow='column',
-        align_items='stretch',
-        width='100%'
-    )
+    'button_hidden': widgets.Layout(margin='10px 0', display='none'),
+    'text_input': widgets.Layout(width='60%', margin='10px 0'),
+    'text_area': widgets.Layout(width='60%', height='150px', margin='10px 0'),
+    'selection': widgets.Layout(margin='10px 0'),
+    'hbox': widgets.Layout(display='flex', flex_flow='row wrap', align_items='center', width='100%'),
+    'vbox': widgets.Layout(display='flex', flex_flow='column', align_items='stretch', width='100%'),
+    'divider': widgets.Layout(height='1px', border='0', border_top='1px solid #eee', margin='15px 0'),
+    'card': widgets.Layout(border='1px solid #ddd', border_radius='4px', padding='15px', margin='10px 0', width='100%'),
+    'tabs': widgets.Layout(width='100%', margin='10px 0'),
+    'accordion': widgets.Layout(width='100%', margin='10px 0'),
+    
+    # Responsive layouts (enhanced versions)
+    'responsive_container': widgets.Layout(width='100%', max_width='100%', padding='10px', overflow='hidden'),
+    'responsive_button': widgets.Layout(width='auto', max_width='150px', height='32px', margin='2px', overflow='hidden'),
+    'responsive_dropdown': widgets.Layout(width='100%', max_width='100%', margin='3px 0', overflow='hidden'),
+    'two_column_left': widgets.Layout(width='47%', margin='0', padding='4px', overflow='hidden'),
+    'two_column_right': widgets.Layout(width='47%', margin='0', padding='4px', overflow='hidden'),
+    'no_scroll': widgets.Layout(overflow='hidden', max_width='100%')
 }
 
-# Layout untuk container utama (existing - unchanged)
-MAIN_CONTAINER = widgets.Layout(
-    width='100%',
-    padding='10px'
-)
-
-# Layout untuk output widget (existing - unchanged)
-OUTPUT_WIDGET = widgets.Layout(
-    width='100%',
-    border='1px solid #ddd',
-    min_height='100px',
-    margin='10px 0',
-    padding='8px 4px'
-)
-
-# Layout untuk tombol (existing - unchanged)
-BUTTON = widgets.Layout(
-    margin='10px 0'
-)
-
-# Layout untuk tombol yang disembunyikan (existing - unchanged)
-HIDDEN_BUTTON = widgets.Layout(
-    margin='10px 0',
-    display='none'
-)
-
-# Layout untuk input text (existing - unchanged)
-TEXT_INPUT = widgets.Layout(
-    width='60%',
-    margin='10px 0'
-)
-
-# Layout untuk textarea (existing - unchanged)
-TEXT_AREA = widgets.Layout(
-    width='60%',
-    height='150px',
-    margin='10px 0'
-)
-
-# Layout untuk radio dan checkbox (existing - unchanged)
-SELECTION = widgets.Layout(
-    margin='10px 0'
-)
-
-# Layout untuk grup widget horizontal (existing - unchanged)
-HORIZONTAL_GROUP = widgets.Layout(
-    display='flex',
-    flex_flow='row wrap',
-    align_items='center',
-    width='100%'
-)
-
-# Layout untuk grup widget vertikal (existing - unchanged)
-VERTICAL_GROUP = widgets.Layout(
-    display='flex',
-    flex_flow='column',
-    align_items='stretch',
-    width='100%'
-)
-
-# Layout untuk divider (existing - unchanged)
-DIVIDER = widgets.Layout(
-    height='1px',
-    border='0',
-    border_top='1px solid #eee',
-    margin='15px 0'
-)
-
-# Layout untuk kartu/card (existing - unchanged)
-CARD = widgets.Layout(
-    border='1px solid #ddd',
-    border_radius='4px',
-    padding='15px',
-    margin='10px 0',
-    width='100%'
-)
-
-# Layout untuk tab container (existing - unchanged)
-TABS = widgets.Layout(
-    width='100%',
-    margin='10px 0'
-)
-
-# Layout untuk accordion (existing - unchanged)
-ACCORDION = widgets.Layout(
-    width='100%',
-    margin='10px 0'
-)
+# Backward compatibility aliases
+MAIN_CONTAINER = LAYOUTS['container']
+OUTPUT_WIDGET = LAYOUTS['output']
+BUTTON = LAYOUTS['button']
+HIDDEN_BUTTON = LAYOUTS['button_hidden']
+TEXT_INPUT = LAYOUTS['text_input']
+TEXT_AREA = LAYOUTS['text_area']
+SELECTION = LAYOUTS['selection']
+HORIZONTAL_GROUP = LAYOUTS['hbox']
+VERTICAL_GROUP = LAYOUTS['vbox']
+DIVIDER = LAYOUTS['divider']
+CARD = LAYOUTS['card']
+TABS = LAYOUTS['tabs']
+ACCORDION = LAYOUTS['accordion']
+STANDARD_LAYOUTS = {k: v for k, v in LAYOUTS.items() if not k.startswith('responsive_') and not k.startswith('two_column_')}
+RESPONSIVE_LAYOUTS = {k: v for k, v in LAYOUTS.items() if k.startswith('responsive_') or k.startswith('two_column_') or k == 'no_scroll'}
 
 # =============================================================================
-# BACKWARD COMPATIBILITY - Existing Functions
+# CONSOLIDATED UTILITY FUNCTIONS
 # =============================================================================
 
-def create_divider(margin: str = "15px 0", color: str = "#eee", height: str = "1px") -> widgets.HTML:
+def create_element(element_type: str, content: Union[str, list] = "", **kwargs) -> widgets.Widget:
     """
-    Create divider horizontal (backward compatible + enhanced).
+    Unified function to create various UI elements with responsive features.
     
     Args:
-        margin: CSS margin untuk divider (default sesuai existing)
-        color: Warna divider (default sesuai existing)
-        height: Tinggi divider
+        element_type: Type of element ('divider', 'header', 'container', 'two_column')
+        content: Content for the element (string for divider/header, list for containers)
+        **kwargs: Additional parameters specific to element type
         
     Returns:
-        HTML widget divider
+        Appropriate widget based on element_type
     """
-    return widgets.HTML(
-        value=f"<hr style='margin: {margin}; border: 0; border-top: {height} solid {color};'>",
-        layout=widgets.Layout(width='100%', margin='0', padding='0')
-    )
-
-# =============================================================================
-# NEW RESPONSIVE UTILITIES
-# =============================================================================
-
-def create_responsive_container(
-    children: list,
-    container_type: str = "vbox",
-    width: str = "100%",
-    max_width: str = "100%",
-    padding: str = "8px",
-    margin: str = "0px",
-    justify_content: str = "flex-start",
-    align_items: str = "stretch"
-) -> widgets.Widget:
-    """
-    Create responsive container yang prevent horizontal scroll.
+    if element_type == 'divider':
+        margin, color, height = kwargs.get('margin', '15px 0'), kwargs.get('color', '#eee'), kwargs.get('height', '1px')
+        return widgets.HTML(f"<hr style='margin: {margin}; border: 0; border-top: {height} solid {color};'>", layout=widgets.Layout(width='100%', margin='0', padding='0'))
     
-    Args:
-        children: List widget children
-        container_type: 'vbox' atau 'hbox'
-        width: Lebar container
-        max_width: Maksimum lebar
-        padding: Padding container
-        margin: Margin container
-        justify_content: CSS justify-content
-        align_items: CSS align-items
-        
-    Returns:
-        Responsive container widget
-    """
-    layout = widgets.Layout(
-        width=width,
-        max_width=max_width,
-        padding=padding,
-        margin=margin,
-        justify_content=justify_content,
-        align_items=align_items,
-        overflow='hidden'  # Prevent horizontal scroll
-    )
+    elif element_type == 'header':
+        title, icon, color, font_size, margin = content, kwargs.get('icon', '📋'), kwargs.get('color', '#333'), kwargs.get('font_size', '16px'), kwargs.get('margin', '15px 0 8px 0')
+        return widgets.HTML(f"<h4 style='color: {color}; margin: {margin}; font-size: {font_size}; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'>{icon} {title}</h4>", layout=widgets.Layout(width='100%', margin='0', padding='0'))
     
-    if container_type.lower() == "hbox":
-        return widgets.HBox(children, layout=layout)
+    elif element_type == 'container':
+        children, container_type = content, kwargs.get('container_type', 'vbox')
+        layout_params = {k: kwargs.get(k, v) for k, v in {'width': '100%', 'max_width': '100%', 'padding': '8px', 'margin': '0px', 'justify_content': 'flex-start', 'align_items': 'stretch', 'overflow': 'hidden'}.items()}
+        layout = widgets.Layout(**layout_params)
+        return widgets.HBox(children, layout=layout) if container_type.lower() == 'hbox' else widgets.VBox(children, layout=layout)
+    
+    elif element_type == 'two_column':
+        left_content, right_content = content
+        left_width, right_width, vertical_align = kwargs.get('left_width', '48%'), kwargs.get('right_width', '48%'), kwargs.get('vertical_align', 'flex-start')
+        left_wrapper = widgets.VBox([left_content], layout=widgets.Layout(width=left_width, margin='0', padding='4px', overflow='hidden'))
+        right_wrapper = widgets.VBox([right_content], layout=widgets.Layout(width=right_width, margin='0', padding='4px', overflow='hidden'))
+        return widgets.HBox([left_wrapper, right_wrapper], layout=widgets.Layout(width='100%', max_width='100%', justify_content='space-between', align_items=vertical_align, margin='0', padding='0', overflow='hidden'))
+    
     else:
-        return widgets.VBox(children, layout=layout)
+        raise ValueError(f"Unsupported element_type: {element_type}")
 
-def create_responsive_two_column(
-    left_content: widgets.Widget,
-    right_content: widgets.Widget,
-    left_width: str = "48%",
-    right_width: str = "48%",
-    gap: str = "2%",
-    vertical_align: str = "flex-start"
-) -> widgets.HBox:
+def get_layout(layout_name: str, **overrides) -> widgets.Layout:
     """
-    Create responsive two-column layout yang tidak overflow.
+    Get layout with optional parameter overrides in one line.
     
     Args:
-        left_content: Widget untuk kolom kiri
-        right_content: Widget untuk kolom kanan
-        left_width: Lebar kolom kiri
-        right_width: Lebar kolom kanan
-        gap: Gap antara kolom
-        vertical_align: Vertical alignment
+        layout_name: Name of layout from LAYOUTS dict
+        **overrides: Layout parameters to override
         
     Returns:
-        HBox container dengan two-column layout
+        Layout object with applied overrides
     """
-    # Wrap content dengan responsive container
-    left_wrapper = widgets.VBox(
-        [left_content],
-        layout=widgets.Layout(
-            width=left_width,
-            margin='0',
-            padding='4px',
-            overflow='hidden'
-        )
-    )
-    
-    right_wrapper = widgets.VBox(
-        [right_content],
-        layout=widgets.Layout(
-            width=right_width,
-            margin='0',
-            padding='4px', 
-            overflow='hidden'
-        )
-    )
-    
-    return widgets.HBox(
-        [left_wrapper, right_wrapper],
-        layout=widgets.Layout(
-            width='100%',
-            max_width='100%',
-            justify_content='space-between',
-            align_items=vertical_align,
-            margin='0',
-            padding='0',
-            overflow='hidden'
-        )
-    )
+    base_layout = LAYOUTS.get(layout_name, widgets.Layout())
+    layout_dict = {attr: getattr(base_layout, attr) for attr in dir(base_layout) if not attr.startswith('_') and hasattr(base_layout, attr) and getattr(base_layout, attr) is not None}
+    layout_dict.update(overrides)
+    return widgets.Layout(**layout_dict)
 
-def apply_responsive_fixes(widget: widgets.Widget) -> widgets.Widget:
+def get_responsive_config(widget_type: str, **kwargs) -> Dict[str, Any]:
     """
-    Apply responsive fixes ke widget yang sudah ada.
+    Get responsive configuration for different widget types in one line.
     
     Args:
-        widget: Widget yang akan di-fix
+        widget_type: Type of widget ('button', 'dropdown', 'input')
+        **kwargs: Additional configuration parameters
         
     Returns:
-        Widget dengan responsive fixes
+        Dictionary with layout and style configuration
+    """
+    configs = {
+        'button': {'layout': widgets.Layout(width=kwargs.get('width', 'auto'), max_width=kwargs.get('max_width', '150px'), height='32px', margin='2px', overflow='hidden')},
+        'dropdown': {'layout': widgets.Layout(width=kwargs.get('width', '100%'), max_width='100%', margin='3px 0', overflow='hidden'), 'style': {'description_width': kwargs.get('description_width', '80px')}},
+        'input': {'layout': widgets.Layout(width=kwargs.get('width', '100%'), max_width='100%', margin='3px 0', overflow='hidden')}
+    }
+    return configs.get(widget_type, {'layout': widgets.Layout(overflow='hidden', max_width='100%')})
+
+def apply_responsive_fixes(widget: widgets.Widget, recursive: bool = True) -> widgets.Widget:
+    """
+    Apply responsive fixes to widget with optional recursion in one line.
+    
+    Args:
+        widget: Widget to fix
+        recursive: Whether to apply fixes to children
+        
+    Returns:
+        Widget with responsive fixes applied
     """
     if hasattr(widget, 'layout'):
-        # Apply responsive layout fixes
-        if not widget.layout.max_width:
-            widget.layout.max_width = '100%'
-        
-        if not widget.layout.overflow:
-            widget.layout.overflow = 'hidden'
-        
-        # Fix margin dan padding jika berlebihan
-        if hasattr(widget.layout, 'margin') and widget.layout.margin and 'px' in widget.layout.margin:
+        widget.layout.max_width = widget.layout.max_width or '100%'
+        widget.layout.overflow = widget.layout.overflow or 'hidden'
+        # Fix excessive margins
+        if hasattr(widget.layout, 'margin') and widget.layout.margin and 'px' in str(widget.layout.margin):
             try:
-                margin_val = int(widget.layout.margin.replace('px', ''))
-                if margin_val > 20:  # Reduce excessive margins
-                    widget.layout.margin = '10px'
-            except:
-                pass
+                margin_val = int(str(widget.layout.margin).replace('px', ''))
+                widget.layout.margin = '10px' if margin_val > 20 else widget.layout.margin
+            except: pass
     
-    # Recursively fix children jika ada
-    if hasattr(widget, 'children'):
-        for child in widget.children:
-            apply_responsive_fixes(child)
+    # Apply to children if recursive
+    if recursive and hasattr(widget, 'children'):
+        [apply_responsive_fixes(child, recursive) for child in widget.children]
     
     return widget
 
-def get_responsive_button_layout(width: str = "auto", max_width: str = "150px") -> widgets.Layout:
-    """
-    Get standardized responsive button layout.
-    
-    Args:
-        width: Button width
-        max_width: Maximum button width
-        
-    Returns:
-        Layout object untuk button
-    """
-    return widgets.Layout(
-        width=width,
-        max_width=max_width,
-        height='32px',
-        margin='2px',
-        overflow='hidden'
-    )
-
-def get_responsive_dropdown_layout(width: str = "100%", description_width: str = "80px") -> Dict[str, Any]:
-    """
-    Get standardized responsive dropdown layout dan style.
-    
-    Args:
-        width: Dropdown width
-        description_width: Description label width
-        
-    Returns:
-        Dictionary dengan layout dan style
-    """
-    return {
-        'layout': widgets.Layout(
-            width=width,
-            max_width='100%',
-            margin='3px 0',
-            overflow='hidden'
-        ),
-        'style': {'description_width': description_width}
-    }
-
-def create_section_header(
-    title: str,
-    icon: str = "📋",
-    color: str = "#333",
-    font_size: str = "16px",
-    margin: str = "15px 0 8px 0"
-) -> widgets.HTML:
-    """
-    Create responsive section header.
-    
-    Args:
-        title: Header title
-        icon: Header icon
-        color: Text color
-        font_size: Font size
-        margin: Header margin
-        
-    Returns:
-        HTML widget untuk section header
-    """
-    return widgets.HTML(
-        value=f"""
-        <h4 style='color: {color}; margin: {margin}; font-size: {font_size}; 
-                   padding: 0; overflow: hidden; text-overflow: ellipsis;
-                   white-space: nowrap;'>
-            {icon} {title}
-        </h4>
-        """,
-        layout=widgets.Layout(width='100%', margin='0', padding='0')
-    )
-
 # =============================================================================
-# ENHANCED RESPONSIVE LAYOUTS (New constants dengan responsive features)
+# CONVENIENCE ONE-LINER FUNCTIONS
 # =============================================================================
 
-# Responsive versions of existing layouts
-RESPONSIVE_LAYOUTS = {
-    'container': widgets.Layout(width='100%', max_width='100%', padding='10px', overflow='hidden'),
-    'two_column_left': widgets.Layout(width='47%', margin='0', padding='4px', overflow='hidden'),
-    'two_column_right': widgets.Layout(width='47%', margin='0', padding='4px', overflow='hidden'),
-    'button_responsive': widgets.Layout(width='auto', max_width='150px', height='32px', margin='2px'),
-    'dropdown_responsive': widgets.Layout(width='100%', max_width='100%', margin='3px 0', overflow='hidden'),
-    'no_scroll': widgets.Layout(overflow='hidden', max_width='100%')
-}
+# One-liner convenience functions for common operations
+create_divider = lambda margin='15px 0', color='#eee', height='1px': create_element('divider', margin=margin, color=color, height=height)
+create_section_header = lambda title, icon='📋', color='#333', font_size='16px', margin='15px 0 8px 0': create_element('header', title, icon=icon, color=color, font_size=font_size, margin=margin)
+create_responsive_container = lambda children, container_type='vbox', **kwargs: create_element('container', children, container_type=container_type, **kwargs)
+create_responsive_two_column = lambda left_content, right_content, **kwargs: create_element('two_column', [left_content, right_content], **kwargs)
+get_responsive_button_layout = lambda width='auto', max_width='150px': get_responsive_config('button', width=width, max_width=max_width)['layout']
+get_responsive_dropdown_layout = lambda width='100%', description_width='80px': get_responsive_config('dropdown', width=width, description_width=description_width)

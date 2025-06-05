@@ -114,18 +114,14 @@ class UIFactory:
         )
 
         # Progress tracking dengan visibility control
-        progress_components = create_single_progress_tracker(
+        progress_tracker = create_single_progress_tracker(
             operation="Environment Setup"
         )
         
         # Progress container yang bisa disembunyikan
-        progress_container = VBox([
-            progress_components['progress_bar'],
-            progress_components['progress_message']
-        ], layout=widgets.Layout(
-            width='100%',
-            visibility='visible'  # Default visible
-        ))
+        progress_container = progress_tracker.container
+        progress_container.layout.width = '100%'
+        progress_container.layout.visibility = 'visible'  # Default visible
 
         # Main layout dengan urutan baru: Header → Button → Status → Progress → Log Output → Environment Summary → Tips
         ui_layout = VBox([
@@ -153,8 +149,9 @@ class UIFactory:
             'button_container': button_container,
             'log_accordion': log_components['log_accordion'],
             'log_output': log_components['log_output'],
-            'progress_bar': progress_components['progress_bar'],
-            'progress_message': progress_components['progress_message'],
+            'progress_tracker': progress_tracker,
+            'progress_bar': progress_tracker.progress_bars.get('main'),
+            'progress_message': progress_tracker.status_widget,
             'progress_container': progress_container,
             'ui_layout': ui_layout
         }

@@ -65,20 +65,20 @@ def hide_progress(ui_components: Dict[str, Any]) -> None:
 def create_progress_tracking(module_name: str = "progress", width: str = "100%") -> Dict[str, Any]:
     """Create progress tracking components menggunakan progress tracker baru"""
     # Gunakan progress tracker baru dengan single level
-    progress_components = create_single_progress_tracker()
+    progress_tracker = create_single_progress_tracker(operation=module_name)
     
     # Tambahkan referensi ke progress_tracker untuk digunakan oleh fungsi lain
     result = {
-        'progress_tracker': progress_components.get('progress_tracker'),
-        'progress_container': progress_components.get('container'),
-        'reset_progress': progress_components.get('reset_all'),
-        'update_progress': progress_components.get('update_progress'),
-        'complete_progress': progress_components.get('complete_operation'),
-        'error_progress': progress_components.get('error_operation')
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'reset_progress': progress_tracker.reset,
+        'update_progress': progress_tracker.update,
+        'complete_progress': progress_tracker.complete,
+        'error_progress': progress_tracker.error
     }
     
     # Untuk backward compatibility
-    result['progress_bar'] = progress_components.get('progress_bars', {}).get('level1')
-    result['progress_message'] = progress_components.get('messages', {}).get('level1')
+    result['progress_bar'] = progress_tracker.progress_bars.get('main')
+    result['progress_message'] = progress_tracker.status_widget
     
     return result

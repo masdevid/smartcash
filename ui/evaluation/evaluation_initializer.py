@@ -205,9 +205,4 @@ def initialize_evaluation_ui(env=None, config=None, parent_callbacks=None, **kwa
     """Factory function untuk initialize evaluation UI dengan auto-display dan parent module support"""
     initializer = EvaluationInitializer()
     ui_components = initializer.initialize(env or get_environment_manager(), config, parent_callbacks=parent_callbacks, **kwargs)
-    
-    # Auto-display main container jika ada
-    if 'main_container' in ui_components:
-        display(ui_components['main_container'])
-    
     return ui_components

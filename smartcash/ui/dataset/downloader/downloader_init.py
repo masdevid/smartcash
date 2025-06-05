@@ -70,16 +70,6 @@ def initialize_downloader_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
         
         # Initialize dengan proper error propagation
         result = initializer.initialize(env=env, config=config, **kwargs)
-        
-        # Validate result is a proper dict
-        if not result or not isinstance(result, dict):
-            raise ValueError("Initializer returned invalid result")
-        
-        # Ensure we have at least 'ui' component
-        if 'ui' not in result:
-            raise ValueError("Missing 'ui' component in result")
-        
-        # Success - return the full result
         return result
         
     except Exception as e:
@@ -87,18 +77,6 @@ def initialize_downloader_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
         error_msg = str(e)
         print(f"❌ Failed to initialize downloader UI: {error_msg}")
         
-        # Import traceback for detailed error info
-        import traceback
-        traceback.print_exc()
-        
-        # Return error dict untuk consistency dengan pattern yang ada
-        return {
-            'error': f"Failed to initialize downloader UI: {error_msg}",
-            'ui': None,
-            'initialized': False,
-            'module_name': 'downloader'
-        }
-
 # Utility functions
 def get_downloader_config() -> Dict[str, Any]:
     """Get current downloader config dengan safe access"""
@@ -110,56 +88,6 @@ def get_downloader_config() -> Dict[str, Any]:
     except Exception:
         return get_default_download_config()
 
-def validate_downloader_layout(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Validate downloader layout dengan proper checks"""
-    if not ui_components:
-        return {
-            'valid': False,
-            'message': 'UI components tidak ditemukan - panggil initialize_downloader_ui() terlebih dahulu',
-            'missing_components': []
-        }
-    
-    try:
-        initializer = create_downloader_initializer()
-        critical_components = initializer._get_critical_components()
-        
-        # Check missing components
-        missing = [comp for comp in critical_components if comp not in ui_components]
-        
-        return {
-            'valid': len(missing) == 0,
-            'message': 'Layout valid' if not missing else f'Missing components: {", ".join(missing)}',
-            'missing_components': missing,
-            'total_components': len(ui_components),
-            'critical_components': len(critical_components)
-        }
-    except Exception as e:
-        return {
-            'valid': False,
-            'message': f'Validation error: {str(e)}',
-            'missing_components': []
-        }
-
-def get_downloader_status() -> Dict[str, Any]:
-    """Get downloader status dengan comprehensive info"""
-    try:
-        initializer = create_downloader_initializer()
-        
-        return {
-            'module_name': 'downloader',
-            'initialized': True,
-            'layout_order_fixed': True,
-            'current_config': get_downloader_config(),
-            'critical_components_count': len(initializer._get_critical_components()),
-            'logger_namespace': initializer.logger_namespace,
-            'config_handler_class': initializer.config_handler_class.__name__ if initializer.config_handler_class else None
-        }
-    except Exception as e:
-        return {
-            'module_name': 'downloader',
-            'initialized': False,
-            'error': str(e)
-        }
 
 def reset_downloader_ui() -> bool:
     """Reset downloader UI dengan cleanup"""

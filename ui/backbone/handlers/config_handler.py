@@ -62,13 +62,8 @@ class BackboneConfigHandler(ConfigHandler):
         }
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari backbone configuration dengan force reset checkbox state"""
+        """Update UI dengan force reset checkbox untuk YOLOv5s model"""
         # Extract configuration values
-        backbones = config.get('backbones', {})
-        model_types = config.get('model_types', {})
-        feature_adapter = config.get('feature_adapter', {})
-        
-        # Dapatkan selected values
         selected_backbone = config.get('selected_backbone', 'efficientnet_b4')
         selected_model_type = config.get('selected_model_type', 'efficient_optimized')
         
@@ -77,28 +72,33 @@ class BackboneConfigHandler(ConfigHandler):
         model_type_mapping = get_model_type_mapping()
         mapping = model_type_mapping.get(selected_model_type, {})
         
-        # One-liner safe update function
-        safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
+        # Block change events during update
+        ui_components['_suppress_all_changes'] = True
         
-        # Update dropdown first
-        [safe_update(key, value) for key, value in [
-            ('backbone_dropdown', selected_backbone),
-            ('model_type_dropdown', selected_model_type)
-        ]]
-        
-        # Force reset checkbox state berdasarkan model_type mapping
-        checkbox_updates = [
-            ('use_attention_checkbox', mapping.get('use_attention', False), mapping.get('disable_features', False)),
-            ('use_residual_checkbox', mapping.get('use_residual', False), mapping.get('disable_features', False)),
-            ('use_ciou_checkbox', mapping.get('use_ciou', False), mapping.get('disable_features', False))
-        ]
-        
-        # Reset checkbox values dan disabled state
-        for widget_name, value, disabled in checkbox_updates:
-            if widget_name in ui_components:
-                widget = ui_components[widget_name]
-                widget.value = value  # Reset value sesuai mapping
-                widget.disabled = disabled  # Set disabled untuk YOLOv5s
+        try:
+            # Update dropdown first
+            [setattr(ui_components[key], 'value', value) for key, value in [
+                ('backbone_dropdown', selected_backbone),
+                ('model_type_dropdown', selected_model_type)
+            ] if key in ui_components and hasattr(ui_components[key], 'value')]
+            
+            # Force checkbox state berdasarkan model_type - khusus YOLOv5s
+            is_yolov5s = selected_model_type == 'yolov5s'
+            checkbox_updates = [
+                ('use_attention_checkbox', False if is_yolov5s else mapping.get('use_attention', False), is_yolov5s),
+                ('use_residual_checkbox', False if is_yolov5s else mapping.get('use_residual', False), is_yolov5s),
+                ('use_ciou_checkbox', False if is_yolov5s else mapping.get('use_ciou', False), is_yolov5s)
+            ]
+            
+            # Apply checkbox updates
+            for widget_name, value, disabled in checkbox_updates:
+                if widget_name in ui_components:
+                    widget = ui_components[widget_name]
+                    widget.value = value  # Force false untuk YOLOv5s
+                    widget.disabled = disabled  # Disable untuk YOLOv5s
+                    
+        finally:
+            ui_components['_suppress_all_changes'] = False
     
     def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Override dengan fixed status panel update"""

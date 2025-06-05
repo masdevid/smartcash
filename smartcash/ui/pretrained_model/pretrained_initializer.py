@@ -10,6 +10,7 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 from smartcash.ui.pretrained_model.components.ui_components import create_pretrained_main_ui
 from smartcash.ui.pretrained_model.handlers.pretrained_handlers import setup_pretrained_handlers
+from smartcash.ui.pretrained_model.handlers.config_handler import PretrainedModelConfigHandler
 
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
 
@@ -17,7 +18,7 @@ class PretrainedModelInitializer(CommonInitializer):
     """Initializer pretrained model terintegrasi dengan architecture yang konsisten"""
     
     def __init__(self):
-        super().__init__(MODULE_LOGGER_NAME, PRETRAINED_MODEL_LOGGER_NAMESPACE)
+        super().__init__(MODULE_LOGGER_NAME, PretrainedModelConfigHandler)
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components dengan integrasi pretrained model services"""

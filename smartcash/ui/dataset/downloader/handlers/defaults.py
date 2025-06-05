@@ -38,7 +38,7 @@ def get_default_download_config() -> Dict[str, Any]:
         
         # Cleanup settings
         'auto_cleanup_temp': True,
-        'preserve_backups': 3,
+        'preserve_backups': 1,
         'cleanup_on_exit': False,
         
         # Progress tracking
@@ -54,11 +54,11 @@ def get_default_download_config() -> Dict[str, Any]:
         # Advanced options
         'use_symlinks': False,
         'preserve_metadata': True,
-        'compress_backup': False,
+        'compress_backup': True,
         
         # Metadata
         'module_name': 'downloader',
-        'version': '1.0.0',
+        'version': '3',
         'created_by': 'SmartCash Download Module',
         'description': 'Configuration for dataset download operations (YOLOv5 format)',
         

@@ -75,7 +75,9 @@ class AugmentationInitializer(CommonInitializer):
         return [
             'ui', 'augment_button', 'check_button', 'save_button', 'reset_button',
             'num_variations', 'target_count', 'augmentation_types', 'target_split',
-            'tracker', 'log_output'
+            'tracker', 'log_output',
+            'progress_tracker', 'progress_container', 'show_for_operation', 
+            'update_progress', 'complete_operation', 'error_operation', 'reset_all'
         ]
 
 # Global instance dengan service layer integration

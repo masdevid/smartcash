@@ -56,7 +56,9 @@ class PreprocessingInitializer(CommonInitializer):
     def _get_critical_components(self) -> List[str]:
         return [
             'ui', 'preprocess_button', 'check_button', 'cleanup_button',
-            'save_button', 'reset_button', 'log_output', 'status_panel'
+            'save_button', 'reset_button', 'log_output', 'status_panel',
+            'progress_tracker', 'progress_container', 'show_for_operation', 
+            'update_progress', 'complete_operation', 'error_operation', 'reset_all'
         ]
 
 # Global instance dan public API

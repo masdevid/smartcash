@@ -80,7 +80,7 @@ class DependencyInitializer(CommonInitializer):
     
     def _get_critical_components(self) -> List[str]:
         """Critical components"""
-        return ['ui', 'install_button', 'analyze_button', 'check_button', 'save_button', 'reset_button', 'log_output', 'status_panel']
+        return ['ui', 'install_button', 'analyze_button', 'check_button', 'save_button', 'reset_button', 'log_output', 'status_panel', 'progress_tracker', 'progress_container', 'show_for_operation', 'update_progress', 'complete_operation', 'error_operation', 'reset_all']
     
     def get_current_config(self) -> Dict[str, Any]:
         """Public API untuk current config"""
@@ -130,7 +130,8 @@ def validate_dependency_setup(ui_components: Dict[str, Any] = None) -> Dict[str,
     if ui_components is None:
         return {'valid': False, 'message': 'UI components tidak ditemukan', 'missing_components': ['all']}
     
-    critical_components = ['ui', 'install_button', 'analyze_button', 'check_button', 'save_button', 'reset_button', 'log_output', 'status_panel']
+    critical_components = ['ui', 'install_button', 'analyze_button', 'check_button', 'save_button', 'reset_button', 'log_output', 'status_panel', 
+                          'progress_tracker', 'progress_container', 'show_for_operation', 'update_progress', 'complete_operation', 'error_operation', 'reset_all']
     missing_components = [comp for comp in critical_components if comp not in ui_components]
     generator_issues = any(hasattr(v, '__next__') and hasattr(v, 'close') for v in ui_components.values())
     

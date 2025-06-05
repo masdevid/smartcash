@@ -35,7 +35,8 @@ class DownloadInitializer(CommonInitializer):
     
     def _get_critical_components(self) -> List[str]:
         """Critical components dengan one-liner list"""
-        return ['ui', 'form_container', 'save_button', 'reset_button', 'download_button', 'check_button', 'cleanup_button', 'log_output', 'confirmation_area']
+        return ['ui', 'form_container', 'save_button', 'reset_button', 'download_button', 'check_button', 'cleanup_button', 'log_output', 'confirmation_area', 
+                'progress_tracker', 'progress_container', 'show_for_operation', 'update_progress', 'complete_operation', 'error_operation', 'reset_all']
 
 # Global instance
 _downloader_initializer = DownloadInitializer()

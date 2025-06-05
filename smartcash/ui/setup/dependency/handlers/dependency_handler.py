@@ -21,9 +21,31 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     # Force cleanup generators terlebih dahulu
     _cleanup_existing_generators(ui_components)
     
-    # Setup progress callback
-    ui_components['progress_callback'] = lambda **kwargs: ui_components.get('update_progress', lambda *a: None)(
-        kwargs.get('type', 'overall'), kwargs.get('progress', 0), kwargs.get('message', 'Processing...'), kwargs.get('color', None))
+    # Setup progress callback dengan support untuk progress tracker baru
+    def progress_callback(**kwargs):
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            level = kwargs.get('type', 'level1')
+            if level == 'overall':
+                level = 'level1'
+            elif level == 'step':
+                level = 'level2'
+            progress_tracker.update(
+                level, 
+                kwargs.get('progress', 0), 
+                kwargs.get('message', 'Processing...'),
+                kwargs.get('color', None)
+            )
+        else:
+            # Fallback untuk progress tracking lama
+            ui_components.get('update_progress', lambda *a: None)(
+                kwargs.get('type', 'overall'), 
+                kwargs.get('progress', 0), 
+                kwargs.get('message', 'Processing...'), 
+                kwargs.get('color', None)
+            )
+    
+    ui_components['progress_callback'] = progress_callback
     
     # Setup button state manager dengan error handling
     try:

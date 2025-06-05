@@ -10,7 +10,7 @@ from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.components.action_buttons import create_action_buttons
-from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
@@ -102,8 +102,8 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Log accordion
     log_components = create_log_accordion(module_name='dependency', height='280px')
     
-    # Progress tracking
-    progress_components = create_progress_tracking_container()
+    # Progress components
+    progress_components = create_dual_progress_tracker()
     
     # Help content
     help_content = """

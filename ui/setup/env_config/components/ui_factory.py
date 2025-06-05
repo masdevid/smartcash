@@ -9,7 +9,7 @@ from ipywidgets import HBox, VBox, Label, Button, Output, HTML
 
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.components.status_panel import create_status_panel
-from smartcash.ui.setup.env_config.components.progress_tracking import create_progress_tracking
+from smartcash.ui.components.progress_tracker import create_single_progress_tracker
 from smartcash.ui.components.log_accordion import create_log_accordion
 
 class UIFactory:
@@ -114,7 +114,7 @@ class UIFactory:
         )
 
         # Progress tracking dengan visibility control
-        progress_components = create_progress_tracking(
+        progress_components = create_single_progress_tracker(
             module_name="env_config",
             width='100%'
         )

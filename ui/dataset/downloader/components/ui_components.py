@@ -5,7 +5,7 @@ Deskripsi: Enhanced UI components dengan form backup_dir/preprocessed_dir dan fi
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
 from smartcash.ui.utils.ui_logger_namespace import get_namespace_color
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
@@ -52,8 +52,8 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
     # 7. Action buttons dengan state management
     action_components = _create_state_managed_action_buttons()
     
-    # 8. Enhanced progress tracking container
-    progress_components = create_progress_tracking_container()
+    # 8. Enhanced progress tracking container dengan dual level untuk overall dan step progress
+    progress_components = create_dual_progress_tracker()
     progress_components['container'].layout.display = 'none'
     
     # 9. Log output - accordion terbuka by default

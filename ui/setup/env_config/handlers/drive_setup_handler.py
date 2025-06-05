@@ -387,12 +387,25 @@ class DriveSetupHandler:
     
     def _update_progress(self, value: float, message: str = ""):
         """Update progress dengan error handling"""
-        if 'progress_bar' in self.ui_components:
-            try:
-                from smartcash.ui.setup.env_config.components.progress_tracking import update_progress
-                update_progress(self.ui_components, int(value * 100), 100, message)
-            except ImportError:
-                pass
+        try:
+            # Cek apakah progress_tracker tersedia
+            if 'progress_tracker' in self.ui_components and self.ui_components['progress_tracker']:
+                # Gunakan progress tracker baru
+                progress_tracker = self.ui_components['progress_tracker']
+                progress_tracker.update('level1', int(value * 100), message)
+            # Fallback ke progress bar lama
+            elif 'progress_bar' in self.ui_components:
+                from smartcash.ui.components.progress_tracker import update_progress
+                progress_bar = self.ui_components.get('progress_bar')
+                if progress_bar:
+                    progress_bar.value = int(value * 100)
+                    progress_bar.description = f"{int(value * 100)}%"
+                    
+                if 'progress_message' in self.ui_components and message:
+                    self.ui_components['progress_message'].value = message
+        except Exception as e:
+            # Silent failure untuk mencegah error pada proses utama
+            pass
     
     def _is_colab(self) -> bool:
         """Check apakah berjalan di Colab"""

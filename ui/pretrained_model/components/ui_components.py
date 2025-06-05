@@ -10,7 +10,7 @@ from smartcash.ui.components.header import create_header
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.action_buttons import create_action_buttons
 from smartcash.ui.components.log_accordion import create_log_accordion
-from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
 from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.pretrained_model.constants.model_constants import MODEL_CONFIGS, DEFAULT_MODELS_DIR, DEFAULT_DRIVE_MODELS_DIR
@@ -63,8 +63,8 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Log accordion
     log_components = create_log_accordion(module_name='pretrained_model', height='220px')
     
-    # Progress tracking
-    progress_components = create_progress_tracking_container()
+    # Progress tracking dengan dual level untuk overall dan step progress
+    progress_components = create_dual_progress_tracker()
     
     # Help panel
     help_content = """

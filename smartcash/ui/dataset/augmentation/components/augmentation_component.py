@@ -19,7 +19,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
     from smartcash.ui.utils.layout_utils import create_divider
     from smartcash.ui.components.action_buttons import create_action_buttons
-    from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+    from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
@@ -65,7 +65,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         width='100%', margin='8px 0', overflow='hidden'
     ))
     
-    progress_components = create_progress_tracking_container()
+    # Progress tracking dengan dual level untuk overall dan step progress
+    progress_components = create_dual_progress_tracker()
     log_components = create_log_accordion('augmentation', '200px')
     help_panel = get_augmentation_info()
 

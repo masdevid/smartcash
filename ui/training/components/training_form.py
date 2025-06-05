@@ -9,7 +9,7 @@ from typing import Dict, Any
 def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create training form dengan YAML config integration - refresh button external"""
     try:
-        from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+        from smartcash.ui.components.progress_tracker import create_three_progress_tracker
         from smartcash.ui.components.log_accordion import create_log_accordion
         from smartcash.ui.components.status_panel import create_status_panel
         from smartcash.ui.training.components.config_tabs import create_config_tabs
@@ -17,8 +17,8 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         # Control buttons dengan YAML-based model info
         control_buttons = _create_enhanced_control_buttons(config)
         
-        # Progress tracking dengan existing component
-        progress_components = create_progress_tracking_container()
+        # Progress tracking dengan three level untuk training epochs, batches, dan metrics
+        progress_components = create_three_progress_tracker()
         
         # Status panel dengan model-specific message
         model_type = config.get('model', {}).get('type', 'efficient_basic')

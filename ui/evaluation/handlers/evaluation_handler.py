@@ -403,7 +403,7 @@ def load_ground_truth_labels(test_folder: str, image_files: List[Path], logger, 
 def setup_progress_handlers(ui_components: Dict[str, Any]) -> None:
     """Setup handlers untuk progress tracking selama evaluation"""
     
-    # Progress update handlers sudah di-handle di create_progress_tracking_container
+    # Progress update handlers sudah di-handle di create_dual_progress_tracker
     # Ini untuk additional setup jika diperlukan
     
     if 'progress_container' in ui_components:

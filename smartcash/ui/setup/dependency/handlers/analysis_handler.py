@@ -36,33 +36,68 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
     
     logger = ui_components.get('logger')  # Get logger from ui_components
     
+    # Get progress tracker jika tersedia
+    progress_tracker = ui_components.get('progress_tracker')
+    
     try:
         # Step 1: Initialize analysis
-        ctx.stepped_progress('ANALYSIS_INIT', "Memulai analisis...")
+        if progress_tracker:
+            progress_tracker.show("Analisis Dependensi", ["Persiapan", "Scanning", "Evaluasi", "Laporan"])
+            progress_tracker.update('level1', 10, "Memulai analisis...")
+            progress_tracker.update('level2', 25, "Inisialisasi...")
+        else:
+            ctx.stepped_progress('ANALYSIS_INIT', "Memulai analisis...")
+            
         log_to_ui_safe(ui_components, "🔍 Memulai analisis dependensi...")
 
         # Step 2: Get installed packages
-        ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "Mendapatkan daftar packages...")
+        if progress_tracker:
+            progress_tracker.update('level1', 30, "Scanning packages...")
+            progress_tracker.update('level2', 50, "Mendapatkan daftar packages...")
+        else:
+            ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "Mendapatkan daftar packages...")
+            
         installed_packages = get_installed_packages_dict()
         log_to_ui_safe(ui_components, f"📦 Found {len(installed_packages)} installed packages")
 
         # Step 3: Get package categories dan reset status
-        ctx.stepped_progress('ANALYSIS_CATEGORIES', "Menganalisis categories...")
+        if progress_tracker:
+            progress_tracker.update('level1', 50, "Evaluasi packages...")
+            progress_tracker.update('level2', 75, "Menganalisis categories...")
+        else:
+            ctx.stepped_progress('ANALYSIS_CATEGORIES', "Menganalisis categories...")
+            
         package_categories = get_package_categories()
         _reset_all_package_status_to_checking(ui_components, package_categories)
         
         # Step 4: Analyze packages status
-        ctx.stepped_progress('ANALYSIS_CHECK', "Checking package status...")
+        if progress_tracker:
+            progress_tracker.update('level1', 70, "Checking packages...")
+            progress_tracker.update('level2', 85, "Memulai pengecekan")
+        else:
+            ctx.stepped_progress('ANALYSIS_CHECK', "Checking package status...")
+            
         analysis_results = _analyze_packages_with_utils(
             package_categories, installed_packages, ui_components, ctx, logger
         )
         
         # Step 5: Update UI dan generate report
-        ctx.stepped_progress('ANALYSIS_UPDATE_UI', "Updating UI...")
+        if progress_tracker:
+            progress_tracker.update('level1', 90, "Generating report...")
+            progress_tracker.update('level2', 95, "Updating UI...")
+        else:
+            ctx.stepped_progress('ANALYSIS_UPDATE_UI', "Updating UI...")
+            
         _finalize_analysis_results(ui_components, analysis_results, ctx, logger)
         
-        ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai", "overall")
-        ctx.stepped_progress('ANALYSIS_COMPLETE', "Complete", "step")
+        # Complete operation
+        if progress_tracker:
+            progress_tracker.update('level1', 100, "Analisis selesai")
+            progress_tracker.update('level2', 100, "Complete")
+            progress_tracker.complete()
+        else:
+            ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai", "overall")
+            ctx.stepped_progress('ANALYSIS_COMPLETE', "Complete", "step")
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menganalisis dependensi: {str(e)}", "error")
@@ -72,6 +107,9 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
 def _analyze_packages_with_utils(package_categories: list, installed_packages: Dict[str, str], 
                                 ui_components: Dict[str, Any], ctx, logger) -> Dict[str, Any]:
     """Analyze packages dengan fixed logger reference"""
+    
+    # Get progress tracker jika tersedia
+    progress_tracker = ui_components.get('progress_tracker')
     
     analysis_results = {'installed': [], 'missing': [], 'upgrade_needed': [], 'package_details': {}}
     total_packages = sum(len(category['packages']) for category in package_categories)
@@ -85,8 +123,16 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
     # Process results
     for (package, category_name), requirement in zip(all_packages, package_requirements):
         current_package += 1
-        progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
-        ctx.progress_tracker('overall', progress, f"Analyzing {package['name']}...")
+        progress = int((current_package / total_packages) * 100)
+        
+        # Update progress
+        if progress_tracker:
+            progress_tracker.update('level1', 70 + int((current_package / total_packages) * 20), 
+                                   f"Analyzing packages: {current_package}/{total_packages}")
+            progress_tracker.update('level2', progress, f"Analyzing {package['name']}...")
+        else:
+            progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
+            ctx.progress_tracker('overall', progress, f"Analyzing {package['name']}...")
         
         package_key, status_info = package['key'], batch_status[requirement]
         
@@ -123,6 +169,9 @@ def _map_status_to_ui(status: str) -> str:
 
 def _finalize_analysis_results(ui_components: Dict[str, Any], analysis_results: Dict[str, Any], ctx, logger):
     """Finalize analysis results dengan comprehensive reporting"""
+    
+    # Get progress tracker jika tersedia
+    progress_tracker = ui_components.get('progress_tracker')
     
     installed_count, missing_count, upgrade_count = len(analysis_results['installed']), len(analysis_results['missing']), len(analysis_results['upgrade_needed'])
     total_count = installed_count + missing_count + upgrade_count

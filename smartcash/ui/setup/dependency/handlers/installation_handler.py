@@ -36,9 +36,18 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
     logger = ui_components.get('logger')  # Get logger from ui_components
     start_time = time.time()
     
+    # Get progress tracker jika tersedia
+    progress_tracker = ui_components.get('progress_tracker')
+    
     try:
         # Step 1: Get selected packages
-        ctx.stepped_progress('INSTALL_INIT', "Mempersiapkan instalasi...")
+        if progress_tracker:
+            progress_tracker.show("Instalasi Packages", ["Persiapan", "Analisis", "Instalasi", "Finalisasi"])
+            progress_tracker.update('level1', 10, "Mempersiapkan instalasi...")
+            progress_tracker.update('level2', 25, "Mengumpulkan packages...")
+        else:
+            ctx.stepped_progress('INSTALL_INIT', "Mempersiapkan instalasi...")
+        
         log_to_ui_safe(ui_components, "🚀 Memulai proses instalasi packages")
         
         selected_packages = get_selected_packages(ui_components)
@@ -48,7 +57,12 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             return
         
         # Step 2: Filter uninstalled packages
-        ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
+        if progress_tracker:
+            progress_tracker.update('level1', 30, "Menganalisis packages...")
+            progress_tracker.update('level2', 50, f"Menganalisis {len(selected_packages)} packages...")
+        else:
+            ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
+        
         log_to_ui_safe(ui_components, f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
         
         def package_logger_func(msg):
@@ -59,23 +73,39 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         if not packages_to_install:
             log_to_ui_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar")
             
-            # Complete operation
-            ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
-            ui_components.get('update_progress', lambda *a: None)('step', 100, "Complete")
-            ui_components.get('complete_operation', lambda x: None)("Semua packages sudah terinstall dengan benar")
+            # Complete operation dengan progress tracker baru
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker:
+                progress_tracker.update('level1', 100, "Semua packages sudah terinstall")
+                progress_tracker.update('level2', 100, "Complete")
+                progress_tracker.complete()
+            else:
+                # Fallback untuk progress tracking lama
+                ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
+                ui_components.get('update_progress', lambda *a: None)('step', 100, "Complete")
+                ui_components.get('complete_operation', lambda x: None)("Semua packages sudah terinstall dengan benar")
+            
             update_status_panel(ui_components, "✅ Semua packages sudah terinstall", "success")
             
             # Hide progress bars setelah delay
             import threading
             def hide_progress_delayed():
                 time.sleep(2)
-                ui_components.get('reset_all', lambda: None)()
+                if progress_tracker:
+                    progress_tracker.reset()
+                else:
+                    ui_components.get('reset_all', lambda: None)()
             
             threading.Thread(target=hide_progress_delayed, daemon=True).start()
             return
         
         # Step 3: Install packages dengan parallel processing
-        ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
+        if progress_tracker:
+            progress_tracker.update('level1', 50, f"Installing packages...")
+            progress_tracker.update('level2', 75, f"Memulai instalasi {len(packages_to_install)} packages...")
+        else:
+            ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
+        
         log_to_ui_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages dengan parallel processing")
         
         installation_results = _install_packages_parallel_with_utils(
@@ -83,16 +113,27 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         )
         
         # Step 4: Finalize dan generate report
-        ctx.stepped_progress('INSTALL_FINALIZE', "Finalisasi instalasi...")
-        duration = time.time() - start_time
+        if progress_tracker:
+            progress_tracker.update('level1', 80, "Finalizing installation...")
+            progress_tracker.update('level2', 90, "Generating report...")
+        else:
+            ctx.stepped_progress('INSTALL_FINALIZE', "Finalizing installation...")
         
-        log_to_ui_safe(ui_components, f"⏱️ Installation selesai dalam {duration:.1f} detik")
+        log_to_ui_safe(ui_components, "📊 Generating installation report...")
+        
+        log_to_ui_safe(ui_components, f"⏱️ Installation selesai dalam {time.time() - start_time:.1f} detik")
         
         # Update all package status dan generate report
-        _finalize_installation_results(ui_components, installation_results, duration, logger)
+        _finalize_installation_results(ui_components, installation_results, time.time() - start_time, logger)
         
-        ctx.stepped_progress('INSTALL_FINALIZE', "Instalasi selesai", "overall")
-        ctx.stepped_progress('INSTALL_FINALIZE', "Complete", "step")
+        # Complete operation
+        if progress_tracker:
+            progress_tracker.update('level1', 100, "Installation complete")
+            progress_tracker.update('level2', 100, "Complete")
+            progress_tracker.complete()
+        else:
+            ctx.stepped_progress('INSTALL_COMPLETE', "Installation complete", "overall")
+            ctx.stepped_progress('INSTALL_COMPLETE', "Complete", "step")
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menginstal dependensi: {str(e)}", "error")
@@ -105,32 +146,51 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
     
     results = {}
     total_packages = len(packages)
-    completed_packages = 0
+    completed_count = 0
     
+    # Update progress
     def update_installation_progress(package: str, success: bool):
-        nonlocal completed_packages
-        completed_packages += 1
+        nonlocal completed_count
+        completed_count += 1
+        progress = int((completed_count / total_packages) * 100)
         
-        # Calculate progress (20% start + 70% for installation)
-        installation_progress = int((completed_packages / total_packages) * 70)
-        overall_progress = ProgressSteps.INSTALL_START + installation_progress
+        # Get progress tracker jika tersedia
+        progress_tracker = ui_components.get('progress_tracker')
         
-        # Update progress
-        ctx.progress_tracker('overall', overall_progress, f"Installing package {completed_packages}/{total_packages}")
-        ctx.progress_tracker('step', int((completed_packages / total_packages) * 100), f"Package {completed_packages}/{total_packages}")
+        # Update progress bars
+        if progress_tracker:
+            progress_tracker.update(
+                'level1', 
+                50 + int((completed_count / total_packages) * 30),
+                f"Installing packages: {completed_count}/{total_packages}"
+            )
+            
+            progress_tracker.update(
+                'level2', 
+                progress,
+                f"{package}: {'✅ Success' if success else '❌ Failed'}",
+                'green' if success else 'red'
+            )
+        else:
+            ui_components.get('update_progress', lambda *a: None)(
+                'overall', 
+                ProgressSteps.INSTALL_START + int((completed_count / total_packages) * 30),
+                f"Installing packages: {completed_count}/{total_packages}"
+            )
+            
+            ui_components.get('update_progress', lambda *a: None)(
+                'step', 
+                progress,
+                f"{package}: {'✅ Success' if success else '❌ Failed'}",
+                'green' if success else 'red'
+            )
         
         # Update package status
-        package_name = package.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
-        status = 'installed' if success else 'error'
-        update_package_status_by_name(ui_components, package_name, status)
+        update_package_status_by_name(ui_components, package, 'installed' if success else 'error')
         
         # Log progress
         status_emoji = "✅" if success else "❌"
-        progress_msg = f"{status_emoji} {package_name}: {'Success' if success else 'Failed'} ({completed_packages}/{total_packages})"
-        logger_func(progress_msg)
-        
-        # Update check/uncheck count display removed
-        # Check/uncheck functionality removed
+        logger_func(f"{status_emoji} {package}: {completed_count}/{total_packages} ({progress}%)")
     
     # Get installation configuration
     max_workers = min(len(packages), config.get('installation', {}).get('parallel_workers', 3))

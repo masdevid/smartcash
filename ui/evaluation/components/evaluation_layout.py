@@ -8,14 +8,14 @@ from typing import Dict, Any
 from smartcash.ui.utils.header_utils import create_header, create_section_title
 from smartcash.ui.utils.layout_utils import create_responsive_two_column, create_divider
 from smartcash.ui.evaluation.components.evaluation_form import create_metrics_display
-from smartcash.ui.components.progress_tracking import create_progress_tracking_container
+from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
 from smartcash.ui.components.log_accordion import create_log_accordion
 
 def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Buat layout untuk evaluation UI dengan flex layout dan mencegah horizontal scrollbar"""
     
-    # Progress tracking container
-    progress_components = create_progress_tracking_container()
+    # Progress tracking container dengan dual level untuk overall dan step progress
+    progress_components = create_dual_progress_tracker()
     
     # Log accordion untuk evaluation logs
     log_components = create_log_accordion('evaluation', height='250px')

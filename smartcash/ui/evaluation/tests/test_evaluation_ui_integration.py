@@ -127,7 +127,7 @@ class TestEvaluationUIIntegration(unittest.TestCase):
         # Panggil fungsi dengan patching
         with patch('smartcash.ui.evaluation.components.evaluation_layout.create_section_title') as mock_section_title:
             with patch('smartcash.ui.evaluation.components.evaluation_form.create_metrics_display'):
-                with patch('smartcash.ui.components.progress_tracking.create_progress_tracking_container'):
+                with patch('smartcash.ui.components.progress_tracker.create_dual_progress_tracker'):
                     with patch('smartcash.ui.components.log_accordion.create_log_accordion'):
                         mock_section_title.return_value = widgets.HTML()
                         result = create_evaluation_layout(form_components, self.config)

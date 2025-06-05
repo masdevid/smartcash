@@ -5,11 +5,12 @@ Deskripsi: Initializer untuk backbone configuration menggunakan backbone_config.
 
 from typing import Dict, Any, Optional
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
-
+MODULE_NAME = 'backbone'
+MODULE_CONFIG = MODULE_NAME+"_config"
 class BackboneInitializer(ConfigCellInitializer):
     """Config cell initializer untuk backbone configuration menggunakan backbone_config.yaml"""
     
-    def __init__(self, module_name='backbone', config_filename='backbone_config', config_handler_class=None, parent_module=None):
+    def __init__(self, module_name=MODULE_NAME, config_filename=MODULE_CONFIG, config_handler_class=None, parent_module=None):
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
@@ -45,8 +46,8 @@ def initialize_backbone_config(env=None, config=None, parent_callbacks=None, **k
     
     return create_config_cell(
         BackboneInitializer, 
-        'backbone', 
-        'backbone_config', 
+        MODULE_NAME, 
+        MODULE_CONFIG,
         env=env, 
         config=config, 
         config_handler_class=BackboneConfigHandler,

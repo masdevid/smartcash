@@ -135,17 +135,19 @@ def _update_feature_checkboxes(ui_components: Dict[str, Any], mapping: Dict[str,
      for widget_name, disabled, _ in checkbox_updates]
 
 def _force_update_feature_checkboxes(ui_components: Dict[str, Any], mapping: Dict[str, Any]) -> None:
-    """Force update feature checkboxes dengan nilai dari mapping"""
+    """Force reset dan update feature checkboxes dengan nilai dari mapping"""
     checkbox_updates = [
         ('use_attention_checkbox', mapping.get('disable_features', False), mapping.get('use_attention', False)),
         ('use_residual_checkbox', mapping.get('disable_features', False), mapping.get('use_residual', False)),
         ('use_ciou_checkbox', mapping.get('disable_features', False), mapping.get('use_ciou', False))
     ]
     
-    # Force update value dan disabled state
-    [(setattr(ui_components.get(widget_name), 'disabled', disabled) or 
-      setattr(ui_components.get(widget_name), 'value', value)) if widget_name in ui_components else None
-     for widget_name, disabled, value in checkbox_updates]
+    # Force reset value first, then update disabled state - fix untuk YOLOv5s
+    for widget_name, disabled, value in checkbox_updates:
+        if widget_name in ui_components:
+            widget = ui_components[widget_name]
+            widget.value = value  # Reset value first
+            widget.disabled = disabled  # Then set disabled state
 
 def _update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
     """Update status panel dengan single icon dan clean message"""

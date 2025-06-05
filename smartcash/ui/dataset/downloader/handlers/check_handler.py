@@ -1,26 +1,25 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/check_handler.py
-Deskripsi: Handler untuk check dataset operation tanpa konfirmasi dengan progress tracking
+Deskripsi: Fixed check handler tanpa threading dan dengan synchronous execution
 """
 
 from typing import Dict, Any, Callable
-import threading
 from smartcash.ui.utils.fallback_utils import show_status_safe
 from smartcash.dataset.downloader.roboflow_client import create_roboflow_client
 from smartcash.dataset.utils.path_validator import get_path_validator
 
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Setup check handler tanpa konfirmasi"""
+    """Setup check handler tanpa konfirmasi dan tanpa threading"""
     
     def handle_check(button):
-        """Handle check dataset operation dengan progress tracking"""
+        """Handle check dataset operation secara synchronous"""
         button.disabled = True
         
         try:
             # Get current config
             config_handler = ui_components.get('config_handler')
             if not config_handler:
-                show_status_safe("❌ Config handler tidak ditemukan", "error", ui_components)
+                show_status_safe(ui_components, "❌ Config handler tidak ditemukan", "error")
                 return
             
             current_config = config_handler.extract_config(ui_components)
@@ -28,98 +27,92 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], l
             # Basic validation
             validation = config_handler.validate_config(current_config)
             if not validation['valid']:
-                show_status_safe(f"❌ Config tidak valid: {'; '.join(validation['errors'])}", "error", ui_components)
+                show_status_safe(ui_components, f"❌ Config tidak valid: {'; '.join(validation['errors'])}", "error")
                 return
             
-            # Execute check tanpa konfirmasi
-            _execute_check(ui_components, current_config, logger)
+            # Execute check secara synchronous
+            _execute_check_sync(ui_components, current_config, logger)
             
         except Exception as e:
             logger.error(f"❌ Error check handler: {str(e)}")
-            show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
+            show_status_safe(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
             button.disabled = False
     
     return handle_check
 
-def _execute_check(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute check operation dengan progress tracking"""
+def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
+    """Execute check operation secara synchronous"""
     
-    def check_thread():
-        """Check thread dengan progress steps"""
-        try:
-            # Show progress
-            progress_tracker = ui_components.get('tracker')
-            if progress_tracker:
-                progress_tracker.show('check')
-                progress_tracker.update('overall', 0, "🔍 Memulai pengecekan dataset...")
-            
-            workspace = config['workspace']
-            project = config['project']
-            version = config['version']
-            api_key = config['api_key']
-            
-            dataset_id = f"{workspace}/{project}:v{version}"
-            
-            # Step 1: Check Roboflow connection
-            if progress_tracker:
-                progress_tracker.update('overall', 10, "🌐 Mengecek koneksi Roboflow...")
-            
-            roboflow_client = create_roboflow_client(api_key, logger)
-            
-            # Step 2: Validate credentials
-            if progress_tracker:
-                progress_tracker.update('overall', 30, "🔑 Validasi kredensial...")
-            
-            cred_result = roboflow_client.validate_credentials(workspace, project)
-            if not cred_result['valid']:
-                error_msg = f"❌ Kredensial tidak valid: {cred_result['message']}"
-                if progress_tracker:
-                    progress_tracker.error(error_msg)
-                show_status_safe(error_msg, "error", ui_components)
-                return
-            
-            # Step 3: Get dataset metadata
-            if progress_tracker:
-                progress_tracker.update('overall', 50, "📊 Mengambil metadata dataset...")
-            
-            metadata_result = roboflow_client.get_dataset_metadata(workspace, project, version)
-            if metadata_result['status'] != 'success':
-                error_msg = f"❌ Gagal ambil metadata: {metadata_result['message']}"
-                if progress_tracker:
-                    progress_tracker.error(error_msg)
-                show_status_safe(error_msg, "error", ui_components)
-                return
-            
-            # Step 4: Check local dataset
-            if progress_tracker:
-                progress_tracker.update('overall', 70, "📁 Mengecek dataset lokal...")
-            
-            local_check = _check_local_dataset(config)
-            
-            # Step 5: Generate report
-            if progress_tracker:
-                progress_tracker.update('overall', 90, "📋 Menyusun laporan...")
-            
-            report = _generate_check_report(metadata_result['data'], local_check, dataset_id)
-            
-            # Show results
-            if progress_tracker:
-                progress_tracker.complete("✅ Pengecekan selesai")
-            
-            show_status_safe(report, "info", ui_components)
-            logger.info(f"📊 Check completed: {dataset_id}")
-            
-        except Exception as e:
-            error_msg = f"❌ Error saat check: {str(e)}"
+    try:
+        # Show progress
+        progress_tracker = ui_components.get('tracker')
+        if progress_tracker:
+            progress_tracker.show('check')
+            progress_tracker.update('overall', 0, "🔍 Memulai pengecekan dataset...")
+        
+        workspace = config['workspace']
+        project = config['project']
+        version = config['version']
+        api_key = config['api_key']
+        
+        dataset_id = f"{workspace}/{project}:v{version}"
+        
+        # Step 1: Check Roboflow connection
+        if progress_tracker:
+            progress_tracker.update('overall', 10, "🌐 Mengecek koneksi Roboflow...")
+        
+        roboflow_client = create_roboflow_client(api_key, logger)
+        
+        # Step 2: Validate credentials
+        if progress_tracker:
+            progress_tracker.update('overall', 30, "🔑 Validasi kredensial...")
+        
+        cred_result = roboflow_client.validate_credentials(workspace, project)
+        if not cred_result['valid']:
+            error_msg = f"❌ Kredensial tidak valid: {cred_result['message']}"
             if progress_tracker:
                 progress_tracker.error(error_msg)
-            show_status_safe(error_msg, "error", ui_components)
-            logger.error(error_msg)
-    
-    # Start check thread
-    thread = threading.Thread(target=check_thread, daemon=True)
-    thread.start()
+            show_status_safe(ui_components, error_msg, "error")
+            return
+        
+        # Step 3: Get dataset metadata
+        if progress_tracker:
+            progress_tracker.update('overall', 50, "📊 Mengambil metadata dataset...")
+        
+        metadata_result = roboflow_client.get_dataset_metadata(workspace, project, version)
+        if metadata_result['status'] != 'success':
+            error_msg = f"❌ Gagal ambil metadata: {metadata_result['message']}"
+            if progress_tracker:
+                progress_tracker.error(error_msg)
+            show_status_safe(ui_components, error_msg, "error")
+            return
+        
+        # Step 4: Check local dataset
+        if progress_tracker:
+            progress_tracker.update('overall', 70, "📁 Mengecek dataset lokal...")
+        
+        local_check = _check_local_dataset(config)
+        
+        # Step 5: Generate report
+        if progress_tracker:
+            progress_tracker.update('overall', 90, "📋 Menyusun laporan...")
+        
+        report = _generate_check_report(metadata_result['data'], local_check, dataset_id)
+        
+        # Show results
+        if progress_tracker:
+            progress_tracker.complete("✅ Pengecekan selesai")
+        
+        show_status_safe(ui_components, report, "info")
+        logger.info(f"📊 Check completed: {dataset_id}")
+        
+    except Exception as e:
+        error_msg = f"❌ Error saat check: {str(e)}"
+        if progress_tracker:
+            progress_tracker.error(error_msg)
+        show_status_safe(ui_components, error_msg, "error")
+        logger.error(error_msg)
 
 def _check_local_dataset(config: Dict[str, Any]) -> Dict[str, Any]:
     """Check existing local dataset dengan path validator"""

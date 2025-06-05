@@ -1,17 +1,16 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/cleanup_handler.py
-Deskripsi: Handler untuk cleanup operation dengan konfirmasi dan progress tracking
+Deskripsi: Fixed cleanup handler tanpa threading dan dengan synchronous execution
 """
 
 from typing import Dict, Any, Callable
-import threading
 from smartcash.ui.utils.fallback_utils import show_status_safe
 from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
 from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrganizer
 from smartcash.dataset.utils.path_validator import get_path_validator
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Setup cleanup handler dengan konfirmasi destruktif"""
+    """Setup cleanup handler dengan konfirmasi destruktif dan tanpa threading"""
     
     def handle_cleanup(button):
         """Handle cleanup operation dengan konfirmasi"""
@@ -22,7 +21,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any],
             cleanup_info = _get_cleanup_info()
             
             if cleanup_info['total_files'] == 0:
-                show_status_safe("ℹ️ Tidak ada file untuk dibersihkan", "info", ui_components)
+                show_status_safe(ui_components, "ℹ️ Tidak ada file untuk dibersihkan", "info")
                 return
             
             # Show confirmation dialog
@@ -30,7 +29,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any],
             
         except Exception as e:
             logger.error(f"❌ Error cleanup handler: {str(e)}")
-            show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
+            show_status_safe(ui_components, f"❌ Error: {str(e)}", "error")
         finally:
             button.disabled = False
     
@@ -108,7 +107,7 @@ Akan menghapus {total_files:,} file dari:
 💾 Pastikan Anda sudah backup data penting
 
 Lanjutkan cleanup?""",
-        on_confirm=lambda b: _execute_cleanup(ui_components, cleanup_info, logger),
+        on_confirm=lambda b: _execute_cleanup_sync(ui_components, cleanup_info, logger),
         on_cancel=lambda b: _clear_confirmation_area(ui_components),
         item_name="Dataset",
         confirm_text="Ya, Hapus Semua",
@@ -117,65 +116,59 @@ Lanjutkan cleanup?""",
     
     _show_in_confirmation_area(ui_components, confirmation_dialog)
 
-def _execute_cleanup(ui_components: Dict[str, Any], cleanup_info: Dict[str, Any], logger) -> None:
-    """Execute cleanup operation dengan progress tracking"""
+def _execute_cleanup_sync(ui_components: Dict[str, Any], cleanup_info: Dict[str, Any], logger) -> None:
+    """Execute cleanup operation secara synchronous"""
     
-    def cleanup_thread():
-        """Cleanup thread dengan progress tracking"""
-        try:
-            # Clear confirmation area
-            _clear_confirmation_area(ui_components)
+    try:
+        # Clear confirmation area
+        _clear_confirmation_area(ui_components)
+        
+        # Show progress
+        progress_tracker = ui_components.get('tracker')
+        if progress_tracker:
+            progress_tracker.show('cleanup')
+            progress_tracker.update('overall', 0, "🧹 Memulai cleanup dataset...")
+        
+        # Create organizer untuk cleanup
+        organizer = DatasetOrganizer(logger)
+        
+        # Setup progress callback
+        if progress_tracker:
+            organizer.set_progress_callback(_create_cleanup_progress_callback(progress_tracker, logger))
+        
+        # Execute cleanup secara synchronous
+        result = organizer.cleanup_all_dataset_folders()
+        
+        # Handle result
+        if result['status'] == 'success':
+            files_removed = result['stats']['total_files_removed']
+            folders_cleaned = len(result['stats']['folders_cleaned'])
             
-            # Show progress
-            progress_tracker = ui_components.get('tracker')
             if progress_tracker:
-                progress_tracker.show('cleanup')
-                progress_tracker.update('overall', 0, "🧹 Memulai cleanup dataset...")
+                progress_tracker.complete(f"✅ Cleanup selesai: {files_removed:,} file dihapus")
             
-            # Create organizer untuk cleanup
-            organizer = DatasetOrganizer(logger)
+            success_msg = f"✅ Dataset berhasil dibersihkan: {files_removed:,} file dari {folders_cleaned} folder"
+            show_status_safe(ui_components, success_msg, "success")
+            logger.success(success_msg)
             
-            # Setup progress callback
+        elif result['status'] == 'empty':
             if progress_tracker:
-                organizer.set_progress_callback(_create_cleanup_progress_callback(progress_tracker, logger))
+                progress_tracker.complete("ℹ️ Tidak ada file untuk dihapus")
+            show_status_safe(ui_components, "ℹ️ Tidak ada file dataset untuk dibersihkan", "info")
             
-            # Execute cleanup
-            result = organizer.cleanup_all_dataset_folders()
-            
-            # Handle result
-            if result['status'] == 'success':
-                files_removed = result['stats']['total_files_removed']
-                folders_cleaned = len(result['stats']['folders_cleaned'])
-                
-                if progress_tracker:
-                    progress_tracker.complete(f"✅ Cleanup selesai: {files_removed:,} file dihapus")
-                
-                success_msg = f"✅ Dataset berhasil dibersihkan: {files_removed:,} file dari {folders_cleaned} folder"
-                show_status_safe(success_msg, "success", ui_components)
-                logger.success(success_msg)
-                
-            elif result['status'] == 'empty':
-                if progress_tracker:
-                    progress_tracker.complete("ℹ️ Tidak ada file untuk dihapus")
-                show_status_safe("ℹ️ Tidak ada file dataset untuk dibersihkan", "info", ui_components)
-                
-            else:
-                error_msg = f"❌ Cleanup gagal: {result.get('message', 'Unknown error')}"
-                if progress_tracker:
-                    progress_tracker.error(error_msg)
-                show_status_safe(error_msg, "error", ui_components)
-                logger.error(error_msg)
-                
-        except Exception as e:
-            error_msg = f"❌ Error saat cleanup: {str(e)}"
+        else:
+            error_msg = f"❌ Cleanup gagal: {result.get('message', 'Unknown error')}"
             if progress_tracker:
                 progress_tracker.error(error_msg)
-            show_status_safe(error_msg, "error", ui_components)
+            show_status_safe(ui_components, error_msg, "error")
             logger.error(error_msg)
-    
-    # Start cleanup thread
-    thread = threading.Thread(target=cleanup_thread, daemon=True)
-    thread.start()
+            
+    except Exception as e:
+        error_msg = f"❌ Error saat cleanup: {str(e)}"
+        if progress_tracker:
+            progress_tracker.error(error_msg)
+        show_status_safe(ui_components, error_msg, "error")
+        logger.error(error_msg)
 
 def _create_cleanup_progress_callback(progress_tracker, logger) -> Callable:
     """Create progress callback untuk cleanup operations"""
@@ -202,12 +195,15 @@ def _show_in_confirmation_area(ui_components: Dict[str, Any], dialog_widget) -> 
     """Show dialog dalam confirmation area"""
     confirmation_area = ui_components.get('confirmation_area')
     if confirmation_area:
+        confirmation_area.layout.display = 'block'
         with confirmation_area:
             confirmation_area.clear_output(wait=True)
             from IPython.display import display
             display(dialog_widget)
 
 def _clear_confirmation_area(ui_components: Dict[str, Any]) -> None:
-    """Clear confirmation area dengan one-liner"""
+    """Clear confirmation area"""
     confirmation_area = ui_components.get('confirmation_area')
-    confirmation_area and confirmation_area.clear_output(wait=True)
+    if confirmation_area:
+        confirmation_area.clear_output(wait=True)
+        confirmation_area.layout.display = 'none'

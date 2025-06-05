@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/initializers/common_initializer.py
-Deskripsi: Clean CommonInitializer dengan pure ConfigHandler dependency
+Deskripsi: Fixed CommonInitializer dengan proper handler binding dan tanpa generator error
 """
 
 from typing import Dict, Any, Optional, List, Type
@@ -15,7 +15,7 @@ from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES, register_na
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 class CommonInitializer(ABC):
-    """Clean CommonInitializer dengan pure ConfigHandler dependency"""
+    """Fixed CommonInitializer dengan proper button handler binding"""
     
     def __init__(self, module_name: str, config_handler_class: Optional[Type[ConfigHandler]] = None, 
                  parent_module: Optional[str] = None):
@@ -38,14 +38,14 @@ class CommonInitializer(ABC):
         return namespace
     
     def initialize(self, env=None, config=None, **kwargs) -> Any:
-        """Main initialization dengan pure ConfigHandler approach"""
+        """Main initialization dengan fixed handler binding"""
         try:
             suppress_all_outputs()
             
-            # Create config handler (single source of truth untuk config)
+            # Create config handler
             config_handler = self._create_config_handler()
             
-            # Load config menggunakan handler
+            # Load config
             merged_config = config or config_handler.load_config()
             
             # Create UI components
@@ -64,13 +64,8 @@ class CommonInitializer(ABC):
             logger_bridge = try_operation_safe(lambda: create_ui_logger_bridge(ui_components, self.logger_namespace))
             self._add_logger_to_components(ui_components, logger_bridge)
             
-            try_operation_safe(
-                lambda: ui_components.update({'button_state_manager': get_button_state_manager(ui_components)}),
-                on_error=lambda e: self.logger.warning(f"⚠️ Error inisialisasi button state manager: {str(e)}")
-            )
-            
-            # Setup handlers dengan config handler
-            self._setup_handlers_with_config_handler(ui_components, merged_config, config_handler, env, **kwargs)
+            # Setup handlers dengan fixed binding
+            self._setup_handlers_fixed(ui_components, merged_config, config_handler, env, **kwargs)
             
             # Validation dan finalization
             validation_result = self._validate_setup(ui_components)
@@ -99,11 +94,11 @@ class CommonInitializer(ABC):
         
         return BaseConfigHandler(self.module_name, extract_fn, update_fn, self.parent_module)
     
-    def _setup_handlers_with_config_handler(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
-                                           config_handler: ConfigHandler, env=None, **kwargs) -> None:
-        """Setup handlers dengan ConfigHandler integration"""
-        # Setup common button handlers dengan config handler
-        self._setup_config_button_handlers(ui_components, config_handler)
+    def _setup_handlers_fixed(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
+                             config_handler: ConfigHandler, env=None, **kwargs) -> None:
+        """Setup handlers dengan fixed button binding tanpa generator error"""
+        # Setup common button handlers dengan proper function reference
+        self._setup_fixed_button_handlers(ui_components, config_handler)
         
         # Setup module-specific handlers
         try_operation_safe(
@@ -113,44 +108,57 @@ class CommonInitializer(ABC):
         
         ui_components['config'] = config
     
-    def _setup_config_button_handlers(self, ui_components: Dict[str, Any], config_handler: ConfigHandler) -> None:
-        """Setup button handlers menggunakan ConfigHandler dengan one-liner style"""
-        button_handlers = {
-            'save_button': lambda b: self._handle_save_with_config_handler(ui_components, config_handler, b),
-            'reset_button': lambda b: self._handle_reset_with_config_handler(ui_components, config_handler, b),
-            'cleanup_button': lambda b: self._handle_cleanup_button(ui_components, b)
-        }
+    def _setup_fixed_button_handlers(self, ui_components: Dict[str, Any], config_handler: ConfigHandler) -> None:
+        """Setup button handlers dengan fixed function binding - no generators"""
         
-        # Bind handlers dengan button state management
-        [ui_components[btn].on_click(handler) for btn, handler in button_handlers.items() 
-         if btn in ui_components and hasattr(ui_components[btn], 'on_click')]
-    
-    def _handle_save_with_config_handler(self, ui_components: Dict[str, Any], 
-                                     config_handler: ConfigHandler, button) -> None:
-        self._handle_config_action(ui_components, config_handler.save_config, button, 'save_config')
-
-    def _handle_reset_with_config_handler(self, ui_components: Dict[str, Any], 
-                                      config_handler: ConfigHandler, button) -> None:
-        self._handle_config_action(ui_components, config_handler.reset_config, button, 'reset_config')
-
-    def _handle_config_action(self, ui: Dict[str, Any], method, btn, ctx: str) -> None:
-        mgr = ui.get('button_state_manager')
-        (setattr(btn, 'disabled', True), method(ui), setattr(btn, 'disabled', False)) \
-            if not mgr else [method(ui) for _ in [mgr.config_context(ctx).__enter__()]][0] or mgr.config_context(ctx).__exit__(None, None, None)
-
-    def _handle_cleanup_button(self, ui_components: Dict[str, Any], button) -> None:
-        """Default cleanup handler dengan button state management"""
-        button_state_manager = ui_components.get('button_state_manager')
+        def save_handler(button):
+            """Fixed save handler tanpa generator"""
+            button.disabled = True
+            try:
+                success = config_handler.save_config(ui_components)
+                if success:
+                    show_status_safe(ui_components, "✅ Konfigurasi berhasil disimpan", "success")
+                else:
+                    show_status_safe(ui_components, "❌ Gagal menyimpan konfigurasi", "error")
+            except Exception as e:
+                show_status_safe(ui_components, f"❌ Error save: {str(e)}", "error")
+            finally:
+                button.disabled = False
         
-        if button_state_manager:
-            with button_state_manager.operation_context('cleanup'):
-                self._do_cleanup(ui_components, button)
-        else:
+        def reset_handler(button):
+            """Fixed reset handler tanpa generator"""
+            button.disabled = True
+            try:
+                success = config_handler.reset_config(ui_components)
+                if success:
+                    show_status_safe(ui_components, "✅ Konfigurasi berhasil direset", "success")
+                else:
+                    show_status_safe(ui_components, "❌ Gagal reset konfigurasi", "error")
+            except Exception as e:
+                show_status_safe(ui_components, f"❌ Error reset: {str(e)}", "error")
+            finally:
+                button.disabled = False
+        
+        def cleanup_handler(button):
+            """Fixed cleanup handler tanpa generator"""
             button.disabled = True
             try:
                 self._do_cleanup(ui_components, button)
+            except Exception as e:
+                show_status_safe(ui_components, f"❌ Error cleanup: {str(e)}", "error")
             finally:
                 button.disabled = False
+        
+        # Bind handlers dengan proper function reference
+        button_mappings = {
+            'save_button': save_handler,
+            'reset_button': reset_handler,
+            'cleanup_button': cleanup_handler
+        }
+        
+        for button_name, handler in button_mappings.items():
+            if button_name in ui_components and hasattr(ui_components[button_name], 'on_click'):
+                ui_components[button_name].on_click(handler)
     
     def _do_cleanup(self, ui_components: Dict[str, Any], button) -> None:
         """Implementasi cleanup - override di subclass jika diperlukan"""

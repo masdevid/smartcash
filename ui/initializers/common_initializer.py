@@ -82,7 +82,7 @@ class CommonInitializer(ABC):
             show_status_safe(ui_components, f"✅ {self.module_name} UI berhasil diinisialisasi", "success")
             
             # Return proper result - pastikan return dict dengan ui component
-            return self._get_return_value(ui_components)
+            return self._get_return_value(ui_components)['ui']
             
         except Exception as e:
             self.logger.error(f"❌ Error inisialisasi {self.module_name}: {str(e)}")
@@ -220,7 +220,7 @@ class CommonInitializer(ABC):
     def _get_return_value(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Get proper return value - ensure it's a dict with ui"""
         # Ensure we return the full ui_components dict
-        return ui_components['ui']
+        return ui_components
 
     get_module_status = lambda self: {'module_name': self.module_name, 'initialized': True, 'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 

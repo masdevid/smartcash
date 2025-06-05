@@ -60,9 +60,9 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Log components
     log_components = create_log_accordion(
-        title="Log dan Status",
-        description="Log dan status instalasi dependency",
-        show_timestamp=True
+        module_name="dependency",
+        height="200px",
+        width="100%"
     )
     
     # Action buttons

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/backbone/handlers/config_handler.py
-Deskripsi: Config handler untuk backbone configuration dengan extract/update menggunakan backbone_config.yaml
+Deskripsi: Fixed config handler dengan status panel update yang benar saat save/reset
 """
 
 from typing import Dict, Any
@@ -8,7 +8,7 @@ from datetime import datetime
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 class BackboneConfigHandler(ConfigHandler):
-    """Config handler khusus untuk backbone configuration menggunakan backbone_config.yaml"""
+    """Config handler khusus untuk backbone configuration dengan fixed status updates"""
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract backbone configuration dari UI sesuai struktur backbone_config.yaml"""
@@ -86,11 +86,19 @@ class BackboneConfigHandler(ConfigHandler):
         
         # Apply updates dengan one-liner
         [safe_update(key, value) for key, value in update_mappings]
-        
-        # Update status panel
-        from smartcash.ui.components.status_panel import update_status_panel
-        if 'status_panel' in ui_components:
-            update_status_panel(ui_components['status_panel'], f"🧠 Backbone {selected_backbone} dengan model {selected_model_type} dimuat", "success")
+    
+    def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Override dengan fixed status panel update"""
+        backbone = config.get('selected_backbone', 'backbone')
+        model_type = config.get('selected_model_type', 'model')
+        self._update_status_panel(ui_components, f"Konfigurasi {backbone} + {model_type} tersimpan", "success")
+        self.logger.success(f"💾 Backbone config tersimpan: {backbone} + {model_type}")
+    
+    def after_reset_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Override dengan fixed status panel update"""
+        backbone = config.get('selected_backbone', 'efficientnet_b4')
+        self._update_status_panel(ui_components, f"Reset ke default: {backbone}", "success")
+        self.logger.success(f"🔄 Backbone config direset ke default")
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default backbone configuration"""

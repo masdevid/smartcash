@@ -11,59 +11,77 @@ from smartcash.ui.strategy.components.ui_form import create_config_summary_card
 
 
 def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Create compact layout fokus pada strategy (bukan hyperparameters)"""
+    """Create responsive layout dengan flexbox dan colorful borders"""
     
-    # Validation strategy section
+    # Validation section dengan responsive flexbox
     validation_section = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 5px 0; color: #333;'>✅ Strategi Validasi</h4>"),
+        widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>✅ Strategi Validasi</h4>"),
         widgets.HBox([
             widgets.VBox([
                 form_components['val_frequency_slider'],
                 form_components['iou_thres_slider']
-            ], layout=widgets.Layout(width='48%')),
+            ], layout=widgets.Layout(flex='1 1 auto', margin='0 4px 0 0')),
             widgets.VBox([
                 form_components['conf_thres_slider'],
                 form_components['max_detections_slider']
-            ], layout=widgets.Layout(width='48%'))
-        ], layout=widgets.Layout(justify_content='space-between', width='100%'))
-    ], layout=widgets.Layout(padding='8px', border='1px solid #e0e0e0', border_radius='4px', margin='5px 0'))
+            ], layout=widgets.Layout(flex='1 1 auto', margin='0 0 0 4px'))
+        ], layout=widgets.Layout(display='flex', width='100%', max_width='100%'))
+    ], layout=widgets.Layout(
+        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden',
+        border='2px solid transparent', 
+        background='linear-gradient(white, white) padding-box, linear-gradient(45deg, #4ecdc4, #44b8b5) border-box'
+    ))
     
-    # Training utilities section
+    # Utils section dengan grid responsive
     utils_section = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 5px 0; color: #333;'>🔧 Utilitas Training</h4>"),
+        widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>🔧 Utilitas Training</h4>"),
         widgets.HBox([
             widgets.VBox([
                 form_components['experiment_name_text'],
                 form_components['checkpoint_dir_text'],
                 form_components['log_metrics_slider']
-            ], layout=widgets.Layout(width='48%')),
+            ], layout=widgets.Layout(flex='1 1 auto', margin='0 4px 0 0')),
             widgets.VBox([
                 form_components['visualize_batch_slider'],
                 form_components['gradient_clipping_slider'],
                 form_components['layer_mode_dropdown']
-            ], layout=widgets.Layout(width='48%'))
-        ], layout=widgets.Layout(justify_content='space-between', width='100%')),
+            ], layout=widgets.Layout(flex='1 1 auto', margin='0 0 0 4px'))
+        ], layout=widgets.Layout(display='flex', width='100%', max_width='100%')),
         form_components['tensorboard_checkbox']
-    ], layout=widgets.Layout(padding='8px', border='1px solid #e0e0e0', border_radius='4px', margin='5px 0'))
+    ], layout=widgets.Layout(
+        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden',
+        border='2px solid transparent',
+        background='linear-gradient(white, white) padding-box, linear-gradient(45deg, #ff6b6b, #ee5a5a) border-box'
+    ))
     
     # Multi-scale section
     multiscale_section = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 5px 0; color: #333;'>🔄 Multi-scale Training</h4>"),
+        widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>🔄 Multi-scale Training</h4>"),
         form_components['multi_scale_checkbox'],
         widgets.HBox([
             form_components['img_size_min_slider'],
             form_components['img_size_max_slider']
-        ], layout=widgets.Layout(justify_content='space-between', width='100%'))
-    ], layout=widgets.Layout(padding='8px', border='1px solid #e0e0e0', border_radius='4px', margin='5px 0'))
+        ], layout=widgets.Layout(display='flex', width='100%', max_width='100%'))
+    ], layout=widgets.Layout(
+        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden',
+        border='2px solid transparent',
+        background='linear-gradient(white, white) padding-box, linear-gradient(45deg, #45b7d1, #3aa3d0) border-box'
+    ))
     
-    # Create single column layout (no tabs needed for fewer components)
+    # Content area dengan flexbox
     content_area = widgets.VBox([
         validation_section,
         utils_section,
         multiscale_section
-    ])
+    ], layout=widgets.Layout(
+        display='flex', 
+        flex_flow='column',
+        width='100%', 
+        max_width='100%',
+        overflow='hidden'
+    ))
     
-    # Create header
+    # Header
     header = create_header(
         title="Konfigurasi Strategi Training",
         description="Pengaturan strategi training (hyperparameters tersedia di modul terpisah)",
@@ -71,22 +89,27 @@ def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     )
     
     # Summary card placeholder
-    summary_card = widgets.HTML(value="<div style='padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 10px 0;'>📊 Loading konfigurasi...</div>")
+    summary_card = widgets.HTML(value="<div style='padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 8px 0;'>📊 Loading konfigurasi...</div>")
     
-    # Main container
+    # Main container dengan overflow protection
     main_container = widgets.VBox([
         header,
-        form_components['status_panel'],
         summary_card,
         content_area,
         form_components['button_container']
-    ], layout=widgets.Layout(width='100%', max_width='100%', padding='10px', overflow='hidden'))
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%', 
+        padding='8px', 
+        overflow='hidden',
+        display='flex',
+        flex_flow='column'
+    ))
     
     return {
         'main_container': main_container,
         'save_button': form_components['save_button'],
         'reset_button': form_components['reset_button'],
-        'status_panel': form_components['status_panel'],
         'summary_card': summary_card,
         'content_area': content_area,
         'header': header,
@@ -94,8 +117,11 @@ def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def update_summary_card(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update summary card dengan konfigurasi terbaru"""
+def update_summary_card(ui_components: Dict[str, Any], config: Dict[str, Any], last_saved: str = None) -> None:
+    """Update summary card dengan timestamp"""
     if 'summary_card' in ui_components:
-        summary_card_widget = create_config_summary_card(config)
+        import datetime
+        if not last_saved:
+            last_saved = datetime.datetime.now().strftime("%H:%M:%S")
+        summary_card_widget = create_config_summary_card(config, last_saved)
         ui_components['summary_card'].value = summary_card_widget.value

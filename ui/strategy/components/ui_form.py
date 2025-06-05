@@ -11,39 +11,45 @@ from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create form widgets khusus strategy parameters"""
     
-    # Extract strategy configs dengan fallback ke cascading inheritance
+    # Extract strategy configs
     validation = config.get('validation', {})
     utils = config.get('training_utils', {})
     multi_scale = config.get('multi_scale', {})
+    model = config.get('model', {})
     
-    # One-liner widget creators
-    int_slider = lambda val, min_val, max_val, desc: widgets.IntSlider(value=val, min=min_val, max=max_val, description=desc, style={'description_width': '140px'}, layout=widgets.Layout(width='100%'))
-    float_slider = lambda val, min_val, max_val, desc, step=0.001: widgets.FloatSlider(value=val, min=min_val, max=max_val, step=step, description=desc, style={'description_width': '140px'}, layout=widgets.Layout(width='100%'), readout_format='.3f')
-    checkbox = lambda val, desc: widgets.Checkbox(value=val, description=desc, style={'description_width': 'initial'})
-    text_input = lambda val, desc: widgets.Text(value=val, description=desc, style={'description_width': '140px'}, layout=widgets.Layout(width='100%'))
-    dropdown = lambda val, opts, desc: widgets.Dropdown(value=val, options=opts, description=desc, style={'description_width': '140px'}, layout=widgets.Layout(width='100%'))
+    # Generate dynamic experiment name
+    model_type = model.get('model_type', 'efficient_optimized')
+    layer_mode = utils.get('layer_mode', 'single')
+    default_experiment = f"{model_type}_{layer_mode}"
+    
+    # Widget creators dengan responsive layout
+    int_slider = lambda val, min_val, max_val, desc: widgets.IntSlider(value=val, min=min_val, max=max_val, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'))
+    float_slider = lambda val, min_val, max_val, desc, step=0.001: widgets.FloatSlider(value=val, min=min_val, max=max_val, step=step, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'), readout_format='.3f')
+    checkbox = lambda val, desc: widgets.Checkbox(value=val, description=desc, style={'description_width': 'initial'}, layout=widgets.Layout(width='auto'))
+    text_input = lambda val, desc: widgets.Text(value=val, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'))
+    dropdown = lambda val, opts, desc: widgets.Dropdown(value=val, options=opts, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'))
     
     # Strategy-specific form components
     form_components = {
         # Validation strategy
-        'val_frequency_slider': int_slider(validation.get('frequency', 1), 1, 10, 'Validation Frequency:'),
+        'val_frequency_slider': int_slider(validation.get('frequency', 1), 1, 10, 'Val Frequency:'),
         'iou_thres_slider': float_slider(validation.get('iou_thres', 0.6), 0.1, 0.9, 'IoU Threshold:', 0.05),
         'conf_thres_slider': float_slider(validation.get('conf_thres', 0.001), 0.0001, 0.01, 'Conf Threshold:', 0.0001),
         'max_detections_slider': int_slider(validation.get('max_detections', 300), 50, 1000, 'Max Detections:'),
         
         # Training utilities
-        'experiment_name_text': text_input(utils.get('experiment_name', 'efficientnet_b4_training'), 'Experiment Name:'),
+        'experiment_name_text': text_input(utils.get('experiment_name', default_experiment), 'Experiment:'),
         'checkpoint_dir_text': text_input(utils.get('checkpoint_dir', '/content/runs/train/checkpoints'), 'Checkpoint Dir:'),
-        'tensorboard_checkbox': checkbox(utils.get('tensorboard', True), 'Enable TensorBoard'),
-        'log_metrics_slider': int_slider(utils.get('log_metrics_every', 10), 1, 50, 'Log Metrics Every:'),
+        'tensorboard_checkbox': checkbox(utils.get('tensorboard', True), 'TensorBoard'),
+        'log_metrics_slider': int_slider(utils.get('log_metrics_every', 10), 1, 50, 'Log Every:'),
         'visualize_batch_slider': int_slider(utils.get('visualize_batch_every', 100), 10, 500, 'Visualize Every:'),
-        'gradient_clipping_slider': float_slider(utils.get('gradient_clipping', 1.0), 0.1, 5.0, 'Gradient Clipping:', 0.1),
+        'gradient_clipping_slider': float_slider(utils.get('gradient_clipping', 1.0), 0.1, 5.0, 'Grad Clipping:', 0.1),
         'layer_mode_dropdown': dropdown(utils.get('layer_mode', 'single'), ['single', 'multilayer'], 'Layer Mode:'),
         
         # Multi-scale training
-        'multi_scale_checkbox': checkbox(multi_scale.get('enabled', True), 'Multi-scale Training'),
-        'img_size_min_slider': int_slider(multi_scale.get('img_size_min', 320), 256, 512, 'Min Image Size:'),
-        'img_size_max_slider': int_slider(multi_scale.get('img_size_max', 640), 512, 1024, 'Max Image Size:')
+        'multi_scale_checkbox': checkbox(multi_scale.get('enabled', True), 'Multi-scale'),
+        'img_size_min_slider': int_slider(multi_scale.get('img_size_min', 320), 256, 512, 'Min Size:'),
+        'img_size_max_slider': int_slider(multi_scale.get('img_size_max', 640), 512, 1024, 'Max Size:')
     }
     
     # Add save/reset buttons

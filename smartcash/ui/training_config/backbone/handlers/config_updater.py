@@ -7,41 +7,73 @@ from typing import Dict, Any
 
 def update_backbone_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
-    Update UI components dari backbone configuration.
+    Update UI components dari backbone configuration sesuai struktur model_config.yaml.
     
     Args:
         ui_components: Dictionary UI components
         config: Configuration dictionary
     """
     model_config = config.get('model', {})
+    transfer_learning_config = model_config.get('transfer_learning', {})
+    unfreeze_schedule = transfer_learning_config.get('unfreeze_schedule', {})
+    efficientnet_config = model_config.get('efficientnet', {})
+    attention_config = efficientnet_config.get('attention', {})
+    export_config = model_config.get('export', {})
+    experiments_config = model_config.get('experiments', {})
     
     # Inisialisasi flag untuk mencegah loop event handler
     ui_components['_suppress_backbone_change'] = True
     ui_components['_suppress_optimization_change'] = True
     
-    # Update backbone dropdown
+    # One-liner safe setter
+    safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
+    
+    # Update backbone dan model type dropdowns
     backbone_value = model_config.get('backbone', 'efficientnet_b4')
-    [setattr(ui_components.get('backbone_dropdown'), 'value', backbone_value) 
-     if hasattr(ui_components.get('backbone_dropdown'), 'value') else None][0]
+    model_type = model_config.get('type', 'efficient_optimized')
     
-    # Update model type dropdown - default ke efficient_optimized
-    model_type = model_config.get('model_type', 'efficient_optimized')
-    [setattr(ui_components.get('model_type_dropdown'), 'value', model_type) 
-     if hasattr(ui_components.get('model_type_dropdown'), 'value') else None][0]
+    # Update UI components dengan mapping approach
+    field_mappings = [
+        # Backbone dan model type
+        ('backbone_dropdown', backbone_value),
+        ('model_type_dropdown', model_type),
+        
+        # Backbone settings
+        ('freeze_backbone_checkbox', model_config.get('backbone_freeze', False)),
+        ('unfreeze_epoch_slider', model_config.get('backbone_unfreeze_epoch', 5)),
+        
+        # Thresholds
+        ('confidence_threshold_slider', model_config.get('confidence', 0.25)),
+        ('iou_threshold_slider', model_config.get('iou_threshold', 0.45)),
+        
+        # Transfer learning
+        ('transfer_learning_checkbox', transfer_learning_config.get('enabled', True)),
+        ('pretrained_weights_text', transfer_learning_config.get('weights', '')),
+        ('freeze_layers_slider', transfer_learning_config.get('freeze_layers', 0)),
+        ('unfreeze_schedule_checkbox', unfreeze_schedule.get('enabled', True)),
+        ('unfreeze_start_epoch_slider', unfreeze_schedule.get('start_epoch', 5)),
+        ('layers_per_epoch_slider', unfreeze_schedule.get('layers_per_epoch', 1)),
+        
+        # Feature optimization
+        ('use_attention_checkbox', model_config.get('use_attention', True)),
+        ('use_residual_checkbox', model_config.get('use_residual', True)),
+        ('use_ciou_checkbox', model_config.get('use_ciou', False)),
+        
+        # Optimasi model
+        ('quantization_checkbox', model_config.get('quantization', False)),
+        ('qat_checkbox', model_config.get('quantization_aware_training', False)),
+        ('fp16_checkbox', model_config.get('fp16_training', True)),
+        
+        # Export settings
+        ('quantize_export_checkbox', export_config.get('quantize_export', False)),
+        
+        # Eksperimen
+        ('experiments_enabled_checkbox', experiments_config.get('enabled', False)),
+        ('experiment_scenario_dropdown', experiments_config.get('scenario', 'baseline'))
+    ]
     
-    # Update optimization checkboxes berdasarkan model_type yang tersimpan
-    use_attention = model_config.get('use_attention', True)
-    use_residual = model_config.get('use_residual', False)
-    use_ciou = model_config.get('use_ciou', False)
-    
-    [setattr(ui_components.get('use_attention_checkbox'), 'value', use_attention) 
-     if hasattr(ui_components.get('use_attention_checkbox'), 'value') else None][0]
-    
-    [setattr(ui_components.get('use_residual_checkbox'), 'value', use_residual) 
-     if hasattr(ui_components.get('use_residual_checkbox'), 'value') else None][0]
-    
-    [setattr(ui_components.get('use_ciou_checkbox'), 'value', use_ciou) 
-     if hasattr(ui_components.get('use_ciou_checkbox'), 'value') else None][0]
+    # Apply all updates
+    [safe_update(key, value) for key, value in field_mappings if key in ui_components]
     
     # Update dependent UI berdasarkan backbone selection
     _update_dependent_ui(ui_components, backbone_value)
@@ -49,6 +81,11 @@ def update_backbone_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) ->
     # Reset flag setelah update UI selesai
     ui_components['_suppress_backbone_change'] = False
     ui_components['_suppress_optimization_change'] = False
+    
+    # Logging untuk informasi
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import update_status_panel
+        update_status_panel(ui_components['status_panel'], f"🤖 UI backbone berhasil diperbarui", "info")
 
 def _update_dependent_ui(ui_components: Dict[str, Any], backbone: str) -> None:
     """Update UI yang dependent pada backbone selection"""

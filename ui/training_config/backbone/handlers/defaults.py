@@ -6,55 +6,114 @@ Deskripsi: Default backbone configuration values dengan one-liner structure
 from typing import Dict, Any
 
 def get_default_backbone_config() -> Dict[str, Any]:
-    """Get default backbone configuration dengan complete structure"""
+    """Get default backbone configuration dengan struktur yang sesuai dengan model_config.yaml"""
     return {
+        # Override konfigurasi model dari base_config
         'model': {
-            # Type model
+            # Parameter baru yang tidak ada di base_config
             'type': 'efficient_basic',  # Tipe model: 'efficient_basic' atau 'yolov5s'
-            
-            # Backbone model
-            'backbone': 'efficientnet_b4',  # Backbone yang didukung: 'efficientnet_b4' atau 'cspdarknet_s'
-            'backbone_pretrained': True,
+            'backbone': 'efficientnet_b4',  # Backbone yang didukung
             'backbone_weights': '',  # Path ke file weights kustom
-            'backbone_freeze': False,  # Freeze backbone selama training
             'backbone_unfreeze_epoch': 5,  # Unfreeze backbone setelah epoch ini
-            
-            # Ukuran input dan preprocessing
-            'input_size': [640, 640],
-            
-            # Thresholds
-            'confidence': 0.25,  # Confidence threshold untuk deteksi
-            'iou_threshold': 0.45,  # IoU threshold untuk NMS
-            'max_detections': 100,  # Jumlah maksimum deteksi yang dihasilkan
-            
-            # Transfer learning
-            'transfer_learning': True,
-            'pretrained': True,
             'pretrained_weights': '',  # Path ke file weights YOLOv5
             
-            # Processing
+            # Parameter processing yang baru
             'anchors': [10,13, 16,30, 33,23, 30,61, 62,45, 59,119, 116,90, 156,198, 373,326],
             'strides': [8, 16, 32],
-            'workers': 4,  # Jumlah worker untuk dataloader
             
-            # Spesifikasi model
-            'depth_multiple': 0.67,  # Faktor skala untuk kedalaman model (YOLOv5s)
-            'width_multiple': 0.75,  # Faktor skala untuk lebar model (YOLOv5s)
+            # Parameter spesifikasi model yang baru
+            'depth_multiple': 0.67,  # Faktor skala untuk kedalaman model
+            'width_multiple': 0.75,  # Faktor skala untuk lebar model
             
-            # Integrasi khusus untuk SmartCash
+            # Parameter integrasi khusus yang baru
             'use_efficient_blocks': True,  # Gunakan blok EfficientNet di FPN/PAN
             'use_adaptive_anchors': True,  # Adaptasi anchors berdasarkan dataset
             
-            # Optimasi model
+            # Parameter optimasi model yang baru
             'quantization': False,
-            'quantization_aware_training': False,  # Gunakan QAT untuk model lebih ringan
-            'fp16_training': True,  # Gunakan mixed precision untuk training
+            'quantization_aware_training': False,
+            'fp16_training': True,
             
-            # Feature optimization (khusus UI)
-            'use_attention': True,
-            'use_residual': True,
-            'use_ciou': False
+            # Parameter fitur optimasi tambahan yang baru
+            'use_attention': False,
+            'use_residual': False,
+            'use_ciou': False,
+            
+            # Parameter dari base_config yang dipertahankan
+            'input_size': [640, 640],
+            'confidence': 0.25,
+            'iou_threshold': 0.45,
+            'max_detections': 100,
+            'transfer_learning': True,
+            'pretrained': True,
+            'workers': 4,
+            'freeze_backbone': False
         },
+        
+        # Parameter khusus EfficientNet-B4 (parameter baru)
+        'efficientnet': {
+            'width_coefficient': 1.4,
+            'depth_coefficient': 1.8,
+            'resolution': 380,
+            'dropout_rate': 0.4
+        },
+        
+        # Parameter transfer learning (parameter baru)
+        'transfer_learning': {
+            'freeze_batch_norm': False,
+            'unfreeze_after_epochs': 10
+        },
+        
+        # Parameter regularisasi khusus model (parameter baru)
+        'regularization': {
+            'label_smoothing': 0.0
+        },
+        
+        # Konfigurasi kompilasi model untuk deployment (parameter baru)
+        'export': {
+            'formats': ['onnx', 'torchscript'],
+            'dynamic_batch': True,
+            'optimize': True,
+            'half_precision': True,
+            'simplify': True
+        },
+        
+        # Konfigurasi khusus untuk uji coba model (parameter baru)
+        'experiments': {
+            'backbones': [
+                {
+                    'name': 'cspdarknet_s',
+                    'description': 'YOLOv5s default backbone',
+                    'config': {
+                        'backbone': 'cspdarknet_s',
+                        'pretrained': True
+                    }
+                },
+                {
+                    'name': 'efficientnet_b4',
+                    'description': 'EfficientNet-B4 backbone',
+                    'config': {
+                        'backbone': 'efficientnet_b4',
+                        'pretrained': True
+                    }
+                }
+            ],
+            'scenarios': [
+                {
+                    'name': 'efficient_advanced',
+                    'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
+                    'config': {
+                        'type': 'efficient_advanced',
+                        'backbone': 'efficientnet_b4',
+                        'use_attention': True,
+                        'use_residual': True,
+                        'use_ciou': True
+                    }
+                }
+            ]
+        },
+        
+        # Metadata
         'config_version': '1.0',
         'description': 'Default backbone configuration untuk SmartCash detection'
     }

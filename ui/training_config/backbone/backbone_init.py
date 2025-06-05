@@ -10,7 +10,7 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler
 class BackboneConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk backbone model configuration"""
     
-    def __init__(self, module_name='backbone', config_filename='model', config_handler_class=None, 
+    def __init__(self, module_name='backbone', config_filename='model_config', config_handler_class=None, 
                  parent_module: Optional[str] = 'training'):
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
     
@@ -67,7 +67,7 @@ def initialize_backbone_config(env=None, config=None, parent_callbacks=None, **k
     return create_config_cell(
         BackboneConfigInitializer, 
         'backbone', 
-        'model', 
+        'model_config', 
         env=env, 
         config=config, 
         config_handler_class=BackboneConfigHandler,

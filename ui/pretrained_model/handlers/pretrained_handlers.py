@@ -29,7 +29,7 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     # Status handler dengan integrasi status_panel
     def update_status(message: str, status_type: str = "info"):
         from smartcash.ui.components.status_panel import update_status_panel
-        if 'status_panel' in ui_components:
+        if 'status_panel' in ui_components and hasattr(ui_components['status_panel'], 'value'):
             update_status_panel(ui_components['status_panel'], message, status_type)
     
     ui_components['update_status'] = update_status

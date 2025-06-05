@@ -213,7 +213,7 @@ class ConfigHandler(ABC):
     
     def _update_status_panel(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
         """Update status panel dengan fallback."""
-        show_status_safe(ui_components, message, status_type)
+        show_status_safe(message, status_type, ui_components)
     
     # Callback management
     def add_callback(self, cb: Callable) -> None:

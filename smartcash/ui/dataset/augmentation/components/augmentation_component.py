@@ -94,7 +94,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
 
     # Main UI assembly dengan service integration
     ui = widgets.VBox([
-        header, status_panel, settings_container, create_divider(),
+        header, status_panel, settings_container,
         action_header,
         action_buttons['container'], confirmation_area,
         progress_tracker.container, log_components['log_accordion'], help_panel

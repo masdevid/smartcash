@@ -8,7 +8,7 @@ from smartcash.ui.dataset.split.handlers.defaults import normalize_split_ratios,
 
 
 def extract_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract config dari UI components dengan one-liner extraction"""
+    """Extract config dari UI components dengan one-liner extraction sesuai struktur dataset_config.yaml"""
     # One-liner value extraction dengan fallback
     get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
     
@@ -26,11 +26,15 @@ def extract_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     from datetime import datetime
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # One-liner config construction sesuai dengan dataset_config.yaml
+    # One-liner config construction sesuai dengan dataset_config.yaml yang diperbarui
     return {
-        'config_version': '1.0',
-        'updated_at': current_time,
+        # Inherit dari base_config.yaml
+        '_base_': 'base_config.yaml',
+        
+        # Override konfigurasi data dari base_config
         'data': {
+            'dir': 'data',                    # Direktori utama data (path relatif)
+            'preprocessed_dir': 'data/preprocessed',  # Direktori untuk hasil preprocessed
             'split_ratios': {
                 'train': train_ratio, 
                 'valid': valid_ratio, 
@@ -38,6 +42,14 @@ def extract_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             },
             'stratified_split': get_value('stratified_checkbox', True),
             'random_seed': get_value('random_seed', 42),
+            'source': 'roboflow',             # Sumber dataset ('roboflow', 'local')
+            'roboflow': {                      # Konfigurasi Roboflow
+                'api_key': '',                  # Diisi oleh user atau dari Google Secret
+                'workspace': 'smartcash-wo2us',
+                'project': 'rupiah-emisi-2022',
+                'version': '3',
+                'output_format': 'yolov5pytorch'
+            },
             'validation': {
                 'enabled': get_value('validation_enabled', True),
                 'fix_issues': get_value('fix_issues', True),
@@ -46,14 +58,42 @@ def extract_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 'visualize_issues': get_value('visualize_issues', False)
             }
         },
+        
+        # Konfigurasi untuk akses dan backup dataset
         'dataset': {
             'backup': {
                 'enabled': get_value('backup_checkbox', True),
                 'dir': get_value('backup_dir', 'data/backup/dataset'),
-                'count': get_value('backup_count', 3),
+                'count': get_value('backup_count', 2),
                 'auto': get_value('auto_backup', False)
+            },
+            'export': {
+                'enabled': True,
+                'formats': ['yolo', 'coco'],
+                'dir': 'data/exported'
+            },
+            'import': {
+                'allowed_formats': ['yolo', 'coco'],
+                'temp_dir': 'data/temp'
             }
-        }
+        },
+        
+        # Override konfigurasi cache dari base_config
+        'cache': {
+            'dir': '.cache/smartcash/dataset'  # Override dari base_config (.cache/smartcash)
+        },
+        
+        # Split settings untuk backward compatibility
+        'split_settings': {
+            'backup_before_split': get_value('backup_checkbox', True),
+            'backup_dir': get_value('backup_dir', 'data/splits_backup'),
+            'dataset_path': 'data',
+            'preprocessed_path': 'data/preprocessed'
+        },
+        
+        # Metadata
+        'config_version': '1.0',
+        'updated_at': current_time
     }
 
 

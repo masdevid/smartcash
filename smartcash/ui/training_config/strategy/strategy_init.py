@@ -17,7 +17,7 @@ from smartcash.common.config.manager import get_config_manager
 class TrainingStrategyConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk strategi pelatihan yang DRY dan sederhana"""
     
-    def __init__(self, module_name='strategy', config_filename='training', config_handler_class=None,
+    def __init__(self, module_name='strategy', config_filename='training_config', config_handler_class=None,
                  parent_module: Optional[str] = 'training'):
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
     

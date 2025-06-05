@@ -7,13 +7,37 @@ from typing import Dict, Any, Tuple
 
 
 def get_default_split_config() -> Dict[str, Any]:
-    """Default split config dengan struktur yang konsisten"""
+    """Default split config dengan struktur yang konsisten dengan dataset_config.yaml"""
     return {
+        # Struktur data sesuai dengan dataset_config.yaml
         'data': {
-            'split_ratios': {'train': 0.7, 'valid': 0.15, 'test': 0.15},
-            'stratified_split': True,
-            'random_seed': 42
+            'dir': 'data',                    # Direktori utama data (path relatif)
+            'preprocessed_dir': 'data/preprocessed',  # Direktori untuk hasil preprocessed
+            'split_ratios': {
+                'train': 0.7,
+                'valid': 0.15,
+                'test': 0.15
+            },
+            'stratified_split': True,         # Gunakan stratified split
+            'random_seed': 42,                # Random seed untuk reproduksibilitas
+            'validation': {
+                'enabled': True,
+                'fix_issues': True,
+                'move_invalid': True,
+                'invalid_dir': 'data/invalid',
+                'visualize_issues': False
+            }
         },
+        # Konfigurasi untuk akses dan backup dataset
+        'dataset': {
+            'backup': {
+                'enabled': True,
+                'dir': 'data/backup/dataset',
+                'count': 2,
+                'auto': False
+            }
+        },
+        # Split settings untuk backward compatibility
         'split_settings': {
             'backup_before_split': True,
             'backup_dir': 'data/splits_backup',

@@ -7,42 +7,66 @@ from typing import Dict, Any
 
 
 def update_hyperparameters_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI dari config dengan one-liner assignments"""
+    """Update UI dari config dengan one-liner assignments sesuai struktur hyperparameters_config.yaml"""
+    
+    # Extract nested configs dengan fallbacks
+    training_config = config.get('training', {})
+    optimizer_config = config.get('optimizer', {})
+    scheduler_config = config.get('scheduler', {})
+    regularization_config = config.get('regularization', {})
+    loss_config = config.get('loss', {})
+    early_stopping_config = config.get('early_stopping', {})
+    save_best_config = config.get('save_best', {})
     
     # One-liner safe setter
     set_val = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
     
-    # Parameter dasar
-    set_val('batch_size_slider', config.get('batch_size', 16))
-    set_val('image_size_slider', config.get('image_size', 640))
-    set_val('epochs_slider', config.get('epochs', 100))
-    set_val('dropout_slider', config.get('dropout', 0.0))
+    # Update UI components dengan mapping approach
+    field_mappings = [
+        # Parameter training dasar
+        ('batch_size_slider', training_config, 'batch_size', 16),
+        ('image_size_slider', training_config, 'image_size', 640),
+        ('epochs_slider', training_config, 'epochs', 100),
+        ('dropout_slider', training_config, 'dropout', 0.0),
+        ('mixed_precision_checkbox', training_config, 'mixed_precision', True),
+        ('gradient_accumulation_slider', training_config, 'gradient_accumulation', 1),
+        ('gradient_clipping_slider', training_config, 'gradient_clipping', 0.0),
+        
+        # Parameter optimasi
+        ('optimizer_dropdown', optimizer_config, 'type', 'Adam'),
+        ('learning_rate_slider', optimizer_config, 'learning_rate', 0.01),
+        ('weight_decay_slider', optimizer_config, 'weight_decay', 0.0005),
+        ('momentum_slider', optimizer_config, 'momentum', 0.937),
+        
+        # Parameter penjadwalan
+        ('scheduler_dropdown', scheduler_config, 'type', 'cosine'),
+        ('warmup_epochs_slider', scheduler_config, 'warmup_epochs', 3),
+        
+        # Parameter regularisasi
+        ('augment_checkbox', regularization_config, 'augment', True),
+        ('label_smoothing_slider', regularization_config, 'label_smoothing', 0.0),
+        
+        # Parameter loss
+        ('box_loss_gain_slider', loss_config, 'box_loss_gain', 0.05),
+        ('cls_loss_gain_slider', loss_config, 'cls_loss_gain', 0.5),
+        ('obj_loss_gain_slider', loss_config, 'obj_loss_gain', 1.0),
+        
+        # Early stopping parameters
+        ('early_stopping_checkbox', early_stopping_config, 'enabled', True),
+        ('patience_slider', early_stopping_config, 'patience', 15),
+        ('min_delta_slider', early_stopping_config, 'min_delta', 0.001),
+        
+        # Checkpoint parameters
+        ('save_best_checkbox', save_best_config, 'enabled', True),
+        ('checkpoint_metric_dropdown', save_best_config, 'metric', 'mAP_0.5')
+    ]
     
-    # Parameter optimasi
-    set_val('optimizer_dropdown', config.get('optimizer', 'Adam'))
-    set_val('learning_rate_slider', config.get('learning_rate', 0.01))
-    set_val('weight_decay_slider', config.get('weight_decay', 0.0005))
-    set_val('momentum_slider', config.get('momentum', 0.937))
+    # Apply all updates dengan one-liner
+    [set_val(component_key, source_config.get(config_key, default_value)) 
+     for component_key, source_config, config_key, default_value in field_mappings 
+     if component_key in ui_components]
     
-    # Parameter penjadwalan
-    set_val('scheduler_dropdown', config.get('scheduler', 'cosine'))
-    set_val('warmup_epochs_slider', config.get('warmup_epochs', 3))
-    
-    # Parameter loss
-    set_val('box_loss_gain_slider', config.get('box_loss_gain', 0.05))
-    set_val('cls_loss_gain_slider', config.get('cls_loss_gain', 0.5))
-    set_val('obj_loss_gain_slider', config.get('obj_loss_gain', 1.0))
-    
-    # Parameter regularisasi
-    set_val('augment_checkbox', config.get('augment', True))
-    
-    # Early stopping parameters
-    early_stopping = config.get('early_stopping', {})
-    set_val('early_stopping_checkbox', early_stopping.get('enabled', True))
-    set_val('patience_slider', early_stopping.get('patience', 15))
-    set_val('min_delta_slider', early_stopping.get('min_delta', 0.001))
-    
-    # Checkpoint parameters
-    save_best = config.get('save_best', {})
-    set_val('save_best_checkbox', save_best.get('enabled', True))
-    set_val('checkpoint_metric_dropdown', save_best.get('metric', 'mAP_0.5'))
+    # Logging untuk informasi
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import update_status_panel
+        update_status_panel(ui_components['status_panel'], f"📈 UI hyperparameters berhasil diperbarui", "info")

@@ -12,7 +12,7 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler
 class SplitConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk split dataset configuration"""
     
-    def __init__(self, module_name='split_dataset', config_filename='dataset', config_handler_class=None, 
+    def __init__(self, module_name='split_dataset', config_filename='dataset_config', config_handler_class=None, 
                  parent_module: Optional[str] = None):
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
     
@@ -68,7 +68,7 @@ def create_split_config_cell(env=None, config=None, parent_module=None, parent_c
     return create_config_cell(
         SplitConfigInitializer, 
         'split_dataset', 
-        'dataset', 
+        'dataset_config', 
         env=env, 
         config=config, 
         config_handler_class=SplitConfigHandler,

@@ -7,28 +7,34 @@ from typing import Dict, Any
 
 
 def get_default_strategy_config() -> Dict[str, Any]:
-    """Return default training strategy config dengan one-liner structure"""
+    """Return default training strategy config dengan struktur yang sesuai dengan training_config.yaml"""
     return {
-        # Parameter validasi
+        # Parameter validasi (parameter baru)
         'validation': {
             'frequency': 1,
             'iou_thres': 0.6,
             'conf_thres': 0.001
         },
         
-        # Parameter multi-scale training
+        # Parameter multi-scale training (parameter baru)
         'multi_scale': True,
         
-        # Konfigurasi tambahan untuk proses training
+        # Override konfigurasi training_utils dari base_config
         'training_utils': {
-            'experiment_name': 'efficientnet_b4_training',
-            'checkpoint_dir': '/content/runs/train/checkpoints',
-            'tensorboard': True,
-            'log_metrics_every': 10,  # Log metrik setiap 10 batch
-            'visualize_batch_every': 100,  # Visualisasi batch setiap 100 batch
-            'gradient_clipping': 1.0,  # Clipping gradien maksimum
-            'mixed_precision': True,  # Gunakan mixed precision training
-            'layer_mode': 'single'  # Opsi: 'single' atau 'multilayer'
+            'experiment_name': 'efficientnet_b4_training',  # Override dari base_config (training)
+            'checkpoint_dir': '/content/runs/train/checkpoints',  # Override dari base_config (runs/train/checkpoints)
+            'tensorboard': True,  # Override dari base_config (false)
+            'log_metrics_every': 10,  # Override dari base_config
+            'visualize_batch_every': 100,  # Override dari base_config (0)
+            'gradient_clipping': 1.0,  # Override dari base_config (0.0)
+            'mixed_precision': True,  # Override dari base_config (false)
+            'layer_mode': 'single'  # Parameter baru
+        },
+        
+        # Referensi ke konfigurasi yang diwarisi
+        'inherited_configs': {
+            'hyperparameters': 'hyperparameters_config.yaml',
+            'model': 'model_config.yaml'
         },
         
         # Metadata

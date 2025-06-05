@@ -220,7 +220,7 @@ class ProgressTracker:
 
 def create_three_level_progress_tracking() -> Dict[str, Any]:
     """Factory function untuk create three-level progress tracker"""
-    tracker = ThreeLevelProgressTracker()
+    tracker = ProgressTracker()
     return {'container': tracker.container, 'progress_container': tracker.container, 'status_widget': tracker.status_widget,
             'step_info_widget': tracker.step_info_widget, 'tqdm_container': tracker.tqdm_container, 'tracker': tracker, 
             'show_container': tracker.show, 'hide_container': tracker.hide, 'show_for_operation': tracker.show, 

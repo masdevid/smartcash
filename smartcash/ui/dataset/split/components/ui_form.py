@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/split/components/split_form.py
+File: smartcash/ui/dataset/split/components/ui_form.py
 Deskripsi: Komponen form untuk split dataset - refactored dengan DRY approach
 """
 

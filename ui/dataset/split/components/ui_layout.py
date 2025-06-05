@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/split/components/split_layout.py
+File: smartcash/ui/dataset/split/components/ui_layout.py
 Deskripsi: Layout komponen untuk UI split dataset - refactored dengan reusable components
 """
 
@@ -8,7 +8,7 @@ import ipywidgets as widgets
 
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.components.info_accordion import create_info_accordion
-from smartcash.ui.dataset.split.components.split_form import create_ratio_section, create_path_section
+from smartcash.ui.dataset.split.components.ui_form import create_ratio_section, create_path_section
 
 
 def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:

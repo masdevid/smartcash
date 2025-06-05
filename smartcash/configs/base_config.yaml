@@ -75,31 +75,36 @@ training:
 # Konfigurasi augmentasi
 augmentation:
   enabled: true
-  num_variations: 2
-  output_prefix: 'aug'
+  num_variations: 2               # Jumlah variasi per gambar
+  target_count: 500               # Target jumlah gambar per kelas
+  output_prefix: 'aug'            # Prefix untuk file hasil augmentasi
   process_bboxes: true            # Proses bbox saat augmentasi
   output_dir: 'data/augmented'    # Direktori output augmentasi (path relatif)
   validate_results: false         # Validasi hasil augmentasi
   resume: false                   # Lanjutkan augmentasi dari sebelumnya
+  target_split: 'train'           # Target split untuk augmentasi (train/valid/test)
+  balance_classes: true           # Seimbangkan jumlah gambar per kelas
+  move_to_preprocessed: true      # Pindahkan hasil ke direktori preprocessed
+  
+  # Jenis augmentasi yang didukung
   types:
-    - 'position'
-    - 'lighting'
-    - 'combined'
-  position:
-    flip: true
-    rotate: true
-    rotate_max_deg: 15
-    translate: true
-    translate_percent: 0.2
-    shear: true
-    shear_max_deg: 10
-  lighting:
-    brightness: true
-    brightness_range: [0.8, 1.2]
-    contrast: true
-    contrast_range: [0.8, 1.2]
-    hue: true
-    hue_range: [-0.1, 0.1]
+    - 'flip'                      # Flip horizontal
+    - 'rotate'                    # Rotasi gambar
+    - 'brightness'                # Ubah kecerahan
+    - 'contrast'                  # Ubah kontras
+    - 'hsv'                       # Ubah HSV
+  
+  # Parameter augmentasi posisi
+  fliplr: 0.5                     # Probabilitas flip horizontal
+  degrees: 10                     # Derajat maksimum rotasi
+  translate: 0.1                  # Translasi maksimum (persen)
+  scale: 0.1                      # Skala maksimum (persen)
+  
+  # Parameter augmentasi pencahayaan
+  hsv_h: 0.015                    # Perubahan hue maksimum
+  hsv_s: 0.7                      # Perubahan saturation maksimum
+  brightness: 0.2                 # Perubahan brightness maksimum
+  contrast: 0.2                   # Perubahan contrast maksimum
     saturation: true
     saturation_range: [0.8, 1.2]
 

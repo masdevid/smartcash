@@ -19,18 +19,64 @@ DETECTION_THRESHOLDS = {
 # Konfigurasi lengkap untuk setiap layer deteksi
 LAYER_CONFIG = {
     'banknote': {
-        'num_classes': 7,  # 7 denominasi ('001', '002', '005', '010', '020', '050', '100')
+        'num_classes': 7,
+        'classes': [
+            {'id': 0, 'name': '001', 'desc': 'Rp1000'},
+            {'id': 1, 'name': '002', 'desc': 'Rp2000'},
+            {'id': 2, 'name': '005', 'desc': 'Rp5000'},
+            {'id': 3, 'name': '010', 'desc': 'Rp10000'},
+            {'id': 4, 'name': '020', 'desc': 'Rp20000'},
+            {'id': 5, 'name': '050', 'desc': 'Rp50000'},
+            {'id': 6, 'name': '100', 'desc': 'Rp100000'},
+        ],
         'description': 'Deteksi uang kertas utuh'
     },
     'nominal': {
-        'num_classes': 7,  # 7 area nominal ('l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100')
+        'num_classes': 7,
+        'classes': [
+            {'id': 7, 'name': 'l2_001', 'desc': 'Rp1000'},
+            {'id': 8, 'name': 'l2_002', 'desc': 'Rp2000'},
+            {'id': 9, 'name': 'l2_005', 'desc': 'Rp5000'},
+            {'id': 10, 'name': 'l2_010', 'desc': 'Rp10000'},
+            {'id': 11, 'name': 'l2_020', 'desc': 'Rp20000'},
+            {'id': 12, 'name': 'l2_050', 'desc': 'Rp50000'},
+            {'id': 13, 'name': 'l2_100', 'desc': 'Rp100000'},
+        ],
         'description': 'Deteksi area nominal'
     },
     'security': {
-        'num_classes': 3,  # 3 fitur keamanan ('l3_sign', 'l3_text', 'l3_thread')
+        'num_classes': 3,
+        'classes': [
+            {'id': 14, 'name': 'l3_sign', 'desc': 'Tanda tangan'},
+            {'id': 15, 'name': 'l3_text', 'desc': 'Teks mikro'},
+            {'id': 16, 'name': 'l3_thread', 'desc': 'Benang pengaman'},
+        ],
         'description': 'Deteksi fitur keamanan'
     }
 }
+
+LAYER_CONFIG_FLAT = [
+    {'id': 0, 'layer': 'banknote', 'name': '001', 'desc': 'Rp1000'},
+    {'id': 1, 'layer': 'banknote', 'name': '002', 'desc': 'Rp2000'},
+    {'id': 2, 'layer': 'banknote', 'name': '005', 'desc': 'Rp5000'},
+    {'id': 3, 'layer': 'banknote', 'name': '010', 'desc': 'Rp10000'},
+    {'id': 4, 'layer': 'banknote', 'name': '020', 'desc': 'Rp20000'},
+    {'id': 5, 'layer': 'banknote', 'name': '050', 'desc': 'Rp50000'},
+    {'id': 6, 'layer': 'banknote', 'name': '100', 'desc': 'Rp100000'},
+    
+    {'id': 7, 'layer': 'nominal', 'name': 'l2_001', 'desc': 'Rp1000'},
+    {'id': 8, 'layer': 'nominal', 'name': 'l2_002', 'desc': 'Rp2000'},
+    {'id': 9, 'layer': 'nominal', 'name': 'l2_005', 'desc': 'Rp5000'},
+    {'id': 10, 'layer': 'nominal', 'name': 'l2_010', 'desc': 'Rp10000'},
+    {'id': 11, 'layer': 'nominal', 'name': 'l2_020', 'desc': 'Rp20000'},
+    {'id': 12, 'layer': 'nominal', 'name': 'l2_050', 'desc': 'Rp50000'},
+    {'id': 13, 'layer': 'nominal', 'name': 'l2_100', 'desc': 'Rp100000'},
+    
+    {'id': 14, 'layer': 'security', 'name': 'l3_sign', 'desc': 'Tanda tangan'},
+    {'id': 15, 'layer': 'security', 'name': 'l3_text', 'desc': 'Teks mikro'},
+    {'id': 16, 'layer': 'security', 'name': 'l3_thread', 'desc': 'Benang pengaman'}
+]
+
 
 # Daftar variasi model EfficientNet yang didukung
 SUPPORTED_EFFICIENTNET_MODELS = ['efficientnet_b4']

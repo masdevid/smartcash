@@ -8,26 +8,37 @@ _base_: 'base_config.yaml'
 # Override konfigurasi augmentasi dari base_config
 augmentation:
   # Parameter yang di-override dari base_config
-  num_variations: 3  # Override dari base_config (2)
-  validate_results: true  # Override dari base_config (false)
+  num_variations: 3               # Override dari base_config (2)
+  validate_results: true          # Override dari base_config (false)
   
   # Parameter tambahan yang tidak ada di base_config
-  balance_classes: true
-  target_count: 500
-  move_to_preprocessed: true
+  balance_classes: true           # Seimbangkan jumlah gambar per kelas
+  target_count: 500               # Target jumlah gambar per kelas
+  move_to_preprocessed: true      # Pindahkan hasil ke direktori preprocessed
   
-  # Parameter posisi yang di-override
-  position:
-    degrees: 15  # Override dari base_config (10)
-    translate: 0.15  # Override dari base_config (0.1)
-    scale: 0.15  # Override dari base_config (0.1)
-    shear_max: 10  # Parameter baru
+  # Jenis augmentasi yang didukung
+  types:
+    - 'flip'                      # Flip horizontal
+    - 'rotate'                    # Rotasi gambar
+    - 'brightness'                # Ubah kecerahan
+    - 'contrast'                  # Ubah kontras
+    - 'hsv'                       # Ubah HSV
+    - 'noise'                     # Tambahkan noise
+    - 'blur'                      # Tambahkan blur
   
-  # Parameter pencahayaan yang di-override
-  lighting:
-    hsv_h: 0.025  # Override dari base_config (0.015)
-    blur: 0.2  # Parameter baru
-    noise: 0.1  # Parameter baru
+  # Parameter augmentasi posisi yang di-override
+  fliplr: 0.5                     # Probabilitas flip horizontal
+  degrees: 15                     # Derajat maksimum rotasi (override dari base_config 10)
+  translate: 0.15                 # Translasi maksimum (override dari base_config 0.1)
+  scale: 0.15                     # Skala maksimum (override dari base_config 0.1)
+  
+  # Parameter augmentasi pencahayaan yang di-override
+  hsv_h: 0.025                    # Perubahan hue maksimum (override dari base_config 0.015)
+  hsv_s: 0.7                      # Perubahan saturation maksimum
+  brightness: 0.2                 # Perubahan brightness maksimum
+  contrast: 0.2                   # Perubahan contrast maksimum
+  blur: 0.2                       # Parameter blur (baru)
+  noise: 0.1                      # Parameter noise (baru)
 
 # Override konfigurasi cleanup dari base_config
 cleanup:

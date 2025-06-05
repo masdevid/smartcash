@@ -1,9 +1,10 @@
 # File: configs/evaluation_config.yaml
 # Author: Alfrida Sabar
-# Deskripsi: Konfigurasi khusus untuk evaluasi model dengan metrik komprehensif
+# Deskripsi: Konfigurasi khusus untuk evaluasi model dengan metrik komprehensif dan skenario pengujian
 
-# Inherit dari base_config.yaml
-_base_: 'base_config.yaml'
+# Inherit dari konfigurasi lain - Menggunakan pewarisan bertingkat
+# Urutan penting: base_config -> model_config -> backbone_config
+_base_: ['base_config.yaml', 'model_config.yaml', 'backbone_config.yaml']
 
 # Override konfigurasi evaluasi dengan metrik yang lebih lengkap
 evaluation:
@@ -11,13 +12,16 @@ evaluation:
   confidence_thresholds: [0.1, 0.25, 0.5, 0.75, 0.9]  # Override dari base_config ([0.25, 0.5])
   per_class_metrics: true  # Override dari base_config (false)
   per_layer_metrics: true  # Override dari base_config (false)
+  iou_thresholds: [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]  # Threshold IoU untuk mAP
   
   # Override konfigurasi visualisasi
   visualization:
     max_samples: 50  # Override dari base_config (20)
     plot_precision_recall_curve: true  # Override dari base_config (false)
     plot_class_distribution: true  # Override dari base_config (false)
+    plot_confusion_matrix: true  # Parameter baru
     save_misclassified: true  # Override dari base_config (false)
+    save_path: 'results/visualizations'
   
   # Konfigurasi untuk benchmark (parameter baru)
   benchmark:
@@ -28,30 +32,86 @@ evaluation:
     measure_memory: true
     export_metrics: true
     export_path: 'results/benchmark'
+  
+  # Konfigurasi untuk perbandingan model
+  comparison:
+    enabled: true
+    models: ['yolov5s', 'efficient_optimized']
+    backbones: ['cspdarknet_s', 'efficientnet_b4']
+    metrics: ['mAP','accuracy', 'precision', 'recall', 'F1', 'inference_time']
+    plot_comparison: true
+    export_comparison: true
+    export_path: 'results/comparison'
 
 # Override konfigurasi model untuk evaluasi
 model:
   max_detections: 300  # Override dari base_config (100)
   nms_method: 'weighted'  # Parameter baru
+  conf_thres: 0.25  # Threshold confidence untuk deteksi
+  iou_thres: 0.45   # Threshold IoU untuk NMS
+  
+  # Konfigurasi untuk model comparison
+  comparison:
+    cspdarknet_s:
+      description: 'YOLOv5s dengan CSPDarknet sebagai baseline backbone'
+      weights: 'weights/yolov5s_cspdarknet.pt'
+    
+    efficientnet_b4:
+      description: 'YOLOv5 dengan EfficientNet-B4 sebagai backbone'
+      weights: 'weights/yolov5_efficientnet_b4.pt'
 
-# Override konfigurasi skenario evaluasi
+# Konfigurasi skenario evaluasi berdasarkan penelitian
 scenarios:
-  # Skenario 1: Evaluasi pada kondisi pencahayaan ideal
-  - name: 'pencahayaan_ideal'
-    subset: 'test/pencahayaan_ideal'
+  # Skenario 1: YOLOv5 Default (CSPDarknet) dengan variasi posisi pengambilan gambar
+  - name: 'skenario_1_cspdarknet_posisi'
+    description: 'Deteksi nilai uang dengan model YOLOv5 Default (CSPDarknet) sebagai baseline backbone dengan variasi posisi pengambilan gambar'
+    model_type: 'yolov5s'
+    backbone: 'cspdarknet_s'
+    subset: 'test/variasi_posisi'
+    metrics: ['mAP','accuracy', 'precision', 'recall', 'F1', 'inference_time']
+    visualization:
+      enabled: true
+      save_path: 'results/skenario_1'
+      plot_confusion_matrix: true
+      plot_precision_recall_curve: true
+    
+  # Skenario 2: YOLOv5 Default (CSPDarknet) dengan variasi pencahayaan
+  - name: 'skenario_2_cspdarknet_cahaya'
+    description: 'Deteksi nilai uang dengan model YOLOv5 Default (CSPDarknet) sebagai baseline backbone dengan pencahayaan beravariasi'
+    model_type: 'yolov5s'
+    backbone: 'cspdarknet_s'
+    subset: 'test/variasi_cahaya'
+    metrics: ['mAP','accuracy', 'precision', 'recall', 'F1', 'inference_time']
+    visualization:
+      enabled: true
+      save_path: 'results/skenario_2'
+      plot_confusion_matrix: true
+      plot_precision_recall_curve: true
+    
+  # Skenario 3: YOLOv5 dengan EfficientNet-B4 dengan variasi posisi pengambilan gambar
+  - name: 'skenario_3_efficientnet_posisi'
+    description: 'Deteksi nilai uang dengan model YOLOv5 dengan arsitektur EfficientNet-B4 sebagai backbone dengan variasi posisi pengambilan gambar'
+    model_type: 'efficient_optimized'
+    backbone: 'efficientnet_b4'
+    subset: 'test/variasi_posisi'
+    metrics: ['mAP','accuracy', 'precision', 'recall', 'F1', 'inference_time']
+    visualization:
+      enabled: true
+      save_path: 'results/skenario_3'
+      plot_confusion_matrix: true
+      plot_precision_recall_curve: true
+    
+  # Skenario 4: YOLOv5 dengan EfficientNet-B4 dengan variasi pencahayaan
+  - name: 'skenario_4_efficientnet_cahaya'
+    description: 'Deteksi nilai uang dengan model YOLOv5 dengan arsitektur EfficientNet-B4 sebagai backbone dengan pencahayaan beravariasi'
+    model_type: 'efficient_optimized'
+    backbone: 'efficientnet_b4'
+    subset: 'test/variasi_cahaya'
+    metrics: ['mAP','accuracy', 'precision', 'recall', 'F1', 'inference_time']
+    visualization:
+      enabled: true
+      save_path: 'results/skenario_4'
+      plot_confusion_matrix: true
+      plot_precision_recall_curve: true
     description: 'Kondisi pencahayaan normal dan ideal'
     
-  # Skenario 2: Evaluasi pada kondisi pencahayaan rendah
-  - name: 'pencahayaan_rendah'
-    subset: 'test/pencahayaan_rendah'
-    description: 'Kondisi pencahayaan rendah (<100 lux)'
-    
-  # Skenario 3: Evaluasi pada kondisi pencahayaan berlebih
-  - name: 'pencahayaan_tinggi'
-    subset: 'test/pencahayaan_tinggi'
-    description: 'Kondisi pencahayaan tinggi (>1000 lux)'
-    
-  # Skenario 4: Evaluasi pada posisi uang yang bervariasi
-  - name: 'posisi_bervariasi'
-    subset: 'test/posisi_bervariasi'
-    description: 'Uang dengan posisi dan orientasi bervariasi'

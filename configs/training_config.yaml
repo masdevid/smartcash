@@ -3,8 +3,8 @@
 # Deskripsi: Konfigurasi khusus untuk proses training dan utilitas training
 
 # Inherit dari konfigurasi lain - Menggunakan pewarisan bertingkat
-# Urutan penting: base_config -> hyperparameters_config -> model_config -> training_config
-_base_: ['hyperparameters_config.yaml', 'model_config.yaml']
+# Urutan penting: base_config -> preprocessing_config -> augmentation_config -> model_config -> backbone_config -> hyperparameters_config -> training_config
+_base_: ['base_config.yaml', 'preprocessing_config.yaml', 'augmentation_config.yaml', 'model_config.yaml', 'backbone_config.yaml', 'hyperparameters_config.yaml']
 
 # Parameter validasi (parameter baru)
 validation:

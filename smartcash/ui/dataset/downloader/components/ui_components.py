@@ -258,10 +258,10 @@ def _create_enhanced_grid_form_container(form_fields: Dict[str, widgets.Widget])
     return widgets.VBox([form_row], layout=widgets.Layout(width='100%', margin='0'))
 
 def _create_fixed_save_reset_buttons() -> Dict[str, widgets.Widget]:
-    """Create save/reset buttons - save secondary, tanpa icon"""
+    """Create save/reset buttons - save primary, tanpa icon"""
     save_button = widgets.Button(
         description='Simpan',  # Tanpa icon
-        button_style='secondary',  # Secondary/default style (grey)
+        button_style='primary',  # Primary/default style (grey)
         layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px')
     )
     

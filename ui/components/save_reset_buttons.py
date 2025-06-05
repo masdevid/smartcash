@@ -15,7 +15,7 @@ def create_save_reset_buttons(save_label: str = "Simpan", reset_label: str = "Re
     # Save button - secondary style, no icon
     save_button = widgets.Button(
         description=save_label, 
-        button_style='secondary', 
+        button_style='primary', 
         tooltip=save_tooltip,
         layout=widgets.Layout(width=button_width, height='32px', margin='0 5px 0 0')
     )

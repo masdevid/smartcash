@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 import time
 import threading
 
-class ThreeLevelProgressTracker:
+class ProgressTracker:
     """Three-level progress tracker dengan overall/step/current progress system dan one-liner operations"""
     
     def __init__(self):

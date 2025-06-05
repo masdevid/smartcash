@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/initializers/common_initializer.py
-Deskripsi: Fixed CommonInitializer tanpa fallback UI dan proper error propagation
+Deskripsi: Fixed CommonInitializer dengan proper return value handling
 """
 
 from typing import Dict, Any, Optional, List, Type
@@ -15,7 +15,7 @@ from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES, register_na
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 class CommonInitializer(ABC):
-    """Fixed CommonInitializer tanpa fallback UI"""
+    """Fixed CommonInitializer dengan proper return value"""
     
     def __init__(self, module_name: str, config_handler_class: Optional[Type[ConfigHandler]] = None, 
                  parent_module: Optional[str] = None):
@@ -37,8 +37,8 @@ class CommonInitializer(ABC):
         register_namespace(namespace, module_name.split('.')[-1].upper())
         return namespace
     
-    def initialize(self, env=None, config=None, **kwargs) -> Any:
-        """Main initialization tanpa fallback UI"""
+    def initialize(self, env=None, config=None, **kwargs) -> Dict[str, Any]:
+        """Main initialization dengan proper return value"""
         try:
             suppress_all_outputs()
             
@@ -48,10 +48,10 @@ class CommonInitializer(ABC):
             # Load config menggunakan handler
             merged_config = config or config_handler.load_config()
             
-            # Create UI components - no fallback
+            # Create UI components
             ui_components = self._create_ui_components(merged_config, env, **kwargs)
             
-            if not ui_components:
+            if not ui_components or not isinstance(ui_components, dict):
                 raise ValueError(f"Failed to create UI components for {self.module_name}")
             
             # Add config handler ke components
@@ -81,11 +81,12 @@ class CommonInitializer(ABC):
             self._finalize_setup(ui_components, merged_config)
             show_status_safe(ui_components, f"✅ {self.module_name} UI berhasil diinisialisasi", "success")
             
+            # Return proper result - pastikan return dict dengan ui component
             return self._get_return_value(ui_components)
             
         except Exception as e:
             self.logger.error(f"❌ Error inisialisasi {self.module_name}: {str(e)}")
-            # Propagate error instead of returning fallback UI
+            # Re-raise untuk proper error handling di caller
             raise
     
     def _create_config_handler(self) -> ConfigHandler:
@@ -216,8 +217,11 @@ class CommonInitializer(ABC):
             'config': config
         })
     
-    # One-liner utilities
-    _get_return_value = lambda self, ui_components: ui_components.get('ui', ui_components)
+    def _get_return_value(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Get proper return value - ensure it's a dict with ui"""
+        # Ensure we return the full ui_components dict
+        return ui_components
+
     get_module_status = lambda self: {'module_name': self.module_name, 'initialized': True, 'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 # Factory functions dengan one-liner style

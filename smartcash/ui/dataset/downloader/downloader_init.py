@@ -71,24 +71,29 @@ def initialize_downloader_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
         # Initialize dengan proper error propagation
         result = initializer.initialize(env=env, config=config, **kwargs)
         
-        # Validate result
+        # Validate result is a proper dict
         if not result or not isinstance(result, dict):
             raise ValueError("Initializer returned invalid result")
         
-        # Check untuk error dalam result
-        if result.get('error'):
-            raise ValueError(f"Initialization error: {result.get('error')}")
+        # Ensure we have at least 'ui' component
+        if 'ui' not in result:
+            raise ValueError("Missing 'ui' component in result")
         
+        # Success - return the full result
         return result
         
     except Exception as e:
-        # Return error dict untuk consistency dengan pattern yang ada
-        error_msg = f"Failed to initialize downloader UI: {str(e)}"
-        print(f"❌ {error_msg}")
+        # Log the actual error for debugging
+        error_msg = str(e)
+        print(f"❌ Failed to initialize downloader UI: {error_msg}")
         
-        # Return minimal structure dengan error info
+        # Import traceback for detailed error info
+        import traceback
+        traceback.print_exc()
+        
+        # Return error dict untuk consistency dengan pattern yang ada
         return {
-            'error': error_msg,
+            'error': f"Failed to initialize downloader UI: {error_msg}",
             'ui': None,
             'initialized': False,
             'module_name': 'downloader'

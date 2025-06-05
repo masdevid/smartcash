@@ -30,7 +30,7 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
     # Training parameter widgets dengan one-liner creation
     training_widgets = {
         'epochs_slider': create_int_slider_widget(training.get('epochs', 100), 10, 300, 'Epochs:'),
-        'batch_size_slider': create_int_slider_widget(training.get('batch_size', 16), 1, 64, 'Batch Size:'),
+        'batch_size_slider': create_int_slider_widget(training.get('batch_size', 16), 4, 64, 'Batch Size:', 4),
         'learning_rate_slider': create_slider_widget(training.get('learning_rate', 0.01), 0.0001, 0.1, 0.001, 'Learning Rate:', '.4f'),
         'image_size_slider': create_int_slider_widget(training.get('image_size', 640), 320, 1280, 'Image Size:', 32),
         'mixed_precision_checkbox': create_checkbox_widget(training.get('mixed_precision', True), 'Mixed Precision'),
@@ -70,12 +70,11 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
     # Summary cards untuk menampilkan config yang tersimpan
     summary_cards = create_summary_cards_widget()
     
-    # Save/reset buttons dan status panel menggunakan shared components
+    # Save/reset buttons tanpa sync info
     save_reset_buttons = create_save_reset_buttons(
         save_tooltip="Simpan konfigurasi hyperparameter",
         reset_tooltip="Reset ke nilai default",
-        with_sync_info=True,
-        sync_message="📂 Konfigurasi akan disinkronkan dengan Google Drive"
+        with_sync_info=False
     )
     
     status_panel = create_status_panel("ℹ️ Siap untuk konfigurasi hyperparameter", "info")

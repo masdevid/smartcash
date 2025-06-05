@@ -126,7 +126,7 @@ class HyperparametersConfigHandler(ConfigHandler):
         self.logger.success("🔄 Hyperparameters config berhasil direset")
     
     def _update_summary_cards(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update summary cards dengan config hyperparameters yang tersimpan"""
+        """Update summary cards dengan config hyperparameters yang tersimpan - always visible dengan 4 cards compact"""
         if 'summary_cards' not in ui_components:
             return
         
@@ -136,28 +136,28 @@ class HyperparametersConfigHandler(ConfigHandler):
         early_stopping = config.get('early_stopping', {})
         
         summary_html = f"""
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin: 10px 0;">
-            <div style="background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #2196f3;">
-                <h5 style="margin: 0 0 8px 0; color: #1976d2;">📊 Training</h5>
-                <p style="margin: 2px 0; font-size: 13px;">Epochs: <strong>{training.get('epochs', 100)}</strong></p>
-                <p style="margin: 2px 0; font-size: 13px;">Batch Size: <strong>{training.get('batch_size', 16)}</strong></p>
-                <p style="margin: 2px 0; font-size: 13px;">Learning Rate: <strong>{training.get('learning_rate', 0.01)}</strong></p>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0;">
+            <div style="background: #e3f2fd; padding: 8px; border-radius: 6px; border-left: 3px solid #2196f3;">
+                <h6 style="margin: 0 0 4px 0; color: #1976d2; font-size: 12px;">📊 Training</h6>
+                <p style="margin: 1px 0; font-size: 11px;">Epochs: <strong>{training.get('epochs', 100)}</strong></p>
+                <p style="margin: 1px 0; font-size: 11px;">Batch: <strong>{training.get('batch_size', 16)}</strong></p>
+                <p style="margin: 1px 0; font-size: 11px;">LR: <strong>{training.get('learning_rate', 0.01)}</strong></p>
             </div>
-            <div style="background: #f3e5f5; padding: 12px; border-radius: 8px; border-left: 4px solid #9c27b0;">
-                <h5 style="margin: 0 0 8px 0; color: #7b1fa2;">⚙️ Optimizer</h5>
-                <p style="margin: 2px 0; font-size: 13px;">Type: <strong>{optimizer.get('type', 'SGD')}</strong></p>
-                <p style="margin: 2px 0; font-size: 13px;">Weight Decay: <strong>{optimizer.get('weight_decay', 0.0005)}</strong></p>
-                <p style="margin: 2px 0; font-size: 13px;">Momentum: <strong>{optimizer.get('momentum', 0.937)}</strong></p>
+            <div style="background: #f3e5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #9c27b0;">
+                <h6 style="margin: 0 0 4px 0; color: #7b1fa2; font-size: 12px;">⚙️ Optimizer</h6>
+                <p style="margin: 1px 0; font-size: 11px;">Type: <strong>{optimizer.get('type', 'SGD')}</strong></p>
+                <p style="margin: 1px 0; font-size: 11px;">WD: <strong>{optimizer.get('weight_decay', 0.0005)}</strong></p>
+                <p style="margin: 1px 0; font-size: 11px;">Mom: <strong>{optimizer.get('momentum', 0.937)}</strong></p>
             </div>
-            <div style="background: #e8f5e8; padding: 12px; border-radius: 8px; border-left: 4px solid #4caf50;">
-                <h5 style="margin: 0 0 8px 0; color: #388e3c;">📈 Scheduler</h5>
-                <p style="margin: 2px 0; font-size: 13px;">Type: <strong>{scheduler.get('type', 'cosine')}</strong></p>
-                <p style="margin: 2px 0; font-size: 13px;">Warmup: <strong>{scheduler.get('warmup_epochs', 3)} epochs</strong></p>
+            <div style="background: #e8f5e8; padding: 8px; border-radius: 6px; border-left: 3px solid #4caf50;">
+                <h6 style="margin: 0 0 4px 0; color: #388e3c; font-size: 12px;">📈 Scheduler</h6>
+                <p style="margin: 1px 0; font-size: 11px;">Type: <strong>{scheduler.get('type', 'cosine')}</strong></p>
+                <p style="margin: 1px 0; font-size: 11px;">Warmup: <strong>{scheduler.get('warmup_epochs', 3)}</strong></p>
             </div>
-            <div style="background: #fff3e0; padding: 12px; border-radius: 8px; border-left: 4px solid #ff9800;">
-                <h5 style="margin: 0 0 8px 0; color: #f57c00;">🛑 Early Stopping</h5>
-                <p style="margin: 2px 0; font-size: 13px;">Enabled: <strong>{'Ya' if early_stopping.get('enabled', True) else 'Tidak'}</strong></p>
-                <p style="margin: 2px 0; font-size: 13px;">Patience: <strong>{early_stopping.get('patience', 15)}</strong></p>
+            <div style="background: #fff3e0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff9800;">
+                <h6 style="margin: 0 0 4px 0; color: #f57c00; font-size: 12px;">🛑 Early Stop</h6>
+                <p style="margin: 1px 0; font-size: 11px;">Enabled: <strong>{'Ya' if early_stopping.get('enabled', True) else 'Tidak'}</strong></p>
+                <p style="margin: 1px 0; font-size: 11px;">Patience: <strong>{early_stopping.get('patience', 15)}</strong></p>
             </div>
         </div>
         """

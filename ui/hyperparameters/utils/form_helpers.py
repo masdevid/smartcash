@@ -55,10 +55,29 @@ def create_section_card(title: str, widgets_list: List[widgets.Widget],
 
 
 def create_summary_cards_widget() -> widgets.HTML:
-    """Create empty summary cards widget untuk menampilkan config summary"""
+    """Create always visible summary cards widget untuk menampilkan config summary"""
     return widgets.HTML(
-        value="<div style='padding: 15px; text-align: center; color: #666;'>📊 Summary akan ditampilkan setelah konfigurasi disimpan</div>",
-        layout=widgets.Layout(width='100%', margin='10px 0', border='1px solid #e0e0e0', border_radius='8px')
+        value="""
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0;">
+            <div style="background: #f5f5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #ccc;">
+                <h6 style="margin: 0 0 4px 0; color: #666; font-size: 12px;">📊 Training</h6>
+                <p style="margin: 1px 0; font-size: 11px; color: #888;">Belum dikonfigurasi</p>
+            </div>
+            <div style="background: #f5f5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #ccc;">
+                <h6 style="margin: 0 0 4px 0; color: #666; font-size: 12px;">⚙️ Optimizer</h6>
+                <p style="margin: 1px 0; font-size: 11px; color: #888;">Belum dikonfigurasi</p>
+            </div>
+            <div style="background: #f5f5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #ccc;">
+                <h6 style="margin: 0 0 4px 0; color: #666; font-size: 12px;">📈 Scheduler</h6>
+                <p style="margin: 1px 0; font-size: 11px; color: #888;">Belum dikonfigurasi</p>
+            </div>
+            <div style="background: #f5f5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #ccc;">
+                <h6 style="margin: 0 0 4px 0; color: #666; font-size: 12px;">🛑 Early Stop</h6>
+                <p style="margin: 1px 0; font-size: 11px; color: #888;">Belum dikonfigurasi</p>
+            </div>
+        </div>
+        """,
+        layout=widgets.Layout(width='100%', margin='5px 0')
     )
 
 

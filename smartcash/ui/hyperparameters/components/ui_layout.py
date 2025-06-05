@@ -62,13 +62,24 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         ], '#4caf50'
     )
     
-    # Create responsive grid layout untuk cards
-    cards_grid = create_responsive_grid_layout([
+    # Create responsive grid layout dengan max 2 columns untuk parameter cards
+    params_grid = widgets.HBox([
         training_section,
-        optimizer_section,
+        optimizer_section
+    ], layout=widgets.Layout(
+        width='100%', display='flex', flex_flow='row wrap',
+        justify_content='space-between', align_items='stretch',
+        gap='10px', overflow='hidden'
+    ))
+    
+    advanced_grid = widgets.HBox([
         advanced_section,
         control_section
-    ])
+    ], layout=widgets.Layout(
+        width='100%', display='flex', flex_flow='row wrap',
+        justify_content='space-between', align_items='stretch',
+        gap='10px', overflow='hidden'
+    ))
     
     # Header component
     header = create_header(
@@ -82,7 +93,8 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         header,
         form_components['status_panel'],
         form_components['summary_cards'],
-        cards_grid,
+        params_grid,
+        advanced_grid,
         form_components['button_container']
     ], layout=widgets.Layout(
         width='100%', max_width='100%', padding='10px',
@@ -97,6 +109,7 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         'status_panel': form_components['status_panel'],
         'summary_cards': form_components['summary_cards'],
         'header': header,
-        'cards_grid': cards_grid,
+        'params_grid': params_grid,
+        'advanced_grid': advanced_grid,
         **form_components  # Include all form components
     }

@@ -6,7 +6,7 @@ Deskripsi: Fixed initializer dengan proper inheritance dan imports
 from typing import Dict, Any, List
 from smartcash.common.environment import get_environment_manager
 from smartcash.common.constants.paths import get_paths_for_environment
-from smartcash.ui.utils.common_initializer import CommonInitializer
+from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 from smartcash.ui.pretrained_model.components.ui_components import create_pretrained_main_ui
 from smartcash.ui.pretrained_model.handlers.pretrained_handlers import setup_pretrained_handlers
@@ -44,7 +44,7 @@ class PretrainedModelInitializer(CommonInitializer):
     def _get_critical_components(self) -> List[str]:
         return [
             'ui', 'download_sync_button', 'reset_ui_button',
-            'log_output', 'status_panel', 'progress_container'
+            'log_output', 'status_panel', 'progress_tracker', 'progress_container'
         ]
 
 # Global instance dan public API

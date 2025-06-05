@@ -17,10 +17,12 @@ from smartcash.ui.pretrained_model.constants.model_constants import MODEL_CONFIG
 
 def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create pretrained model UI components"""
+    get_icon = lambda key, fallback="⚙️": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
+    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
     
     # Header
     header = create_header(
-        f"{ICONS['model']} Persiapan Model Pre-trained", 
+        f"{get_icon('model')} Persiapan Model Pre-trained", 
         "Download dan sinkronisasi model YOLOv5 dan EfficientNet-B4 untuk SmartCash"
     )
     
@@ -64,7 +66,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     log_components = create_log_accordion(module_name='pretrained_model', height='220px')
     
     # Progress tracking dengan dual level untuk overall dan step progress
-    progress_components = create_dual_progress_tracker()
+    progress_tracker = create_dual_progress_tracker()
     
     # Help panel
     help_content = """
@@ -91,16 +93,17 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Section headers
     action_header = widgets.HTML(f"""
-        <h4 style='color: {COLORS['dark']}; margin: 12px 0 8px 0; font-size: 16px;'>
-            {ICONS['download']} Aksi Model
-        </h4>
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Actions
+    </h4>
     """)
     
     # Main UI assembly
     ui = widgets.VBox([
         header, status_panel, info_html,
         create_divider(), action_header, action_buttons['container'],
-        progress_components['container'], log_components['log_accordion'], 
+        progress_tracker['container'], log_components['log_accordion'], 
         create_divider(), help_panel
     ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
     
@@ -113,13 +116,13 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'action_buttons': action_buttons,
         'download_sync_button': action_buttons['download_button'],
         'reset_ui_button': action_buttons['check_button'],
-        'progress_components': progress_components,
-        'progress_container': progress_components['container'],
-        'show_for_operation': progress_components['show_for_operation'],
-        'update_progress': progress_components['update_progress'],
-        'complete_operation': progress_components['complete_operation'],
-        'error_operation': progress_components['error_operation'],
-        'reset_all': progress_components['reset_all'],
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker['container'],
+        'show_for_operation': progress_tracker['show_for_operation'],
+        'update_progress': progress_tracker['update_progress'],
+        'complete_operation': progress_tracker['complete_operation'],
+        'error_operation': progress_tracker['error_operation'],
+        'reset_all': progress_tracker['reset_all'],
         'log_components': log_components,
         'log_accordion': log_components['log_accordion'],
         'log_output': log_components['log_output'],

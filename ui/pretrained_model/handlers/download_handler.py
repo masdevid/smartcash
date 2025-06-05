@@ -22,10 +22,20 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
         
         try:
             logger and logger.info("🚀 Memulai download dan sinkronisasi model")
-            ui_components.get('show_for_operation', lambda x: None)('download')
+            # Gunakan progress_tracker jika tersedia
+            if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'show_for_operation'):
+                ui_components['progress_tracker'].show_for_operation('download')
+            else:
+                # Fallback ke metode lama
+                ui_components.get('show_for_operation', lambda x: None)('download')
             
             # Phase 1: Check existing models
-            ui_components.get('update_progress', lambda *a: None)('overall', 10, "Memeriksa model yang tersedia")
+            # Gunakan progress_tracker jika tersedia
+            if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'update'):
+                ui_components['progress_tracker'].update('overall', 10, "Memeriksa model yang tersedia")
+            else:
+                # Fallback ke metode lama
+                ui_components.get('update_progress', lambda *a: None)('overall', 10, "Memeriksa model yang tersedia")
             checker = ModelChecker(config, logger)
             check_result = checker.check_all_models()
             
@@ -39,7 +49,12 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             # Phase 2: Download missing models
             if models_to_download:
                 logger and logger.info(f"📥 Mengunduh {len(models_to_download)} model: {', '.join(models_to_download)}")
-                ui_components.get('update_progress', lambda *a: None)('overall', 30, "Mengunduh model")
+                # Gunakan progress_tracker jika tersedia
+                if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'update'):
+                    ui_components['progress_tracker'].update('overall', 30, "Mengunduh model")
+                else:
+                    # Fallback ke metode lama
+                    ui_components.get('update_progress', lambda *a: None)('overall', 30, "Mengunduh model")
                 
                 downloader = ModelDownloader(config, logger)
                 downloader.register_progress_callback(ui_components.get('progress_callback'))
@@ -55,7 +70,12 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                 logger and logger.info("ℹ️ Semua model sudah tersedia, skip download")
             
             # Phase 3: Sync to Drive
-            ui_components.get('update_progress', lambda *a: None)('overall', 80, "Sinkronisasi ke Google Drive")
+            # Gunakan progress_tracker jika tersedia
+            if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'update'):
+                ui_components['progress_tracker'].update('overall', 80, "Sinkronisasi ke Google Drive")
+            else:
+                # Fallback ke metode lama
+                ui_components.get('update_progress', lambda *a: None)('overall', 80, "Sinkronisasi ke Google Drive")
             syncer = ModelSyncer(config, logger)
             sync_result = syncer.sync_to_drive()
             
@@ -65,15 +85,23 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             
             # Phase 4: Final status
             total_models = len(existing_models) + len(models_to_download)
-            ui_components.get('complete_operation', lambda x: None)(
-                f"Setup model selesai: {total_models} model siap digunakan"
-            )
+            # Gunakan progress_tracker jika tersedia
+            if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'complete_operation'):
+                ui_components['progress_tracker'].complete_operation(f"Setup model selesai: {total_models} model siap digunakan")
+            else:
+                # Fallback ke metode lama
+                ui_components.get('complete_operation', lambda x: None)(f"Setup model selesai: {total_models} model siap digunakan")
             _update_status_panel(ui_components, f"✅ Setup model selesai: {total_models} model siap", "success")
             
         except Exception as e:
             error_msg = f"Setup model gagal: {str(e)}"
             logger and logger.error(f"💥 {error_msg}")
-            ui_components.get('error_operation', lambda x: None)(error_msg)
+            # Gunakan progress_tracker jika tersedia
+            if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'error_operation'):
+                ui_components['progress_tracker'].error_operation(error_msg)
+            else:
+                # Fallback ke metode lama
+                ui_components.get('error_operation', lambda x: None)(error_msg)
             _update_status_panel(ui_components, error_msg, "error")
         
         finally:
@@ -97,7 +125,12 @@ def _reset_ui_logger(ui_components: Dict[str, Any]):
             widget.clear_output(wait=True)
     
     # Reset progress container
-    ui_components.get('reset_all', lambda: None)()
+    # Gunakan progress_tracker jika tersedia
+    if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'reset_all'):
+        ui_components['progress_tracker'].reset_all()
+    else:
+        # Fallback ke metode lama
+        ui_components.get('reset_all', lambda: None)()
 
 def _update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str = "info"):
     """Update status panel dengan consistent formatting"""

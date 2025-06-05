@@ -30,14 +30,22 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.ui_logger_namespace import AUGMENTATION_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 
     MODULE_LOGGER_NAME = KNOWN_NAMESPACES[AUGMENTATION_LOGGER_NAMESPACE]
+    get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
+    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
     
     # Header dengan service context
-    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
+    header = create_header(f"{get_icon('augmentation')} Dataset Augmentation", 
                           "Augmentasi dataset dengan service integration untuk performa optimal")
 
     # Status panel dengan service info
     status_panel = create_status_panel("✅ Augmentation UI siap digunakan", "success")
-
+    action_header = widgets.HTML(f"""
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Actions
+    </h4>
+    """)
+    
     # Widget groups dengan service support
     basic_options = create_basic_options_widget()
     advanced_options = create_advanced_options_widget()
@@ -48,7 +56,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         save_label="Simpan Config", reset_label="Reset Config",
         save_tooltip="Simpan konfigurasi augmentation",
         reset_tooltip="Reset ke konfigurasi default",
-        with_sync_info=True, button_width="120px"
     )
 
     action_buttons = create_action_buttons(
@@ -88,6 +95,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Main UI assembly dengan service integration
     ui = widgets.VBox([
         header, status_panel, settings_container, create_divider(),
+        action_header,
         action_buttons['container'], confirmation_area,
         progress_tracker.container, log_components['log_accordion'], help_panel
     ], layout=widgets.Layout(width='100%', overflow='hidden'))

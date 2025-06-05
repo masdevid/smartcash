@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/utils/operation_utils.py
-Deskripsi: Consolidated utilities untuk download operations dengan one-liner style
+Deskripsi: Fixed operation utilities dengan syntax error diperbaiki dan one-liner style
 """
 
 from typing import Dict, Any, Optional
@@ -83,7 +83,7 @@ class DownloadOperations:
         }
     
     def create_backup_if_needed(self, backup_enabled: bool = True) -> Dict[str, Any]:
-        """Create backup dataset jika diperlukan dengan one-liner check"""
+        """Create backup dataset jika diperlukan dengan fixed f-string syntax"""
         if not backup_enabled or not self.check_existing_dataset():
             return {'created': False, 'message': 'Backup not needed or no existing data'}
         
@@ -93,7 +93,10 @@ class DownloadOperations:
             
             paths = self.path_validator.get_dataset_paths()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = f"{paths.get('backup', f'{paths['data_root']}/backup')}/dataset_backup_{timestamp}"
+            
+            # Fixed f-string syntax - split nested f-string
+            backup_dir = paths.get('backup', f"{paths['data_root']}/backup")
+            backup_path = f"{backup_dir}/dataset_backup_{timestamp}"
             
             # Copy existing data
             shutil.copytree(paths['data_root'], backup_path, ignore=shutil.ignore_patterns('backup', 'downloads', '*.tmp'))
@@ -263,3 +266,18 @@ def validate_dataset_identifier(workspace: str, project: str, version: str) -> D
         'errors': errors,
         'identifier': f"{workspace}/{project}:v{version}" if not errors else None
     }
+
+def create_safe_backup_path(base_path: str, timestamp: str) -> str:
+    """Create safe backup path tanpa nested f-string - one-liner helper"""
+    return f"{base_path}/dataset_backup_{timestamp}"
+
+def get_safe_download_path(base_downloads: str, dataset_id: str) -> str:
+    """Get safe download path tanpa nested f-string - one-liner helper"""
+    safe_id = dataset_id.replace('/', '_').replace(':', '_v')
+    return f"{base_downloads}/{safe_id}"
+
+# Fixed utility functions untuk path operations
+create_backup_path = lambda base, timestamp: f"{base}/dataset_backup_{timestamp}"
+create_temp_path = lambda base, identifier: f"{base}/{identifier.replace('/', '_').replace(':', '_v')}"
+get_downloads_path = lambda data_root: f"{data_root}/downloads"
+get_backup_path = lambda data_root: f"{data_root}/backup"

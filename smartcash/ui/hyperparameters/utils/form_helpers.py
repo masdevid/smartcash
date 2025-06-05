@@ -50,7 +50,7 @@ def create_section_card(title: str, widgets_list: List[widgets.Widget],
         *widgets_list
     ], layout=widgets.Layout(
         padding='15px', border=f'1px solid {border_color}', 
-        border_radius='8px', margin='5px', width='32%', min_width='300px'
+        border_radius='8px', margin='5px', width='45%', min_width='300px'
     ))
 
 

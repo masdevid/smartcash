@@ -68,7 +68,7 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         optimizer_section
     ], layout=widgets.Layout(
         width='100%', display='flex', flex_flow='row wrap',
-        justify_content='stretch', align_items='stretch',
+        justify_content='space-between', align_items='stretch',
         gap='10px', overflow='hidden'
     ))
     

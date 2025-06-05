@@ -174,7 +174,6 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         custom_section, 
         widgets.HBox([auto_analyze_checkbox], layout=widgets.Layout(justify_content='flex-start', margin='5px 0')),
         save_reset_buttons['container'],
-        create_divider(margin="20px 0", color="#e0e0e0"), 
         action_header, 
         widgets.HBox([action_buttons['container']], layout=widgets.Layout(justify_content='center', margin='10px 0')),
         progress_tracker.container, 

@@ -30,7 +30,7 @@ def create_save_reset_buttons(save_label: str = "Simpan", reset_label: str = "Re
     
     # Container untuk buttons
     button_container = widgets.HBox([save_button, reset_button], 
-        layout=widgets.Layout(width='auto', justify_content='flex-start', 
+        layout=widgets.Layout(width='auto', justify_content='flex-end', 
                              align_items='center', margin='0', padding='0'))
     
     components = [button_container]

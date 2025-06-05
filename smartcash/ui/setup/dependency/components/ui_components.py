@@ -55,6 +55,16 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         custom_packages
     ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
+    # Progress tracker
+    progress_tracker = create_dual_progress_tracker("Installation")
+    
+    # Log components
+    log_components = create_log_accordion(
+        title="Log dan Status",
+        description="Log dan status instalasi dependency",
+        show_timestamp=True
+    )
+    
     # Action buttons
     action_buttons = create_action_buttons(
         primary_label="Install Packages",

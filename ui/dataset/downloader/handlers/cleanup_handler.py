@@ -45,8 +45,6 @@ def _get_comprehensive_cleanup_info() -> Dict[str, Any]:
             'valid': {'path': dataset_paths['valid'], 'description': 'Validation dataset', 'icon': '✅'},
             'test': {'path': dataset_paths['test'], 'description': 'Test dataset', 'icon': '🧪'},
             'downloads': {'path': dataset_paths['downloads'], 'description': 'Downloaded files', 'icon': '📥'},
-            'preprocessed': {'path': dataset_paths.get('preprocessed', ''), 'description': 'Preprocessed data', 'icon': '⚙️'},
-            'augmented': {'path': dataset_paths.get('augmented', ''), 'description': 'Augmented data', 'icon': '🔄'},
             'backup': {'path': dataset_paths.get('backup', ''), 'description': 'Backup files', 'icon': '💾'}
         }
         

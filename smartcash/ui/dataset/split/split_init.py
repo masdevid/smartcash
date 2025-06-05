@@ -3,17 +3,18 @@ File: smartcash/ui/dataset/split/split_init.py
 Deskripsi: Config cell untuk split dataset dengan arsitektur yang diperbaharui menggunakan ConfigCellInitializer
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from IPython.display import display
 
-from smartcash.ui.utils.config_cell_initializer import ConfigCellInitializer, create_config_cell
-from smartcash.ui.utils.config_handlers import ConfigHandler
+from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 class SplitConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk split dataset configuration"""
     
-    def __init__(self, module_name='split_dataset', config_filename='dataset', config_handler_class=None):
-        super().__init__(module_name, config_filename, config_handler_class)
+    def __init__(self, module_name='split_dataset', config_filename='dataset', config_handler_class=None, 
+                 parent_module: Optional[str] = None):
+        super().__init__(module_name, config_filename, config_handler_class, parent_module)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components untuk split config"""
@@ -50,13 +51,15 @@ class SplitConfigHandler(ConfigHandler):
         return get_default_split_config()
 
 
-def create_split_config_cell(env=None, config=None, **kwargs):
+def create_split_config_cell(env=None, config=None, parent_module=None, parent_callbacks=None, **kwargs):
     """
     Factory function untuk create split config cell
     
     Args:
         env: Environment manager instance
         config: Override config values
+        parent_module: Parent module name (e.g., 'dataset', 'training')
+        parent_callbacks: Callbacks for parent modules
         **kwargs: Additional arguments
         
     Returns:
@@ -66,9 +69,11 @@ def create_split_config_cell(env=None, config=None, **kwargs):
         SplitConfigInitializer, 
         'split_dataset', 
         'dataset', 
-        env, 
-        config, 
-        config_handler_class=SplitConfigHandler, 
+        env=env, 
+        config=config, 
+        config_handler_class=SplitConfigHandler,
+        parent_module=parent_module,
+        parent_callbacks=parent_callbacks,
         **kwargs
     )
 

@@ -3,9 +3,9 @@ File: smartcash/ui/training_config/strategy/strategy_init.py
 Deskripsi: Config cell untuk strategi pelatihan dengan ConfigCellInitializer yang DRY
 """
 
-from typing import Dict, Any
-from smartcash.ui.utils.config_cell_initializer import ConfigCellInitializer, create_config_cell
-from smartcash.ui.utils.config_handlers import ConfigHandler
+from typing import Dict, Any, Optional
+from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.ui.training_config.strategy.components.ui_form import create_strategy_form
 from smartcash.ui.training_config.strategy.components.ui_layout import create_strategy_layout
 from smartcash.ui.training_config.strategy.handlers.config_extractor import extract_strategy_config
@@ -17,8 +17,9 @@ from smartcash.common.config.manager import get_config_manager
 class TrainingStrategyConfigInitializer(ConfigCellInitializer):
     """Config cell initializer untuk strategi pelatihan yang DRY dan sederhana"""
     
-    def __init__(self, module_name='strategy', config_filename='training_config', config_handler_class=None):
-        super().__init__(module_name, config_filename, config_handler_class)
+    def __init__(self, module_name='strategy', config_filename='training', config_handler_class=None,
+                 parent_module: Optional[str] = 'training'):
+        super().__init__(module_name, config_filename, config_handler_class, parent_module)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components dengan reusable form dan layout"""
@@ -89,13 +90,14 @@ class StrategyConfigHandler(ConfigHandler):
         return get_default_strategy_config()
 
 
-def initialize_strategy_config(env=None, config=None, **kwargs):
+def initialize_strategy_config(env=None, config=None, parent_callbacks=None, **kwargs):
     """
     Factory function untuk training strategy config cell
     
     Args:
         env: Environment manager instance
         config: Override config values
+        parent_callbacks: Callbacks untuk parent modules (training, evaluation)
         **kwargs: Additional arguments
         
     Returns:
@@ -105,8 +107,10 @@ def initialize_strategy_config(env=None, config=None, **kwargs):
         TrainingStrategyConfigInitializer, 
         'strategy', 
         'training_config', 
-        env, 
-        config, 
-        config_handler_class=StrategyConfigHandler, 
+        env=env, 
+        config=config, 
+        config_handler_class=StrategyConfigHandler,
+        parent_module='training',
+        parent_callbacks=parent_callbacks,
         **kwargs
     )

@@ -3,20 +3,120 @@ File: smartcash/ui/training/training_init.py
 Deskripsi: Enhanced training initializer dengan YAML config integration dan simplified architecture
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Type
 from IPython.display import display
-from smartcash.ui.utils.common_initializer import CommonInitializer
+from smartcash.ui.initializers.common_initializer import CommonInitializer, create_common_initializer
 from smartcash.ui.utils.logging_utils import suppress_backend_logs
 from smartcash.ui.utils.ui_logger_namespace import TRAINING_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 from smartcash.common.config.manager import get_config_manager
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[TRAINING_LOGGER_NAMESPACE]
+
+class TrainingConfigHandler(ConfigHandler):
+    """Config handler untuk training dengan YAML integration"""
+    
+    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract config dari UI components"""
+        # Implementasi ekstraksi config dari UI components
+        config = {}
+        
+        # Ekstrak model config
+        model_config = {}
+        if 'model_type' in ui_components:
+            model_config['type'] = ui_components['model_type'].value
+        if 'backbone_selector' in ui_components:
+            model_config['backbone'] = ui_components['backbone_selector'].value
+        if 'confidence_threshold' in ui_components:
+            model_config['confidence'] = ui_components['confidence_threshold'].value
+        if 'iou_threshold' in ui_components:
+            model_config['iou_threshold'] = ui_components['iou_threshold'].value
+        
+        # Ekstrak training config
+        training_config = {}
+        if 'batch_size' in ui_components:
+            training_config['batch_size'] = ui_components['batch_size'].value
+        if 'epochs' in ui_components:
+            training_config['epochs'] = ui_components['epochs'].value
+        if 'learning_rate' in ui_components:
+            training_config['learning_rate'] = ui_components['learning_rate'].value
+        if 'optimizer' in ui_components:
+            training_config['optimizer'] = ui_components['optimizer'].value
+            
+        # Combine configs
+        config['model'] = model_config
+        config['training'] = training_config
+        
+        return config
+    
+    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI dari config"""
+        # Update model config
+        model_config = config.get('model', {})
+        if 'model_type' in ui_components and 'type' in model_config:
+            ui_components['model_type'].value = model_config['type']
+        if 'backbone_selector' in ui_components and 'backbone' in model_config:
+            ui_components['backbone_selector'].value = model_config['backbone']
+        if 'confidence_threshold' in ui_components and 'confidence' in model_config:
+            ui_components['confidence_threshold'].value = model_config['confidence']
+        if 'iou_threshold' in ui_components and 'iou_threshold' in model_config:
+            ui_components['iou_threshold'].value = model_config['iou_threshold']
+        
+        # Update training config
+        training_config = config.get('training', {})
+        if 'batch_size' in ui_components and 'batch_size' in training_config:
+            ui_components['batch_size'].value = training_config['batch_size']
+        if 'epochs' in ui_components and 'epochs' in training_config:
+            ui_components['epochs'].value = training_config['epochs']
+        if 'learning_rate' in ui_components and 'learning_rate' in training_config:
+            ui_components['learning_rate'].value = training_config['learning_rate']
+        if 'optimizer' in ui_components and 'optimizer' in training_config:
+            ui_components['optimizer'].value = training_config['optimizer']
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default config untuk training"""
+        return {
+            'model': {
+                'type': 'efficient_basic',
+                'backbone': 'efficientnet_b4',
+                'backbone_pretrained': True,
+                'confidence': 0.25,
+                'iou_threshold': 0.45,
+                'use_attention': False,
+                'use_residual': False,
+                'use_ciou': False
+            },
+            'training': {},
+            'hyperparameters': {},
+            'epochs': 100,
+            'batch_size': 16,
+            'learning_rate': 0.001,
+            'weight_decay': 0.0005,
+            'optimizer': 'Adam',
+            'scheduler': 'cosine',
+            'early_stopping': {'enabled': True, 'patience': 15},
+            'save_best': {'enabled': True},
+            'multi_scale': True,
+            'training_utils': {
+                'experiment_name': 'efficientnet_b4_training',
+                'checkpoint_dir': '/content/runs/train/checkpoints',
+                'mixed_precision': True,
+                'layer_mode': 'single'
+            },
+            'validation': {
+                'frequency': 1,
+                'iou_thres': 0.6,
+                'conf_thres': 0.001
+            },
+            'pretrained_models_path': '/content/drive/MyDrive/SmartCash/models'
+        }
 
 class TrainingInitializer(CommonInitializer):
     """Enhanced training initializer dengan YAML config integration"""
     
-    def __init__(self):
-        super().__init__(MODULE_LOGGER_NAME, TRAINING_LOGGER_NAMESPACE)
+    def __init__(self, module_name: str = MODULE_LOGGER_NAME, config_handler_class: Optional[Type[ConfigHandler]] = None, 
+                 parent_module: Optional[str] = None):
+        super().__init__(module_name, config_handler_class or TrainingConfigHandler, parent_module)
         self.config_update_callbacks = []
         self._ui_displayed = False
     
@@ -273,41 +373,9 @@ class TrainingInitializer(CommonInitializer):
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Default config sesuai YAML structure"""
-        return {
-            'model': {
-                'type': 'efficient_basic',
-                'backbone': 'efficientnet_b4',
-                'backbone_pretrained': True,
-                'confidence': 0.25,
-                'iou_threshold': 0.45,
-                'use_attention': False,
-                'use_residual': False,
-                'use_ciou': False
-            },
-            'training': {},
-            'hyperparameters': {},
-            'epochs': 100,
-            'batch_size': 16,
-            'learning_rate': 0.001,
-            'weight_decay': 0.0005,
-            'optimizer': 'Adam',
-            'scheduler': 'cosine',
-            'early_stopping': {'enabled': True, 'patience': 15},
-            'save_best': {'enabled': True},
-            'multi_scale': True,
-            'training_utils': {
-                'experiment_name': 'efficientnet_b4_training',
-                'checkpoint_dir': '/content/runs/train/checkpoints',
-                'mixed_precision': True,
-                'layer_mode': 'single'
-            },
-            'validation': {
-                'frequency': 1,
-                'iou_thres': 0.6,
-                'conf_thres': 0.001
-            },
-            'pretrained_models_path': '/content/drive/MyDrive/SmartCash/models'
-        }
+        # Menggunakan config handler untuk mendapatkan default config
+        config_handler = self._create_config_handler()
+        return config_handler.get_default_config()
     
     def _get_critical_components(self) -> List[str]:
         """Critical components untuk training UI"""
@@ -320,8 +388,8 @@ class TrainingInitializer(CommonInitializer):
 # Global instance
 _training_initializer = TrainingInitializer()
 
-def initialize_training_ui(env=None, config=None, **kwargs):
-    """Factory function untuk training UI dengan YAML config integration"""
+def initialize_training_ui(env=None, config=None, parent_callbacks=None, **kwargs):
+    """Factory function untuk training UI dengan YAML config integration dan parent module support"""
     suppress_backend_logs()
     
     try:
@@ -332,8 +400,8 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         if initializer._ui_displayed:
             return {'message': 'Training UI sudah ditampilkan', 'status': 'duplicate'}
         
-        # Initialize dengan YAML integration
-        result = initializer.initialize(env, config, **kwargs)
+        # Initialize dengan YAML integration dan parent module support
+        result = initializer.initialize(env, config, parent_callbacks=parent_callbacks, **kwargs)
         
         # Auto-display dengan duplicate prevention
         if result and isinstance(result, dict):
@@ -351,7 +419,15 @@ def initialize_training_ui(env=None, config=None, **kwargs):
         display(fallback.get('ui', fallback))
         return fallback
 
-# One-liner factory untuk compatibility
-create_training_ui = lambda env=None, config=None, **kw: initialize_training_ui(env, config, **kw)
-get_training_initializer = lambda: _training_initializer
-reset_training_display = lambda: setattr(_training_initializer, '_ui_displayed', False)
+# One-liner factory untuk compatibility dengan parent module support
+def create_training_ui(env=None, config=None, parent_callbacks=None, **kwargs):
+    """Create training UI dengan parent module support"""
+    return initialize_training_ui(env, config, parent_callbacks, **kwargs)
+    
+def get_training_initializer():
+    """Get training initializer instance"""
+    return _training_initializer
+    
+def reset_training_display():
+    """Reset training display state"""
+    setattr(_training_initializer, '_ui_displayed', False)

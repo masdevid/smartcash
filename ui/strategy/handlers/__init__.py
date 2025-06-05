@@ -1,0 +1,3 @@
+"""
+Handlers untuk strategy module
+"""

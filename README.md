@@ -1,21 +1,40 @@
-Perbaikan berikutnya:
-- `ROBOFLOW_API_KEY` harus autodetect colab secret diawal
-- Opsi "Organisasi dataset" tidak diperlukan karena sudah pasti TRUE.
-- Action button tidak mentrigger apapun. Pastikan tiap click, buka log_output, reset/clear lognya dan reset state progress_tracking. 
-- Selalu konfirmasi dulu sebelum memulai actions
-- Button save dan reset belum menampilkan log dan update status panelnya. 
-- Sesuaikan warna header dengan tema warna pada ui_logger_namespace.py
-- Form masih muncul horizontal scrollbar, dan input text masih overflow. Pastikan menggunakan flex layout. 
-- Buat form menjadi dua kolom. Kolom kiri seksi Dataset Information. Kolom kanan Storage Settings dan Checkbox Options.
-- Integrasikan dengan `smartcash/dataset/**` dengan tepat.
-- Gunakan one-liner style code
-- Keep DRY
+Refaktor `smartcash/ui/training_config/strategy/` ke lokasi baru `smartcash/ui/strategy` menggunakan `training_config.yaml` dan mewarisi `smartcash/ui/initializers/config_cell_initializer.py`
+* Struktur file: 
+   * components/ui_form
+   * components/ui_layout
+   * handlers/defaults 
+   * handlers/config_handler 
+   * strategy_init.py 
+   * utils/** (if any consolidated function) 
+* Reuse shared components, handlers, dan utils `smartcash/ui/{components, handlers, utils}`
+* Setiap save/reset action mengupdate status panel secara informatif dan pastikan hanya ada 1 icon dalam status panel message
+* Hanya buat parameter yang pasti dan penting untuk diubah
+* Tata layout dengan rapi dan compact menggunakan flexbox dan grid, pastikan tidak menyebabkan overflow yang menyebabkan horizontal scrollbar muncul
+* Buat Summary Cards untuk mengetahui config lengkapnya yang tersimpan
+* Gunakan one-liner style code
+* Hilangkan sync_info
+* Terapkan prinsip DRY
+* Jangan buat UI fallbacks 
+* Jangan buat tests suites dan examples 
+* Buat script sh pembuatan folder, struktur file baru beserta `__init__.py` yang straight forward diawal
 
-Perbaiki urutan layout form pada `smartcash/ui/dataset/downloader/components/**`
-- Form 2 kolom
-- Save Reset Button
-- Area Konfirmasi
-- Action Buttons
-- Progress Tracker
-- Log Output
-Gunakan one-liner style code. Sesuaikan handler atau init yang terpengaruh.
+
+Refaktor `smartcash/ui/dataset/split/` ke lokasi baru `smartcash/ui/split` menggunakan `split_config.yaml` dan mewarisi `smartcash/ui/initializers/config_cell_initializer.py`
+* Struktur file: 
+   * components/ui_form
+   * components/ui_layout
+   * handlers/defaults 
+   * handlers/config_handler 
+   * split_init.py 
+   * utils/** (if any consolidated function) 
+* Reuse shared components, handlers, dan utils `smartcash/ui/{components, handlers, utils}`
+* Setiap save/reset action mengupdate status panel secara informatif dan pastikan hanya ada 1 icon dalam status panel message
+* Hanya buat parameter yang pasti dan penting untuk diubah
+* Tata layout dengan rapi dan compact menggunakan flexbox dan grid, pastikan tidak menyebabkan overflow yang menyebabkan horizontal scrollbar muncul
+* Buat Summary Cards untuk mengetahui config lengkapnya yang tersimpan
+* Hilangkan sync_info
+* Gunakan one-liner style code
+* Terapkan prinsip DRY
+* Jangan buat UI fallbacks 
+* Jangan buat tests suites dan examples 
+* Buat script sh pembuatan folder, struktur file baru beserta `__init__.py` yang straight forward diawal

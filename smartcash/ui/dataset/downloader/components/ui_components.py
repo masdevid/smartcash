@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: Enhanced UI components dengan form backup_dir/preprocessed_dir dan fixed persistence
+Deskripsi: Fixed UI components dengan progress tracker baru dan one-liner style
 """
 
 import ipywidgets as widgets
@@ -10,7 +10,7 @@ from smartcash.ui.utils.ui_logger_namespace import get_namespace_color
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI dengan enhanced form fields dan fixed persistence"""
+    """Create main downloader UI dengan fixed progress tracker"""
     config = config or {}
     roboflow = config.get('roboflow', {})
     
@@ -23,7 +23,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     return ui_components
 
 def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
-    """Create enhanced downloader UI dengan backup/preprocessed form fields - no overflow"""
+    """Create enhanced downloader UI dengan fixed progress tracker integration"""
     
     # 1. Header dengan responsive design
     header = widgets.HTML(f"""
@@ -52,9 +52,10 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
     # 7. Action buttons dengan state management
     action_components = _create_state_managed_action_buttons()
     
-    # 8. Enhanced progress tracking container dengan dual level untuk overall dan step progress
+    # 8. Progress tracker dengan dual level support - FIXED IMPLEMENTATION
     progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
-    progress_tracker.container.layout.display = 'none'
+    progress_container = progress_tracker.container
+    progress_container.layout.display = 'none'  # Hidden by default
     
     # 9. Log output - accordion terbuka by default
     log_components = _create_open_log_accordion()
@@ -67,7 +68,7 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
         save_reset_components['container'],
         confirmation_area,
         action_components['container'],
-        progress_components['container'],
+        progress_container,  # Use progress_container directly
         log_components['accordion']
     ], layout=widgets.Layout(
         width='100%', 
@@ -81,21 +82,45 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
         box_sizing='border-box'
     ))
     
-    # Membuat dictionary hasil dengan komponen progress tracker yang benar
-    progress_tracker_components = {
+    # Return comprehensive components dictionary dengan fixed progress tracker methods
+    return {
+        # Main UI components
+        'ui': main_ui,
+        'main_container': main_ui,
+        'header': header,
+        'status_panel': status_panel,
+        'form_container': form_container,
+        'confirmation_area': confirmation_area,
+        
+        # Form fields
+        **form_fields,
+        
+        # Save/Reset components
+        **save_reset_components,
+        
+        # Action buttons
+        **action_components,
+        
+        # Progress tracker components - FIXED MAPPING
         'progress_tracker': progress_tracker,
-        'progress_container': progress_tracker.container,
-        'show_for_operation': progress_tracker.show,
-        'update_progress': progress_tracker.update,
-        'complete_operation': progress_tracker.complete,
-        'error_operation': progress_tracker.error,
-        'reset_all': progress_tracker.reset
+        'progress_container': progress_container,
+        'container': progress_container,  # Alias for compatibility
+        
+        # Progress tracker methods - direct mapping
+        'show_for_operation': lambda operation=None, steps=None: progress_tracker.show(operation, steps),
+        'update_progress': lambda level, progress, message="": progress_tracker.update(level, progress, message),
+        'complete_operation': lambda message="Operation completed": progress_tracker.complete(message),
+        'error_operation': lambda message="Operation failed": progress_tracker.error(message),
+        'reset_all': lambda: progress_tracker.reset(),
+        
+        # Additional progress convenience methods
+        'update_overall': lambda progress, message="": progress_tracker.update_overall(progress, message),
+        'update_current': lambda progress, message="": progress_tracker.update_current(progress, message),
+        'hide_container': lambda: progress_tracker.hide(),
+        
+        # Log components
+        **log_components
     }
-    
-    return {**{
-        'ui': main_ui, 'main_container': main_ui, 'header': header, 'status_panel': status_panel,
-        'form_container': form_container, 'confirmation_area': confirmation_area
-    }, **form_fields, **save_reset_components, **action_components, **progress_tracker_components, **log_components}
 
 def _get_dynamic_status_html() -> str:
     """Get dynamic status HTML dengan environment detection - one-liner conditionals"""
@@ -305,8 +330,8 @@ def _create_open_log_accordion() -> Dict[str, widgets.Widget]:
         box_sizing='border-box'
     ))
     
-    # Set accordion terbuka dan title dengan one-liner chaining
-    log_accordion.set_title(0, '📋 Download Logs') and setattr(log_accordion, 'selected_index', 0)
+    # Set accordion terbuka dan title dengan one-liner
+    log_accordion.set_title(0, '📋 Download Logs'), setattr(log_accordion, 'selected_index', 0)
     
     return {'log_output': log_output, 'log_accordion': log_accordion, 'accordion': log_accordion}
 
@@ -318,7 +343,7 @@ def detect_api_key() -> str:
 def validate_ui_layout(ui: Dict[str, Any]) -> bool:
     """Validate UI layout dengan enhanced field checking"""
     required_fields = ['ui', 'form_container', 'save_button', 'reset_button', 'download_button', 'log_output', 
-                      'backup_dir_input', 'preprocessed_dir_input']
+                      'backup_dir_input', 'preprocessed_dir_input', 'progress_tracker', 'progress_container']
     return all(key in ui for key in required_fields)
 
 def get_enhanced_ui_status(ui: Dict[str, Any]) -> str:
@@ -326,7 +351,8 @@ def get_enhanced_ui_status(ui: Dict[str, Any]) -> str:
     component_count = len([k for k in ui.keys() if not k.startswith('_')])
     api_status = '✅' if detect_api_key() else '❌'
     path_fields = '✅' if all(field in ui for field in ['backup_dir_input', 'preprocessed_dir_input']) else '❌'
-    return f"✅ Enhanced UI Ready: {component_count} components | API Key: {api_status} | Path Config: {path_fields}"
+    progress_status = '✅' if 'progress_tracker' in ui else '❌'
+    return f"✅ Enhanced UI Ready: {component_count} components | API Key: {api_status} | Path Config: {path_fields} | Progress: {progress_status}"
 
 def disable_other_buttons(active_button: widgets.Button) -> None:
     """Disable other buttons saat satu action berjalan - one-liner state management"""

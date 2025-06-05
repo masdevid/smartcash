@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/dataset/downloader/handlers/download_handler.py  
-Deskripsi: Fixed download handler dengan button state management dan proper dialog confirmation
+File: smartcash/ui/dataset/downloader/handlers/download_handler.py
+Deskripsi: Fixed download handler dengan progress tracker baru dan one-liner style
 """
 
 import ipywidgets as widgets
@@ -134,20 +134,26 @@ def _show_download_confirmation(ui_components: Dict[str, Any], config: Dict[str,
     _show_in_confirmation_area(ui_components, confirmation_dialog)
 
 def _execute_download_sync(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute download operation dengan proper dual-level progress tracking"""
+    """Execute download operation dengan fixed dual-level progress tracking"""
     try:
         # Clear confirmation area
         _clear_confirmation_area(ui_components)
         
-        # Show progress container dengan dual-level tracking
-        _show_progress_tracker(ui_components)
+        # Get progress tracker dari ui_components
         progress_tracker = ui_components.get('progress_tracker')
+        if not progress_tracker:
+            logger.error("❌ Progress tracker tidak ditemukan")
+            show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
+            return
+        
+        # Show progress dengan proper method call
+        progress_tracker.show("Download Dataset")
         
         # Create downloader instance
         downloader = get_downloader_instance(config, logger)
         
         # Setup dual-level progress callback
-        progress_tracker and downloader.set_progress_callback(_create_dual_level_progress_callback(progress_tracker, logger))
+        downloader.set_progress_callback(_create_dual_level_progress_callback(progress_tracker, logger))
         
         # Execute download
         result = downloader.download_dataset(
@@ -164,58 +170,57 @@ def _execute_download_sync(ui_components: Dict[str, Any], config: Dict[str, Any]
         # Handle result dengan proper status display
         if result['status'] == 'success':
             success_msg = f"✅ Dataset berhasil didownload: {result['stats']['total_images']} gambar"
-            # Update progress ke 100% dan sembunyikan setelah delay
-            _update_progress_complete(ui_components, success_msg)
+            # Complete progress dengan success message
+            progress_tracker.complete(success_msg)
             show_status_safe(f"{success_msg} ke {result['output_dir']}", "success", ui_components)
             logger.success(success_msg)
         else:
             error_msg = f"❌ Download gagal: {result['message']}"
-            # Update progress error
-            _update_progress_error(ui_components, error_msg)
+            # Error progress
+            progress_tracker.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
             logger.error(error_msg)
             
     except Exception as e:
         error_msg = f"❌ Error saat download: {str(e)}"
-        # Update progress error
-        _update_progress_error(ui_components, error_msg)
+        # Error progress handling
+        progress_tracker = ui_components.get('progress_tracker')
+        progress_tracker and progress_tracker.error(error_msg)
         show_status_safe(error_msg, "error", ui_components)
         logger.error(error_msg)
 
 def _create_dual_level_progress_callback(progress_tracker, logger) -> Callable:
-    """Create dual-level progress callback untuk downloader dengan proper step mapping"""
+    """Create dual-level progress callback untuk downloader dengan fixed level names"""
     
     def progress_callback(step: str, current: int, total: int, message: str):
-        """Dual-level progress callback dengan step mapping ke level1/level2"""
+        """Dual-level progress callback dengan mapping ke overall/current levels"""
         try:
             # Hitung persentase progress
-            percentage = min(100, max(0, int((current / total) * 100)))
+            percentage = min(100, max(0, int((current / total) * 100) if total > 0 else 0))
             
             # Map download steps ke dual-level progress
             if step in ['validate', 'connect', 'metadata']:
                 # Tahap awal (0-20%)
-                level1_percentage = min(20, percentage)
-                progress_tracker.update('level1', level1_percentage, f"🔄 Menyiapkan download: {level1_percentage}%")
-                progress_tracker.update('level2', percentage, message)
+                overall_percentage = min(20, percentage // 5)
+                progress_tracker.update_overall(overall_percentage, f"🔄 Menyiapkan download")
+                progress_tracker.update_current(percentage, message)
             elif step == 'download':
                 # Tahap download (20-80%)
-                level1_percentage = 20 + int(percentage * 0.6)  # 20-80% range
-                progress_tracker.update('level1', level1_percentage, f"📥 Downloading dataset: {level1_percentage}%")
-                progress_tracker.update('level2', percentage, message)
+                overall_percentage = 20 + int(percentage * 0.6)
+                progress_tracker.update_overall(overall_percentage, f"📥 Downloading dataset")
+                progress_tracker.update_current(percentage, message)
             elif step in ['extract', 'organize']:
                 # Tahap akhir (80-100%)
-                level1_percentage = 80 + int(percentage * 0.2)  # 80-100% range
-                progress_tracker.update('level1', level1_percentage, f"🔄 Finalisasi dataset: {level1_percentage}%")
-                progress_tracker.update('level2', percentage, message)
+                overall_percentage = 80 + int(percentage * 0.2)
+                progress_tracker.update_overall(overall_percentage, f"🔄 Finalisasi dataset")
+                progress_tracker.update_current(percentage, message)
             else:
                 # Generic progress update
-                progress_tracker.update('level2', percentage, message)
+                progress_tracker.update_current(percentage, message)
                 
         except Exception as e:
-            logger.debug(f"🔍 Dual-level progress callback error: {str(e)}")
+            logger.debug(f"🔍 Progress callback error: {str(e)}")
             # Silent failure untuk mencegah error pada proses utama
-    
-    return progress_callback
     
     return progress_callback
 
@@ -253,44 +258,3 @@ def _clear_confirmation_area(ui_components: Dict[str, Any]) -> None:
         confirmation_area.clear_output(wait=True),
         setattr(confirmation_area.layout, 'display', 'none')
     )
-
-def _show_progress_tracker(ui_components: Dict[str, Any]) -> None:
-    """Show dan reset progress tracker dengan proper initialization"""
-    # Dapatkan progress tracker dan container
-    progress_tracker = ui_components.get('progress_tracker')
-    container = ui_components.get('container')
-    
-    if progress_tracker and container:
-        # Reset progress tracker
-        progress_tracker.reset()
-        # Tampilkan container
-        container.layout.display = 'block'
-        # Update progress awal
-        progress_tracker.update('level1', 0, "🚀 Memulai download dataset...")
-        progress_tracker.update('level2', 0, "Menyiapkan koneksi...")
-
-def _hide_progress_tracker(ui_components: Dict[str, Any], delay: float = 0.5) -> None:
-    """Hide progress tracker dengan optional delay"""
-    container = ui_components.get('container')
-    if container:
-        if delay > 0:
-            time.sleep(delay)
-        container.layout.display = 'none'
-
-def _update_progress_complete(ui_components: Dict[str, Any], message: str) -> None:
-    """Update progress ke 100% dan tandai sebagai complete"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        progress_tracker.update('level1', 100, message)
-        progress_tracker.update('level2', 100, "Selesai")
-        # Sembunyikan progress setelah delay
-        _hide_progress_tracker(ui_components, 1.0)
-
-def _update_progress_error(ui_components: Dict[str, Any], error_message: str) -> None:
-    """Update progress dengan error message"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        progress_tracker.error('level1', error_message)
-        progress_tracker.error('level2', "Error saat download")
-        # Sembunyikan progress setelah delay
-        _hide_progress_tracker(ui_components, 2.0)

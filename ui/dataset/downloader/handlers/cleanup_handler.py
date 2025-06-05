@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/cleanup_handler.py
-Deskripsi: Regenerated cleanup handler dengan complete implementation dan proper dialog confirmation
+Deskripsi: Fixed cleanup handler dengan progress tracker baru dan one-liner style
 """
 
 from typing import Dict, Any, Callable
@@ -10,7 +10,7 @@ from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrgani
 from smartcash.dataset.utils.path_validator import get_path_validator
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Setup cleanup handler dengan comprehensive confirmation dan three-level progress"""
+    """Setup cleanup handler dengan fixed progress tracker integration"""
     
     def handle_cleanup(button):
         """Handle cleanup operation dengan proper validation dan confirmation flow"""
@@ -19,7 +19,9 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any],
             cleanup_info = _get_comprehensive_cleanup_info()
             
             # Early return jika tidak ada file dengan one-liner check
-            cleanup_info['total_files'] == 0 and show_status_safe("ℹ️ Tidak ada file untuk dibersihkan", "info", ui_components) and None
+            if cleanup_info['total_files'] == 0:
+                show_status_safe("ℹ️ Tidak ada file untuk dibersihkan", "info", ui_components)
+                return
             
             if cleanup_info['total_files'] > 0:
                 # Show comprehensive confirmation dialog
@@ -139,29 +141,25 @@ def _show_comprehensive_cleanup_confirmation(ui_components: Dict[str, Any], clea
     _show_in_confirmation_area(ui_components, confirmation_dialog)
 
 def _execute_comprehensive_cleanup_sync(ui_components: Dict[str, Any], cleanup_info: Dict[str, Any], logger) -> None:
-    """Execute comprehensive cleanup operation dengan detailed dual-level progress tracking"""
+    """Execute comprehensive cleanup operation dengan fixed dual-level progress tracking"""
     try:
-        # Initialize dual-level progress tracking untuk cleanup
+        # Get progress tracker dari ui_components
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            # Reset progress tracker terlebih dahulu
-            progress_tracker.reset()
-            # Tampilkan container progress
-            if 'container' in ui_components:
-                ui_components['container'].layout.display = 'block'
-            # Update progress awal
-            progress_tracker.update('level1', 0, "🧹 Memulai comprehensive cleanup dataset...")
-            progress_tracker.update('level2', 0, "Menyiapkan proses cleanup...")
+        if not progress_tracker:
+            logger.error("❌ Progress tracker tidak ditemukan")
+            show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
+            return
+        
+        # Show progress untuk cleanup operation
+        progress_tracker.show("Cleanup Dataset")
         
         # Create organizer dengan progress integration
         organizer = DatasetOrganizer(logger)
         
         # Setup organizer dengan progress callback
-        organizer = DatasetOrganizer(logger=logger)
-        if progress_tracker:
-            organizer.set_progress_callback(
-                _create_comprehensive_cleanup_progress_callback(progress_tracker, logger, cleanup_info)
-            )
+        organizer.set_progress_callback(
+            _create_comprehensive_cleanup_progress_callback(progress_tracker, logger, cleanup_info)
+        )
         
         # Execute comprehensive cleanup
         result = organizer.cleanup_all_dataset_folders()
@@ -173,19 +171,12 @@ def _execute_comprehensive_cleanup_sync(ui_components: Dict[str, Any], cleanup_i
             
             # Comprehensive success message dengan detailed stats
             success_msg = f"✅ Berhasil membersihkan {cleanup_info['total_files']} file ({cleanup_info['total_size_mb']:.1f} MB)"
-            if progress_tracker:
-                progress_tracker.update('level1', 100, success_msg)
-                progress_tracker.update('level2', 100, "Pembersihan selesai")
-                # Sembunyikan progress setelah delay
-                import time
-                time.sleep(0.5)
-                if 'container' in ui_components:
-                    ui_components['container'].layout.display = 'none'
+            progress_tracker.complete(success_msg)
             show_status_safe(success_msg, "success", ui_components)
             logger.success(f"🧹 {success_msg}")
             
             # Additional success details dalam log
-            with ui_components.get('log_output', type('MockContext', (), {'__enter__': lambda: None, '__exit__': lambda *args: None})())():
+            with ui_components.get('log_output'):
                 from IPython.display import display, HTML
                 display(HTML(f"""
                 <div style="padding: 10px; background: #e8f5e8; border-radius: 4px; margin: 5px 0;">
@@ -198,82 +189,40 @@ def _execute_comprehensive_cleanup_sync(ui_components: Dict[str, Any], cleanup_i
             
         elif result['status'] == 'empty':
             info_msg = "ℹ️ Tidak ada file yang perlu dibersihkan"
-            if progress_tracker:
-                progress_tracker.update('level1', 100, info_msg)
-                progress_tracker.update('level2', 100, "Tidak ada yang dibersihkan")
-                # Sembunyikan progress setelah delay
-                import time
-                time.sleep(0.5)
-                if 'container' in ui_components:
-                    ui_components['container'].layout.display = 'none'
+            progress_tracker.complete(info_msg)
             show_status_safe(info_msg, "info", ui_components)
             logger.info(f"🧹 {info_msg}")
             
         else:
-            error_msg = f"❌ Error saat cleanup: {str(result['error'])}"
-            if progress_tracker:
-                progress_tracker.error('level1', error_msg)
-                progress_tracker.error('level2', "Error saat cleanup")
-                # Sembunyikan progress setelah delay
-                import time
-                time.sleep(1.0)
-                if 'container' in ui_components:
-                    ui_components['container'].layout.display = 'none'
+            error_msg = f"❌ Error saat cleanup: {result.get('message', 'Unknown error')}"
+            progress_tracker.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
             logger.error(f"🧹 {error_msg}")
             
     except Exception as e:
         error_msg = f"❌ Error saat comprehensive cleanup: {str(e)}"
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            progress_tracker.error('level1', error_msg)
-            progress_tracker.error('level2', "Error saat cleanup")
-            # Sembunyikan progress setelah delay
-            import time
-            time.sleep(1.0)
-            if 'container' in ui_components:
-                ui_components['container'].layout.display = 'none'
+        progress_tracker and progress_tracker.error(error_msg)
         show_status_safe(error_msg, "error", ui_components)
         logger.error(error_msg)
 
-
 def _create_comprehensive_cleanup_progress_callback(progress_tracker, logger, cleanup_info: Dict[str, Any]) -> Callable:
-    """Create comprehensive progress callback untuk cleanup operations dengan detailed dual-level mapping"""
+    """Create comprehensive progress callback untuk cleanup operations dengan fixed dual-level mapping"""
     
     def comprehensive_progress_callback(step: str, current: int, total: int, message: str):
-        """Comprehensive progress callback dengan detailed step mapping dan file counting"""
+        """Comprehensive progress callback dengan fixed level mapping"""
         try:
-            # Map cleanup steps ke comprehensive dual-level progress dengan detailed tracking
-            if step == 'scan':
-                # Scan step updates dengan dual-level progress mapping
-                level1_percentage = int(current * 0.3)  # 0-30% progress untuk scan
-                progress_tracker.update('level1', level1_percentage, f"🔍 Scanning: {level1_percentage}%")
-                progress_tracker.update('level2', current, f"🔍 {message}")
-                
-            elif step == 'delete':
-                # Delete step updates dengan dual-level progress mapping
-                level1_percentage = 30 + int(current * 0.6)  # 30-90% progress untuk delete
-                progress_tracker.update('level1', level1_percentage, f"🗑️ Cleanup: {level1_percentage}%")
-                progress_tracker.update('level2', current, f"🗑️ {message}")
-                
-            elif step == 'complete':
-                # Complete step updates dengan dual-level progress mapping
-                progress_tracker.update('level1', 100, f"✅ Cleanup completed")
-                progress_tracker.update('level2', 100, f"✅ {message}")
-                
-            elif step == 'verify':
-                # Verify step updates dengan dual-level progress mapping
-                level1_percentage = 90 + int(current * 0.1)  # 90-100% progress untuk verify
-                progress_tracker.update('level1', level1_percentage, f"🔍 Verifying: {level1_percentage}%")
-                progress_tracker.update('level2', current, f"🔍 {message}")
-                
+            # Map cleanup steps ke dual-level progress
+            if step == 'cleanup':
+                # Main cleanup progress
+                progress_tracker.update_overall(current, f"🧹 Cleanup: {current}%")
+                progress_tracker.update_current(current, message)
             else:
-                # Generic progress update untuk unknown steps
-                progress_tracker.update('level1', min(99, current), message)
-                progress_tracker.update('level2', current, message)
+                # Other steps
+                progress_tracker.update_current(current, message)
                 
         except Exception as e:
-            logger.debug(f"🔍 Comprehensive cleanup progress callback error: {str(e)}")
+            logger.debug(f"🔍 Cleanup progress callback error: {str(e)}")
     
     return comprehensive_progress_callback
 

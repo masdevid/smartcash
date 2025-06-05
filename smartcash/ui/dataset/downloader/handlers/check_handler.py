@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/check_handler.py
-Deskripsi: Fixed check handler dengan proper report formatting dan separate report lines
+Deskripsi: Fixed check handler dengan progress tracker baru dan one-liner style
 """
 
 from typing import Dict, Any, Callable, List
@@ -9,10 +9,10 @@ from smartcash.dataset.downloader.roboflow_client import create_roboflow_client
 from smartcash.dataset.utils.path_validator import get_path_validator
 
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Setup check handler dengan proper validation dan report formatting"""
+    """Setup check handler dengan fixed progress tracker integration"""
     
     def handle_check(button):
-        """Handle check dataset operation dengan proper flow dan formatting"""
+        """Handle check dataset operation dengan fixed progress flow"""
         try:
             # Get current config dari config handler
             config_handler = ui_components.get('config_handler')
@@ -30,7 +30,7 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], l
                 show_status_safe(error_msg, "error", ui_components)
                 return
             
-            # Execute check dengan proper progress tracking
+            # Execute check dengan fixed progress tracking
             _execute_check_sync(ui_components, current_config, logger)
             
         except Exception as e:
@@ -40,111 +40,83 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], l
     return handle_check
 
 def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute check operation dengan proper dual-level progress tracking"""
+    """Execute check operation dengan fixed dual-level progress tracking"""
     try:
-        # Show progress container dengan dual-level tracking
+        # Get progress tracker dari ui_components
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            # Reset progress tracker terlebih dahulu
-            progress_tracker.reset()
-            # Tampilkan container progress
-            if 'container' in ui_components:
-                ui_components['container'].layout.display = 'block'
-            # Update progress awal
-            progress_tracker.update('level1', 0, "🔍 Memulai pengecekan dataset...")
-            progress_tracker.update('level2', 0, "Menyiapkan validasi...")
+        if not progress_tracker:
+            logger.error("❌ Progress tracker tidak ditemukan")
+            show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
+            return
+        
+        # Show progress untuk check operation
+        progress_tracker.show("Check Dataset")
         
         workspace, project, version, api_key = config['workspace'], config['project'], config['version'], config['api_key']
         dataset_id = f"{workspace}/{project}:v{version}"
         
         # Step 1: Validate parameters
-        if progress_tracker:
-            progress_tracker.update('level1', 10, "🔍 Validasi parameter")
-            progress_tracker.update('level2', 50, "🔍 Validating parameters...")
+        progress_tracker.update_overall(10, "🔍 Validasi parameter")
+        progress_tracker.update_current(50, "Validating parameters...")
         
         # Step 2: Check Roboflow connection
-        if progress_tracker:
-            progress_tracker.update('level1', 20, "🌐 Koneksi Roboflow")
-            progress_tracker.update('level2', 0, "🌐 Connecting to Roboflow...")
+        progress_tracker.update_overall(20, "🌐 Koneksi Roboflow")
+        progress_tracker.update_current(0, "Connecting to Roboflow...")
         roboflow_client = create_roboflow_client(api_key, logger)
-        if progress_tracker:
-            progress_tracker.update('level2', 100, "🌐 Connected to Roboflow")
+        progress_tracker.update_current(100, "Connected to Roboflow")
         
         # Step 3: Validate credentials
-        if progress_tracker:
-            progress_tracker.update('level1', 30, "🔑 Validasi kredensial")
-            progress_tracker.update('level2', 0, "🔑 Validating credentials...")
+        progress_tracker.update_overall(30, "🔑 Validasi kredensial")
+        progress_tracker.update_current(0, "Validating credentials...")
         cred_result = roboflow_client.validate_credentials(workspace, project)
         
         if not cred_result['valid']:
             error_msg = f"❌ Kredensial tidak valid: {cred_result['message']}"
-            if progress_tracker:
-                progress_tracker.error('level1', error_msg)
-                progress_tracker.error('level2', "Validasi gagal")
+            progress_tracker.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
             return
         
-        if progress_tracker:
-            progress_tracker.update('level2', 100, "🔑 Credentials validated")
+        progress_tracker.update_current(100, "Credentials validated")
         
         # Step 4: Get dataset metadata
-        if progress_tracker:
-            progress_tracker.update('level1', 50, "📊 Mengambil metadata")
-            progress_tracker.update('level2', 0, "📊 Fetching dataset metadata...")
+        progress_tracker.update_overall(50, "📊 Mengambil metadata")
+        progress_tracker.update_current(0, "Fetching dataset metadata...")
         metadata_result = roboflow_client.get_dataset_metadata(workspace, project, version)
         
-        if not metadata_result['success']:
+        if metadata_result['status'] != 'success':
             error_msg = f"❌ Gagal mendapatkan metadata: {metadata_result['message']}"
-            if progress_tracker:
-                progress_tracker.error('level1', error_msg)
-                progress_tracker.error('level2', "Metadata gagal")
+            progress_tracker.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
             return
         
-        if progress_tracker:
-            progress_tracker.update('level2', 100, "📊 Metadata retrieved")
+        progress_tracker.update_current(100, "Metadata retrieved")
         
         # Step 5: Check local dataset
-        if progress_tracker:
-            progress_tracker.update('level1', 70, "📁 Memeriksa dataset lokal")
-            progress_tracker.update('level2', 0, "📁 Checking local dataset...")
+        progress_tracker.update_overall(70, "📁 Memeriksa dataset lokal")
+        progress_tracker.update_current(0, "Checking local dataset...")
         local_check = _check_local_dataset_sync(config)
-        if progress_tracker:
-            progress_tracker.update('level2', 100, "📁 Local check completed")
+        progress_tracker.update_current(100, "Local check completed")
         
         # Step 6: Generate report
-        if progress_tracker:
-            progress_tracker.update('level1', 90, "📋 Membuat laporan")
-            progress_tracker.update('level2', 0, "📋 Generating report...")
+        progress_tracker.update_overall(90, "📋 Membuat laporan")
+        progress_tracker.update_current(0, "Generating report...")
         report = _generate_detailed_check_report(metadata_result['data'], local_check, dataset_id)
+        
         # Show report
         ui_components['log_output'].clear_output(wait=True)
         with ui_components['log_output']:
             from IPython.display import Markdown, display
             display(Markdown(report))
         
-        if progress_tracker:
-            progress_tracker.update('level1', 100, "✅ Pengecekan selesai")
-            progress_tracker.update('level2', 100, "Selesai")
-            # Sembunyikan progress setelah delay
-            import time
-            time.sleep(0.5)
-            if 'container' in ui_components:
-                ui_components['container'].layout.display = 'none'
+        # Complete progress
+        progress_tracker.complete("✅ Pengecekan selesai")
         show_status_safe("✅ Pengecekan dataset selesai", "success", ui_components)
         logger.info(f"📊 Check completed: {dataset_id}")
         
     except Exception as e:
         error_msg = f"❌ Error saat check: {str(e)}"
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            progress_tracker.error('level1', error_msg)
-            progress_tracker.error('level2', "Error saat check")
-            # Sembunyikan progress setelah delay
-            import time
-            time.sleep(1.0)
-            if 'container' in ui_components:
-                ui_components['container'].layout.display = 'none'
+        progress_tracker and progress_tracker.error(error_msg)
         show_status_safe(error_msg, "error", ui_components)
         logger.error(error_msg)
 

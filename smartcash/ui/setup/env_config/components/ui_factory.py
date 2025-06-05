@@ -115,8 +115,7 @@ class UIFactory:
 
         # Progress tracking dengan visibility control
         progress_components = create_single_progress_tracker(
-            module_name="env_config",
-            width='100%'
+            operation="Environment Setup"
         )
         
         # Progress container yang bisa disembunyikan

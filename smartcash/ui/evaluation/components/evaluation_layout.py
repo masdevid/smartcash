@@ -15,7 +15,7 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     """Buat layout untuk evaluation UI dengan flex layout dan mencegah horizontal scrollbar"""
     
     # Progress tracking container dengan dual level untuk overall dan step progress
-    progress_components = create_dual_progress_tracker()
+    progress_components = create_dual_progress_tracker(operation="Evaluation")
     
     # Log accordion untuk evaluation logs
     log_components = create_log_accordion('evaluation', height='250px')

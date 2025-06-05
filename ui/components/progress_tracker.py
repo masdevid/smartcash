@@ -542,10 +542,28 @@ def create_single_progress_tracker(operation: str = "Process") -> ProgressTracke
     config = ProgressConfig(level=ProgressLevel.SINGLE, operation=operation)
     return ProgressTracker(config)
 
-def create_dual_progress_tracker(operation: str = "Process") -> ProgressTracker:
-    """Create dual-level progress tracker"""
+def create_dual_progress_tracker(operation: str = "Process") -> Dict[str, Any]:
+    """Create dual-level progress tracker dengan format dictionary untuk backward compatibility"""
     config = ProgressConfig(level=ProgressLevel.DUAL, operation=operation)
-    return ProgressTracker(config)
+    tracker = ProgressTracker(config)
+    return {
+        'container': tracker.container,
+        'progress_container': tracker.container,
+        'status_widget': tracker.status_widget,
+        'step_info_widget': tracker.step_info_widget,
+        'tqdm_container': tracker.tqdm_container,
+        'tracker': tracker,
+        'show_container': tracker.show,
+        'hide_container': tracker.hide,
+        'show_for_operation': tracker.show,
+        'update_overall': tracker.update_overall,
+        'update_step': tracker.update_step,
+        'update_current': tracker.update_current,
+        'update_progress': tracker.update,
+        'complete_operation': tracker.complete,
+        'error_operation': tracker.error,
+        'reset_all': tracker.reset
+    }
 
 def create_triple_progress_tracker(operation: str = "Process", 
                                  steps: List[str] = None,

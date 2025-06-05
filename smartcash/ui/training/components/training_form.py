@@ -18,7 +18,11 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
         control_buttons = _create_control_buttons(config)
         
         # Progress tracking dengan three level untuk training epochs, batches, dan metrics
-        progress_components = create_three_progress_tracker()
+        # Menggunakan steps yang sesuai dengan proses training
+        progress_components = create_three_progress_tracker(
+            operation="Training",
+            steps=["Initialization", "Training", "Validation", "Checkpoint"]
+        )
         
         # Status panel dengan model-specific message
         model_type = config.get('model', {}).get('type', 'efficient_basic')
@@ -44,10 +48,21 @@ def create_training_form(config: Dict[str, Any]) -> Dict[str, Any]:
             layout=widgets.Layout(width='140px', height='30px')
         )
         
+        # Memastikan semua komponen yang diperlukan tersedia
         return {
             **control_buttons,
-            'progress_container': progress_components.get('container'),
-            'progress_tracker': progress_components.get('tracker'),
+            'progress_container': progress_components['container'],
+            'progress_tracker': progress_components['tracker'],
+            'update_progress': progress_components['update_progress'],
+            'update_overall': progress_components['update_overall'],
+            'update_step': progress_components['update_step'],
+            'update_current': progress_components['update_current'],
+            'show_container': progress_components['show_container'],
+            'hide_container': progress_components['hide_container'],
+            'show_for_operation': progress_components['show_for_operation'],
+            'complete_operation': progress_components['complete_operation'],
+            'error_operation': progress_components['error_operation'],
+            'reset_all': progress_components['reset_all'],
             'status_panel': status_panel,
             'config_tabs': config_tabs,
             'info_display': config_tabs,

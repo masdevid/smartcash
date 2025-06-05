@@ -62,42 +62,42 @@ class BackboneConfigHandler(ConfigHandler):
         }
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan force reset checkbox untuk YOLOv5s model"""
-        # Extract configuration values
-        selected_backbone = config.get('selected_backbone', 'efficientnet_b4')
-        selected_model_type = config.get('selected_model_type', 'efficient_optimized')
-        
-        # Get mapping untuk reset checkbox state yang benar
-        from .defaults import get_model_type_mapping
-        model_type_mapping = get_model_type_mapping()
-        mapping = model_type_mapping.get(selected_model_type, {})
-        
-        # Block change events during update
+        """Update UI dengan global suppression untuk prevent onChange events during config load"""
+        # Block all change events during config load
         ui_components['_suppress_all_changes'] = True
         
         try:
+            # Extract configuration values
+            selected_backbone = config.get('selected_backbone', 'efficientnet_b4')
+            selected_model_type = config.get('selected_model_type', 'efficient_optimized')
+            
+            # Get mapping untuk reset checkbox state yang benar
+            from .defaults import get_model_type_mapping
+            model_type_mapping = get_model_type_mapping()
+            mapping = model_type_mapping.get(selected_model_type, {})
+            
             # Update dropdown first
             [setattr(ui_components[key], 'value', value) for key, value in [
                 ('backbone_dropdown', selected_backbone),
                 ('model_type_dropdown', selected_model_type)
             ] if key in ui_components and hasattr(ui_components[key], 'value')]
             
-            # Force checkbox state berdasarkan model_type - khusus YOLOv5s
-            is_yolov5s = selected_model_type == 'yolov5s'
+            # Force reset checkbox state berdasarkan model_type mapping - YOLOv5s fix
             checkbox_updates = [
-                ('use_attention_checkbox', False if is_yolov5s else mapping.get('use_attention', False), is_yolov5s),
-                ('use_residual_checkbox', False if is_yolov5s else mapping.get('use_residual', False), is_yolov5s),
-                ('use_ciou_checkbox', False if is_yolov5s else mapping.get('use_ciou', False), is_yolov5s)
+                ('use_attention_checkbox', mapping.get('use_attention', False), mapping.get('disable_features', False)),
+                ('use_residual_checkbox', mapping.get('use_residual', False), mapping.get('disable_features', False)),
+                ('use_ciou_checkbox', mapping.get('use_ciou', False), mapping.get('disable_features', False))
             ]
             
-            # Apply checkbox updates
+            # Reset checkbox values dan disabled state untuk YOLOv5s
             for widget_name, value, disabled in checkbox_updates:
                 if widget_name in ui_components:
                     widget = ui_components[widget_name]
-                    widget.value = value  # Force false untuk YOLOv5s
+                    widget.value = value  # Reset value sesuai mapping
                     widget.disabled = disabled  # Disable untuk YOLOv5s
-                    
+            
         finally:
+            # Re-enable change events setelah config load selesai
             ui_components['_suppress_all_changes'] = False
     
     def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:

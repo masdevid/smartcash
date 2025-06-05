@@ -21,9 +21,9 @@ class DownloadInitializer(CommonInitializer):
         super().__init__('downloader', DownloadConfigHandler, 'dataset')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan one-liner import dan direct creation"""
-        from smartcash.ui.dataset.downloader.components.ui_layout import create_downloader_ui
-        return create_downloader_ui(config, env)
+        """Create UI components dengan direct import - no fallbacks"""
+        from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
+        return create_downloader_main_ui(config)
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers dengan one-liner call"""
@@ -63,9 +63,3 @@ def reset_downloader_layout() -> bool:
     global _downloader_initializer
     _downloader_initializer = DownloadInitializer()
     return True
-
-# One-liner utilities dengan proper argument handling
-debug_layout_order = lambda ui_components: [type(child).__name__ for child in getattr(ui_components.get('ui'), 'children', [])] if ui_components and 'ui' in ui_components else ['No UI found']
-debug_component_count = lambda ui_components: len([k for k in ui_components.keys() if not k.startswith('_')]) if ui_components else 0
-debug_button_states = lambda ui_components: {k: getattr(v, 'disabled', 'N/A') for k, v in ui_components.items() if 'button' in k} if ui_components else {}
-get_layout_summary = lambda ui_components: f"Components: {debug_component_count(ui_components)} | Layout: {len(debug_layout_order(ui_components))} widgets | Fixed: {ui_components.get('layout_order_fixed', False)}" if ui_components else "UI components not available"

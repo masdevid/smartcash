@@ -103,7 +103,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     log_components = create_log_accordion(module_name='dependency', height='280px')
     
     # Progress components
-    progress_components = create_dual_progress_tracker()
+    progress_tracker = create_dual_progress_tracker(operation="Dependency Installation")
     
     # Help content
     help_content = """
@@ -204,13 +204,13 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'reset_button': save_reset_buttons['reset_button'],
         
         # Progress components
-        'progress_components': progress_components,
-        'progress_container': progress_components['container'],
-        'show_for_operation': progress_components.get('show_for_operation'),
-        'update_progress': progress_components.get('update_progress'),
-        'complete_operation': progress_components.get('complete_operation'),
-        'error_operation': progress_components.get('error_operation'),
-        'reset_all': progress_components.get('reset_all'),
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'show_for_operation': progress_tracker.show,
+        'update_progress': progress_tracker.update,
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_all': progress_tracker.reset,
         
         # Log components
         'log_components': log_components,

@@ -53,8 +53,8 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
     action_components = _create_state_managed_action_buttons()
     
     # 8. Enhanced progress tracking container dengan dual level untuk overall dan step progress
-    progress_components = create_dual_progress_tracker()
-    progress_components['container'].layout.display = 'none'
+    progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
+    progress_tracker.container.layout.display = 'none'
     
     # 9. Log output - accordion terbuka by default
     log_components = _create_open_log_accordion()
@@ -81,10 +81,21 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
         box_sizing='border-box'
     ))
     
+    # Membuat dictionary hasil dengan komponen progress tracker yang benar
+    progress_tracker_components = {
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'show_for_operation': progress_tracker.show,
+        'update_progress': progress_tracker.update,
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_all': progress_tracker.reset
+    }
+    
     return {**{
         'ui': main_ui, 'main_container': main_ui, 'header': header, 'status_panel': status_panel,
         'form_container': form_container, 'confirmation_area': confirmation_area
-    }, **form_fields, **save_reset_components, **action_components, **progress_components, **log_components}
+    }, **form_fields, **save_reset_components, **action_components, **progress_tracker_components, **log_components}
 
 def _get_dynamic_status_html() -> str:
     """Get dynamic status HTML dengan environment detection - one-liner conditionals"""

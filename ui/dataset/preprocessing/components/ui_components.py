@@ -59,7 +59,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     log_components = create_log_accordion(module_name='preprocessing', height='220px')
     
     # Progress tracking dengan dual level untuk overall dan step progress
-    progress_components = create_dual_progress_tracker()
+    progress_tracker = create_dual_progress_tracker(operation="Dataset Preprocessing")
     
     # Help panel
     help_content = """
@@ -101,7 +101,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     ui = widgets.VBox([
         header, status_panel, config_header, input_options, save_reset_buttons['container'],
         create_divider(), action_header, action_buttons['container'], confirmation_area,
-        progress_components['container'], log_components['log_accordion'], 
+        progress_tracker.container, log_components['log_accordion'], 
         create_divider(), help_panel
     ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
     
@@ -132,13 +132,13 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'reset_button': save_reset_buttons['reset_button'],
         
         # Progress components
-        'progress_components': progress_components,
-        'progress_container': progress_components['container'],
-        'show_for_operation': progress_components.get('show_for_operation'),
-        'update_progress': progress_components.get('update_progress'),
-        'complete_operation': progress_components.get('complete_operation'),
-        'error_operation': progress_components.get('error_operation'),
-        'reset_all': progress_components.get('reset_all'),
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'show_for_operation': progress_tracker.show,
+        'update_progress': progress_tracker.update,
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_all': progress_tracker.reset,
         
         # Log components
         'log_components': log_components,

@@ -66,7 +66,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     ))
     
     # Progress tracking dengan dual level untuk overall dan step progress
-    progress_components = create_dual_progress_tracker()
+    progress_tracker = create_dual_progress_tracker(operation="Dataset Augmentation")
     log_components = create_log_accordion('augmentation', '200px')
     help_panel = get_augmentation_info()
 
@@ -89,7 +89,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     ui = widgets.VBox([
         header, status_panel, settings_container, create_divider(),
         action_buttons['container'], confirmation_area,
-        progress_components['container'], log_components['log_accordion'], help_panel
+        progress_tracker.container, log_components['log_accordion'], help_panel
     ], layout=widgets.Layout(width='100%', overflow='hidden'))
 
     # Component mapping dengan service integration
@@ -108,7 +108,14 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'reset_button': config_buttons['reset_button'],
         
         # Progress dan log dengan service integration
-        **progress_components, 'log_output': log_components['log_output'],
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'show_for_operation': progress_tracker.show,
+        'update_progress': progress_tracker.update,
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_all': progress_tracker.reset,
+        'log_output': log_components['log_output'],
         'log_accordion': log_components['log_accordion'],
         'status': log_components['log_output'],  # Compatibility
         

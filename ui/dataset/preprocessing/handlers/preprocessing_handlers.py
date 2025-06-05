@@ -19,8 +19,27 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
         def progress_callback(**kwargs):
             progress = kwargs.get('progress', 0)
             message = kwargs.get('message', 'Processing...')
-            step = kwargs.get('step', 0)
-            ui_components.get('update_progress', lambda *a: None)('overall', progress, message)
+            level = kwargs.get('type', 'level1')
+            
+            # Menggunakan progress_tracker object jika tersedia
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker:
+                # Mapping level untuk kompatibilitas
+                if level == 'overall':
+                    level = 'level1'
+                elif level == 'step':
+                    level = 'level2'
+                
+                # Update progress menggunakan metode progress_tracker
+                progress_tracker.update(
+                    level,
+                    progress,
+                    message,
+                    kwargs.get('color', None)
+                )
+            else:
+                # Fallback untuk kompatibilitas
+                ui_components.get('update_progress', lambda *a: None)('overall', progress, message)
         return progress_callback
     
     ui_components['progress_callback'] = create_progress_callback()
@@ -101,11 +120,19 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             ui_components.get('show_for_operation', lambda x: None)('check')
             
             # Check source dataset
-            ui_components.get('update_progress', lambda *a: None)('overall', 30, "Checking source dataset")
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker:
+                progress_tracker.update('level1', 30, "🔍 Checking source dataset")
+            else:
+                ui_components.get('update_progress', lambda *a: None)('overall', 30, "Checking source dataset")
+            
             source_valid, source_msg = _validate_dataset_ready(config, logger)
             
             # Check preprocessed dengan direct scanning
-            ui_components.get('update_progress', lambda *a: None)('overall', 70, "Checking preprocessed dataset")
+            if progress_tracker:
+                progress_tracker.update('level1', 70, "📁 Checking preprocessed dataset")
+            else:
+                ui_components.get('update_progress', lambda *a: None)('overall', 70, "Checking preprocessed dataset")
             preprocessed_exists, preprocessed_count = _check_preprocessed_exists(config)
             
             # Display results

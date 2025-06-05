@@ -177,7 +177,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         create_divider(margin="20px 0", color="#e0e0e0"), 
         action_header, 
         widgets.HBox([action_buttons['container']], layout=widgets.Layout(justify_content='center', margin='10px 0')),
-        progress_components['container'], 
+        progress_tracker.container, 
         log_components['log_accordion'], 
         create_divider(margin="15px 0", color="#f0f0f0"), 
         help_panel

@@ -20,74 +20,26 @@ def create_form_fields(config: Dict[str, Any] = None) -> Dict[str, Any]:
     local = config.get('local', {})
     
     # Override config API key jika terdeteksi dari secrets
-    if api_key and not roboflow.get('api_key'):
-        roboflow['api_key'] = api_key
+    if api_key and not roboflow.get('api_key'): roboflow['api_key'] = api_key
     
     # Get environment-specific paths
     env_manager = get_environment_manager()
-    paths = get_paths_for_environment(
-        is_colab=env_manager.is_colab,
-        is_drive_mounted=env_manager.is_drive_mounted
-    )
+    paths = get_paths_for_environment(is_colab=env_manager.is_colab, is_drive_mounted=env_manager.is_drive_mounted)
     
     # Form fields dengan consistent styling
-    workspace_field = widgets.Text(
-        value=roboflow.get('workspace', 'smartcash-wo2us'),
-        placeholder='Nama workspace di Roboflow (e.g., smartcash-wo2us)',
-        description='Workspace:',
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': '90px'}
-    )
+    workspace_field = widgets.Text(value=roboflow.get('workspace', 'smartcash-wo2us'), placeholder='Nama workspace di Roboflow (e.g., smartcash-wo2us)', description='Workspace:', layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': '90px'})
+    project_field = widgets.Text(value=roboflow.get('project', 'rupiah-emisi-2022'), placeholder='Nama project di Roboflow (e.g., rupiah-emisi-2022)', description='Project:', layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': '90px'})
+    version_field = widgets.Text(value=str(roboflow.get('version', '3')), placeholder='Versi dataset (e.g., 3)', description='Version:', layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': '90px'})
     
-    project_field = widgets.Text(
-        value=roboflow.get('project', 'rupiah-emisi-2022'),
-        placeholder='Nama project di Roboflow (e.g., rupiah-emisi-2022)',
-        description='Project:',
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': '90px'}
-    )
-    
-    version_field = widgets.Text(
-        value=str(roboflow.get('version', '3')),
-        placeholder='Versi dataset (e.g., 3)',
-        description='Version:',
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': '90px'}
-    )
-    
-    api_key_field = widgets.Password(
-        value=roboflow.get('api_key', ''),
-        placeholder='🔑 Terdeteksi otomatis dari Colab secrets' if api_key else 'Masukkan API Key Roboflow',
-        description='API Key:',
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': '90px'}
-    )
+    # API key field dengan auto-detect dari secrets
+    api_key_field = widgets.Password(value=api_key or roboflow.get('api_key', ''), placeholder='🔑 Terdeteksi otomatis dari Colab secrets' if api_key else 'Masukkan API Key Roboflow', description='API Key:', layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': '90px'}, disabled=bool(api_key))
     
     # Directory fields dengan smart defaults
-    output_dir_field = widgets.Text(
-        value=local.get('output_dir', paths.get('data_root', '/content/data')),
-        placeholder='Direktori untuk menyimpan dataset (e.g., /content/data)',
-        description='Output Dir:',
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': '90px'}
-    )
-    
-    backup_dir_field = widgets.Text(
-        value=local.get('backup_dir', paths.get('backup', '/content/data/backup')),
-        placeholder='Direktori untuk backup dataset lama',
-        description='Backup Dir:',
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': '90px'}
-    )
+    output_dir_field = widgets.Text(value=local.get('output_dir', paths.get('data_root', '/content/data')), placeholder='Direktori untuk menyimpan dataset (e.g., /content/data)', description='Output Dir:', layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': '90px'})
+    backup_dir_field = widgets.Text(value=local.get('backup_dir', paths.get('backup', '/content/data/backup')), placeholder='Direktori untuk backup dataset lama', description='Backup Dir:', layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': '90px'})
     
     # Backup checkbox dengan improved description
-    backup_checkbox = widgets.Checkbox(
-        value=local.get('backup_enabled', False),
-        description='Enable backup dataset existing sebelum download',
-        indent=False,
-        layout=widgets.Layout(width='100%', max_width='100%'),
-        style={'description_width': 'initial'}
-    )
+    backup_checkbox = widgets.Checkbox(value=local.get('backup_enabled', False), description='Enable backup dataset existing sebelum download', indent=False, layout=widgets.Layout(width='100%', max_width='100%'), style={'description_width': 'initial'})
     
     # API key status indicator
     api_status_html = _create_api_status_indicator(api_key)
@@ -106,8 +58,8 @@ def create_form_fields(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'output_dir_field': output_dir_field,
         'backup_dir_field': backup_dir_field,
         'backup_checkbox': backup_checkbox,
-        'api_status_info': api_status_html,
-        'env_info': env_info_html,
+        'api_status_html': api_status_html,
+        'env_info_html': env_info_html,
         'structure_info': structure_info
     }
 

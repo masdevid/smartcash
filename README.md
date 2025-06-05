@@ -10,3 +10,12 @@ Perbaikan berikutnya:
 - Integrasikan dengan `smartcash/dataset/**` dengan tepat.
 - Gunakan one-liner style code
 - Keep DRY
+
+Perbaiki urutan layout form pada `smartcash/ui/dataset/downloader/components/**`
+- Form 2 kolom
+- Save Reset Button
+- Area Konfirmasi
+- Action Buttons
+- Progress Tracker
+- Log Output
+Gunakan one-liner style code. Sesuaikan handler atau init yang terpengaruh.

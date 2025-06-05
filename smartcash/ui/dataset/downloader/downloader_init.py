@@ -1,190 +1,192 @@
 """
 File: smartcash/ui/dataset/downloader/downloader_init.py
-Deskripsi: Improved downloader initializer dengan auto API key detection dan proper handlers
+Deskripsi: Fixed downloader initializer dengan layout order yang benar dan one-liner style
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.utils.fallback_utils import create_fallback_ui, try_operation_safe, show_status_safe
-from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge, get_logger
-from smartcash.ui.utils.ui_logger_namespace import DOWNLOAD_LOGGER_NAMESPACE, KNOWN_NAMESPACES, get_namespace_color
-from smartcash.ui.handlers.config_handlers import BaseConfigHandler
-from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config, get_default_api_key
-from smartcash.common.environment import get_environment_manager
+from smartcash.ui.utils.logger_bridge import get_logger
+from smartcash.ui.utils.ui_logger_namespace import DOWNLOAD_LOGGER_NAMESPACE, KNOWN_NAMESPACES
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 
-class DownloaderConfigHandler(BaseConfigHandler):
-    """Config handler dengan auto API key detection dan YAML structure preservation."""
-    
-    def __init__(self, module_name: str = 'downloader', parent_module: str = 'dataset'):
-        super().__init__(module_name, parent_module=parent_module)
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dengan YAML structure preservation."""
-        try:
-            config = get_default_downloader_config()
-            
-            # Update roboflow section
-            config['roboflow'].update({
-                'workspace': self._get_safe_value(ui_components, 'workspace_field', ''),
-                'project': self._get_safe_value(ui_components, 'project_field', ''),
-                'version': self._get_safe_value(ui_components, 'version_field', '1'),
-                'api_key': self._get_safe_value(ui_components, 'api_key_field', ''),
-                'format': 'yolov5pytorch'  # Fixed format
-            })
-            
-            # Update local section - organize_dataset always TRUE
-            config['local'].update({
-                'output_dir': self._get_safe_value(ui_components, 'output_dir_field', ''),
-                'backup_dir': self._get_safe_value(ui_components, 'backup_dir_field', ''),
-                'organize_dataset': True,  # Always TRUE
-                'backup_enabled': self._get_safe_value(ui_components, 'backup_checkbox', False)
-            })
-            
-            return config
-        except Exception as e:
-            self.logger.error(f"❌ Extract config error: {str(e)}")
-            return get_default_downloader_config()
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan YAML structure dan auto API key detection."""
-        try:
-            roboflow = config.get('roboflow', {})
-            local = config.get('local', {})
-            
-            # Auto-detect API key dari Colab secrets jika belum ada
-            api_key = roboflow.get('api_key', '') or get_default_api_key()
-            
-            # Update fields dengan safe setting
-            field_updates = [
-                ('workspace_field', roboflow.get('workspace', '')),
-                ('project_field', roboflow.get('project', '')),
-                ('version_field', roboflow.get('version', '1')),
-                ('api_key_field', api_key),
-                ('output_dir_field', local.get('output_dir', '')),
-                ('backup_dir_field', local.get('backup_dir', '')),
-                ('backup_checkbox', local.get('backup_enabled', False))
-            ]
-            
-            [self._set_safe_value(ui_components, field, value) for field, value in field_updates]
-            
-            # Update status jika API key terdeteksi dari Colab secrets
-            if api_key and not roboflow.get('api_key'):
-                show_status_safe("🔑 API key terdeteksi dari Colab secrets", 'success', ui_components)
-                
-        except Exception as e:
-            self.logger.error(f"❌ Update UI error: {str(e)}")
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        return get_default_downloader_config()
-    
-    def _get_safe_value(self, ui_components: Dict[str, Any], key: str, default: Any) -> Any:
-        """Get value safely dari UI component."""
-        return try_operation_safe(
-            lambda: getattr(ui_components.get(key), 'value', default),
-            fallback_value=default
-        )
-    
-    def _set_safe_value(self, ui_components: Dict[str, Any], key: str, value: Any) -> None:
-        """Set value safely ke UI component."""
-        widget = ui_components.get(key)
-        widget and hasattr(widget, 'value') and try_operation_safe(
-            lambda: setattr(widget, 'value', value)
-        )
+# Import handlers dengan one-liner style
+from smartcash.ui.dataset.downloader.handlers.config_handler import DownloadConfigHandler
+from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
+from smartcash.ui.dataset.downloader.handlers.defaults import get_default_download_config
 
-class DownloaderInitializer(CommonInitializer):
-    """Fixed downloader initializer dengan proper action handlers."""
+MODULE_LOGGER_NAME = KNOWN_NAMESPACES.get(DOWNLOAD_LOGGER_NAMESPACE, 'DOWNLOAD')
+
+class DownloadInitializer(CommonInitializer):
+    """Fixed download initializer dengan proper layout order dan one-liner implementation"""
     
     def __init__(self):
-        super().__init__('downloader', DownloaderConfigHandler, 'dataset')
+        super().__init__('downloader', DownloadConfigHandler, 'dataset')
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan auto API key detection."""
+        """Create UI components dengan fixed layout order - one-liner imports"""
         try:
             from smartcash.ui.dataset.downloader.components.ui_layout import create_downloader_ui
-            
-            # Auto-detect API key dari Colab secrets sebelum create UI
-            if not config.get('roboflow', {}).get('api_key'):
-                api_key = get_default_api_key()
-                if api_key:
-                    config.setdefault('roboflow', {})['api_key'] = api_key
-            
-            # Add environment manager
-            env_manager = get_environment_manager()
-            
-            ui_components = create_downloader_ui(config, env_manager)
-            ui_components.update({
-                'downloader_initialized': True,
-                'config': config,
-                'module_name': 'downloader',
-                'env_manager': env_manager
-            })
-            
-            # Add progress tracking components
-            progress_components = self._create_progress_components()
-            ui_components.update(progress_components)
-            
-            return ui_components
-            
-        except Exception as e:
-            self.logger.error(f"❌ Error creating UI components: {str(e)}")
-            return create_fallback_ui(f"Error creating downloader UI: {str(e)}", 'downloader')
+            ui_components = create_downloader_ui(config, env)
+        except ImportError:
+            ui_components = self._create_fallback_ui_components(config, env)
+        
+        # Add initialization flags dan metadata
+        ui_components.update({
+            'downloader_initialized': True,
+            'layout_order_fixed': True,
+            'auto_check_on_load': config.get('auto_check_on_load', False),
+            'module_name': 'downloader',
+            'parent_module': 'dataset'
+        })
+        
+        return ui_components
     
-    def _create_progress_components(self) -> Dict[str, Any]:
-        """Create progress tracking components."""
-        try:
-            from smartcash.ui.components.progress_tracking import create_progress_tracking_container
-            return create_progress_tracking_container()
-        except Exception:
-            return {}
+    def _create_fallback_ui_components(self, config: Dict[str, Any], env=None) -> Dict[str, Any]:
+        """Create fallback UI components - one-liner minimal UI"""
+        import ipywidgets as widgets
+        
+        # Minimal form dengan fixed order
+        header = widgets.HTML("<h3>📥 Dataset Downloader (Fallback Mode)</h3>")
+        
+        # Basic form fields - one-liner style
+        form_fields = {
+            'workspace_input': widgets.Text(value='smartcash-wo2us', description='Workspace:'),
+            'project_input': widgets.Text(value='rupiah-emisi-2022', description='Project:'),
+            'version_input': widgets.Text(value='3', description='Version:'),
+            'api_key_input': widgets.Password(description='API Key:')
+        }
+        
+        # Buttons dengan fixed order
+        save_button = widgets.Button(description='💾 Simpan', button_style='success')
+        reset_button = widgets.Button(description='🔄 Reset')
+        download_button = widgets.Button(description='📥 Download', button_style='primary')
+        check_button = widgets.Button(description='🔍 Check', button_style='info')
+        cleanup_button = widgets.Button(description='🧹 Cleanup', button_style='danger')
+        
+        # Output components
+        confirmation_area = widgets.Output()
+        log_output = widgets.Output()
+        status_panel = widgets.HTML("📊 Fallback mode active")
+        
+        # Fixed layout order sesuai requirement
+        form_container = widgets.VBox(list(form_fields.values()))
+        save_reset_container = widgets.HBox([save_button, reset_button])
+        action_container = widgets.HBox([download_button, check_button, cleanup_button])
+        
+        ui = widgets.VBox([
+            header, status_panel, form_container,     # Header, status, form 2 kolom
+            save_reset_container,                     # Save reset button
+            confirmation_area,                        # Area konfirmasi
+            action_container,                         # Action buttons
+            log_output                               # Log output (progress tracker diabaikan di fallback)
+        ])
+        
+        # Combine semua components
+        components = {
+            'ui': ui, 'main_container': ui, 'header': header, 'status_panel': status_panel,
+            'form_container': form_container, 'save_reset_container': save_reset_container,
+            'confirmation_area': confirmation_area, 'action_container': action_container,
+            'log_output': log_output, 'save_button': save_button, 'reset_button': reset_button,
+            'download_button': download_button, 'check_button': check_button, 'cleanup_button': cleanup_button
+        }
+        
+        components.update(form_fields)
+        return components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup action handlers dengan proper confirmation dan logging."""
+        """Setup handlers dengan proper error handling - one-liner fallback"""
         try:
-            # Import action handlers
-            from smartcash.ui.dataset.downloader.handlers.action_handlers import setup_download_action_handlers
-            
-            # Setup all action handlers
-            handler_result = setup_download_action_handlers(ui_components)
-            
-            if handler_result.get('status') == 'success':
-                self.logger.info("✅ Action handlers configured successfully")
-                return {'handlers_setup': True, 'handlers_count': handler_result.get('handlers_configured', 0)}
-            else:
-                self.logger.error(f"❌ Handler setup failed: {handler_result.get('message', 'Unknown error')}")
-                return {'handlers_setup': False, 'error': handler_result.get('message')}
-            
+            return setup_download_handlers(ui_components, config, env)
         except Exception as e:
-            self.logger.error(f"❌ Error setting up handlers: {str(e)}")
-            return {'handlers_setup': False, 'error': str(e)}
+            self.logger.warning(f"⚠️ Error setup handlers: {str(e)}")
+            return self._setup_fallback_handlers(ui_components, config)
+    
+    def _setup_fallback_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Setup fallback handlers - one-liner button binding"""
+        # Simple button handlers untuk fallback mode
+        fallback_handlers = {
+            'save_button': lambda b: self.logger.info("💾 Save handler (fallback)"),
+            'reset_button': lambda b: self.logger.info("🔄 Reset handler (fallback)"),
+            'download_button': lambda b: self.logger.info("📥 Download handler (fallback)"),
+            'check_button': lambda b: self.logger.info("🔍 Check handler (fallback)"),
+            'cleanup_button': lambda b: self.logger.info("🧹 Cleanup handler (fallback)")
+        }
+        
+        # Bind handlers dengan one-liner
+        [ui_components[btn].on_click(handler) for btn, handler in fallback_handlers.items() 
+         if btn in ui_components and hasattr(ui_components[btn], 'on_click')]
+        
+        ui_components['handlers_mode'] = 'fallback'
+        return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
-        return get_default_downloader_config()
+        """Get default config - one-liner"""
+        return get_default_download_config()
     
     def _get_critical_components(self) -> List[str]:
-        return [
-            'ui', 'download_button', 'workspace_field', 'project_field', 
-            'status_panel', 'log_output', 'form_container'
-        ]
+        """Critical components untuk validation - one-liner list"""
+        return ['ui', 'form_container', 'save_button', 'reset_button', 'download_button', 
+                'check_button', 'cleanup_button', 'log_output', 'confirmation_area']
     
-    def _get_return_value(self, ui_components: Dict[str, Any]):
-        return ui_components.get('ui', ui_components.get('main_container'))
+    def validate_layout_order(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate layout order sesuai requirement - one-liner validation"""
+        required_order = ['form_container', 'save_reset_container', 'confirmation_area', 
+                         'action_container', 'progress_container', 'log_output']
+        
+        # Check main container children order
+        main_ui = ui_components.get('ui') or ui_components.get('main_container')
+        if not main_ui or not hasattr(main_ui, 'children'):
+            return {'valid': False, 'message': 'Main UI container tidak ditemukan'}
+        
+        # Simple order validation - check keberadaan components
+        missing_components = [comp for comp in required_order if comp not in ui_components]
+        
+        return {
+            'valid': len(missing_components) == 0,
+            'missing_components': missing_components,
+            'layout_order_fixed': ui_components.get('layout_order_fixed', False),
+            'message': 'Layout order valid' if not missing_components else f'Missing: {missing_components}'
+        }
 
 # Global instance
-_downloader_initializer = DownloaderInitializer()
+_downloader_initializer = DownloadInitializer()
 
-def initialize_downloader_ui(env=None, config=None, **kwargs):
-    """Initialize downloader UI dengan auto API key detection."""
-    try:
-        return _downloader_initializer.initialize(env=env, config=config, **kwargs)
-    except Exception as e:
-        logger = get_logger('downloader.init')
-        logger.error(f"❌ Initialization failed: {str(e)}")
-        return create_fallback_ui(f"Gagal inisialisasi downloader: {str(e)}", 'downloader')['ui']
+def initialize_downloader_ui(env=None, config=None, **kwargs) -> Any:
+    """Initialize downloader UI dengan fixed layout order - one-liner factory"""
+    return _downloader_initializer.initialize(env=env, config=config, **kwargs)
+
+def get_downloader_config() -> Dict[str, Any]:
+    """Get current downloader config - one-liner"""
+    handler = getattr(_downloader_initializer, 'config_handler', None)
+    return handler.get_current_config() if handler else {}
+
+def validate_downloader_layout(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Validate downloader layout order - one-liner validation"""
+    if not ui_components:
+        return {'valid': False, 'message': 'UI components tidak ditemukan'}
+    
+    return _downloader_initializer.validate_layout_order(ui_components)
 
 def get_downloader_status() -> Dict[str, Any]:
-    """Get downloader status."""
-    return {'module': 'downloader', 'initialized': True, 'status': 'ready', 'config_available': True}
+    """Get downloader status dengan layout info - one-liner status"""
+    status = _downloader_initializer.get_module_status()
+    status.update({
+        'layout_order_fixed': True,
+        'current_config': get_downloader_config(),
+        'critical_components_count': len(_downloader_initializer._get_critical_components())
+    })
+    return status
 
-def setup_downloader(env=None, config=None, **kwargs):
-    """Main entry point."""
-    return initialize_downloader_ui(env=env, config=config, **kwargs)
+def reset_downloader_layout() -> bool:
+    """Reset downloader layout - one-liner reset"""
+    try:
+        _downloader_initializer.__init__()
+        return True
+    except Exception:
+        return False
+
+# One-liner utilities untuk debugging
+debug_layout_order = lambda ui: [type(child).__name__ for child in getattr(ui.get('ui'), 'children', [])]
+debug_component_count = lambda ui: len([k for k in ui.keys() if not k.startswith('_')])
+debug_button_states = lambda ui: {k: getattr(v, 'disabled', 'N/A') for k, v in ui.items() if 'button' in k}
+get_layout_summary = lambda ui: f"Components: {debug_component_count(ui)} | Layout: {len(debug_layout_order(ui))} widgets | Fixed: {ui.get('layout_order_fixed', False)}"

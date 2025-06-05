@@ -56,9 +56,9 @@ class ButtonHandler:
     
     def _reset_log_area_only(self):
         """Reset hanya log output area"""
-        tracker = self.ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'reset'):
-            tracker.reset()
+        progress_tracker = self.ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'reset'):
+            progress_tracker.reset()
         elif 'reset_all' in self.ui_components:
             self.ui_components['reset_all']()
 

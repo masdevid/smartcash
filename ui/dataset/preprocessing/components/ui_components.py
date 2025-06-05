@@ -92,15 +92,15 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     """)
     
     action_header = widgets.HTML(f"""
-        <h4 style='color: {get_color('dark', '#333')}; margin: 12px 0 8px 0; font-size: 16px;'>
-            {get_icon('play', '▶️')} Aksi Preprocessing
-        </h4>
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Actions
+    </h4>
     """)
     
     # Main UI assembly
     ui = widgets.VBox([
-        header, status_panel, config_header, input_options, save_reset_buttons['container'],
-        create_divider(), action_header, action_buttons['container'], confirmation_area,
+        header, status_panel, config_header, input_options, save_reset_buttons['container'], action_header, action_buttons['container'], confirmation_area,
         progress_tracker.container, log_components['log_accordion'], 
         create_divider(), help_panel
     ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))

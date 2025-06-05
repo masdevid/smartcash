@@ -59,13 +59,19 @@ def _create_enhanced_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, A
     
     # 9. Log output - accordion terbuka by default
     log_components = _create_open_log_accordion()
-    
+    action_header = widgets.HTML(f"""
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Actions
+    </h4>
+    """)
     # 10. Main container dengan CSS Flexbox - no overflow
     main_ui = widgets.VBox([
         header,
         status_panel,
         form_container,
         save_reset_components['container'],
+        action_header,
         confirmation_area,
         action_components['container'],
         progress_container,  # Use progress_container directly

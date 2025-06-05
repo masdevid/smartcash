@@ -71,8 +71,9 @@ def _create_reset_handler(ui_components: Dict[str, Any]):
 
 def _reset_ui_state(ui_components: Dict[str, Any]):
     """Reset progress dan log sebelum operation"""
-    tracker = ui_components.get('tracker')
-    tracker and hasattr(tracker, 'reset') and tracker.reset()
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker and hasattr(progress_tracker, 'reset'):
+        progress_tracker.reset()
     
     log_output = ui_components.get('log_output')
     if log_output and hasattr(log_output, 'clear_output'):

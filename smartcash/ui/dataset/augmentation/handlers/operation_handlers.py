@@ -54,16 +54,16 @@ def execute_check(ui_components: Dict[str, Any]):
         from smartcash.dataset.augmentor.utils.path_operations import get_best_data_location
         
         # Step 1: Find data location (0-20%)
-        tracker = ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 10, "🔍 Mencari lokasi data")
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update('overall', 10, "🔍 Mencari lokasi data")
         
         data_location = get_best_data_location()
         log_to_ui(ui_components, f"📁 Data location: {data_location}", 'info')
         
         # Step 2: Check raw dataset (20-50%)
-        if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 30, "📊 Menganalisis raw dataset")
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update('overall', 30, "📊 Menganalisis raw dataset")
         
         raw_info = detect_split_structure(data_location)
         if raw_info['status'] == 'success':
@@ -77,14 +77,14 @@ def execute_check(ui_components: Dict[str, Any]):
             log_to_ui(ui_components, f"❌ Raw dataset tidak ditemukan: {raw_info.get('message', 'Unknown error')}", 'error')
         
         # Step 3: Check augmented dataset (50-75%)
-        if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 60, "🔄 Mengecek augmented dataset")
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update('overall', 60, "🔄 Mengecek augmented dataset")
         
         _check_augmented_dataset(ui_components, data_location)
         
         # Step 4: Check preprocessed dataset (75-100%)
-        if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 80, "🔧 Mengecek preprocessed dataset")
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update('overall', 80, "🔧 Mengecek preprocessed dataset")
         
         _check_preprocessed_dataset(ui_components, data_location)
         
@@ -151,10 +151,10 @@ def _create_granular_progress_callback(ui_components: Dict[str, Any]):
             progress_msg = f"{step_emoji} {step.title()}: {percentage}% - {message}"
             log_to_ui(ui_components, progress_msg, 'info')
             
-            # Update tracker dengan step context
-            tracker = ui_components.get('tracker')
-            if tracker and hasattr(tracker, 'update'):
-                tracker.update(step, percentage, message)
+            # Update progress tracker dengan step context
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'update'):
+                progress_tracker.update(step, percentage, message)
     
     return callback
 

@@ -87,15 +87,15 @@ def _execute_cleanup_with_progress(ui_components: Dict[str, Any]):
         service = create_service_from_ui(ui_components)
         
         # Progress update
-        tracker = ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 30, "Mencari file augmented")
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update('overall', 30, "Mencari file augmented")
         
         result = service.cleanup_augmented_data(include_preprocessed=True)
         
         # Progress update
-        if tracker and hasattr(tracker, 'update'):
-            tracker.update('overall', 80, "Menyelesaikan cleanup")
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update('overall', 80, "Menyelesaikan cleanup")
         
         if result.get('status') == 'success':
             total_deleted = result.get('total_deleted', 0)

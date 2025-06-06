@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py
-Deskripsi: Optimized download handler dengan progress tracker dual-level dan one-liner style
+Deskripsi: Fixed download handler dengan proper callable checks dan one-liner style
 """
 
 import ipywidgets as widgets
@@ -10,7 +10,7 @@ from smartcash.ui.components.confirmation_dialog import create_confirmation_dial
 from smartcash.ui.dataset.downloader.handlers.check_handler import setup_check_handler
 from smartcash.ui.dataset.downloader.handlers.cleanup_handler import setup_cleanup_handler
 from smartcash.ui.dataset.downloader.handlers.validation_handler import setup_validation_handler
-from smartcash.ui.dataset.downloader.utils.operation_utils import consolidate_download_operations
+from smartcash.ui.dataset.downloader.utils.operation_utils import get_streamlined_download_operations
 from smartcash.dataset.downloader import get_downloader_instance
 from smartcash.common.logger import get_logger
 
@@ -226,13 +226,20 @@ def _show_in_confirmation_area(ui_components: Dict[str, Any], dialog_widget) -> 
 def _clear_confirmation_area(ui_components: Dict[str, Any]) -> None:
     """Clear confirmation area dengan one-liner"""
     confirmation_area = ui_components.get('confirmation_area')
-    confirmation_area and (
-        confirmation_area.clear_output(wait=True),
-        setattr(confirmation_area.layout, 'display', 'none')
-    )
+    if confirmation_area:
+        confirmation_area.clear_output(wait=True)
+        confirmation_area.layout.display = 'none'
+
+# Fixed utilities dengan proper callable checks
+def _has_existing_dataset() -> bool:
+    """Check existing dataset dengan proper callable handling"""
+    try:
+        operations = get_streamlined_download_operations()
+        return operations.check_existing_dataset()
+    except Exception:
+        return False
 
 # Utilities dengan one-liner optimization
-_has_existing_dataset = lambda: consolidate_download_operations().check_existing_dataset()
 get_download_status = lambda ui: {'ready': 'progress_tracker' in ui, 'handlers_count': len([k for k in ui.keys() if k.endswith('_handler')])}
 validate_handlers_setup = lambda ui: all(key in ui for key in ['check_handler', 'download_handler', 'cleanup_handler'])
 get_handler_summary = lambda ui: f"✅ Handlers setup: {len([k for k in ui.keys() if k.endswith('_handler')])} handlers | Progress: {'✅' if 'progress_tracker' in ui else '❌'}"

@@ -310,7 +310,7 @@ class ProgressTracker:
                 self._update_progress_bar(bar_config.name, 0, bar_config.description)
     
     def _update_progress_bar(self, level_name: str, value: int, message: str = "", color: str = None):
-        """Update individual progress bar dengan HTML/CSS (tanpa duplikasi icon)"""
+        """Update individual progress bar dengan HTML/CSS yang kompatibel dengan Jupyter"""
         if level_name not in self.progress_bars:
             return
             
@@ -321,21 +321,24 @@ class ProgressTracker:
         bar_color = color or config.color
         display_message = self._clean_message(message or config.description)
         
-        # Force update dengan unique timestamp untuk trigger re-render
-        timestamp = int(time.time() * 1000)
+        # Menggunakan background gradient untuk visual progress tanpa transition
+        progress_bg = f"linear-gradient(to right, {bar_color} 0%, {bar_color} {value}%, #e9ecef {value}%, #e9ecef 100%)"
         
         bar_html = f"""
-        <div style="margin-bottom: 8px;" data-update="{timestamp}">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <div style="margin-bottom: 8px; font-family: 'Segoe UI', Arial, sans-serif;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span style="font-size: 14px; font-weight: 500; color: #333;">
                     {config.emoji} {self._truncate_message(display_message, 40)}
                 </span>
-                <span style="font-size: 12px; color: #666; font-weight: bold;">{value}%</span>
+                <span style="font-size: 13px; color: #666; font-weight: bold; 
+                           background: {bar_color}; color: white; padding: 2px 6px; 
+                           border-radius: 3px; min-width: 35px; text-align: center;">{value}%</span>
             </div>
-            <div style="background: #e9ecef; border-radius: 10px; overflow: hidden; height: 18px; position: relative;">
-                <div style="background: {bar_color}; height: 100%; width: {value}%; 
-                           transition: width 0.5s ease-in-out; border-radius: 10px; 
-                           min-width: {2 if value > 0 else 0}px;"></div>
+            <div style="background: {progress_bg}; border-radius: 10px; height: 20px; 
+                       border: 1px solid #ddd; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                           color: {'white' if value > 50 else '#333'}; font-size: 11px; font-weight: bold; 
+                           text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">{value}%</div>
             </div>
         </div>
         """

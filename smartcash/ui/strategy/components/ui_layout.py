@@ -16,7 +16,7 @@ def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     # One-liner layout generators dengan overflow fix
     safe_layout = lambda **kw: widgets.Layout(width='100%', max_width='100%', overflow='hidden', **kw)
     grid_layout = lambda min_w='180px': safe_layout(grid_template_columns=f'repeat(auto-fit, minmax({min_w}, 1fr))', grid_gap='6px')
-    section_layout = lambda bg: safe_layout(padding='10px', margin='6px 0', border_radius='8px', border='2px solid transparent', background=bg)
+    section_layout = lambda bg: safe_layout(padding='10px', margin='6px 0', border_radius='8px', padding="0 4px", border='2px solid #333', background=bg)
     header_html = lambda title, icon: widgets.HTML(f"<h4 style='margin: 6px 0; color: #333; font-size: 14px; overflow: hidden; text-overflow: ellipsis;'>{icon} {title}</h4>")
     
     # Apply overflow fix to existing form components

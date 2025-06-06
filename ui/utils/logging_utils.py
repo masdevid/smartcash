@@ -20,7 +20,7 @@ def setup_aggressive_log_suppression() -> None:
     # Suppression targets termasuk tqdm
     suppression_targets = [
         'requests', 'urllib3', 'tensorflow', 'torch', 'sklearn', 'ipywidgets',
-        'google', 'yaml', 'tqdm', 'matplotlib', 'pandas', 'numpy', 'PIL',
+        'google', 'yaml', 'matplotlib', 'pandas', 'numpy', 'PIL',
         'smartcash.dataset', 'smartcash.model', 'smartcash.training',
         'smartcash.common', 'smartcash.ui.dataset', 'smartcash.detection',
         'IPython', 'traitlets', 'tornado', 'seaborn', 'cv2', 'pathlib',
@@ -39,18 +39,18 @@ def setup_aggressive_log_suppression() -> None:
     # Suppress tqdm specifically
     # _suppress_tqdm_completely()
 
-def _suppress_tqdm_completely() -> None:
-    """Suppress tqdm completely untuk avoid weak reference issues"""
-    try:
-        import tqdm
-        # Disable tqdm globally
-        tqdm.tqdm.__init__ = lambda self, *args, **kwargs: None
-        tqdm.tqdm.update = lambda self, n=1: None
-        tqdm.tqdm.close = lambda self: None
-        tqdm.tqdm.__enter__ = lambda self: self
-        tqdm.tqdm.__exit__ = lambda self, *args: None
-    except ImportError:
-        pass
+# def _suppress_tqdm_completely() -> None:
+#     """Suppress tqdm completely untuk avoid weak reference issues"""
+#     try:
+#         import tqdm
+#         # Disable tqdm globally
+#         tqdm.tqdm.__init__ = lambda self, *args, **kwargs: None
+#         tqdm.tqdm.update = lambda self, n=1: None
+#         tqdm.tqdm.close = lambda self: None
+#         tqdm.tqdm.__enter__ = lambda self: self
+#         tqdm.tqdm.__exit__ = lambda self, *args: None
+#     except ImportError:
+#         pass
 
 def setup_stdout_suppression() -> None:
     """Setup stdout/stderr suppression dengan anonymous class pattern"""

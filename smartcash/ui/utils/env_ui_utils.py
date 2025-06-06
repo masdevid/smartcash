@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/env_ui_utils.py
-Deskripsi: Utilitas UI untuk environment config
+Deskripsi: Utilitas UI untuk environment config dengan namespace yang sudah diperbaiki
 """
 
 from typing import Dict, Any, Optional
@@ -11,10 +11,10 @@ from IPython.display import display, HTML
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger import log_to_ui
-from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
 
-# Konstanta untuk ID namespace di UI
-MODULE_LOGGER_NAME = "ENV-CONFIG"
+# Konstanta namespace yang diperbaiki berdasarkan KNOWN_NAMESPACES
+ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
+MODULE_LOGGER_NAME = "ENV"
 
 def update_status(ui_components: Dict[str, Any], message: str, style: str = "info") -> None:
     """
@@ -109,4 +109,4 @@ def update_progress(ui_components: Dict[str, Any], value: float, message: str = 
         
     # Log progress message jika ada
     if message:
-        log_message(ui_components, message, "info") 
+        log_message(ui_components, message, "info")

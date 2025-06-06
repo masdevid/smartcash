@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/components/env_config_component.py
-Deskripsi: Component dengan constants dan utils integration untuk clean code
+Deskripsi: Component dengan constants dan utils integration untuk clean code dengan namespace yang diperbaiki
 """
 
 from typing import Dict, Any
@@ -9,11 +9,13 @@ from IPython.display import display
 from smartcash.ui.setup.env_config.components.ui_factory import UIFactory
 from smartcash.ui.setup.env_config.handlers.environment_config_orchestrator import EnvironmentConfigOrchestrator
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
-from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
 from smartcash.ui.setup.env_config.utils import (
     show_progress_safe, hide_progress_safe, get_prioritized_missing_items,
     refresh_environment_state_silent
 )
+
+# Fixed namespace berdasarkan KNOWN_NAMESPACES yang tersedia
+ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
 
 class EnvConfigComponent:
     """Component UI dengan constants dan utils integration"""

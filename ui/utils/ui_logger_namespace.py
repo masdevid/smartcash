@@ -8,10 +8,9 @@ from typing import Dict, Any, Optional
 # ENHANCED KNOWN_NAMESPACES dengan UUID support
 KNOWN_NAMESPACES = {
     # Setup & Environment (existing)
-    "smartcash.setup.dependency_installer": "DEPS",
-    "smartcash.ui.env_config": "ENV",
-    "smartcash.setup.environment": "SETUP",
-    
+    "smartcash.ui.setup.dependency_installer": "DEPS",
+    "smartcash.ui.setup.env_config": "ENV",
+    "smartcash.ui.setup": "SETUP",
     # Dataset modules (existing + enhanced)
     "smartcash.dataset.download": "DOWNLOAD",
     "smartcash.dataset.preprocessing": "PREPROC",

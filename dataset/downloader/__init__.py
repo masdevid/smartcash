@@ -1,52 +1,54 @@
 """
 File: smartcash/dataset/downloader/__init__.py
-Deskripsi: Entry point untuk dataset downloader dengan factory pattern dan lazy loading
+Deskripsi: Factory untuk proper integration antara UI dan service layer
 """
 
 from typing import Dict, Any, Optional
-from .download_service import DownloadService, create_download_service
-from .roboflow_client import RoboflowClient, create_roboflow_client  
-from .file_processor import FileProcessor, create_file_processor
-from .validators import DatasetValidator, FileValidator, create_dataset_validator, create_file_validator
-from .progress_tracker import DownloadProgressTracker, create_download_tracker
+from smartcash.common.logger import get_logger
 
-__all__ = [
-    'DownloadService', 'create_download_service',
-    'RoboflowClient', 'create_roboflow_client',
-    'FileProcessor', 'create_file_processor', 
-    'DatasetValidator', 'FileValidator', 'create_dataset_validator', 'create_file_validator',
-    'DownloadProgressTracker', 'create_download_tracker',
-    'get_downloader_instance', 'create_downloader_config'
-]
-
-# Lazy loading pattern untuk heavy dependencies
-_downloader_instances = {}
-
-def get_downloader_instance(config: Dict[str, Any], logger=None) -> DownloadService:
-    """Get atau create downloader instance dengan caching untuk performance."""
-    cache_key = f"{config.get('workspace', '')}_{config.get('project', '')}_{id(logger) if logger else 'default'}"
+def get_downloader_instance(config: Dict[str, Any], logger=None):
+    """
+    Factory untuk create downloader instance dengan proper integration.
     
-    if cache_key not in _downloader_instances:
-        _downloader_instances[cache_key] = create_download_service(config, logger)
-    
-    return _downloader_instances[cache_key]
+    Args:
+        config: Configuration dictionary
+        logger: Optional logger instance
+        
+    Returns:
+        Downloader service instance
+    """
+    try:
+        from smartcash.dataset.downloader.download_service import create_download_service
+        return create_download_service(config, logger)
+    except ImportError as e:
+        logger = logger or get_logger('downloader.factory')
+        logger.error(f"❌ Import error: {str(e)}")
+        raise ImportError(f"Cannot import download service: {str(e)}")
 
-def create_downloader_config(workspace: str, project: str, version: str, api_key: str, **kwargs) -> Dict[str, Any]:
-    """Factory untuk create downloader config dengan sensible defaults."""
-    from smartcash.ui.dataset.downloader.handlers.defaults import DEFAULT_CONFIG
+def create_roboflow_downloader(api_key: str, config: Dict[str, Any] = None, logger=None):
+    """
+    Create Roboflow downloader dengan default config.
     
-    config = DEFAULT_CONFIG.copy()
-    config.update({
-        'workspace': workspace,
-        'project': project, 
-        'version': version,
+    Args:
+        api_key: Roboflow API key
+        config: Optional config override
+        logger: Optional logger
+        
+    Returns:
+        Configured downloader instance
+    """
+    default_config = {
         'api_key': api_key,
-        **kwargs
-    })
+        'output_format': 'yolov5pytorch',
+        'validate_download': True,
+        'organize_dataset': True,
+        'backup_existing': False
+    }
     
-    return config
+    if config:
+        default_config.update(config)
+    
+    return get_downloader_instance(default_config, logger)
 
-def clear_downloader_cache():
-    """Clear downloader instance cache untuk cleanup."""
-    global _downloader_instances
-    _downloader_instances.clear()
+# Export untuk backward compatibility
+__all__ = ['get_downloader_instance', 'create_roboflow_downloader']

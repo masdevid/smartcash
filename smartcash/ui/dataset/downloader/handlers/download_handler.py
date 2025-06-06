@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py
-Deskripsi: Fixed download handler dengan API progress_tracker yang benar dan one-liner style
+Deskripsi: Fixed download handler dengan proper integration ke smartcash.dataset.downloader dan one-liner style
 """
 
 import ipywidgets as widgets
@@ -11,11 +11,11 @@ from smartcash.ui.dataset.downloader.handlers.check_handler import setup_check_h
 from smartcash.ui.dataset.downloader.handlers.cleanup_handler import setup_cleanup_handler
 from smartcash.ui.dataset.downloader.handlers.validation_handler import setup_validation_handler
 from smartcash.ui.dataset.downloader.utils.operation_utils import get_streamlined_download_operations
-from smartcash.dataset.downloader import get_downloader_instance
+from smartcash.dataset.downloader.download_service import create_download_service  # Fixed import
 from smartcash.common.logger import get_logger
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup semua handlers dengan fixed API progress tracker"""
+    """Setup semua handlers dengan fixed integration"""
     
     logger = ui_components.get('logger') or get_logger('downloader.handlers')
     
@@ -23,7 +23,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     check_handler = _wrap_with_state_management(setup_check_handler(ui_components, config, logger), ui_components, logger)
     cleanup_handler = _wrap_with_state_management(setup_cleanup_handler(ui_components, config, logger), ui_components, logger)
     validation_handler = setup_validation_handler(ui_components, config, logger)
-    download_handler = _wrap_with_state_management(_create_download_handler(ui_components, config, logger), ui_components, logger)
+    download_handler = _wrap_with_state_management(_create_fixed_download_handler(ui_components, config, logger), ui_components, logger)
     
     # Bind handlers dengan fixed button management
     _bind_button_handlers_fixed(ui_components, {
@@ -64,11 +64,11 @@ def _wrap_with_state_management(handler: Callable, ui_components: Dict[str, Any]
     
     return state_managed_handler
 
-def _create_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Create fixed download handler dengan API progress tracker yang benar"""
+def _create_fixed_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
+    """Create fixed download handler dengan proper service integration"""
     
     def handle_download(button):
-        """Handle download dengan fixed validation dan confirmation"""
+        """Handle download dengan fixed validation dan service call"""
         try:
             # Get current config
             config_handler = ui_components.get('config_handler')
@@ -136,7 +136,7 @@ def _show_download_confirmation_fixed(ui_components: Dict[str, Any], config: Dic
     _show_in_confirmation_area_fixed(ui_components, confirmation_dialog)
 
 def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute download dengan API progress_tracker yang benar"""
+    """Execute download dengan proper service integration"""
     try:
         # Clear confirmation area
         _clear_confirmation_area_fixed(ui_components)
@@ -148,19 +148,19 @@ def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str
             show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
             return
         
-        # Show progress dengan benar API - gunakan show method
+        # Show progress dengan API yang benar
         download_steps = ["validate", "connect", "metadata", "download", "extract", "organize"]
         step_weights = {"validate": 5, "connect": 10, "metadata": 15, "download": 50, "extract": 15, "organize": 5}
         progress_tracker.show("Download Dataset", download_steps, step_weights)
         
-        # Create downloader instance
-        downloader = get_downloader_instance(config, logger)
+        # Create download service dengan proper integration - FIXED
+        download_service = create_download_service(config, logger)
         
-        # Setup fixed dual-level progress callback dengan API yang benar
-        downloader.set_progress_callback(_create_fixed_progress_callback(progress_tracker, logger))
+        # Setup fixed dual-level progress callback
+        download_service.set_progress_callback(_create_fixed_progress_callback(progress_tracker, logger))
         
-        # Execute download
-        result = downloader.download_dataset(
+        # Execute download dengan proper method call - FIXED
+        result = download_service.download_dataset(
             workspace=config['workspace'], 
             project=config['project'], 
             version=config['version'],

@@ -14,7 +14,7 @@ from smartcash.common.config.manager import get_config_manager
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
     """Setup unified handlers dengan integrasi preprocessors"""
     
-    # Setup progress callback
+    # Setup progress callback dengan API yang benar
     def create_progress_callback():
         def progress_callback(**kwargs):
             progress = kwargs.get('progress', 0)
@@ -24,22 +24,21 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
             # Menggunakan progress_tracker object jika tersedia
             progress_tracker = ui_components.get('progress_tracker')
             if progress_tracker:
-                # Mapping level untuk kompatibilitas
-                if level == 'overall':
-                    level = 'level1'
-                elif level == 'step':
-                    level = 'level2'
-                
-                # Update progress menggunakan metode progress_tracker
-                progress_tracker.update(
-                    level,
-                    progress,
-                    message,
-                    kwargs.get('color', None)
-                )
+                # Mapping level untuk API yang benar
+                if level == 'overall' or level == 'level1':
+                    # Gunakan update_overall untuk level1/overall
+                    progress_tracker.update_overall(progress, message, kwargs.get('color', None))
+                elif level == 'step' or level == 'level2':
+                    # Gunakan update_current untuk level2/step
+                    progress_tracker.update_current(progress, message, kwargs.get('color', None))
+                else:
+                    # Fallback ke update untuk kompatibilitas
+                    progress_tracker.update(level, progress, message, kwargs.get('color', None))
             else:
-                # Fallback untuk kompatibilitas
-                ui_components.get('update_progress', lambda *a: None)('overall', progress, message)
+                # Fallback untuk kompatibilitas dengan implementasi lama
+                update_fn = ui_components.get('update_progress')
+                if update_fn:
+                    update_fn('overall' if level in ['overall', 'level1'] else 'step', progress, message)
         return progress_callback
     
     ui_components['progress_callback'] = create_progress_callback()
@@ -70,7 +69,17 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
                 return
             
             logger and logger.info("🚀 Memulai preprocessing dataset")
-            ui_components.get('show_for_operation', lambda x: None)('preprocessing')
+            
+            # Show progress tracker dengan API yang benar
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker:
+                # Gunakan metode show dengan parameter yang benar
+                preprocessing_steps = ["prepare", "process", "verify"]
+                step_weights = {"prepare": 20, "process": 60, "verify": 20}
+                progress_tracker.show("Preprocessing Dataset", preprocessing_steps, step_weights)
+            else:
+                # Fallback ke metode lama
+                ui_components.get('show_for_operation', lambda x: None)('preprocessing')
             
             # Extract config dan execute
             params = _extract_processing_params(ui_components)
@@ -87,9 +96,17 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
             if result['success']:
                 total = result.get('total_images', 0)
                 time_taken = result.get('processing_time', 0)
-                ui_components.get('complete_operation', lambda x: None)(
-                    f"Preprocessing selesai: {total:,} gambar dalam {time_taken:.1f}s"
-                )
+                # Complete operation dengan API yang benar
+                progress_tracker = ui_components.get('progress_tracker')
+                if progress_tracker and hasattr(progress_tracker, 'complete'):
+                    progress_tracker.complete(
+                        f"Preprocessing selesai: {total:,} gambar dalam {time_taken:.1f}s"
+                    )
+                else:
+                    # Fallback ke metode lama
+                    ui_components.get('complete_operation', lambda x: None)(
+                        f"Preprocessing selesai: {total:,} gambar dalam {time_taken:.1f}s"
+                    )
                 _update_status_panel(ui_components, f"✅ Preprocessing berhasil: {total:,} gambar", "success")
             else:
                 raise Exception(result['message'])
@@ -97,7 +114,13 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
         except Exception as e:
             error_msg = f"Preprocessing gagal: {str(e)}"
             logger and logger.error(f"💥 {error_msg}")
-            ui_components.get('error_operation', lambda x: None)(error_msg)
+            # Error operation dengan API yang benar
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'error'):
+                progress_tracker.error(error_msg)
+            else:
+                # Fallback ke metode lama
+                ui_components.get('error_operation', lambda x: None)(error_msg)
             _update_status_panel(ui_components, error_msg, "error")
         
         finally:
@@ -152,7 +175,13 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             else:
                 logger and logger.info("ℹ️ Belum ada preprocessed dataset")
             
-            ui_components.get('complete_operation', lambda x: None)("Dataset check selesai")
+            # Complete operation dengan API yang benar
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'complete'):
+                progress_tracker.complete("Dataset check selesai")
+            else:
+                # Fallback ke metode lama
+                ui_components.get('complete_operation', lambda x: None)("Dataset check selesai")
             
         except Exception as e:
             error_msg = f"Check gagal: {str(e)}"
@@ -238,7 +267,10 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
                 if result['success']:
                     stats = result.get('stats', {})
                     files_removed = stats.get('files_removed', 0)
-                    ui_components.get('complete_operation', lambda x: None)(
+                    # Complete operation dengan API yang benar
+                    progress_tracker = ui_components.get('progress_tracker')
+                    if progress_tracker and hasattr(progress_tracker, 'complete'):
+                        progress_tracker.complete(
                         f"Cleanup selesai: {files_removed:,} file dihapus"
                     )
                     _update_status_panel(ui_components, f"🧹 Cleanup berhasil: {files_removed:,} file", "success")
@@ -248,7 +280,13 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
             except Exception as e:
                 error_msg = f"Cleanup gagal: {str(e)}"
                 logger and logger.error(f"💥 {error_msg}")
-                ui_components.get('error_operation', lambda x: None)(error_msg)
+                # Error operation dengan API yang benar
+                progress_tracker = ui_components.get('progress_tracker')
+                if progress_tracker and hasattr(progress_tracker, 'error'):
+                    progress_tracker.error(error_msg)
+                else:
+                    # Fallback ke metode lama
+                    ui_components.get('error_operation', lambda x: None)(error_msg)
             
             finally:
                 button_manager.enable_buttons()

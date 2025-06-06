@@ -32,30 +32,67 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info', 
     # Priority 3: Console fallback
     print(formatted_message)
 
-def show_progress_safe(ui_components: Dict[str, Any], operation: str):
-    """Safe progress show dengan fallback"""
+def show_progress_safe(ui_components: Dict[str, Any], operation: str, steps=None, step_weights=None):
+    """Safe progress show dengan fallback dan API yang benar"""
     try:
-        tracker = ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'show'):
-            tracker.show(operation)
+        # Gunakan progress_tracker dengan API yang benar
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'show'):
+            # Gunakan metode show dengan parameter yang benar
+            if steps and step_weights:
+                progress_tracker.show(operation, steps, step_weights)
+            else:
+                # Fallback dengan default steps jika tidak disediakan
+                default_steps = ["prepare", "process", "verify"]
+                default_weights = {"prepare": 20, "process": 60, "verify": 20}
+                progress_tracker.show(operation, default_steps, default_weights)
+        else:
+            # Fallback ke metode lama atau tracker lama
+            tracker = ui_components.get('tracker')
+            if tracker and hasattr(tracker, 'show'):
+                tracker.show(operation)
+            else:
+                show_fn = ui_components.get('show_for_operation')
+                if show_fn:
+                    show_fn(operation)
     except Exception:
         pass
 
 def complete_progress_safe(ui_components: Dict[str, Any], message: str):
-    """Safe progress complete dengan fallback"""
+    """Safe progress complete dengan fallback dan API yang benar"""
     try:
-        tracker = ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'complete'):
-            tracker.complete(message)
+        # Gunakan progress_tracker dengan API yang benar
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'complete'):
+            progress_tracker.complete(message)
+        else:
+            # Fallback ke metode lama atau tracker lama
+            tracker = ui_components.get('tracker')
+            if tracker and hasattr(tracker, 'complete'):
+                tracker.complete(message)
+            else:
+                complete_fn = ui_components.get('complete_operation')
+                if complete_fn:
+                    complete_fn(message)
     except Exception:
         pass
 
 def error_progress_safe(ui_components: Dict[str, Any], message: str):
-    """Safe progress error dengan fallback"""
+    """Safe progress error dengan fallback dan API yang benar"""
     try:
-        tracker = ui_components.get('tracker')
-        if tracker and hasattr(tracker, 'error'):
-            tracker.error(message)
+        # Gunakan progress_tracker dengan API yang benar
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'error'):
+            progress_tracker.error(message)
+        else:
+            # Fallback ke metode lama atau tracker lama
+            tracker = ui_components.get('tracker')
+            if tracker and hasattr(tracker, 'error'):
+                tracker.error(message)
+            else:
+                error_fn = ui_components.get('error_operation')
+                if error_fn:
+                    error_fn(message)
     except Exception:
         pass
 

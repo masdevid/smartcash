@@ -11,7 +11,10 @@ def execute_augmentation(ui_components: Dict[str, Any]):
     try:
         # Disable buttons dan show progress
         _disable_operation_buttons(ui_components)
-        show_progress_safe(ui_components, 'augmentation')
+        # Gunakan show_progress_safe dengan steps dan step_weights
+        augmentation_steps = ["prepare", "augment", "normalize", "verify"]
+        step_weights = {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10}
+        show_progress_safe(ui_components, 'Augmentasi Dataset', augmentation_steps, step_weights)
         
         log_to_ui(ui_components, "🚀 Memulai pipeline augmentasi dengan progress tracking...", 'info')
         
@@ -46,7 +49,10 @@ def execute_check(ui_components: Dict[str, Any]):
     """Execute check dengan detailed progress steps"""
     try:
         _disable_operation_buttons(ui_components)
-        show_progress_safe(ui_components, 'check')
+        # Gunakan show_progress_safe dengan steps dan step_weights
+        check_steps = ["locate", "analyze_raw", "analyze_augmented", "analyze_preprocessed"]
+        step_weights = {"locate": 10, "analyze_raw": 30, "analyze_augmented": 30, "analyze_preprocessed": 30}
+        show_progress_safe(ui_components, 'Pengecekan Dataset', check_steps, step_weights)
         
         log_to_ui(ui_components, "🔍 Memulai pengecekan dataset dengan detail...", 'info')
         
@@ -55,14 +61,20 @@ def execute_check(ui_components: Dict[str, Any]):
         
         # Step 1: Find data location (0-20%)
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'update'):
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(10, "🔍 Mencari lokasi data")
+        elif progress_tracker and hasattr(progress_tracker, 'update'):
+            # Fallback untuk kompatibilitas
             progress_tracker.update('overall', 10, "🔍 Mencari lokasi data")
         
         data_location = get_best_data_location()
         log_to_ui(ui_components, f"📁 Data location: {data_location}", 'info')
         
         # Step 2: Check raw dataset (20-50%)
-        if progress_tracker and hasattr(progress_tracker, 'update'):
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(30, "📊 Menganalisis raw dataset")
+        elif progress_tracker and hasattr(progress_tracker, 'update'):
+            # Fallback untuk kompatibilitas
             progress_tracker.update('overall', 30, "📊 Menganalisis raw dataset")
         
         raw_info = detect_split_structure(data_location)
@@ -77,13 +89,19 @@ def execute_check(ui_components: Dict[str, Any]):
             log_to_ui(ui_components, f"❌ Raw dataset tidak ditemukan: {raw_info.get('message', 'Unknown error')}", 'error')
         
         # Step 3: Check augmented dataset (50-75%)
-        if progress_tracker and hasattr(progress_tracker, 'update'):
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(60, "🔄 Mengecek augmented dataset")
+        elif progress_tracker and hasattr(progress_tracker, 'update'):
+            # Fallback untuk kompatibilitas
             progress_tracker.update('overall', 60, "🔄 Mengecek augmented dataset")
         
         _check_augmented_dataset(ui_components, data_location)
         
         # Step 4: Check preprocessed dataset (75-100%)
-        if progress_tracker and hasattr(progress_tracker, 'update'):
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(80, "🔧 Mengecek preprocessed dataset")
+        elif progress_tracker and hasattr(progress_tracker, 'update'):
+            # Fallback untuk kompatibilitas
             progress_tracker.update('overall', 80, "🔧 Mengecek preprocessed dataset")
         
         _check_preprocessed_dataset(ui_components, data_location)
@@ -153,8 +171,22 @@ def _create_granular_progress_callback(ui_components: Dict[str, Any]):
             
             # Update progress tracker dengan step context
             progress_tracker = ui_components.get('progress_tracker')
-            if progress_tracker and hasattr(progress_tracker, 'update'):
-                progress_tracker.update(step, percentage, message)
+            if progress_tracker:
+                # Mapping step ke API yang benar
+                if step == 'overall':
+                    # Gunakan update_overall untuk progress keseluruhan
+                    if hasattr(progress_tracker, 'update_overall'):
+                        progress_tracker.update_overall(percentage, message)
+                    elif hasattr(progress_tracker, 'update'):
+                        # Fallback untuk kompatibilitas
+                        progress_tracker.update('level1', percentage, message)
+                else:
+                    # Gunakan update_current untuk progress langkah saat ini
+                    if hasattr(progress_tracker, 'update_current'):
+                        progress_tracker.update_current(percentage, message)
+                    elif hasattr(progress_tracker, 'update'):
+                        # Fallback untuk kompatibilitas
+                        progress_tracker.update('level2', percentage, message)
     
     return callback
 

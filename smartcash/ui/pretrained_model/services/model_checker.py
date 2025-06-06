@@ -27,6 +27,10 @@ class ModelChecker:
             
             self.logger and self.logger.info(f"🔍 Checking {len(model_names)} models di {self.models_dir}")
             
+            # Debug ui_components keys
+            ui_keys = list(self.ui_components.keys())
+            self.logger and self.logger.info(f"🔧 UI Components: {ui_keys}")
+            
             for i, model_name in enumerate(model_names):
                 self._update_check_progress(i, len(model_names), model_name)
                 
@@ -73,23 +77,22 @@ class ModelChecker:
         tracker and tracker.complete(summary_msg)
     
     def _safe_update_progress(self, progress: int, message: str) -> None:
-        """Safe update progress dengan fallback dan debug"""
-        print(f"🔧 DEBUG: Updating progress {progress}% - {message}")
+        """Safe update progress dengan fallback dan log output"""
+        self.logger and self.logger.info(f"🔧 Progress: {progress}% - {message}")
         
         # Try update_primary first
         update_fn = self.ui_components.get('update_primary')
         if update_fn:
-            print(f"🔧 DEBUG: Using update_primary")
+            self.logger and self.logger.info(f"🔧 Using update_primary")
             update_fn(progress, message)
         else:
-            print(f"🔧 DEBUG: update_primary not found, trying tracker")
+            self.logger and self.logger.info(f"🔧 Fallback to tracker")
             # Fallback to tracker
             tracker = self.ui_components.get('tracker')
             if tracker:
-                print(f"🔧 DEBUG: Using tracker.update_primary")
                 tracker.update_primary(progress, message)
             else:
-                print(f"🔧 DEBUG: No tracker found in ui_components")
+                self.logger and self.logger.error(f"🔧 No progress methods found")
     
     def _check_single_model(self, model_name: str) -> Dict[str, Any]:
         """Check single model dengan detailed validation"""

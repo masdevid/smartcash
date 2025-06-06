@@ -213,17 +213,14 @@ class ProgressTracker:
                color: str = None, trigger_callbacks: bool = True):
         """Update specific progress level dengan auto show dan callback support"""
         if level_name not in self.active_levels:
-            print(f"⚠️ Level {level_name} not in active levels: {self.active_levels}")
             return
         
         if not self.is_visible:
             self.container.layout.display = 'flex'
             self.container.layout.visibility = 'visible'
             self.is_visible = True
-            print(f"📱 Progress tracker shown for {level_name}")
         
         progress = max(0, min(100, progress))
-        print(f"📊 Updating {level_name}: {progress}% - {message}")
         
         if level_name in self.progress_bars:
             self._update_progress_bar(level_name, progress, message, color)

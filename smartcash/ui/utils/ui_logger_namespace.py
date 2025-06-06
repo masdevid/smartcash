@@ -276,6 +276,15 @@ def get_namespace_summary() -> Dict[str, Any]:
     
     return base_summary
 
+# Backward compatibility constants untuk module-specific namespaces
+PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
+DEPENDENCY_LOGGER_NAMESPACE = "smartcash.ui.setup.dependency_installer"
+AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
+EVALUATION_LOGGER_NAMESPACE = "smartcash.model.evaluation"
+DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
+TRAINING_LOGGER_NAMESPACE = "smartcash.model.training"
+ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.setup.env_config"
+
 # Export constants for backward compatibility
 __all__ = [
     # Existing exports
@@ -284,5 +293,10 @@ __all__ = [
     'register_namespace', 'get_all_namespaces', 'get_namespace_summary',
     
     # NEW: UUID-specific exports
-    'register_uuid_namespace', 'get_uuid_operation_context', 'format_uuid_progress_message'
+    'register_uuid_namespace', 'get_uuid_operation_context', 'format_uuid_progress_message',
+    
+    # Backward compatibility constants
+    'PREPROCESSING_LOGGER_NAMESPACE', 'DEPENDENCY_LOGGER_NAMESPACE', 'AUGMENTATION_LOGGER_NAMESPACE',
+    'EVALUATION_LOGGER_NAMESPACE', 'DOWNLOAD_LOGGER_NAMESPACE', 'TRAINING_LOGGER_NAMESPACE',
+    'ENV_CONFIG_LOGGER_NAMESPACE'
 ]

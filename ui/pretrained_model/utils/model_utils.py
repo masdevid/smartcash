@@ -44,14 +44,14 @@ class ModelUtils:
     
     @staticmethod
     def get_models_from_ui_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract model config dari UI components dengan fallback"""
+        """Extract model config dari UI components dengan safe attribute access"""
         return {
-            'models_dir': ui_components.get('models_dir_input', {}).get('value', '/content/models'),
-            'drive_models_dir': ui_components.get('drive_models_dir_input', {}).get('value', '/content/drive/MyDrive/SmartCash/models'),
+            'models_dir': getattr(ui_components.get('models_dir_input'), 'value', '/content/models'),
+            'drive_models_dir': getattr(ui_components.get('drive_models_dir_input'), 'value', '/content/drive/MyDrive/SmartCash/models'),
             'models': {
-                'yolov5': {'url': ui_components.get('yolov5_url_input', {}).get('value', ''), 
+                'yolov5': {'url': getattr(ui_components.get('yolov5_url_input'), 'value', ''), 
                           **get_model_configs().get('yolov5', {})},
-                'efficientnet_b4': {'url': ui_components.get('efficientnet_url_input', {}).get('value', ''), 
+                'efficientnet_b4': {'url': getattr(ui_components.get('efficientnet_url_input'), 'value', ''), 
                                    **get_model_configs().get('efficientnet_b4', {})}
             }
         }

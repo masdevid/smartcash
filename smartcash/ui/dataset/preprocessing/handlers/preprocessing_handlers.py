@@ -356,22 +356,70 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
 
 # Safe validation helpers
 def _validate_dataset_ready(config: Dict[str, Any], logger) -> tuple[bool, str]:
-    """Safe dataset validation"""
+    """Safe dataset validation dengan error handling yang lebih baik"""
     def validate_operation():
         from smartcash.dataset.utils.path_validator import get_path_validator
+        from pathlib import Path
+        import os
         
+        # Pastikan config dan data_dir valid
+        if not config or not isinstance(config, dict):
+            return False, "Konfigurasi tidak valid"
+            
         data_dir = config.get('data', {}).get('dir', 'data')
-        validator = get_path_validator(logger)
-        result = validator.validate_dataset_structure(data_dir)
+        if not data_dir or not isinstance(data_dir, str):
+            return False, "Path dataset tidak valid"
         
-        if not result.get('valid', False) or result.get('total_images', 0) == 0:
-            issues = result.get('issues', ['Unknown error'])
-            first_issue = issues[0] if issues else 'No images found'
-            return False, f"Dataset tidak valid: {first_issue}"
+        # Validasi path dataset secara manual terlebih dahulu
+        data_path = Path(data_dir)
+        if not data_path.exists():
+            return False, f"Directory dataset tidak ditemukan: {data_dir}"
+            
+        # Periksa struktur dasar dataset
+        required_splits = ['train']
+        missing_splits = []
         
-        return True, f"Dataset siap: {result['total_images']:,} gambar"
+        for split in required_splits:
+            split_path = data_path / split
+            if not split_path.exists():
+                missing_splits.append(split)
+                continue
+                
+            images_dir = split_path / 'images'
+            labels_dir = split_path / 'labels'
+            
+            if not images_dir.exists() or not labels_dir.exists():
+                missing_splits.append(f"{split} (images/labels)")
+        
+        if missing_splits:
+            return False, f"Struktur dataset tidak lengkap: {', '.join(missing_splits)} tidak ditemukan"
+        
+        # Gunakan validator untuk analisis lebih detail
+        try:
+            validator = get_path_validator(logger)
+            result = validator.validate_dataset_structure(data_dir)
+            
+            if not result.get('valid', False):
+                issues = result.get('issues', ['Unknown error'])
+                first_issue = issues[0] if issues else 'No images found'
+                return False, f"Dataset tidak valid: {first_issue}"
+            
+            total_images = result.get('total_images', 0)
+            if total_images == 0:
+                return False, "Dataset tidak memiliki gambar"
+                
+            return True, f"Dataset siap: {total_images:,} gambar"
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger and logger.error(f"❌ Error validasi dataset: {error_msg}")
+            return False, f"Error validasi dataset: {error_msg[:100]}..."
     
-    return safe_operation_or_none(validate_operation) or (False, "Error validating dataset")
+    try:
+        return safe_operation_or_none(validate_operation) or (False, "Error validating dataset")
+    except Exception as e:
+        logger and logger.error(f"❌ Unexpected error in dataset validation: {str(e)}")
+        return False, f"Error validasi dataset: {str(e)[:100]}..."
 
 def _check_preprocessed_exists(config: Dict[str, Any]) -> tuple[bool, int]:
     """Safe check existing preprocessed data"""

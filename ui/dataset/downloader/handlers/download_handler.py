@@ -169,29 +169,44 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
         step_weights = {"validate": 5, "connect": 10, "metadata": 15, "download": 50, "extract": 15, "organize": 5}
         safe_operation_or_none(lambda: progress_tracker.show("Download Dataset", download_steps, step_weights))
         
-        # Create download service dengan safe factory - FIXED
-        download_service = safe_operation_or_none(lambda: get_downloader_instance(config, logger))
+        # Validasi konfigurasi sebelum membuat download service
+        required_fields = ['workspace', 'project', 'version', 'api_key']
+        missing_fields = [field for field in required_fields if field not in config or not config[field]]
+        
+        if missing_fields:
+            error_msg = f"❌ Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan"
+            safe_operation_or_none(lambda: progress_tracker.error(error_msg))
+            show_status_safe(error_msg, "error", ui_components)
+            return
+        
+        # Pastikan konfigurasi memiliki format yang benar untuk download service
+        download_config = {
+            'endpoint': 'roboflow',  # Default endpoint
+            'workspace': config.get('workspace', ''),
+            'project': config.get('project', ''),
+            'version': config.get('version', ''),
+            'api_key': config.get('api_key', ''),
+            'output_format': config.get('output_format', 'yolov5pytorch'),
+            'validate_download': config.get('validate_download', True),
+            'organize_dataset': True,
+            'backup_existing': config.get('backup_existing', False)
+        }
+        
+        # Create download service dengan safe factory dan konfigurasi yang benar
+        download_service = safe_operation_or_none(lambda: get_downloader_instance(download_config, logger))
         if not download_service:
             error_msg = "❌ Gagal membuat download service"
             safe_operation_or_none(lambda: progress_tracker.error(error_msg))
             show_status_safe(error_msg, "error", ui_components)
+            logger and logger.error(f"Detail config: {str(download_config)}")
             return
         
         # Setup safe progress callback
         progress_callback = _create_safe_progress_callback(progress_tracker, logger)
         safe_operation_or_none(lambda: download_service.set_progress_callback(progress_callback))
         
-        # Execute download dengan safe method call - FIXED
-        result = safe_operation_or_none(lambda: download_service.download_dataset(
-            workspace=config['workspace'], 
-            project=config['project'], 
-            version=config['version'],
-            api_key=config['api_key'], 
-            output_format=config.get('output_format', 'yolov5pytorch'),
-            validate_download=config.get('validate_download', True), 
-            organize_dataset=True,
-            backup_existing=config.get('backup_existing', False)
-        ))
+        # Execute download dengan safe method call dan parameter yang benar
+        result = safe_operation_or_none(lambda: download_service.download_dataset())
         
         if not result:
             error_msg = "❌ Download service tidak merespons"

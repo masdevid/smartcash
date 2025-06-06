@@ -27,5 +27,5 @@ def _get_fallback_model_configs() -> dict:
                            'filename': 'efficientnet_b4_huggingface.bin', 'min_size_mb': 60, 'description': 'Feature extraction backbone'}
     }
 
-# Dynamic property untuk CONFIG access
-MODEL_CONFIGS = property(lambda self: get_model_configs())
+# Static reference untuk CONFIG access
+MODEL_CONFIGS = get_model_configs()

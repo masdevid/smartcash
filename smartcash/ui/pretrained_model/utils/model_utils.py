@@ -61,7 +61,7 @@ class ProgressTracker:
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
-        self.progress_tracker = ui_components.get('progress_tracker', {}).get('tracker')
+        self.progress_tracker = ui_components.get('progress_tracker')
     
     def next_step(self, step_name: str, message: str) -> None:
         """Move ke step berikutnya dengan message"""

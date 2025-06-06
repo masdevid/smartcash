@@ -38,12 +38,12 @@ class ModelDownloader:
     def _start_download_operation(self, model_count: int) -> None:
         """Start download operation dengan progress tracker"""
         tracker = self.ui_components.get('tracker')
-        tracker and tracker.show("Model Download", ["Preparation", "Download", "Validation"])
-        self._safe_update_progress(10, f"📥 Memulai download {model_count} model")
+        tracker and tracker.show("Model Download")
+        self._safe_update_progress(5, f"Memulai download {model_count} model")
     
     def _update_download_progress(self, current: int, total: int, model_name: str) -> None:
         """Update progress untuk current download"""
-        progress = int((current / total) * 100) if total > 0 else 0
+        progress = int(10 + (current / total) * 60) if total > 0 else 10  # 10-70%
         self._safe_update_progress(progress, f"Download {model_name} ({current+1}/{total})")
     
     def _complete_download_operation(self, downloaded: int, total: int) -> None:

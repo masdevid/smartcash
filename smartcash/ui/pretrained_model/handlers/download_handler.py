@@ -22,7 +22,7 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
         try:
             logger and logger.info("🚀 Memulai download dan sinkronisasi model")
             
-            # Phase 1: Check existing models
+            # Phase 1: Check existing models (0-30%)
             checker = ModelChecker(ui_components, logger)
             check_result = checker.check_all_models()
             
@@ -32,7 +32,7 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             # Log results
             existing_models and logger and logger.info(f"✅ Model tersedia: {', '.join(existing_models)}")
             
-            # Phase 2: Download missing models
+            # Phase 2: Download missing models (30-80%)
             if models_to_download:
                 logger and logger.info(f"📥 Mengunduh {len(models_to_download)} model: {', '.join(models_to_download)}")
                 
@@ -46,17 +46,24 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                 logger and logger.success(f"✅ {downloaded_count} model berhasil diunduh")
             else:
                 logger and logger.info("ℹ️ Semua model sudah tersedia, skip download")
+                # Update progress untuk skip download
+                update_primary = ui_components.get('update_primary')
+                update_primary and update_primary(80, "Skip download - semua model tersedia")
             
-            # Phase 3: Sync to Drive
+            # Phase 3: Sync to Drive (80-100%)
             syncer = ModelSyncer(ui_components, logger)
             sync_result = syncer.sync_to_drive()
             
             sync_count = sync_result.get('synced_count', 0) if sync_result.get('success', False) else 0
             sync_count and logger and logger.success(f"☁️ {sync_count} model disinkronkan ke Drive")
             
-            # Phase 4: Complete
+            # Phase 4: Complete (100%)
             total_models = len(existing_models) + len(models_to_download)
             final_message = f"Setup model selesai: {total_models} model siap digunakan"
+            
+            # Complete progress tracker
+            tracker = ui_components.get('tracker')
+            tracker and tracker.complete(final_message)
             _update_status_panel(ui_components, f"✅ {final_message}", "success")
             
         except Exception as e:

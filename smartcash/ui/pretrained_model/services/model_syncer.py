@@ -57,12 +57,12 @@ class ModelSyncer:
     def _start_sync_operation(self) -> None:
         """Start sync operation dengan progress tracker"""
         tracker = self.ui_components.get('tracker')
-        tracker and tracker.show("Drive Sync", ["Check Drive", "Copy Files", "Validation"])
-        self._safe_update_progress(10, "☁️ Memulai sinkronisasi ke Drive")
+        tracker and tracker.show("Drive Sync")
+        self._safe_update_progress(5, "Memulai sinkronisasi ke Drive")
     
     def _update_sync_progress(self, current: int, total: int, filename: str) -> None:
         """Update progress untuk current sync"""
-        progress = int((current / total) * 100) if total > 0 else 0
+        progress = int(10 + (current / total) * 80) if total > 0 else 10  # 10-90%
         self._safe_update_progress(progress, f"Sync {filename} ({current+1}/{total})")
     
     def _complete_sync_operation(self, synced_count: int, message: str) -> None:

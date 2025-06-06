@@ -56,12 +56,12 @@ class ModelChecker:
     def _start_check_operation(self) -> None:
         """Start check operation dengan progress tracker"""
         tracker = self.ui_components.get('tracker')
-        tracker and tracker.show("Model Check", ["Scanning", "Validation", "Results"])
-        self._safe_update_progress(10, "🔍 Memulai pemeriksaan model")
+        tracker and tracker.show("Model Check")
+        self._safe_update_progress(5, "Memulai pemeriksaan model")
     
     def _update_check_progress(self, current: int, total: int, model_name: str) -> None:
         """Update progress untuk current check"""
-        progress = int((current / total) * 100) if total > 0 else 0
+        progress = int(20 + (current / total) * 70) if total > 0 else 20  # 20-90%
         self._safe_update_progress(progress, f"Check {model_name} ({current+1}/{total})")
     
     def _complete_check_operation(self, existing_count: int, total_count: int) -> None:

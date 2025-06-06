@@ -24,17 +24,22 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Model configuration form
     config_form = _create_model_config_form(config)
     
-    # Control buttons menggunakan existing components
+    # Action button
     download_button = widgets.Button(description="Download & Sync Model", button_style='primary', 
                                    icon='download', layout=get_layout('responsive_button', width='200px'))
     
-    # Import dan create save/reset buttons dari existing components
-    from smartcash.ui.components.config_buttons import create_save_reset_buttons
-    config_buttons = create_save_reset_buttons()
+    # Save/Reset buttons menggunakan komponen yang sudah ada
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    save_reset_components = create_save_reset_buttons(save_label="Simpan Konfigurasi", 
+                                                     reset_label="Reset Konfigurasi",
+                                                     with_sync_info=True,
+                                                     sync_message="Konfigurasi model akan otomatis disinkronkan.")
     
-    # Button group
-    button_group = widgets.HBox([download_button, config_buttons['save_button'], config_buttons['reset_button']],
-                               layout=widgets.Layout(width='100%', justify_content='flex-start'))
+    # Button group dengan download dan save/reset
+    button_group = widgets.VBox([
+        download_button,
+        save_reset_components['container']
+    ], layout=widgets.Layout(width='100%', margin='5px 0'))
     
     # Simple log output
     log_output = widgets.Output(layout=widgets.Layout(width='100%', height='200px', 
@@ -64,7 +69,9 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     return {
         'ui': ui, 'header': header, 'status_panel': status_panel,
         'config_form': config_form, 'download_sync_button': download_button,
-        'save_button': config_buttons['save_button'], 'reset_button': config_buttons['reset_button'],
+        'save_button': save_reset_components['save_button'], 
+        'reset_button': save_reset_components['reset_button'],
+        'save_reset_components': save_reset_components,  # Include full component untuk handler access
         'log_output': log_output, 'status': log_output, 'progress_display': progress_display,
         'models_dir_input': config_form['models_dir'], 'drive_models_dir_input': config_form['drive_models_dir'],
         'yolov5_url_input': config_form['yolov5_url'], 'efficientnet_url_input': config_form['efficientnet_url'],

@@ -214,21 +214,8 @@ class ConfigHandler(ABC):
                     self.logger.debug(f"🔍 Error resetting {key}: {str(e)}")
     
     def _update_status_panel(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
-        """Update status panel dengan fallback dan safe log output access"""
-        # Primary: Use show_status_safe
+        """Update status panel dengan safe fallback"""
         show_status_safe(message, status_type, ui_components)
-        
-        # Secondary: Try to update log_output safely
-        try:
-            log_output = ui_components.get('log_output')
-            if log_output and hasattr(log_output, '__enter__'):
-                with log_output:
-                    from IPython.display import display, HTML
-                    color_map = {'success': '#28a745', 'info': '#007bff', 'warning': '#ffc107', 'error': '#dc3545'}
-                    color = color_map.get(status_type, '#007bff')
-                    display(HTML(f"<div style='color: {color}; margin: 5px 0; padding: 8px; background: {color}10; border-radius: 4px;'>{message}</div>"))
-        except Exception as e:
-            self.logger.debug(f"🔍 Log output display error: {str(e)}")
     
     # Callback management dengan one-liner checks
     def add_callback(self, cb: Callable) -> None:

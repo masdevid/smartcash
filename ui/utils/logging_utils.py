@@ -23,7 +23,7 @@ def setup_aggressive_log_suppression() -> None:
         'google', 'yaml', 'matplotlib', 'pandas', 'numpy', 'PIL',
         'smartcash.dataset', 'smartcash.model', 'smartcash.training',
         'smartcash.common', 'smartcash.ui.dataset', 'smartcash.detection',
-        'IPython', 'traitlets', 'tornado', 'seaborn', 'cv2', 'pathlib',
+        'IPython', 'tornado', 'seaborn', 'cv2', 'pathlib',
         'asyncio', 'concurrent', 'multiprocessing', 'threading',
         'h5py', 'scipy', 'plotly', 'bokeh', 'altair', 'streamlit'
     ]

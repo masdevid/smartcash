@@ -1,326 +1,588 @@
 """
 File: smartcash/ui/components/progress_tracker.py
-Deskripsi: Optimized progress tracker dengan enhanced flexibility dan backward compatibility
+Deskripsi: Flexible Three-level progress tracker dengan callback system dan dynamic level configuration
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional, Callable, Union, List
-from IPython.display import display, HTML
+from typing import Dict, Any, Optional, Set, Callable, List, Union, Tuple
+from tqdm.auto import tqdm
+import time
+import threading
+from enum import Enum
+from dataclasses import dataclass, field
 
-def create_progress_tracker(tracker_type: str = "single", height: str = "120px", width: str = "100%", 
-                          show_percentage: bool = True, show_eta: bool = False, 
-                          auto_hide_delay: float = 3.0, theme: str = "default") -> Dict[str, Any]:
-    """
-    Create flexible progress tracker dengan multiple configurations
-    
-    Args:
-        tracker_type: 'single', 'dual', 'multi' untuk different progress tracking modes
-        height: Height of progress container
-        width: Width of progress container
-        show_percentage: Show percentage display
-        show_eta: Show estimated time of arrival
-        auto_hide_delay: Auto hide delay after completion (0 = no auto hide)
-        theme: 'default', 'minimal', 'detailed' styling themes
-    """
-    
-    if tracker_type == "dual":
-        return _create_dual_progress_tracker(height, width, show_percentage, show_eta, auto_hide_delay, theme)
-    elif tracker_type == "multi":
-        return _create_multi_progress_tracker(height, width, show_percentage, show_eta, auto_hide_delay, theme)
-    else:
-        return _create_single_progress_tracker(height, width, show_percentage, show_eta, auto_hide_delay, theme)
+class ProgressLevel(Enum):
+    """Progress level enum untuk type safety"""
+    SINGLE = 1
+    DUAL = 2
+    TRIPLE = 3
 
-def _create_single_progress_tracker(height: str, width: str, show_percentage: bool, 
-                                   show_eta: bool, auto_hide_delay: float, theme: str) -> Dict[str, Any]:
-    """Create single progress tracker dengan enhanced features"""
-    
-    # Theme configurations
-    themes = {
-        "default": {"bg_color": "#e9ecef", "bar_color": "#007bff", "text_color": "#333"},
-        "minimal": {"bg_color": "#f8f9fa", "bar_color": "#28a745", "text_color": "#666"},
-        "detailed": {"bg_color": "#e9ecef", "bar_color": "#6f42c1", "text_color": "#212529"}
-    }
-    current_theme = themes.get(theme, themes["default"])
-    
-    # Progress bar
-    progress_bar = widgets.IntProgress(value=0, min=0, max=100, description='Progress:',
-                                     bar_style='', style={'bar_color': current_theme["bar_color"]},
-                                     layout=widgets.Layout(width='100%', margin='2px 0'))
-    
-    # Progress message
-    progress_message = widgets.HTML(value="", layout=widgets.Layout(width='100%', margin='2px 0'))
-    
-    # Optional components
-    components = [progress_bar, progress_message]
-    
-    if show_percentage:
-        percentage_display = widgets.HTML(value="0%", layout=widgets.Layout(width='60px', text_align='right'))
-        progress_row = widgets.HBox([progress_bar, percentage_display], 
-                                   layout=widgets.Layout(width='100%', align_items='center'))
-        components = [progress_row, progress_message]
-    
-    if show_eta:
-        eta_display = widgets.HTML(value="", layout=widgets.Layout(width='100%', margin='2px 0'))
-        components.append(eta_display)
-    
-    # Container
-    container = widgets.VBox(components, layout=widgets.Layout(width=width, height=height, 
-                                                              visibility='hidden', padding='10px',
-                                                              border='1px solid #ddd', border_radius='4px'))
-    
-    # State tracking
-    state = {'visible': False, 'start_time': None, 'current_operation': None}
-    
-    def show_for_operation(operation_name: str) -> None:
-        """Show tracker untuk operation"""
-        import time
-        state.update({'visible': True, 'start_time': time.time(), 'current_operation': operation_name})
-        container.layout.visibility = 'visible'
-        progress_bar.value = 0
-        progress_bar.bar_style = ''
-        _update_display(0, f"Memulai {operation_name}...")
-    
-    def update_progress(category: str, value: int, message: str = "") -> None:
-        """Update progress dengan enhanced display"""
-        if not state['visible']: return
-        
-        progress_bar.value = min(max(value, 0), 100)
-        _update_display(value, message)
-        
-        if show_eta and state['start_time']:
-            _update_eta_display(value)
-    
-    def complete_operation(final_message: str) -> None:
-        """Complete operation dengan success styling"""
-        if not state['visible']: return
-        
-        progress_bar.value = 100
-        progress_bar.bar_style = 'success'
-        _update_display(100, final_message, "success")
-        
-        if auto_hide_delay > 0:
-            import threading
-            threading.Timer(auto_hide_delay, reset_all).start()
-    
-    def error_operation(error_message: str) -> None:
-        """Handle error dengan error styling"""
-        if not state['visible']: return
-        
-        progress_bar.bar_style = 'danger'
-        _update_display(progress_bar.value, error_message, "error")
-        
-        if auto_hide_delay > 0:
-            import threading
-            threading.Timer(auto_hide_delay, reset_all).start()
-    
-    def reset_all() -> None:
-        """Reset tracker ke initial state"""
-        state.update({'visible': False, 'start_time': None, 'current_operation': None})
-        container.layout.visibility = 'hidden'
-        progress_bar.value = 0
-        progress_bar.bar_style = ''
-        _update_display(0, "")
-    
-    def _update_display(value: int, message: str, msg_type: str = "info") -> None:
-        """Update display components"""
-        colors = {"info": current_theme["text_color"], "success": "#28a745", "error": "#dc3545"}
-        color = colors.get(msg_type, colors["info"])
-        
-        progress_message.value = f"<div style='color: {color}; font-size: 14px;'>{message}</div>"
-        
-        if show_percentage and 'percentage_display' in locals():
-            percentage_display.value = f"<div style='color: {color}; font-weight: bold;'>{value}%</div>"
-    
-    def _update_eta_display(current_progress: int) -> None:
-        """Update ETA display"""
-        if not show_eta or current_progress <= 0: return
-        
-        import time
-        elapsed = time.time() - state['start_time']
-        estimated_total = (elapsed / current_progress) * 100
-        eta_seconds = estimated_total - elapsed
-        
-        if eta_seconds > 0:
-            eta_display.value = f"<div style='color: #666; font-size: 12px;'>ETA: {eta_seconds:.0f}s</div>"
-    
-    # Enhanced API methods
-    def update_status(message: str, msg_type: str = "info") -> None:
-        """Update status message tanpa mengubah progress"""
-        _update_display(progress_bar.value, message, msg_type)
-    
-    def set_theme(new_theme: str) -> None:
-        """Change theme dinamically"""
-        nonlocal current_theme
-        current_theme = themes.get(new_theme, themes["default"])
-        progress_bar.style.bar_color = current_theme["bar_color"]
-    
-    return {
-        'container': container, 'progress_bar': progress_bar, 'progress_message': progress_message,
-        'show_for_operation': show_for_operation, 'update_progress': update_progress,
-        'complete_operation': complete_operation, 'error_operation': error_operation,
-        'reset_all': reset_all, 'update_status': update_status, 'set_theme': set_theme,
-        'state': state, 'type': 'single'
-    }
+@dataclass
+class ProgressConfig:
+    """Configuration untuk progress tracking"""
+    level: ProgressLevel = ProgressLevel.TRIPLE
+    operation: str = "Process"
+    steps: List[str] = field(default_factory=list)
+    step_weights: Dict[str, int] = field(default_factory=dict)
+    auto_advance: bool = True
+    auto_hide_delay: float = 3.0
+    animation_speed: float = 0.1
+    width_adjustment: int = 0
 
-def _create_dual_progress_tracker(height: str, width: str, show_percentage: bool, 
-                                 show_eta: bool, auto_hide_delay: float, theme: str) -> Dict[str, Any]:
-    """Create dual progress tracker (overall + current step)"""
-    
-    # Create two single trackers
-    overall_tracker = _create_single_progress_tracker("60px", "100%", show_percentage, False, 0, theme)
-    current_tracker = _create_single_progress_tracker("60px", "100%", show_percentage, show_eta, 0, theme)
-    
-    # Always visible containers
-    overall_tracker['container'].layout.visibility = 'visible'
-    current_tracker['container'].layout.visibility = 'visible'
-    
-    # Combined container
-    container = widgets.VBox([
-        widgets.HTML("<div style='font-weight: bold; margin-bottom: 5px;'>Overall Progress</div>"),
-        overall_tracker['container'],
-        widgets.HTML("<div style='font-weight: bold; margin: 10px 0 5px 0;'>Current Step</div>"),
-        current_tracker['container']
-    ], layout=widgets.Layout(width=width, height=height, visibility='hidden',
-                           padding='10px', border='1px solid #ddd', border_radius='4px'))
-    
-    # Dual tracker state
-    dual_state = {'visible': False, 'current_operation': None}
-    
-    def show_for_operation(operation_name: str, **kwargs) -> None:
-        """Show dual tracker dengan flexible parameters"""
-        dual_state.update({'visible': True, 'current_operation': operation_name})
-        container.layout.visibility = 'visible'
-        overall_tracker['show_for_operation'](operation_name)
-        current_tracker['reset_all']()
-    
-    def update_progress(category: str, value: int, message: str = "") -> None:
-        """Update appropriate tracker based on category"""
-        if category == "overall":
-            overall_tracker['update_progress']('overall', value, message)
-        else:
-            current_tracker['update_progress']('current', value, message)
-    
-    def complete_operation(final_message: str) -> None:
-        """Complete dual operation"""
-        overall_tracker['complete_operation'](final_message)
-        current_tracker['complete_operation']("Step completed")
-        
-        if auto_hide_delay > 0:
-            import threading
-            threading.Timer(auto_hide_delay, reset_all).start()
-    
-    def error_operation(error_message: str) -> None:
-        """Handle dual error"""
-        overall_tracker['error_operation'](error_message)
-        current_tracker['error_operation']("Step failed")
-    
-    def reset_all() -> None:
-        """Reset dual tracker"""
-        dual_state.update({'visible': False, 'current_operation': None})
-        container.layout.visibility = 'hidden'
-        overall_tracker['reset_all']()
-        current_tracker['reset_all']()
-    
-    return {
-        'container': container, 'overall_tracker': overall_tracker, 'current_tracker': current_tracker,
-        'show_for_operation': show_for_operation, 'update_progress': update_progress,
-        'complete_operation': complete_operation, 'error_operation': error_operation,
-        'reset_all': reset_all, 'state': dual_state, 'type': 'dual'
-    }
+@dataclass
+class ProgressBarConfig:
+    """Configuration untuk individual progress bar"""
+    name: str
+    description: str
+    emoji: str
+    color: str
+    position: int
+    visible: bool = True
 
-def _create_multi_progress_tracker(height: str, width: str, show_percentage: bool, 
-                                  show_eta: bool, auto_hide_delay: float, theme: str) -> Dict[str, Any]:
-    """Create multi-step progress tracker"""
+class CallbackManager:
+    """Manager untuk handling callbacks dengan type safety"""
     
-    # Step tracking
-    steps_container = widgets.VBox([], layout=widgets.Layout(width='100%'))
-    current_step_tracker = _create_single_progress_tracker("60px", "100%", show_percentage, show_eta, 0, theme)
-    current_step_tracker['container'].layout.visibility = 'visible'
+    def __init__(self):
+        self.callbacks: Dict[str, List[Callable]] = {}
+        self.one_time_callbacks: Set[str] = set()
     
-    container = widgets.VBox([
-        widgets.HTML("<div style='font-weight: bold; margin-bottom: 10px;'>Multi-Step Progress</div>"),
-        steps_container,
-        widgets.HTML("<div style='font-weight: bold; margin: 10px 0 5px 0;'>Current Step</div>"),
-        current_step_tracker['container']
-    ], layout=widgets.Layout(width=width, height=height, visibility='hidden',
-                           padding='10px', border='1px solid #ddd', border_radius='4px'))
+    def register(self, event: str, callback: Callable, one_time: bool = False) -> str:
+        """Register callback dengan automatic cleanup"""
+        callback_id = f"{event}_{id(callback)}_{time.time()}"
+        self.callbacks.setdefault(event, []).append((callback_id, callback))
+        one_time and self.one_time_callbacks.add(callback_id)
+        return callback_id
     
-    # Multi tracker state
-    multi_state = {'visible': False, 'steps': [], 'current_step': 0}
+    def unregister(self, callback_id: str):
+        """Unregister specific callback dengan cleanup"""
+        for event, callback_list in self.callbacks.items():
+            self.callbacks[event] = [cb for cb in callback_list if cb[0] != callback_id]
+        self.one_time_callbacks.discard(callback_id)
     
-    def show_for_operation(operation_name: str, steps: List[str] = None) -> None:
-        """Show multi tracker dengan step list"""
-        steps = steps or ["Step 1", "Step 2", "Step 3"]
-        multi_state.update({'visible': True, 'steps': steps, 'current_step': 0})
-        container.layout.visibility = 'visible'
-        _update_steps_display()
-        current_step_tracker['show_for_operation'](steps[0] if steps else "Unknown Step")
-    
-    def update_progress(category: str, value: int, message: str = "") -> None:
-        """Update current step progress"""
-        current_step_tracker['update_progress']('current', value, message)
-    
-    def next_step(step_name: str = None) -> None:
-        """Move to next step"""
-        multi_state['current_step'] += 1
-        _update_steps_display()
-        step_name = step_name or multi_state['steps'][multi_state['current_step']] if multi_state['current_step'] < len(multi_state['steps']) else "Final Step"
-        current_step_tracker['show_for_operation'](step_name)
-    
-    def complete_operation(final_message: str) -> None:
-        """Complete multi operation"""
-        current_step_tracker['complete_operation'](final_message)
-        _update_steps_display(completed=True)
+    def trigger(self, event: str, *args, **kwargs):
+        """Trigger callbacks dengan error handling"""
+        if event not in self.callbacks:
+            return
         
-        if auto_hide_delay > 0:
-            import threading
-            threading.Timer(auto_hide_delay, reset_all).start()
+        callbacks_to_remove = []
+        for callback_id, callback in self.callbacks[event][:]:
+            try:
+                callback(*args, **kwargs)
+                if callback_id in self.one_time_callbacks:
+                    callbacks_to_remove.append(callback_id)
+            except Exception as e:
+                print(f"Callback error for {event}: {e}")
+                callbacks_to_remove.append(callback_id)
+        
+        # Cleanup one-time callbacks
+        for callback_id in callbacks_to_remove:
+            self.unregister(callback_id)
+
+class ProgressTracker:
+    """Flexible progress tracker dengan dynamic level configuration dan callback system"""
     
-    def error_operation(error_message: str) -> None:
-        """Handle multi error"""
-        current_step_tracker['error_operation'](error_message)
+    def __init__(self, config: Optional[ProgressConfig] = None):
+        self.config = config or ProgressConfig()
+        self.callback_manager = CallbackManager()
+        self.progress_bars: Dict[str, tqdm] = {}
+        self.active_levels: List[str] = []
+        self.current_step_index = 0
+        self.is_complete = False
+        self.is_error = False
+        
+        # Progress state tracking
+        self.progress_values: Dict[str, int] = {}
+        self.progress_messages: Dict[str, str] = {}
+        
+        self._setup_level_configuration()
+        self._create_ui_components()
+        self._register_default_callbacks()
     
-    def reset_all() -> None:
-        """Reset multi tracker"""
-        multi_state.update({'visible': False, 'steps': [], 'current_step': 0})
-        container.layout.visibility = 'hidden'
-        steps_container.children = []
-        current_step_tracker['reset_all']()
+    def _setup_level_configuration(self):
+        """Setup level configuration berdasarkan ProgressLevel"""
+        level_configs = {
+            ProgressLevel.SINGLE: [
+                ProgressBarConfig("primary", f"📊 {self.config.operation} Progress", "📊", "#28a745", 0)
+            ],
+            ProgressLevel.DUAL: [
+                ProgressBarConfig("overall", f"📊 Overall Progress", "📊", "#28a745", 0),
+                ProgressBarConfig("current", f"⚡ Current Operation", "⚡", "#ffc107", 1)
+            ],
+            ProgressLevel.TRIPLE: [
+                ProgressBarConfig("overall", f"📊 Overall Progress ({self.config.operation})", "📊", "#28a745", 0),
+                ProgressBarConfig("step", f"🔄 Step Progress", "🔄", "#17a2b8", 1),
+                ProgressBarConfig("current", f"⚡ Current Operation", "⚡", "#ffc107", 2)
+            ]
+        }
+        
+        self.bar_configs = level_configs[self.config.level]
+        self.active_levels = [config.name for config in self.bar_configs if config.visible]
     
-    def _update_steps_display(completed: bool = False) -> None:
-        """Update steps visualization"""
-        steps_html = []
-        for i, step in enumerate(multi_state['steps']):
-            if i < multi_state['current_step'] or completed:
-                status = "✅"
-                color = "#28a745"
-            elif i == multi_state['current_step']:
-                status = "🔄"
-                color = "#007bff"
-            else:
-                status = "⏳"
-                color = "#6c757d"
+    def _create_ui_components(self):
+        """Create UI components dengan responsive design"""
+        # Header dengan level indicator
+        level_indicator = {
+            ProgressLevel.SINGLE: "Single Progress",
+            ProgressLevel.DUAL: "Dual Progress", 
+            ProgressLevel.TRIPLE: "Triple Progress"
+        }[self.config.level]
+        
+        self.header_widget = widgets.HTML(
+            f"<h4 style='color: #333; margin: 0; font-size: 16px; font-weight: 600;'>"
+            f"📊 {level_indicator} Tracker</h4>",
+            layout=widgets.Layout(margin='0 0 10px 0', width='100%')
+        )
+        
+        self.status_widget = widgets.HTML(
+            "", layout=widgets.Layout(margin='0 0 8px 0', width='100%')
+        )
+        
+        # Step info hanya untuk TRIPLE level
+        self.step_info_widget = widgets.HTML(
+            "", layout=widgets.Layout(
+                margin='0 0 5px 0', width='100%',
+                display='block' if self.config.level == ProgressLevel.TRIPLE else 'none'
+            )
+        )
+        
+        self.tqdm_container = widgets.Output(
+            layout=widgets.Layout(
+                margin='0', width='100%', max_width='100%', 
+                overflow='hidden', flex='1 1 auto'
+            )
+        )
+        
+        # Dynamic container height berdasarkan level
+        container_heights = {
+            ProgressLevel.SINGLE: '120px',
+            ProgressLevel.DUAL: '180px',
+            ProgressLevel.TRIPLE: '250px'
+        }
+        
+        self.container = widgets.VBox(
+            [self.header_widget, self.status_widget, self.step_info_widget, self.tqdm_container],
+            layout=widgets.Layout(
+                display='flex', flex_flow='column nowrap', align_items='stretch',
+                margin='10px 0', padding='15px', border='1px solid #28a745',
+                border_radius='8px', background_color='#f8fff8', width='100%',
+                min_height=container_heights[self.config.level],
+                max_height='400px', overflow='hidden', box_sizing='border-box'
+            )
+        )
+    
+    def _register_default_callbacks(self):
+        """Register default callbacks untuk common operations"""
+        # Auto-advance callback untuk TRIPLE level
+        if self.config.level == ProgressLevel.TRIPLE and self.config.auto_advance:
+            self.on_step_complete(self._auto_advance_step)
+        
+        # Auto-hide callback
+        self.on_complete(lambda: self._delayed_hide())
+        
+        # Progress sync callbacks
+        self.on_progress_update(self._sync_progress_state)
+    
+    # Callback registration methods
+    def on_progress_update(self, callback: Callable[[str, int, str], None]) -> str:
+        """Register callback untuk progress updates"""
+        return self.callback_manager.register('progress_update', callback)
+    
+    def on_step_complete(self, callback: Callable[[str, int], None]) -> str:
+        """Register callback untuk step completion (TRIPLE level only)"""
+        return self.callback_manager.register('step_complete', callback)
+    
+    def on_complete(self, callback: Callable[[], None]) -> str:
+        """Register callback untuk operation completion"""
+        return self.callback_manager.register('complete', callback)
+    
+    def on_error(self, callback: Callable[[str], None]) -> str:
+        """Register callback untuk error events"""
+        return self.callback_manager.register('error', callback)
+    
+    def on_reset(self, callback: Callable[[], None]) -> str:
+        """Register callback untuk reset events"""
+        return self.callback_manager.register('reset', callback)
+    
+    def remove_callback(self, callback_id: str):
+        """Remove specific callback"""
+        self.callback_manager.unregister(callback_id)
+    
+    # Main interface methods
+    def show(self, operation: str = None, steps: List[str] = None, 
+             step_weights: Dict[str, int] = None, level: ProgressLevel = None):
+        """Show progress tracker dengan dynamic configuration"""
+        # Update configuration jika provided
+        if operation:
+            self.config.operation = operation
+        if steps:
+            self.config.steps = steps
+        if step_weights:
+            self.config.step_weights = step_weights
+        if level:
+            self.config.level = level
+            self._setup_level_configuration()
+            self._create_ui_components()
+        
+        # Initialize steps dan weights dari config (tidak ada default)
+        if not self.config.steps and self.config.level == ProgressLevel.TRIPLE:
+            raise ValueError("Steps must be provided for TRIPLE level progress tracking")
+        
+        # Show container dan initialize progress bars
+        self.container.layout.display = 'flex'
+        self.container.layout.visibility = 'visible'
+        self._initialize_progress_bars()
+        self._update_step_info()
+        
+        # Reset state
+        self.current_step_index = 0
+        self.is_complete = False
+        self.is_error = False
+        
+        self._update_status("🚀 Starting operation...", 'info')
+    
+    def update(self, level_name: str, progress: int, message: str = "", 
+               color: str = None, trigger_callbacks: bool = True):
+        """Update specific progress level dengan callback support"""
+        if level_name not in self.active_levels:
+            return
+        
+        # Normalize progress value
+        progress = max(0, min(100, progress))
+        
+        # Update progress bar
+        if level_name in self.progress_bars:
+            self._update_progress_bar(
+                self.progress_bars[level_name], progress, level_name, message, color
+            )
+        
+        # Update state tracking
+        self.progress_values[level_name] = progress
+        if message:
+            self.progress_messages[level_name] = message
+        
+        # Trigger callbacks
+        if trigger_callbacks:
+            self.callback_manager.trigger('progress_update', level_name, progress, message)
             
-            steps_html.append(f"<div style='color: {color}; margin: 2px 0;'>{status} {step}</div>")
-        
-        steps_container.children = [widgets.HTML("".join(steps_html))]
+            # Check for step completion (TRIPLE level only)
+            if (self.config.level == ProgressLevel.TRIPLE and 
+                level_name == 'step' and progress >= 100):
+                self.callback_manager.trigger('step_complete', 
+                                            self.config.steps[self.current_step_index], 
+                                            self.current_step_index)
     
+    # Convenience methods untuk different levels
+    def update_primary(self, progress: int, message: str = "", color: str = None):
+        """Update primary progress (SINGLE level)"""
+        self.update('primary', progress, message, color)
+    
+    def update_overall(self, progress: int, message: str = "", color: str = None):
+        """Update overall progress (DUAL/TRIPLE level)"""
+        if self.config.level == ProgressLevel.TRIPLE:
+            # Calculate overall progress berdasarkan step weights
+            progress = self._calculate_weighted_overall_progress(progress)
+        self.update('overall', progress, message, color)
+    
+    def update_step(self, progress: int, message: str = "", color: str = None):
+        """Update step progress (TRIPLE level only)"""
+        if self.config.level == ProgressLevel.TRIPLE:
+            self.update('step', progress, message, color)
+    
+    def update_current(self, progress: int, message: str = "", color: str = None):
+        """Update current operation progress (DUAL/TRIPLE level)"""
+        self.update('current', progress, message, color)
+    
+    def complete(self, message: str = "Operation completed successfully!"):
+        """Complete operation dengan callback triggering"""
+        if self.is_complete:
+            return
+        
+        self.is_complete = True
+        self._set_all_bars_complete(message)
+        self._update_status(f"✅ {message}", 'success')
+        
+        if self.config.level == ProgressLevel.TRIPLE:
+            self.current_step_index = len(self.config.steps)
+            self._update_step_info()
+        
+        self.callback_manager.trigger('complete')
+    
+    def error(self, message: str = "Operation failed"):
+        """Set error state dengan callback triggering"""
+        if self.is_error:
+            return
+        
+        self.is_error = True
+        self._set_all_bars_error(message)
+        self._update_status(f"❌ {message}", 'error')
+        self.callback_manager.trigger('error', message)
+    
+    def reset(self):
+        """Reset tracker dengan complete cleanup"""
+        self._cleanup_progress_bars()
+        self.progress_values.clear()
+        self.progress_messages.clear()
+        self.current_step_index = 0
+        self.is_complete = False
+        self.is_error = False
+        self.hide()
+        self.callback_manager.trigger('reset')
+    
+    def hide(self):
+        """Hide progress container"""
+        self.container.layout.display = 'none'
+        self.container.layout.visibility = 'hidden'
+        self._cleanup_progress_bars()
+    
+    # Internal helper methods
+    def _initialize_progress_bars(self):
+        """Initialize progress bars berdasarkan current configuration"""
+        self._cleanup_progress_bars()
+        optimal_width = self._calculate_optimal_width()
+        
+        with self.tqdm_container:
+            for bar_config in self.bar_configs:
+                if bar_config.visible:
+                    self._create_progress_bar(bar_config, optimal_width)
+    
+    def _create_progress_bar(self, config: ProgressBarConfig, width: int):
+        """Create individual progress bar"""
+        bar = tqdm(
+            total=100, desc=config.description,
+            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}]',
+            colour=config.color, position=config.position, ncols=width,
+            ascii=False, mininterval=self.config.animation_speed, 
+            maxinterval=0.5, smoothing=0.3, dynamic_ncols=True, leave=True
+        )
+        self.progress_bars[config.name] = bar
+    
+    def _update_progress_bar(self, bar: tqdm, value: int, level_name: str, 
+                           message: str, color: str = None):
+        """Update individual progress bar dengan smooth animation"""
+        # Smooth progress update
+        diff = value - bar.n
+        if diff > 0:
+            bar.update(diff)
+        elif diff < 0:
+            bar.reset(total=100)
+            bar.update(value)
+        
+        # Update color jika provided
+        if color:
+            bar.colour = self._normalize_color(color)
+            bar.refresh()
+        
+        # Update description dengan message
+        if message:
+            emoji = next((config.emoji for config in self.bar_configs 
+                         if config.name == level_name), "📊")
+            bar.set_description(f"{emoji} {self._truncate_message(message, 40)}")
+    
+    def _calculate_weighted_overall_progress(self, step_progress: int) -> int:
+        """Calculate weighted overall progress untuk TRIPLE level"""
+        if not self.config.steps or not self.config.step_weights:
+            return step_progress
+        
+        # Calculate completed steps weight
+        completed_weight = sum(
+            self.config.step_weights.get(step, 0) 
+            for step in self.config.steps[:self.current_step_index]
+        )
+        
+        # Calculate current step contribution
+        current_step = (self.config.steps[self.current_step_index] 
+                       if self.current_step_index < len(self.config.steps) else '')
+        current_weight = self.config.step_weights.get(current_step, 0)
+        current_contribution = (step_progress / 100) * current_weight
+        
+        # Calculate total progress
+        total_weight = sum(self.config.step_weights.values())
+        if total_weight == 0:
+            return step_progress
+        
+        return int((completed_weight + current_contribution) / total_weight * 100)
+    
+    def _auto_advance_step(self, step_name: str, step_index: int):
+        """Auto advance ke step berikutnya"""
+        if self.current_step_index < len(self.config.steps) - 1:
+            self.current_step_index += 1
+            self._update_step_info()
+            # Reset step progress
+            if 'step' in self.progress_bars:
+                self.update('step', 0, f"Starting {self.config.steps[self.current_step_index]}", 
+                          trigger_callbacks=False)
+    
+    def _update_step_info(self):
+        """Update step information display untuk TRIPLE level"""
+        if (self.config.level != ProgressLevel.TRIPLE or 
+            not self.config.steps or 
+            self.current_step_index >= len(self.config.steps)):
+            return
+        
+        current_step = self.config.steps[self.current_step_index]
+        weight = self.config.step_weights.get(current_step, 0)
+        
+        step_info = f"""
+        <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin: 2px 0;">
+            <small style="color: #1976d2;">
+                <strong>Step {self.current_step_index + 1}/{len(self.config.steps)}:</strong> 
+                {current_step.title()} 
+                <span style="color: #666;">(Weight: {weight}%)</span>
+            </small>
+        </div>
+        """
+        self.step_info_widget.value = step_info
+    
+    def _set_all_bars_complete(self, message: str):
+        """Set all bars ke complete state"""
+        for level_name, bar in self.progress_bars.items():
+            if bar:
+                bar.n = 100
+                bar.colour = '#28a745'
+                bar.refresh()
+                emoji = next((config.emoji for config in self.bar_configs 
+                             if config.name == level_name), "📊")
+                bar.set_description(f"✅ {emoji} {self._truncate_message(message, 35)}")
+    
+    def _set_all_bars_error(self, message: str):
+        """Set all bars ke error state"""
+        for level_name, bar in self.progress_bars.items():
+            if bar:
+                bar.colour = '#dc3545'
+                bar.refresh()
+                emoji = next((config.emoji for config in self.bar_configs 
+                             if config.name == level_name), "📊")
+                bar.set_description(f"❌ {emoji} {self._truncate_message(message, 35)}")
+    
+    def _cleanup_progress_bars(self):
+        """Cleanup all progress bars"""
+        for bar in self.progress_bars.values():
+            if bar:
+                bar.close()
+        self.progress_bars.clear()
+        self.tqdm_container.clear_output(wait=True)
+    
+    def _delayed_hide(self):
+        """Hide container after delay"""
+        def hide_after_delay():
+            time.sleep(self.config.auto_hide_delay)
+            if self.is_complete and not self.is_error:
+                self.hide()
+        
+        threading.Thread(target=hide_after_delay, daemon=True).start()
+    
+    def _sync_progress_state(self, level_name: str, progress: int, message: str):
+        """Sync progress state untuk internal tracking"""
+        # Update status message jika significant progress
+        if progress > 0 and message:
+            style = 'success' if progress >= 100 else 'info'
+            self._update_status(message, style)
+    
+    def _update_status(self, message: str, style: str = None):
+        """Update status message dengan styling"""
+        color_map = {
+            'success': '#28a745', 'info': '#007bff', 
+            'warning': '#ffc107', 'error': '#dc3545'
+        }
+        color = color_map.get(style, '#495057')
+        
+        self.status_widget.value = f"""
+        <div style="color: {color}; font-size: 13px; font-weight: 500; margin: 0; 
+                    padding: 8px 12px; background: rgba(233, 236, 239, 0.5); 
+                    border-radius: 6px; border-left: 3px solid {color}; 
+                    width: 100%; box-sizing: border-box; word-wrap: break-word; 
+                    overflow-wrap: break-word; line-height: 1.4; 
+                    display: flex; align-items: center;">
+            {message}
+        </div>
+        """
+    
+    def _get_default_weights(self) -> Dict[str, int]:
+        """Generate equal weights untuk semua steps"""
+        if not self.config.steps:
+            return {}
+        
+        num_steps = len(self.config.steps)
+        base_weight = 100 // num_steps
+        remainder = 100 % num_steps
+        
+        weights = {}
+        for i, step in enumerate(self.config.steps):
+            weights[step] = base_weight + (1 if i < remainder else 0)
+        
+        return weights
+    
+    def _calculate_optimal_width(self) -> int:
+        """Calculate optimal width berdasarkan number of bars"""
+        base_width = 100
+        level_adjustment = {
+            ProgressLevel.SINGLE: 20,
+            ProgressLevel.DUAL: 10,
+            ProgressLevel.TRIPLE: 0
+        }
+        return base_width + level_adjustment[self.config.level] + self.config.width_adjustment
+    
+    @staticmethod
+    def _normalize_color(color: str) -> str:
+        """Normalize color values"""
+        color_map = {
+            'success': '#28a745', 'info': '#007bff',
+            'warning': '#ffc107', 'error': '#dc3545'
+        }
+        return color_map.get(color, color)
+    
+    @staticmethod
+    def _truncate_message(message: str, max_length: int) -> str:
+        """Truncate message dengan ellipsis"""
+        return message if len(message) <= max_length else f"{message[:max_length-3]}..."
+
+# Factory functions untuk different use cases
+def create_single_progress_tracker(operation: str = "Process") -> ProgressTracker:
+    """Create single-level progress tracker"""
+    config = ProgressConfig(level=ProgressLevel.SINGLE, operation=operation)
+    return ProgressTracker(config)
+
+def create_dual_progress_tracker(operation: str = "Process") -> ProgressTracker:
+    """Create dual-level progress tracker"""
+    config = ProgressConfig(level=ProgressLevel.DUAL, operation=operation)
+    return ProgressTracker(config)
+
+def create_triple_progress_tracker(operation: str = "Process", 
+                                 steps: List[str] = None,
+                                 step_weights: Dict[str, int] = None) -> ProgressTracker:
+    """Create triple-level progress tracker"""
+    if not steps:
+        raise ValueError("Steps must be provided for triple-level progress tracker")
+    
+    config = ProgressConfig(
+        level=ProgressLevel.TRIPLE, operation=operation,
+        steps=steps, step_weights=step_weights or {}
+    )
+    return ProgressTracker(config)
+
+def create_flexible_tracker(config: ProgressConfig) -> ProgressTracker:
+    """Create tracker dengan custom configuration"""
+    return ProgressTracker(config)
+
+# Backward compatibility
+def create_three_progress_tracker() -> Dict[str, Any]:
+    """Backward compatibility untuk existing code"""
+    tracker = create_triple_progress_tracker()
     return {
-        'container': container, 'current_step_tracker': current_step_tracker, 'steps_container': steps_container,
-        'show_for_operation': show_for_operation, 'update_progress': update_progress, 'next_step': next_step,
-        'complete_operation': complete_operation, 'error_operation': error_operation,
-        'reset_all': reset_all, 'state': multi_state, 'type': 'multi'
+        'container': tracker.container,
+        'progress_container': tracker.container,
+        'status_widget': tracker.status_widget,
+        'step_info_widget': tracker.step_info_widget,
+        'tqdm_container': tracker.tqdm_container,
+        'tracker': tracker,
+        'show_container': tracker.show,
+        'hide_container': tracker.hide,
+        'show_for_operation': tracker.show,
+        'update_overall': tracker.update_overall,
+        'update_step': tracker.update_step,
+        'update_current': tracker.update_current,
+        'update_progress': tracker.update,
+        'complete_operation': tracker.complete,
+        'error_operation': tracker.error,
+        'reset_all': tracker.reset
     }
-
-# Backward compatibility functions
-def create_dual_progress_tracker(height: str = "180px", width: str = "100%") -> Dict[str, Any]:
-    """Backward compatibility untuk create_dual_progress_tracker"""
-    return create_progress_tracker("dual", height, width)
-
-def create_single_progress_tracker(height: str = "120px", width: str = "100%") -> Dict[str, Any]:
-    """Backward compatibility untuk create_single_progress_tracker"""
-    return create_progress_tracker("single", height, width)
-
-def create_three_progress_tracker(height: str = "200px", width: str = "100%") -> Dict[str, Any]:
-    """Backward compatibility untuk create_three_progress_tracker - alias untuk multi"""
-    return create_progress_tracker("multi", height, width)

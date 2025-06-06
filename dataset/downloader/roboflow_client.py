@@ -40,24 +40,27 @@ class RoboflowClient:
                 response.raise_for_status()
                 metadata = response.json()
                 
-                # One-liner validation dan cache storage
-                ('export' not in metadata or 'link' not in metadata['export']) and self._raise_error("Response tidak lengkap")
+                # Validasi response
+                if 'export' not in metadata or 'link' not in metadata['export']:
+                    self._raise_error("Response tidak lengkap")
                 
                 result = {
                     'status': 'success', 'data': metadata, 'download_url': metadata['export']['link'],
                     'size_mb': metadata.get('export', {}).get('size', 0), 'message': 'Metadata berhasil'
                 }
                 
-                # One-liner caching dan logging
+                # Caching dan logging
                 self._metadata_cache[cache_key] = result
                 self._notify_progress("metadata", 100, 100, "✅ Metadata diperoleh")
-                'project' in metadata and self.logger.info(f"📊 Dataset: {len(metadata['project'].get('classes', []))} kelas, {metadata.get('version', {}).get('images', 0)} gambar")
+                if 'project' in metadata:
+                    self.logger.info(f"📊 Dataset: {len(metadata['project'].get('classes', []))} kelas, {metadata.get('version', {}).get('images', 0)} gambar")
                 
                 return result
                 
             except requests.HTTPError as e:
                 error_msg = self._handle_http_error(e.response.status_code, workspace, project, version)
-                attempt == self.retry_count and self._return_error_result(error_msg)
+                if attempt == self.retry_count:
+                    return self._return_error_result(error_msg)
                 
             except requests.RequestException as e:
                 if attempt < self.retry_count:
@@ -89,14 +92,15 @@ class RoboflowClient:
                         f.write(chunk)
                         downloaded += len(chunk)
                         
-                        # One-liner progress update dengan threshold
-                        total_size > 0 and (
-                            progress := int((downloaded / total_size) * 100),
-                            (progress - last_progress >= 5 or downloaded - (last_progress * total_size / 100) >= 1048576) and (
-                                self._notify_progress("download", progress, 100, f"📥 {downloaded/1048576:.1f}/{total_size/1048576:.1f} MB"),
+                        # Progress update dengan threshold
+                        if total_size > 0:
+                            progress = int((downloaded / total_size) * 100)
+                            
+                            if progress - last_progress >= 5 or downloaded - (last_progress * total_size / 100) >= 1048576:
+                                self._notify_progress("download", progress, 100, f"📥 {downloaded/1048576:.1f}/{total_size/1048576:.1f} MB")
                                 setattr(self, '_temp_last_progress', progress)  # Update last_progress
-                            )
-                        ) and (last_progress := progress)
+                                
+                            last_progress = progress
             
             self._notify_progress("download", 100, 100, "✅ Download selesai")
             return {
@@ -126,8 +130,9 @@ class RoboflowClient:
                 500: "Server error"}.get(status_code, f"HTTP Error {status_code}")
     
     def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """One-liner progress notification dengan safe execution"""
-        self._progress_callback and (lambda: self._progress_callback(step, current, total, message))() if True else None
+        """Progress notification dengan safe execution"""
+        if self._progress_callback:
+            self._progress_callback(step, current, total, message)
     
     def _return_error_result(self, message: str) -> Dict[str, Any]:
         """One-liner error result creation"""

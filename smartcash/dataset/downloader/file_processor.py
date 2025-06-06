@@ -101,8 +101,9 @@ class FileProcessor:
         splits = [split for split in ['train', 'valid', 'test', 'val'] 
                  if (source_dir / split).exists() and (source_dir / split / 'images').exists()]
         
-        # One-liner fallback detection
-        not splits and (source_dir / 'images').exists() and splits.append('train')
+        # Fallback detection untuk dataset tanpa split
+        if not splits and (source_dir / 'images').exists():
+            splits.append('train')
         
         return {'valid': bool(splits), 'splits': splits}
     
@@ -157,11 +158,15 @@ class FileProcessor:
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [executor.submit(shutil.copy2, file_path, target_dir / file_path.name) for file_path in file_list]
             
-            # One-liner progress tracking
-            [i % batch_size == 0 and self._notify_progress("organize", 
-                start_progress + int(((i + 1) / len(file_list)) * (end_progress - start_progress)), 
-                100, f"📁 Copy {split}: {i + 1}/{len(file_list)}") 
-             for i, future in enumerate(futures) if future.result() or True]
+            # Progress tracking dengan interval
+            for i, future in enumerate(futures):
+                try:
+                    future.result()  # Ensure future completes
+                    if i % batch_size == 0:
+                        progress = start_progress + int(((i + 1) / len(file_list)) * (end_progress - start_progress))
+                        self._notify_progress("organize", progress, 100, f"📁 Copy {split}: {i + 1}/{len(file_list)}")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Copy error: {str(e)}")
     
     def _copy_additional_files_optimized(self, source_dir: Path, target_dir: Path) -> None:
         """One-liner optimized additional files copying"""
@@ -193,20 +198,27 @@ class FileProcessor:
                 split_futures = {split: executor.submit(self._validate_single_split_optimized, dataset_dir / split, split) 
                                for split in splits_to_check}
                 
-                # One-liner result aggregation
-                [validation_result['splits'].update({split: future.result()}) and
-                 validation_result.update({
-                     'total_images': validation_result['total_images'] + future.result().get('images', 0),
-                     'total_labels': validation_result['total_labels'] + future.result().get('labels', 0)
-                 }) and
-                 (future.result().get('images', 0) == 0 and validation_result['issues'].append(f"Split {split}: No images")) and
-                 (abs(future.result().get('images', 0) - future.result().get('labels', 0)) > 
-                  future.result().get('images', 0) * 0.1 and 
-                  validation_result['issues'].append(f"Split {split}: Image-label mismatch"))
-                 for split, future in split_futures.items()]
+                # Result aggregation dengan validasi
+                for split, future in split_futures.items():
+                    result = future.result()
+                    validation_result['splits'][split] = result
+                    
+                    # Update totals
+                    validation_result['total_images'] += result.get('images', 0)
+                    validation_result['total_labels'] += result.get('labels', 0)
+                    
+                    # Validasi images
+                    if result.get('images', 0) == 0:
+                        validation_result['issues'].append(f"Split {split}: No images")
+                    
+                    # Validasi image-label mismatch
+                    if abs(result.get('images', 0) - result.get('labels', 0)) > result.get('images', 0) * 0.1:
+                        validation_result['issues'].append(f"Split {split}: Image-label mismatch")
             
-            # One-liner overall validation
-            validation_result['total_images'] == 0 and validation_result.update({'valid': False}) and validation_result['issues'].append("No images found")
+            # Overall validation
+            if validation_result['total_images'] == 0:
+                validation_result.update({'valid': False})
+                validation_result['issues'].append("No images found")
             
             return validation_result
             
@@ -258,8 +270,9 @@ class FileProcessor:
             return {'status': 'error', 'message': f'❌ Batch copy error: {str(e)}'}
     
     def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """One-liner progress notification dengan safe execution"""
-        self._progress_callback and (lambda: self._progress_callback(step, current, total, message))() if True else None
+        """Progress notification dengan safe execution"""
+        if self._progress_callback:
+            self._progress_callback(step, current, total, message)
     
     def _return_error(self, message: str) -> None:
         """One-liner error return"""

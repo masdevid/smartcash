@@ -171,7 +171,8 @@ def _show_download_confirmation_safe(ui_components: Dict[str, Any], config: Dict
         safe_operation_or_none(lambda: _show_in_confirmation_area_safe(ui_components, confirmation_dialog))
     except Exception as e:
         error_msg = f"❌ Error saat menampilkan konfirmasi: {str(e)}"
-        logger and logger.error(error_msg)
+        if logger:
+            logger.error(error_msg)
         show_status_safe(error_msg, "error", ui_components)
         # Langsung jalankan download jika konfirmasi gagal
         safe_operation_or_none(lambda: _execute_download_sync_safe(ui_components, config, logger))
@@ -284,7 +285,8 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
         progress_tracker = ui_components.get('progress_tracker')
         safe_operation_or_none(lambda: progress_tracker.error(error_msg) if progress_tracker else None)
         show_status_safe(error_msg, "error", ui_components)
-        logger and logger.error(error_msg)
+        if logger:
+            logger.error(error_msg)
 
 def _create_safe_progress_callback(progress_tracker, logger) -> Callable:
     """Create safe dual-level progress callback dengan API yang benar"""

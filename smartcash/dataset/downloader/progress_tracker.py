@@ -111,9 +111,10 @@ class DownloadProgressTracker:
         self._notify_progress("complete", 100, 100, final_message)
     
     def error_process(self, error_message: str, step_name: str = "") -> None:
-        """One-liner error handling dengan step context"""
+        """Error handling dengan step context"""
         self.is_active = False
-        step_name and step_name in self.steps and setattr(self.steps[step_name], 'message', error_message)
+        if step_name and step_name in self.steps:
+            setattr(self.steps[step_name], 'message', error_message)
         self._notify_step("error", 0, error_message)
         self._notify_progress("error", 0, 100, error_message)
     
@@ -125,12 +126,14 @@ class DownloadProgressTracker:
         self.overall_progress = int(weighted_progress / total_weight * 100) if total_weight > 0 else 0
     
     def _notify_progress(self, event_type: str, progress: int, total: int, message: str) -> None:
-        """One-liner progress notification dengan safe execution"""
-        self._progress_callback and (lambda: self._progress_callback(event_type, progress, total, message))() if True else None
+        """Progress notification dengan safe execution"""
+        if self._progress_callback:
+            self._progress_callback(event_type, progress, total, message)
     
     def _notify_step(self, event_type: str, progress: int, message: str) -> None:
-        """One-liner step notification dengan safe execution"""
-        self._step_callback and (lambda: self._step_callback(event_type, progress, message))() if True else None
+        """Step notification dengan safe execution"""
+        if self._step_callback:
+            self._step_callback(event_type, progress, message)
     
     def get_progress_summary_optimized(self) -> Dict[str, Any]:
         """One-liner optimized progress summary"""
@@ -172,19 +175,20 @@ class CallbackManager:
         self._callbacks: Dict[str, List[Callable]] = {}
     
     def register_callback(self, event_type: str, callback: Callable) -> None:
-        """One-liner callback registration"""
+        """Callback registration dengan validasi"""
         self._callbacks.setdefault(event_type, []).append(callback)
     
     def unregister_callback(self, event_type: str, callback: Callable) -> None:
-        """One-liner callback unregistration"""
-        event_type in self._callbacks and callback in self._callbacks[event_type] and self._callbacks[event_type].remove(callback)
+        """Callback unregistration dengan validasi"""
+        if event_type in self._callbacks and callback in self._callbacks[event_type]:
+            self._callbacks[event_type].remove(callback)
     
     def notify_callbacks(self, event_type: str, *args, **kwargs) -> None:
-        """One-liner callback notification dengan error protection"""
+        """Callback notification dengan error protection"""
         [self._safe_callback_call(callback, *args, **kwargs) for callback in self._callbacks.get(event_type, [])]
     
     def _safe_callback_call(self, callback: Callable, *args, **kwargs) -> None:
-        """One-liner safe callback execution"""
+        """Safe callback execution dengan error protection"""
         try:
             callback(*args, **kwargs)
         except Exception:
@@ -200,10 +204,16 @@ def create_callback_manager() -> CallbackManager:
     return CallbackManager()
 
 def create_step_weights_optimized(include_validation: bool = True, include_organize: bool = True) -> Dict[str, int]:
-    """One-liner optimized step weights creation"""
+    """Optimized step weights creation dengan validasi"""
     base_weights = {'metadata': 20, 'download': 60, 'extract': 20}
-    include_validation and base_weights.update({'validation': 10, **{k: int(v * 0.9) for k, v in base_weights.items()}})
-    include_organize and base_weights.update({'organize': 10}) and base_weights.update({k: int((v / sum(base_weights.values())) * 100) for k, v in base_weights.items()})
+    
+    if include_validation:
+        base_weights.update({'validation': 10, **{k: int(v * 0.9) for k, v in base_weights.items()}})
+    
+    if include_organize:
+        base_weights.update({'organize': 10})
+        base_weights.update({k: int((v / sum(base_weights.values())) * 100) for k, v in base_weights.items()})
+    
     return base_weights
 
 def format_progress_message_optimized(step: str, progress: int, message: str) -> str:

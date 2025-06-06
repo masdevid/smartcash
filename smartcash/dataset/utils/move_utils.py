@@ -8,7 +8,7 @@ import shutil
 import glob
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 # Definisi ekstensi gambar yang didukung

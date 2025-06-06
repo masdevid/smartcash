@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/config_handler.py
-Deskripsi: Fixed config handler tanpa path fields dengan optimasi one-liner
+Deskripsi: Fixed config handler dengan variable scoping fixes untuk log_output errors
 """
 
 from typing import Dict, Any
@@ -9,59 +9,68 @@ from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downlo
 from smartcash.ui.dataset.downloader.utils.colab_secrets import set_api_key_to_config, validate_api_key, get_api_key_from_secrets
 
 class DownloadConfigHandler(ConfigHandler):
-    """Streamlined config handler tanpa path configuration"""
+    """Fixed config handler dengan proper variable scoping"""
     
     def __init__(self, module_name: str, parent_module: str = None):
         super().__init__(module_name, parent_module)
         self._current_config = {}
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dari UI widgets tanpa path fields"""
+        """Extract config dari UI widgets dengan safe value access"""
         config = {
-            'workspace': getattr(ui_components.get('workspace_input'), 'value', '').strip(),
-            'project': getattr(ui_components.get('project_input'), 'value', '').strip(), 
-            'version': getattr(ui_components.get('version_input'), 'value', '').strip(),
-            'api_key': getattr(ui_components.get('api_key_input'), 'value', '').strip(),
+            'workspace': self._get_widget_value(ui_components, 'workspace_input', '').strip(),
+            'project': self._get_widget_value(ui_components, 'project_input', '').strip(), 
+            'version': self._get_widget_value(ui_components, 'version_input', '').strip(),
+            'api_key': self._get_widget_value(ui_components, 'api_key_input', '').strip(),
             'output_format': 'yolov5pytorch',  # Hardcoded
-            'validate_download': getattr(ui_components.get('validate_checkbox'), 'value', True),
+            'validate_download': self._get_widget_value(ui_components, 'validate_checkbox', True),
             'organize_dataset': True,  # Always true
-            'backup_existing': getattr(ui_components.get('backup_checkbox'), 'value', False),
+            'backup_existing': self._get_widget_value(ui_components, 'backup_checkbox', False),
             
             # Roboflow section untuk persistence
             'roboflow': {
-                'workspace': getattr(ui_components.get('workspace_input'), 'value', '').strip(),
-                'project': getattr(ui_components.get('project_input'), 'value', '').strip(),
-                'version': getattr(ui_components.get('version_input'), 'value', '').strip(),
-                'api_key': getattr(ui_components.get('api_key_input'), 'value', '').strip(),
+                'workspace': self._get_widget_value(ui_components, 'workspace_input', '').strip(),
+                'project': self._get_widget_value(ui_components, 'project_input', '').strip(),
+                'version': self._get_widget_value(ui_components, 'version_input', '').strip(),
+                'api_key': self._get_widget_value(ui_components, 'api_key_input', '').strip(),
             }
         }
         
         # Auto-detect API key jika kosong
-        (not config['api_key'] and (detected_key := get_api_key_from_secrets()) and 
-         config.update({'api_key': detected_key, '_api_key_source': 'colab_secret'}) and
-         config['roboflow'].update({'api_key': detected_key}) and
-         ui_components.get('api_key_input') and setattr(ui_components['api_key_input'], 'value', detected_key))
+        if not config['api_key']:
+            detected_key = get_api_key_from_secrets()
+            if detected_key:
+                config['api_key'] = detected_key
+                config['_api_key_source'] = 'colab_secret'
+                config['roboflow']['api_key'] = detected_key
+                # Update UI widget jika ada
+                api_key_widget = ui_components.get('api_key_input')
+                if api_key_widget and hasattr(api_key_widget, 'value'):
+                    api_key_widget.value = detected_key
         
         # Validate API key
-        config['api_key'] and config.update({
-            '_api_key_valid': (validation := validate_api_key(config['api_key']))['valid'],
-            '_api_key_message': validation['message'],
-            '_api_key_source': config.get('_api_key_source', 'manual')
-        })
+        if config['api_key']:
+            validation = validate_api_key(config['api_key'])
+            config['_api_key_valid'] = validation['valid']
+            config['_api_key_message'] = validation['message']
+            config['_api_key_source'] = config.get('_api_key_source', 'manual')
         
         self._current_config = config
         return config
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari config tanpa path fields"""
+        """Update UI dari config dengan safe widget access"""
         # Auto-detect API key untuk reset
-        (not config.get('api_key') and (detected_key := get_api_key_from_secrets()) and 
-         config.update({'api_key': detected_key, '_api_key_source': 'colab_secret'}))
+        if not config.get('api_key'):
+            detected_key = get_api_key_from_secrets()
+            if detected_key:
+                config['api_key'] = detected_key
+                config['_api_key_source'] = 'colab_secret'
         
         # Extract roboflow config
         roboflow_config = config.get('roboflow', {})
         
-        # Widget updates tanpa path fields
+        # Widget updates dengan safe access
         widget_updates = [
             ('workspace_input', roboflow_config.get('workspace', config.get('workspace', 'smartcash-wo2us'))),
             ('project_input', roboflow_config.get('project', config.get('project', 'rupiah-emisi-2022'))),
@@ -71,28 +80,29 @@ class DownloadConfigHandler(ConfigHandler):
             ('backup_checkbox', config.get('backup_existing', False))
         ]
         
-        # Update widget values
-        [setattr(ui_components[widget_key], 'value', value) 
-         for widget_key, value in widget_updates 
-         if widget_key in ui_components and hasattr(ui_components[widget_key], 'value')]
+        # Update widget values dengan safe access
+        for widget_key, value in widget_updates:
+            self._set_widget_value(ui_components, widget_key, value)
         
         self._current_config = config
     
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default config tanpa path configuration"""
+        """Get default config dengan auto-detect API key"""
         config = get_default_download_config()
         
         # Auto-detect API key
-        (detected_key := get_api_key_from_secrets()) and config.update({
-            'api_key': detected_key, 
-            '_api_key_source': 'colab_secret',
-            'roboflow': {**config.get('roboflow', {}), 'api_key': detected_key}
-        })
+        detected_key = get_api_key_from_secrets()
+        if detected_key:
+            config['api_key'] = detected_key
+            config['_api_key_source'] = 'colab_secret'
+            roboflow_config = config.get('roboflow', {})
+            roboflow_config['api_key'] = detected_key
+            config['roboflow'] = roboflow_config
         
         return config
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate config tanpa path validation"""
+        """Validate config dengan comprehensive checks"""
         errors = []
         
         # Required field validation
@@ -103,15 +113,21 @@ class DownloadConfigHandler(ConfigHandler):
             (config.get('api_key', '').strip(), 'API key wajib diisi')
         ]
         
-        [errors.append(message) for value, message in required_checks if not value]
+        for value, message in required_checks:
+            if not value:
+                errors.append(message)
         
         # API key validation
-        (api_key := config.get('api_key', '').strip()) and not (validation := validate_api_key(api_key))['valid'] and errors.append(f"API key tidak valid: {validation['message']}")
+        api_key = config.get('api_key', '').strip()
+        if api_key:
+            validation = validate_api_key(api_key)
+            if not validation['valid']:
+                errors.append(f"API key tidak valid: {validation['message']}")
         
         return {'valid': len(errors) == 0, 'errors': errors, 'warnings': []}
     
     def save_config(self, ui_components: Dict[str, Any], config_name: str = None) -> bool:
-        """Save config tanpa path configuration"""
+        """Save config dengan fixed variable scoping"""
         try:
             self.before_save(ui_components)
             config = self.extract_config(ui_components)
@@ -138,7 +154,12 @@ class DownloadConfigHandler(ConfigHandler):
             if success:
                 ui_components['config'] = persistent_config
                 self.after_save_success(ui_components, persistent_config)
-                [__import__('smartcash.ui.utils.fallback_utils', fromlist=['try_operation_safe']).try_operation_safe(lambda cb=cb: cb(persistent_config)) for cb in self.callbacks]
+                # Trigger callbacks dengan safe execution
+                for callback in self.callbacks:
+                    try:
+                        callback(persistent_config)
+                    except Exception as e:
+                        self.logger.debug(f"🔍 Callback error: {str(e)}")
             else:
                 self.after_save_failure(ui_components, "Gagal menyimpan konfigurasi")
             
@@ -149,7 +170,7 @@ class DownloadConfigHandler(ConfigHandler):
             return False
     
     def load_config(self, config_name: str = None, use_base_config: bool = True) -> Dict[str, Any]:
-        """Load config dengan streamlined processing"""
+        """Load config dengan enhanced processing"""
         config_name = config_name or f"{self.module_name}_config"
         
         try:
@@ -158,7 +179,7 @@ class DownloadConfigHandler(ConfigHandler):
             
             if specific_config:
                 enhanced_config = self._enhance_loaded_config(specific_config)
-                self.logger.info(f"📄 Loaded streamlined config: {config_name}")
+                self.logger.info(f"📄 Loaded config: {config_name}")
                 return enhanced_config
             
             # Fallback ke base_config.yaml
@@ -171,7 +192,7 @@ class DownloadConfigHandler(ConfigHandler):
             
             # Final fallback
             default_config = self.get_default_config()
-            self.logger.warning(f"⚠️ Using streamlined defaults for {config_name}")
+            self.logger.warning(f"⚠️ Using defaults for {config_name}")
             return default_config
             
         except Exception as e:
@@ -179,10 +200,10 @@ class DownloadConfigHandler(ConfigHandler):
             return self.get_default_config()
     
     def _enhance_loaded_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Enhance loaded config tanpa path processing"""
+        """Enhance loaded config dengan auto-detect API key"""
         roboflow_section = config.get('roboflow', {})
         
-        # Streamlined config structure
+        # Enhanced config structure
         enhanced = {
             **config,
             'workspace': roboflow_section.get('workspace', config.get('workspace', 'smartcash-wo2us')),
@@ -192,49 +213,73 @@ class DownloadConfigHandler(ConfigHandler):
         }
         
         # Auto-detect API key jika tidak ada
-        (not enhanced['api_key'] and (detected_key := get_api_key_from_secrets()) and 
-         enhanced.update({'api_key': detected_key, '_api_key_source': 'colab_secret'}))
+        if not enhanced['api_key']:
+            detected_key = get_api_key_from_secrets()
+            if detected_key:
+                enhanced['api_key'] = detected_key
+                enhanced['_api_key_source'] = 'colab_secret'
         
         return enhanced
     
-    # Streamlined hooks
     def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Streamlined save success hook"""
+        """Fixed save success hook dengan safe log output access"""
         super().after_save_success(ui_components, config)
         
         dataset_id = f"{config.get('workspace', '')}/{config.get('project', '')}:v{config.get('version', '')}"
         api_source = config.get('_api_key_source', 'manual')
         
         success_msg = f"✅ Konfigurasi tersimpan: {dataset_id} (API: {api_source})"
-        self._show_notification(ui_components, success_msg, 'success')
+        self._show_notification_safe(ui_components, success_msg, 'success')
         self.logger.success(f"💾 {success_msg}")
     
     def after_reset_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Streamlined reset success hook"""
+        """Fixed reset success hook dengan safe log output access"""
         super().after_reset_success(ui_components, config)
         
         api_source = config.get('_api_key_source', 'default')
         success_msg = f"✅ Konfigurasi direset ke default (API: {api_source})"
-        self._show_notification(ui_components, success_msg, 'success')
+        self._show_notification_safe(ui_components, success_msg, 'success')
         self.logger.success(f"🔄 {success_msg}")
     
-    def _show_notification(self, ui_components: Dict[str, Any], message: str, msg_type: str) -> None:
-        """Show notification dengan streamlined display"""
+    def _show_notification_safe(self, ui_components: Dict[str, Any], message: str, msg_type: str) -> None:
+        """Show notification dengan safe log output access"""
         status_colors = {'success': '#28a745', 'error': '#dc3545', 'warning': '#ffc107', 'info': '#007bff'}
         color = status_colors.get(msg_type, '#007bff')
         
         status_html = f"""<div style="padding: 12px; background-color: {color}15; border-left: 4px solid {color}; border-radius: 4px; margin-bottom: 15px;"><span style="color: {color}; font-weight: 500;">{message}</span></div>"""
-        (status_panel := ui_components.get('status_panel')) and setattr(status_panel, 'value', status_html)
         
-        # Log output display
-        (log_output := ui_components.get('log_output')) and (lambda: (
-            __import__('IPython.display', fromlist=['display', 'HTML']),
-            log_output.__enter__(),
-            __import__('IPython.display', fromlist=['display']).display(__import__('IPython.display', fromlist=['HTML']).HTML(f"""<div style="color: {color}; margin: 5px 0; padding: 8px; background: {color}10; border-radius: 4px;">{message}</div>""")),
-            log_output.__exit__(None, None, None)
-        ))() if hasattr(log_output, '__enter__') else None
+        # Safe status panel update
+        status_panel = ui_components.get('status_panel')
+        if status_panel and hasattr(status_panel, 'value'):
+            status_panel.value = status_html
+        
+        # Safe log output display
+        log_output = ui_components.get('log_output')
+        if log_output and hasattr(log_output, 'clear_output'):
+            try:
+                with log_output:
+                    from IPython.display import display, HTML
+                    display(HTML(f"""<div style="color: {color}; margin: 5px 0; padding: 8px; background: {color}10; border-radius: 4px;">{message}</div>"""))
+            except Exception as e:
+                self.logger.debug(f"🔍 Log output display error: {str(e)}")
+    
+    def _get_widget_value(self, ui_components: Dict[str, Any], widget_key: str, default_value=None):
+        """Safe widget value getter"""
+        widget = ui_components.get(widget_key)
+        if widget and hasattr(widget, 'value'):
+            return widget.value
+        return default_value
+    
+    def _set_widget_value(self, ui_components: Dict[str, Any], widget_key: str, value):
+        """Safe widget value setter"""
+        widget = ui_components.get(widget_key)
+        if widget and hasattr(widget, 'value'):
+            try:
+                widget.value = value
+            except Exception as e:
+                self.logger.debug(f"🔍 Widget update error for {widget_key}: {str(e)}")
 
 # Factory function
 def create_download_config_handler(parent_module: str = 'dataset') -> DownloadConfigHandler:
-    """Factory untuk streamlined download config handler"""
+    """Factory untuk fixed download config handler"""
     return DownloadConfigHandler('downloader', parent_module)

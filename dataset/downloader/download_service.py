@@ -34,13 +34,21 @@ class DownloadService:
         [component.set_progress_callback(callback) for component in [self.roboflow_client, self.file_processor] if hasattr(component, 'set_progress_callback')]
         hasattr(self.progress_tracker, 'set_callback') and self.progress_tracker.set_callback(callback)
     
-    def download_dataset(self, workspace: str, project: str, version: str, api_key: str,
-                        output_format: str = 'yolov5pytorch', validate_download: bool = True,
-                        organize_dataset: bool = True, backup_existing: bool = False) -> Dict[str, Any]:
-        """Download dataset dengan optimized flow dan one-liner operations"""
+    def download_dataset(self) -> Dict[str, Any]:
+        """Download dataset dengan optimized flow dan one-liner operations menggunakan config dari constructor"""
         start_time = time.time()
         
         try:
+            # Ekstrak parameter dari config
+            workspace = self.config.get('workspace', '')
+            project = self.config.get('project', '')
+            version = self.config.get('version', '')
+            api_key = self.config.get('api_key', '')
+            output_format = self.config.get('output_format', 'yolov5pytorch')
+            validate_download = self.config.get('validate_download', True)
+            organize_dataset = self.config.get('organize_dataset', True)
+            backup_existing = self.config.get('backup_existing', False)
+            
             # Step 1: Validation dengan one-liner check
             self._notify_progress('validate', 0, 100, "🔍 Validasi parameter...")
             validation_result = self._validate_parameters(workspace, project, version, api_key, output_format)
@@ -82,6 +90,7 @@ class DownloadService:
             return self._success_result(paths, final_stats, time.time() - start_time, workspace, project, version, output_format)
             
         except Exception as e:
+            self.logger.error(f"💥 Download error: {str(e)}")
             return self._error_result(str(e), time.time() - start_time)
     
     def _validate_parameters(self, workspace: str, project: str, version: str, api_key: str, output_format: str) -> Dict[str, Any]:

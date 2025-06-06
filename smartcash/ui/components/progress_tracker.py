@@ -186,8 +186,8 @@ def _create_dual_progress_tracker(height: str, width: str, show_percentage: bool
     # Dual tracker state
     dual_state = {'visible': False, 'current_operation': None}
     
-    def show_for_operation(operation_name: str) -> None:
-        """Show dual tracker"""
+    def show_for_operation(operation_name: str, **kwargs) -> None:
+        """Show dual tracker dengan flexible parameters"""
         dual_state.update({'visible': True, 'current_operation': operation_name})
         container.layout.visibility = 'visible'
         overall_tracker['show_for_operation'](operation_name)

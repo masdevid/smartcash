@@ -101,7 +101,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menganalisis dependensi: {str(e)}", "error")
-        logger and logger.error(f"💥 Analysis error: {str(e)}")
+        if logger:
+            logger.error(f"💥 Analysis error: {str(e)}")
         raise
 
 def _analyze_packages_with_utils(package_categories: list, installed_packages: Dict[str, str], 
@@ -159,7 +160,8 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
         
         # Log progress
         status_emoji = "✅" if status_info['status'] == 'installed' else "❌" if status_info['status'] == 'missing' else "⚠️"
-        logger and logger.debug(f"{status_emoji} {package['name']}: {status_info['status']} ({current_package}/{total_packages})")
+        if logger:
+            logger.debug(f"{status_emoji} {package['name']}: {status_info['status']} ({current_package}/{total_packages})")
     
     return analysis_results
 

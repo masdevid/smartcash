@@ -134,7 +134,8 @@ def safe_execute_split_aware(operation, fallback_result=None, split_context: str
     except Exception as e:
         context_msg = f" untuk split {split_context}" if split_context else ""
         error_msg = f"Operation failed{context_msg}: {str(e)}"
-        logger and hasattr(logger, 'error') and logger.error(f"❌ {error_msg}")
+        if logger and hasattr(logger, 'error'):
+            logger.error(f"❌ {error_msg}")
         return fallback_result
 
 # =============================================================================

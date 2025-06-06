@@ -1,113 +1,46 @@
 """
 File: smartcash/common/threadpools.py
-Deskripsi: Utilitas untuk menstandarisasi penggunaan ThreadPoolExecutor
+Deskripsi: Thread pool utilities untuk optimal performance dengan one-liner style
 """
 
 import os
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Callable, TypeVar, Any, Dict
-from tqdm.auto import tqdm
+from typing import Optional
 
-T = TypeVar('T')  # Input type
-R = TypeVar('R')  # Result type
-
-def get_optimal_thread_count() -> int:
+def get_optimal_thread_count(operation_type: str = 'io') -> int:
     """
-    Dapatkan jumlah thread optimal berdasarkan CPU dan lingkungan.
-    
-    Returns:
-        Jumlah worker thread yang direkomendasikan
-    """
-    # Dapatkan jumlah CPU yang tersedia
-    cpu_count = os.cpu_count() or 4
-    
-    # Gunakan 2x cpu_count untuk workload I/O-bound (seperti pemrosesan file)
-    return min(32, cpu_count * 2)
-
-def process_in_parallel(
-    items: List[T], 
-    process_func: Callable[[T], R], 
-    max_workers: int = None,
-    desc: str = None,
-    unit: str = "item",
-    show_progress: bool = True
-) -> List[R]:
-    """
-    Proses daftar item secara paralel menggunakan ThreadPoolExecutor.
+    Get optimal thread count berdasarkan operation type dan system specs.
     
     Args:
-        items: Daftar item yang akan diproses
-        process_func: Fungsi untuk memproses setiap item
-        max_workers: Jumlah maksimum worker (default: optimal berdasarkan CPU)
-        desc: Deskripsi untuk progress bar
-        unit: Unit untuk progress bar
-        show_progress: Apakah menampilkan progress bar
+        operation_type: 'io' untuk I/O bound, 'cpu' untuk CPU bound
         
     Returns:
-        List hasil pemrosesan
+        Optimal thread count
     """
-    if not items:
-        return []
-        
-    # Gunakan jumlah thread optimal jika tidak ditentukan
-    if max_workers is None:
-        max_workers = get_optimal_thread_count()
+    cpu_count = os.cpu_count() or 1
     
-    results = []
-    
-    # Setup progress bar
-    pbar = tqdm(total=len(items), desc=desc, unit=unit, disable=not show_progress)
-    
-    # Proses dengan ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit semua tugas
-        futures = [executor.submit(process_func, item) for item in items]
-        
-        # Kumpulkan hasil
-        for future in futures:
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception as e:
-                # Log error jika diperlukan dan lanjutkan
-                results.append(None)
-            finally:
-                # Update progress
-                pbar.update(1)
-    
-    pbar.close()
-    return results
+    if operation_type == 'io':
+        # I/O bound: CPU count + 1, max 8 untuk avoid overhead
+        return min(8, cpu_count + 1)
+    elif operation_type == 'cpu':
+        # CPU bound: CPU count, max CPU cores
+        return cpu_count
+    else:
+        # Default: conservative approach
+        return min(4, cpu_count)
 
-def process_with_stats(
-    items: List[T], 
-    process_func: Callable[[T], Dict], 
-    max_workers: int = None,
-    desc: str = None,
-    show_progress: bool = True
-) -> Dict[str, int]:
-    """
-    Versi khusus process_in_parallel yang mengumpulkan statistik dari hasil.
-    
-    Args:
-        items: Daftar item yang akan diproses
-        process_func: Fungsi yang mengembalikan status per item (dict dengan keys seperti 'success', 'error', dll)
-        max_workers: Jumlah maksimum worker
-        desc: Deskripsi untuk progress bar
-        show_progress: Apakah menampilkan progress bar
-        
-    Returns:
-        Dictionary berisi akumulasi statistik
-    """
-    results = process_in_parallel(items, process_func, max_workers, desc, show_progress=show_progress)
-    
-    # Inisialisasi stats
-    stats = {}
-    
-    # Gabungkan hasil statistik
-    for result in results:
-        if result:
-            for key, value in result.items():
-                if isinstance(value, (int, float)):
-                    stats[key] = stats.get(key, 0) + value
-    
-    return stats
+def get_file_operation_workers(file_count: int) -> int:
+    """One-liner optimal workers untuk file operations"""
+    return min(get_optimal_thread_count('io'), max(2, file_count // 100))
+
+def get_download_workers() -> int:
+    """One-liner optimal workers untuk download operations"""
+    return min(4, get_optimal_thread_count('io'))
+
+def get_rename_workers(total_files: int) -> int:
+    """One-liner optimal workers untuk rename operations"""
+    return min(6, max(2, total_files // 500))
+
+# Convenience functions
+optimal_io_workers = lambda: get_optimal_thread_count('io')
+optimal_cpu_workers = lambda: get_optimal_thread_count('cpu')
+safe_worker_count = lambda count: min(8, max(1, count))

@@ -18,7 +18,8 @@ def cleanup_files(aug_dir: str, prep_dir: str = None, progress_tracker: Progress
         aug_files.extend(find_aug_files(prep_dir))
     
     total_files = len(aug_files)
-    progress_tracker and progress_tracker.progress("overall", 0, 100, f"Mulai cleanup: {total_files} file")
+    if progress_tracker:
+        progress_tracker.progress("overall", 0, 100, f"Mulai cleanup: {total_files} file")
     
     for i, file_path in enumerate(aug_files):
         if delete_file(file_path):
@@ -31,7 +32,8 @@ def cleanup_files(aug_dir: str, prep_dir: str = None, progress_tracker: Progress
             current_progress = int((i / max(total_files, 1)) * 100)
             progress_tracker.progress("overall", current_progress, 100, f"Cleanup: {i+1}/{total_files} file")
     
-    progress_tracker and progress_tracker.progress("overall", 100, 100, f"Cleanup selesai: {total_deleted} file dihapus")
+    if progress_tracker:
+        progress_tracker.progress("overall", 100, 100, f"Cleanup selesai: {total_deleted} file dihapus")
     
     return {
         'status': 'success' if total_deleted > 0 else 'empty',
@@ -51,7 +53,8 @@ def cleanup_split_aware(aug_dir: str, prep_dir: str = None, target_split: str = 
         aug_split_dir = f"{aug_dir}/{target_split}"
         deleted = _cleanup_split_directory(aug_split_dir)
         total_deleted += deleted
-        progress_tracker and progress_tracker.progress("overall", 50, 100, f"Cleanup {target_split}: {deleted} files")
+        if progress_tracker:
+            progress_tracker.progress("overall", 50, 100, f"Cleanup {target_split}: {deleted} files")
     else:
         for split in ['train', 'valid', 'test']:
             aug_split_dir = f"{aug_dir}/{split}"
@@ -72,7 +75,8 @@ def cleanup_split_aware(aug_dir: str, prep_dir: str = None, target_split: str = 
                     deleted = _cleanup_augmented_from_split(prep_split_dir)
                     total_deleted += deleted
     
-    progress_tracker and progress_tracker.progress("overall", 100, 100, f"Split cleanup selesai: {total_deleted} files")
+    if progress_tracker:
+        progress_tracker.progress("overall", 100, 100, f"Split cleanup selesai: {total_deleted} files")
     
     return {
         'status': 'success' if total_deleted > 0 else 'empty',

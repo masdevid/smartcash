@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Callable
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetProcessingError
-from smartcash.dataset.services.dataset_file_renamer import create_dataset_renamer
+from smartcash.dataset.organizer.dataset_file_renamer import create_dataset_renamer
 from smartcash.dataset.preprocessor.core.preprocessing_coordinator import SplitCoordinator
 from smartcash.dataset.preprocessor.core.preprocessing_validator import PreprocessingValidator
 from smartcash.dataset.preprocessor.utils.preprocessing_config import PreprocessingConfig

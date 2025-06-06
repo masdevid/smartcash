@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.services.dataset_file_renamer import create_dataset_renamer
+from smartcash.dataset.organizer.dataset_file_renamer import create_dataset_renamer
 from smartcash.dataset.preprocessor.storage.preprocessing_pipeline_manager import PreprocessingPipelineManager
 
 

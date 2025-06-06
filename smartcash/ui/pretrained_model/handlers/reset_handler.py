@@ -23,11 +23,13 @@ def setup_reset_handler(ui_components: Dict[str, Any]):
             _update_status_panel(ui_components, "UI berhasil direset", "success")
             
             # Log reset action
-            logger and logger.info("🧹 UI berhasil direset - siap untuk operasi baru")
+            if logger:
+                logger.info("🧹 UI berhasil direset - siap untuk operasi baru")
             
         except Exception as e:
             error_msg = f"Reset UI gagal: {str(e)}"
-            logger and logger.error(f"💥 {error_msg}")
+            if logger:
+                logger.error(f"💥 {error_msg}")
             _update_status_panel(ui_components, error_msg, "error")
     
     ui_components['reset_ui_button'].on_click(execute_reset_ui)

@@ -80,7 +80,8 @@ class SimpleProgressDelegate:
     def _safe_log(self, message: str) -> None:
         """Safe logging dengan fallback"""
         logger = self.ui_components.get('logger')
-        logger and logger.info(message)
+        if logger:
+            logger.info(message)
 
 # Backward compatibility alias
 ProgressTracker = SimpleProgressDelegate

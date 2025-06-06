@@ -20,7 +20,8 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
         button and setattr(button, 'disabled', True)
         
         try:
-            logger and logger.info("🚀 Memulai download dan sinkronisasi model")
+            if logger:
+                logger.info("🚀 Memulai download dan sinkronisasi model")
             
             # Show progress tracker dengan API yang benar
             progress_tracker = ui_components.get('progress_tracker')
@@ -44,7 +45,8 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             existing_models = check_result.get('existing_models', [])
             
             # Log results
-            existing_models and logger and logger.info(f"✅ Model tersedia: {', '.join(existing_models)}")
+            if existing_models and logger:
+                logger.info(f"✅ Model tersedia: {', '.join(existing_models)}")
             
             # Update progress setelah check selesai
             if progress_tracker:
@@ -52,7 +54,8 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             
             # Phase 2: Download missing models (30-80%)
             if models_to_download:
-                logger and logger.info(f"📥 Mengunduh {len(models_to_download)} model: {', '.join(models_to_download)}")
+                if logger:
+                    logger.info(f"📥 Mengunduh {len(models_to_download)} model: {', '.join(models_to_download)}")
                 
                 downloader = ModelDownloader(ui_components, logger)
                 download_result = downloader.download_models(models_to_download)
@@ -61,9 +64,11 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                     raise Exception(download_result.get('message', 'Download gagal'))
                 
                 downloaded_count = download_result.get('downloaded_count', 0)
-                logger and logger.success(f"✅ {downloaded_count} model berhasil diunduh")
+                if logger:
+                    logger.success(f"✅ {downloaded_count} model berhasil diunduh")
             else:
-                logger and logger.info("ℹ️ Semua model sudah tersedia, skip download")
+                if logger:
+                    logger.info("ℹ️ Semua model sudah tersedia, skip download")
                 # Update progress untuk skip download dengan API yang benar
                 if progress_tracker:
                     progress_tracker.update_overall(80, "Skip download - semua model tersedia")
@@ -77,7 +82,8 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             sync_result = syncer.sync_to_drive()
             
             sync_count = sync_result.get('synced_count', 0) if sync_result.get('success', False) else 0
-            sync_count and logger and logger.success(f"☁️ {sync_count} model disinkronkan ke Drive")
+            if sync_count and logger:
+                logger.success(f"☁️ {sync_count} model disinkronkan ke Drive")
             
             # Phase 4: Complete (100%)
             total_models = len(existing_models) + len(models_to_download)
@@ -94,7 +100,8 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             
         except Exception as e:
             error_msg = f"Setup model gagal: {str(e)}"
-            logger and logger.error(f"💥 {error_msg}")
+            if logger:
+                logger.error(f"💥 {error_msg}")
             _update_status_panel(ui_components, error_msg, "error")
             
             # Error progress tracker dengan API yang benar

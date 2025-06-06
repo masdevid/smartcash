@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from smartcash.common.logger import get_logger
 from smartcash.common.threadpools import get_optimal_thread_count
-from smartcash.dataset.services.dataset_file_renamer import create_dataset_renamer
+from smartcash.dataset.organizer.dataset_file_renamer import create_dataset_renamer
 
 class BatchProcessor:
     """Batch processor dengan renamer integration untuk UUID consistency"""

@@ -16,7 +16,8 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
         
         try:
             _reset_ui_logger(ui_components)
-            logger and logger.info("🔍 Memulai auto-check model")
+            if logger:
+                logger.info("🔍 Memulai auto-check model")
             
             # Show progress tracker dengan API yang benar
             progress_tracker = ui_components.get('progress_tracker')
@@ -38,13 +39,16 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             existing_models = check_result.get('existing_models', [])
             
             # Log dan update status
-            existing_models and logger and logger.info(f"✅ Model tersedia: {', '.join(existing_models)}")
+            if existing_models and logger:
+                logger.info(f"✅ Model tersedia: {', '.join(existing_models)}")
             
             if models_to_download:
-                logger and logger.warning(f"⚠️ Model yang belum tersedia: {', '.join(models_to_download)}")
+                if logger:
+                    logger.warning(f"⚠️ Model yang belum tersedia: {', '.join(models_to_download)}")
                 _update_status_panel(ui_components, f"⚠️ {len(models_to_download)} model perlu diunduh", "warning")
             else:
-                logger and logger.success("✅ Semua model sudah tersedia")
+                if logger:
+                    logger.success("✅ Semua model sudah tersedia")
                 _update_status_panel(ui_components, "✅ Semua model sudah tersedia", "success")
             
             # Complete operation dengan API yang benar
@@ -56,7 +60,8 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             
         except Exception as e:
             error_msg = f"Auto-check gagal: {str(e)}"
-            logger and logger.error(f"💥 {error_msg}")
+            if logger:
+                logger.error(f"💥 {error_msg}")
             
             # Error operation dengan API yang benar
             if progress_tracker:

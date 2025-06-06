@@ -51,7 +51,8 @@ class ModelCheckpointManager(ICheckpointService):
             self._atomic_save(checkpoint_data, checkpoint_path)
             self.progress_tracker.update(3, 4, "💾 Menyimpan checkpoint...")
             
-            is_best and self._handle_best_checkpoint(checkpoint_path)
+            if is_best:
+                self._handle_best_checkpoint(checkpoint_path)
             self._cleanup_old_checkpoints()
             self.last_checkpoint_path = str(checkpoint_path)
             
@@ -80,7 +81,8 @@ class ModelCheckpointManager(ICheckpointService):
             
             if model and 'model_state_dict' in checkpoint:
                 model.load_state_dict(checkpoint['model_state_dict'])
-                optimizer and 'optimizer_state_dict' in checkpoint and optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                if optimizer and 'optimizer_state_dict' in checkpoint:
+                    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 
                 self.progress_tracker.update(3, 3, f"✅ Model loaded: {checkpoint_path.name}")
                 self.logger.info(f"✅ Model berhasil dimuat: {checkpoint_path}")
@@ -264,7 +266,8 @@ class ModelCheckpointManager(ICheckpointService):
             'metadata': metadata or {}
         }
         
-        optimizer and checkpoint_data.update({'optimizer_state_dict': optimizer.state_dict()})
+        if optimizer:
+            checkpoint_data.update({'optimizer_state_dict': optimizer.state_dict()})
         
         if self.model_manager:
             model_metadata = {
@@ -283,7 +286,8 @@ class ModelCheckpointManager(ICheckpointService):
         """Atomic save operation untuk prevent corruption"""
         temp_path = str(checkpoint_path) + ".tmp"
         torch.save(checkpoint_data, temp_path)
-        checkpoint_path.exists() and os.remove(checkpoint_path)
+        if checkpoint_path.exists():
+            os.remove(checkpoint_path)
         os.rename(temp_path, checkpoint_path)
     
     def _handle_best_checkpoint(self, checkpoint_path: Path):
@@ -376,7 +380,8 @@ class ModelCheckpointManager(ICheckpointService):
             elif 'epoch' in filename:
                 info['checkpoint_type'] = 'epoch'
                 epoch_parts = [part for part in name_parts if part.startswith('epoch') or part.isdigit()]
-                epoch_parts and info.update({'epoch': int(epoch_parts[-1]) if epoch_parts[-1].isdigit() else 0})
+                if epoch_parts:
+                    info.update({'epoch': int(epoch_parts[-1]) if epoch_parts[-1].isdigit() else 0})
             else:
                 info['checkpoint_type'] = 'custom'
             

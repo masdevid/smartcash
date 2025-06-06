@@ -15,11 +15,13 @@ def process_batch(items: List[Any], process_func: Callable, max_workers: int = N
     results = []
     
     if not items:
-        progress_tracker and progress_tracker.log_info("⚠️ Tidak ada item untuk diproses")
+        if progress_tracker:
+            progress_tracker.log_info("⚠️ Tidak ada item untuk diproses")
         return results
     
     total_items = len(items)
-    progress_tracker and progress_tracker.log_info(f"🚀 Memulai {operation_name}: {total_items} item")
+    if progress_tracker:
+        progress_tracker.log_info(f"🚀 Memulai {operation_name}: {total_items} item")
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(process_func, item): i for i, item in enumerate(items)}
@@ -38,7 +40,8 @@ def process_batch(items: List[Any], process_func: Callable, max_workers: int = N
                 if completed_count % max(1, total_items // 10) == 0:
                     successful = sum(1 for r in results if r.get('status') == 'success')
                     success_rate = (successful / completed_count) * 100
-                    progress_tracker and progress_tracker.log_info(
+                    if progress_tracker:
+                        progress_tracker.log_info(
                         f"📊 Progress: {completed_count}/{total_items} ({success_rate:.1f}% berhasil)"
                     )
                     
@@ -47,7 +50,8 @@ def process_batch(items: List[Any], process_func: Callable, max_workers: int = N
     
     # Final summary
     successful = sum(1 for r in results if r.get('status') == 'success')
-    progress_tracker and progress_tracker.log_success(
+    if progress_tracker:
+        progress_tracker.log_success(
         f"✅ {operation_name} selesai: {successful}/{total_items} berhasil"
     )
     

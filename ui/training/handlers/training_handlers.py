@@ -17,13 +17,17 @@ def setup_all_training_handlers(ui_components: Dict[str, Any], config: Dict[str,
         
         # Log successful setup
         logger = ui_components.get('logger')
-        logger and logger.success("✅ Training handlers berhasil disetup") and logger.info("   • Button handlers: start, stop, reset, refresh") and logger.info("   • Config handlers: refresh config")
+        if logger:
+            logger.success("✅ Training handlers berhasil disetup")
+            logger.info("   • Button handlers: start, stop, reset, refresh")
+            logger.info("   • Config handlers: refresh config")
         
         return ui_components
         
     except Exception as e:
         logger = ui_components.get('logger')
-        logger and logger.error(f"❌ Error setup training handlers: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error setup training handlers: {str(e)}")
         ui_components['handler_error'] = str(e)
         return ui_components
 
@@ -72,12 +76,16 @@ def _setup_training_button_handlers(ui_components: Dict[str, Any], config: Dict[
         """Handler untuk reset metrics dan chart"""
         try:
             # Clear all outputs dengan one-liner
-            [ui_components.get(output) and ui_components[output].clear_output(wait=True) 
-             for output in ['log_output', 'chart_output', 'metrics_output']]
+            for output in ['log_output', 'chart_output', 'metrics_output']:
+                if ui_components.get(output):
+                    ui_components[output].clear_output(wait=True)
             
             # Reset training manager metrics
             training_manager = ui_components.get('training_manager')
-            training_manager and hasattr(training_manager, 'reset_metrics') and training_manager.reset_metrics()
+            if training_manager:
+                if hasattr(training_manager, 'reset_metrics'):
+                    if callable(training_manager.reset_metrics):
+                        training_manager.reset_metrics()
             
             ui_components['logger'].success("✅ Metrics dan chart berhasil direset")
             

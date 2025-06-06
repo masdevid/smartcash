@@ -72,7 +72,8 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal memeriksa status dependensi: {str(e)}", "error")
-        logger and logger.error(f"💥 Status check error: {str(e)}")
+        if logger:
+            logger.error(f"💥 Status check error: {str(e)}")
         raise
 
 def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], ctx, logger) -> Dict[str, Dict[str, Any]]:
@@ -82,11 +83,13 @@ def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], 
     package_categories = get_package_categories()
     installed_packages = get_installed_packages_dict()
     
-    logger and logger.info("🔍 Analyzing package categories...")
+    if logger:
+        logger.info("🔍 Analyzing package categories...")
     
     # Process all packages
     for category in package_categories:
-        logger and logger.info(f"🔍 Checking {category['name']} category...")
+        if logger:
+            logger.info(f"🔍 Checking {category['name']} category...")
         for package in category['packages']:
             package_key = package['key']
             package_name = package['pip_name'].split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
@@ -156,7 +159,8 @@ def _log_status_summary_with_utils(ui_components: Dict[str, Any], package_status
     # Log category summaries
     for category, stats in category_summary.items():
         percentage = (stats['installed']/stats['total']*100) if stats['total'] > 0 else 0
-        logger and logger.info(f"📋 {category}: {stats['installed']}/{stats['total']} ({percentage:.1f}%)")
+        if logger:
+            logger.info(f"📋 {category}: {stats['installed']}/{stats['total']} ({percentage:.1f}%)")
     
     # Log system requirements warnings
     if not system_requirements.get('all_requirements_met', True) and logger:

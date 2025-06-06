@@ -41,9 +41,12 @@ class TrainingService:
         if not callback: return
         
         # Set callbacks untuk semua trackers
-        hasattr(callback, 'update_progress') and self.progress_tracker.set_callback(callback)
-        hasattr(callback, 'update_metrics') and self.metrics_tracker.set_callback(callback)
-        self.checkpoint_service and hasattr(callback, 'update_progress') and self.checkpoint_service.set_progress_callback(callback)
+        if hasattr(callback, 'update_progress'):
+            self.progress_tracker.set_callback(callback)
+        if hasattr(callback, 'update_metrics'):
+            self.metrics_tracker.set_callback(callback)
+        if self.checkpoint_service and hasattr(callback, 'update_progress'):
+            self.checkpoint_service.set_progress_callback(callback)
         
         self._callback = callback
         self.logger.debug(f"🔄 Callback diatur: {type(callback).__name__}")
@@ -105,7 +108,9 @@ class TrainingService:
                 val_metrics = self._validate_epoch(model, val_loader, epoch, epochs) if val_loader else {}
                 
                 # Learning rate update
-                scheduler and scheduler.step() and self.metrics_tracker.update_learning_rate(optimizer.param_groups[0]['lr'])
+                if scheduler:
+                    scheduler.step()
+                    self.metrics_tracker.update_learning_rate(optimizer.param_groups[0]['lr'])
                 
                 # Combined metrics dan best model checking
                 epoch_metrics = {**train_metrics, **{f"val_{k}": v for k, v in val_metrics.items()}}
@@ -267,11 +272,12 @@ class TrainingService:
     
     def stop_training(self) -> None:
         """Stop training yang sedang berjalan"""
-        not self.is_training and self.logger.warning("⚠️ Tidak ada training yang sedang berjalan") or (
-            setattr(self, 'should_stop', True), 
-            self.logger.info("🛑 Menghentikan training..."),
+        if not self.is_training:
+            self.logger.warning("⚠️ Tidak ada training yang sedang berjalan")
+        else:
+            setattr(self, 'should_stop', True)
+            self.logger.info("🛑 Menghentikan training...")
             self.progress_tracker.update_status("Menghentikan training...")
-        )
     
     def get_training_progress(self) -> Dict[str, Any]:
         """Get current training progress dengan status lengkap"""
@@ -286,50 +292,64 @@ class TrainingService:
     def _notify_training_start(self, total_epochs, total_batches, config):
         """Notify training start dengan error protection"""
         try:
-            hasattr(self._callback, 'on_training_start') and self._callback.on_training_start(total_epochs, total_batches, config)
-            isinstance(self._callback, dict) and 'training_start' in self._callback and self._callback['training_start'](total_epochs, total_batches, config)
+            if hasattr(self._callback, 'on_training_start'):
+                self._callback.on_training_start(total_epochs, total_batches, config)
+            if isinstance(self._callback, dict) and 'training_start' in self._callback:
+                self._callback['training_start'](total_epochs, total_batches, config)
         except Exception as e: self.logger.warning(f"⚠️ Training start callback error: {str(e)}")
     
     def _notify_epoch_start(self, epoch, total_epochs):
         """Notify epoch start"""
         try:
-            hasattr(self._callback, 'on_epoch_start') and self._callback.on_epoch_start(epoch, total_epochs)
-            isinstance(self._callback, dict) and 'epoch_start' in self._callback and self._callback['epoch_start'](epoch, total_epochs)
+            if hasattr(self._callback, 'on_epoch_start'):
+                self._callback.on_epoch_start(epoch, total_epochs)
+            if isinstance(self._callback, dict) and 'epoch_start' in self._callback:
+                self._callback['epoch_start'](epoch, total_epochs)
         except Exception as e: self.logger.warning(f"⚠️ Epoch start callback error: {str(e)}")
     
     def _notify_batch_end(self, batch, total_batches, metrics):
         """Notify batch end"""
         try:
-            hasattr(self._callback, 'on_batch_end') and self._callback.on_batch_end(batch, total_batches, metrics)
-            isinstance(self._callback, dict) and 'batch_end' in self._callback and self._callback['batch_end'](batch, total_batches, metrics)
+            if hasattr(self._callback, 'on_batch_end'):
+                self._callback.on_batch_end(batch, total_batches, metrics)
+            if isinstance(self._callback, dict) and 'batch_end' in self._callback:
+                self._callback['batch_end'](batch, total_batches, metrics)
         except Exception as e: self.logger.warning(f"⚠️ Batch end callback error: {str(e)}")
     
     def _notify_epoch_end(self, epoch, metrics, is_best=False):
         """Notify epoch end"""
         try:
-            hasattr(self._callback, 'on_epoch_end') and self._callback.on_epoch_end(epoch, metrics, is_best)
-            isinstance(self._callback, dict) and 'epoch_end' in self._callback and self._callback['epoch_end'](epoch, metrics, is_best)
+            if hasattr(self._callback, 'on_epoch_end'):
+                self._callback.on_epoch_end(epoch, metrics, is_best)
+            if isinstance(self._callback, dict) and 'epoch_end' in self._callback:
+                self._callback['epoch_end'](epoch, metrics, is_best)
         except Exception as e: self.logger.warning(f"⚠️ Epoch end callback error: {str(e)}")
     
     def _notify_validation_end(self, epoch, metrics):
         """Notify validation end"""
         try:
-            hasattr(self._callback, 'on_validation_end') and self._callback.on_validation_end(epoch, metrics)
-            isinstance(self._callback, dict) and 'validation_end' in self._callback and self._callback['validation_end'](epoch, metrics)
+            if hasattr(self._callback, 'on_validation_end'):
+                self._callback.on_validation_end(epoch, metrics)
+            if isinstance(self._callback, dict) and 'validation_end' in self._callback:
+                self._callback['validation_end'](epoch, metrics)
         except Exception as e: self.logger.warning(f"⚠️ Validation end callback error: {str(e)}")
     
     def _notify_training_end(self, final_metrics, total_time):
         """Notify training end"""
         try:
-            hasattr(self._callback, 'on_training_end') and self._callback.on_training_end(final_metrics, total_time)
-            isinstance(self._callback, dict) and 'training_end' in self._callback and self._callback['training_end'](final_metrics, total_time)
+            if hasattr(self._callback, 'on_training_end'):
+                self._callback.on_training_end(final_metrics, total_time)
+            if isinstance(self._callback, dict) and 'training_end' in self._callback:
+                self._callback['training_end'](final_metrics, total_time)
         except Exception as e: self.logger.warning(f"⚠️ Training end callback error: {str(e)}")
     
     def _notify_training_error(self, error_message, phase):
         """Notify training error"""
         try:
-            hasattr(self._callback, 'on_training_error') and self._callback.on_training_error(error_message, phase)
-            isinstance(self._callback, dict) and 'training_error' in self._callback and self._callback['training_error'](error_message, phase)
+            if hasattr(self._callback, 'on_training_error'):
+                self._callback.on_training_error(error_message, phase)
+            if isinstance(self._callback, dict) and 'training_error' in self._callback:
+                self._callback['training_error'](error_message, phase)
         except Exception as e: self.logger.warning(f"⚠️ Training error callback error: {str(e)}")
     
     def _raise_error(self, message): raise ModelTrainingError(message)

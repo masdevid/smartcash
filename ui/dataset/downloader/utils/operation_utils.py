@@ -7,11 +7,6 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 from smartcash.dataset.utils.path_validator import get_path_validator
 from smartcash.common.environment import get_environment_manager
-from smartcash.common.utils.one_liner_fixes import (
-    safe_operation_or_none, fix_path_operation, 
-    fix_directory_operation, safe_boolean_and_operation
-)
-
 class StreamlinedDownloadOperations:
     """Fixed download operations dengan proper method calls dan safe patterns"""
     
@@ -28,7 +23,7 @@ class StreamlinedDownloadOperations:
             # dan gunakan all() sebagai pengganti safe_boolean_and_operation
             return all([validation.get('valid', False), validation.get('total_images', 0) > 0])
         
-        return bool(safe_operation_or_none(check_operation) or False)
+        return bool(check_operation() or False)
     
     def get_dataset_summary(self) -> Dict[str, Any]:
         """Fixed dataset summary dengan safe validation pattern"""
@@ -46,7 +41,7 @@ class StreamlinedDownloadOperations:
                 'drive_storage': self.env_manager.is_drive_mounted
             }
         
-        return safe_operation_or_none(summary_operation) or {
+        return summary_operation() or {
             'exists': False, 'total_images': 0, 'total_labels': 0, 
             'issues_count': 0, 'splits': {}, 'data_root': '', 'drive_storage': False
         }
@@ -68,7 +63,7 @@ class StreamlinedDownloadOperations:
                 'shortage_mb': max(0, required_mb - free_mb)
             }
         
-        return safe_operation_or_none(space_operation) or {
+        return space_operation() or {
             'sufficient': False, 'free_mb': 0, 'required_mb': required_mb, 'shortage_mb': required_mb
         }
     
@@ -92,7 +87,7 @@ class StreamlinedDownloadOperations:
                 'backup': paths.get('backup', f"{paths['data_root']}/backup")
             }
         
-        return safe_operation_or_none(paths_operation) or {'data_root': '', 'temp_download': '', 'downloads_base': '', 'train': '', 'valid': '', 'test': '', 'backup': ''}
+        return paths_operation() or {'data_root': '', 'temp_download': '', 'downloads_base': '', 'train': '', 'valid': '', 'test': '', 'backup': ''}
     
     def create_backup_if_needed(self, backup_enabled: bool = True) -> Dict[str, Any]:
         """Fixed backup creation dengan safe operations"""
@@ -124,7 +119,7 @@ class StreamlinedDownloadOperations:
                 'message': f'Backup created: {backup_path}'
             }
         
-        return safe_operation_or_none(backup_operation) or {'created': False, 'message': 'Backup operation failed'}
+        return backup_operation() or {'created': False, 'message': 'Backup operation failed'}
     
     def cleanup_temp_files(self, dataset_identifier: str = None) -> Dict[str, Any]:
         """Fixed temp cleanup dengan safe file operations"""
@@ -158,7 +153,7 @@ class StreamlinedDownloadOperations:
             
             return {'cleaned': cleaned_count, 'message': f'Cleaned {cleaned_count} temp files'}
         
-        return safe_operation_or_none(cleanup_operation) or {'cleaned': 0, 'message': 'Cleanup operation failed'}
+        return cleanup_operation() or {'cleaned': 0, 'message': 'Cleanup operation failed'}
     
     def estimate_download_time(self, size_mb: float, connection_speed_mbps: float = 10.0) -> Dict[str, Any]:
         """Fixed download time estimation dengan safe calculations"""
@@ -185,7 +180,7 @@ class StreamlinedDownloadOperations:
                 'speed_mbps': connection_speed_mbps
             }
         
-        return safe_operation_or_none(estimate_operation) or {'estimated_seconds': 0, 'formatted_time': 'Unknown', 'size_mb': size_mb, 'speed_mbps': connection_speed_mbps}
+        return estimate_operation() or {'estimated_seconds': 0, 'formatted_time': 'Unknown', 'size_mb': size_mb, 'speed_mbps': connection_speed_mbps}
     
     def format_dataset_info(self, metadata: Dict[str, Any]) -> str:
         """Fixed dataset info formatting dengan safe data extraction"""
@@ -219,7 +214,7 @@ class StreamlinedDownloadOperations:
             
             return "\n".join(info_lines)
         
-        return safe_operation_or_none(format_operation) or "❌ Error formatting dataset info"
+        return format_operation() or "❌ Error formatting dataset info"
     
     def get_operation_status(self) -> Dict[str, Any]:
         """Fixed operation status dengan safe dataset summary"""
@@ -238,7 +233,7 @@ class StreamlinedDownloadOperations:
                 'dataset_summary': dataset_summary
             }
         
-        return safe_operation_or_none(status_operation) or {
+        return status_operation() or {
             'ready_for_download': True, 'ready_for_check': True, 'ready_for_cleanup': False,
             'environment': {'is_colab': False, 'drive_mounted': False, 'storage_location': 'Unknown'},
             'dataset_summary': {'exists': False, 'total_images': 0}
@@ -251,39 +246,39 @@ def get_streamlined_download_operations() -> StreamlinedDownloadOperations:
     """Fixed singleton factory dengan safe initialization"""
     global _download_operations
     if _download_operations is None:
-        _download_operations = safe_operation_or_none(StreamlinedDownloadOperations) or StreamlinedDownloadOperations()
+        _download_operations = StreamlinedDownloadOperations()
     return _download_operations
 
 # Fixed utility functions dengan safe operations
 def check_dataset_exists() -> bool:
     """Fixed dataset existence check"""
     operations = get_streamlined_download_operations()
-    return safe_operation_or_none(operations.check_existing_dataset) or False
+    return operations.check_existing_dataset()
 
 def get_dataset_info() -> Dict[str, Any]:
     """Fixed dataset info retrieval"""
     operations = get_streamlined_download_operations()
-    return safe_operation_or_none(operations.get_dataset_summary) or {'exists': False, 'total_images': 0}
+    return operations.get_dataset_summary()
 
 def validate_space(mb: float) -> Dict[str, Any]:
     """Fixed space validation"""
     operations = get_streamlined_download_operations()
-    return safe_operation_or_none(lambda: operations.validate_download_space(mb)) or {'sufficient': False}
+    return operations.validate_download_space(mb)
 
 def cleanup_temps(dataset_id: str = None) -> Dict[str, Any]:
     """Fixed temp cleanup"""
     operations = get_streamlined_download_operations()
-    return safe_operation_or_none(lambda: operations.cleanup_temp_files(dataset_id)) or {'cleaned': 0}
+    return operations.cleanup_temp_files(dataset_id)
 
 def estimate_time(size_mb: float) -> Dict[str, Any]:
     """Fixed time estimation"""
     operations = get_streamlined_download_operations()
-    return safe_operation_or_none(lambda: operations.estimate_download_time(size_mb)) or {'estimated_seconds': 0}
+    return operations.estimate_download_time(size_mb)
 
 def get_status() -> Dict[str, Any]:
     """Fixed status retrieval"""
     operations = get_streamlined_download_operations()
-    return safe_operation_or_none(operations.get_operation_status) or {'ready_for_download': True}
+    return operations.get_operation_status()
 
 def format_size(bytes_size: int) -> str:
     """Fixed size formatting dengan safe calculations"""
@@ -301,7 +296,7 @@ def format_size(bytes_size: int) -> str:
         
         return f"{size:.1f} {units[unit_index]}"
     
-    return safe_operation_or_none(format_operation) or f"{bytes_size} bytes"
+    return format_operation() or f"{bytes_size} bytes"
 
 def validate_dataset_identifier(workspace: str, project: str, version: str) -> Dict[str, Any]:
     """Fixed dataset identifier validation dengan safe string operations"""
@@ -338,7 +333,7 @@ def validate_dataset_identifier(workspace: str, project: str, version: str) -> D
             'identifier': f"{workspace_clean}/{project_clean}:v{version_clean}" if not errors else None
         }
     
-    return safe_operation_or_none(validate_operation) or {'valid': False, 'errors': ['Validation failed'], 'identifier': None}
+    return validate_operation() or {'valid': False, 'errors': ['Validation failed'], 'identifier': None}
 
 # Fixed utility functions dengan safe patterns
 def create_temp_path(base: str, identifier: str) -> str:

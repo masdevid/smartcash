@@ -9,7 +9,6 @@ from IPython.display import clear_output
 import uuid
 import atexit
 from typing import Dict, Any, Optional, List
-from smartcash.common.utils.one_liner_fixes import safe_operation_or_none, safe_widget_operation
 
 _ACTIVE_DIALOGS = {}
 _CLEANUP_REGISTERED = False
@@ -26,7 +25,7 @@ def _register_cleanup_handler():
                 return True
             return False
         
-        if safe_operation_or_none(register_operation):
+        if register_operation():
             _CLEANUP_REGISTERED = True
 
 def create_confirmation_dialog(title: str, message: str, on_confirm: Callable, on_cancel: Callable,
@@ -87,7 +86,7 @@ def create_confirmation_dialog(title: str, message: str, on_confirm: Callable, o
             if on_confirm and callable(on_confirm):
                 on_confirm(button)
         
-        safe_operation_or_none(confirm_operation)
+        confirm_operation()
     
     def handle_cancel(button):
         """Safe cancel handler"""
@@ -96,11 +95,11 @@ def create_confirmation_dialog(title: str, message: str, on_confirm: Callable, o
             if on_cancel and callable(on_cancel):
                 on_cancel(button)
         
-        safe_operation_or_none(cancel_operation)
+        cancel_operation()
     
     # Bind handlers safely
-    safe_widget_operation(confirm_button, 'on_click', handle_confirm)
-    safe_widget_operation(cancel_button, 'on_click', handle_cancel)
+    confirm_button.on_click(handle_confirm)
+    cancel_button.on_click(handle_cancel)
     
     # Register dialog safely
     _ACTIVE_DIALOGS[dialog_id] = {
@@ -144,7 +143,7 @@ def cleanup_all_dialogs():
         
         return cleanup_count
     
-    safe_operation_or_none(cleanup_operation)
+    cleanup_operation()
 
 def _cleanup_dialog_immediate(dialog_id: str):
     """Immediate cleanup untuk single dialog dengan safe operations"""
@@ -160,8 +159,14 @@ def _cleanup_dialog_immediate(dialog_id: str):
         for button_key in ['confirm_button', 'cancel_button']:
             button = dialog_info.get(button_key)
             if button:
-                safe_widget_operation(button, 'disabled', True)
-                safe_widget_operation(button, 'description', "Selesai")
+                try:
+                    button.disabled = True
+                except Exception:
+                    pass
+                try:
+                    button.description = "Selesai"
+                except Exception:
+                    pass
                 
                 # Clear click handlers safely
                 if hasattr(button, '_click_handlers') and hasattr(button._click_handlers, 'callbacks'):
@@ -173,21 +178,27 @@ def _cleanup_dialog_immediate(dialog_id: str):
         # Hide dialog safely
         dialog = dialog_info.get('dialog')
         if dialog and hasattr(dialog, 'layout'):
-            safe_widget_operation(dialog.layout, 'display', 'none')
-            safe_widget_operation(dialog.layout, 'visibility', 'hidden')
+            try:
+                dialog.layout.display = 'none'
+            except Exception:
+                pass
+            try:
+                dialog.layout.visibility = 'hidden'
+            except Exception:
+                pass
         
         # Remove from active dialogs
         del _ACTIVE_DIALOGS[dialog_id]
         return True
     
-    safe_operation_or_none(cleanup_operation)
+    cleanup_operation()
 
 def get_active_dialog_count() -> int:
     """Get jumlah active dialogs untuk debugging"""
     def count_operation():
         return len(_ACTIVE_DIALOGS)
     
-    return safe_operation_or_none(count_operation) or 0
+    return count_operation()
 
 def force_cleanup_dialog_by_id(dialog_id: str) -> bool:
     """Force cleanup specific dialog by ID"""
@@ -197,7 +208,7 @@ def force_cleanup_dialog_by_id(dialog_id: str) -> bool:
             return True
         return False
     
-    return bool(safe_operation_or_none(cleanup_operation))
+    return cleanup_operation()
 
 def get_dialog_status() -> Dict[str, Any]:
     """Get status of dialog system"""
@@ -208,9 +219,7 @@ def get_dialog_status() -> Dict[str, Any]:
             'dialog_ids': list(_ACTIVE_DIALOGS.keys())
         }
     
-    return safe_operation_or_none(status_operation) or {
-        'active_dialogs': 0, 'cleanup_registered': False, 'dialog_ids': []
-    }
+    return status_operation()
 
 def create_safe_confirmation_with_validation(title: str, message: str, 
                                            validation_func: Callable = None,
@@ -236,12 +245,12 @@ def create_safe_confirmation_with_validation(title: str, message: str,
             
             return True
         
-        safe_operation_or_none(validate_and_confirm)
+        validate_and_confirm()
     
     def safe_cancel_handler(button):
         """Safe cancel handler"""
         if on_cancel and callable(on_cancel):
-            safe_operation_or_none(lambda: on_cancel(button))
+            on_cancel(button)
     
     return create_confirmation_dialog(
         title, message, safe_confirm_handler, safe_cancel_handler, **kwargs
@@ -296,10 +305,10 @@ def create_info_dialog(title: str, message: str, on_close: Callable = None,
             if on_close and callable(on_close):
                 on_close(button)
         
-        safe_operation_or_none(close_operation)
+        close_operation()
     
     # Bind handler safely
-    safe_widget_operation(close_button, 'on_click', handle_close)
+    close_button.on_click(handle_close)
     
     # Register dialog
     _ACTIVE_DIALOGS[dialog_id] = {
@@ -364,9 +373,9 @@ def create_progress_dialog(title: str, message: str, progress_callback: Callable
                 _cleanup_dialog_immediate(dialog_id)
                 cancel_callback(button)
             
-            safe_operation_or_none(cancel_operation)
+            cancel_operation()
         
-        safe_widget_operation(cancel_button, 'on_click', handle_cancel)
+        cancel_button.on_click(handle_cancel)
     else:
         cancel_button = None
     
@@ -390,7 +399,7 @@ def create_progress_dialog(title: str, message: str, progress_callback: Callable
             if status:
                 status_label.value = f'<div style="text-align: center; color: #666; font-size: 12px;">{status}</div>'
         
-        safe_operation_or_none(update_operation)
+        update_operation()
     
     # Complete function
     def complete_progress(success: bool = True, final_message: str = None):
@@ -411,7 +420,7 @@ def create_progress_dialog(title: str, message: str, progress_callback: Callable
             
             threading.Thread(target=delayed_cleanup, daemon=True).start()
         
-        safe_operation_or_none(complete_operation)
+        complete_operation()
     
     # Register dialog
     dialog_info = {
@@ -435,4 +444,4 @@ def create_progress_dialog(title: str, message: str, progress_callback: Callable
     }
 
 # Auto cleanup saat module import
-safe_operation_or_none(cleanup_all_dialogs)
+cleanup_all_dialogs()

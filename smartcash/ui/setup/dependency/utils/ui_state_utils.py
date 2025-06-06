@@ -20,7 +20,9 @@ def update_status_panel(ui_components: Dict[str, Any], message: str, status_type
 
 def reset_ui_logger(ui_components: Dict[str, Any]):
     """Reset UI logger output untuk clear previous logs - one-liner"""
-    (log_output := ui_components.get('log_output')) and hasattr(log_output, 'clear_output') and log_output.clear_output(wait=True)
+    log_output = ui_components.get('log_output')
+    if log_output and hasattr(log_output, 'clear_output'):
+        log_output.clear_output(wait=True)
 
 def update_progress_step(ui_components: Dict[str, Any], progress_type: str, value: int, 
                         message: str = "", color: str = None):
@@ -168,7 +170,8 @@ def handle_operation_lifecycle(ui_components: Dict[str, Any], operation_name: st
         error_msg = f"{operation_name.title()} failed: {str(e)}"
         error_operation_with_message(ui_components, error_msg)
         update_status_panel(ui_components, f"❌ {error_msg}", "error")
-        logger and logger.error(f"💥 {error_msg}")
+        if logger:
+            logger.error(f"💥 {error_msg}")
         raise
 
 class ProgressSteps:

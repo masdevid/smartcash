@@ -176,7 +176,8 @@ def _handle_config_operation_result(ui_components: Dict[str, Any], success: bool
     
     if success:
         success_msg = f"✅ Konfigurasi berhasil {'disimpan' if operation == 'save' else 'direset'}"
-        logger and logger.success(success_msg)
+        if logger:
+            logger.success(success_msg)
         
         # Update status panel dengan safe handling
         try:
@@ -188,7 +189,8 @@ def _handle_config_operation_result(ui_components: Dict[str, Any], success: bool
             log_to_ui_safe(ui_components, f"⚠️ Status panel update error: {str(e)}", "warning")
     else:
         error_msg = f"❌ Gagal {'menyimpan' if operation == 'save' else 'mereset'} konfigurasi"
-        logger and logger.error(error_msg)
+        if logger:
+            logger.error(error_msg)
         
         # Update status panel dengan safe handling
         try:
@@ -210,13 +212,15 @@ def _setup_auto_analyze_on_render(ui_components: Dict[str, Any]):
             time.sleep(1)  # Delay untuk ensure UI ready
             
             logger = ui_components.get('logger')
-            logger and logger.info("🔍 Auto-analyzing packages after UI render...")
+            if logger:
+                logger.info("🔍 Auto-analyzing packages after UI render...")
             
             # Validate trigger function
             trigger_analysis = ui_components.get('trigger_analysis')
             if trigger_analysis and callable(trigger_analysis):
                 trigger_analysis()
-                logger and logger.info("✅ Auto-analysis triggered")
+                if logger:
+                    logger.info("✅ Auto-analysis triggered")
             else:
                 log_to_ui_safe(ui_components, "⚠️ Auto-analysis trigger tidak tersedia", "warning")
                 

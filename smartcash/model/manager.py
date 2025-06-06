@@ -71,7 +71,8 @@ class ModelManager:
             )
             
             # Load pretrained weights jika tersedia
-            not self.testing_mode and self.config.get('pretrained', True) and self._load_pretrained_weights()
+            if not self.testing_mode and self.config.get('pretrained', True):
+                self._load_pretrained_weights()
             
             self.logger.success(f"✅ Model berhasil dibangun: {self.config['backbone']} | {self.layer_mode} | {self.detection_layers}")
             return self.model

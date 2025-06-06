@@ -1,19 +1,21 @@
 # File: configs/base_config.yaml
-# Author: Alfrida Sabar (direvisi)
-# Deskripsi: Konfigurasi dasar untuk sistem SmartCash dengan path yang terstandarisasi
+# Author: Alfrida Sabar (Enhanced dengan UUID support)
+# Deskripsi: Konfigurasi dasar untuk sistem SmartCash dengan UUID file renaming dan research-ready format
 
 # Informasi project
 project:
   name: 'SmartCash'
-  version: '1.0.0'
-  description: 'Sistem deteksi denominasi mata uang dengan YOLOv5 dan EfficientNet'
+  version: '2.1.0'
+  description: 'Sistem deteksi denominasi mata uang dengan YOLOv5, EfficientNet dan UUID file naming'
+  research_mode: true
 
-# Konfigurasi integrasi dengan Google Drive
+# Enhanced konfigurasi integrasi dengan Google Drive
 drive:
   use_drive: false              # Apakah menggunakan Google Drive untuk storage
   sync_on_start: true           # Sinkronisasi saat aplikasi dimulai
   sync_strategy: 'drive_priority' # Strategi sinkronisasi ('drive_priority', 'local_priority', 'newest', 'merge')
   symlinks: false               # Buat symlinks ke direktori Drive
+  backup_on_sync: true          # Backup sebelum sync
   paths:
     smartcash_dir: 'SmartCash'  # Direktori SmartCash di Drive
     configs_dir: 'configs'      # Direktori konfigurasi di Drive
@@ -21,7 +23,7 @@ drive:
     runs_dir: 'runs'            # Direktori runs di Drive
     logs_dir: 'logs'            # Direktori logs di Drive
 
-# Struktur dasar data - Dengan variabel path
+# Enhanced struktur dasar data dengan UUID support
 data:
   dir: 'data'                    # Direktori utama data (path relatif)
   preprocessed_dir: 'data/preprocessed'  # Direktori untuk hasil preprocessed (path relatif)
@@ -37,16 +39,37 @@ data:
     workspace: 'smartcash-wo2us'
     project: 'rupiah-emisi-2022'
     version: '3'
+    output_format: 'yolov5pytorch'
+  
+  # Enhanced file naming configuration dengan UUID support
+  file_naming:
+    uuid_format: true                    # Enable UUID format untuk research
+    naming_strategy: 'research_uuid'     # research_uuid, simple, legacy
+    preserve_original: false             # Keep original filenames sebagai backup
+    sequence_padding: 3                  # Padding untuk sequence numbers (001, 002, dst)
+    nominal_padding: 6                   # Padding untuk nominal (001000, 002000, dst)
+    case_sensitive: false                # Case sensitivity untuk filename matching
+    
+  # Enhanced validation settings dengan UUID consistency
+  validation:
+    enabled: true
+    fix_issues: true
+    move_invalid: true
+    invalid_dir: 'data/invalid'
+    visualize_issues: false
+    check_uuid_consistency: true         # Check UUID consistency antar image-label pairs
+    validate_nominal_mapping: true       # Validate nominal mapping dari class ID
+    check_file_integrity: true           # Check file integrity (size, format)
 
-# Konfigurasi layer deteksi
+# Enhanced konfigurasi layer deteksi dengan research context
 layers:
-  - 'banknote'  # Deteksi uang kertas utuh
-  - 'nominal'   # Deteksi area nominal
-  - 'security'  # Deteksi fitur keamanan
+  - 'banknote'  # Layer 1 - Deteksi uang kertas utuh (ID: 0-6)
+  - 'nominal'   # Layer 2 - Deteksi area nominal (ID: 7-13)
+  - 'security'  # Layer 3 - Deteksi fitur keamanan (ID: 14-16)
 
-# Konfigurasi model
+# Enhanced konfigurasi model dengan research parameters
 model:
-  backbone: 'efficientnet_b4'     # Backbone yang digunakan
+  backbone: 'efficientnet_b4'     # Backbone yang digunakan untuk research
   input_size: [640, 640]          # Ukuran input model
   confidence: 0.25                # Threshold untuk deteksi
   iou_threshold: 0.45             # Threshold untuk NMS
@@ -56,8 +79,13 @@ model:
   workers: 4                      # Jumlah worker untuk dataloader
   freeze_backbone: false          # Apakah backbone dibekukan saat training
   unfreeze_epoch: 0               # Epoch untuk unfreeze backbone
+  
+  # Research-specific model settings
+  research_mode: true             # Enable research-specific features
+  layer_evaluation: true          # Enable per-layer evaluation
+  backbone_comparison: true       # Enable backbone comparison features
 
-# Konfigurasi training
+# Enhanced konfigurasi training untuk research
 training:
   epochs: 30
   batch_size: 16
@@ -71,8 +99,13 @@ training:
   lr_factor: 0.1
   save_best_only: false           # Hanya menyimpan model terbaik
   save_every: 0                   # Simpan checkpoint setiap N epoch (0 = disable)
+  
+  # Research-specific training settings
+  experiment_tracking: true       # Enable experiment tracking
+  save_training_logs: true        # Save detailed training logs
+  validate_every_epoch: true      # Validate setiap epoch untuk research
 
-# Konfigurasi augmentasi
+# Enhanced konfigurasi augmentasi dengan research parameters
 augmentation:
   enabled: true
   num_variations: 2               # Jumlah variasi per gambar
@@ -86,13 +119,19 @@ augmentation:
   balance_classes: true           # Seimbangkan jumlah gambar per kelas
   move_to_preprocessed: true      # Pindahkan hasil ke direktori preprocessed
   
-  # Jenis augmentasi yang didukung
+  # Research-specific augmentation settings
+  preserve_uuid_consistency: true # Maintain UUID consistency saat augmentasi
+  research_variations: true       # Enable research-specific variations
+  
+  # Jenis augmentasi yang didukung untuk research
   types:
     - 'flip'                      # Flip horizontal
     - 'rotate'                    # Rotasi gambar
     - 'brightness'                # Ubah kecerahan
     - 'contrast'                  # Ubah kontras
     - 'hsv'                       # Ubah HSV
+    - 'noise'                     # Tambahan untuk research
+    - 'blur'                      # Tambahan untuk research
   
   # Parameter augmentasi posisi
   fliplr: 0.5                     # Probabilitas flip horizontal
@@ -100,20 +139,22 @@ augmentation:
   translate: 0.1                  # Translasi maksimum (persen)
   scale: 0.1                      # Skala maksimum (persen)
   
-  # Parameter augmentasi pencahayaan
+  # Parameter augmentasi pencahayaan untuk research scenarios
   hsv_h: 0.015                    # Perubahan hue maksimum
   hsv_s: 0.7                      # Perubahan saturation maksimum
   brightness: 0.2                 # Perubahan brightness maksimum
   contrast: 0.2                   # Perubahan contrast maksimum
-    saturation: true
-    saturation_range: [0.8, 1.2]
+  noise: 0.1                      # Parameter noise untuk research
+  blur: 0.2                       # Parameter blur untuk research
 
-# Konfigurasi preprocessing
+# Enhanced konfigurasi preprocessing dengan UUID support
 preprocessing:
   output_dir: 'data/preprocessed'  # Path relatif
   save_visualizations: false
   vis_dir: 'visualizations'        # Path relatif
   sample_size: 0                   # 0 = semua
+  preserve_uuid_format: true       # Preserve UUID format saat preprocessing
+  
   validate:
     enabled: true
     fix_issues: true
@@ -122,6 +163,8 @@ preprocessing:
     check_image_quality: true
     check_labels: true
     check_coordinates: true
+    check_uuid_consistency: true   # Enhanced dengan UUID check
+    
   normalization:
     enabled: true
     method: 'minmax'
@@ -129,12 +172,15 @@ preprocessing:
     preserve_aspect_ratio: true
     normalize_pixel_values: true
     pixel_range: [0, 1]
+    
   analysis:
     enabled: false
     class_balance: true
     image_size_distribution: true
     bbox_statistics: true
     layer_balance: true
+    uuid_distribution: true        # Analyze UUID distribution
+    
   balance:
     enabled: false
     target_distribution: 'auto'
@@ -144,8 +190,9 @@ preprocessing:
       augmentation: true
     min_samples_per_class: 100
     max_samples_per_class: 1000
+    maintain_uuid_consistency: true # Maintain UUID saat balancing
 
-# Konfigurasi untuk pembersihan dataset
+# Enhanced konfigurasi untuk pembersihan dataset dengan UUID awareness
 cleanup:
   augmentation_patterns:
     - 'aug_.*'
@@ -159,8 +206,15 @@ cleanup:
   backup_enabled: true
   backup_count: 3                 # Jumlah backup yang disimpan
   auto_cleanup_preprocessed: false
+  
+  # Enhanced cleanup dengan UUID support
+  uuid_cleanup:
+    preserve_uuid_files: true     # Preserve files dengan UUID format
+    cleanup_legacy_only: false   # Hanya cleanup legacy format files
+    backup_before_cleanup: true   # Backup sebelum cleanup
+    validate_before_removal: true # Validate sebelum remove files
 
-# Konfigurasi evaluasi
+# Enhanced konfigurasi evaluasi untuk research
 evaluation:
   metrics:
     - 'precision'
@@ -170,28 +224,43 @@ evaluation:
     - 'accuracy'
     - 'confusion_matrix'
     - 'inference_time'
+    - 'per_layer_metrics'         # Enhanced untuk research
+    - 'per_class_metrics'         # Enhanced untuk research
   test_batch_size: 8
   save_predictions: true
   visualize_results: true
   confidence_thresholds: [0.25, 0.5]
   per_class_metrics: false
   per_layer_metrics: false
+  
+  # Research-specific evaluation settings
+  research_evaluation: true
+  scenario_evaluation: true       # Enable scenario-based evaluation
+  backbone_comparison: true       # Enable backbone comparison
+  
   visualization:
     max_samples: 20
     plot_confusion_matrix: true
     plot_precision_recall_curve: false
     plot_class_distribution: false
     save_misclassified: false
+    save_research_plots: true     # Save research-specific plots
 
-# Konfigurasi logger
+# Enhanced konfigurasi logger dengan research context
 logging:
   level: 'INFO'
   use_colors: true
   use_emojis: true
   log_to_file: true
   logs_dir: 'logs'                # Path relatif
+  
+  # Research-specific logging
+  research_logging: true
+  log_uuid_operations: true      # Log UUID operations untuk debugging
+  detailed_progress: true        # Detailed progress untuk research
+  experiment_logs: true          # Separate logs untuk experiments
 
-# Konfigurasi cache
+# Enhanced konfigurasi cache dengan UUID support
 cache:
   enabled: true
   dir: '.cache/smartcash'         # Path relatif
@@ -199,20 +268,30 @@ cache:
   ttl_hours: 24
   auto_cleanup: true
   cleanup_interval_mins: 30
+  
+  # UUID-specific caching
+  cache_uuid_mappings: true      # Cache UUID mappings untuk performance
+  uuid_cache_size: 10000         # Max UUID mappings dalam cache
 
-# Konfigurasi UI
+# Enhanced konfigurasi UI dengan research features
 ui:
   theme: 'default'                # default, dark, light
   plot_style: 'seaborn'
   max_displayed_items: 20
   enable_animations: true
+  
+  # Research UI features
+  research_mode: true            # Enable research-specific UI elements
+  show_uuid_info: true           # Show UUID info dalam UI
+  advanced_controls: true        # Show advanced research controls
 
-# Pengaturan environment (tambahan dari colab_config.yaml)
+# Enhanced pengaturan environment dengan UUID support
 environment:
   colab: false                    # True jika berjalan di Google Colab
   create_dirs_on_start: true      # Buat direktori yang diperlukan saat startup
+  setup_uuid_environment: true   # Setup UUID environment saat startup
 
-# Pengaturan performance 
+# Enhanced pengaturan performance dengan threading
 performance:
   num_workers: 4
   batch_size: 16
@@ -222,11 +301,35 @@ performance:
   use_mixed_precision: false
   auto_garbage_collect: false
   release_memory: false
+  
+  # Enhanced threading configuration
+  threading:
+    io_workers: 8                # Max workers untuk I/O operations
+    cpu_workers: null            # CPU workers (auto-detect dari CPU count)
+    rename_workers: 6            # Workers untuk rename operations
+    download_workers: 4          # Workers untuk download operations
+    parallel_threshold: 100      # Min files untuk parallel processing
+    batch_processing: true       # Enable batch processing untuk large datasets
 
-# Pengaturan skenario evaluasi
-scenarios: []
+# Enhanced pengaturan skenario evaluasi untuk research
+scenarios:
+  # Research scenarios untuk evaluation
+  position_variation:
+    enabled: true
+    description: 'Test dengan variasi posisi pengambilan gambar'
+    test_split: 'test/variasi_posisi'
+    
+  lighting_variation:
+    enabled: true
+    description: 'Test dengan variasi pencahayaan'
+    test_split: 'test/variasi_cahaya'
+    
+  backbone_comparison:
+    enabled: true
+    description: 'Perbandingan backbone CSPDarknet vs EfficientNet-B4'
+    backbones: ['cspdarknet_s', 'efficientnet_b4']
 
-# Pengaturan training utils
+# Enhanced pengaturan training utils dengan research support
 training_utils:
   experiment_name: 'training'
   checkpoint_dir: 'runs/train/checkpoints'  # Path relatif
@@ -235,3 +338,115 @@ training_utils:
   visualize_batch_every: 0
   gradient_clipping: 0.0
   mixed_precision: false
+  
+  # Research-specific training utilities
+  experiment_tracking: true
+  save_model_snapshots: true     # Save model snapshots untuk analysis
+  detailed_metrics: true         # Save detailed metrics untuk research
+
+# NEW: UUID renaming configuration untuk research
+uuid_renaming:
+  enabled: true                          # Enable UUID renaming by default
+  backup_before_rename: true             # Create backup before rename operations
+  batch_size: 1000                       # Files per batch untuk rename operations
+  parallel_workers: 4                    # Parallel workers untuk rename
+  validate_consistency: true             # Validate UUID consistency after rename
+  cleanup_registry: true                 # Auto cleanup UUID registry
+  registry_max_size: 10000              # Max UUID registry size untuk memory management
+  
+  # Layer priority untuk nominal extraction (research context)
+  layer_priority:
+    banknote: 10                         # Layer 1 - highest priority untuk nominal
+    nominal: 9                           # Layer 2 - second priority
+    security: 1                          # Layer 3 - lowest priority (undetermined)
+  
+  # Class ID to nominal mapping untuk research
+  class_mapping:
+    # Layer 1 - Banknote detection
+    0: {nominal: '001000', desc: 'Rp1000', layer: 'banknote'}
+    1: {nominal: '002000', desc: 'Rp2000', layer: 'banknote'}
+    2: {nominal: '005000', desc: 'Rp5000', layer: 'banknote'}
+    3: {nominal: '010000', desc: 'Rp10000', layer: 'banknote'}
+    4: {nominal: '020000', desc: 'Rp20000', layer: 'banknote'}
+    5: {nominal: '050000', desc: 'Rp50000', layer: 'banknote'}
+    6: {nominal: '100000', desc: 'Rp100000', layer: 'banknote'}
+    
+    # Layer 2 - Nominal detection
+    7: {nominal: '001000', desc: 'Rp1000', layer: 'nominal'}
+    8: {nominal: '002000', desc: 'Rp2000', layer: 'nominal'}
+    9: {nominal: '005000', desc: 'Rp5000', layer: 'nominal'}
+    10: {nominal: '010000', desc: 'Rp10000', layer: 'nominal'}
+    11: {nominal: '020000', desc: 'Rp20000', layer: 'nominal'}
+    12: {nominal: '050000', desc: 'Rp50000', layer: 'nominal'}
+    13: {nominal: '100000', desc: 'Rp100000', layer: 'nominal'}
+    
+    # Layer 3 - Security features (undetermined nominal)
+    14: {nominal: '000000', desc: 'Tanda tangan', layer: 'security'}
+    15: {nominal: '000000', desc: 'Teks mikro', layer: 'security'}
+    16: {nominal: '000000', desc: 'Benang pengaman', layer: 'security'}
+  
+  # Rollback settings untuk safety
+  rollback:
+    enabled: true                        # Enable rollback capability
+    keep_backups: 3                      # Number of backups to keep
+    auto_cleanup_days: 7                 # Auto cleanup backups after N days
+    validate_before_rollback: true       # Validate backup before rollback
+
+# NEW: Enhanced download configuration dengan UUID support
+download:
+  rename_files: true                     # Enable UUID renaming after download
+  organize_dataset: true                 # Organize into train/valid/test
+  backup_existing: false                 # Backup existing dataset
+  validate_download: true                # Validate after download
+  retry_count: 3                         # Download retry count
+  timeout: 30                            # Download timeout seconds
+  chunk_size: 8192                       # Download chunk size
+  
+  # Progress reporting untuk research tracking
+  progress_interval: 0.05                # Report every 5%
+  batch_progress_interval: 0.10          # Batch progress every 10%
+  detailed_logging: true                 # Detailed logging untuk research
+  
+  # Research-specific download settings
+  research_mode: true                    # Enable research-specific features
+  preserve_metadata: true                # Preserve original metadata
+  validate_integrity: true               # Validate file integrity after download
+
+# NEW: Research configuration untuk denominasi dan scenarios
+research:
+  # Denomination mapping untuk research analysis
+  denomination_mapping:
+    layer_1_classes: [0, 1, 2, 3, 4, 5, 6]        # Banknote detection
+    layer_2_classes: [7, 8, 9, 10, 11, 12, 13]    # Nominal detection
+    layer_3_classes: [14, 15, 16]                  # Security features
+    
+  # Nominal values untuk research analysis
+  nominal_values:
+    '001000': 1000                       # Rp1000
+    '002000': 2000                       # Rp2000  
+    '005000': 5000                       # Rp5000
+    '010000': 10000                      # Rp10000
+    '020000': 20000                      # Rp20000
+    '050000': 50000                      # Rp50000
+    '100000': 100000                     # Rp100000
+    '000000': 0                          # Undetermined
+    
+  # Research scenarios configuration
+  scenarios:
+    position_variation: true             # Test position variations
+    lighting_variation: true             # Test lighting variations
+    backbone_comparison: true            # Compare backbones (CSPDarknet vs EfficientNet)
+    layer_evaluation: true               # Evaluate per-layer performance
+    
+  # Experimental settings
+  experiments:
+    uuid_consistency_analysis: true      # Analyze UUID consistency impact
+    filename_impact_study: true          # Study impact of filename format
+    performance_benchmarking: true       # Benchmark performance improvements
+    
+  # Output settings untuk research
+  output:
+    save_intermediate_results: true      # Save intermediate results
+    export_research_data: true           # Export data untuk external analysis
+    generate_reports: true               # Generate research reports
+    detailed_statistics: true            # Generate detailed statistics

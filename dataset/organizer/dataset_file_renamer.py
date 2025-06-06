@@ -1,5 +1,5 @@
 """
-File: smartcash/dataset/services/dataset_file_renamer.py
+File: smartcash/dataset/organizer/dataset_file_renamer.py
 Deskripsi: Service untuk batch rename file existing ke format UUID consistency dengan research naming
 """
 

@@ -160,11 +160,13 @@ def update_config_tabs_in_form(ui_components: Dict[str, Any], config: Dict[str, 
         
         # Log successful update
         logger = ui_components.get('logger')
-        logger and logger.info("🔄 Config tabs berhasil diperbarui dari YAML")
+        if logger:
+            logger.info("🔄 Config tabs berhasil diperbarui dari YAML")
         
     except Exception as e:
         logger = ui_components.get('logger')
-        logger and logger.warning(f"⚠️ Error updating config tabs: {str(e)}")
+        if logger:
+            logger.warning(f"⚠️ Error updating config tabs: {str(e)}")
 
 # One-liner utilities untuk form management
 get_model_summary = lambda config: f"{config.get('model', {}).get('backbone', 'efficientnet_b4')} ({config.get('model', {}).get('type', 'efficient_basic')})"

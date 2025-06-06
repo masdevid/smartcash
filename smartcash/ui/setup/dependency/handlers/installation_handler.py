@@ -137,7 +137,8 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menginstal dependensi: {str(e)}", "error")
-        logger and logger.error(f"💥 Installation error: {str(e)}")
+        if logger:
+            logger.error(f"💥 Installation error: {str(e)}")
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
@@ -195,7 +196,8 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
     use_cache = config.get('installation', {}).get('use_cache', True)
     force_reinstall = config.get('installation', {}).get('force_reinstall', False)
     
-    logger and logger.info(f"🔧 Installation config: {max_workers} workers, {timeout}s timeout, cache: {use_cache}, force: {force_reinstall}")
+    if logger:
+        logger.info(f"🔧 Installation config: {max_workers} workers, {timeout}s timeout, cache: {use_cache}, force: {force_reinstall}")
     
     try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -205,7 +207,8 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
                 for package in packages
             }
             
-            logger and logger.info(f"🚀 Started parallel installation dengan {len(future_to_package)} tasks")
+            if logger:
+                logger.info(f"🚀 Started parallel installation dengan {len(future_to_package)} tasks")
             
             # Process results
             for future in as_completed(future_to_package):
@@ -217,14 +220,17 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
                     
                     # Detailed logging
                     if success:
-                        logger and logger.debug(f"✅ {package}: {message}")
+                        if logger:
+                            logger.debug(f"✅ {package}: {message}")
                     else:
-                        logger and logger.warning(f"⚠️ {package}: {message}")
+                        if logger:
+                            logger.warning(f"⚠️ {package}: {message}")
                         
                 except Exception as e:
                     error_msg = f"💥 Error installing {package}: {str(e)}"
                     logger_func(error_msg)
-                    logger and logger.error(error_msg)
+                    if logger:
+                        logger.error(error_msg)
                     results[package] = False
                     update_installation_progress(package, False)
         
@@ -233,7 +239,8 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
     except Exception as e:
         error_msg = f"💥 Installation process failed: {str(e)}"
         logger_func(error_msg)
-        logger and logger.error(error_msg)
+        if logger:
+            logger.error(error_msg)
         return {package: False for package in packages}
 
 def _finalize_installation_results(ui_components: Dict[str, Any], installation_results: Dict[str, bool], 
@@ -255,7 +262,8 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     # Log failed packages
     if failed_count > 0:
         failed_packages = [pkg for pkg, success in installation_results.items() if not success]
-        logger and logger.warning(f"⚠️ Failed packages: {', '.join(failed_packages[:5])}" + 
+        if logger:
+            logger.warning(f"⚠️ Failed packages: {', '.join(failed_packages[:5])}" + 
                                  (f" and {len(failed_packages)-5} more" if len(failed_packages) > 5 else ""))
     
     # Generate dan display detailed report
@@ -270,15 +278,18 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     # Update status panel
     if success_count == total_count:
         status_msg = f"✅ Instalasi berhasil: {success_count}/{total_count} packages"
-        logger and logger.success(f"🎉 Installation completed successfully: all {success_count} packages installed")
+        if logger:
+            logger.success(f"🎉 Installation completed successfully: all {success_count} packages installed")
         update_status_panel(ui_components, status_msg, "success")
     elif success_count > 0:
         status_msg = f"⚠️ Instalasi partial: {success_count}/{total_count} berhasil, {failed_count} gagal"
-        logger and logger.warning(f"⚠️ Partial installation: {failed_count} packages failed")
+        if logger:
+            logger.warning(f"⚠️ Partial installation: {failed_count} packages failed")
         update_status_panel(ui_components, status_msg, "warning")
     else:
         status_msg = f"❌ Instalasi gagal: {failed_count}/{total_count} packages gagal"
-        logger and logger.error(f"💥 Installation failed: all {failed_count} packages failed")
+        if logger:
+            logger.error(f"💥 Installation failed: all {failed_count} packages failed")
         update_status_panel(ui_components, status_msg, "error")
     
     # Update package status
@@ -289,4 +300,5 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     }
     
     batch_update_package_status(ui_components, status_mapping)
-    logger and logger.info(f"🔄 Updated UI status untuk {len(status_mapping)} packages")
+    if logger:
+        logger.info(f"🔄 Updated UI status untuk {len(status_mapping)} packages")

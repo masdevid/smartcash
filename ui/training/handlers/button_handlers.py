@@ -71,15 +71,18 @@ def setup_training_button_handlers(ui_components: Dict[str, Any], config: Dict[s
             
             # Reset chart output
             chart_output = ui_components.get('chart_output')
-            chart_output and chart_output.clear_output(wait=True)
+            if chart_output:
+                chart_output.clear_output(wait=True)
             
             # Reset metrics output
             metrics_output = ui_components.get('metrics_output')
-            metrics_output and metrics_output.clear_output(wait=True)
+            if metrics_output:
+                metrics_output.clear_output(wait=True)
             
             # Reset melalui training manager jika ada
             training_manager = ui_components.get('training_manager')
-            training_manager and hasattr(training_manager, 'reset_metrics') and training_manager.reset_metrics()
+            if training_manager and hasattr(training_manager, 'reset_metrics'):
+                training_manager.reset_metrics()
             
             ui_components['logger'].success("✅ Metrics dan chart berhasil direset")
             

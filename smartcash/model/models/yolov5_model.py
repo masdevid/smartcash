@@ -38,7 +38,8 @@ class YOLOv5Model(nn.Module):
         self.img_size = self.config.get('img_size', (640, 640))
         
         # Validate multilayer configuration
-        self.layer_mode == 'multilayer' and len(self.detection_layers) < 2 and self.logger.warning(
+        if self.layer_mode == 'multilayer' and len(self.detection_layers) < 2:
+            self.logger.warning(
             f"⚠️ Mode multilayer dengan {len(self.detection_layers)} layers - tidak optimal"
         )
         
@@ -92,7 +93,8 @@ class YOLOv5Model(nn.Module):
                     
                     try:
                         nms_out = non_max_suppression(formatted_detections.unsqueeze(0), conf_threshold, nms_threshold, max_det=max_detections)
-                        len(nms_out) > 0 and len(nms_out[0]) > 0 and layer_detections[layer_name][i].append(nms_out[0])
+                        if len(nms_out) > 0 and len(nms_out[0]) > 0:
+                            layer_detections[layer_name][i].append(nms_out[0])
                     except Exception as e:
                         self.logger.warning(f"⚠️ NMS error: {str(e)}")
         
@@ -126,7 +128,10 @@ class YOLOv5Model(nn.Module):
             # Final NMS pada 7 kelas utama
             try:
                 final_nms = non_max_suppression(primary_dets.unsqueeze(0), 0.2, 0.4, max_det=300) if len(primary_dets) > 0 else []
-                results.append(final_nms[0] if final_nms and len(final_nms[0]) > 0 else torch.zeros((0, 6), device=device))
+                if final_nms and len(final_nms[0]) > 0:
+                    results.append(final_nms[0])
+                else:
+                    results.append(torch.zeros((0, 6), device=device))
             except:
                 results.append(torch.zeros((0, 6), device=device))
         
@@ -235,7 +240,8 @@ class YOLOv5Model(nn.Module):
                     
                     try:
                         nms_out = non_max_suppression(formatted.unsqueeze(0), conf_threshold, 0.45, max_det=300)
-                        len(nms_out) > 0 and len(nms_out[0]) > 0 and layer_results[layer_name][i].append(nms_out[0])
+                        if len(nms_out) > 0 and len(nms_out[0]) > 0:
+                            layer_results[layer_name][i].append(nms_out[0])
                     except: continue
         
         # Combine per layer dan batch

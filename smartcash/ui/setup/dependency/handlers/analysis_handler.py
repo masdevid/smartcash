@@ -43,8 +43,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         # Step 1: Initialize analysis
         if progress_tracker:
             progress_tracker.show("Analisis Dependensi", ["Persiapan", "Scanning", "Evaluasi", "Laporan"])
-            progress_tracker.update('level1', 10, "Memulai analisis...")
-            progress_tracker.update('level2', 25, "Inisialisasi...")
+            progress_tracker.update_overall(10, "Memulai analisis...")
+            progress_tracker.update_current(25, "Inisialisasi...")
         else:
             ctx.stepped_progress('ANALYSIS_INIT', "Memulai analisis...")
             
@@ -52,8 +52,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
 
         # Step 2: Get installed packages
         if progress_tracker:
-            progress_tracker.update('level1', 30, "Scanning packages...")
-            progress_tracker.update('level2', 50, "Mendapatkan daftar packages...")
+            progress_tracker.update_overall(30, "Scanning packages...")
+            progress_tracker.update_current(50, "Mendapatkan daftar packages...")
         else:
             ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "Mendapatkan daftar packages...")
             
@@ -62,8 +62,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
 
         # Step 3: Get package categories dan reset status
         if progress_tracker:
-            progress_tracker.update('level1', 50, "Evaluasi packages...")
-            progress_tracker.update('level2', 75, "Menganalisis categories...")
+            progress_tracker.update_overall(50, "Evaluasi packages...")
+            progress_tracker.update_current(75, "Menganalisis categories...")
         else:
             ctx.stepped_progress('ANALYSIS_CATEGORIES', "Menganalisis categories...")
             
@@ -72,8 +72,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         
         # Step 4: Analyze packages status
         if progress_tracker:
-            progress_tracker.update('level1', 70, "Checking packages...")
-            progress_tracker.update('level2', 85, "Memulai pengecekan")
+            progress_tracker.update_overall(70, "Checking packages...")
+            progress_tracker.update_current(85, "Memulai pengecekan")
         else:
             ctx.stepped_progress('ANALYSIS_CHECK', "Checking package status...")
             
@@ -83,8 +83,8 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         
         # Step 5: Update UI dan generate report
         if progress_tracker:
-            progress_tracker.update('level1', 90, "Generating report...")
-            progress_tracker.update('level2', 95, "Updating UI...")
+            progress_tracker.update_overall(90, "Generating report...")
+            progress_tracker.update_current(95, "Updating UI...")
         else:
             ctx.stepped_progress('ANALYSIS_UPDATE_UI', "Updating UI...")
             
@@ -92,9 +92,9 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
         
         # Complete operation
         if progress_tracker:
-            progress_tracker.update('level1', 100, "Analisis selesai")
-            progress_tracker.update('level2', 100, "Complete")
-            progress_tracker.complete()
+            progress_tracker.update_overall(100, "Analisis selesai")
+            progress_tracker.update_current(100, "Complete")
+            progress_tracker.complete("✅ Analisis selesai")
         else:
             ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai", "overall")
             ctx.stepped_progress('ANALYSIS_COMPLETE', "Complete", "step")
@@ -127,12 +127,17 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
         
         # Update progress
         if progress_tracker:
-            progress_tracker.update('level1', 70 + int((current_package / total_packages) * 20), 
-                                   f"Analyzing packages: {current_package}/{total_packages}")
-            progress_tracker.update('level2', progress, f"Analyzing {package['name']}...")
+            progress_tracker.update_overall(70 + int((current_package / total_packages) * 20), 
+                                  f"Checking {current_package}/{total_packages}")
+            progress_tracker.update_current(progress, f"Analyzing {package['name']}...")
         else:
             progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
-            ctx.progress_tracker('overall', progress, f"Analyzing {package['name']}...")
+            # Gunakan metode yang benar untuk progress tracking
+            if hasattr(ctx, 'update_progress'):
+                ctx.update_progress(progress, f"Analyzing {package['name']}...")
+            elif hasattr(ctx, 'progress_tracker') and callable(ctx.progress_tracker):
+                # Fallback untuk kompatibilitas dengan context lama
+                ctx.progress_tracker('overall', progress, f"Analyzing {package['name']}...")
         
         package_key, status_info = package['key'], batch_status[requirement]
         

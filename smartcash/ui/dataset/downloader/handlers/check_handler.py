@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/check_handler.py
-Deskripsi: Optimized check handler dengan progress tracker dual-level dan one-liner style
+Deskripsi: Fixed check handler dengan API progress_tracker yang benar dan one-liner style
 """
 
 from typing import Dict, Any, Callable
@@ -9,10 +9,10 @@ from smartcash.dataset.downloader.roboflow_client import create_roboflow_client
 from smartcash.dataset.utils.path_validator import get_path_validator
 
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Setup optimized check handler dengan dual-level progress"""
+    """Setup optimized check handler dengan API progress tracker yang benar"""
     
     def handle_check(button):
-        """Handle check operation dengan streamlined flow"""
+        """Handle check operation dengan streamlined flow dan API yang benar"""
         try:
             # Get current config
             config_handler = ui_components.get('config_handler')
@@ -29,7 +29,7 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], l
                 show_status_safe(error_msg, "error", ui_components)
                 return
             
-            # Execute check dengan optimized progress
+            # Execute check dengan optimized progress API
             _execute_check_sync(ui_components, current_config, logger)
             
         except Exception as e:
@@ -39,7 +39,7 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any], l
     return handle_check
 
 def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute check dengan optimized dual-level progress tracking"""
+    """Execute check dengan API progress_tracker yang benar"""
     try:
         # Get progress tracker
         progress_tracker = ui_components.get('progress_tracker')
@@ -48,25 +48,27 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
             show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
             return
         
-        # Show progress
-        progress_tracker.show("Check Dataset")
+        # Show progress dengan API yang benar
+        check_steps = ["validate", "connect", "credentials", "metadata", "local_check", "report"]
+        step_weights = {"validate": 10, "connect": 15, "credentials": 20, "metadata": 25, "local_check": 20, "report": 10}
+        progress_tracker.show("Check Dataset", check_steps, step_weights)
         
         workspace, project, version, api_key = config['workspace'], config['project'], config['version'], config['api_key']
         dataset_id = f"{workspace}/{project}:v{version}"
         
-        # Step 1: Validate parameters (0-20%)
-        progress_tracker.update_overall(10, "🔍 Validasi parameter")
-        progress_tracker.update_primary(50, "Validating parameters...")
+        # Step 1: Validate parameters - gunakan API yang benar
+        progress_tracker.update('overall', 10, "🔍 Validasi parameter")
+        progress_tracker.update('current', 50, "Validating parameters...")
         
-        # Step 2: Connect to Roboflow (20-40%)
-        progress_tracker.update_overall(25, "🌐 Koneksi Roboflow")
-        progress_tracker.update_primary(0, "Connecting to Roboflow...")
+        # Step 2: Connect to Roboflow
+        progress_tracker.update('overall', 20, "🌐 Koneksi Roboflow")
+        progress_tracker.update('current', 0, "Connecting to Roboflow...")
         roboflow_client = create_roboflow_client(api_key, logger)
-        progress_tracker.update_primary(100, "Connected to Roboflow")
+        progress_tracker.update('current', 100, "Connected to Roboflow")
         
-        # Step 3: Validate credentials (40-60%)
-        progress_tracker.update_overall(45, "🔑 Validasi kredensial")
-        progress_tracker.update_primary(0, "Validating credentials...")
+        # Step 3: Validate credentials
+        progress_tracker.update('overall', 35, "🔑 Validasi kredensial")
+        progress_tracker.update('current', 0, "Validating credentials...")
         cred_result = roboflow_client.validate_credentials(workspace, project)
         
         if not cred_result['valid']:
@@ -75,11 +77,11 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
             show_status_safe(error_msg, "error", ui_components)
             return
         
-        progress_tracker.update_primary(100, "Credentials validated")
+        progress_tracker.update('current', 100, "Credentials validated")
         
-        # Step 4: Get dataset metadata (60-80%)
-        progress_tracker.update_overall(65, "📊 Mengambil metadata")
-        progress_tracker.update_primary(0, "Fetching dataset metadata...")
+        # Step 4: Get dataset metadata
+        progress_tracker.update('overall', 55, "📊 Mengambil metadata")
+        progress_tracker.update('current', 0, "Fetching dataset metadata...")
         metadata_result = roboflow_client.get_dataset_metadata(workspace, project, version)
         
         if metadata_result['status'] != 'success':
@@ -88,17 +90,17 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
             show_status_safe(error_msg, "error", ui_components)
             return
         
-        progress_tracker.update_primary(100, "Metadata retrieved")
+        progress_tracker.update('current', 100, "Metadata retrieved")
         
-        # Step 5: Check local dataset (80-95%)
-        progress_tracker.update_overall(85, "📁 Memeriksa dataset lokal")
-        progress_tracker.update_primary(0, "Checking local dataset...")
+        # Step 5: Check local dataset
+        progress_tracker.update('overall', 80, "📁 Memeriksa dataset lokal")
+        progress_tracker.update('current', 0, "Checking local dataset...")
         local_check = _check_local_dataset_sync(config)
-        progress_tracker.update_primary(100, "Local check completed")
+        progress_tracker.update('current', 100, "Local check completed")
         
-        # Step 6: Generate report (95-100%)
-        progress_tracker.update_overall(95, "📋 Membuat laporan")
-        progress_tracker.update_primary(0, "Generating report...")
+        # Step 6: Generate report
+        progress_tracker.update('overall', 95, "📋 Membuat laporan")
+        progress_tracker.update('current', 0, "Generating report...")
         report = _generate_streamlined_check_report(metadata_result['data'], local_check, dataset_id)
         
         # Show report
@@ -107,7 +109,7 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
             from IPython.display import Markdown, display
             display(Markdown(report))
         
-        # Complete progress
+        # Complete progress dengan API yang benar
         progress_tracker.complete("✅ Pengecekan selesai")
         show_status_safe("✅ Pengecekan dataset selesai", "success", ui_components)
         logger.info(f"📊 Check completed: {dataset_id}")
@@ -151,65 +153,47 @@ def _generate_streamlined_check_report(remote_metadata: Dict[str, Any], local_ch
     # Local dataset info
     local_exists, local_images, local_labels = local_check['exists'], local_check['total_images'], local_check['total_labels']
     
-    # Build report dengan optimized sections
-    report_sections = [
-        f"📊 **Dataset Check Report: {dataset_id}**",
-        "",
+    # Build report dengan optimized sections - one-liner list comprehension untuk cleaner code
+    base_sections = [
+        f"📊 **Dataset Check Report: {dataset_id}**", "",
         "🌐 **Remote Dataset (Roboflow):**",
         f"   • Kelas: {remote_classes}",
         f"   • Gambar: {remote_images:,}",
         f"   • Ukuran: {remote_size_mb:.1f} MB",
-        f"   • Format: YOLOv5 PyTorch (hardcoded)",
-        "",
+        f"   • Format: YOLOv5 PyTorch (hardcoded)", "",
         "💻 **Local Dataset:**"
     ]
     
-    if local_exists:
-        splits_found = ', '.join(s for s in local_check['splits'] if local_check['splits'][s]['exists'])
-        local_details = [
-            f"   • Status: ✅ Ditemukan",
-            f"   • Gambar: {local_images:,}",
-            f"   • Label: {local_labels:,}",
-            f"   • Splits: {splits_found}"
-        ]
-        report_sections.extend(local_details)
-        
-        # Comparison section jika ada data lokal
-        if local_images != remote_images:
-            diff = abs(local_images - remote_images)
-            status = "🔄" if local_images < remote_images else "📈"
-            comparison_section = [
-                "",
-                "🔍 **Perbandingan:**",
-                f"   • Selisih gambar: {status} {diff:,}"
-            ]
-            report_sections.extend(comparison_section)
-    else:
-        local_not_found = [
-            f"   • Status: ❌ Tidak ditemukan",
-            f"   • Rekomendasi: Download dataset terlebih dahulu"
-        ]
-        report_sections.extend(local_not_found)
+    local_sections = [
+        f"   • Status: ✅ Ditemukan",
+        f"   • Gambar: {local_images:,}",
+        f"   • Label: {local_labels:,}",
+        f"   • Splits: {', '.join(s for s in local_check['splits'] if local_check['splits'][s]['exists'])}"
+    ] if local_exists else [
+        f"   • Status: ❌ Tidak ditemukan",
+        f"   • Rekomendasi: Download dataset terlebih dahulu"
+    ]
     
-    # Issues section jika ada
-    if local_check.get('issues'):
-        report_sections.extend([
-            "",
-            "⚠️ **Issues:**"
-        ])
-        issue_details = [f"   • {issue}" for issue in local_check['issues'][:5]]
-        report_sections.extend(issue_details)
+    # Comparison section dengan one-liner conditional
+    comparison_sections = ([
+        "", "🔍 **Perbandingan:**",
+        f"   • Selisih gambar: {'🔄' if local_images < remote_images else '📈'} {abs(local_images - remote_images):,}"
+    ] if local_exists and local_images != remote_images else [])
+    
+    # Issues section dengan one-liner conditional
+    issue_sections = ([
+        "", "⚠️ **Issues:**"
+    ] + [f"   • {issue}" for issue in local_check['issues'][:5]]
+    if local_check.get('issues') else [])
     
     # Status summary dengan one-liner conditional
     status_emoji = "✅" if local_exists and not local_check.get('issues') else "⚠️" if local_exists else "❌"
     status_text = 'Ready' if local_exists and not local_check.get('issues') else 'Needs attention' if local_exists else 'Download required'
     
-    report_sections.extend([
-        "",
-        f"{status_emoji} **Status: {status_text}**"
-    ])
+    # Combine all sections dengan one-liner
+    all_sections = base_sections + local_sections + comparison_sections + issue_sections + ["", f"{status_emoji} **Status: {status_text}**"]
     
-    return '\n'.join(report_sections)
+    return '\n'.join(all_sections)
 
 # Optimized utilities dengan one-liner style
 get_check_status = lambda ui: {'ready': 'progress_tracker' in ui and 'config_handler' in ui, 'tracker_available': 'progress_tracker' in ui}

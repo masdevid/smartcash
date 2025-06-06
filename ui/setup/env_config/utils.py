@@ -18,7 +18,8 @@ def update_progress_safe(ui_components: Dict[str, Any], value: int, message: str
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker:
-            progress_tracker.update('main', value, message)
+            # Gunakan metode update_overall yang benar sesuai API
+            progress_tracker.update_overall(value, message)
         elif 'progress_bar' in ui_components:
             progress_bar = ui_components['progress_bar']
             setattr(progress_bar, 'value', value) if hasattr(progress_bar, 'value') else None
@@ -57,7 +58,8 @@ def reset_progress_safe(ui_components: Dict[str, Any], message: str = "") -> Non
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker:
             progress_tracker.reset()
-            progress_tracker.update('main', 0, message) if message else None
+            # Gunakan metode update_overall yang benar sesuai API
+            progress_tracker.update_overall(0, message) if message else None
         elif 'progress_bar' in ui_components:
             progress_bar = ui_components['progress_bar']
             setattr(progress_bar, 'value', 0) if hasattr(progress_bar, 'value') else None
@@ -66,6 +68,37 @@ def reset_progress_safe(ui_components: Dict[str, Any], message: str = "") -> Non
                 message_widget = ui_components['progress_message']
                 setattr(message_widget, 'value', message) if hasattr(message_widget, 'value') else None
             show_progress_safe(ui_components)
+    except Exception:
+        pass
+
+def complete_progress_safe(ui_components: Dict[str, Any], message: str = "✅ Selesai") -> None:
+    """Complete progress dengan progress_tracker atau fallback - one-liner"""
+    try:
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            progress_tracker.complete(message)
+        elif 'progress_bar' in ui_components:
+            progress_bar = ui_components['progress_bar']
+            setattr(progress_bar, 'value', 100) if hasattr(progress_bar, 'value') else None
+            setattr(progress_bar, 'description', "100%") if hasattr(progress_bar, 'description') else None
+            if 'progress_message' in ui_components:
+                message_widget = ui_components['progress_message']
+                setattr(message_widget, 'value', message) if hasattr(message_widget, 'value') else None
+    except Exception:
+        pass
+
+def error_progress_safe(ui_components: Dict[str, Any], message: str = "❌ Error") -> None:
+    """Error progress dengan progress_tracker atau fallback - one-liner"""
+    try:
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            progress_tracker.error(message)
+        elif 'progress_bar' in ui_components:
+            progress_bar = ui_components['progress_bar']
+            setattr(progress_bar, 'bar_style', 'danger') if hasattr(progress_bar, 'bar_style') else None
+            if 'progress_message' in ui_components:
+                message_widget = ui_components['progress_message']
+                setattr(message_widget, 'value', message) if hasattr(message_widget, 'value') else None
     except Exception:
         pass
 

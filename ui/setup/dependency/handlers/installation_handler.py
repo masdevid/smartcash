@@ -43,8 +43,8 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         # Step 1: Get selected packages
         if progress_tracker:
             progress_tracker.show("Instalasi Packages", ["Persiapan", "Analisis", "Instalasi", "Finalisasi"])
-            progress_tracker.update('level1', 10, "Mempersiapkan instalasi...")
-            progress_tracker.update('level2', 25, "Mengumpulkan packages...")
+            progress_tracker.update_overall(10, "Mempersiapkan instalasi...")
+            progress_tracker.update_current(25, "Mengumpulkan packages...")
         else:
             ctx.stepped_progress('INSTALL_INIT', "Mempersiapkan instalasi...")
         
@@ -58,8 +58,8 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Step 2: Filter uninstalled packages
         if progress_tracker:
-            progress_tracker.update('level1', 30, "Menganalisis packages...")
-            progress_tracker.update('level2', 50, f"Menganalisis {len(selected_packages)} packages...")
+            progress_tracker.update_overall(30, "Menganalisis packages...")
+            progress_tracker.update_current(50, f"Menganalisis {len(selected_packages)} packages...")
         else:
             ctx.stepped_progress('INSTALL_ANALYSIS', "Menganalisis packages...")
         
@@ -76,9 +76,9 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             # Complete operation dengan progress tracker baru
             progress_tracker = ui_components.get('progress_tracker')
             if progress_tracker:
-                progress_tracker.update('level1', 100, "Semua packages sudah terinstall")
-                progress_tracker.update('level2', 100, "Complete")
-                progress_tracker.complete()
+                progress_tracker.update_overall(100, "Semua packages sudah terinstall")
+                progress_tracker.update_current(100, "Complete")
+                progress_tracker.complete("✅ Semua packages sudah terinstall")
             else:
                 # Fallback untuk progress tracking lama
                 ui_components.get('update_progress', lambda *a: None)('overall', 100, "Semua packages sudah terinstall")
@@ -101,8 +101,8 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Step 3: Install packages dengan parallel processing
         if progress_tracker:
-            progress_tracker.update('level1', 50, f"Installing packages...")
-            progress_tracker.update('level2', 75, f"Memulai instalasi {len(packages_to_install)} packages...")
+            progress_tracker.update_overall(50, f"Installing packages...")
+            progress_tracker.update_current(75, f"Memulai instalasi {len(packages_to_install)} packages...")
         else:
             ctx.stepped_progress('INSTALL_START', f"Installing {len(packages_to_install)} packages...")
         
@@ -114,8 +114,8 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Step 4: Finalize dan generate report
         if progress_tracker:
-            progress_tracker.update('level1', 80, "Finalizing installation...")
-            progress_tracker.update('level2', 90, "Generating report...")
+            progress_tracker.update_overall(80, "Finalizing installation...")
+            progress_tracker.update_current(90, "Generating report...")
         else:
             ctx.stepped_progress('INSTALL_FINALIZE', "Finalizing installation...")
         
@@ -128,9 +128,9 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         
         # Complete operation
         if progress_tracker:
-            progress_tracker.update('level1', 100, "Installation complete")
-            progress_tracker.update('level2', 100, "Complete")
-            progress_tracker.complete()
+            progress_tracker.update_overall(100, "Installation complete")
+            progress_tracker.update_current(100, "Complete")
+            progress_tracker.complete("✅ Instalasi selesai")
         else:
             ctx.stepped_progress('INSTALL_COMPLETE', "Installation complete", "overall")
             ctx.stepped_progress('INSTALL_COMPLETE', "Complete", "step")
@@ -159,18 +159,15 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         
         # Update progress bars
         if progress_tracker:
-            progress_tracker.update(
-                'level1', 
-                50 + int((completed_count / total_packages) * 30),
-                f"Installing packages: {completed_count}/{total_packages}"
-            )
+            # Update progress dengan metode yang benar
+            progress_tracker.update_overall(50 + int((completed_count / total_packages) * 30), 
+                                   f"Installing {completed_count}/{total_packages}")
             
-            progress_tracker.update(
-                'level2', 
-                progress,
-                f"{package}: {'✅ Success' if success else '❌ Failed'}",
-                'green' if success else 'red'
-            )
+            status_icon = "✅" if success else "❌"
+            status_msg = "Success" if success else "Failed"
+            color = "green" if success else "red"
+            
+            progress_tracker.update_current(progress, f"{status_icon} {package} {status_msg}", color)
         else:
             ui_components.get('update_progress', lambda *a: None)(
                 'overall', 

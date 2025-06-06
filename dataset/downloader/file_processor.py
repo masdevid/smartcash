@@ -21,25 +21,8 @@ class FileProcessor:
         self._progress_callback = callback
     
     def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """Notify progress dengan error handling.
-        
-        Memastikan callback dipanggil dengan format yang benar untuk UI progress tracker:
-        - step: Nama step yang valid (extract, organize, dll)
-        - current: Nilai progress saat ini (0-100)
-        - total: Nilai total progress (biasanya 100)
-        - message: Pesan status yang informatif
-        """
-        if self._progress_callback:
-            try:
-                # Pastikan nilai dalam range yang valid
-                current = max(0, min(100, current))
-                total = max(1, total)
-                
-                # Panggil callback dengan format yang benar
-                self._progress_callback(step, current, total, message)
-            except Exception as e:
-                self.logger.debug(f"🔍 Progress callback error: {str(e)}")
-                pass
+        """Notify progress dengan error handling - one-liner safe call."""
+        self._progress_callback and (lambda: self._progress_callback(step, current, total, message))() if True else None
     
     def extract_zip(self, zip_path: Path, extract_to: Path) -> Dict[str, Any]:
         """Extract ZIP file dengan progress tracking dan one-liner error handling."""

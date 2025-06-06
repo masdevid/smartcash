@@ -25,17 +25,16 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     def progress_callback(**kwargs):
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker:
-            level = kwargs.get('type', 'level1')
-            if level == 'overall':
-                level = 'level1'
-            elif level == 'step':
-                level = 'level2'
-            progress_tracker.update(
-                level, 
-                kwargs.get('progress', 0), 
-                kwargs.get('message', 'Processing...'),
-                kwargs.get('color', None)
-            )
+            level = kwargs.get('type', 'overall')
+            progress = kwargs.get('progress', 0)
+            message = kwargs.get('message', 'Processing...')
+            color = kwargs.get('color', None)
+            
+            # Gunakan metode yang benar sesuai API progress tracker
+            if level == 'overall' or level == 'level1':
+                progress_tracker.update_overall(progress, message, color)
+            elif level == 'step' or level == 'level2':
+                progress_tracker.update_current(progress, message, color)
         else:
             # Fallback untuk progress tracking lama
             ui_components.get('update_progress', lambda *a: None)(

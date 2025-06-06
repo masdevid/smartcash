@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: Fixed UI components tanpa backup/preprocessing dir form dan optimasi progress tracker
+Deskripsi: Fixed UI components dengan API progress_tracker yang benar dan optimasi progress tracker
 """
 
 import ipywidgets as widgets
@@ -10,7 +10,7 @@ from smartcash.ui.utils.ui_logger_namespace import get_namespace_color
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI tanpa path fields dan dengan progress tracker yang dioptimasi"""
+    """Create main downloader UI dengan API progress tracker yang benar"""
     config = config or {}
     roboflow = config.get('roboflow', {})
     detected_api_key = get_api_key_from_secrets()
@@ -20,7 +20,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     return ui_components
 
 def _create_streamlined_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
-    """Create streamlined downloader UI tanpa path configuration"""
+    """Create streamlined downloader UI dengan API progress tracker yang benar"""
     
     # 1. Header dengan gradient design
     header = widgets.HTML(f"""
@@ -49,12 +49,10 @@ def _create_streamlined_downloader_ui(config: Dict[str, Any], roboflow: Dict[str
     # 7. Action buttons dengan state management
     action_components = _create_action_buttons()
     
-    # 8. Progress tracker dengan dual level - optimized
-    progress_tracker = create_dual_progress_tracker(operation="Dataset Download", auto_hide=False)
+    # 8. Progress tracker dengan dual level - API yang benar
+    progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
     progress_container = progress_tracker.container
     progress_container.layout.display = 'none'
-    # Tambahkan komentar untuk membantu developer memahami penggunaan yang benar
-    # Metode yang tersedia: update_overall(), update_primary(), complete(), error(), reset(), show(), hide()
     
     # 9. Log accordion terbuka by default
     log_components = _create_log_accordion()
@@ -94,17 +92,8 @@ def _create_streamlined_downloader_ui(config: Dict[str, Any], roboflow: Dict[str
         # Buttons
         **save_reset_components, **action_components,
         
-        # Progress tracker - optimized mapping
+        # Progress tracker dengan API yang benar
         'progress_tracker': progress_tracker, 'progress_container': progress_container,
-        
-        # Progress methods - one-liner mapping
-        'show_for_operation': lambda op=None, steps=None: progress_tracker.show(op, steps),
-        'update_overall': lambda prog, msg="": progress_tracker.update_overall(prog, msg),
-        'update_current': lambda prog, msg="": progress_tracker.update_current(prog, msg),
-        'complete_operation': lambda msg="Completed": progress_tracker.complete(msg),
-        'error_operation': lambda msg="Failed": progress_tracker.error(msg),
-        'reset_all': lambda: progress_tracker.reset(),
-        'hide_container': lambda: progress_tracker.hide(),
         
         # Log components
         **log_components
@@ -204,7 +193,7 @@ def _create_action_buttons() -> Dict[str, widgets.Widget]:
     check_button = widgets.Button(description='🔍 Check', button_style='info', layout=button_layout)
     cleanup_button = widgets.Button(description='🧹 Cleanup', button_style='danger', layout=button_layout)
     
-    # State management attributes
+    # State management attributes - one-liner setup
     all_buttons = [download_button, check_button, cleanup_button]
     [setattr(btn, '_all_buttons', all_buttons) for btn in all_buttons]
     
@@ -229,14 +218,14 @@ def _create_log_accordion() -> Dict[str, widgets.Widget]:
     return {'log_output': log_output, 'log_accordion': log_accordion, 'accordion': log_accordion}
 
 def _get_dynamic_status_html() -> str:
-    """Get status HTML dengan environment detection"""
+    """Get status HTML dengan environment detection - one-liner nested conditionals"""
     try:
         import google.colab
         from pathlib import Path
         is_drive_mounted = Path('/content/drive/MyDrive').exists()
         api_key = get_api_key_from_secrets()
         
-        # Status generation dengan nested conditionals
+        # Status generation dengan nested conditionals - one-liner
         return ("""<div style="padding: 12px; background: #e8f5e8; border-left: 4px solid #4caf50; border-radius: 4px; margin-bottom: 15px;"><span style="color: #2e7d32;">✅ Drive terhubung + API Key terdeteksi - Siap download!</span></div>""" if (is_drive_mounted and api_key) else
                 """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;"><span style="color: #856404;">⚠️ Drive terhubung - Masukkan API Key untuk mulai</span></div>""" if is_drive_mounted else
                 """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;"><span style="color: #856404;">⚠️ API Key tersedia - Mount Drive untuk penyimpanan permanen</span></div>""" if api_key else
@@ -244,7 +233,7 @@ def _get_dynamic_status_html() -> str:
     except ImportError:
         return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; margin-bottom: 15px;"><span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
 
-# Utilities
+# Utilities dengan one-liner style
 detect_api_key = lambda: get_api_key_from_secrets() or ''
 validate_ui_layout = lambda ui: all(key in ui for key in ['ui', 'form_container', 'save_button', 'download_button', 'log_output', 'progress_tracker'])
 get_ui_status = lambda ui: f"✅ Streamlined UI Ready: {len([k for k in ui.keys() if not k.startswith('_')])} components | API: {'✅' if detect_api_key() else '❌'} | Progress: {'✅' if 'progress_tracker' in ui else '❌'}"

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py
-Deskripsi: Fixed download handler dengan error fixes untuk 'bool' object is not callable dan variable scoping
+Deskripsi: Fixed download handler dengan API progress_tracker yang benar dan one-liner style
 """
 
 import ipywidgets as widgets
@@ -15,7 +15,7 @@ from smartcash.dataset.downloader import get_downloader_instance
 from smartcash.common.logger import get_logger
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup semua handlers dengan fixed state management"""
+    """Setup semua handlers dengan fixed API progress tracker"""
     
     logger = ui_components.get('logger') or get_logger('downloader.handlers')
     
@@ -44,20 +44,13 @@ def _wrap_with_state_management(handler: Callable, ui_components: Dict[str, Any]
         """Fixed wrapper untuk mutual exclusion buttons"""
         all_buttons = []
         try:
-            # Get all buttons safely
-            all_buttons = getattr(button, '_all_buttons', [])
-            if not all_buttons:
-                all_buttons = [
-                    ui_components.get('check_button'),
-                    ui_components.get('download_button'), 
-                    ui_components.get('cleanup_button')
-                ]
-                all_buttons = [btn for btn in all_buttons if btn is not None]
+            # Get all buttons safely - one-liner collection
+            all_buttons = (getattr(button, '_all_buttons', None) or 
+                          [ui_components.get(btn) for btn in ['check_button', 'download_button', 'cleanup_button']] or [])
+            all_buttons = [btn for btn in all_buttons if btn is not None and hasattr(btn, 'disabled')]
             
-            # Disable all buttons
-            for btn in all_buttons:
-                if hasattr(btn, 'disabled'):
-                    btn.disabled = True
+            # Disable all buttons - one-liner
+            [setattr(btn, 'disabled', True) for btn in all_buttons]
             
             # Execute handler
             handler(button)
@@ -66,15 +59,13 @@ def _wrap_with_state_management(handler: Callable, ui_components: Dict[str, Any]
             logger and logger.error(f"❌ Error in handler: {str(e)}")
             show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
         finally:
-            # Re-enable buttons
-            for btn in all_buttons:
-                if hasattr(btn, 'disabled'):
-                    btn.disabled = False
+            # Re-enable buttons - one-liner
+            [setattr(btn, 'disabled', False) for btn in all_buttons]
     
     return state_managed_handler
 
 def _create_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Create fixed download handler"""
+    """Create fixed download handler dengan API progress tracker yang benar"""
     
     def handle_download(button):
         """Handle download dengan fixed validation dan confirmation"""
@@ -112,19 +103,12 @@ def _create_download_handler(ui_components: Dict[str, Any], config: Dict[str, An
 def _show_download_confirmation_fixed(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
     """Show fixed confirmation dialog"""
     
-    workspace = config.get('workspace', '')
-    project = config.get('project', '')
-    version = config.get('version', '')
+    workspace, project, version = config.get('workspace', ''), config.get('project', ''), config.get('version', '')
     dataset_id = f"{workspace}/{project}:v{version}"
     
-    def on_confirm_handler(button):
-        """Fixed confirm handler"""
-        _clear_confirmation_area_fixed(ui_components)
-        _execute_download_sync_fixed(ui_components, config, logger)
-    
-    def on_cancel_handler(button):
-        """Fixed cancel handler"""
-        _clear_confirmation_area_fixed(ui_components)
+    # Fixed handlers dengan one-liner
+    on_confirm_handler = lambda button: (_clear_confirmation_area_fixed(ui_components), _execute_download_sync_fixed(ui_components, config, logger))
+    on_cancel_handler = lambda button: _clear_confirmation_area_fixed(ui_components)
     
     confirmation_dialog = create_confirmation_dialog(
         title="Konfirmasi Download Dataset",
@@ -148,7 +132,7 @@ def _show_download_confirmation_fixed(ui_components: Dict[str, Any], config: Dic
     _show_in_confirmation_area_fixed(ui_components, confirmation_dialog)
 
 def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute download dengan fixed dual-level progress tracking"""
+    """Execute download dengan API progress_tracker yang benar"""
     try:
         # Clear confirmation area
         _clear_confirmation_area_fixed(ui_components)
@@ -160,13 +144,15 @@ def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str
             show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
             return
         
-        # Show progress dengan dual level
-        progress_tracker.show("Download Dataset")
+        # Show progress dengan benar API - gunakan show method
+        download_steps = ["validate", "connect", "metadata", "download", "extract", "organize"]
+        step_weights = {"validate": 5, "connect": 10, "metadata": 15, "download": 50, "extract": 15, "organize": 5}
+        progress_tracker.show("Download Dataset", download_steps, step_weights)
         
         # Create downloader instance
         downloader = get_downloader_instance(config, logger)
         
-        # Setup fixed dual-level progress callback
+        # Setup fixed dual-level progress callback dengan API yang benar
         downloader.set_progress_callback(_create_fixed_progress_callback(progress_tracker, logger))
         
         # Execute download
@@ -196,36 +182,41 @@ def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str
     except Exception as e:
         error_msg = f"❌ Error saat download: {str(e)}"
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            progress_tracker.error(error_msg)
+        progress_tracker and progress_tracker.error(error_msg)
         show_status_safe(error_msg, "error", ui_components)
         logger.error(error_msg)
 
-def _create_fixed_progress_callback(progress_tracker, logger):
-    """Create fixed dual-level progress callback"""
+def _create_fixed_progress_callback(progress_tracker, logger) -> Callable:
+    """Create fixed dual-level progress callback dengan API yang benar"""
     
     def progress_callback(step: str, current: int, total: int, message: str):
-        """Fixed dual-level progress dengan proper mapping"""
+        """Fixed dual-level progress dengan API progress_tracker yang benar"""
         try:
             percentage = min(100, max(0, int((current / total) * 100) if total > 0 else 0))
             
-            # Map steps ke dual-level progress dengan fixed calculation
+            # Map steps ke progress levels dengan API yang benar
             step_mapping = {
-                'validate': (0, 10, "🔄 Validasi parameter"),
-                'connect': (10, 20, "🌐 Koneksi Roboflow"),
-                'metadata': (20, 30, "📊 Ambil metadata"),
-                'download': (30, 80, "📥 Download dataset"),
-                'extract': (80, 90, "📦 Ekstrak files"),
-                'organize': (90, 100, "🗂️ Organisir struktur")
+                'validate': ('overall', "🔄 Validasi parameter"),
+                'connect': ('overall', "🌐 Koneksi Roboflow"),
+                'metadata': ('overall', "📊 Ambil metadata"), 
+                'download': ('current', "📥 Download dataset"),
+                'extract': ('current', "📦 Ekstrak files"),
+                'organize': ('current', "🗂️ Organisir struktur")
             }
             
             if step in step_mapping:
-                start_pct, end_pct, overall_msg = step_mapping[step]
-                overall_percentage = start_pct + int(percentage * (end_pct - start_pct) / 100)
-                progress_tracker.update_overall(overall_percentage, overall_msg)
-                progress_tracker.update_primary(percentage, message)
+                level_name, overall_msg = step_mapping[step]
+                
+                # Update dengan API yang benar - gunakan update method
+                if level_name == 'overall':
+                    # Update overall progress untuk high-level steps
+                    progress_tracker.update('overall', percentage, overall_msg)
+                else:
+                    # Update current progress untuk detail steps
+                    progress_tracker.update('current', percentage, message)
             else:
-                progress_tracker.update_primary(percentage, message)
+                # Generic progress update untuk unknown steps
+                progress_tracker.update('current', percentage, message)
                 
         except Exception as e:
             logger.debug(f"🔍 Progress callback error: {str(e)}")
@@ -233,60 +224,38 @@ def _create_fixed_progress_callback(progress_tracker, logger):
     return progress_callback
 
 def _bind_button_handlers_fixed(ui_components: Dict[str, Any], handlers: Dict[str, Callable]) -> None:
-    """Bind button handlers dengan fixed approach"""
+    """Bind button handlers dengan fixed approach - one-liner"""
     button_mappings = [
         ('check_button', handlers.get('check_handler')),
         ('download_button', handlers.get('download_handler')),
         ('cleanup_button', handlers.get('cleanup_handler'))
     ]
     
-    for button_name, handler in button_mappings:
-        if button_name in ui_components and handler is not None:
-            button = ui_components[button_name]
-            if hasattr(button, 'on_click'):
-                button.on_click(handler)
+    # One-liner binding dengan safe checks
+    [ui_components[btn_name].on_click(handler) 
+     for btn_name, handler in button_mappings 
+     if btn_name in ui_components and handler is not None and hasattr(ui_components[btn_name], 'on_click')]
 
 def _show_in_confirmation_area_fixed(ui_components: Dict[str, Any], dialog_widget) -> None:
-    """Show dialog dalam confirmation area dengan fixed display"""
+    """Show dialog dalam confirmation area dengan fixed display - one-liner"""
     confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area:
-        try:
-            confirmation_area.layout.display = 'block'
-            confirmation_area.layout.visibility = 'visible'
-            with confirmation_area:
-                confirmation_area.clear_output(wait=True)
-                from IPython.display import display
-                display(dialog_widget)
-        except Exception:
-            pass
+    confirmation_area and (
+        setattr(confirmation_area.layout, 'display', 'block'),
+        setattr(confirmation_area.layout, 'visibility', 'visible'),
+        confirmation_area.clear_output(wait=True),
+        __import__('IPython.display', fromlist=['display']).display(dialog_widget)
+    ) if confirmation_area else None
 
 def _clear_confirmation_area_fixed(ui_components: Dict[str, Any]) -> None:
-    """Clear confirmation area dengan fixed approach"""
+    """Clear confirmation area dengan fixed approach - one-liner"""
     confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area:
-        try:
-            confirmation_area.clear_output(wait=True)
-            confirmation_area.layout.display = 'none'
-            confirmation_area.layout.visibility = 'hidden'
-        except Exception:
-            pass
+    confirmation_area and (
+        confirmation_area.clear_output(wait=True),
+        setattr(confirmation_area.layout, 'display', 'none'),
+        setattr(confirmation_area.layout, 'visibility', 'hidden')
+    ) if confirmation_area else None
 
-# Fixed utilities
-def get_download_status_fixed(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Get download status dengan fixed approach"""
-    return {
-        'ready': 'progress_tracker' in ui_components,
-        'handlers_count': len([k for k in ui_components.keys() if k.endswith('_handler')]),
-        'buttons_available': all(btn in ui_components for btn in ['check_button', 'download_button', 'cleanup_button'])
-    }
-
-def validate_handlers_setup_fixed(ui_components: Dict[str, Any]) -> bool:
-    """Validate handlers setup dengan fixed approach"""
-    required_handlers = ['check_handler', 'download_handler', 'cleanup_handler']
-    return all(handler in ui_components for handler in required_handlers)
-
-def get_handler_summary_fixed(ui_components: Dict[str, Any]) -> str:
-    """Get handler summary dengan fixed approach"""
-    handler_count = len([k for k in ui_components.keys() if k.endswith('_handler')])
-    progress_status = '✅' if 'progress_tracker' in ui_components else '❌'
-    return f"✅ Handlers setup: {handler_count} handlers | Progress: {progress_status}"
+# Fixed utilities dengan one-liner style
+get_download_status_fixed = lambda ui: {'ready': 'progress_tracker' in ui, 'handlers_count': len([k for k in ui.keys() if k.endswith('_handler')]), 'buttons_available': all(btn in ui for btn in ['check_button', 'download_button', 'cleanup_button'])}
+validate_handlers_setup_fixed = lambda ui: all(handler in ui for handler in ['check_handler', 'download_handler', 'cleanup_handler'])
+get_handler_summary_fixed = lambda ui: f"✅ Handlers setup: {len([k for k in ui.keys() if k.endswith('_handler')])} handlers | Progress: {'✅' if 'progress_tracker' in ui else '❌'}"

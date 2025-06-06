@@ -25,19 +25,66 @@ def reset_ui_logger(ui_components: Dict[str, Any]):
 def update_progress_step(ui_components: Dict[str, Any], progress_type: str, value: int, 
                         message: str = "", color: str = None):
     """Update progress dengan consolidated approach - one-liner"""
-    ui_components.get('update_progress', lambda *a: None)(progress_type, value, message, color)
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        # Gunakan metode yang benar sesuai API progress tracker
+        if progress_type == 'overall' or progress_type == 'level1':
+            progress_tracker.update_overall(value, message, color)
+        elif progress_type == 'step' or progress_type == 'level2':
+            progress_tracker.update_current(value, message, color)
+    else:
+        # Fallback untuk progress tracking lama
+        ui_components.get('update_progress', lambda *a: None)(progress_type, value, message, color)
 
 def show_operation_progress(ui_components: Dict[str, Any], operation: str):
     """Show progress container untuk operation - one-liner"""
-    ui_components.get('show_for_operation', lambda x: None)(operation)
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        # Gunakan API progress tracker yang benar
+        if operation == 'install':
+            progress_tracker.show("Instalasi Packages", ["Persiapan", "Analisis", "Instalasi", "Finalisasi"])
+        elif operation == 'analyze':
+            progress_tracker.show("Analisis Dependensi", ["Persiapan", "Scanning", "Evaluasi", "Laporan"])
+        elif operation == 'status':
+            progress_tracker.show("Status Check", ["Persiapan", "Sistem Info", "Package Check", "Laporan"])
+        else:
+            progress_tracker.show(operation.title(), ["Persiapan", "Proses", "Finalisasi"])
+    else:
+        ui_components.get('show_for_operation', lambda x: None)(operation)
+
+def show_progress_tracker_safe(ui_components: Dict[str, Any], title: str, steps: list):
+    """Show progress tracker dengan safe fallback - one-liner"""
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        progress_tracker.show(title, steps)
+    else:
+        ui_components.get('show_for_operation', lambda x: None)(title)
+
+def reset_progress_tracker_safe(ui_components: Dict[str, Any]):
+    """Reset progress tracker dengan safe fallback - one-liner"""
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        progress_tracker.reset()
+        progress_tracker.update_overall(0, "")
+    else:
+        # Tidak ada fallback untuk reset dalam API lama
+        pass
 
 def complete_operation_with_message(ui_components: Dict[str, Any], message: str):
     """Complete operation dengan success message - one-liner"""
-    ui_components.get('complete_operation', lambda x: None)(message)
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        progress_tracker.complete(message)
+    else:
+        ui_components.get('complete_operation', lambda x: None)(message)
 
 def error_operation_with_message(ui_components: Dict[str, Any], message: str):
     """Error operation dengan error message - one-liner"""
-    ui_components.get('error_operation', lambda x: None)(message)
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        progress_tracker.error(message)
+    else:
+        ui_components.get('error_operation', lambda x: None)(message)
 
 def update_package_status_by_name(ui_components: Dict[str, Any], package_name: str, status: str):
     """Update package status berdasarkan nama dengan category lookup - one-liner"""
@@ -69,7 +116,12 @@ def with_button_context(ui_components: Dict[str, Any], operation: str, func: Cal
 
 def create_progress_tracker(ui_components: Dict[str, Any]) -> Callable:
     """Create progress tracking function dengan closure - one-liner factory"""
-    return lambda progress_type, value, message="", color=None: update_progress_step(ui_components, progress_type, value, message, color)
+    # Fungsi wrapper untuk kompatibilitas dengan kode lama yang menggunakan progress_tracker sebagai callable
+    def progress_tracker_wrapper(progress_type, value, message="", color=None):
+        # Gunakan metode yang benar sesuai API progress tracker
+        update_progress_step(ui_components, progress_type, value, message, color)
+    
+    return progress_tracker_wrapper
 
 def create_logger_bridge(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
     """Create logger bridge menggunakan built-in logger dari CommonInitializer - one-liner mapping"""
@@ -79,10 +131,17 @@ def create_logger_bridge(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
 
 def setup_progress_callback(ui_components: Dict[str, Any]) -> Callable:
     """Setup progress callback untuk handlers dengan unified interface - one-liner"""
-    return lambda **kwargs: update_progress_step(
-        ui_components, kwargs.get('type', 'overall'), kwargs.get('progress', 0), 
-        kwargs.get('message', 'Processing...'), kwargs.get('color', None)
-    )
+    # Fungsi wrapper untuk kompatibilitas dengan kode lama yang menggunakan progress callback
+    def progress_callback_wrapper(**kwargs):
+        progress_type = kwargs.get('type', 'overall')
+        progress = kwargs.get('progress', 0)
+        message = kwargs.get('message', 'Processing...')
+        color = kwargs.get('color', None)
+        
+        # Gunakan metode yang benar sesuai API progress tracker
+        update_progress_step(ui_components, progress_type, progress, message, color)
+    
+    return progress_callback_wrapper
 
 def handle_operation_lifecycle(ui_components: Dict[str, Any], operation_name: str, 
                              operation_func: Callable, *args, **kwargs):
@@ -144,8 +203,23 @@ def create_stepped_progress_tracker(ui_components: Dict[str, Any], steps_class=P
     def step_progress(step_name: str, message: str = "", progress_type: str = "overall"):
         """Update progress menggunakan predefined steps - one-liner"""
         step_value = getattr(steps_class, step_name.upper(), 0)
-        update_progress_step(ui_components, progress_type, step_value, message)
-        progress_type == "overall" and update_progress_step(ui_components, "step", step_value, message)
+        
+        # Gunakan metode yang benar sesuai API progress tracker
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            if progress_type == 'overall' or progress_type == 'level1':
+                progress_tracker.update_overall(step_value, message)
+            elif progress_type == 'step' or progress_type == 'level2':
+                progress_tracker.update_current(step_value, message)
+            
+            # Jika update overall, juga update current untuk konsistensi
+            if progress_type == 'overall':
+                progress_tracker.update_current(step_value, message)
+        else:
+            # Fallback ke metode lama
+            update_progress_step(ui_components, progress_type, step_value, message)
+            if progress_type == "overall":
+                update_progress_step(ui_components, "step", step_value, message)
     
     return step_progress
 

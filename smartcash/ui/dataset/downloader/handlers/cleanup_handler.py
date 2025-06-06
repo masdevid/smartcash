@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/cleanup_handler.py
-Deskripsi: Optimized cleanup handler dengan progress tracker dual-level dan one-liner style
+Deskripsi: Fixed cleanup handler dengan API progress_tracker yang benar dan one-liner style
 """
 
 from typing import Dict, Any, Callable
@@ -10,7 +10,7 @@ from smartcash.dataset.services.organizer.dataset_organizer import DatasetOrgani
 from smartcash.dataset.utils.path_validator import get_path_validator
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Setup optimized cleanup handler dengan dual-level progress"""
+    """Setup optimized cleanup handler dengan API progress tracker yang benar"""
     
     def handle_cleanup(button):
         """Handle cleanup dengan streamlined validation dan confirmation flow"""
@@ -90,6 +90,10 @@ def _show_streamlined_cleanup_confirmation(ui_components: Dict[str, Any], cleanu
     ]
     file_breakdown = '\n'.join(file_breakdown_lines)
     
+    # One-liner confirmation handlers
+    on_confirm_handler = lambda b: (_clear_confirmation_area(ui_components), _execute_streamlined_cleanup_sync(ui_components, cleanup_info, logger))
+    on_cancel_handler = lambda b: _clear_confirmation_area(ui_components)
+    
     confirmation_dialog = create_destructive_confirmation(
         title="🧹 Konfirmasi Cleanup Dataset",
         message=f"""⚠️ **OPERASI DESTRUKTIF - TIDAK DAPAT DIBATALKAN** ⚠️
@@ -108,15 +112,15 @@ def _show_streamlined_cleanup_confirmation(ui_components: Dict[str, Any], cleanu
 💾 Pastikan sudah **BACKUP DATA PENTING** secara manual
 
 ⚡ **Yakin ingin melanjutkan cleanup destruktif ini?**""",
-        on_confirm=lambda b: (_clear_confirmation_area(ui_components), _execute_streamlined_cleanup_sync(ui_components, cleanup_info, logger)),
-        on_cancel=lambda b: _clear_confirmation_area(ui_components),
+        on_confirm=on_confirm_handler,
+        on_cancel=on_cancel_handler,
         item_name="Dataset Complete", confirm_text="🗑️ Ya, Hapus SEMUA", cancel_text="❌ Batal"
     )
     
     _show_in_confirmation_area(ui_components, confirmation_dialog)
 
 def _execute_streamlined_cleanup_sync(ui_components: Dict[str, Any], cleanup_info: Dict[str, Any], logger) -> None:
-    """Execute streamlined cleanup dengan optimized dual-level progress"""
+    """Execute streamlined cleanup dengan API progress_tracker yang benar"""
     try:
         # Get progress tracker
         progress_tracker = ui_components.get('progress_tracker')
@@ -125,8 +129,10 @@ def _execute_streamlined_cleanup_sync(ui_components: Dict[str, Any], cleanup_inf
             show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
             return
         
-        # Show progress
-        progress_tracker.show("Cleanup Dataset")
+        # Show progress dengan API yang benar
+        cleanup_steps = ["scan", "cleanup", "verify"]
+        step_weights = {"scan": 10, "cleanup": 80, "verify": 10}
+        progress_tracker.show("Cleanup Dataset", cleanup_steps, step_weights)
         
         # Create organizer dengan progress integration
         organizer = DatasetOrganizer(logger)
@@ -148,16 +154,18 @@ def _execute_streamlined_cleanup_sync(ui_components: Dict[str, Any], cleanup_inf
             logger.success(f"🧹 {success_msg}")
             
             # Additional success details dalam log
-            with ui_components.get('log_output'):
-                from IPython.display import display, HTML
-                display(HTML(f"""
-                <div style="padding: 10px; background: #e8f5e8; border-radius: 4px; margin: 5px 0;">
-                    <strong style="color: #2e7d32;">🎉 Cleanup Summary:</strong><br>
-                    📁 Folders cleaned: {', '.join(result['stats']['folders_cleaned'])}<br>
-                    💾 Space freed: ~{cleanup_info['total_size_mb']:.1f} MB<br>
-                    ⏱️ Duration: {result.get('duration', 'N/A')} seconds
-                </div>
-                """))
+            log_output = ui_components.get('log_output')
+            if log_output:
+                with log_output:
+                    from IPython.display import display, HTML
+                    display(HTML(f"""
+                    <div style="padding: 10px; background: #e8f5e8; border-radius: 4px; margin: 5px 0;">
+                        <strong style="color: #2e7d32;">🎉 Cleanup Summary:</strong><br>
+                        📁 Folders cleaned: {', '.join(result['stats']['folders_cleaned'])}<br>
+                        💾 Space freed: ~{cleanup_info['total_size_mb']:.1f} MB<br>
+                        ⏱️ Duration: {result.get('duration', 'N/A')} seconds
+                    </div>
+                    """))
             
         elif result['status'] == 'empty':
             info_msg = "ℹ️ Tidak ada file yang perlu dibersihkan"
@@ -179,31 +187,32 @@ def _execute_streamlined_cleanup_sync(ui_components: Dict[str, Any], cleanup_inf
         logger.error(error_msg)
 
 def _create_streamlined_cleanup_progress_callback(progress_tracker, logger, cleanup_info: Dict[str, Any]) -> Callable:
-    """Create streamlined progress callback untuk cleanup operations"""
+    """Create streamlined progress callback untuk cleanup operations dengan API yang benar"""
     
     def cleanup_progress_callback(step: str, current: int, total: int, message: str):
-        """Streamlined progress callback dengan optimized level mapping"""
+        """Streamlined progress callback dengan API progress_tracker yang benar"""
         try:
             percentage = min(100, max(0, int((current / total) * 100) if total > 0 else 0))
             
-            # Map cleanup steps ke dual-level progress dengan optimized calculation
+            # Map cleanup steps ke progress levels dengan API yang benar
             if step == 'scan':
-                # Scanning phase (0-20%)
-                progress_tracker.update_overall(int(percentage * 0.2), "🔍 Scanning files")
-                progress_tracker.update_primary(percentage, message)
+                # Scanning phase - update overall progress
+                progress_tracker.update('overall', percentage, "🔍 Scanning files")
+                progress_tracker.update('current', percentage, message)
             elif step == 'cleanup':
-                # Main cleanup phase (20-90%)
-                overall_pct = 20 + int(percentage * 0.7)
-                progress_tracker.update_overall(overall_pct, f"🧹 Cleanup: {percentage}%")
-                progress_tracker.update_primary(percentage, message)
+                # Main cleanup phase - update current progress
+                progress_tracker.update('current', percentage, message)
+                # Update overall based on cleanup progress
+                overall_pct = 10 + int(percentage * 0.8)  # 10% dari scan + 80% cleanup
+                progress_tracker.update('overall', overall_pct, f"🧹 Cleanup: {percentage}%")
             elif step == 'verify':
-                # Verification phase (90-100%)
-                overall_pct = 90 + int(percentage * 0.1)
-                progress_tracker.update_overall(overall_pct, "✅ Verifikasi cleanup")
-                progress_tracker.update_primary(percentage, message)
+                # Verification phase - final stage
+                overall_pct = 90 + int(percentage * 0.1)  # 90% done + 10% verify
+                progress_tracker.update('overall', overall_pct, "✅ Verifikasi cleanup")
+                progress_tracker.update('current', percentage, message)
             else:
-                # Generic progress
-                progress_tracker.update_primary(percentage, message)
+                # Generic progress untuk unknown steps
+                progress_tracker.update('current', percentage, message)
                 
         except Exception as e:
             logger.debug(f"🔍 Cleanup progress callback error: {str(e)}")
@@ -211,15 +220,14 @@ def _create_streamlined_cleanup_progress_callback(progress_tracker, logger, clea
     return cleanup_progress_callback
 
 def _show_in_confirmation_area(ui_components: Dict[str, Any], dialog_widget) -> None:
-    """Show dialog dalam confirmation area dengan optimized display"""
+    """Show dialog dalam confirmation area dengan optimized display - one-liner"""
     confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area:
-        setattr(confirmation_area.layout, 'display', 'block')
-        setattr(confirmation_area.layout, 'visibility', 'visible')
-        with confirmation_area:
-            confirmation_area.clear_output(wait=True)
-            from IPython.display import display
-            display(dialog_widget)
+    confirmation_area and (
+        setattr(confirmation_area.layout, 'display', 'block'),
+        setattr(confirmation_area.layout, 'visibility', 'visible'),
+        confirmation_area.clear_output(wait=True),
+        __import__('IPython.display', fromlist=['display']).display(dialog_widget)
+    ) if confirmation_area else None
 
 def _clear_confirmation_area(ui_components: Dict[str, Any]) -> None:
     """Clear confirmation area dengan one-liner cleanup"""
@@ -228,7 +236,7 @@ def _clear_confirmation_area(ui_components: Dict[str, Any]) -> None:
         confirmation_area.clear_output(wait=True),
         setattr(confirmation_area.layout, 'display', 'none'),
         setattr(confirmation_area.layout, 'visibility', 'hidden')
-    )
+    ) if confirmation_area else None
 
 # Optimized utilities dengan one-liner style
 get_cleanup_status = lambda ui: {'ready_for_cleanup': _get_streamlined_cleanup_info()['has_data'], 'confirmation_available': 'confirmation_area' in ui, 'progress_tracker_available': 'progress_tracker' in ui}

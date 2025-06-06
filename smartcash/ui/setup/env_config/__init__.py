@@ -10,6 +10,7 @@ from .constants import (
 )
 from .utils import (
     update_progress_safe, hide_progress_safe, show_progress_safe,
+    complete_progress_safe, error_progress_safe, reset_progress_safe,
     is_colab_environment, test_drive_readiness, validate_setup_integrity
 )
 
@@ -19,6 +20,7 @@ __all__ = [
     'REQUIRED_FOLDERS', 'CONFIG_TEMPLATES', 'ESSENTIAL_CONFIGS',
     'STATUS_MESSAGES', 'PROGRESS_MESSAGES',
     'update_progress_safe', 'hide_progress_safe', 'show_progress_safe',
+    'complete_progress_safe', 'error_progress_safe', 'reset_progress_safe',
     'is_colab_environment', 'test_drive_readiness', 'validate_setup_integrity'
 ]
 

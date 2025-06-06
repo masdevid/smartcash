@@ -141,7 +141,7 @@ class EnhancedProgressTracker:
         
         # Set all visible bars ke 100% dengan one-liner
         [self._update_progress_bar(level, 100, "Selesai", '#28a745') for level in self.progress_bars.keys()]
-        [setattr(self.progress_values, level, 100) for level in self.progress_values]
+        [self.progress_values.update({level: 100}) for level in self.progress_values]
         
         self._update_status(f"✅ {message}", 'success')
         self._schedule_auto_hide()
@@ -202,8 +202,8 @@ class EnhancedProgressTracker:
     
     def _reset_all_progress(self) -> None:
         """Reset all progress bars dengan one-liner state clearing"""
-        [setattr(self.progress_values, level, 0) for level in self.progress_values]
-        [setattr(self.progress_messages, level, "") for level in self.progress_messages]
+        [self.progress_values.update({level: 0}) for level in self.progress_values]
+        [self.progress_messages.update({level: ""}) for level in self.progress_messages]
         [self._update_progress_bar(level, 0) for level in self.progress_bars.keys()]
         self.status_message.value = ""
     

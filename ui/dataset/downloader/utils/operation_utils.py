@@ -24,7 +24,9 @@ class StreamlinedDownloadOperations:
         def check_operation():
             paths = self.path_validator.get_dataset_paths()
             validation = self.path_validator.validate_dataset_structure(paths['data_root'])
-            return safe_boolean_and_operation(validation.get('valid'), validation.get('total_images', 0) > 0)
+            # Perbaikan: Pastikan validation.get('valid') dan validation.get('total_images', 0) > 0 adalah boolean
+            # dan gunakan all() sebagai pengganti safe_boolean_and_operation
+            return all([validation.get('valid', False), validation.get('total_images', 0) > 0])
         
         return bool(safe_operation_or_none(check_operation) or False)
     

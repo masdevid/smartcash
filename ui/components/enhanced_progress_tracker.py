@@ -99,7 +99,7 @@ class EnhancedProgressTracker:
         
         value = max(0, min(100, value))
         self.progress_values[level] = value
-        message and setattr(self.progress_messages, level, message)
+        message and (self.progress_messages.__setitem__(level, message))
         
         # Auto-calculate overall progress untuk DUAL/TRIPLE mode
         if level == 'step' and self.mode in [ProgressMode.DUAL, ProgressMode.TRIPLE]:

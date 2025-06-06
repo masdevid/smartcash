@@ -26,12 +26,27 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     logger.debug("✅ Semua handlers berhasil disetup")
     return ui_components
 
-def _setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
+def _setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger):
     """Setup download button handler dengan proper service integration"""
     download_button = ui_components.get('download_button')
     if not download_button:
         logger.error("❌ Download button tidak ditemukan")
-        return
+        # Buat dummy handler untuk menghindari error
+        class DummyHandler:
+            def set_progress_callback(self, callback): pass
+        return DummyHandler()
+    
+    # Buat objek handler dengan metode yang diperlukan
+    class DownloadHandlerObj:
+        def __init__(self):
+            self.logger = logger
+            
+        def set_progress_callback(self, callback):
+            # Dummy method untuk compatibility
+            logger.debug(f"🔧 Progress callback diset pada download handler")
+    
+    # Buat instance handler
+    handler = DownloadHandlerObj()
     
     def on_download_click(button):
         """Handle download dengan validation dan service call"""
@@ -43,6 +58,7 @@ def _setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any
             config_handler = ui_components.get('config_handler')
             if not config_handler:
                 show_status_safe("❌ Config handler tidak tersedia", "error", ui_components)
+                button.disabled = False
                 return
             
             current_config = config_handler.extract_config_from_ui(ui_components)
@@ -79,6 +95,9 @@ def _setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any
     
     download_button.on_click(on_download_click)
     logger.debug("✅ Download handler berhasil disetup")
+    
+    # Return handler object untuk digunakan di ui_components
+    return handler
 
 def _show_download_confirmation(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
     """Show confirmation dialog untuk download yang akan menimpa existing data"""

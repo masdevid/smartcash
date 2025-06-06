@@ -97,6 +97,14 @@ NAMESPACE_COLORS = {
     "PRETRAIN": "#D7BDE2"   # Light purple untuk pretrained model
 }
 
+# ENHANCED namespace color helper function
+def get_namespace_color(namespace_id: str) -> str:
+    """Mendapatkan warna untuk namespace ID yang diberikan"""
+    if not namespace_id:
+        return "#007bff"  # Default blue
+    
+    return NAMESPACE_COLORS.get(namespace_id, "#007bff")
+
 # ENHANCED flag mapping dengan UUID support
 def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
     """Enhanced namespace ID detection dengan UUID support"""

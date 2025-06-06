@@ -50,11 +50,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     action_header = widgets.HTML(f"""<h4 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 10px 0; 
                                            border-bottom: 2px solid {COLORS.get('primary', '#007bff')}; padding-bottom: 6px;'>
                                        {ICONS.get('play', '▶️')} Actions</h4>""")
-    
-    progress_header = widgets.HTML(f"""<h4 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 10px 0; 
-                                            border-bottom: 2px solid {COLORS.get('success', '#28a745')}; padding-bottom: 6px;'>
-                                        {ICONS.get('progress', '📈')} Progress</h4>""")
-    
+       
     log_header = widgets.HTML(f"""<h4 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 10px 0; 
                                          border-bottom: 2px solid {COLORS.get('info', '#17a2b8')}; padding-bottom: 6px;'>
                                    {ICONS.get('log', '📋')} Log Aktivitas</h4>""")
@@ -66,7 +62,6 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         save_reset_components['container'],
         action_header, 
         button_group,
-        progress_header,
         progress_components['container'],
         log_header, 
         log_output

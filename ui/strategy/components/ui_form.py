@@ -22,12 +22,12 @@ def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
     layer_mode = utils.get('layer_mode', 'single')
     default_experiment = f"{model_type}_{layer_mode}"
     
-    # Widget creators dengan responsive layout - one-liner factories
-    int_slider = lambda val, min_val, max_val, desc: widgets.IntSlider(value=val, min=min_val, max=max_val, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'))
-    float_slider = lambda val, min_val, max_val, desc, step=0.001: widgets.FloatSlider(value=val, min=min_val, max=max_val, step=step, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'), readout_format='.3f')
-    checkbox = lambda val, desc: widgets.Checkbox(value=val, description=desc, style={'description_width': 'initial'}, layout=widgets.Layout(width='auto'))
-    text_input = lambda val, desc: widgets.Text(value=val, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'))
-    dropdown = lambda val, opts, desc: widgets.Dropdown(value=val, options=opts, description=desc, style={'description_width': '120px'}, layout=widgets.Layout(width='100%', max_width='100%'))
+    # Widget creators dengan responsive layout - one-liner factories dengan overflow fix
+    int_slider = lambda val, min_val, max_val, desc: widgets.IntSlider(value=val, min=min_val, max=max_val, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    float_slider = lambda val, min_val, max_val, desc, step=0.001: widgets.FloatSlider(value=val, min=min_val, max=max_val, step=step, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'), readout_format='.3f')
+    checkbox = lambda val, desc: widgets.Checkbox(value=val, description=desc, style={'description_width': 'initial'}, layout=widgets.Layout(width='auto', max_width='100%', overflow='hidden'))
+    text_input = lambda val, desc: widgets.Text(value=val, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    dropdown = lambda val, opts, desc: widgets.Dropdown(value=val, options=opts, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
     
     # Strategy-specific form components dengan one-liner mapping
     form_components = {

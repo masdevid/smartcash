@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/initializers/common_initializer.py
-Deskripsi: Fixed CommonInitializer dengan proper context manager dan simplified button handling
+Deskripsi: Fixed CommonInitializer dengan simplified button handling dan fixed import errors
 """
 
 from typing import Dict, Any, Optional, List, Type
@@ -10,11 +10,11 @@ import datetime
 from smartcash.ui.utils.fallback_utils import create_fallback_ui, try_operation_safe, show_status_safe
 from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge, get_logger
 from smartcash.ui.utils.logging_utils import suppress_all_outputs
-from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES, register_namespace
+from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 class CommonInitializer(ABC):
-    """Fixed CommonInitializer dengan simplified button handling tanpa generator context manager"""
+    """Fixed CommonInitializer dengan simplified button handling dan fixed imports"""
     
     def __init__(self, module_name: str, config_handler_class: Optional[Type[ConfigHandler]] = None, 
                  parent_module: Optional[str] = None):
@@ -22,19 +22,13 @@ class CommonInitializer(ABC):
         self.parent_module = parent_module
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
-        # Setup logger namespace
+        # Setup logger namespace - simplified without register_namespace
         self.logger_namespace = (KNOWN_NAMESPACES.get(f"smartcash.ui.{self.full_module_name}") or 
                                 KNOWN_NAMESPACES.get(self.full_module_name) or
-                                self._register_new_namespace(self.full_module_name))
+                                f"smartcash.ui.{self.full_module_name}")
         
         self.logger = get_logger(self.logger_namespace)
         self.config_handler_class = config_handler_class
-        
-    def _register_new_namespace(self, module_name: str) -> str:
-        """Register namespace baru dengan one-liner"""
-        namespace = f"smartcash.ui.{module_name}" if "smartcash" not in module_name else module_name
-        register_namespace(namespace, module_name.split('.')[-1].upper())
-        return namespace
     
     def initialize(self, env=None, config=None, **kwargs) -> Any:
         """Main initialization dengan simplified error handling"""
@@ -72,7 +66,7 @@ class CommonInitializer(ABC):
                 return create_fallback_ui(validation_result['message'], self.module_name)
             
             self._finalize_setup(ui_components, merged_config)
-            show_status_safe(ui_components, f"✅ {self.module_name} UI berhasil diinisialisasi", "success")
+            show_status_safe(f"✅ {self.module_name} UI berhasil diinisialisasi", "success", ui_components)
             
             return self._get_return_value(ui_components)
             
@@ -95,7 +89,7 @@ class CommonInitializer(ABC):
     
     def _setup_handlers_with_config_handler(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
                                            config_handler: ConfigHandler, env=None, **kwargs) -> None:
-        """Setup handlers dengan simplified button handling tanpa context manager"""
+        """Setup handlers dengan simplified button handling"""
         # Setup simplified button handlers
         self._setup_simplified_button_handlers(ui_components, config_handler)
         
@@ -165,7 +159,7 @@ class CommonInitializer(ABC):
         except Exception as e:
             error_msg = f"❌ Error during {operation_name}: {str(e)}"
             self.logger.error(error_msg)
-            show_status_safe(ui_components, error_msg, "error")
+            show_status_safe(error_msg, "error", ui_components)
             
         finally:
             # Always restore button state
@@ -173,7 +167,7 @@ class CommonInitializer(ABC):
     
     def _do_cleanup(self, ui_components: Dict[str, Any], button) -> bool:
         """Implementasi cleanup - override di subclass jika diperlukan"""
-        show_status_safe(ui_components, "🧹 Membersihkan resources...", "info")
+        show_status_safe("🧹 Membersihkan resources...", "info", ui_components)
         
         # Default cleanup: clear outputs dan reset progress
         config_handler = ui_components.get('config_handler')
@@ -181,7 +175,7 @@ class CommonInitializer(ABC):
             config_handler._clear_ui_outputs(ui_components)
             config_handler._reset_progress_bars(ui_components)
         
-        show_status_safe(ui_components, "✅ Cleanup selesai", "success")
+        show_status_safe("✅ Cleanup selesai", "success", ui_components)
         return True
     
     # Abstract methods - tetap sama

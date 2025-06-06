@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/config_handler.py
-Deskripsi: Config handler untuk downloader yang mewarisi base ConfigHandler dengan Roboflow dan UUID support
+Deskripsi: Fixed config handler untuk downloader dengan implementasi lengkap abstract methods
 """
 
 from typing import Dict, Any
@@ -9,11 +9,19 @@ from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downlo
 from smartcash.ui.dataset.downloader.utils.colab_secrets import set_api_key_to_config
 
 class DownloaderConfigHandler(ConfigHandler):
-    """Config handler untuk downloader dengan API key management dan UUID support"""
+    """Fixed config handler untuk downloader dengan implementasi lengkap abstract methods"""
     
     def __init__(self, module_name: str = 'downloader', parent_module: str = 'dataset'):
         super().__init__(module_name, parent_module)
     
+    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract config dari downloader UI components - implementasi abstract method"""
+        return self.extract_config_from_ui(ui_components)
+    
+    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI dari config - implementasi abstract method"""
+        self.update_ui_from_config(ui_components, config)
+
     def get_default_config(self) -> Dict[str, Any]:
         """Get default config dari dataset_config.yaml dengan API key auto-detection"""
         config = get_default_downloader_config()
@@ -68,6 +76,42 @@ class DownloaderConfigHandler(ConfigHandler):
         ]
         
         [self._set_widget_value(ui_components, widget_name, value) for widget_name, value in widget_updates]
+    
+    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate config dengan comprehensive checks"""
+        errors = []
+        
+        # Extract roboflow config
+        roboflow = config.get('data', {}).get('roboflow', {})
+        
+        # Required fields validation
+        required_fields = {
+            'workspace': roboflow.get('workspace', '').strip(),
+            'project': roboflow.get('project', '').strip(),
+            'version': roboflow.get('version', '').strip(),
+            'api_key': roboflow.get('api_key', '').strip()
+        }
+        
+        # Check missing required fields
+        missing_fields = [field for field, value in required_fields.items() if not value]
+        if missing_fields:
+            errors.extend([f"Field '{field}' wajib diisi" for field in missing_fields])
+        
+        # Format validation
+        if required_fields['workspace'] and len(required_fields['workspace']) < 3:
+            errors.append("Workspace minimal 3 karakter")
+        
+        if required_fields['project'] and len(required_fields['project']) < 3:
+            errors.append("Project minimal 3 karakter")
+        
+        if required_fields['api_key'] and len(required_fields['api_key']) < 10:
+            errors.append("API key terlalu pendek")
+        
+        return {
+            'valid': len(errors) == 0,
+            'errors': errors,
+            'warnings': []
+        }
     
     def _get_widget_value(self, ui_components: Dict[str, Any], widget_name: str, default_value: Any = None) -> Any:
         """Get widget value dengan safe access dan default"""

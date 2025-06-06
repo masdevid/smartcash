@@ -183,7 +183,9 @@ except ImportError:
         "text_muted": "#6c757d",
         "bg_light": "#f8f9fa",
         "bg_white": "#ffffff",
-        "bg_dark": "#343a40"
+        "bg_dark": "#343a40",
+        "header_bg": "#f0f8ff",
+        "header_border": "#3498db"
     }
     
     # Fallback icons

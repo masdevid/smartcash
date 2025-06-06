@@ -6,7 +6,7 @@ Deskripsi: Fixed downloader initializer dengan proper action button binding dan 
 from typing import Dict, Any, Optional, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
-from smartcash.ui.dataset.downloader.handlers.config_handler import create_downloader_config_handler
+from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
 from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
 from smartcash.common.logger import get_logger
@@ -17,7 +17,7 @@ class DownloaderInitializer(CommonInitializer):
     def __init__(self):
         super().__init__(
             module_name='downloader',
-            config_handler_class=create_downloader_config_handler,
+            config_handler_class=DownloaderConfigHandler,
             parent_module='dataset'
         )
     

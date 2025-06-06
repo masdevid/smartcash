@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/components/status_panel.py
-Deskripsi: Komponen status panel yang reusable dengan one-liner style
+Deskripsi: Fixed status panel dengan single icon dan consistency
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 def create_status_panel(message: str = "", status_type: str = "info", layout: Optional[Dict[str, Any]] = None) -> widgets.HTML:
-    """Buat status panel yang bisa digunakan kembali dengan one-liner style."""
+    """Fixed status panel dengan single icon consistency"""
     from smartcash.ui.utils.constants import ALERT_STYLES
     style_info = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
     bg_color, text_color, icon = style_info['bg_color'], style_info['text_color'], style_info['icon']
@@ -17,7 +17,7 @@ def create_status_panel(message: str = "", status_type: str = "info", layout: Op
     return widgets.HTML(value=html_content, layout=widgets.Layout(**default_layout))
 
 def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "info") -> None:
-    """Update status panel yang sudah ada dengan one-liner style."""
+    """Update status panel dengan single icon consistency"""
     from smartcash.ui.utils.constants import ALERT_STYLES
     style_info = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
     bg_color, text_color, icon = style_info['bg_color'], style_info['text_color'], style_info['icon']

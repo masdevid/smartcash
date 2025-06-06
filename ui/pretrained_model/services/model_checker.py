@@ -73,23 +73,13 @@ class ModelChecker:
         tracker and tracker.complete(summary_msg)
     
     def _safe_update_progress(self, progress: int, message: str) -> None:
-        """Safe update progress dengan fallback dan debug"""
-        print(f"🔧 DEBUG: Updating progress {progress}% - {message}")
-        
-        # Try update_primary first
+        """Safe update progress dengan fallback"""
         update_fn = self.ui_components.get('update_primary')
         if update_fn:
-            print(f"🔧 DEBUG: Using update_primary")
             update_fn(progress, message)
         else:
-            print(f"🔧 DEBUG: update_primary not found, trying tracker")
-            # Fallback to tracker
             tracker = self.ui_components.get('tracker')
-            if tracker:
-                print(f"🔧 DEBUG: Using tracker.update_primary")
-                tracker.update_primary(progress, message)
-            else:
-                print(f"🔧 DEBUG: No tracker found in ui_components")
+            tracker and tracker.update_primary(progress, message)
     
     def _check_single_model(self, model_name: str) -> Dict[str, Any]:
         """Check single model dengan detailed validation"""

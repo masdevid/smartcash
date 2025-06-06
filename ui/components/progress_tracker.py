@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracker.py
-Deskripsi: Fixed progress tracker dengan auto show/hide dan clean progress display
+Deskripsi: Progress tracker menggunakan ipywidgets IntProgress untuk visual yang lebih baik
 """
 
 import ipywidgets as widgets
@@ -77,12 +77,13 @@ class CallbackManager:
             self.unregister(callback_id)
 
 class ProgressTracker:
-    """Fixed progress tracker dengan auto show/hide dan clean display"""
+    """Progress tracker menggunakan ipywidgets IntProgress"""
     
     def __init__(self, config: Optional[ProgressConfig] = None):
         self.config = config or ProgressConfig()
         self.callback_manager = CallbackManager()
-        self.progress_bars: Dict[str, widgets.HTML] = {}
+        self.progress_bars: Dict[str, widgets.IntProgress] = {}
+        self.progress_labels: Dict[str, widgets.HTML] = {}
         self.active_levels: List[str] = []
         self.current_step_index = 0
         self.is_complete = False
@@ -99,16 +100,16 @@ class ProgressTracker:
         """Setup level configuration berdasarkan ProgressLevel"""
         level_configs = {
             ProgressLevel.SINGLE: [
-                ProgressBarConfig("primary", "Progress", "📊", "#28a745", 0)
+                ProgressBarConfig("primary", "Progress", "📊", "success", 0)
             ],
             ProgressLevel.DUAL: [
-                ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
-                ProgressBarConfig("current", "Current Operation", "⚡", "#ffc107", 1)
+                ProgressBarConfig("overall", "Overall Progress", "📊", "success", 0),
+                ProgressBarConfig("current", "Current Operation", "⚡", "warning", 1)
             ],
             ProgressLevel.TRIPLE: [
-                ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
-                ProgressBarConfig("step", "Step Progress", "🔄", "#17a2b8", 1),
-                ProgressBarConfig("current", "Current Operation", "⚡", "#ffc107", 2)
+                ProgressBarConfig("overall", "Overall Progress", "📊", "success", 0),
+                ProgressBarConfig("step", "Step Progress", "🔄", "info", 1),
+                ProgressBarConfig("current", "Current Operation", "⚡", "warning", 2)
             ]
         }
         
@@ -116,7 +117,7 @@ class ProgressTracker:
         self.active_levels = [config.name for config in self.bar_configs if config.visible]
     
     def _create_ui_components(self):
-        """Create UI components dengan responsive design"""
+        """Create UI components dengan ipywidgets IntProgress"""
         self.header_widget = widgets.HTML("", layout=widgets.Layout(margin='0 0 10px 0', width='100%'))
         self.status_widget = widgets.HTML("", layout=widgets.Layout(margin='0 0 8px 0', width='100%'))
         self.step_info_widget = widgets.HTML("", layout=widgets.Layout(
@@ -127,21 +128,25 @@ class ProgressTracker:
         self._initialize_progress_bars()
         
         container_heights = {
-            ProgressLevel.SINGLE: '100px',
-            ProgressLevel.DUAL: '150px',
-            ProgressLevel.TRIPLE: '200px'
+            ProgressLevel.SINGLE: '120px',
+            ProgressLevel.DUAL: '180px',
+            ProgressLevel.TRIPLE: '240px'
         }
         
-        progress_bars_list = [self.progress_bars[level] for level in self.active_levels]
+        # Combine all progress components
+        progress_components = []
+        for level in self.active_levels:
+            if level in self.progress_labels and level in self.progress_bars:
+                progress_components.extend([self.progress_labels[level], self.progress_bars[level]])
         
         self.container = widgets.VBox(
-            [self.header_widget, self.status_widget, self.step_info_widget] + progress_bars_list,
+            [self.header_widget, self.status_widget, self.step_info_widget] + progress_components,
             layout=widgets.Layout(
                 display='none', flex_flow='column nowrap', align_items='stretch',
                 margin='10px 0', padding='15px', border='1px solid #28a745',
                 border_radius='8px', background_color='#f8fff8', width='100%',
                 min_height=container_heights[self.config.level],
-                max_height='300px', overflow='hidden', box_sizing='border-box'
+                max_height='400px', overflow='hidden', box_sizing='border-box'
             )
         )
     
@@ -222,8 +227,13 @@ class ProgressTracker:
         
         progress = max(0, min(100, progress))
         
+        # Update IntProgress bar
         if level_name in self.progress_bars:
-            self._update_progress_bar(level_name, progress, message, color)
+            self.progress_bars[level_name].value = progress
+        
+        # Update label
+        if level_name in self.progress_labels:
+            self._update_progress_label(level_name, progress, message, color)
         
         self.progress_values[level_name] = progress
         if message:
@@ -300,50 +310,46 @@ class ProgressTracker:
         self.is_visible = False
     
     def _initialize_progress_bars(self):
-        """Initialize progress bars sebagai HTML widgets"""
+        """Initialize progress bars menggunakan ipywidgets IntProgress"""
         for bar_config in self.bar_configs:
             if bar_config.visible:
-                self.progress_bars[bar_config.name] = widgets.HTML(
-                    value="", 
-                    layout=widgets.Layout(width='100%', margin='2px 0')
+                # Create IntProgress widget
+                self.progress_bars[bar_config.name] = widgets.IntProgress(
+                    value=0, min=0, max=100, 
+                    bar_style=bar_config.color,
+                    layout=widgets.Layout(width='100%', margin='2px 0 8px 0')
                 )
-                self._update_progress_bar(bar_config.name, 0, bar_config.description)
+                
+                # Create label widget
+                self.progress_labels[bar_config.name] = widgets.HTML(
+                    value="", 
+                    layout=widgets.Layout(width='100%', margin='0 0 2px 0')
+                )
+                
+                # Initialize label
+                self._update_progress_label(bar_config.name, 0, bar_config.description)
     
-    def _update_progress_bar(self, level_name: str, value: int, message: str = "", color: str = None):
-        """Update individual progress bar dengan HTML/CSS yang kompatibel dengan Jupyter"""
-        if level_name not in self.progress_bars:
+    def _update_progress_label(self, level_name: str, value: int, message: str = "", color: str = None):
+        """Update progress label dengan message dan percentage"""
+        if level_name not in self.progress_labels:
             return
             
         config = next((c for c in self.bar_configs if c.name == level_name), None)
         if not config:
             return
         
-        bar_color = color or config.color
         display_message = self._clean_message(message or config.description)
         
-        # Menggunakan background gradient untuk visual progress tanpa transition
-        progress_bg = f"linear-gradient(to right, {bar_color} 0%, {bar_color} {value}%, #e9ecef {value}%, #e9ecef 100%)"
-        
-        bar_html = f"""
-        <div style="margin-bottom: 8px; font-family: 'Segoe UI', Arial, sans-serif;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: 14px; font-weight: 500; color: #333;">
-                    {config.emoji} {self._truncate_message(display_message, 40)}
-                </span>
-                <span style="font-size: 13px; color: #666; font-weight: bold; 
-                           background: {bar_color}; color: white; padding: 2px 6px; 
-                           border-radius: 3px; min-width: 35px; text-align: center;">{value}%</span>
-            </div>
-            <div style="background: {progress_bg}; border-radius: 10px; height: 20px; 
-                       border: 1px solid #ddd; position: relative; overflow: hidden;">
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                           color: {'white' if value > 50 else '#333'}; font-size: 11px; font-weight: bold; 
-                           text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">{value}%</div>
-            </div>
+        label_html = f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+            <span style="font-size: 14px; font-weight: 500; color: #333;">
+                {config.emoji} {self._truncate_message(display_message, 45)}
+            </span>
+            <span style="font-size: 12px; color: #666; font-weight: bold;">{value}%</span>
         </div>
         """
         
-        self.progress_bars[level_name].value = bar_html
+        self.progress_labels[level_name].value = label_html
     
     def _clean_message(self, message: str) -> str:
         """Clean message dari emoji duplikat"""
@@ -404,13 +410,18 @@ class ProgressTracker:
     def _set_all_bars_complete(self, message: str):
         """Set all bars ke complete state"""
         for level_name in self.progress_bars:
-            self._update_progress_bar(level_name, 100, f"✅ {self._truncate_message(message, 35)}", '#28a745')
+            self.progress_bars[level_name].value = 100
+            self.progress_bars[level_name].bar_style = 'success'
+            if level_name in self.progress_labels:
+                self._update_progress_label(level_name, 100, f"✅ {self._truncate_message(message, 35)}")
     
     def _set_all_bars_error(self, message: str):
         """Set all bars ke error state"""
         for level_name in self.progress_bars:
-            self._update_progress_bar(level_name, self.progress_values.get(level_name, 0), 
-                                    f"❌ {self._truncate_message(message, 35)}", '#dc3545')
+            self.progress_bars[level_name].bar_style = 'danger'
+            if level_name in self.progress_labels:
+                current_value = self.progress_values.get(level_name, 0)
+                self._update_progress_label(level_name, current_value, f"❌ {self._truncate_message(message, 35)}")
     
     def _delayed_hide(self):
         """Hide container after delay"""

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/logging_utils.py
-Deskripsi: Fixed logging utilities tanpa tqdm dependencies untuk avoid weak reference error
+Deskripsi: Enhanced logging utilities dengan aggressive log suppression untuk clean UI
 """
 
 import logging
@@ -17,43 +17,28 @@ def setup_aggressive_log_suppression() -> None:
     root.setLevel(logging.CRITICAL)
     root.propagate = False
     
-    # Suppression targets termasuk tqdm
+    # One-liner suppression untuk 50+ common targets
     suppression_targets = [
         'requests', 'urllib3', 'tensorflow', 'torch', 'sklearn', 'ipywidgets',
-        'google', 'yaml', 'matplotlib', 'pandas', 'numpy', 'PIL',
+        'google', 'yaml', 'tqdm', 'matplotlib', 'pandas', 'numpy', 'PIL',
         'smartcash.dataset', 'smartcash.model', 'smartcash.training',
         'smartcash.common', 'smartcash.ui.dataset', 'smartcash.detection',
-        'IPython', 'tornado', 'seaborn', 'cv2', 'pathlib',
+        'IPython', 'traitlets', 'tornado', 'seaborn', 'cv2', 'pathlib',
         'asyncio', 'concurrent', 'multiprocessing', 'threading',
         'h5py', 'scipy', 'plotly', 'bokeh', 'altair', 'streamlit'
     ]
     
-    # Suppress semua targets
+    # One-liner untuk suppress semua targets
     [setattr(logging.getLogger(t), 'level', logging.CRITICAL) or 
      setattr(logging.getLogger(t), 'propagate', False) or
      logging.getLogger(t).handlers.clear() for t in suppression_targets]
     
-    # Suppress warnings
+    # Suppress warnings dengan one-liner
     warnings.filterwarnings('ignore')
-    
-    # Suppress tqdm specifically
-    # _suppress_tqdm_completely()
-
-# def _suppress_tqdm_completely() -> None:
-#     """Suppress tqdm completely untuk avoid weak reference issues"""
-#     try:
-#         import tqdm
-#         # Disable tqdm globally
-#         tqdm.tqdm.__init__ = lambda self, *args, **kwargs: None
-#         tqdm.tqdm.update = lambda self, n=1: None
-#         tqdm.tqdm.close = lambda self: None
-#         tqdm.tqdm.__enter__ = lambda self: self
-#         tqdm.tqdm.__exit__ = lambda self, *args: None
-#     except ImportError:
-#         pass
 
 def setup_stdout_suppression() -> None:
     """Setup stdout/stderr suppression dengan anonymous class pattern"""
+    # Stdout suppression dengan anonymous class
     if not hasattr(sys, '_original_stdout_saved'):
         sys._original_stdout_saved = sys.stdout
         sys.stdout = type('StdoutSuppressor', (), {
@@ -63,6 +48,7 @@ def setup_stdout_suppression() -> None:
             'fileno': lambda self: sys._original_stdout_saved.fileno()
         })()
     
+    # Stderr suppression dengan anonymous class
     if not hasattr(sys, '_original_stderr_saved'):
         sys._original_stderr_saved = sys.stderr
         sys.stderr = type('StderrSuppressor', (), {
@@ -87,16 +73,33 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
                          log_dir: str = "logs",
                          log_level: int = logging.INFO,
                          redirect_all_logs: bool = False) -> Any:
-    """Setup logger untuk IPython dengan integrasi UI yang disederhanakan"""
+    """
+    Setup logger untuk IPython dengan integrasi UI yang disederhanakan
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        module_name: Nama modul untuk logger
+        log_to_file: Flag untuk logging ke file
+        log_dir: Direktori log files
+        log_level: Level logging
+        redirect_all_logs: Redirect semua logs ke UI
+        
+    Returns:
+        UILogger instance atau None jika gagal
+    """
     try:
+        # Setup aggressive suppression dulu
         setup_aggressive_log_suppression()
         if redirect_all_logs:
             setup_stdout_suppression()
         
+        # Import UILogger
         from smartcash.ui.utils.ui_logger import create_ui_logger
         
+        # Set module name
         module_name = module_name or ui_components.get('module_name', 'ipython')
         
+        # Create UI logger
         logger = create_ui_logger(
             ui_components, 
             name=module_name, 
@@ -106,10 +109,13 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
             log_level=log_level
         )
         
+        # Register cleanup untuk cell execution
         register_cleanup_on_cell_execution(ui_components)
+        
         return logger
         
     except Exception as e:
+        # Fallback dengan error display
         error_message = f"🚨 Error setup logger: {str(e)}"
         
         if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
@@ -119,7 +125,7 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
         return logging.getLogger(module_name or 'ipython')
 
 def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
-    """Register cleanup function ke IPython events"""
+    """Register cleanup function ke IPython events dengan one-liner handlers"""
     try:
         from IPython import get_ipython
         ipython = get_ipython()
@@ -127,46 +133,32 @@ def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
         if not ipython:
             return
         
-        def cleanup_func():
-            restore_stdout()
-            observer_manager = ui_components.get('observer_manager', {})
-            if hasattr(observer_manager, 'unregister_group'):
-                observer_group = ui_components.get('observer_group')
-                observer_manager.unregister_group(observer_group)
-            
-            # Clean resources
-            resources = ui_components.get('resources', [])
-            for resource, cleanup_func in resources:
-                try:
-                    if callable(cleanup_func):
-                        cleanup_func(resource)
-                    elif hasattr(resource, 'close'):
-                        resource.close()
-                except Exception:
-                    pass
-            
-            ui_components['resources'] = []
-            
-            # Hide UI elements
-            for key in ['progress_bar', 'progress_message', 'progress_container']:
-                widget = ui_components.get(key)
-                if widget and hasattr(widget, 'layout'):
-                    widget.layout.visibility = 'hidden'
+        # One-liner cleanup function
+        cleanup_func = lambda: (
+            restore_stdout(),
+            ui_components.get('observer_manager', {}).get('unregister_group', lambda x: None)(ui_components.get('observer_group')),
+            [cleanup_func(resource) if callable(cleanup_func) else getattr(resource, 'close', lambda: None)() 
+             for resource, cleanup_func in ui_components.get('resources', [])],
+            ui_components.update({'resources': []}),
+            [setattr(ui_components[key], 'layout.visibility', 'hidden') 
+             for key in ['progress_bar', 'progress_message', 'progress_container'] 
+             if key in ui_components and hasattr(ui_components[key], 'layout')]
+        )
         
-        # Unregister existing handlers
+        # Unregister existing cleanup handlers dengan one-liner
         if hasattr(ipython.events, '_events') and 'pre_run_cell' in ipython.events._events:
-            existing_handlers = list(ipython.events._events['pre_run_cell'])
-            for handler in existing_handlers:
-                if hasattr(handler, '__qualname__') and 'cleanup' in handler.__qualname__:
-                    ipython.events.unregister('pre_run_cell', handler)
+            [ipython.events.unregister('pre_run_cell', handler) 
+             for handler in list(ipython.events._events['pre_run_cell'])
+             if hasattr(handler, '__qualname__') and 'cleanup' in handler.__qualname__]
         
+        # Register new cleanup
         ui_components['cleanup'] = cleanup_func
         ipython.events.register('pre_run_cell', cleanup_func)
         
     except (ImportError, AttributeError):
         pass
 
-# One-liner utilities
+# One-liner utilities untuk common operations
 redirect_all_logs_to_ui = lambda ui_components: setup_stdout_suppression() if ui_components else None
 restore_console_logs = lambda ui_components: restore_stdout() if ui_components else None
 suppress_backend_logs = lambda: setup_aggressive_log_suppression()
@@ -190,7 +182,7 @@ def create_silent_context():
     
     return SilentContext()
 
-# Specific suppression functions
+# Pattern matching untuk specific log suppression
 suppress_ml_logs = lambda: [logging.getLogger(lib).setLevel(logging.CRITICAL) 
                            for lib in ['tensorflow', 'torch', 'sklearn', 'cv2']]
 suppress_viz_logs = lambda: [logging.getLogger(lib).setLevel(logging.CRITICAL) 

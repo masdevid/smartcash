@@ -19,7 +19,7 @@ def get_default_strategy_config() -> Dict[str, Any]:
         
         # Training utilities
         'training_utils': {
-            'experiment_name': 'efficientnet_b4_training',
+            'experiment_name': 'efficient_optimized_single',  # Dynamic: {model_type}_{layer_mode}
             'checkpoint_dir': '/content/runs/train/checkpoints',
             'tensorboard': True,
             'log_metrics_every': 10,
@@ -34,6 +34,11 @@ def get_default_strategy_config() -> Dict[str, Any]:
             'img_size_min': 320,
             'img_size_max': 640,
             'step_size': 32
+        },
+        
+        # Model info untuk dynamic experiment name
+        'model': {
+            'model_type': 'efficient_optimized'
         },
         
         # Metadata

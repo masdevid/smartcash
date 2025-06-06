@@ -95,9 +95,8 @@ class StrategyInitializer(ConfigCellInitializer):
         """Buat UI components dengan cascading config loading"""
         try:
             # Load cascading config untuk memastikan defaults yang benar
-            if not config or len(config) < 5:  # Config terlalu minimal, load ulang
+            if not config or len(config) < 5:
                 config = self._load_cascading_config()
-                show_status_safe("🔗 Config dimuat dari cascading inheritance", "info", {'status_panel': None})
             
             # Create form components dengan merged config
             form_components = create_strategy_form(config)
@@ -111,7 +110,6 @@ class StrategyInitializer(ConfigCellInitializer):
             # Setup callback untuk update summary saat config berubah
             self._setup_summary_update_callback(ui_components)
             
-            show_status_safe("✅ Strategy UI berhasil dimuat dengan cascading config", "success", ui_components)
             return ui_components
             
         except Exception as e:
@@ -121,7 +119,6 @@ class StrategyInitializer(ConfigCellInitializer):
             form_components = create_strategy_form(default_config)
             ui_components = create_strategy_layout(form_components)
             update_summary_card(ui_components, default_config)
-            show_status_safe("⚠️ Menggunakan default config karena error", "warning", ui_components)
             return ui_components
     
     def _setup_summary_update_callback(self, ui_components: Dict[str, Any]) -> None:

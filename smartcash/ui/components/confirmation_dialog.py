@@ -8,6 +8,7 @@ from typing import Callable, Optional
 from IPython.display import clear_output
 import uuid
 import atexit
+from typing import Dict, Any, Optional, List
 from smartcash.common.utils.one_liner_fixes import safe_operation_or_none, safe_widget_operation
 
 _ACTIVE_DIALOGS = {}

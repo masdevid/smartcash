@@ -5,7 +5,7 @@ Deskripsi: Flexible Three-level progress tracker dengan callback system dan dyna
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional, Set, Callable, List, Union, Tuple
-from tqdm.auto import tqdm
+from tqdm.notebook import tqdm
 import time
 import threading
 from enum import Enum

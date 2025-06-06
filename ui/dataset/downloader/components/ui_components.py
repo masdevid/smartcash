@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: Fixed UI components dengan progress tracker baru dan one-liner style
+Deskripsi: Fixed UI components tanpa backup/preprocessing dir form dan optimasi progress tracker
 """
 
 import ipywidgets as widgets
@@ -10,63 +10,61 @@ from smartcash.ui.utils.ui_logger_namespace import get_namespace_color
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI dengan fixed progress tracker"""
+    """Create main downloader UI tanpa path fields dan dengan progress tracker yang dioptimasi"""
     config = config or {}
     roboflow = config.get('roboflow', {})
-    
-    # Auto-detect API key saat UI creation
     detected_api_key = get_api_key_from_secrets()
     
-    ui_components = _create_downloader_ui(config, roboflow, detected_api_key)
-    ui_components['layout_order_fixed'] = True
-    
+    ui_components = _create_streamlined_downloader_ui(config, roboflow, detected_api_key)
+    ui_components['layout_optimized'] = True
     return ui_components
 
-def _create_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
-    """Create enhanced downloader UI dengan fixed progress tracker integration"""
-    get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
-    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
-    # 1. Header dengan responsive design
+def _create_streamlined_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
+    """Create streamlined downloader UI tanpa path configuration"""
+    
+    # 1. Header dengan gradient design
     header = widgets.HTML(f"""
     <div style="background: linear-gradient(135deg, {get_namespace_color('DOWNLOAD')}, {get_namespace_color('DOWNLOAD')}CC); 
                 padding: 20px; color: white; border-radius: 8px; margin-bottom: 15px; 
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
         <h3 style="margin: 0; color: white; font-weight: 600;">📥 Dataset Downloader</h3>
-        <p style="margin: 8px 0 0; opacity: 0.95; font-size: 14px;">Download dan organize dataset untuk SmartCash training</p>
+        <p style="margin: 8px 0 0; opacity: 0.95; font-size: 14px;">Download dataset Roboflow untuk SmartCash training (format YOLOv5)</p>
     </div>""", layout=widgets.Layout(width='100%', margin='0'))
     
-    # 2. Status panel dengan auto environment detection
+    # 2. Status panel dinamis
     status_panel = widgets.HTML(_get_dynamic_status_html(), layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
     
-    # 3. Enhanced form fields dengan backup/preprocessed dirs
-    form_fields = _create_form_fields(roboflow, api_key, config)
+    # 3. Streamlined form fields tanpa path config
+    form_fields = _create_streamlined_form_fields(roboflow, api_key, config)
     
-    # 4. Enhanced form container dengan path configuration
-    form_container = _create_grid_form_container(form_fields)
+    # 4. 2-column form container (dataset config + options)
+    form_container = _create_two_column_form_container(form_fields)
     
     # 5. Save/Reset buttons
-    save_reset_components = _create_fixed_save_reset_buttons()
+    save_reset_components = _create_save_reset_buttons()
     
-    # 6. Confirmation area (hidden by default)
+    # 6. Confirmation area
     confirmation_area = widgets.Output(layout=widgets.Layout(width='100%', max_height='400px', overflow='auto', display='none', margin='10px 0'))
     
     # 7. Action buttons dengan state management
-    action_components = _create_state_managed_action_buttons()
+    action_components = _create_action_buttons()
     
-    # 8. Progress tracker dengan dual level support - FIXED IMPLEMENTATION
+    # 8. Progress tracker dengan dual level - optimized
     progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
     progress_container = progress_tracker.container
-    progress_container.layout.display = 'none'  # Hidden by default
+    progress_container.layout.display = 'none'
     
-    # 9. Log output - accordion terbuka by default
-    log_components = _create_open_log_accordion()
-    action_header = widgets.HTML(f"""
-    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
-               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
-        {get_icon('play', '▶️')} Actions
-    </h4>
-    """)
-    # 10. Main container dengan CSS Flexbox - no overflow
+    # 9. Log accordion terbuka by default
+    log_components = _create_log_accordion()
+    
+    # 10. Action header
+    action_header = widgets.HTML("""
+    <h4 style='color: #333; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid #28a745; padding-bottom: 6px;'>
+        ▶️ Actions
+    </h4>""")
+    
+    # 11. Main container streamlined
     main_ui = widgets.VBox([
         header,
         status_panel,
@@ -75,133 +73,71 @@ def _create_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_
         action_header,
         confirmation_area,
         action_components['container'],
-        progress_container,  # Use progress_container directly
+        progress_container,
         log_components['accordion']
     ], layout=widgets.Layout(
-        width='100%', 
-        max_width='100%', 
-        padding='0', 
-        margin='0',
-        display='flex',
-        flex_flow='column nowrap',
-        align_items='stretch',
-        overflow='hidden',
-        box_sizing='border-box'
+        width='100%', max_width='100%', padding='0', margin='0',
+        display='flex', flex_flow='column nowrap', align_items='stretch',
+        overflow='hidden', box_sizing='border-box'
     ))
     
-    # Return comprehensive components dictionary dengan fixed progress tracker methods
     return {
-        # Main UI components
-        'ui': main_ui,
-        'main_container': main_ui,
-        'header': header,
-        'status_panel': status_panel,
-        'form_container': form_container,
-        'confirmation_area': confirmation_area,
+        # Main UI
+        'ui': main_ui, 'main_container': main_ui, 'header': header, 'status_panel': status_panel,
+        'form_container': form_container, 'confirmation_area': confirmation_area,
         
-        # Form fields
+        # Form fields tanpa path fields
         **form_fields,
         
-        # Save/Reset components
-        **save_reset_components,
+        # Buttons
+        **save_reset_components, **action_components,
         
-        # Action buttons
-        **action_components,
+        # Progress tracker - optimized mapping
+        'progress_tracker': progress_tracker, 'progress_container': progress_container,
         
-        # Progress tracker components - FIXED MAPPING
-        'progress_tracker': progress_tracker,
-        'progress_container': progress_container,
-        'container': progress_container,  # Alias for compatibility
-        
-        # Progress tracker methods - direct mapping
-        'show_for_operation': lambda operation=None, steps=None: progress_tracker.show(operation, steps),
-        'update_progress': lambda level, progress, message="": progress_tracker.update(level, progress, message),
-        'complete_operation': lambda message="Operation completed": progress_tracker.complete(message),
-        'error_operation': lambda message="Operation failed": progress_tracker.error(message),
+        # Progress methods - one-liner mapping
+        'show_for_operation': lambda op=None, steps=None: progress_tracker.show(op, steps),
+        'update_overall': lambda prog, msg="": progress_tracker.update_overall(prog, msg),
+        'update_current': lambda prog, msg="": progress_tracker.update_current(prog, msg),
+        'complete_operation': lambda msg="Completed": progress_tracker.complete(msg),
+        'error_operation': lambda msg="Failed": progress_tracker.error(msg),
         'reset_all': lambda: progress_tracker.reset(),
-        
-        # Additional progress convenience methods
-        'update_overall': lambda progress, message="": progress_tracker.update_overall(progress, message),
-        'update_current': lambda progress, message="": progress_tracker.update_current(progress, message),
         'hide_container': lambda: progress_tracker.hide(),
         
         # Log components
         **log_components
     }
 
-def _get_dynamic_status_html() -> str:
-    """Get dynamic status HTML dengan environment detection - one-liner conditionals"""
-    try:
-        import google.colab
-        from pathlib import Path
-        is_drive_mounted = Path('/content/drive/MyDrive').exists()
-        api_key = get_api_key_from_secrets()
-        
-        # One-liner status generation dengan nested conditionals
-        return ("""<div style="padding: 12px; background: #e8f5e8; border-left: 4px solid #4caf50; border-radius: 4px; margin-bottom: 15px; width: 100%; box-sizing: border-box;"><span style="color: #2e7d32;">✅ Drive terhubung + API Key terdeteksi - Siap download!</span></div>""" if (is_drive_mounted and api_key) else
-                """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px; width: 100%; box-sizing: border-box;"><span style="color: #856404;">⚠️ Drive terhubung - Masukkan API Key untuk mulai</span></div>""" if is_drive_mounted else
-                """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px; width: 100%; box-sizing: border-box;"><span style="color: #856404;">⚠️ API Key tersedia - Mount Drive untuk penyimpanan permanen</span></div>""" if api_key else
-                """<div style="padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px; margin-bottom: 15px; width: 100%; box-sizing: border-box;"><span style="color: #721c24;">❌ Perlu mount Drive dan setup API Key</span></div>""")
-    except ImportError:
-        return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; margin-bottom: 15px; width: 100%; box-sizing: border-box;"><span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
-
-def _create_form_fields(roboflow: Dict[str, Any], api_key: str, config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
-    """Create enhanced form fields dengan backup/preprocessed directories dan one-liner layout"""
+def _create_streamlined_form_fields(roboflow: Dict[str, Any], api_key: str, config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
+    """Create streamlined form fields tanpa backup/preprocessing directories"""
     common_layout = widgets.Layout(width='100%', margin='2px 0')
     common_style = {'description_width': '100px'}
     
-    # Get paths dari config atau defaults dengan one-liner fallback
-    backup_dir = config.get('backup_dir', config.get('paths', {}).get('backup', 'data/backup'))
-    preprocessed_dir = config.get('preprocessed_dir', config.get('paths', {}).get('preprocessed', 'data/preprocessed'))
-    
     return {
-        # Dataset configuration
+        # Dataset configuration only
         'workspace_input': widgets.Text(
             value=roboflow.get('workspace', 'smartcash-wo2us'), 
-            description='Workspace:', 
-            placeholder='Nama workspace Roboflow', 
-            layout=common_layout, 
-            style=common_style
+            description='Workspace:', placeholder='Nama workspace Roboflow', 
+            layout=common_layout, style=common_style
         ),
         'project_input': widgets.Text(
             value=roboflow.get('project', 'rupiah-emisi-2022'), 
-            description='Project:', 
-            placeholder='Nama project Roboflow', 
-            layout=common_layout, 
-            style=common_style
+            description='Project:', placeholder='Nama project Roboflow', 
+            layout=common_layout, style=common_style
         ),
         'version_input': widgets.Text(
             value=str(roboflow.get('version', '3')), 
-            description='Version:', 
-            placeholder='Versi dataset', 
-            layout=common_layout, 
-            style=common_style
+            description='Version:', placeholder='Versi dataset', 
+            layout=common_layout, style=common_style
         ),
         'api_key_input': widgets.Password(
             value=api_key or roboflow.get('api_key', ''), 
             description='API Key:', 
             placeholder='🔑 Auto-detect dari Colab secrets' if api_key else 'Masukkan API Key Roboflow', 
-            layout=common_layout, 
-            style=common_style
+            layout=common_layout, style=common_style
         ),
         
-        # Path configuration - NEW FIELDS
-        'backup_dir_input': widgets.Text(
-            value=backup_dir,
-            description='Backup Dir:', 
-            placeholder='Direktori untuk backup dataset', 
-            layout=common_layout, 
-            style=common_style
-        ),
-        'preprocessed_dir_input': widgets.Text(
-            value=preprocessed_dir,
-            description='Preproc Dir:', 
-            placeholder='Direktori untuk preprocessed data', 
-            layout=common_layout, 
-            style=common_style
-        ),
-        
-        # Options
+        # Options only (no path configuration)
         'validate_checkbox': widgets.Checkbox(
             value=config.get('validate_download', True), 
             description='Validasi download', 
@@ -209,162 +145,106 @@ def _create_form_fields(roboflow: Dict[str, Any], api_key: str, config: Dict[str
         ),
         'backup_checkbox': widgets.Checkbox(
             value=config.get('backup_existing', False), 
-            description='Backup existing', 
+            description='Backup existing data', 
             layout=widgets.Layout(width='100%', margin='2px 0')
         )
     }
 
-def _create_grid_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.VBox:
-    """Create enhanced form container dengan 3-column layout untuk path config"""
+def _create_two_column_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.VBox:
+    """Create 2-column form container tanpa path configuration"""
     
-    # Format info yang selalu ditampilkan
+    # Format info hardcoded
     format_info = widgets.HTML("""
     <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin-bottom: 8px; width: 100%; box-sizing: border-box;">
         <small style="color: #1976d2;"><strong>📦 Format:</strong> YOLOv5 PyTorch (hardcoded)</small>
     </div>""", layout=widgets.Layout(width='100%', margin='0'))
     
-    # Left column - dataset config dengan one-liner VBox
+    # Left column - dataset config
     left_column = widgets.VBox([
-        form_fields['workspace_input'],
-        form_fields['project_input'], 
-        form_fields['version_input'],
-        form_fields['api_key_input']
-    ], layout=widgets.Layout(width='32%', padding='8px', box_sizing='border-box', flex='1 1 32%'))
+        form_fields['workspace_input'], form_fields['project_input'], 
+        form_fields['version_input'], form_fields['api_key_input']
+    ], layout=widgets.Layout(width='48%', padding='8px', box_sizing='border-box', flex='1 1 48%'))
     
-    # Middle column - path config dengan one-liner VBox  
-    middle_column = widgets.VBox([
-        widgets.HTML("""<div style="padding: 8px; background: #fff3cd; border-radius: 4px; margin-bottom: 8px; width: 100%; box-sizing: border-box;"><small style="color: #856404;"><strong>📂 Path Config:</strong> Direktori penyimpanan</small></div>""", layout=widgets.Layout(width='100%', margin='0')),
-        form_fields['backup_dir_input'],
-        form_fields['preprocessed_dir_input'],
-        widgets.HTML("""<div style="height: 20px;"></div>""")  # Spacer
-    ], layout=widgets.Layout(width='32%', padding='8px', box_sizing='border-box', flex='1 1 32%'))
-    
-    # Right column - options dengan one-liner VBox
+    # Right column - options
     right_column = widgets.VBox([
-        format_info,
-        form_fields['validate_checkbox'],
-        form_fields['backup_checkbox'],
-        widgets.HTML("""<div style="height: 40px;"></div>""")  # Spacer untuk alignment
-    ], layout=widgets.Layout(width='32%', padding='8px', box_sizing='border-box', flex='1 1 32%'))
+        format_info, form_fields['validate_checkbox'], form_fields['backup_checkbox'],
+        widgets.HTML("""<div style="height: 60px;"></div>""")  # Spacer
+    ], layout=widgets.Layout(width='48%', padding='8px', box_sizing='border-box', flex='1 1 48%'))
     
-    # Form row dengan responsive 3-column flexbox
-    form_row = widgets.HBox([left_column, middle_column, right_column], layout=widgets.Layout(
-        width='100%',
-        display='flex',
-        flex_flow='row wrap',
-        justify_content='space-between',
-        align_items='flex-start',
-        border='1px solid #ddd',
-        border_radius='5px',
-        padding='15px',
-        margin='0 0 15px 0',
-        box_sizing='border-box',
-        overflow='hidden'
+    # Form row responsive
+    form_row = widgets.HBox([left_column, right_column], layout=widgets.Layout(
+        width='100%', display='flex', flex_flow='row wrap', justify_content='space-between',
+        align_items='flex-start', border='1px solid #ddd', border_radius='5px',
+        padding='15px', margin='0 0 15px 0', box_sizing='border-box', overflow='hidden'
     ))
     
     return widgets.VBox([form_row], layout=widgets.Layout(width='100%', margin='0'))
 
-def _create_fixed_save_reset_buttons() -> Dict[str, widgets.Widget]:
-    """Create save/reset buttons - save primary, tanpa icon"""
-    save_button = widgets.Button(
-        description='Simpan',  # Tanpa icon
-        button_style='primary',  # Primary/default style (grey)
-        layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px')
-    )
-    
-    reset_button = widgets.Button(
-        description='Reset',  # Tanpa icon
-        button_style='',  # Default style
-        layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px')
-    )
+def _create_save_reset_buttons() -> Dict[str, widgets.Widget]:
+    """Create save/reset buttons tanpa icon"""
+    save_button = widgets.Button(description='Simpan', button_style='primary', 
+                                layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px'))
+    reset_button = widgets.Button(description='Reset', button_style='', 
+                                 layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px'))
     
     container = widgets.HBox([save_button, reset_button], layout=widgets.Layout(
-        width='100%',
-        justify_content='flex-end',
-        margin='10px 0',
-        display='flex',
-        flex_flow='row nowrap',
-        align_items='center'
+        width='100%', justify_content='flex-end', margin='10px 0',
+        display='flex', flex_flow='row nowrap', align_items='center'
     ))
     
     return {'save_button': save_button, 'reset_button': reset_button, 'container': container}
 
-def _create_state_managed_action_buttons() -> Dict[str, widgets.Widget]:
-    """Create action buttons dengan state management untuk mutual exclusion"""
-    button_layout = widgets.Layout(
-        width='auto', 
-        min_width='140px', 
-        height='35px', 
-        margin='5px',
-        flex='0 1 auto'
-    )
+def _create_action_buttons() -> Dict[str, widgets.Widget]:
+    """Create action buttons dengan state management"""
+    button_layout = widgets.Layout(width='auto', min_width='140px', height='35px', margin='5px', flex='0 1 auto')
     
     download_button = widgets.Button(description='📥 Download', button_style='primary', layout=button_layout)
     check_button = widgets.Button(description='🔍 Check', button_style='info', layout=button_layout)
     cleanup_button = widgets.Button(description='🧹 Cleanup', button_style='danger', layout=button_layout)
     
-    # Add state management attributes dengan one-liner setattr
-    [setattr(btn, '_all_buttons', [download_button, check_button, cleanup_button]) 
-     for btn in [download_button, check_button, cleanup_button]]
+    # State management attributes
+    all_buttons = [download_button, check_button, cleanup_button]
+    [setattr(btn, '_all_buttons', all_buttons) for btn in all_buttons]
     
-    container = widgets.HBox([download_button, check_button, cleanup_button], layout=widgets.Layout(
-        width='100%',
-        justify_content='flex-start',
-        margin='15px 0',
-        display='flex',
-        flex_flow='row wrap',
-        align_items='center',
-        overflow='hidden'
+    container = widgets.HBox(all_buttons, layout=widgets.Layout(
+        width='100%', justify_content='flex-start', margin='15px 0',
+        display='flex', flex_flow='row wrap', align_items='center', overflow='hidden'
     ))
     
     return {'download_button': download_button, 'check_button': check_button, 'cleanup_button': cleanup_button, 'container': container}
 
-def _create_open_log_accordion() -> Dict[str, widgets.Widget]:
-    """Create log accordion yang terbuka by default"""
+def _create_log_accordion() -> Dict[str, widgets.Widget]:
+    """Create log accordion terbuka by default"""
     log_output = widgets.Output(layout=widgets.Layout(
-        width='100%', 
-        max_height='300px', 
-        border='1px solid #ddd', 
-        border_radius='4px', 
-        padding='8px', 
-        overflow='auto',
-        box_sizing='border-box'
+        width='100%', max_height='300px', border='1px solid #ddd', 
+        border_radius='4px', padding='8px', overflow='auto', box_sizing='border-box'
     ))
     
-    log_accordion = widgets.Accordion([log_output], layout=widgets.Layout(
-        width='100%', 
-        margin='10px 0',
-        box_sizing='border-box'
-    ))
-    
-    # Set accordion terbuka dan title dengan one-liner
-    log_accordion.set_title(0, '📋 Download Logs'), setattr(log_accordion, 'selected_index', 0)
+    log_accordion = widgets.Accordion([log_output], layout=widgets.Layout(width='100%', margin='10px 0', box_sizing='border-box'))
+    log_accordion.set_title(0, '📋 Download Logs')
+    log_accordion.selected_index = 0  # Terbuka by default
     
     return {'log_output': log_output, 'log_accordion': log_accordion, 'accordion': log_accordion}
 
-# Enhanced utilities dengan path support
-def detect_api_key() -> str:
-    """Detect API key dengan one-liner fallback"""
-    return get_api_key_from_secrets() or ''
+def _get_dynamic_status_html() -> str:
+    """Get status HTML dengan environment detection"""
+    try:
+        import google.colab
+        from pathlib import Path
+        is_drive_mounted = Path('/content/drive/MyDrive').exists()
+        api_key = get_api_key_from_secrets()
+        
+        # Status generation dengan nested conditionals
+        return ("""<div style="padding: 12px; background: #e8f5e8; border-left: 4px solid #4caf50; border-radius: 4px; margin-bottom: 15px;"><span style="color: #2e7d32;">✅ Drive terhubung + API Key terdeteksi - Siap download!</span></div>""" if (is_drive_mounted and api_key) else
+                """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;"><span style="color: #856404;">⚠️ Drive terhubung - Masukkan API Key untuk mulai</span></div>""" if is_drive_mounted else
+                """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;"><span style="color: #856404;">⚠️ API Key tersedia - Mount Drive untuk penyimpanan permanen</span></div>""" if api_key else
+                """<div style="padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px; margin-bottom: 15px;"><span style="color: #721c24;">❌ Perlu mount Drive dan setup API Key</span></div>""")
+    except ImportError:
+        return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; margin-bottom: 15px;"><span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
 
-def validate_ui_layout(ui: Dict[str, Any]) -> bool:
-    """Validate UI layout dengan enhanced field checking"""
-    required_fields = ['ui', 'form_container', 'save_button', 'reset_button', 'download_button', 'log_output', 
-                      'backup_dir_input', 'preprocessed_dir_input', 'progress_tracker', 'progress_container']
-    return all(key in ui for key in required_fields)
-
-def get_ui_status(ui: Dict[str, Any]) -> str:
-    """Get enhanced UI status dengan path config info"""
-    component_count = len([k for k in ui.keys() if not k.startswith('_')])
-    api_status = '✅' if detect_api_key() else '❌'
-    path_fields = '✅' if all(field in ui for field in ['backup_dir_input', 'preprocessed_dir_input']) else '❌'
-    progress_status = '✅' if 'progress_tracker' in ui else '❌'
-    return f"✅ Enhanced UI Ready: {component_count} components | API Key: {api_status} | Path Config: {path_fields} | Progress: {progress_status}"
-
-def disable_other_buttons(active_button: widgets.Button) -> None:
-    """Disable other buttons saat satu action berjalan - one-liner state management"""
-    hasattr(active_button, '_all_buttons') and [setattr(btn, 'disabled', True) for btn in active_button._all_buttons if btn != active_button]
-
-def enable_all_buttons(button_list: list) -> None:
-    """Enable all buttons setelah operation selesai - one-liner restore"""
-    [setattr(btn, 'disabled', False) for btn in button_list if hasattr(btn, 'disabled')]
+# Utilities
+detect_api_key = lambda: get_api_key_from_secrets() or ''
+validate_ui_layout = lambda ui: all(key in ui for key in ['ui', 'form_container', 'save_button', 'download_button', 'log_output', 'progress_tracker'])
+get_ui_status = lambda ui: f"✅ Streamlined UI Ready: {len([k for k in ui.keys() if not k.startswith('_')])} components | API: {'✅' if detect_api_key() else '❌'} | Progress: {'✅' if 'progress_tracker' in ui else '❌'}"
+disable_other_buttons = lambda btn: hasattr(btn, '_all_buttons') and [setattr(b, 'disabled', True) for b in btn._all_buttons if b != btn]
+enable_all_buttons = lambda btns: [setattr(btn, 'disabled', False) for btn in btns if hasattr(btn, 'disabled')]

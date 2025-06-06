@@ -320,3 +320,7 @@ def create_dual_progress_tracker(height: str = "180px", width: str = "100%") -> 
 def create_single_progress_tracker(height: str = "120px", width: str = "100%") -> Dict[str, Any]:
     """Backward compatibility untuk create_single_progress_tracker"""
     return create_progress_tracker("single", height, width)
+
+def create_three_progress_tracker(height: str = "200px", width: str = "100%") -> Dict[str, Any]:
+    """Backward compatibility untuk create_three_progress_tracker - alias untuk multi"""
+    return create_progress_tracker("multi", height, width)

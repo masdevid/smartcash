@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/config_handlers.py
-Deskripsi: Optimized ConfigHandler dengan one-liner style namun tetap readable
+Deskripsi: Fixed ConfigHandler dengan proper log output access dan error handling
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -10,7 +10,7 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.utils.fallback_utils import try_operation_safe, show_status_safe
 
 class ConfigHandler(ABC):
-    """Enhanced ConfigHandler dengan one-liner optimizations dan complete lifecycle management."""
+    """Fixed ConfigHandler dengan proper log output handling dan complete lifecycle management."""
     
     def __init__(self, module_name: str, parent_module: str = None):
         self.module_name, self.parent_module = module_name, parent_module
@@ -73,7 +73,7 @@ class ConfigHandler(ABC):
                    self.get_default_config())
     
     def save_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None) -> bool:
-        """Save config dengan lifecycle hooks"""
+        """Save config dengan lifecycle hooks dan fixed log output"""
         try:
             self.before_save(ui_components)
             config = self.extract_config(ui_components)
@@ -87,7 +87,7 @@ class ConfigHandler(ABC):
             return self._handle_save_failure(ui_components, str(e)) or False
     
     def reset_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None) -> bool:
-        """Reset config dengan lifecycle hooks"""
+        """Reset config dengan lifecycle hooks dan fixed log output"""
         try:
             self.before_reset(ui_components)
             default_config = self.get_default_config()
@@ -176,23 +176,59 @@ class ConfigHandler(ABC):
         self._update_status_panel(ui_components, f"❌ Gagal reset: {error}", "error")
         self.logger.error(f"💥 Error resetting config: {error}")
     
-    # Helper methods dengan one-liner optimizations
+    # Fixed helper methods dengan proper log output access
     def _clear_ui_outputs(self, ui_components: Dict[str, Any]) -> None:
-        """Clear UI outputs dengan walrus operator"""
-        [widget.clear_output(wait=True) for key in ['log_output', 'status', 'confirmation_area'] 
-         if (widget := ui_components.get(key)) and hasattr(widget, 'clear_output')]
+        """Clear UI outputs dengan safe widget access"""
+        output_keys = ['log_output', 'status', 'confirmation_area']
+        
+        for key in output_keys:
+            widget = ui_components.get(key)
+            if widget and hasattr(widget, 'clear_output'):
+                try:
+                    widget.clear_output(wait=True)
+                except Exception as e:
+                    self.logger.debug(f"🔍 Error clearing {key}: {str(e)}")
     
     def _reset_progress_bars(self, ui_components: Dict[str, Any]) -> None:
-        """Reset progress bars dengan chained operations"""
-        progress_keys = ['progress_bar', 'progress_container', 'current_progress']
-        [setattr(widget, 'layout.visibility', 'hidden') for key in progress_keys 
-         if (widget := ui_components.get(key)) and hasattr(widget, 'layout')]
-        [setattr(widget, 'value', 0) for key in progress_keys 
-         if (widget := ui_components.get(key)) and hasattr(widget, 'value')]
+        """Reset progress bars dengan safe widget access"""
+        progress_keys = ['progress_bar', 'progress_container', 'current_progress', 'progress_tracker']
+        
+        for key in progress_keys:
+            widget = ui_components.get(key)
+            if widget:
+                try:
+                    # Try to hide widget
+                    if hasattr(widget, 'layout'):
+                        widget.layout.visibility = 'hidden'
+                        widget.layout.display = 'none'
+                    
+                    # Try to reset value
+                    if hasattr(widget, 'value'):
+                        widget.value = 0
+                    
+                    # Try to reset progress tracker
+                    if hasattr(widget, 'reset'):
+                        widget.reset()
+                        
+                except Exception as e:
+                    self.logger.debug(f"🔍 Error resetting {key}: {str(e)}")
     
     def _update_status_panel(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
-        """Update status panel dengan fallback"""
+        """Update status panel dengan fallback dan safe log output access"""
+        # Primary: Use show_status_safe
         show_status_safe(message, status_type, ui_components)
+        
+        # Secondary: Try to update log_output safely
+        try:
+            log_output = ui_components.get('log_output')
+            if log_output and hasattr(log_output, '__enter__'):
+                with log_output:
+                    from IPython.display import display, HTML
+                    color_map = {'success': '#28a745', 'info': '#007bff', 'warning': '#ffc107', 'error': '#dc3545'}
+                    color = color_map.get(status_type, '#007bff')
+                    display(HTML(f"<div style='color: {color}; margin: 5px 0; padding: 8px; background: {color}10; border-radius: 4px;'>{message}</div>"))
+        except Exception as e:
+            self.logger.debug(f"🔍 Log output display error: {str(e)}")
     
     # Callback management dengan one-liner checks
     def add_callback(self, cb: Callable) -> None:

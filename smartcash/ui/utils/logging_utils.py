@@ -37,7 +37,7 @@ def setup_aggressive_log_suppression() -> None:
     warnings.filterwarnings('ignore')
     
     # Suppress tqdm specifically
-    _suppress_tqdm_completely()
+    # _suppress_tqdm_completely()
 
 def _suppress_tqdm_completely() -> None:
     """Suppress tqdm completely untuk avoid weak reference issues"""

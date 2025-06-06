@@ -25,6 +25,8 @@ class EnhancedProgressTracker:
         self.progress_values = {'overall': 0, 'step': 0, 'current': 0}
         self.progress_messages = {'overall': '', 'step': '', 'current': ''}
         self.step_weights, self.current_step_index, self.total_steps = {}, 0, 0
+        self.progress_bars = {}
+        self.hidden_bars = {}
         self._create_ui_components()
     
     def _create_ui_components(self):
@@ -36,10 +38,9 @@ class EnhancedProgressTracker:
         }
         config = mode_configs[self.mode]
         
-        # Dynamic bar creation dengan visibility control
-        self.progress_bars = {bar: self._create_progress_bar(bar) for bar in config['bars']}
-        self.hidden_bars = {bar: self._create_progress_bar(bar, visible=False) 
-                           for bar in ['overall', 'step', 'current'] if bar not in config['bars']}
+        # Initialize progress bars untuk semua levels
+        all_levels = ['overall', 'step', 'current']
+        self.progress_bars = {bar: self._create_progress_bar(bar, bar in config['bars']) for bar in all_levels}
         
         # Header dengan mode indicator
         self.header = widgets.HTML(f"""<h4 style='color: #333; margin: 0 0 10px 0; font-size: 16px; font-weight: 600;'>
@@ -48,7 +49,7 @@ class EnhancedProgressTracker:
         # Status message
         self.status_message = widgets.HTML("", layout=widgets.Layout(width='100%', margin='5px 0'))
         
-        # Container dengan dynamic height
+        # Container dengan only visible bars
         visible_bars = [self.progress_bars[bar] for bar in config['bars']]
         self.container = widgets.VBox([self.header, self.status_message] + visible_bars, 
             layout=widgets.Layout(width='100%', visibility='hidden', padding='15px', margin='10px 0',
@@ -64,8 +65,19 @@ class EnhancedProgressTracker:
         }
         config = level_configs.get(level, {'icon': '📊', 'name': level.title(), 'color': '#007bff'})
         
-        return widgets.HTML("", layout=widgets.Layout(width='100%', margin='2px 0', 
-                                                     display='block' if visible else 'none'))
+        # Initialize dengan empty progress bar
+        initial_html = f"""
+        <div style="margin-bottom: 8px; {'' if visible else 'display: none;'}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="font-size: 14px; font-weight: 500; color: #333;">{config['icon']} {config['name']}</span>
+                <span style="font-size: 12px; color: #666;">0%</span>
+            </div>
+            <div style="background: #e9ecef; border-radius: 10px; overflow: hidden; height: 16px;">
+                <div style="background: {config['color']}; height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 10px;"></div>
+            </div>
+        </div>"""
+        
+        return widgets.HTML(initial_html, layout=widgets.Layout(width='100%', margin='2px 0'))
     
     def configure_mode(self, mode: ProgressMode, operation_name: str = None, steps: List[str] = None, 
                       step_weights: Dict[str, int] = None) -> None:
@@ -85,10 +97,12 @@ class EnhancedProgressTracker:
              step_weights: Dict[str, int] = None) -> None:
         """Show progress tracker dengan optional reconfiguration"""
         # Reconfigure jika ada parameter baru
-        (mode or operation_name or steps) and self.configure_mode(mode or self.mode, operation_name, steps, step_weights)
+        if mode or operation_name or steps:
+            self.configure_mode(mode or self.mode, operation_name, steps, step_weights)
         
         self.is_visible = True
         self.container.layout.visibility = 'visible'
+        self.container.layout.display = 'flex'
         self._reset_all_progress()
         self._update_status(f"🚀 Memulai {self.operation_name}...", 'info')
     
@@ -167,6 +181,7 @@ class EnhancedProgressTracker:
         """Hide progress container dengan cleanup"""
         self.is_visible = False
         self.container.layout.visibility = 'hidden'
+        self.container.layout.display = 'none'
         self._cancel_auto_hide()
     
     def _update_progress_bar(self, level: str, value: int, message: str = "", color: str = '#007bff') -> None:

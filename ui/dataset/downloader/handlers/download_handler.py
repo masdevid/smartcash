@@ -100,14 +100,27 @@ def _create_fixed_download_handler(ui_components: Dict[str, Any], config: Dict[s
                 show_status_safe(error_msg, "error", ui_components)
                 return
             
+            # Pastikan konfigurasi memiliki format yang benar untuk download service
+            download_config = {
+                'endpoint': 'roboflow',  # Default endpoint
+                'workspace': current_config.get('workspace', 'smartcash-wo2us'),
+                'project': current_config.get('project', 'rupiah-emisi-2022'),
+                'version': current_config.get('version', '3'),
+                'api_key': current_config.get('api_key', ''),
+                'output_format': current_config.get('output_format', 'yolov5pytorch'),
+                'validate_download': current_config.get('validate_download', True),
+                'organize_dataset': True,
+                'backup_existing': current_config.get('backup_existing', False)
+            }
+            
             # Safe existing dataset check
             operations = safe_operation_or_none(lambda: get_streamlined_download_operations())
             has_existing = safe_operation_or_none(lambda: operations.check_existing_dataset() if operations else False) or False
             
             if has_existing:
-                _show_download_confirmation_safe(ui_components, current_config, logger)
+                _show_download_confirmation_safe(ui_components, download_config, logger)
             else:
-                _execute_download_sync_safe(ui_components, current_config, logger)
+                _execute_download_sync_safe(ui_components, download_config, logger)
                 
         except Exception as e:
             error_msg = f"❌ Error download handler: {str(e)}"
@@ -117,22 +130,26 @@ def _create_fixed_download_handler(ui_components: Dict[str, Any], config: Dict[s
     return handle_download
 
 def _show_download_confirmation_safe(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Show safe confirmation dialog dengan proper handlers"""
-    
-    workspace, project, version = config.get('workspace', ''), config.get('project', ''), config.get('version', '')
+    """Show download confirmation dengan safe dialog creation dan proper error handling"""
+    # Extract config values untuk dialog
+    workspace = config.get('workspace', '')
+    project = config.get('project', '')
+    version = config.get('version', '')
     dataset_id = f"{workspace}/{project}:v{version}"
     
-    # Safe confirmation handlers
     def on_confirm_handler(button):
-        safe_operation_or_none(lambda: _clear_confirmation_area_safe(ui_components))
         safe_operation_or_none(lambda: _execute_download_sync_safe(ui_components, config, logger))
     
     def on_cancel_handler(button):
         safe_operation_or_none(lambda: _clear_confirmation_area_safe(ui_components))
     
-    confirmation_dialog = create_confirmation_dialog(
-        title="Konfirmasi Download Dataset",
-        message=f"""📥 **Dataset Download Confirmation**
+    try:
+        # Import confirmation dialog creator
+        from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
+        
+        confirmation_dialog = create_confirmation_dialog(
+            title="Konfirmasi Download Dataset",
+            message=f"""📥 **Dataset Download Confirmation**
 
 🎯 **Target Dataset:** {dataset_id}
 
@@ -143,13 +160,19 @@ def _show_download_confirmation_safe(ui_components: Dict[str, Any], config: Dict
 • Format: YOLOv5 PyTorch (hardcoded)
 
 🚀 Lanjutkan download?""",
-        on_confirm=on_confirm_handler,
-        on_cancel=on_cancel_handler,
-        confirm_text="Ya, Download", 
-        cancel_text="Batal"
-    )
-    
-    safe_operation_or_none(lambda: _show_in_confirmation_area_safe(ui_components, confirmation_dialog))
+            on_confirm=on_confirm_handler,
+            on_cancel=on_cancel_handler,
+            confirm_text="Ya, Download", 
+            cancel_text="Batal"
+        )
+        
+        safe_operation_or_none(lambda: _show_in_confirmation_area_safe(ui_components, confirmation_dialog))
+    except Exception as e:
+        error_msg = f"❌ Error saat menampilkan konfirmasi: {str(e)}"
+        logger and logger.error(error_msg)
+        show_status_safe(error_msg, "error", ui_components)
+        # Langsung jalankan download jika konfirmasi gagal
+        safe_operation_or_none(lambda: _execute_download_sync_safe(ui_components, config, logger))
 
 def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
     """Execute download dengan safe service integration dan proper error handling"""
@@ -171,7 +194,19 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
         
         # Validasi konfigurasi sebelum membuat download service
         required_fields = ['workspace', 'project', 'version', 'api_key']
-        missing_fields = [field for field in required_fields if field not in config or not config[field]]
+        missing_fields = []
+        
+        # Gunakan nilai default jika tidak ada
+        for field in required_fields:
+            if field not in config or not config[field]:
+                # Coba ambil dari default config
+                from smartcash.ui.dataset.downloader.handlers.defaults import get_default_download_config
+                default_config = get_default_download_config()
+                if field in default_config and default_config[field]:
+                    config[field] = default_config[field]
+                    logger and logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
+                else:
+                    missing_fields.append(field)
         
         if missing_fields:
             error_msg = f"❌ Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan"
@@ -182,9 +217,9 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
         # Pastikan konfigurasi memiliki format yang benar untuk download service
         download_config = {
             'endpoint': 'roboflow',  # Default endpoint
-            'workspace': config.get('workspace', ''),
-            'project': config.get('project', ''),
-            'version': config.get('version', ''),
+            'workspace': config.get('workspace', 'smartcash-wo2us'),
+            'project': config.get('project', 'rupiah-emisi-2022'),
+            'version': config.get('version', '3'),
             'api_key': config.get('api_key', ''),
             'output_format': config.get('output_format', 'yolov5pytorch'),
             'validate_download': config.get('validate_download', True),
@@ -192,21 +227,30 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
             'backup_existing': config.get('backup_existing', False)
         }
         
-        # Create download service dengan safe factory dan konfigurasi yang benar
-        download_service = safe_operation_or_none(lambda: get_downloader_instance(download_config, logger))
-        if not download_service:
+        # Extract config values untuk logging
+        workspace = download_config.get('workspace', '')
+        project = download_config.get('project', '')
+        version = download_config.get('version', '')
+        
+        # Get downloader instance dengan config lengkap
+        logger.info(f"🔄 Membuat download service untuk {workspace}/{project}:v{version}")
+        downloader = get_downloader_instance(download_config, logger)
+        
+        if not downloader:
             error_msg = "❌ Gagal membuat download service"
             safe_operation_or_none(lambda: progress_tracker.error(error_msg))
             show_status_safe(error_msg, "error", ui_components)
             logger and logger.error(f"Detail config: {str(download_config)}")
             return
         
-        # Setup safe progress callback
-        progress_callback = _create_safe_progress_callback(progress_tracker, logger)
-        safe_operation_or_none(lambda: download_service.set_progress_callback(progress_callback))
+        # Setup progress callback
+        if progress_tracker:
+            progress_callback = _create_safe_progress_callback(progress_tracker, logger)
+            safe_operation_or_none(lambda: downloader.set_progress_callback(progress_callback))
         
-        # Execute download dengan safe method call dan parameter yang benar
-        result = safe_operation_or_none(lambda: download_service.download_dataset())
+        # Execute download tanpa parameter karena config sudah diinisialisasi di constructor
+        logger.info(f"📥 Memulai download dataset {workspace}/{project}:v{version}")
+        result = safe_operation_or_none(lambda: downloader.download_dataset())
         
         if not result:
             error_msg = "❌ Download service tidak merespons"
@@ -258,12 +302,17 @@ def _create_safe_progress_callback(progress_tracker, logger) -> Callable:
                 
                 # Safe API calls dengan proper method names
                 if level_name == 'overall':
-                    safe_operation_or_none(lambda: progress_tracker.update_overall(percentage, overall_msg))
+                    # Gunakan metode update() yang benar untuk progress tracker
+                    safe_operation_or_none(lambda: progress_tracker.update('overall', percentage, overall_msg))
                 else:
-                    safe_operation_or_none(lambda: progress_tracker.update_current(percentage, message))
+                    # Gunakan metode update() yang benar untuk progress tracker
+                    safe_operation_or_none(lambda: progress_tracker.update('current', percentage, message))
             else:
                 # Generic progress update untuk unknown steps
-                safe_operation_or_none(lambda: progress_tracker.update_current(percentage, message))
+                safe_operation_or_none(lambda: progress_tracker.update('current', percentage, message))
+            
+            # Log progress untuk debugging
+            logger and logger.debug(f"Progress {step}: {percentage}% - {message}")
         
         safe_operation_or_none(callback_operation)
     

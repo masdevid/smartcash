@@ -39,6 +39,10 @@ class DownloadService:
         start_time = time.time()
         
         try:
+            # Validasi config terlebih dahulu
+            if not self._validate_config():
+                return self._error_result("Konfigurasi tidak valid", time.time() - start_time)
+                
             # Ekstrak parameter dari config
             workspace = self.config.get('workspace', '')
             project = self.config.get('project', '')
@@ -93,6 +97,24 @@ class DownloadService:
             self.logger.error(f"💥 Download error: {str(e)}")
             return self._error_result(str(e), time.time() - start_time)
     
+    def _validate_config(self) -> bool:
+        """Validasi konfigurasi yang diberikan saat inisialisasi"""
+        required_fields = ['workspace', 'project', 'version', 'api_key']
+        missing_fields = [field for field in required_fields if field not in self.config or not self.config[field]]
+        
+        if missing_fields:
+            error_msg = f"Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan"
+            self.logger.error(f"❌ {error_msg}")
+            return False
+            
+        # Validasi panjang API key
+        api_key = self.config.get('api_key', '')
+        if len(api_key) < 10:
+            self.logger.error("❌ API key terlalu pendek")
+            return False
+            
+        return True
+        
     def _validate_parameters(self, workspace: str, project: str, version: str, api_key: str, output_format: str) -> Dict[str, Any]:
         """One-liner parameter validation"""
         errors = [msg for value, msg in [(workspace, "Workspace kosong"), (project, "Project kosong"), (version, "Version kosong"), (api_key, "API key kosong")] if not value]
@@ -189,8 +211,14 @@ class DownloadService:
         return {'status': 'error', 'message': error_msg, 'duration': duration}
     
     def _return_error(self, message: str) -> None:
-        """One-liner error return yang raise exception"""
+        """Return error dengan one-liner exception raising"""
+        self.logger.error(message)
         raise Exception(message)
+        
+    def _notify_error(self, message: str) -> Dict[str, Any]:
+        """Notify error dan return error result tanpa raise exception"""
+        self.logger.error(message)
+        return self._error_result(message, 0)
     
     def get_service_info(self) -> Dict[str, Any]:
         """One-liner service info untuk debugging"""
@@ -200,7 +228,48 @@ class DownloadService:
             'components': {comp: bool(getattr(self, comp, None)) for comp in ['roboflow_client', 'file_processor', 'validator', 'progress_tracker']}
         }
 
-# One-liner factory function
-def create_download_service(config: Dict[str, Any], logger=None) -> DownloadService:
-    """Factory untuk create optimized download service"""
-    return DownloadService(config, logger)
+# Factory function dengan enhanced error handling
+def create_download_service(config: Dict[str, Any], logger=None) -> Optional[DownloadService]:
+    """Factory untuk create optimized download service dengan validasi dan error handling"""
+    logger = logger or get_logger('downloader.factory')
+    
+    try:
+        # Validasi config dasar
+        if not config:
+            logger.error("❌ Config kosong")
+            return None
+        
+        # Validasi field yang diperlukan
+        required_fields = ['workspace', 'project', 'version', 'api_key']
+        default_values = {
+            'workspace': 'smartcash-wo2us',
+            'project': 'rupiah-emisi-2022',
+            'version': '3'
+        }
+        
+        # Terapkan nilai default jika field tidak ada atau kosong
+        for field in required_fields:
+            if field not in config or not config[field]:
+                if field in default_values:
+                    config[field] = default_values[field]
+                    logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
+        
+        # Periksa lagi setelah menerapkan nilai default
+        missing_fields = [field for field in required_fields if field not in config or not config[field]]
+        
+        if missing_fields:
+            logger.error(f"❌ Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan")
+            return None
+            
+        # Buat instance dengan error handling
+        service = DownloadService(config, logger)
+        
+        # Validasi komponen penting
+        if not service.roboflow_client or not service.file_processor:
+            logger.error("❌ Komponen download service tidak lengkap")
+            return None
+            
+        return service
+    except Exception as e:
+        logger.error(f"❌ Error saat membuat download service: {str(e)}")
+        return None

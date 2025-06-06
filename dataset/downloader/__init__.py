@@ -6,24 +6,54 @@ Deskripsi: Optimized factory dan exports dengan one-liner style dan enhanced int
 from typing import Dict, Any, Optional
 from smartcash.common.logger import get_logger
 
-def get_downloader_instance(config: Dict[str, Any], logger=None):
+def get_downloader_instance(config: Dict[str, Any], logger=None) -> Optional['DownloadService']:
     """
     Optimized factory untuk downloader instance dengan enhanced error handling.
     
     Args:
-        config: Configuration dictionary
+        config: Configuration dictionary dengan format yang benar
         logger: Optional logger instance
         
     Returns:
-        Downloader service instance
+        Downloader service instance atau None jika terjadi error
     """
     try:
+        # Validasi config
+        if not config:
+            logger and logger.error("❌ Config tidak boleh kosong")
+            return None
+        
+        # Validasi field yang diperlukan dengan nilai default
+        required_fields = ['workspace', 'project', 'version', 'api_key']
+        default_values = {
+            'workspace': 'smartcash-wo2us',
+            'project': 'rupiah-emisi-2022',
+            'version': '3'
+        }
+        
+        # Terapkan nilai default jika field tidak ada atau kosong
+        for field in required_fields:
+            if field not in config or not config[field]:
+                if field in default_values:
+                    config[field] = default_values[field]
+                    logger and logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
+        
+        # Periksa lagi setelah menerapkan nilai default
+        missing_fields = [field for field in required_fields if field not in config or not config[field]]
+        
+        if missing_fields:
+            logger and logger.error(f"❌ Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan")
+            return None
+        
+        # Buat service
         from smartcash.dataset.downloader.download_service import create_download_service
         return create_download_service(config, logger)
     except ImportError as e:
-        logger = logger or get_logger('downloader.factory')
-        logger.error(f"❌ Import error: {str(e)}")
-        raise ImportError(f"Cannot import download service: {str(e)}")
+        logger and logger.error(f"❌ Gagal import module: {str(e)}")
+        return None
+    except Exception as e:
+        logger and logger.error(f"❌ Gagal membuat download service: {str(e)}")
+        return None
 
 def create_roboflow_downloader(api_key: str, config: Dict[str, Any] = None, logger=None):
     """

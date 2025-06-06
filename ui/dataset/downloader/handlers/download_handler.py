@@ -8,30 +8,6 @@ from smartcash.ui.utils.fallback_utils import show_status_safe
 from smartcash.ui.components.dialogs import confirm
 from smartcash.dataset.downloader import get_downloader_instance
 
-class DownloadHandler:
-    """Handler untuk download dataset"""
-    def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any], logger):
-        self.ui_components = ui_components
-        self.config = config
-        self.logger = logger
-    
-    def set_progress_callback(self, callback):
-        """Dummy method untuk compatibility"""
-        pass
-
-class CheckHandler:
-    """Handler untuk check dataset"""
-    def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any], logger):
-        self.ui_components = ui_components
-        self.config = config
-        self.logger = logger
-
-class CleanupHandler:
-    """Handler untuk cleanup dataset"""
-    def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any], logger):
-        self.ui_components = ui_components
-        self.config = config
-        self.logger = logger
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
     """Setup handlers dengan fixed integration"""
@@ -41,14 +17,11 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     logger = ui_components.get('logger')
     
     # Setup individual handlers dan tambahkan ke ui_components
-    ui_components['check_handler'] = CheckHandler(ui_components, config, logger)
-    setup_check_handler(ui_components, config, logger)
+    ui_components['check_handler'] = setup_check_handler(ui_components, config, logger)
     
-    ui_components['cleanup_handler'] = CleanupHandler(ui_components, config, logger)
-    setup_cleanup_handler(ui_components, config, logger)
+    ui_components['cleanup_handler'] = setup_cleanup_handler(ui_components, config, logger)
     
-    ui_components['download_handler'] = DownloadHandler(ui_components, config, logger)
-    _setup_download_handler(ui_components, config, logger)
+    ui_components['download_handler'] = _setup_download_handler(ui_components, config, logger)
     
     logger.debug("✅ Semua handlers berhasil disetup")
     return ui_components

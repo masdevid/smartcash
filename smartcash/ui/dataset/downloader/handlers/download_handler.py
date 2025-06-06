@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py
-Deskripsi: Fixed download handler dengan proper integration ke smartcash.dataset.downloader dan one-liner style
+Deskripsi: Fixed download handler dengan proper integration dan mengatasi error 'bool' object is not callable
 """
 
 import ipywidgets as widgets
@@ -11,22 +11,23 @@ from smartcash.ui.dataset.downloader.handlers.check_handler import setup_check_h
 from smartcash.ui.dataset.downloader.handlers.cleanup_handler import setup_cleanup_handler
 from smartcash.ui.dataset.downloader.handlers.validation_handler import setup_validation_handler
 from smartcash.ui.dataset.downloader.utils.operation_utils import get_streamlined_download_operations
-from smartcash.dataset.downloader.download_service import create_download_service  # Fixed import
+from smartcash.dataset.downloader import get_downloader_instance  # Fixed import
 from smartcash.common.logger import get_logger
+from smartcash.common.utils.one_liner_fixes import safe_operation_or_none, safe_widget_operation
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup semua handlers dengan fixed integration"""
+    """Setup semua handlers dengan fixed integration dan proper error handling"""
     
     logger = ui_components.get('logger') or get_logger('downloader.handlers')
     
-    # Setup handlers dengan fixed wrapper
-    check_handler = _wrap_with_state_management(setup_check_handler(ui_components, config, logger), ui_components, logger)
-    cleanup_handler = _wrap_with_state_management(setup_cleanup_handler(ui_components, config, logger), ui_components, logger)
+    # Setup handlers dengan fixed wrapper dan safe operations
+    check_handler = _wrap_with_safe_state_management(setup_check_handler(ui_components, config, logger), ui_components, logger)
+    cleanup_handler = _wrap_with_safe_state_management(setup_cleanup_handler(ui_components, config, logger), ui_components, logger)
     validation_handler = setup_validation_handler(ui_components, config, logger)
-    download_handler = _wrap_with_state_management(_create_fixed_download_handler(ui_components, config, logger), ui_components, logger)
+    download_handler = _wrap_with_safe_state_management(_create_fixed_download_handler(ui_components, config, logger), ui_components, logger)
     
-    # Bind handlers dengan fixed button management
-    _bind_button_handlers_fixed(ui_components, {
+    # Bind handlers dengan safe button management
+    _bind_button_handlers_safe(ui_components, {
         'check_handler': check_handler, 'download_handler': download_handler, 'cleanup_handler': cleanup_handler
     })
     
@@ -37,82 +38,97 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     
     return ui_components
 
-def _wrap_with_state_management(handler: Callable, ui_components: Dict[str, Any], logger) -> Callable:
-    """Fixed wrapper dengan proper button state management"""
+def _wrap_with_safe_state_management(handler: Callable, ui_components: Dict[str, Any], logger) -> Callable:
+    """Fixed wrapper dengan safe button state management dan error handling"""
     
-    def state_managed_handler(button):
-        """Fixed wrapper untuk mutual exclusion buttons"""
+    def safe_state_managed_handler(button):
+        """Fixed wrapper untuk mutual exclusion buttons dengan safe operations"""
         all_buttons = []
         try:
-            # Get all buttons safely - one-liner collection
-            all_buttons = (getattr(button, '_all_buttons', None) or 
-                          [ui_components.get(btn) for btn in ['check_button', 'download_button', 'cleanup_button']] or [])
-            all_buttons = [btn for btn in all_buttons if btn is not None and hasattr(btn, 'disabled')]
+            # Safe button collection dengan fallback
+            all_buttons = (_get_all_buttons_safe(button, ui_components) or 
+                          [ui_components.get(btn) for btn in ['check_button', 'download_button', 'cleanup_button']])
+            all_buttons = [btn for btn in all_buttons if btn and hasattr(btn, 'disabled')]
             
-            # Disable all buttons - one-liner
-            [setattr(btn, 'disabled', True) for btn in all_buttons]
+            # Safe disable all buttons
+            safe_operation_or_none(lambda: [setattr(btn, 'disabled', True) for btn in all_buttons])
             
-            # Execute handler
-            handler(button)
+            # Execute handler dengan safe operation
+            safe_operation_or_none(lambda: handler(button))
             
         except Exception as e:
-            logger and logger.error(f"❌ Error in handler: {str(e)}")
-            show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
+            error_msg = f"❌ Error in handler: {str(e)}"
+            logger and logger.error(error_msg)
+            show_status_safe(error_msg, "error", ui_components)
         finally:
-            # Re-enable buttons - one-liner
-            [setattr(btn, 'disabled', False) for btn in all_buttons]
+            # Always re-enable buttons
+            safe_operation_or_none(lambda: [setattr(btn, 'disabled', False) for btn in all_buttons])
     
-    return state_managed_handler
+    return safe_state_managed_handler
+
+def _get_all_buttons_safe(button, ui_components: Dict[str, Any]) -> list:
+    """Safe get all buttons dengan fallback"""
+    # Try to get from button attribute first
+    if button and hasattr(button, '_all_buttons'):
+        return getattr(button, '_all_buttons', [])
+    
+    # Fallback to UI components
+    button_names = ['check_button', 'download_button', 'cleanup_button']
+    return [ui_components.get(btn) for btn in button_names if btn in ui_components]
 
 def _create_fixed_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> Callable:
-    """Create fixed download handler dengan proper service integration"""
+    """Create fixed download handler dengan proper service integration dan error handling"""
     
     def handle_download(button):
         """Handle download dengan fixed validation dan service call"""
         try:
-            # Get current config
+            # Safe config extraction
             config_handler = ui_components.get('config_handler')
             if not config_handler:
                 show_status_safe("❌ Config handler tidak ditemukan", "error", ui_components)
                 return
             
-            current_config = config_handler.extract_config(ui_components)
+            current_config = safe_operation_or_none(lambda: config_handler.extract_config(ui_components))
+            if not current_config:
+                show_status_safe("❌ Gagal mengambil konfigurasi", "error", ui_components)
+                return
             
-            # Validate config
-            validation = config_handler.validate_config(current_config)
-            if not validation['valid']:
-                error_msg = f"❌ Config tidak valid: {'; '.join(validation['errors'])}"
+            # Safe validation
+            validation = safe_operation_or_none(lambda: config_handler.validate_config(current_config))
+            if not validation or not validation.get('valid', False):
+                error_msg = f"❌ Config tidak valid: {'; '.join(validation.get('errors', ['Unknown error']) if validation else ['Validation failed'])}"
                 show_status_safe(error_msg, "error", ui_components)
                 return
             
-            # Check existing dataset untuk confirmation
-            operations = get_streamlined_download_operations()
-            has_existing = operations.check_existing_dataset()
+            # Safe existing dataset check
+            operations = safe_operation_or_none(lambda: get_streamlined_download_operations())
+            has_existing = safe_operation_or_none(lambda: operations.check_existing_dataset() if operations else False) or False
             
             if has_existing:
-                _show_download_confirmation_fixed(ui_components, current_config, logger)
+                _show_download_confirmation_safe(ui_components, current_config, logger)
             else:
-                _execute_download_sync_fixed(ui_components, current_config, logger)
+                _execute_download_sync_safe(ui_components, current_config, logger)
                 
         except Exception as e:
-            logger.error(f"❌ Error download handler: {str(e)}")
-            show_status_safe(f"❌ Error: {str(e)}", "error", ui_components)
+            error_msg = f"❌ Error download handler: {str(e)}"
+            logger and logger.error(error_msg)
+            show_status_safe(error_msg, "error", ui_components)
     
     return handle_download
 
-def _show_download_confirmation_fixed(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Show fixed confirmation dialog"""
+def _show_download_confirmation_safe(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
+    """Show safe confirmation dialog dengan proper handlers"""
     
     workspace, project, version = config.get('workspace', ''), config.get('project', ''), config.get('version', '')
     dataset_id = f"{workspace}/{project}:v{version}"
     
-    # Fixed handlers dengan proper function definitions
+    # Safe confirmation handlers
     def on_confirm_handler(button):
-        _clear_confirmation_area_fixed(ui_components)
-        _execute_download_sync_fixed(ui_components, config, logger)
+        safe_operation_or_none(lambda: _clear_confirmation_area_safe(ui_components))
+        safe_operation_or_none(lambda: _execute_download_sync_safe(ui_components, config, logger))
     
     def on_cancel_handler(button):
-        _clear_confirmation_area_fixed(ui_components)
+        safe_operation_or_none(lambda: _clear_confirmation_area_safe(ui_components))
     
     confirmation_dialog = create_confirmation_dialog(
         title="Konfirmasi Download Dataset",
@@ -133,34 +149,40 @@ def _show_download_confirmation_fixed(ui_components: Dict[str, Any], config: Dic
         cancel_text="Batal"
     )
     
-    _show_in_confirmation_area_fixed(ui_components, confirmation_dialog)
+    safe_operation_or_none(lambda: _show_in_confirmation_area_safe(ui_components, confirmation_dialog))
 
-def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
-    """Execute download dengan proper service integration"""
+def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str, Any], logger) -> None:
+    """Execute download dengan safe service integration dan proper error handling"""
     try:
         # Clear confirmation area
-        _clear_confirmation_area_fixed(ui_components)
+        safe_operation_or_none(lambda: _clear_confirmation_area_safe(ui_components))
         
-        # Get progress tracker
+        # Safe progress tracker setup
         progress_tracker = ui_components.get('progress_tracker')
         if not progress_tracker:
-            logger.error("❌ Progress tracker tidak ditemukan")
+            logger and logger.error("❌ Progress tracker tidak ditemukan")
             show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
             return
         
-        # Show progress dengan API yang benar
+        # Setup progress dengan safe API calls
         download_steps = ["validate", "connect", "metadata", "download", "extract", "organize"]
         step_weights = {"validate": 5, "connect": 10, "metadata": 15, "download": 50, "extract": 15, "organize": 5}
-        progress_tracker.show("Download Dataset", download_steps, step_weights)
+        safe_operation_or_none(lambda: progress_tracker.show("Download Dataset", download_steps, step_weights))
         
-        # Create download service dengan proper integration - FIXED
-        download_service = create_download_service(config, logger)
+        # Create download service dengan safe factory - FIXED
+        download_service = safe_operation_or_none(lambda: get_downloader_instance(config, logger))
+        if not download_service:
+            error_msg = "❌ Gagal membuat download service"
+            safe_operation_or_none(lambda: progress_tracker.error(error_msg))
+            show_status_safe(error_msg, "error", ui_components)
+            return
         
-        # Setup fixed dual-level progress callback
-        download_service.set_progress_callback(_create_fixed_progress_callback(progress_tracker, logger))
+        # Setup safe progress callback
+        progress_callback = _create_safe_progress_callback(progress_tracker, logger)
+        safe_operation_or_none(lambda: download_service.set_progress_callback(progress_callback))
         
-        # Execute download dengan proper method call - FIXED
-        result = download_service.download_dataset(
+        # Execute download dengan safe method call - FIXED
+        result = safe_operation_or_none(lambda: download_service.download_dataset(
             workspace=config['workspace'], 
             project=config['project'], 
             version=config['version'],
@@ -169,36 +191,44 @@ def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str
             validate_download=config.get('validate_download', True), 
             organize_dataset=True,
             backup_existing=config.get('backup_existing', False)
-        )
+        ))
         
-        # Handle result dengan fixed status display
-        if result['status'] == 'success':
-            success_msg = f"✅ Dataset berhasil didownload: {result['stats']['total_images']} gambar"
-            progress_tracker.complete(success_msg)
-            show_status_safe(f"{success_msg} ke {result['output_dir']}", "success", ui_components)
-            logger.success(success_msg)
-        else:
-            error_msg = f"❌ Download gagal: {result['message']}"
-            progress_tracker.error(error_msg)
+        if not result:
+            error_msg = "❌ Download service tidak merespons"
+            safe_operation_or_none(lambda: progress_tracker.error(error_msg))
             show_status_safe(error_msg, "error", ui_components)
-            logger.error(error_msg)
+            return
+        
+        # Handle result dengan safe status display
+        if result.get('status') == 'success':
+            stats = result.get('stats', {})
+            total_images = stats.get('total_images', 0)
+            success_msg = f"✅ Dataset berhasil didownload: {total_images:,} gambar"
+            safe_operation_or_none(lambda: progress_tracker.complete(success_msg))
+            show_status_safe(f"{success_msg} ke {result.get('output_dir', 'unknown location')}", "success", ui_components)
+            logger and logger.success(success_msg)
+        else:
+            error_msg = f"❌ Download gagal: {result.get('message', 'Unknown error')}"
+            safe_operation_or_none(lambda: progress_tracker.error(error_msg))
+            show_status_safe(error_msg, "error", ui_components)
+            logger and logger.error(error_msg)
             
     except Exception as e:
         error_msg = f"❌ Error saat download: {str(e)}"
         progress_tracker = ui_components.get('progress_tracker')
-        progress_tracker and progress_tracker.error(error_msg)
+        safe_operation_or_none(lambda: progress_tracker.error(error_msg) if progress_tracker else None)
         show_status_safe(error_msg, "error", ui_components)
-        logger.error(error_msg)
+        logger and logger.error(error_msg)
 
-def _create_fixed_progress_callback(progress_tracker, logger) -> Callable:
-    """Create fixed dual-level progress callback dengan API yang benar"""
+def _create_safe_progress_callback(progress_tracker, logger) -> Callable:
+    """Create safe dual-level progress callback dengan API yang benar"""
     
-    def progress_callback(step: str, current: int, total: int, message: str):
-        """Fixed dual-level progress dengan API progress_tracker yang benar"""
-        try:
+    def safe_progress_callback(step: str, current: int, total: int, message: str):
+        """Safe dual-level progress dengan proper API calls dan error handling"""
+        def callback_operation():
             percentage = min(100, max(0, int((current / total) * 100) if total > 0 else 0))
             
-            # Map steps ke progress levels dengan API yang benar
+            # Safe step mapping ke progress levels
             step_mapping = {
                 'validate': ('overall', "🔄 Validasi parameter"),
                 'connect': ('overall', "🌐 Koneksi Roboflow"),
@@ -211,61 +241,119 @@ def _create_fixed_progress_callback(progress_tracker, logger) -> Callable:
             if step in step_mapping:
                 level_name, overall_msg = step_mapping[step]
                 
-                # Update dengan API yang benar - gunakan update method
+                # Safe API calls dengan proper method names
                 if level_name == 'overall':
-                    # Update overall progress untuk high-level steps
-                    progress_tracker.update('overall', percentage, overall_msg)
+                    safe_operation_or_none(lambda: progress_tracker.update_overall(percentage, overall_msg))
                 else:
-                    # Update current progress untuk detail steps
-                    progress_tracker.update('current', percentage, message)
+                    safe_operation_or_none(lambda: progress_tracker.update_current(percentage, message))
             else:
                 # Generic progress update untuk unknown steps
-                progress_tracker.update('current', percentage, message)
-                
-        except Exception as e:
-            logger.debug(f"🔍 Progress callback error: {str(e)}")
+                safe_operation_or_none(lambda: progress_tracker.update_current(percentage, message))
+        
+        safe_operation_or_none(callback_operation)
     
-    return progress_callback
+    return safe_progress_callback
 
-def _bind_button_handlers_fixed(ui_components: Dict[str, Any], handlers: Dict[str, Callable]) -> None:
-    """Bind button handlers dengan fixed approach - one-liner"""
+def _bind_button_handlers_safe(ui_components: Dict[str, Any], handlers: Dict[str, Callable]) -> None:
+    """Bind button handlers dengan safe approach dan error handling"""
     button_mappings = [
         ('check_button', handlers.get('check_handler')),
         ('download_button', handlers.get('download_handler')),
         ('cleanup_button', handlers.get('cleanup_handler'))
     ]
     
-    # One-liner binding dengan safe checks
-    [ui_components[btn_name].on_click(handler) 
-     for btn_name, handler in button_mappings 
-     if btn_name in ui_components and handler is not None and hasattr(ui_components[btn_name], 'on_click')]
+    # Safe binding dengan proper error handling
+    for btn_name, handler in button_mappings:
+        if btn_name in ui_components and handler and callable(handler):
+            button = ui_components[btn_name]
+            if button and hasattr(button, 'on_click'):
+                safe_widget_operation(button, 'on_click', handler)
 
-def _show_in_confirmation_area_fixed(ui_components: Dict[str, Any], dialog_widget) -> None:
-    """Show dialog dalam confirmation area dengan fixed display"""
-    confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area:
-        try:
+def _show_in_confirmation_area_safe(ui_components: Dict[str, Any], dialog_widget) -> None:
+    """Show dialog dalam confirmation area dengan safe display dan error handling"""
+    def show_operation():
+        confirmation_area = ui_components.get('confirmation_area')
+        if confirmation_area and hasattr(confirmation_area, 'layout'):
             confirmation_area.layout.display = 'block'
             confirmation_area.layout.visibility = 'visible'
-            with confirmation_area:
+            
+            if hasattr(confirmation_area, 'clear_output'):
                 confirmation_area.clear_output(wait=True)
-                from IPython.display import display
+                
+            from IPython.display import display
+            with confirmation_area:
                 display(dialog_widget)
-        except Exception:
-            pass
+    
+    safe_operation_or_none(show_operation)
 
-def _clear_confirmation_area_fixed(ui_components: Dict[str, Any]) -> None:
-    """Clear confirmation area dengan fixed approach"""
-    confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area:
-        try:
+def _clear_confirmation_area_safe(ui_components: Dict[str, Any]) -> None:
+    """Clear confirmation area dengan safe approach dan error handling"""
+    def clear_operation():
+        confirmation_area = ui_components.get('confirmation_area')
+        if confirmation_area and hasattr(confirmation_area, 'clear_output'):
             confirmation_area.clear_output(wait=True)
-            confirmation_area.layout.display = 'none'
-            confirmation_area.layout.visibility = 'hidden'
-        except Exception:
-            pass
+            
+            if hasattr(confirmation_area, 'layout'):
+                confirmation_area.layout.display = 'none'
+                confirmation_area.layout.visibility = 'hidden'
+    
+    safe_operation_or_none(clear_operation)
 
-# Fixed utilities dengan one-liner style
-get_download_status_fixed = lambda ui: {'ready': 'progress_tracker' in ui, 'handlers_count': len([k for k in ui.keys() if k.endswith('_handler')]), 'buttons_available': all(btn in ui for btn in ['check_button', 'download_button', 'cleanup_button'])}
-validate_handlers_setup_fixed = lambda ui: all(handler in ui for handler in ['check_handler', 'download_handler', 'cleanup_handler'])
-get_handler_summary_fixed = lambda ui: f"✅ Handlers setup: {len([k for k in ui.keys() if k.endswith('_handler')])} handlers | Progress: {'✅' if 'progress_tracker' in ui else '❌'}"
+# Safe utilities dengan improved error handling dan status checks
+def get_download_status_safe(ui: Dict[str, Any]) -> Dict[str, Any]:
+    """Get download status dengan safe validation dan fallback"""
+    def status_operation():
+        return {
+            'ready': bool(ui.get('progress_tracker')) and bool(ui.get('config_handler')),
+            'handlers_count': len([k for k in ui.keys() if k.endswith('_handler')]),
+            'buttons_available': all(btn in ui for btn in ['check_button', 'download_button', 'cleanup_button']),
+            'progress_tracker_available': bool(ui.get('progress_tracker')),
+            'config_handler_available': bool(ui.get('config_handler'))
+        }
+    
+    return safe_operation_or_none(status_operation) or {
+        'ready': False, 'handlers_count': 0, 'buttons_available': False,
+        'progress_tracker_available': False, 'config_handler_available': False
+    }
+
+def validate_handlers_setup_safe(ui: Dict[str, Any]) -> bool:
+    """Validate handlers setup dengan safe checking"""
+    def validate_operation():
+        required_handlers = ['check_handler', 'download_handler', 'cleanup_handler']
+        return all(handler in ui and callable(ui[handler]) for handler in required_handlers)
+    
+    return bool(safe_operation_or_none(validate_operation))
+
+def get_handler_summary_safe(ui: Dict[str, Any]) -> str:
+    """Get handler summary dengan safe status formatting"""
+    def summary_operation():
+        handlers_count = len([k for k in ui.keys() if k.endswith('_handler')])
+        progress_status = '✅' if 'progress_tracker' in ui else '❌'
+        config_status = '✅' if 'config_handler' in ui else '❌'
+        buttons_status = '✅' if all(btn in ui for btn in ['check_button', 'download_button', 'cleanup_button']) else '❌'
+        
+        return f"📊 Handlers: {handlers_count} | Progress: {progress_status} | Config: {config_status} | Buttons: {buttons_status}"
+    
+    return safe_operation_or_none(summary_operation) or "❌ Error getting handler summary"
+
+def reset_download_handlers_safe(ui_components: Dict[str, Any]) -> bool:
+    """Reset download handlers state dengan safe operations"""
+    def reset_operation():
+        # Clear confirmation area
+        _clear_confirmation_area_safe(ui_components)
+        
+        # Reset progress tracker
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'reset'):
+            progress_tracker.reset()
+        
+        # Enable all buttons
+        buttons = ['check_button', 'download_button', 'cleanup_button']
+        for btn_name in buttons:
+            btn = ui_components.get(btn_name)
+            if btn and hasattr(btn, 'disabled'):
+                btn.disabled = False
+        
+        return True
+    
+    return bool(safe_operation_or_none(reset_operation))

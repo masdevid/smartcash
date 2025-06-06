@@ -1,46 +1,43 @@
 """
 File: smartcash/ui/pretrained_model/services/model_checker.py
-Deskripsi: Service untuk check existing models dengan form config integration
+Deskripsi: Optimized model checker dengan enhanced progress tracker integration
 """
 
 from pathlib import Path
 from typing import Dict, Any, List
-from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, ProgressTracker
+from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, ProgressHelper
 
 class ModelChecker:
-    """Service untuk check existing models dengan UI config integration"""
+    """Service untuk check existing models dengan enhanced progress integration"""
     
     def __init__(self, ui_components: Dict[str, Any], logger=None):
         self.ui_components, self.logger = ui_components, logger
-        self.progress_tracker = ProgressTracker(ui_components)
+        self.progress_helper = ProgressHelper(ui_components)
         self.config = ModelUtils.get_models_from_ui_config(ui_components)
         self.models_dir = Path(self.config['models_dir'])
         self.models_dir.mkdir(parents=True, exist_ok=True)
     
     def check_all_models(self) -> Dict[str, Any]:
-        """Check semua model dengan UI config dan progress tracking"""
+        """Check semua model dengan enhanced progress tracking"""
         try:
-            self.progress_tracker.next_step('CHECK_MODELS', "🔍 Memeriksa model tersedia")
-            
             model_names = list(self.config['models'].keys())
             existing_models, missing_models, model_details = [], [], {}
             
             self.logger and self.logger.info(f"🔍 Checking {len(model_names)} models di {self.models_dir}")
             
             for i, model_name in enumerate(model_names):
-                self.progress_tracker.update_current_step((i * 100) // len(model_names), 
-                                                         f"Check {model_name} ({i+1}/{len(model_names)})")
+                # Update current operation progress
+                current_progress = ((i + 1) * 100) // len(model_names)
+                self.progress_helper.update_current_step(current_progress, f"Check {model_name} ({i+1}/{len(model_names)})")
                 
                 model_detail = self._check_single_model(model_name)
                 model_details[model_name] = model_detail
                 
+                # Categorize models dengan one-liner
                 (existing_models.append(model_name) if model_detail['exists'] and model_detail['valid'] 
                  else missing_models.append(model_name))
                 
                 self._log_model_status(model_detail)
-            
-            summary_msg = f"Check selesai: {len(existing_models)}/{len(model_names)} model tersedia"
-            self.progress_tracker.update_current_step(100, summary_msg)
             
             return {
                 'existing_models': existing_models, 'missing_models': missing_models,

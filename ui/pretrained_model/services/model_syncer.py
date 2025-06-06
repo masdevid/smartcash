@@ -1,28 +1,26 @@
 """
 File: smartcash/ui/pretrained_model/services/model_syncer.py
-Deskripsi: Service untuk sync model ke Google Drive dengan UI config integration
+Deskripsi: Optimized model syncer dengan enhanced progress tracker integration
 """
 
 import shutil
 from pathlib import Path
 from typing import Dict, Any
-from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, ProgressTracker
+from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, ProgressHelper
 
 class ModelSyncer:
-    """Service untuk sync model ke Google Drive dengan UI config"""
+    """Service untuk sync model ke Google Drive dengan enhanced progress integration"""
     
     def __init__(self, ui_components: Dict[str, Any], logger=None):
         self.ui_components, self.logger = ui_components, logger
-        self.progress_tracker = ProgressTracker(ui_components)
+        self.progress_helper = ProgressHelper(ui_components)
         self.config = ModelUtils.get_models_from_ui_config(ui_components)
         self.models_dir = Path(self.config['models_dir'])
         self.drive_models_dir = Path(self.config['drive_models_dir'])
     
     def sync_to_drive(self) -> Dict[str, Any]:
-        """Sync local models ke Google Drive dengan progress tracking"""
+        """Sync local models ke Google Drive dengan enhanced progress tracking"""
         try:
-            self.progress_tracker.next_step('SYNC_START', "☁️ Memulai sinkronisasi ke Drive")
-            
             # Check Drive availability
             if not self._is_drive_available():
                 self.logger and self.logger.warning("⚠️ Google Drive tidak tersedia")
@@ -42,11 +40,16 @@ class ModelSyncer:
             
             synced_count = 0
             for i, model_file in enumerate(model_files):
-                self.progress_tracker.update_current_step((i * 100) // len(model_files),
-                                                         f"Sync {model_file.name} ({i+1}/{len(model_files)})")
-                synced_count += (1 if self._sync_single_file(model_file) else 0)
+                # Update current operation progress
+                current_progress = ((i + 1) * 100) // len(model_files)
+                self.progress_helper.update_current_step(
+                    current_progress, 
+                    f"Sync {model_file.name} ({i+1}/{len(model_files)})"
+                )
+                
+                if self._sync_single_file(model_file):
+                    synced_count += 1
             
-            self.progress_tracker.next_step('SYNC_COMPLETE', f"☁️ {synced_count} model disinkronkan")
             self.logger and self.logger.success(f"☁️ {synced_count} model disinkronkan ke Drive")
             return {'success': True, 'synced_count': synced_count}
             

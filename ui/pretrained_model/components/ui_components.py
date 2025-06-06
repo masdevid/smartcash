@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained_model/components/ui_components.py
-Deskripsi: Fixed UI components menggunakan SimpleProgressTracker untuk avoid weak reference error
+Deskripsi: Fixed UI components dengan Enhanced Progress Tracker untuk mengganti implementasi lama
 """
 
 import ipywidgets as widgets
@@ -8,10 +8,10 @@ from typing import Dict, Any, Optional
 from smartcash.ui.components.header import create_header
 from smartcash.ui.utils.layout_utils import create_divider, get_layout
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.ui.components.simple_progress_tracker import create_simple_progress_tracker
+from smartcash.ui.components.enhanced_progress_tracker import create_triple_progress, ProgressMode
 
 def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create pretrained model UI dengan fixed progress tracker"""
+    """Create pretrained model UI dengan enhanced progress tracker"""
     config = config or {}
     
     # Header
@@ -38,13 +38,20 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
                                                      border='1px solid #ddd', overflow='auto',
                                                      padding='10px', margin='10px 0'))
     
-    # Create simple progress tracker (fixed implementation)
-    progress_components = create_simple_progress_tracker({})
+    # Create enhanced progress tracker dengan steps untuk pretrained model
+    steps = ["Check Models", "Download Missing", "Sync to Drive"]
+    step_weights = {"Check Models": 20, "Download Missing": 60, "Sync to Drive": 20}
+    
+    # Base UI components untuk tracker initialization
+    base_ui = {'log_output': log_output}
+    
+    # Create enhanced triple progress tracker
+    progress_components = create_triple_progress(base_ui, 
+                                               operation_name="Model Setup",
+                                               auto_hide_delay=3.0)
     
     # Button group
-    button_group = widgets.VBox([
-        download_button
-    ], layout=widgets.Layout(width='100%', margin='5px 0'))
+    button_group = widgets.VBox([download_button], layout=widgets.Layout(width='100%', margin='5px 0'))
     
     # Section headers
     action_header = widgets.HTML(f"""<h4 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 10px 0; 
@@ -68,7 +75,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         log_output
     ], layout=get_layout('container'))
     
-    # Combine all components
+    # Combine all components dengan enhanced progress tracker
     ui_components = {
         'ui': ui, 'header': header, 'config_form': config_form, 
         'download_sync_button': download_button,
@@ -82,10 +89,14 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'yolov5_url_input': config_form['yolov5_url'], 
         'efficientnet_url_input': config_form['efficientnet_url'],
         'module_name': 'pretrained_model', 
-        'auto_check_enabled': True
+        'auto_check_enabled': True,
+        # Enhanced progress configuration
+        'progress_mode': ProgressMode.TRIPLE,
+        'progress_steps': steps,
+        'progress_step_weights': step_weights
     }
     
-    # Add progress tracker methods
+    # Add enhanced progress tracker methods dengan steps configuration
     ui_components.update(progress_components)
     
     return ui_components
@@ -95,29 +106,26 @@ def _create_model_config_form(config: Dict[str, Any]) -> Dict[str, Any]:
     pretrained_config = config.get('pretrained_models', {})
     models_config = pretrained_config.get('models', {})
     
-    # Directory inputs
+    # Directory inputs dengan one-liner setup
     models_dir = widgets.Text(
         value=pretrained_config.get('models_dir', '/content/models'),
-        description='Models Dir:', 
-        placeholder='Path untuk menyimpan model lokal',
+        description='Models Dir:', placeholder='Path untuk menyimpan model lokal',
         layout=widgets.Layout(width='100%', margin='5px 0'),
         style={'description_width': '100px'}
     )
     
     drive_models_dir = widgets.Text(
         value=pretrained_config.get('drive_models_dir', '/content/drive/MyDrive/SmartCash/models'),
-        description='Drive Dir:', 
-        placeholder='Path untuk sinkronisasi ke Drive',
+        description='Drive Dir:', placeholder='Path untuk sinkronisasi ke Drive',
         layout=widgets.Layout(width='100%', margin='5px 0'),
         style={'description_width': '100px'}
     )
     
-    # Model URL inputs
+    # Model URL inputs dengan fallback URLs
     yolov5_config = models_config.get('yolov5', {})
     yolov5_url = widgets.Text(
         value=yolov5_config.get('url', 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt'),
-        description='YOLOv5 URL:', 
-        placeholder='URL download YOLOv5',
+        description='YOLOv5 URL:', placeholder='URL download YOLOv5',
         layout=widgets.Layout(width='100%', margin='5px 0'),
         style={'description_width': '100px'}
     )
@@ -125,8 +133,7 @@ def _create_model_config_form(config: Dict[str, Any]) -> Dict[str, Any]:
     efficientnet_config = models_config.get('efficientnet_b4', {})
     efficientnet_url = widgets.Text(
         value=efficientnet_config.get('url', 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin'),
-        description='EfficientNet URL:', 
-        placeholder='URL download EfficientNet-B4',
+        description='EfficientNet URL:', placeholder='URL download EfficientNet-B4',
         layout=widgets.Layout(width='100%', margin='5px 0'),
         style={'description_width': '100px'}
     )

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained_model/utils/model_utils.py
-Deskripsi: Fixed utilities dengan simplified progress tracker untuk avoid weak reference error
+Deskripsi: Optimized utilities dengan enhanced progress tracker integration untuk backward compatibility
 """
 
 from pathlib import Path
@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from smartcash.ui.pretrained_model.constants.model_constants import get_model_configs
 
 class ModelUtils:
-    """Utilities untuk model operations dengan dynamic config"""
+    """Utilities untuk model operations dengan dynamic config dan enhanced progress support"""
     
     @staticmethod
     def get_all_model_names() -> List[str]:
@@ -56,24 +56,59 @@ class ModelUtils:
             }
         }
 
-class ProgressTracker:
-    """Simplified progress tracker untuk avoid weak reference error"""
+class ProgressHelper:
+    """Helper untuk enhanced progress tracker dengan backward compatibility"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
+        self.logger = ui_components.get('logger')
         
-    def next_step(self, step_name: str, message: str) -> None:
-        """Move ke step berikutnya dengan message - delegasi ke UI components"""
-        update_fn = self.ui_components.get('update_progress')
-        update_fn and update_fn('overall', 0, message)
-        
-        logger = self.ui_components.get('logger')
-        logger and logger.info(f"📋 {step_name}: {message}")
+        # Detect progress tracker type dan setup delegates
+        self._setup_progress_delegates()
     
-    def update_current_step(self, progress: int, message: str) -> None:
-        """Update current step progress - delegasi ke UI components"""
-        update_fn = self.ui_components.get('update_progress')
-        update_fn and update_fn('current', progress, message)
+    def _setup_progress_delegates(self):
+        """Setup progress delegates berdasarkan tracker type yang tersedia"""
+        # Check untuk enhanced progress tracker
+        if 'update_overall' in self.ui_components:
+            self.next_step = lambda step_name, message: self._enhanced_next_step(step_name, message)
+            self.update_current_step = lambda progress, message: self._enhanced_update_current(progress, message)
         
-        # Optional: log significant progress updates
-        progress % 25 == 0 and progress > 0 and self.ui_components.get('logger') and self.ui_components['logger'].info(f"⏳ Progress: {progress}%")
+        # Fallback untuk simple progress tracker
+        elif 'update_progress' in self.ui_components:
+            self.next_step = lambda step_name, message: self._simple_next_step(step_name, message)
+            self.update_current_step = lambda progress, message: self._simple_update_current(progress, message)
+        
+        # No-op fallback jika tidak ada tracker
+        else:
+            self.next_step = lambda step_name, message: self._log_only(step_name, message)
+            self.update_current_step = lambda progress, message: self._log_only(f"{progress}%", message)
+    
+    def _enhanced_next_step(self, step_name: str, message: str) -> None:
+        """Enhanced progress tracker delegation"""
+        self.ui_components.get('update_overall', lambda *a: None)(0, message)
+        self.logger and self.logger.info(f"📋 {step_name}: {message}")
+    
+    def _enhanced_update_current(self, progress: int, message: str) -> None:
+        """Enhanced progress tracker current update"""
+        self.ui_components.get('update_current', lambda *a: None)(progress, message)
+        # Log significant progress updates only
+        progress % 25 == 0 and progress > 0 and self.logger and self.logger.info(f"⏳ Progress: {progress}%")
+    
+    def _simple_next_step(self, step_name: str, message: str) -> None:
+        """Simple progress tracker delegation untuk backward compatibility"""
+        self.ui_components.get('update_progress', lambda *a: None)('overall', 0, message)
+        self.logger and self.logger.info(f"📋 {step_name}: {message}")
+    
+    def _simple_update_current(self, progress: int, message: str) -> None:
+        """Simple progress tracker current update"""
+        self.ui_components.get('update_progress', lambda *a: None)('current', progress, message)
+        progress % 25 == 0 and progress > 0 and self.logger and self.logger.info(f"⏳ Progress: {progress}%")
+    
+    def _log_only(self, step_name: str, message: str) -> None:
+        """Fallback ke log only jika tidak ada progress tracker"""
+        self.logger and self.logger.info(f"📋 {step_name}: {message}")
+
+# Backward compatibility alias untuk existing code
+class ProgressTracker(ProgressHelper):
+    """Alias untuk backward compatibility dengan existing code"""
+    pass

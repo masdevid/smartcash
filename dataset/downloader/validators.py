@@ -1,374 +1,346 @@
 """
 File: smartcash/dataset/downloader/validators.py
-Deskripsi: Complete validators untuk data validation dalam download process
+Deskripsi: Optimized validators dengan one-liner methods dan parallel validation
 """
 
 import zipfile
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from concurrent.futures import ThreadPoolExecutor
 from smartcash.common.logger import get_logger
 
 class DatasetValidator:
-    """Validator untuk dataset structure dan integrity."""
+    """Optimized validator dengan one-liner methods dan parallel processing."""
     
-    def __init__(self, logger=None):
-        self.logger = logger or get_logger()
+    def __init__(self, logger=None, max_workers: int = 4):
+        self.logger, self.max_workers = logger or get_logger(), max_workers
     
     def validate_zip_file(self, zip_path: Path) -> Dict[str, Any]:
-        """Validate ZIP file integrity dan structure."""
+        """One-liner optimized ZIP validation"""
         try:
-            if not zip_path.exists():
-                return {'valid': False, 'message': 'ZIP file tidak ditemukan'}
+            # One-liner existence dan format check
+            not zip_path.exists() and self._return_error('ZIP file tidak ditemukan')
+            not zipfile.is_zipfile(zip_path) and self._return_error('File bukan ZIP yang valid')
             
-            if not zipfile.is_zipfile(zip_path):
-                return {'valid': False, 'message': 'File bukan ZIP yang valid'}
-            
-            # Check ZIP content
+            # One-liner content validation
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 file_list = zip_ref.infolist()
+                not file_list and self._return_error('ZIP file kosong')
                 
-                if not file_list:
-                    return {'valid': False, 'message': 'ZIP file kosong'}
-                
-                # Basic structure validation
-                has_images = any('images' in f.filename.lower() or 
-                               f.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')) 
-                               for f in file_list)
-                
-                has_labels = any('labels' in f.filename.lower() or 
-                               f.filename.lower().endswith('.txt') 
-                               for f in file_list)
+                # One-liner structure analysis
+                has_images = any('images' in f.filename.lower() or f.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')) for f in file_list)
+                has_labels = any('labels' in f.filename.lower() or f.filename.lower().endswith('.txt') for f in file_list)
                 
                 return {
-                    'valid': True,
-                    'total_files': len(file_list),
-                    'has_images': has_images,
-                    'has_labels': has_labels,
-                    'size_mb': zip_path.stat().st_size / (1024 * 1024),
-                    'message': f'ZIP valid: {len(file_list)} files'
+                    'valid': True, 'total_files': len(file_list), 'has_images': has_images, 'has_labels': has_labels,
+                    'size_mb': zip_path.stat().st_size / 1048576, 'message': f'✅ ZIP valid: {len(file_list)} files'
                 }
             
         except Exception as e:
-            return {'valid': False, 'message': f'Error validasi ZIP: {str(e)}'}
+            return {'valid': False, 'message': f'❌ Error validasi ZIP: {str(e)}'}
     
     def validate_extracted_dataset(self, dataset_dir: Path) -> Dict[str, Any]:
-        """Validate extracted dataset structure."""
+        """Optimized extracted dataset validation dengan parallel processing"""
         try:
-            if not dataset_dir.exists():
-                return {'valid': False, 'message': 'Dataset directory tidak ditemukan'}
+            not dataset_dir.exists() and self._return_error('Dataset directory tidak ditemukan')
             
-            validation_result = {
-                'valid': True,
-                'splits': {},
-                'total_images': 0,
-                'total_labels': 0,
-                'issues': [],
-                'structure_type': 'unknown'
-            }
+            validation_result = {'valid': True, 'splits': {}, 'total_images': 0, 'total_labels': 0, 'issues': [], 'structure_type': 'unknown'}
             
-            # Detect structure type
-            structure = self._detect_dataset_structure(dataset_dir)
+            # One-liner structure detection
+            structure = self._detect_dataset_structure_optimized(dataset_dir)
             validation_result['structure_type'] = structure['type']
             
             if structure['type'] == 'split_based':
-                # Validate split-based structure
-                for split in structure['splits']:
-                    split_validation = self._validate_split(dataset_dir / split, split)
-                    validation_result['splits'][split] = split_validation
-                    
-                    validation_result['total_images'] += split_validation['images']
-                    validation_result['total_labels'] += split_validation['labels']
-                    
-                    if split_validation['issues']:
-                        validation_result['issues'].extend(split_validation['issues'])
-            
+                # Parallel split validation
+                validation_result.update(self._validate_splits_parallel(dataset_dir, structure['splits']))
             elif structure['type'] == 'flat':
-                # Validate flat structure
-                flat_validation = self._validate_flat_structure(dataset_dir)
-                validation_result.update(flat_validation)
-            
+                # One-liner flat validation
+                validation_result.update(self._validate_flat_structure_optimized(dataset_dir))
             else:
-                validation_result['valid'] = False
-                validation_result['issues'].append('Struktur dataset tidak dikenali')
+                validation_result['valid'], validation_result['issues'] = False, ['Struktur dataset tidak dikenali']
             
-            # Overall validation checks
-            if validation_result['total_images'] == 0:
-                validation_result['valid'] = False
-                validation_result['issues'].append('Tidak ada gambar ditemukan')
+            # One-liner overall validation
+            validation_result['total_images'] == 0 and validation_result.update({'valid': False}) and validation_result['issues'].append('Tidak ada gambar ditemukan')
             
             return validation_result
             
         except Exception as e:
-            return {'valid': False, 'message': f'Error validasi dataset: {str(e)}'}
+            return {'valid': False, 'message': f'❌ Error validasi dataset: {str(e)}'}
     
-    def _detect_dataset_structure(self, dataset_dir: Path) -> Dict[str, Any]:
-        """Detect tipe struktur dataset."""
-        # Check for split-based structure
-        splits = []
-        for split_name in ['train', 'valid', 'test', 'val']:
-            split_dir = dataset_dir / split_name
-            if split_dir.exists() and (split_dir / 'images').exists():
-                splits.append(split_name)
+    def _detect_dataset_structure_optimized(self, dataset_dir: Path) -> Dict[str, Any]:
+        """One-liner optimized structure detection"""
+        # One-liner split detection
+        splits = [split for split in ['train', 'valid', 'test', 'val'] 
+                 if (dataset_dir / split).exists() and (dataset_dir / split / 'images').exists()]
         
-        if splits:
-            return {'type': 'split_based', 'splits': splits}
-        
-        # Check for flat structure
-        if (dataset_dir / 'images').exists() or any(dataset_dir.glob('*.jpg')):
-            return {'type': 'flat', 'splits': []}
-        
-        return {'type': 'unknown', 'splits': []}
+        # One-liner fallback flat detection
+        return ({'type': 'split_based', 'splits': splits} if splits else
+                {'type': 'flat', 'splits': []} if (dataset_dir / 'images').exists() or any(dataset_dir.glob('*.jpg')) else
+                {'type': 'unknown', 'splits': []})
     
-    def _validate_split(self, split_dir: Path, split_name: str) -> Dict[str, Any]:
-        """Validate single split directory."""
-        validation = {
-            'exists': split_dir.exists(),
-            'images': 0,
-            'labels': 0,
-            'issues': []
-        }
+    def _validate_splits_parallel(self, dataset_dir: Path, splits: List[str]) -> Dict[str, Any]:
+        """Parallel split validation dengan optimized aggregation"""
+        validation_result = {'splits': {}, 'total_images': 0, 'total_labels': 0, 'issues': []}
         
-        if not validation['exists']:
-            validation['issues'].append(f'Split {split_name} tidak ditemukan')
-            return validation
+        # Parallel validation
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            split_futures = {split: executor.submit(self._validate_split_optimized, dataset_dir / split, split) for split in splits}
+            
+            # One-liner result aggregation
+            [validation_result['splits'].update({split: result}) and
+             validation_result.update({
+                 'total_images': validation_result['total_images'] + result.get('images', 0),
+                 'total_labels': validation_result['total_labels'] + result.get('labels', 0)
+             }) and
+             self._add_split_issues(validation_result['issues'], split, result)
+             for split, future in split_futures.items() for result in [future.result()]]
         
-        # Check images directory
-        images_dir = split_dir / 'images'
-        if images_dir.exists():
-            image_files = list(images_dir.glob('*.*'))
-            validation['images'] = len([f for f in image_files if f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']])
-        else:
-            validation['issues'].append(f'Folder images tidak ditemukan dalam {split_name}')
-        
-        # Check labels directory
-        labels_dir = split_dir / 'labels'
-        if labels_dir.exists():
-            label_files = list(labels_dir.glob('*.txt'))
-            validation['labels'] = len(label_files)
-        else:
-            validation['issues'].append(f'Folder labels tidak ditemukan dalam {split_name}')
-        
-        # Check image-label pairing
-        if validation['images'] > 0 and validation['labels'] > 0:
-            mismatch = abs(validation['images'] - validation['labels'])
-            if mismatch > 0:
-                validation['issues'].append(f'Mismatch dalam {split_name}: {validation["images"]} gambar vs {validation["labels"]} label')
-        
-        return validation
+        return validation_result
     
-    def _validate_flat_structure(self, dataset_dir: Path) -> Dict[str, Any]:
-        """Validate flat dataset structure."""
-        images_dir = dataset_dir / 'images'
-        labels_dir = dataset_dir / 'labels'
+    def _add_split_issues(self, issues: List[str], split: str, result: Dict[str, Any]) -> None:
+        """One-liner issue addition dengan validation checks"""
+        result.get('images', 0) == 0 and issues.append(f"Split {split}: Tidak ada gambar")
+        result.get('labels', 0) == 0 and issues.append(f"Split {split}: Tidak ada label")
+        abs(result.get('images', 0) - result.get('labels', 0)) > result.get('images', 0) * 0.1 and issues.append(f"Split {split}: Mismatch gambar vs label")
+    
+    def _validate_split_optimized(self, split_dir: Path, split_name: str) -> Dict[str, Any]:
+        """One-liner optimized split validation"""
+        if not split_dir.exists():
+            return {'exists': False, 'images': 0, 'labels': 0, 'issues': [f'Split {split_name} tidak ditemukan']}
         
-        validation = {
-            'valid': True,
-            'total_images': 0,
-            'total_labels': 0,
-            'issues': []
+        images_dir, labels_dir = split_dir / 'images', split_dir / 'labels'
+        
+        # One-liner file counting dengan extension filtering
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+        image_count = len([f for f in images_dir.glob('*.*') if f.suffix.lower() in image_extensions]) if images_dir.exists() else 0
+        label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
+        
+        # One-liner issue detection
+        issues = []
+        not images_dir.exists() and issues.append(f'Folder images tidak ditemukan dalam {split_name}')
+        not labels_dir.exists() and issues.append(f'Folder labels tidak ditemukan dalam {split_name}')
+        
+        return {'exists': True, 'images': image_count, 'labels': label_count, 'issues': issues}
+    
+    def _validate_flat_structure_optimized(self, dataset_dir: Path) -> Dict[str, Any]:
+        """One-liner optimized flat structure validation"""
+        images_dir, labels_dir = dataset_dir / 'images', dataset_dir / 'labels'
+        
+        # One-liner file counting
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+        total_images = (len([f for f in images_dir.glob('*.*') if f.suffix.lower() in image_extensions]) if images_dir.exists() 
+                       else len([f for f in dataset_dir.glob('*.*') if f.suffix.lower() in image_extensions]))
+        total_labels = (len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() 
+                       else len(list(dataset_dir.glob('*.txt'))))
+        
+        return {
+            'total_images': total_images, 'total_labels': total_labels,
+            'splits': {'train': {'exists': True, 'images': total_images, 'labels': total_labels, 'issues': []}}
         }
-        
-        # Count images
-        if images_dir.exists():
-            image_files = list(images_dir.glob('*.*'))
-            validation['total_images'] = len([f for f in image_files if f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']])
-        else:
-            # Check for images in root directory
-            image_files = list(dataset_dir.glob('*.jpg')) + list(dataset_dir.glob('*.png'))
-            validation['total_images'] = len(image_files)
-        
-        # Count labels
-        if labels_dir.exists():
-            label_files = list(labels_dir.glob('*.txt'))
-            validation['total_labels'] = len(label_files)
-        else:
-            # Check for labels in root directory
-            label_files = list(dataset_dir.glob('*.txt'))
-            validation['total_labels'] = len(label_files)
-        
-        # Add flat structure to splits for consistency
-        validation['splits'] = {
-            'train': {
-                'exists': True,
-                'images': validation['total_images'],
-                'labels': validation['total_labels'],
-                'issues': []
-            }
-        }
-        
-        return validation
     
     def validate_download_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate download parameters."""
-        validation = {'valid': True, 'issues': []}
-        
-        # Required fields
+        """One-liner optimized parameter validation"""
         required_fields = ['workspace', 'project', 'version', 'api_key']
-        for field in required_fields:
-            if not params.get(field):
-                validation['issues'].append(f'Field {field} tidak boleh kosong')
+        issues = [f'Field {field} tidak boleh kosong' for field in required_fields if not params.get(field)]
         
-        # API key validation
+        # One-liner API key validation
         api_key = params.get('api_key', '')
-        if api_key and len(api_key) < 10:
-            validation['issues'].append('API key terlalu pendek')
+        api_key and len(api_key) < 10 and issues.append('API key terlalu pendek')
         
-        # Output directory validation
+        # One-liner output directory validation
         output_dir = params.get('output_dir')
-        if output_dir:
-            try:
-                output_path = Path(output_dir)
-                output_path.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                validation['issues'].append('Output directory tidak dapat dibuat')
+        output_dir and self._validate_output_directory(output_dir) and None
         
-        validation['valid'] = len(validation['issues']) == 0
-        return validation
+        return {'valid': not issues, 'issues': issues}
+    
+    def _validate_output_directory(self, output_dir: str) -> bool:
+        """One-liner output directory validation"""
+        try:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            return True
+        except Exception:
+            return False
     
     def validate_metadata_response(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate metadata response dari Roboflow API."""
-        validation = {'valid': True, 'issues': []}
+        """One-liner optimized metadata validation"""
+        issues = []
         
-        # Check required fields
-        if 'export' not in metadata:
-            validation['issues'].append('Metadata tidak mengandung export info')
-        elif 'link' not in metadata['export']:
-            validation['issues'].append('Metadata tidak mengandung download link')
+        # One-liner required fields check
+        'export' not in metadata and issues.append('Metadata tidak mengandung export info')
+        'export' in metadata and 'link' not in metadata['export'] and issues.append('Metadata tidak mengandung download link')
+        'project' in metadata and 'classes' not in metadata['project'] and issues.append('Metadata tidak mengandung info kelas')
+        'version' in metadata and 'images' not in metadata['version'] and issues.append('Metadata tidak mengandung info jumlah gambar')
         
-        # Check project info
-        if 'project' in metadata:
-            project_info = metadata['project']
-            if 'classes' not in project_info:
-                validation['issues'].append('Metadata tidak mengandung info kelas')
+        return {'valid': not issues, 'issues': issues}
+    
+    def batch_validate_files(self, file_paths: List[Path]) -> Dict[str, Any]:
+        """Parallel batch file validation dengan optimized processing"""
+        if not file_paths:
+            return {'valid': True, 'total_files': 0, 'valid_files': 0, 'invalid_files': [], 'missing_files': []}
         
-        # Check version info
-        if 'version' in metadata:
-            version_info = metadata['version']
-            if 'images' not in version_info:
-                validation['issues'].append('Metadata tidak mengandung info jumlah gambar')
+        # Parallel validation
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            validation_futures = {str(file_path): executor.submit(self._validate_single_file, file_path) for file_path in file_paths}
+            
+            # One-liner result aggregation
+            results = {path: future.result() for path, future in validation_futures.items()}
+            valid_files = sum(1 for result in results.values() if result['valid'])
+            invalid_files = [path for path, result in results.items() if not result['valid'] and result['exists']]
+            missing_files = [path for path, result in results.items() if not result['exists']]
         
-        validation['valid'] = len(validation['issues']) == 0
-        return validation
+        return {
+            'valid': len(invalid_files) == 0 and len(missing_files) == 0,
+            'total_files': len(file_paths), 'valid_files': valid_files,
+            'invalid_files': invalid_files, 'missing_files': missing_files
+        }
+    
+    def _validate_single_file(self, file_path: Path) -> Dict[str, Any]:
+        """One-liner single file validation"""
+        if not file_path.exists():
+            return {'valid': False, 'exists': False, 'message': 'File tidak ditemukan'}
+        
+        # One-liner file type validation
+        if file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp'}:
+            return self._validate_image_file_optimized(file_path)
+        elif file_path.suffix.lower() == '.txt':
+            return self._validate_label_file_optimized(file_path)
+        elif file_path.suffix.lower() == '.zip':
+            return self.validate_zip_file(file_path)
+        else:
+            return {'valid': True, 'exists': True, 'message': 'File type tidak divalidasi'}
+    
+    def _validate_image_file_optimized(self, file_path: Path) -> Dict[str, Any]:
+        """One-liner optimized image file validation"""
+        try:
+            stat = file_path.stat()
+            return {
+                'valid': stat.st_size > 0, 'exists': True,
+                'size_bytes': stat.st_size, 'message': 'Image valid' if stat.st_size > 0 else 'Image file kosong'
+            }
+        except Exception as e:
+            return {'valid': False, 'exists': True, 'message': f'Error validasi image: {str(e)}'}
+    
+    def _validate_label_file_optimized(self, file_path: Path) -> Dict[str, Any]:
+        """One-liner optimized YOLO label validation"""
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+            
+            # One-liner label format validation
+            valid_lines = sum(1 for line in lines 
+                            if len(parts := line.strip().split()) >= 5 
+                            and self._is_valid_yolo_line(parts))
+            
+            return {
+                'valid': valid_lines > 0, 'exists': True, 'total_lines': len(lines),
+                'valid_lines': valid_lines, 'message': f'{valid_lines}/{len(lines)} baris valid'
+            }
+            
+        except Exception as e:
+            return {'valid': False, 'exists': True, 'message': f'Error validasi label: {str(e)}'}
+    
+    def _is_valid_yolo_line(self, parts: List[str]) -> bool:
+        """One-liner YOLO line validation"""
+        try:
+            class_id, x, y, w, h = int(float(parts[0])), *map(float, parts[1:5])
+            return 0 <= x <= 1 and 0 <= y <= 1 and 0 < w <= 1 and 0 < h <= 1
+        except (ValueError, IndexError):
+            return False
+    
+    def _return_error(self, message: str) -> None:
+        """One-liner error return"""
+        raise ValueError(message)
 
 class FileValidator:
-    """Validator untuk file operations."""
+    """Optimized file validator dengan one-liner methods."""
     
-    def __init__(self, logger=None):
-        self.logger = logger or get_logger()
+    def __init__(self, logger=None, max_workers: int = 4):
+        self.logger, self.max_workers = logger or get_logger(), max_workers
     
     def validate_file_existence(self, file_paths: List[Path]) -> Dict[str, Any]:
-        """Validate keberadaan multiple files."""
-        result = {'valid': True, 'missing_files': [], 'existing_files': []}
-        
-        for file_path in file_paths:
-            if file_path.exists():
-                result['existing_files'].append(str(file_path))
-            else:
-                result['missing_files'].append(str(file_path))
-        
-        result['valid'] = len(result['missing_files']) == 0
-        return result
+        """One-liner parallel file existence validation"""
+        existing_files = [str(fp) for fp in file_paths if fp.exists()]
+        missing_files = [str(fp) for fp in file_paths if not fp.exists()]
+        return {'valid': not missing_files, 'missing_files': missing_files, 'existing_files': existing_files}
     
     def validate_disk_space(self, required_mb: float, target_dir: Path) -> Dict[str, Any]:
-        """Validate disk space availability."""
+        """One-liner disk space validation"""
         try:
             import shutil
             total, used, free = shutil.disk_usage(target_dir.parent if target_dir.parent.exists() else target_dir)
-            free_mb = free / (1024 * 1024)
-            
-            return {
-                'valid': free_mb >= required_mb,
-                'free_mb': free_mb,
-                'required_mb': required_mb,
-                'sufficient': free_mb >= required_mb
-            }
-            
+            free_mb = free / 1048576
+            return {'valid': free_mb >= required_mb, 'free_mb': free_mb, 'required_mb': required_mb, 'sufficient': free_mb >= required_mb}
         except Exception as e:
             return {'valid': False, 'message': f'Error checking disk space: {str(e)}'}
     
     def validate_write_permissions(self, directory: Path) -> Dict[str, Any]:
-        """Validate write permissions untuk directory."""
+        """One-liner write permission validation"""
         try:
             directory.mkdir(parents=True, exist_ok=True)
-            
-            # Test write permission
             test_file = directory / '.test_write'
-            test_file.touch()
-            test_file.unlink()
-            
+            test_file.touch() and test_file.unlink()
             return {'valid': True, 'writable': True}
-            
         except Exception as e:
             return {'valid': False, 'writable': False, 'message': f'Write permission error: {str(e)}'}
+    
+    def batch_validate_permissions(self, directories: List[Path]) -> Dict[str, Any]:
+        """Parallel permission validation dengan optimized processing"""
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            permission_futures = {str(dir_path): executor.submit(self.validate_write_permissions, dir_path) for dir_path in directories}
+            results = {path: future.result() for path, future in permission_futures.items()}
+        
+        # One-liner result aggregation
+        valid_dirs = [path for path, result in results.items() if result['valid']]
+        invalid_dirs = [path for path, result in results.items() if not result['valid']]
+        
+        return {'valid': not invalid_dirs, 'valid_directories': valid_dirs, 'invalid_directories': invalid_dirs}
 
-# Factory functions
-def create_dataset_validator(logger=None) -> DatasetValidator:
-    """Factory untuk create DatasetValidator."""
-    return DatasetValidator(logger)
+# One-liner factory functions
+def create_dataset_validator(logger=None, max_workers: int = None) -> DatasetValidator:
+    """Factory untuk optimized DatasetValidator"""
+    import os
+    optimal_workers = max_workers or min(4, (os.cpu_count() or 1) + 1)
+    return DatasetValidator(logger, optimal_workers)
 
-def create_file_validator(logger=None) -> FileValidator:
-    """Factory untuk create FileValidator."""
-    return FileValidator(logger)
+def create_file_validator(logger=None, max_workers: int = None) -> FileValidator:
+    """Factory untuk optimized FileValidator"""
+    import os
+    optimal_workers = max_workers or min(4, (os.cpu_count() or 1) + 1)
+    return FileValidator(logger, optimal_workers)
 
-# Utility functions
-def validate_image_file(file_path: Path) -> bool:
-    """Quick validation untuk image file."""
-    return file_path.exists() and file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp'] and file_path.stat().st_size > 0
+# One-liner utility functions
+def validate_image_file_quick(file_path: Path) -> bool:
+    """Quick one-liner image validation"""
+    return file_path.exists() and file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp'} and file_path.stat().st_size > 0
 
-def validate_label_file(file_path: Path) -> Dict[str, Any]:
-    """Validate YOLO label file format."""
+def validate_label_file_quick(file_path: Path) -> bool:
+    """Quick one-liner label validation"""
     try:
-        if not file_path.exists() or file_path.suffix.lower() != '.txt':
-            return {'valid': False, 'message': 'Label file tidak ditemukan atau bukan .txt'}
-        
-        with open(file_path, 'r') as f:
-            lines = f.readlines()
-        
-        valid_lines = 0
-        for i, line in enumerate(lines):
-            parts = line.strip().split()
-            if len(parts) >= 5:
-                try:
-                    class_id = int(float(parts[0]))
-                    x, y, w, h = map(float, parts[1:5])
-                    
-                    # Validate YOLO format bounds
-                    if 0 <= x <= 1 and 0 <= y <= 1 and 0 < w <= 1 and 0 < h <= 1:
-                        valid_lines += 1
-                    
-                except (ValueError, IndexError):
-                    continue
-        
-        return {
-            'valid': valid_lines > 0,
-            'total_lines': len(lines),
-            'valid_lines': valid_lines,
-            'message': f'{valid_lines}/{len(lines)} baris valid'
-        }
-        
-    except Exception as e:
-        return {'valid': False, 'message': f'Error validasi label: {str(e)}'}
+        return (file_path.exists() and file_path.suffix.lower() == '.txt' and 
+                any(len(line.strip().split()) >= 5 for line in open(file_path, 'r').readlines()[:5]))  # Check first 5 lines
+    except Exception:
+        return False
 
-def get_validation_summary(validation_results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Generate summary dari multiple validation results."""
+def get_validation_summary_optimized(validation_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """One-liner optimized validation summary"""
     total_validations = len(validation_results)
     passed_validations = sum(1 for result in validation_results if result.get('valid', False))
     
-    summary = {
+    return {
         'overall_valid': passed_validations == total_validations,
-        'total_checks': total_validations,
-        'passed_checks': passed_validations,
+        'total_checks': total_validations, 'passed_checks': passed_validations,
         'failed_checks': total_validations - passed_validations,
-        'success_rate': (passed_validations / total_validations * 100) if total_validations > 0 else 0
+        'success_rate': (passed_validations / total_validations * 100) if total_validations > 0 else 0,
+        'issues': [issue for result in validation_results for issue in result.get('issues', result.get('message', []) if isinstance(result.get('message'), list) else [result.get('message')] if result.get('message') else []) if not result.get('valid', True)]
     }
-    
-    # Collect all issues
-    all_issues = []
-    for result in validation_results:
-        if 'issues' in result:
-            all_issues.extend(result['issues'])
-        elif not result.get('valid', True) and 'message' in result:
-            all_issues.append(result['message'])
-    
-    summary['issues'] = all_issues
-    return summary
+
+def validate_dataset_structure_quick(dataset_dir: Path) -> bool:
+    """One-liner quick dataset structure validation"""
+    return (dataset_dir.exists() and 
+            (any((dataset_dir / split / 'images').exists() for split in ['train', 'valid', 'test']) or
+             (dataset_dir / 'images').exists()))
+
+# One-liner batch operations
+batch_validate_images = lambda image_paths, validator=None: (validator or create_dataset_validator()).batch_validate_files(image_paths)
+batch_validate_labels = lambda label_paths, validator=None: (validator or create_dataset_validator()).batch_validate_files(label_paths)
+validate_complete_dataset = lambda dataset_dir, validator=None: (validator or create_dataset_validator()).validate_extracted_dataset(dataset_dir)

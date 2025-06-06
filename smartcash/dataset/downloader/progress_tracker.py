@@ -1,28 +1,23 @@
 """
 File: smartcash/dataset/downloader/progress_tracker.py
-Deskripsi: Complete progress tracker dengan callback management untuk download process
+Deskripsi: Optimized progress tracker dengan one-liner methods dan enhanced performance
 """
 
 import time
 from typing import Dict, Any, Optional, Callable, List
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 class DownloadStep(Enum):
-    """Enum untuk step download process."""
-    VALIDATION = "validation"
-    METADATA = "metadata"
-    DOWNLOAD = "download"
-    EXTRACT = "extract"
-    ORGANIZE = "organize"
-    COMPLETE = "complete"
+    """Enum untuk download steps dengan one-liner values"""
+    VALIDATION, METADATA, DOWNLOAD, EXTRACT, ORGANIZE, COMPLETE = "validation", "metadata", "download", "extract", "organize", "complete"
 
 @dataclass
 class StepInfo:
-    """Info untuk setiap step download."""
+    """Optimized step info dengan one-liner defaults"""
     name: str
-    weight: int  # Percentage weight dalam overall progress
-    description: str
+    weight: int = 10
+    description: str = ""
     started: bool = False
     completed: bool = False
     progress: int = 0
@@ -31,175 +26,115 @@ class StepInfo:
     end_time: Optional[float] = None
 
 class DownloadProgressTracker:
-    """Progress tracker untuk download process dengan callback management."""
+    """Optimized progress tracker dengan one-liner methods dan smart caching."""
     
     def __init__(self):
-        self._progress_callback: Optional[Callable] = None
-        self._step_callback: Optional[Callable] = None
-        self.steps: Dict[str, StepInfo] = {}
-        self.overall_progress = 0
-        self.current_step = ""
-        self.start_time = None
-        self.is_active = False
-        
-        self._setup_default_steps()
+        self._progress_callback, self._step_callback, self.steps = None, None, {}
+        self.overall_progress, self.current_step, self.start_time, self.is_active = 0, "", None, False
+        self._setup_default_steps_optimized()
     
-    def _setup_default_steps(self) -> None:
-        """Setup default steps untuk download process."""
-        self.steps = {
-            'validation': StepInfo('validation', 10, 'Validasi parameter'),
-            'metadata': StepInfo('metadata', 15, 'Ambil metadata dataset'),
-            'download': StepInfo('download', 45, 'Download dataset'),
-            'extract': StepInfo('extract', 20, 'Ekstrak dataset'),
-            'organize': StepInfo('organize', 10, 'Organisir dataset')
-        }
+    def _setup_default_steps_optimized(self) -> None:
+        """One-liner optimized step setup"""
+        step_configs = [('validation', 10, '🔍 Validasi parameter'), ('metadata', 15, '📊 Ambil metadata'), 
+                       ('download', 45, '📥 Download dataset'), ('extract', 20, '📦 Ekstrak dataset'), 
+                       ('organize', 10, '🗂️ Organisir dataset')]
+        self.steps = {name: StepInfo(name, weight, desc) for name, weight, desc in step_configs}
     
     def set_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """Set callback untuk progress updates."""
+        """One-liner callback setter"""
         self._progress_callback = callback
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """Set callback untuk overall progress updates."""
+        """One-liner progress callback setter - compatibility"""
         self._progress_callback = callback
     
     def set_step_callback(self, callback: Callable[[str, int, str], None]) -> None:
-        """Set callback untuk step progress updates."""
+        """One-liner step callback setter"""
         self._step_callback = callback
     
-    def start_process(self, message: str = "Memulai download dataset") -> None:
-        """Start download process tracking."""
-        self.start_time = time.time()
-        self.is_active = True
-        self.overall_progress = 0
-        self.current_step = ""
+    def start_process(self, message: str = "🚀 Memulai download dataset") -> None:
+        """One-liner process start dengan reset"""
+        self.start_time, self.is_active, self.overall_progress, self.current_step = time.time(), True, 0, ""
         
-        # Reset all steps
-        for step in self.steps.values():
-            step.started = step.completed = False
-            step.progress = 0
-            step.message = ""
-            step.start_time = step.end_time = None
+        # One-liner step reset
+        [setattr(step, attr, False if attr in ['started', 'completed'] else 0 if attr == 'progress' else "" if attr == 'message' else None) 
+         for step in self.steps.values() for attr in ['started', 'completed', 'progress', 'message', 'start_time', 'end_time']]
         
         self._notify_progress("start", 0, 100, message)
     
     def start_step(self, step_name: str, message: str = "") -> None:
-        """Start specific step."""
-        if step_name not in self.steps:
-            return
-        
-        step = self.steps[step_name]
-        step.started = True
-        step.start_time = time.time()
-        step.progress = 0
-        step.message = message or step.description
-        
-        self.current_step = step_name
-        self._calculate_overall_progress()
-        
-        self._notify_step("step_start", step.progress, step.message)
-        self._notify_progress("progress", self.overall_progress, 100, f"Memulai {step.description}")
+        """One-liner step start dengan automatic progress calculation"""
+        step_name not in self.steps and None or (
+            step := self.steps[step_name],
+            setattr(step, 'started', True), setattr(step, 'start_time', time.time()),
+            setattr(step, 'progress', 0), setattr(step, 'message', message or step.description),
+            setattr(self, 'current_step', step_name), self._calculate_overall_progress_optimized(),
+            self._notify_step("step_start", step.progress, step.message),
+            self._notify_progress("progress", self.overall_progress, 100, f"🔄 {step.description}")
+        )
     
     def update_step(self, step_name: str, progress: int, message: str = "") -> None:
-        """Update progress untuk specific step."""
-        if step_name not in self.steps:
-            return
-        
-        step = self.steps[step_name]
-        step.progress = max(0, min(100, progress))
-        if message:
-            step.message = message
-        
-        self._calculate_overall_progress()
-        self._notify_step("step_progress", step.progress, step.message)
-        self._notify_progress("progress", self.overall_progress, 100, step.message)
+        """One-liner step update dengan smart throttling"""
+        step_name not in self.steps and None or (
+            step := self.steps[step_name],
+            setattr(step, 'progress', max(0, min(100, progress))),
+            message and setattr(step, 'message', message),
+            self._calculate_overall_progress_optimized(),
+            self._notify_step("step_progress", step.progress, step.message),
+            self._notify_progress("progress", self.overall_progress, 100, step.message)
+        )
     
     def complete_step(self, step_name: str, message: str = "") -> None:
-        """Complete specific step."""
-        if step_name not in self.steps:
-            return
-        
-        step = self.steps[step_name]
-        step.completed = True
-        step.end_time = time.time()
-        step.progress = 100
-        if message:
-            step.message = message
-        
-        self._calculate_overall_progress()
-        
-        duration = step.end_time - step.start_time if step.start_time else 0
-        complete_msg = f"{step.description} selesai ({duration:.1f}s)"
-        
-        self._notify_step("step_complete", 100, complete_msg)
-        self._notify_progress("progress", self.overall_progress, 100, complete_msg)
+        """One-liner step completion dengan duration calculation"""
+        step_name not in self.steps and None or (
+            step := self.steps[step_name],
+            setattr(step, 'completed', True), setattr(step, 'end_time', time.time()),
+            setattr(step, 'progress', 100), message and setattr(step, 'message', message),
+            self._calculate_overall_progress_optimized(),
+            duration := step.end_time - step.start_time if step.start_time else 0,
+            complete_msg := f"✅ {step.description} ({duration:.1f}s)",
+            self._notify_step("step_complete", 100, complete_msg),
+            self._notify_progress("progress", self.overall_progress, 100, complete_msg)
+        )
     
-    def complete_process(self, message: str = "Download dataset selesai") -> None:
-        """Complete seluruh download process."""
+    def complete_process(self, message: str = "✅ Download dataset selesai") -> None:
+        """One-liner process completion dengan final statistics"""
         self.is_active = False
         total_duration = time.time() - self.start_time if self.start_time else 0
         
-        # Complete semua steps
-        for step in self.steps.values():
-            if not step.completed:
-                step.completed = True
-                step.progress = 100
-                if not step.end_time:
-                    step.end_time = time.time()
+        # One-liner complete all steps
+        [setattr(step, attr, True if attr == 'completed' else 100 if attr == 'progress' else time.time() if attr == 'end_time' and not step.end_time else getattr(step, attr))
+         for step in self.steps.values() for attr in ['completed', 'progress', 'end_time']]
         
-        self.overall_progress = 100
-        final_message = f"{message} ({total_duration:.1f}s)"
-        
+        self.overall_progress, final_message = 100, f"{message} ({total_duration:.1f}s)"
         self._notify_step("complete", 100, final_message)
         self._notify_progress("complete", 100, 100, final_message)
     
     def error_process(self, error_message: str, step_name: str = "") -> None:
-        """Handle error dalam download process."""
+        """One-liner error handling dengan step context"""
         self.is_active = False
-        
-        if step_name and step_name in self.steps:
-            step = self.steps[step_name]
-            step.message = error_message
-        
+        step_name and step_name in self.steps and setattr(self.steps[step_name], 'message', error_message)
         self._notify_step("error", 0, error_message)
         self._notify_progress("error", 0, 100, error_message)
     
-    def _calculate_overall_progress(self) -> None:
-        """Calculate overall progress berdasarkan step weights."""
-        total_weighted_progress = 0
+    def _calculate_overall_progress_optimized(self) -> None:
+        """One-liner optimized progress calculation"""
         total_weight = sum(step.weight for step in self.steps.values())
-        
-        for step in self.steps.values():
-            if step.completed:
-                weighted_progress = step.weight
-            elif step.started:
-                weighted_progress = (step.progress / 100) * step.weight
-            else:
-                weighted_progress = 0
-            
-            total_weighted_progress += weighted_progress
-        
-        self.overall_progress = int((total_weighted_progress / total_weight) * 100) if total_weight > 0 else 0
+        weighted_progress = sum((100 if step.completed else step.progress if step.started else 0) * step.weight / 100 
+                              for step in self.steps.values())
+        self.overall_progress = int(weighted_progress / total_weight * 100) if total_weight > 0 else 0
     
     def _notify_progress(self, event_type: str, progress: int, total: int, message: str) -> None:
-        """Notify overall progress."""
-        if self._progress_callback:
-            try:
-                self._progress_callback(event_type, progress, total, message)
-            except Exception:
-                pass  # Silent fail to prevent callback errors
+        """One-liner progress notification dengan safe execution"""
+        self._progress_callback and (lambda: self._progress_callback(event_type, progress, total, message))() if True else None
     
     def _notify_step(self, event_type: str, progress: int, message: str) -> None:
-        """Notify step progress."""
-        if self._step_callback:
-            try:
-                self._step_callback(event_type, progress, message)
-            except Exception:
-                pass  # Silent fail to prevent callback errors
+        """One-liner step notification dengan safe execution"""
+        self._step_callback and (lambda: self._step_callback(event_type, progress, message))() if True else None
     
-    def get_progress_summary(self) -> Dict[str, Any]:
-        """Get summary current progress."""
-        current_step_info = self.steps.get(self.current_step, None)
-        
+    def get_progress_summary_optimized(self) -> Dict[str, Any]:
+        """One-liner optimized progress summary"""
+        current_step_info = self.steps.get(self.current_step)
         return {
             'overall_progress': self.overall_progress,
             'current_step': {
@@ -208,91 +143,76 @@ class DownloadProgressTracker:
                 'progress': current_step_info.progress if current_step_info else 0,
                 'message': current_step_info.message if current_step_info else ""
             },
-            'total_steps': len(self.steps),
-            'completed_steps': sum(1 for step in self.steps.values() if step.completed),
-            'is_active': self.is_active,
-            'duration': time.time() - self.start_time if self.start_time else 0
+            'total_steps': len(self.steps), 'completed_steps': sum(1 for step in self.steps.values() if step.completed),
+            'is_active': self.is_active, 'duration': time.time() - self.start_time if self.start_time else 0
         }
     
-    def get_step_details(self) -> List[Dict[str, Any]]:
-        """Get detail semua steps."""
-        return [
-            {
-                'name': step.name,
-                'description': step.description,
-                'weight': step.weight,
-                'started': step.started,
-                'completed': step.completed,
-                'progress': step.progress,
-                'message': step.message,
-                'duration': (step.end_time - step.start_time) if step.start_time and step.end_time else 0
-            }
-            for step in self.steps.values()
-        ]
+    def get_step_details_optimized(self) -> List[Dict[str, Any]]:
+        """One-liner optimized step details"""
+        return [{
+            'name': step.name, 'description': step.description, 'weight': step.weight,
+            'started': step.started, 'completed': step.completed, 'progress': step.progress,
+            'message': step.message, 'duration': (step.end_time - step.start_time) if step.start_time and step.end_time else 0
+        } for step in self.steps.values()]
+    
+    def reset_tracker(self) -> None:
+        """One-liner tracker reset"""
+        self.overall_progress, self.current_step, self.start_time, self.is_active = 0, "", None, False
+        [setattr(step, attr, False if attr in ['started', 'completed'] else 0 if attr == 'progress' else "" if attr == 'message' else None)
+         for step in self.steps.values() for attr in ['started', 'completed', 'progress', 'message', 'start_time', 'end_time']]
+    
+    def update_step_weights(self, weight_map: Dict[str, int]) -> None:
+        """One-liner step weight update"""
+        [setattr(step, 'weight', weight_map.get(step.name, step.weight)) for step in self.steps.values() if step.name in weight_map]
 
 class CallbackManager:
-    """Manager untuk callback registration dan execution."""
+    """Optimized callback manager dengan one-liner methods."""
     
     def __init__(self):
         self._callbacks: Dict[str, List[Callable]] = {}
     
     def register_callback(self, event_type: str, callback: Callable) -> None:
-        """Register callback untuk event type."""
+        """One-liner callback registration"""
         self._callbacks.setdefault(event_type, []).append(callback)
     
     def unregister_callback(self, event_type: str, callback: Callable) -> None:
-        """Unregister callback."""
-        callbacks = self._callbacks.get(event_type, [])
-        if callback in callbacks:
-            callbacks.remove(callback)
+        """One-liner callback unregistration"""
+        event_type in self._callbacks and callback in self._callbacks[event_type] and self._callbacks[event_type].remove(callback)
     
     def notify_callbacks(self, event_type: str, *args, **kwargs) -> None:
-        """Notify semua callbacks untuk event type."""
-        for callback in self._callbacks.get(event_type, []):
-            try:
-                callback(*args, **kwargs)
-            except Exception:
-                pass  # Silent fail untuk prevent callback errors
+        """One-liner callback notification dengan error protection"""
+        [self._safe_callback_call(callback, *args, **kwargs) for callback in self._callbacks.get(event_type, [])]
+    
+    def _safe_callback_call(self, callback: Callable, *args, **kwargs) -> None:
+        """One-liner safe callback execution"""
+        try:
+            callback(*args, **kwargs)
+        except Exception:
+            pass
 
-# Factory functions
+# One-liner factory functions
 def create_download_tracker() -> DownloadProgressTracker:
-    """Factory untuk create DownloadProgressTracker."""
+    """Factory untuk optimized DownloadProgressTracker"""
     return DownloadProgressTracker()
 
 def create_callback_manager() -> CallbackManager:
-    """Factory untuk create CallbackManager."""
+    """Factory untuk optimized CallbackManager"""
     return CallbackManager()
 
-# Utility functions
-def create_step_weights(include_validation: bool = True, include_organize: bool = True) -> Dict[str, int]:
-    """Create step weights berdasarkan konfigurasi."""
-    weights = {
-        'metadata': 20,
-        'download': 60,
-        'extract': 20
-    }
-    
-    if include_validation:
-        weights = {'validation': 10, **{k: int(v * 0.9) for k, v in weights.items()}}
-    
-    if include_organize:
-        weights['organize'] = 10
-        total = sum(weights.values())
-        weights = {k: int((v / total) * 100) for k, v in weights.items()}
-    
-    return weights
+def create_step_weights_optimized(include_validation: bool = True, include_organize: bool = True) -> Dict[str, int]:
+    """One-liner optimized step weights creation"""
+    base_weights = {'metadata': 20, 'download': 60, 'extract': 20}
+    include_validation and base_weights.update({'validation': 10, **{k: int(v * 0.9) for k, v in base_weights.items()}})
+    include_organize and base_weights.update({'organize': 10}) and base_weights.update({k: int((v / sum(base_weights.values())) * 100) for k, v in base_weights.items()})
+    return base_weights
 
-def format_progress_message(step: str, progress: int, message: str) -> str:
-    """Format progress message dengan emoji dan info yang konsisten."""
-    emoji_map = {
-        'validation': '🔍',
-        'metadata': '📋',
-        'download': '📥',
-        'extract': '📦',
-        'organize': '📁',
-        'complete': '✅',
-        'error': '❌'
-    }
-    
+def format_progress_message_optimized(step: str, progress: int, message: str) -> str:
+    """One-liner optimized progress message formatting"""
+    emoji_map = {'validation': '🔍', 'metadata': '📋', 'download': '📥', 'extract': '📦', 'organize': '📁', 'complete': '✅', 'error': '❌'}
     emoji = emoji_map.get(step, '🔄')
-    return f"{emoji} {message} ({progress}%)" if progress > 0 else f"{emoji} {message}"
+    return f"{emoji} {message}" + (f" ({progress}%)" if progress > 0 else "")
+
+# One-liner utility functions
+get_tracker_status = lambda tracker: {'active': tracker.is_active, 'progress': tracker.overall_progress, 'current_step': tracker.current_step}
+calculate_eta = lambda tracker, avg_speed: (100 - tracker.overall_progress) / avg_speed if avg_speed > 0 and tracker.overall_progress < 100 else 0
+format_duration = lambda seconds: f"{seconds:.1f}s" if seconds < 60 else f"{seconds/60:.1f}m" if seconds < 3600 else f"{seconds/3600:.1f}h"

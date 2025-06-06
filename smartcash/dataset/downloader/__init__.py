@@ -20,7 +20,8 @@ def get_downloader_instance(config: Dict[str, Any], logger=None) -> Optional['Do
     try:
         # Validasi config
         if not config:
-            logger and logger.error("❌ Config tidak boleh kosong")
+            if logger:
+                logger.error("❌ Config tidak boleh kosong")
             return None
         
         # Validasi field yang diperlukan dengan nilai default
@@ -36,23 +37,27 @@ def get_downloader_instance(config: Dict[str, Any], logger=None) -> Optional['Do
             if field not in config or not config[field]:
                 if field in default_values:
                     config[field] = default_values[field]
-                    logger and logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
+                    if logger:
+                        logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
         
         # Periksa lagi setelah menerapkan nilai default
         missing_fields = [field for field in required_fields if field not in config or not config[field]]
         
         if missing_fields:
-            logger and logger.error(f"❌ Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan")
+            if logger:
+                logger.error(f"❌ Konfigurasi tidak lengkap: {', '.join(missing_fields)} tidak ditemukan")
             return None
         
         # Buat service
         from smartcash.dataset.downloader.download_service import create_download_service
         return create_download_service(config, logger)
     except ImportError as e:
-        logger and logger.error(f"❌ Gagal import module: {str(e)}")
+        if logger:
+            logger.error(f"❌ Gagal import module: {str(e)}")
         return None
     except Exception as e:
-        logger and logger.error(f"❌ Gagal membuat download service: {str(e)}")
+        if logger:
+            logger.error(f"❌ Gagal membuat download service: {str(e)}")
         return None
 
 def create_roboflow_downloader(api_key: str, config: Dict[str, Any] = None, logger=None):

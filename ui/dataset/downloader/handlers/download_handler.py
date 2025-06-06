@@ -58,7 +58,8 @@ def _wrap_with_safe_state_management(handler: Callable, ui_components: Dict[str,
             
         except Exception as e:
             error_msg = f"❌ Error in handler: {str(e)}"
-            logger and logger.error(error_msg)
+            if logger:
+                logger.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
         finally:
             # Always re-enable buttons
@@ -124,7 +125,8 @@ def _create_fixed_download_handler(ui_components: Dict[str, Any], config: Dict[s
                 
         except Exception as e:
             error_msg = f"❌ Error download handler: {str(e)}"
-            logger and logger.error(error_msg)
+            if logger:
+                logger.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
     
     return handle_download
@@ -183,7 +185,8 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
         # Safe progress tracker setup
         progress_tracker = ui_components.get('progress_tracker')
         if not progress_tracker:
-            logger and logger.error("❌ Progress tracker tidak ditemukan")
+            if logger:
+                logger.error("❌ Progress tracker tidak ditemukan")
             show_status_safe("❌ Progress tracker tidak tersedia", "error", ui_components)
             return
         
@@ -204,7 +207,8 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
                 default_config = get_default_download_config()
                 if field in default_config and default_config[field]:
                     config[field] = default_config[field]
-                    logger and logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
+                    if logger:
+                        logger.info(f"🔄 Menggunakan nilai default untuk {field}: {config[field]}")
                 else:
                     missing_fields.append(field)
         
@@ -240,7 +244,8 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
             error_msg = "❌ Gagal membuat download service"
             safe_operation_or_none(lambda: progress_tracker.error(error_msg))
             show_status_safe(error_msg, "error", ui_components)
-            logger and logger.error(f"Detail config: {str(download_config)}")
+            if logger:
+                logger.error(f"Detail config: {str(download_config)}")
             return
         
         # Setup progress callback
@@ -265,12 +270,14 @@ def _execute_download_sync_safe(ui_components: Dict[str, Any], config: Dict[str,
             success_msg = f"✅ Dataset berhasil didownload: {total_images:,} gambar"
             safe_operation_or_none(lambda: progress_tracker.complete(success_msg))
             show_status_safe(f"{success_msg} ke {result.get('output_dir', 'unknown location')}", "success", ui_components)
-            logger and logger.success(success_msg)
+            if logger:
+                logger.success(success_msg)
         else:
             error_msg = f"❌ Download gagal: {result.get('message', 'Unknown error')}"
             safe_operation_or_none(lambda: progress_tracker.error(error_msg))
             show_status_safe(error_msg, "error", ui_components)
-            logger and logger.error(error_msg)
+            if logger:
+                logger.error(error_msg)
             
     except Exception as e:
         error_msg = f"❌ Error saat download: {str(e)}"
@@ -312,7 +319,8 @@ def _create_safe_progress_callback(progress_tracker, logger) -> Callable:
                 safe_operation_or_none(lambda: progress_tracker.update('current', percentage, message))
             
             # Log progress untuk debugging
-            logger and logger.debug(f"Progress {step}: {percentage}% - {message}")
+            if logger:
+                logger.debug(f"Progress {step}: {percentage}% - {message}")
         
         safe_operation_or_none(callback_operation)
     

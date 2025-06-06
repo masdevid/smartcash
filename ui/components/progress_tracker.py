@@ -1,26 +1,15 @@
 """
 File: smartcash/ui/components/progress_tracker.py
-Deskripsi: Fixed progress tracker dengan tqdm compatibility untuk Colab environment
+Deskripsi: Flexible Three-level progress tracker dengan callback system dan dynamic level configuration
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional, Set, Callable, List, Union, Tuple
+from tqdm.notebook import tqdm
 import time
 import threading
 from enum import Enum
 from dataclasses import dataclass, field
-
-# Fixed tqdm import untuk Colab compatibility
-try:
-    from tqdm.notebook import tqdm
-    TQDM_AVAILABLE = True
-except ImportError:
-    try:
-        from tqdm import tqdm
-        TQDM_AVAILABLE = True
-    except ImportError:
-        TQDM_AVAILABLE = False
-        print("⚠️ tqdm tidak tersedia, menggunakan fallback progress display")
 
 class ProgressLevel(Enum):
     """Progress level enum untuk type safety"""
@@ -49,53 +38,6 @@ class ProgressBarConfig:
     color: str
     position: int
     visible: bool = True
-
-class FallbackProgressBar:
-    """Fallback progress bar jika tqdm tidak tersedia"""
-    
-    def __init__(self, total=100, desc="Progress", colour="#28a745", **kwargs):
-        self.total = total
-        self.desc = desc
-        self.colour = colour
-        self.n = 0
-        self.widget = widgets.HTML(self._generate_html())
-    
-    def _generate_html(self):
-        percentage = (self.n / self.total) * 100 if self.total > 0 else 0
-        return f"""
-        <div style="margin: 5px 0;">
-            <div style="font-size: 13px; margin-bottom: 3px; color: #333;">{self.desc}</div>
-            <div style="background: #e0e0e0; border-radius: 4px; height: 20px; overflow: hidden;">
-                <div style="background: {self.colour}; height: 100%; width: {percentage}%; 
-                           transition: width 0.3s ease; border-radius: 4px; 
-                           display: flex; align-items: center; justify-content: center;">
-                    <span style="color: white; font-size: 11px; font-weight: bold;">
-                        {percentage:.0f}%
-                    </span>
-                </div>
-            </div>
-        </div>
-        """
-    
-    def update(self, n=1):
-        self.n = min(self.total, self.n + n)
-        self.widget.value = self._generate_html()
-    
-    def set_description(self, desc):
-        self.desc = desc
-        self.widget.value = self._generate_html()
-    
-    def reset(self, total=None):
-        if total is not None:
-            self.total = total
-        self.n = 0
-        self.widget.value = self._generate_html()
-    
-    def close(self):
-        pass
-    
-    def refresh(self):
-        self.widget.value = self._generate_html()
 
 class CallbackManager:
     """Manager untuk handling callbacks dengan type safety"""
@@ -129,7 +71,7 @@ class CallbackManager:
                 if callback_id in self.one_time_callbacks:
                     callbacks_to_remove.append(callback_id)
             except Exception as e:
-                print(f"⚠️ Callback error untuk {event}: {e}")
+                print(f"Callback error for {event}: {e}")
                 callbacks_to_remove.append(callback_id)
         
         # Cleanup one-time callbacks
@@ -142,8 +84,7 @@ class ProgressTracker:
     def __init__(self, config: Optional[ProgressConfig] = None):
         self.config = config or ProgressConfig()
         self.callback_manager = CallbackManager()
-        self.progress_bars: Dict[str, Union[tqdm, FallbackProgressBar]] = {}
-        self.progress_widgets: Dict[str, widgets.Widget] = {}
+        self.progress_bars: Dict[str, tqdm] = {}
         self.active_levels: List[str] = []
         self.current_step_index = 0
         self.is_complete = False
@@ -204,11 +145,10 @@ class ProgressTracker:
             )
         )
         
-        # Container untuk progress bars - gunakan VBox untuk fallback compatibility
-        self.tqdm_container = widgets.VBox(
-            [], layout=widgets.Layout(
+        self.tqdm_container = widgets.Output(
+            layout=widgets.Layout(
                 margin='0', width='100%', max_width='100%', 
-                overflow='visible', flex='1 1 auto'
+                overflow='hidden', flex='1 1 auto'
             )
         )
         
@@ -226,7 +166,7 @@ class ProgressTracker:
                 margin='10px 0', padding='15px', border='1px solid #28a745',
                 border_radius='8px', background_color='#f8fff8', width='100%',
                 min_height=container_heights[self.config.level],
-                max_height='400px', overflow='visible', box_sizing='border-box'
+                max_height='400px', overflow='hidden', box_sizing='border-box'
             )
         )
     
@@ -283,10 +223,9 @@ class ProgressTracker:
             self._setup_level_configuration()
             self._create_ui_components()
         
-        # Initialize steps dan weights dari config untuk TRIPLE level
-        if self.config.level == ProgressLevel.TRIPLE and not self.config.steps:
-            # Provide default steps jika tidak ada
-            self.config.steps = ["Initialization", "Processing", "Finalization"]
+        # Initialize steps dan weights dari config (tidak ada default)
+        if not self.config.steps and self.config.level == ProgressLevel.TRIPLE:
+            raise ValueError("Steps must be provided for TRIPLE level progress tracking")
         
         # Show container dan initialize progress bars
         self.container.layout.display = 'flex'
@@ -399,99 +338,55 @@ class ProgressTracker:
     def _initialize_progress_bars(self):
         """Initialize progress bars berdasarkan current configuration"""
         self._cleanup_progress_bars()
+        optimal_width = self._calculate_optimal_width()
         
-        for bar_config in self.bar_configs:
-            if bar_config.visible:
-                self._create_progress_bar(bar_config)
+        with self.tqdm_container:
+            for bar_config in self.bar_configs:
+                if bar_config.visible:
+                    self._create_progress_bar(bar_config, optimal_width)
     
-    def _create_progress_bar(self, config: ProgressBarConfig):
-        """Create individual progress bar dengan tqdm atau fallback"""
+    def _create_progress_bar(self, config: ProgressBarConfig, width: int):
+        """Create individual progress bar dengan safe parameter handling"""
         try:
-            if TQDM_AVAILABLE:
-                # Gunakan tqdm dengan parameter yang safe untuk Colab
-                bar = tqdm(
-                    total=100, 
-                    desc=config.description,
-                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total}',
-                    colour=config.color, 
-                    ascii=False, 
-                    leave=True,
-                    disable=False  # Explicitly set disable untuk avoid AttributeError
-                )
-                self.progress_bars[config.name] = bar
-                
-                # Untuk tqdm, kita perlu output container
-                if not hasattr(self, '_tqdm_output_created'):
-                    self.tqdm_container.children = []
-                    self._tqdm_output_created = True
-                    
-            else:
-                # Gunakan fallback progress bar
-                bar = FallbackProgressBar(
-                    total=100,
-                    desc=config.description,
-                    colour=config.color
-                )
-                self.progress_bars[config.name] = bar
-                self.progress_widgets[config.name] = bar.widget
-                
-                # Update container children
-                children = list(self.tqdm_container.children)
-                children.append(bar.widget)
-                self.tqdm_container.children = children
-                
-        except Exception as e:
-            print(f"⚠️ Error creating progress bar {config.name}: {e}")
-            # Fallback ke FallbackProgressBar
-            bar = FallbackProgressBar(
-                total=100,
-                desc=config.description,
-                colour=config.color
+            bar = tqdm(
+                total=100, desc=config.description,
+                bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}]',
+                colour=config.color, ncols=width,
+                ascii=False, mininterval=self.config.animation_speed, 
+                maxinterval=0.5, smoothing=0.3, dynamic_ncols=True, leave=True
             )
             self.progress_bars[config.name] = bar
-            self.progress_widgets[config.name] = bar.widget
-            
-            children = list(self.tqdm_container.children)
-            children.append(bar.widget)
-            self.tqdm_container.children = children
-    
-    def _update_progress_bar(self, bar: Union[tqdm, FallbackProgressBar], value: int, 
-                           level_name: str, message: str, color: str = None):
-        """Update individual progress bar dengan smooth animation"""
-        try:
-            # Update progress value
-            if hasattr(bar, 'n'):
-                diff = value - bar.n
-                if diff > 0:
-                    bar.update(diff)
-                elif diff < 0:
-                    bar.reset(total=100)
-                    bar.update(value)
-            
-            # Update color jika provided
-            if color and hasattr(bar, 'colour'):
-                bar.colour = self._normalize_color(color)
-                if hasattr(bar, 'refresh'):
-                    bar.refresh()
-            
-            # Update description dengan message
-            if message and hasattr(bar, 'set_description'):
-                emoji = next((config.emoji for config in self.bar_configs 
-                             if config.name == level_name), "📊")
-                truncated_message = self._truncate_message(message, 40)
-                bar.set_description(f"{emoji} {truncated_message}")
-                
         except Exception as e:
-            print(f"⚠️ Error updating progress bar {level_name}: {e}")
+            # Fallback dengan parameter minimal
+            bar = tqdm(total=100, desc=config.description, ncols=width)
+            self.progress_bars[config.name] = bar
+    
+    def _update_progress_bar(self, bar: tqdm, value: int, level_name: str, 
+                           message: str, color: str = None):
+        """Update individual progress bar dengan smooth animation"""
+        # Smooth progress update
+        diff = value - bar.n
+        if diff > 0:
+            bar.update(diff)
+        elif diff < 0:
+            bar.reset(total=100)
+            bar.update(value)
+        
+        # Update color jika provided
+        if color:
+            bar.colour = self._normalize_color(color)
+            bar.refresh()
+        
+        # Update description dengan message
+        if message:
+            emoji = next((config.emoji for config in self.bar_configs 
+                         if config.name == level_name), "📊")
+            bar.set_description(f"{emoji} {self._truncate_message(message, 40)}")
     
     def _calculate_weighted_overall_progress(self, step_progress: int) -> int:
         """Calculate weighted overall progress untuk TRIPLE level"""
-        if not self.config.steps:
+        if not self.config.steps or not self.config.step_weights:
             return step_progress
-        
-        # Generate equal weights jika tidak ada step_weights
-        if not self.config.step_weights:
-            self.config.step_weights = self._get_default_weights()
         
         # Calculate completed steps weight
         completed_weight = sum(
@@ -530,7 +425,7 @@ class ProgressTracker:
             return
         
         current_step = self.config.steps[self.current_step_index]
-        weight = self.config.step_weights.get(current_step, 0) if self.config.step_weights else 0
+        weight = self.config.step_weights.get(current_step, 0)
         
         step_info = f"""
         <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin: 2px 0;">
@@ -546,55 +441,31 @@ class ProgressTracker:
     def _set_all_bars_complete(self, message: str):
         """Set all bars ke complete state"""
         for level_name, bar in self.progress_bars.items():
-            try:
-                if hasattr(bar, 'n'):
-                    bar.n = 100
-                if hasattr(bar, 'colour'):
-                    bar.colour = '#28a745'
-                if hasattr(bar, 'refresh'):
-                    bar.refresh()
-                if hasattr(bar, 'set_description'):
-                    emoji = next((config.emoji for config in self.bar_configs 
-                                 if config.name == level_name), "📊")
-                    bar.set_description(f"✅ {emoji} {self._truncate_message(message, 35)}")
-            except Exception as e:
-                print(f"⚠️ Error setting complete state for {level_name}: {e}")
+            if bar:
+                bar.n = 100
+                bar.colour = '#28a745'
+                bar.refresh()
+                emoji = next((config.emoji for config in self.bar_configs 
+                             if config.name == level_name), "📊")
+                bar.set_description(f"✅ {emoji} {self._truncate_message(message, 35)}")
     
     def _set_all_bars_error(self, message: str):
         """Set all bars ke error state"""
         for level_name, bar in self.progress_bars.items():
-            try:
-                if hasattr(bar, 'colour'):
-                    bar.colour = '#dc3545'
-                if hasattr(bar, 'refresh'):
-                    bar.refresh()
-                if hasattr(bar, 'set_description'):
-                    emoji = next((config.emoji for config in self.bar_configs 
-                                 if config.name == level_name), "📊")
-                    bar.set_description(f"❌ {emoji} {self._truncate_message(message, 35)}")
-            except Exception as e:
-                print(f"⚠️ Error setting error state for {level_name}: {e}")
+            if bar:
+                bar.colour = '#dc3545'
+                bar.refresh()
+                emoji = next((config.emoji for config in self.bar_configs 
+                             if config.name == level_name), "📊")
+                bar.set_description(f"❌ {emoji} {self._truncate_message(message, 35)}")
     
     def _cleanup_progress_bars(self):
         """Cleanup all progress bars"""
         for bar in self.progress_bars.values():
-            try:
-                if hasattr(bar, 'close'):
-                    bar.close()
-            except Exception:
-                pass
-        
+            if bar:
+                bar.close()
         self.progress_bars.clear()
-        self.progress_widgets.clear()
-        
-        # Clear container
-        try:
-            if hasattr(self.tqdm_container, 'clear_output'):
-                self.tqdm_container.clear_output(wait=True)
-            else:
-                self.tqdm_container.children = []
-        except Exception:
-            pass
+        self.tqdm_container.clear_output(wait=True)
     
     def _delayed_hide(self):
         """Hide container after delay"""
@@ -646,6 +517,16 @@ class ProgressTracker:
         
         return weights
     
+    def _calculate_optimal_width(self) -> int:
+        """Calculate optimal width berdasarkan number of bars"""
+        base_width = 100
+        level_adjustment = {
+            ProgressLevel.SINGLE: 20,
+            ProgressLevel.DUAL: 10,
+            ProgressLevel.TRIPLE: 0
+        }
+        return base_width + level_adjustment[self.config.level] + self.config.width_adjustment
+    
     @staticmethod
     def _normalize_color(color: str) -> str:
         """Normalize color values"""
@@ -675,10 +556,12 @@ def create_triple_progress_tracker(operation: str = "Process",
                                  steps: List[str] = None,
                                  step_weights: Dict[str, int] = None) -> ProgressTracker:
     """Create triple-level progress tracker"""
+    if not steps:
+        raise ValueError("Steps must be provided for triple-level progress tracker")
+    
     config = ProgressConfig(
         level=ProgressLevel.TRIPLE, operation=operation,
-        steps=steps or ["Initialization", "Processing", "Finalization"], 
-        step_weights=step_weights or {}
+        steps=steps, step_weights=step_weights or {}
     )
     return ProgressTracker(config)
 

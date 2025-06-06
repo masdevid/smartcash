@@ -346,15 +346,20 @@ class ProgressTracker:
                     self._create_progress_bar(bar_config, optimal_width)
     
     def _create_progress_bar(self, config: ProgressBarConfig, width: int):
-        """Create individual progress bar"""
-        bar = tqdm(
-            total=100, desc=config.description,
-            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}]',
-            colour=config.color, position=config.position, ncols=width,
-            ascii=False, mininterval=self.config.animation_speed, 
-            maxinterval=0.5, smoothing=0.3, dynamic_ncols=True, leave=True
-        )
-        self.progress_bars[config.name] = bar
+        """Create individual progress bar dengan safe parameter handling"""
+        try:
+            bar = tqdm(
+                total=100, desc=config.description,
+                bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}]',
+                colour=config.color, ncols=width,
+                ascii=False, mininterval=self.config.animation_speed, 
+                maxinterval=0.5, smoothing=0.3, dynamic_ncols=True, leave=True
+            )
+            self.progress_bars[config.name] = bar
+        except Exception as e:
+            # Fallback dengan parameter minimal
+            bar = tqdm(total=100, desc=config.description, ncols=width)
+            self.progress_bars[config.name] = bar
     
     def _update_progress_bar(self, bar: tqdm, value: int, level_name: str, 
                            message: str, color: str = None):

@@ -1,87 +1,103 @@
 """
 File: smartcash/ui/dataset/downloader/utils/operation_utils.py
-Deskripsi: Fixed operation utilities dengan proper method calls dan one-liner style
+Deskripsi: Fixed operation utilities dengan proper method calls dan safe one-liner patterns
 """
 
 from typing import Dict, Any, Optional
 from pathlib import Path
 from smartcash.dataset.utils.path_validator import get_path_validator
 from smartcash.common.environment import get_environment_manager
+from smartcash.common.utils.one_liner_fixes import (
+    safe_operation_or_none, fix_path_operation, 
+    fix_directory_operation, safe_boolean_and_operation
+)
 
 class StreamlinedDownloadOperations:
-    """Fixed download operations dengan proper method calls"""
+    """Fixed download operations dengan proper method calls dan safe patterns"""
     
     def __init__(self):
         self.path_validator = get_path_validator()
         self.env_manager = get_environment_manager()
     
     def check_existing_dataset(self) -> bool:
-        """Fixed existing dataset check dengan proper method call"""
-        try:
+        """Fixed existing dataset check dengan safe operation pattern"""
+        def check_operation():
             paths = self.path_validator.get_dataset_paths()
-            # Fixed: call validate_dataset_structure as method, not property
             validation = self.path_validator.validate_dataset_structure(paths['data_root'])
-            return validation['valid'] and validation['total_images'] > 0
-        except Exception:
-            return False
+            return safe_boolean_and_operation(validation.get('valid'), validation.get('total_images', 0) > 0)
+        
+        return bool(safe_operation_or_none(check_operation) or False)
     
     def get_dataset_summary(self) -> Dict[str, Any]:
-        """Fixed dataset summary dengan proper validation call"""
-        try:
+        """Fixed dataset summary dengan safe validation pattern"""
+        def summary_operation():
             paths = self.path_validator.get_dataset_paths()
-            # Fixed: proper method call
             validation = self.path_validator.validate_dataset_structure(paths['data_root'])
             
             return {
-                'exists': validation['valid'], 'total_images': validation['total_images'],
-                'total_labels': validation['total_labels'], 'issues_count': len(validation.get('issues', [])),
-                'splits': {k: v for k, v in validation['splits'].items() if v.get('exists', False)},
-                'data_root': paths['data_root'], 'drive_storage': self.env_manager.is_drive_mounted
+                'exists': validation.get('valid', False),
+                'total_images': validation.get('total_images', 0),
+                'total_labels': validation.get('total_labels', 0),
+                'issues_count': len(validation.get('issues', [])),
+                'splits': {k: v for k, v in validation.get('splits', {}).items() if v.get('exists', False)},
+                'data_root': paths['data_root'],
+                'drive_storage': self.env_manager.is_drive_mounted
             }
-        except Exception as e:
-            return {'exists': False, 'error': str(e), 'total_images': 0, 'total_labels': 0, 'splits': {}}
+        
+        return safe_operation_or_none(summary_operation) or {
+            'exists': False, 'total_images': 0, 'total_labels': 0, 
+            'issues_count': 0, 'splits': {}, 'data_root': '', 'drive_storage': False
+        }
     
     def validate_download_space(self, required_mb: float) -> Dict[str, Any]:
-        """Fixed space validation dengan proper error handling"""
-        try:
-            import shutil
+        """Fixed space validation dengan safe disk usage check"""
+        def space_operation():
             paths = self.path_validator.get_dataset_paths()
-            target_path = Path(paths['data_root'])
+            target_path = fix_path_operation(paths['data_root'], 'mkdir', parents=True, exist_ok=True)
             
-            # Ensure parent exists
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            total, used, free = shutil.disk_usage(target_path.parent)
+            import shutil
+            total, used, free = shutil.disk_usage(target_path.parent if target_path.parent.exists() else target_path)
             free_mb = free / (1024 * 1024)
             
             return {
-                'sufficient': free_mb >= required_mb, 'free_mb': free_mb,
-                'required_mb': required_mb, 'shortage_mb': max(0, required_mb - free_mb)
+                'sufficient': free_mb >= required_mb,
+                'free_mb': free_mb,
+                'required_mb': required_mb,
+                'shortage_mb': max(0, required_mb - free_mb)
             }
-        except Exception as e:
-            return {'sufficient': False, 'error': str(e), 'free_mb': 0, 'required_mb': required_mb}
-    
-    def get_download_paths(self, dataset_identifier: str) -> Dict[str, str]:
-        """Fixed download paths dengan environment awareness"""
-        paths = self.path_validator.get_dataset_paths()
         
-        # Create temp download path
-        downloads_base = paths.get('downloads', f"{paths['data_root']}/downloads")
-        temp_download = f"{downloads_base}/{dataset_identifier.replace('/', '_').replace(':', '_v')}"
-        
-        return {
-            'data_root': paths['data_root'], 'temp_download': temp_download,
-            'downloads_base': downloads_base, 'train': paths['train'],
-            'valid': paths['valid'], 'test': paths['test'],
-            'backup': paths.get('backup', f"{paths['data_root']}/backup")
+        return safe_operation_or_none(space_operation) or {
+            'sufficient': False, 'free_mb': 0, 'required_mb': required_mb, 'shortage_mb': required_mb
         }
     
-    def create_backup_if_needed(self, backup_enabled: bool = True) -> Dict[str, Any]:
-        """Fixed backup creation dengan proper dataset check"""
-        if not backup_enabled or not self.check_existing_dataset():
-            return {'created': False, 'message': 'Backup not needed or no existing data'}
+    def get_download_paths(self, dataset_identifier: str) -> Dict[str, str]:
+        """Fixed download paths dengan safe path operations"""
+        def paths_operation():
+            paths = self.path_validator.get_dataset_paths()
+            downloads_base = paths.get('downloads', f"{paths['data_root']}/downloads")
+            
+            # Safe identifier cleaning
+            clean_identifier = dataset_identifier.replace('/', '_').replace(':', '_v') if dataset_identifier else 'unknown'
+            temp_download = f"{downloads_base}/{clean_identifier}"
+            
+            return {
+                'data_root': paths['data_root'],
+                'temp_download': temp_download,
+                'downloads_base': downloads_base,
+                'train': paths['train'],
+                'valid': paths['valid'],
+                'test': paths['test'],
+                'backup': paths.get('backup', f"{paths['data_root']}/backup")
+            }
         
-        try:
+        return safe_operation_or_none(paths_operation) or {'data_root': '', 'temp_download': '', 'downloads_base': '', 'train': '', 'valid': '', 'test': '', 'backup': ''}
+    
+    def create_backup_if_needed(self, backup_enabled: bool = True) -> Dict[str, Any]:
+        """Fixed backup creation dengan safe operations"""
+        def backup_operation():
+            if not backup_enabled or not self.check_existing_dataset():
+                return {'created': False, 'message': 'Backup not needed or no existing data'}
+            
             import shutil
             from datetime import datetime
             
@@ -90,157 +106,264 @@ class StreamlinedDownloadOperations:
             backup_dir = paths.get('backup', f"{paths['data_root']}/backup")
             backup_path = f"{backup_dir}/dataset_backup_{timestamp}"
             
-            # Copy existing data
-            shutil.copytree(paths['data_root'], backup_path, 
-                          ignore=shutil.ignore_patterns('backup', 'downloads', '*.tmp'))
+            # Safe directory operations
+            fix_directory_operation(backup_dir, 'create', parents=True, exist_ok=True)
             
-            return {'created': True, 'backup_path': backup_path, 'message': f'Backup created: {backup_path}'}
+            # Safe copy operation
+            shutil.copytree(
+                paths['data_root'], backup_path,
+                ignore=shutil.ignore_patterns('backup', 'downloads', '*.tmp'),
+                dirs_exist_ok=True
+            )
             
-        except Exception as e:
-            return {'created': False, 'error': str(e), 'message': f'Backup failed: {str(e)}'}
+            return {
+                'created': True,
+                'backup_path': backup_path,
+                'message': f'Backup created: {backup_path}'
+            }
+        
+        return safe_operation_or_none(backup_operation) or {'created': False, 'message': 'Backup operation failed'}
     
     def cleanup_temp_files(self, dataset_identifier: str = None) -> Dict[str, Any]:
-        """Fixed temp cleanup dengan proper path handling"""
-        try:
+        """Fixed temp cleanup dengan safe file operations"""
+        def cleanup_operation():
             paths = self.path_validator.get_dataset_paths()
-            downloads_path = Path(paths.get('downloads', f"{paths['data_root']}/downloads"))
+            downloads_path = fix_path_operation(paths.get('downloads', f"{paths['data_root']}/downloads"), 'exists')
             
-            if not downloads_path.exists():
+            if not downloads_path or not downloads_path.exists():
                 return {'cleaned': 0, 'message': 'No temp files to clean'}
             
             cleaned_count = 0
             
+            # Safe file pattern matching
             if dataset_identifier:
-                # Cleanup specific dataset temp files
                 temp_pattern = dataset_identifier.replace('/', '_').replace(':', '_v')
                 temp_files = list(downloads_path.glob(f"*{temp_pattern}*"))
             else:
-                # Cleanup all temp files
                 temp_files = list(downloads_path.rglob('*'))
             
+            # Safe file removal
             for temp_file in temp_files:
                 try:
                     if temp_file.is_file():
                         temp_file.unlink()
                         cleaned_count += 1
                     elif temp_file.is_dir():
-                        import shutil
-                        shutil.rmtree(temp_file, ignore_errors=True)
+                        fix_directory_operation(str(temp_file), 'remove', ignore_errors=True)
                         cleaned_count += 1
                 except Exception:
                     continue
             
             return {'cleaned': cleaned_count, 'message': f'Cleaned {cleaned_count} temp files'}
-            
-        except Exception as e:
-            return {'cleaned': 0, 'error': str(e), 'message': f'Cleanup failed: {str(e)}'}
+        
+        return safe_operation_or_none(cleanup_operation) or {'cleaned': 0, 'message': 'Cleanup operation failed'}
     
     def estimate_download_time(self, size_mb: float, connection_speed_mbps: float = 10.0) -> Dict[str, Any]:
-        """Fixed download time estimation"""
-        try:
-            # Convert MB to Mb dan calculate time
+        """Fixed download time estimation dengan safe calculations"""
+        def estimate_operation():
+            # Safe calculation with fallbacks
+            if size_mb <= 0 or connection_speed_mbps <= 0:
+                return {'estimated_seconds': 0, 'formatted_time': 'Unknown', 'size_mb': size_mb, 'speed_mbps': connection_speed_mbps}
+            
             size_mb_bits = size_mb * 8
             time_seconds = size_mb_bits / connection_speed_mbps
             
-            # Format time
-            formatted_time = (f"{time_seconds:.0f} detik" if time_seconds < 60 else
-                            f"{time_seconds/60:.1f} menit" if time_seconds < 3600 else
-                            f"{time_seconds/3600:.1f} jam")
+            # Safe time formatting
+            if time_seconds < 60:
+                formatted_time = f"{time_seconds:.0f} detik"
+            elif time_seconds < 3600:
+                formatted_time = f"{time_seconds/60:.1f} menit"
+            else:
+                formatted_time = f"{time_seconds/3600:.1f} jam"
             
             return {
-                'estimated_seconds': time_seconds, 'formatted_time': formatted_time,
-                'size_mb': size_mb, 'speed_mbps': connection_speed_mbps
+                'estimated_seconds': time_seconds,
+                'formatted_time': formatted_time,
+                'size_mb': size_mb,
+                'speed_mbps': connection_speed_mbps
             }
-            
-        except Exception as e:
-            return {'estimated_seconds': 0, 'formatted_time': 'Unknown', 'error': str(e)}
+        
+        return safe_operation_or_none(estimate_operation) or {'estimated_seconds': 0, 'formatted_time': 'Unknown', 'size_mb': size_mb, 'speed_mbps': connection_speed_mbps}
     
     def format_dataset_info(self, metadata: Dict[str, Any]) -> str:
-        """Fixed dataset info formatting"""
-        try:
-            project_info, version_info, export_info = metadata.get('project', {}), metadata.get('version', {}), metadata.get('export', {})
-            classes, images, size_mb = project_info.get('classes', []), version_info.get('images', 0), export_info.get('size', 0)
+        """Fixed dataset info formatting dengan safe data extraction"""
+        def format_operation():
+            # Safe metadata extraction
+            project_info = metadata.get('project', {}) if metadata else {}
+            version_info = metadata.get('version', {}) if metadata else {}
+            export_info = metadata.get('export', {}) if metadata else {}
+            
+            classes = project_info.get('classes', [])
+            images = version_info.get('images', 0)
+            size_mb = export_info.get('size', 0)
+            
+            # Safe class list formatting
+            class_display = ', '.join(classes[:5]) if classes else 'Unknown'
+            if len(classes) > 5:
+                class_display += '...'
             
             info_lines = [
-                f"📊 **Dataset Information**",
-                f"🏷️ Classes: {len(classes)} ({', '.join(classes[:5])}{'...' if len(classes) > 5 else ''})",
-                f"🖼️ Images: {images:,}", f"💾 Size: {size_mb:.1f} MB",
-                f"📦 Format: YOLOv5 PyTorch (hardcoded)"
+                "📊 **Dataset Information**",
+                f"🏷️ Classes: {len(classes)} ({class_display})",
+                f"🖼️ Images: {images:,}",
+                f"💾 Size: {size_mb:.1f} MB",
+                "📦 Format: YOLOv5 PyTorch"
             ]
             
-            # Add download estimate
+            # Safe download estimate
             estimate = self.estimate_download_time(size_mb)
-            estimate.get('formatted_time') and info_lines.append(f"⏱️ Est. Download: {estimate['formatted_time']}")
+            if estimate.get('formatted_time') != 'Unknown':
+                info_lines.append(f"⏱️ Est. Download: {estimate['formatted_time']}")
             
             return "\n".join(info_lines)
-            
-        except Exception as e:
-            return f"❌ Error formatting dataset info: {str(e)}"
+        
+        return safe_operation_or_none(format_operation) or "❌ Error formatting dataset info"
     
     def get_operation_status(self) -> Dict[str, Any]:
-        """Fixed operation status dengan proper dataset summary"""
-        dataset_summary = self.get_dataset_summary()
+        """Fixed operation status dengan safe dataset summary"""
+        def status_operation():
+            dataset_summary = self.get_dataset_summary()
+            
+            return {
+                'ready_for_download': not dataset_summary.get('exists', False) or dataset_summary.get('issues_count', 0) > 0,
+                'ready_for_check': True,
+                'ready_for_cleanup': dataset_summary.get('exists', False),
+                'environment': {
+                    'is_colab': self.env_manager.is_colab,
+                    'drive_mounted': self.env_manager.is_drive_mounted,
+                    'storage_location': 'Google Drive' if self.env_manager.is_drive_mounted else 'Local'
+                },
+                'dataset_summary': dataset_summary
+            }
         
-        return {
-            'ready_for_download': not dataset_summary['exists'] or dataset_summary['issues_count'] > 0,
-            'ready_for_check': True, 'ready_for_cleanup': dataset_summary['exists'],
-            'environment': {
-                'is_colab': self.env_manager.is_colab, 'drive_mounted': self.env_manager.is_drive_mounted,
-                'storage_location': 'Google Drive' if self.env_manager.is_drive_mounted else 'Local'
-            },
-            'dataset_summary': dataset_summary
+        return safe_operation_or_none(status_operation) or {
+            'ready_for_download': True, 'ready_for_check': True, 'ready_for_cleanup': False,
+            'environment': {'is_colab': False, 'drive_mounted': False, 'storage_location': 'Unknown'},
+            'dataset_summary': {'exists': False, 'total_images': 0}
         }
 
-# Fixed singleton instance
+# Fixed singleton pattern
 _download_operations = None
 
 def get_streamlined_download_operations() -> StreamlinedDownloadOperations:
-    """Fixed singleton factory"""
+    """Fixed singleton factory dengan safe initialization"""
     global _download_operations
     if _download_operations is None:
-        _download_operations = StreamlinedDownloadOperations()
+        _download_operations = safe_operation_or_none(StreamlinedDownloadOperations) or StreamlinedDownloadOperations()
     return _download_operations
 
-# Fixed utility functions
-check_dataset_exists = lambda: get_streamlined_download_operations().check_existing_dataset()
-get_dataset_info = lambda: get_streamlined_download_operations().get_dataset_summary()
-validate_space = lambda mb: get_streamlined_download_operations().validate_download_space(mb)
-cleanup_temps = lambda dataset_id=None: get_streamlined_download_operations().cleanup_temp_files(dataset_id)
-estimate_time = lambda size_mb: get_streamlined_download_operations().estimate_download_time(size_mb)
-get_status = lambda: get_streamlined_download_operations().get_operation_status()
+# Fixed utility functions dengan safe operations
+def check_dataset_exists() -> bool:
+    """Fixed dataset existence check"""
+    operations = get_streamlined_download_operations()
+    return safe_operation_or_none(operations.check_existing_dataset) or False
+
+def get_dataset_info() -> Dict[str, Any]:
+    """Fixed dataset info retrieval"""
+    operations = get_streamlined_download_operations()
+    return safe_operation_or_none(operations.get_dataset_summary) or {'exists': False, 'total_images': 0}
+
+def validate_space(mb: float) -> Dict[str, Any]:
+    """Fixed space validation"""
+    operations = get_streamlined_download_operations()
+    return safe_operation_or_none(lambda: operations.validate_download_space(mb)) or {'sufficient': False}
+
+def cleanup_temps(dataset_id: str = None) -> Dict[str, Any]:
+    """Fixed temp cleanup"""
+    operations = get_streamlined_download_operations()
+    return safe_operation_or_none(lambda: operations.cleanup_temp_files(dataset_id)) or {'cleaned': 0}
+
+def estimate_time(size_mb: float) -> Dict[str, Any]:
+    """Fixed time estimation"""
+    operations = get_streamlined_download_operations()
+    return safe_operation_or_none(lambda: operations.estimate_download_time(size_mb)) or {'estimated_seconds': 0}
+
+def get_status() -> Dict[str, Any]:
+    """Fixed status retrieval"""
+    operations = get_streamlined_download_operations()
+    return safe_operation_or_none(operations.get_operation_status) or {'ready_for_download': True}
 
 def format_size(bytes_size: int) -> str:
-    """Fixed size formatting"""
-    units, size, unit_index = ['B', 'KB', 'MB', 'GB'], float(bytes_size), 0
+    """Fixed size formatting dengan safe calculations"""
+    def format_operation():
+        if bytes_size <= 0:
+            return "0 B"
+        
+        units = ['B', 'KB', 'MB', 'GB']
+        size = float(bytes_size)
+        unit_index = 0
+        
+        while size >= 1024 and unit_index < len(units) - 1:
+            size /= 1024
+            unit_index += 1
+        
+        return f"{size:.1f} {units[unit_index]}"
     
-    while size >= 1024 and unit_index < len(units) - 1:
-        size, unit_index = size / 1024, unit_index + 1
-    
-    return f"{size:.1f} {units[unit_index]}"
+    return safe_operation_or_none(format_operation) or f"{bytes_size} bytes"
 
 def validate_dataset_identifier(workspace: str, project: str, version: str) -> Dict[str, Any]:
-    """Fixed dataset identifier validation"""
-    validation_rules = [
-        (bool(workspace.strip()), "Workspace tidak boleh kosong"),
-        (bool(project.strip()), "Project tidak boleh kosong"), 
-        (bool(version.strip()), "Version tidak boleh kosong"),
-        (workspace.replace('-', '').replace('_', '').isalnum(), "Workspace hanya boleh huruf, angka, dash, underscore"),
-        (project.replace('-', '').replace('_', '').isalnum(), "Project hanya boleh huruf, angka, dash, underscore"),
-        (version.replace('.', '').isalnum(), "Version hanya boleh huruf, angka, titik")
-    ]
+    """Fixed dataset identifier validation dengan safe string operations"""
+    def validate_operation():
+        # Safe string operations
+        workspace_clean = workspace.strip() if workspace else ""
+        project_clean = project.strip() if project else ""
+        version_clean = version.strip() if version else ""
+        
+        validation_rules = [
+            (bool(workspace_clean), "Workspace tidak boleh kosong"),
+            (bool(project_clean), "Project tidak boleh kosong"),
+            (bool(version_clean), "Version tidak boleh kosong")
+        ]
+        
+        # Safe character validation
+        if workspace_clean:
+            workspace_valid = workspace_clean.replace('-', '').replace('_', '').isalnum()
+            validation_rules.append((workspace_valid, "Workspace hanya boleh huruf, angka, dash, underscore"))
+        
+        if project_clean:
+            project_valid = project_clean.replace('-', '').replace('_', '').isalnum()
+            validation_rules.append((project_valid, "Project hanya boleh huruf, angka, dash, underscore"))
+        
+        if version_clean:
+            version_valid = version_clean.replace('.', '').isalnum()
+            validation_rules.append((version_valid, "Version hanya boleh huruf, angka, titik"))
+        
+        errors = [message for valid, message in validation_rules if not valid]
+        
+        return {
+            'valid': len(errors) == 0,
+            'errors': errors,
+            'identifier': f"{workspace_clean}/{project_clean}:v{version_clean}" if not errors else None
+        }
     
-    errors = [message for valid, message in validation_rules if not valid]
-    
-    return {
-        'valid': len(errors) == 0, 'errors': errors,
-        'identifier': f"{workspace}/{project}:v{version}" if not errors else None
-    }
+    return safe_operation_or_none(validate_operation) or {'valid': False, 'errors': ['Validation failed'], 'identifier': None}
 
-# Fixed utility functions
-create_temp_path = lambda base, identifier: f"{base}/{identifier.replace('/', '_').replace(':', '_v')}"
-get_downloads_path = lambda data_root: f"{data_root}/downloads"
-get_backup_path = lambda data_root: f"{data_root}/backup"
-format_download_summary = lambda summary: f"Images: {summary.get('total_images', 0):,} | Issues: {summary.get('issues_count', 0)} | Drive: {'✅' if summary.get('drive_storage') else '❌'}"
+# Fixed utility functions dengan safe patterns
+def create_temp_path(base: str, identifier: str) -> str:
+    """Fixed temp path creation"""
+    if not base or not identifier:
+        return ""
+    clean_identifier = identifier.replace('/', '_').replace(':', '_v')
+    return f"{base}/{clean_identifier}"
+
+def get_downloads_path(data_root: str) -> str:
+    """Fixed downloads path"""
+    return f"{data_root}/downloads" if data_root else "downloads"
+
+def get_backup_path(data_root: str) -> str:
+    """Fixed backup path"""
+    return f"{data_root}/backup" if data_root else "backup"
+
+def format_download_summary(summary: Dict[str, Any]) -> str:
+    """Fixed download summary formatting"""
+    if not summary:
+        return "No summary available"
+    
+    total_images = summary.get('total_images', 0)
+    issues_count = summary.get('issues_count', 0)
+    drive_storage = summary.get('drive_storage', False)
+    
+    return f"Images: {total_images:,} | Issues: {issues_count} | Drive: {'✅' if drive_storage else '❌'}"
 
 # Backward compatibility alias
 consolidate_download_operations = get_streamlined_download_operations

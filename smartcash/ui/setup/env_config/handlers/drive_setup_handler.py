@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/handlers/drive_setup_handler.py
-Deskripsi: Drive setup handler dengan constants dan utils integration
+Deskripsi: Drive setup handler dengan SmartProgressTracker integration dan phase management
 """
 
 import os
@@ -16,11 +16,12 @@ from smartcash.ui.setup.env_config.constants import (
 )
 from smartcash.ui.setup.env_config.utils import (
     update_progress_safe, is_colab_environment, test_drive_readiness,
-    wait_for_drive_ready, create_folder_with_retry, validate_setup_integrity
+    wait_for_drive_ready, create_folder_with_retry, validate_setup_integrity,
+    start_progress_phase, next_progress_phase, complete_progress_safe
 )
 
 class DriveSetupHandler:
-    """Drive setup handler dengan constants dan utils integration"""
+    """Drive setup handler dengan SmartProgressTracker integration untuk phase management"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -34,7 +35,7 @@ class DriveSetupHandler:
             self.logger = create_ui_logger_bridge(self.ui_components, "drive_setup")
     
     def ensure_drive_mounted(self) -> Tuple[bool, str]:
-        """Mount Drive dengan constants dan utils integration"""
+        """Mount Drive dengan SmartProgressTracker phase integration"""
         self._ensure_logger()
         
         if not is_colab_environment():
@@ -46,7 +47,7 @@ class DriveSetupHandler:
         try:
             from google.colab import drive
             self.logger.info("📱 Mounting Google Drive...")
-            update_progress_safe(self.ui_components, 10, PROGRESS_MESSAGES['drive_mount'])
+            update_progress_safe(self.ui_components, 10, "📱 Mounting Google Drive...")
             
             drive.mount('/content/drive')
             return wait_for_drive_ready(RETRY_CONFIG['drive_mount_timeout'], self.ui_components)
@@ -55,9 +56,9 @@ class DriveSetupHandler:
             return False, f"Mount error: {str(e)}"
     
     def create_drive_folders(self, drive_base_path: str) -> Dict[str, bool]:
-        """Create folders dengan progress tracking dan utils"""
+        """Create folders dengan SmartProgressTracker step tracking"""
         self._ensure_logger()
-        update_progress_safe(self.ui_components, 30, PROGRESS_MESSAGES['folders_create'])
+        next_progress_phase(self.ui_components, "📁 Creating Drive folders")
         
         results = {}
         drive_base = Path(drive_base_path)
@@ -67,18 +68,18 @@ class DriveSetupHandler:
             self.logger.error("❌ Gagal create base path")
             return {folder: False for folder in self.required_folders}
         
-        # Create folders dengan progress tracking
+        # Create folders dengan step progress tracking
         total_folders = len(self.required_folders)
         for idx, folder in enumerate(self.required_folders):
             folder_path = drive_base / folder
-            progress = 30 + (idx / total_folders) * 15  # 30-45% range
-            update_progress_safe(self.ui_components, int(progress), f"📁 Creating {folder}...")
+            step_progress = int((idx / total_folders) * 100)
+            update_progress_safe(self.ui_components, step_progress, f"📁 Creating {folder}...")
             
             success = create_folder_with_retry(folder_path, RETRY_CONFIG['drive_ready_attempts'])
             results[folder] = success
         
         success_count = sum(results.values())
-        update_progress_safe(self.ui_components, 45, f"📁 Created {success_count}/{total_folders} folders")
+        update_progress_safe(self.ui_components, 100, f"📁 Created {success_count}/{total_folders} folders")
         
         if success_count > 0:
             self.logger.success(f"📁 Setup {success_count}/{total_folders} folder di Drive")
@@ -86,9 +87,9 @@ class DriveSetupHandler:
         return results
     
     def clone_config_templates(self, drive_base_path: str) -> Dict[str, bool]:
-        """Clone configs dengan constants dan progress tracking"""
+        """Clone configs dengan step progress tracking"""
         self._ensure_logger()
-        update_progress_safe(self.ui_components, 50, PROGRESS_MESSAGES['configs_clone'])
+        next_progress_phase(self.ui_components, "📋 Cloning config templates")
         
         results = {}
         repo_config_path = Path(REPO_CONFIG_PATH)
@@ -107,8 +108,8 @@ class DriveSetupHandler:
             dst_file = drive_config_path / config_file
             success = False
             
-            progress = 50 + (idx / total_configs) * 15  # 50-65% range
-            update_progress_safe(self.ui_components, int(progress), f"📋 Copying {config_file}...")
+            step_progress = int((idx / total_configs) * 100)
+            update_progress_safe(self.ui_components, step_progress, f"📋 Copying {config_file}...")
             
             try:
                 if src_file.exists():
@@ -128,16 +129,16 @@ class DriveSetupHandler:
             
             results[config_file] = success
         
-        update_progress_safe(self.ui_components, 65, f"📋 Cloned {cloned_count} config templates")
+        update_progress_safe(self.ui_components, 100, f"📋 Cloned {cloned_count} config templates")
         if cloned_count > 0:
             self.logger.success(f"📋 Clone {cloned_count} config template")
         
         return results
     
     def create_symlinks(self, drive_base_path: str) -> Dict[str, bool]:
-        """Create symlinks dengan constants dan utils integration"""
+        """Create symlinks dengan step progress tracking"""
         self._ensure_logger()
-        update_progress_safe(self.ui_components, 70, PROGRESS_MESSAGES['symlinks_create'])
+        next_progress_phase(self.ui_components, "🔗 Creating symlinks")
         
         if not is_colab_environment():
             return {folder: True for folder in self.required_folders}
@@ -151,8 +152,8 @@ class DriveSetupHandler:
             drive_path = drive_base / folder
             success = False
             
-            progress = 70 + (idx / total_symlinks) * 20  # 70-90% range
-            update_progress_safe(self.ui_components, int(progress), f"🔗 Linking {folder}...")
+            step_progress = int((idx / total_symlinks) * 100)
+            update_progress_safe(self.ui_components, step_progress, f"🔗 Linking {folder}...")
             
             try:
                 # Check existing valid symlink
@@ -204,25 +205,25 @@ class DriveSetupHandler:
             
             results[folder] = success
         
-        success_count = sum(results.values())
-        update_progress_safe(self.ui_components, 90, f"🔗 Created {success_count}/{total_symlinks} symlinks")
+        update_progress_safe(self.ui_components, 100, f"🔗 Created {success_count}/{total_symlinks} symlinks")
         
+        success_count = sum(results.values())
         if success_count > 0:
             self.logger.success(f"🔗 Setup {success_count}/{total_symlinks} symlink")
         
         return results
     
     def perform_complete_setup(self, drive_base_path: str) -> Dict[str, Any]:
-        """Complete setup dengan constants/utils integration"""
+        """Complete setup dengan SmartProgressTracker phase management"""
         self._ensure_logger()
         
         if not test_drive_readiness(Path(DRIVE_MOUNT_POINT)):
             return {'success': False, 'error': 'Drive not ready for setup'}
         
         self.logger.info(f"🚀 Memulai setup lengkap di: {drive_base_path}")
-        update_progress_safe(self.ui_components, 5, "🚀 Starting complete setup...")
+        start_progress_phase(self.ui_components, "environment setup")
         
-        # Execute setup steps
+        # Execute setup phases dengan SmartProgressTracker
         folder_results = self.create_drive_folders(drive_base_path)
         config_results = self.clone_config_templates(drive_base_path)
         
@@ -240,17 +241,17 @@ class DriveSetupHandler:
         
         overall_success = folder_success and config_success and symlink_success
         
-        # Final validation
-        update_progress_safe(self.ui_components, 95, PROGRESS_MESSAGES['validation'])
+        # Final validation phase
+        next_progress_phase(self.ui_components, "🔍 Validating setup")
         if overall_success:
             validation_passed = validate_setup_integrity(drive_base_path)
             if not validation_passed:
                 self.logger.warning("⚠️ Setup validation menunjukkan beberapa issue")
                 overall_success = False
         
-        # Complete progress
-        final_message = PROGRESS_MESSAGES['complete'] if overall_success else "⚠️ Setup completed with issues"
-        update_progress_safe(self.ui_components, 100, final_message)
+        # Complete dengan SmartProgressTracker
+        final_message = "✅ Setup environment berhasil" if overall_success else "⚠️ Setup completed with issues"
+        complete_progress_safe(self.ui_components, final_message)
         
         return {
             'folders': folder_results,

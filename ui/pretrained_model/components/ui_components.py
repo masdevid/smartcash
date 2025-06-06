@@ -43,7 +43,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Button group
     button_group = widgets.VBox([
-        download_button, status_panel
+        download_button
     ], layout=widgets.Layout(width='100%', margin='5px 0'))
     
     # Section headers
@@ -57,7 +57,8 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Main UI assembly
     ui = widgets.VBox([
-        header, 
+        header,
+        status_panel,
         config_form['container'], 
         save_reset_components['container'],
         action_header, 

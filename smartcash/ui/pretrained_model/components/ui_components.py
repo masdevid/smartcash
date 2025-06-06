@@ -6,7 +6,6 @@ Deskripsi: Clean UI components tanpa dependencies yang berpotensi cause weak ref
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from smartcash.ui.components.header import create_header
-from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.utils.layout_utils import create_divider, get_layout
 from smartcash.ui.utils.constants import ICONS, COLORS
 
@@ -18,9 +17,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     header = create_header(f"{ICONS.get('model', '🤖')} Persiapan Model Pre-trained", 
                           "Download dan sinkronisasi model YOLOv5 dan EfficientNet-B4 untuk SmartCash")
     
-    # Status panel
-    status_panel = create_status_panel("Mempersiapkan konfigurasi model...", "info")
-    
+   
     # Model configuration form
     config_form = _create_model_config_form(config)
     
@@ -58,17 +55,17 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Main UI assembly
     ui = widgets.VBox([
-        header, status_panel, config_form['container'], save_reset_components['container'], action_header, button_group,
+        header, config_form['container'], save_reset_components['container'], action_header, button_group,
         progress_display['container'], log_header, log_output
     ], layout=get_layout('container'))
     
     return {
-        'ui': ui, 'header': header, 'status_panel': status_panel,
+        'ui': ui, 'header': header, 
         'config_form': config_form, 'download_sync_button': download_button,
         'save_button': save_reset_components['save_button'], 
         'reset_button': save_reset_components['reset_button'],
         'save_reset_components': save_reset_components,
-        'log_output': log_output, 'status': log_output, 'progress_display': progress_display,
+        'log_output': log_output, 'progress_display': progress_display,
         'models_dir_input': config_form['models_dir'], 'drive_models_dir_input': config_form['drive_models_dir'],
         'yolov5_url_input': config_form['yolov5_url'], 'efficientnet_url_input': config_form['efficientnet_url'],
         'module_name': 'pretrained_model', 'auto_check_enabled': True,

@@ -44,7 +44,7 @@ class PretrainedInit(CommonInitializer):
     
     def _get_critical_components(self) -> List[str]:
         """Critical components untuk validasi"""
-        return ['ui', 'download_sync_button', 'log_output', 'status_panel']
+        return ['ui', 'download_sync_button', 'log_output']
     
     def _clear_existing_widgets(self) -> None:
         """Clear existing widgets untuk avoid conflicts"""

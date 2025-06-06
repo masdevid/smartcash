@@ -56,17 +56,17 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
         
         # Step 1: Validate parameters (0-20%)
         progress_tracker.update_overall(10, "🔍 Validasi parameter")
-        progress_tracker.update_current(50, "Validating parameters...")
+        progress_tracker.update_primary(50, "Validating parameters...")
         
         # Step 2: Connect to Roboflow (20-40%)
         progress_tracker.update_overall(25, "🌐 Koneksi Roboflow")
-        progress_tracker.update_current(0, "Connecting to Roboflow...")
+        progress_tracker.update_primary(0, "Connecting to Roboflow...")
         roboflow_client = create_roboflow_client(api_key, logger)
-        progress_tracker.update_current(100, "Connected to Roboflow")
+        progress_tracker.update_primary(100, "Connected to Roboflow")
         
         # Step 3: Validate credentials (40-60%)
         progress_tracker.update_overall(45, "🔑 Validasi kredensial")
-        progress_tracker.update_current(0, "Validating credentials...")
+        progress_tracker.update_primary(0, "Validating credentials...")
         cred_result = roboflow_client.validate_credentials(workspace, project)
         
         if not cred_result['valid']:
@@ -75,11 +75,11 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
             show_status_safe(error_msg, "error", ui_components)
             return
         
-        progress_tracker.update_current(100, "Credentials validated")
+        progress_tracker.update_primary(100, "Credentials validated")
         
         # Step 4: Get dataset metadata (60-80%)
         progress_tracker.update_overall(65, "📊 Mengambil metadata")
-        progress_tracker.update_current(0, "Fetching dataset metadata...")
+        progress_tracker.update_primary(0, "Fetching dataset metadata...")
         metadata_result = roboflow_client.get_dataset_metadata(workspace, project, version)
         
         if metadata_result['status'] != 'success':
@@ -88,17 +88,17 @@ def _execute_check_sync(ui_components: Dict[str, Any], config: Dict[str, Any], l
             show_status_safe(error_msg, "error", ui_components)
             return
         
-        progress_tracker.update_current(100, "Metadata retrieved")
+        progress_tracker.update_primary(100, "Metadata retrieved")
         
         # Step 5: Check local dataset (80-95%)
         progress_tracker.update_overall(85, "📁 Memeriksa dataset lokal")
-        progress_tracker.update_current(0, "Checking local dataset...")
+        progress_tracker.update_primary(0, "Checking local dataset...")
         local_check = _check_local_dataset_sync(config)
-        progress_tracker.update_current(100, "Local check completed")
+        progress_tracker.update_primary(100, "Local check completed")
         
         # Step 6: Generate report (95-100%)
         progress_tracker.update_overall(95, "📋 Membuat laporan")
-        progress_tracker.update_current(0, "Generating report...")
+        progress_tracker.update_primary(0, "Generating report...")
         report = _generate_streamlined_check_report(metadata_result['data'], local_check, dataset_id)
         
         # Show report

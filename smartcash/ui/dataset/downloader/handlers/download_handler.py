@@ -201,7 +201,7 @@ def _execute_download_sync_fixed(ui_components: Dict[str, Any], config: Dict[str
         show_status_safe(error_msg, "error", ui_components)
         logger.error(error_msg)
 
-def _create_fixed_progress_callback(progress_tracker, logger) -> Callable:
+def _create_fixed_progress_callback(progress_tracker, logger):
     """Create fixed dual-level progress callback"""
     
     def progress_callback(step: str, current: int, total: int, message: str):
@@ -223,10 +223,9 @@ def _create_fixed_progress_callback(progress_tracker, logger) -> Callable:
                 start_pct, end_pct, overall_msg = step_mapping[step]
                 overall_percentage = start_pct + int(percentage * (end_pct - start_pct) / 100)
                 progress_tracker.update_overall(overall_percentage, overall_msg)
-                progress_tracker.update_current(percentage, message)
+                progress_tracker.update_primary(percentage, message)
             else:
-                # Generic progress update
-                progress_tracker.update_current(percentage, message)
+                progress_tracker.update_primary(percentage, message)
                 
         except Exception as e:
             logger.debug(f"🔍 Progress callback error: {str(e)}")

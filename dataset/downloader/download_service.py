@@ -34,7 +34,18 @@ class DownloadService:
         self._progress_callback: Optional[Callable] = None
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """Set progress callback untuk UI updates."""
+        """Set progress callback untuk UI updates.
+        
+        Callback akan dipanggil dengan format: callback(step, current, total, message)
+        - step: Nama step (validate, connect, metadata, download, extract, organize)
+        - current: Nilai progress saat ini
+        - total: Nilai total progress (biasanya 100)
+        - message: Pesan status
+        
+        Callback ini akan digunakan oleh UI progress tracker dengan metode:
+        - update_overall() untuk progress keseluruhan
+        - update_primary() untuk progress step saat ini
+        """
         self._progress_callback = callback
         
         # Propagate ke components
@@ -263,9 +274,21 @@ class DownloadService:
             self.logger.warning(f"⚠️ Cleanup warning: {str(e)}")
     
     def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """Notify progress melalui callback."""
+        """Notify progress melalui callback.
+        
+        Memastikan callback dipanggil dengan format yang benar untuk UI progress tracker:
+        - step: Nama step (validate, connect, metadata, download, extract, organize)
+        - current: Nilai progress saat ini (0-100)
+        - total: Nilai total progress (biasanya 100)
+        - message: Pesan status yang informatif
+        """
         if self._progress_callback:
             try:
+                # Pastikan nilai dalam range yang valid
+                current = max(0, min(100, current))
+                total = max(1, total)
+                
+                # Panggil callback dengan format yang benar
                 self._progress_callback(step, current, total, message)
             except Exception as e:
                 self.logger.error(f"❌ Progress callback error: {str(e)}")

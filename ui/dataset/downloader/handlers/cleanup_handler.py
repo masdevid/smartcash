@@ -190,20 +190,20 @@ def _create_streamlined_cleanup_progress_callback(progress_tracker, logger, clea
             if step == 'scan':
                 # Scanning phase (0-20%)
                 progress_tracker.update_overall(int(percentage * 0.2), "🔍 Scanning files")
-                progress_tracker.update_current(percentage, message)
+                progress_tracker.update_primary(percentage, message)
             elif step == 'cleanup':
                 # Main cleanup phase (20-90%)
                 overall_pct = 20 + int(percentage * 0.7)
                 progress_tracker.update_overall(overall_pct, f"🧹 Cleanup: {percentage}%")
-                progress_tracker.update_current(percentage, message)
+                progress_tracker.update_primary(percentage, message)
             elif step == 'verify':
                 # Verification phase (90-100%)
                 overall_pct = 90 + int(percentage * 0.1)
                 progress_tracker.update_overall(overall_pct, "✅ Verifikasi cleanup")
-                progress_tracker.update_current(percentage, message)
+                progress_tracker.update_primary(percentage, message)
             else:
                 # Generic progress
-                progress_tracker.update_current(percentage, message)
+                progress_tracker.update_primary(percentage, message)
                 
         except Exception as e:
             logger.debug(f"🔍 Cleanup progress callback error: {str(e)}")

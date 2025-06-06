@@ -55,7 +55,18 @@ class DownloadProgressTracker:
         }
     
     def set_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """Set callback untuk progress updates."""
+        """Set callback untuk progress updates.
+        
+        Callback akan dipanggil dengan format: callback(step, current, total, message)
+        - step: Nama step (validation, metadata, download, extract, organize)
+        - current: Nilai progress saat ini
+        - total: Nilai total progress (biasanya 100)
+        - message: Pesan status
+        
+        Callback ini harus kompatibel dengan UI progress tracker yang mengharapkan:
+        - update_overall() untuk progress keseluruhan
+        - update_primary() untuk progress step saat ini
+        """
         self._progress_callback = callback
     
     def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:

@@ -50,9 +50,11 @@ def _create_streamlined_downloader_ui(config: Dict[str, Any], roboflow: Dict[str
     action_components = _create_action_buttons()
     
     # 8. Progress tracker dengan dual level - optimized
-    progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
+    progress_tracker = create_dual_progress_tracker(operation="Dataset Download", auto_hide=False)
     progress_container = progress_tracker.container
     progress_container.layout.display = 'none'
+    # Tambahkan komentar untuk membantu developer memahami penggunaan yang benar
+    # Metode yang tersedia: update_overall(), update_primary(), complete(), error(), reset(), show(), hide()
     
     # 9. Log accordion terbuka by default
     log_components = _create_log_accordion()

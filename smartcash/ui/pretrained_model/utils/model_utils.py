@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained_model/utils/model_utils.py
-Deskripsi: Utilities untuk model operations dengan config integration dan one-liner style
+Deskripsi: Fixed utilities dengan simplified progress tracker untuk avoid weak reference error
 """
 
 from pathlib import Path
@@ -57,16 +57,23 @@ class ModelUtils:
         }
 
 class ProgressTracker:
-    """Lightweight progress tracker wrapper untuk existing progress_tracker"""
+    """Simplified progress tracker untuk avoid weak reference error"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
-        self.progress_tracker = ui_components.get('progress_tracker')
-    
+        
     def next_step(self, step_name: str, message: str) -> None:
-        """Move ke step berikutnya dengan message"""
-        self.progress_tracker and hasattr(self.progress_tracker, 'update_status') and self.progress_tracker.update_status(message)
+        """Move ke step berikutnya dengan message - delegasi ke UI components"""
+        update_fn = self.ui_components.get('update_progress')
+        update_fn and update_fn('overall', 0, message)
+        
+        logger = self.ui_components.get('logger')
+        logger and logger.info(f"📋 {step_name}: {message}")
     
     def update_current_step(self, progress: int, message: str) -> None:
-        """Update current step progress"""
-        self.progress_tracker and hasattr(self.progress_tracker, 'update_step') and self.progress_tracker.update_step(progress, message)
+        """Update current step progress - delegasi ke UI components"""
+        update_fn = self.ui_components.get('update_progress')
+        update_fn and update_fn('current', progress, message)
+        
+        # Optional: log significant progress updates
+        progress % 25 == 0 and progress > 0 and self.ui_components.get('logger') and self.ui_components['logger'].info(f"⏳ Progress: {progress}%")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained_model/components/ui_components.py
-Deskripsi: UI components pretrained model dengan form konfigurasi dan progress tracker
+Deskripsi: Fixed UI components dengan single progress tracker untuk avoid weak reference error
 """
 
 import ipywidgets as widgets
@@ -8,12 +8,11 @@ from typing import Dict, Any, Optional
 from smartcash.ui.components.header import create_header
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.log_accordion import create_log_accordion
-from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
 from smartcash.ui.utils.layout_utils import create_divider, get_layout
 from smartcash.ui.utils.constants import ICONS, COLORS
 
 def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create pretrained model UI dengan form konfigurasi"""
+    """Create pretrained model UI dengan single progress tracker untuk avoid weak reference error"""
     config = config or {}
     
     # Header
@@ -30,8 +29,8 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     download_button = widgets.Button(description="Download & Sync Model", button_style='primary', 
                                    icon='download', layout=get_layout('responsive_button', width='200px'))
     
-    # Progress tracker
-    progress_tracker = create_dual_progress_tracker(height='180px')
+    # Single progress tracker untuk avoid weak reference error
+    progress_tracker = _create_single_progress_tracker()
     
     # Log accordion
     log_components = create_log_accordion(module_name='pretrained_model', height='200px')
@@ -45,7 +44,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     ui = widgets.VBox([
         header, status_panel, config_form['container'],
         create_divider(), action_header, download_button,
-        progress_tracker.container, log_components['log_accordion']
+        progress_tracker['container'], log_components['log_accordion']
     ], layout=get_layout('container'))
     
     return {
@@ -55,7 +54,91 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'log_output': log_components['log_output'], 'status': log_components['log_output'],
         'models_dir_input': config_form['models_dir'], 'drive_models_dir_input': config_form['drive_models_dir'],
         'yolov5_url_input': config_form['yolov5_url'], 'efficientnet_url_input': config_form['efficientnet_url'],
-        'module_name': 'pretrained_model', 'auto_check_enabled': True
+        'module_name': 'pretrained_model', 'auto_check_enabled': True,
+        # Progress tracker methods untuk compatibility
+        'show_for_operation': progress_tracker['show_for_operation'],
+        'update_progress': progress_tracker['update_progress'],
+        'complete_operation': progress_tracker['complete_operation'],
+        'error_operation': progress_tracker['error_operation'],
+        'reset_all': progress_tracker['reset_all']
+    }
+
+def _create_single_progress_tracker() -> Dict[str, Any]:
+    """Create single progress tracker dengan clean implementation untuk avoid weak reference error"""
+    
+    # Progress bar untuk overall operation
+    progress_bar = widgets.IntProgress(value=0, min=0, max=100, description='Progress:',
+                                     bar_style='', style={'bar_color': '#007bff'},
+                                     layout=widgets.Layout(width='100%', margin='5px 0'))
+    
+    # Progress message
+    progress_message = widgets.HTML(value="<div style='margin: 5px 0; color: #666;'>Siap memulai operasi...</div>",
+                                   layout=widgets.Layout(width='100%'))
+    
+    # Progress container dengan visibility control
+    progress_container = widgets.VBox([progress_bar, progress_message],
+                                     layout=widgets.Layout(width='100%', margin='10px 0', padding='10px',
+                                                          border='1px solid #ddd', border_radius='4px',
+                                                          visibility='hidden'))
+    
+    # Operation state
+    operation_state = {'current_operation': None, 'is_visible': False}
+    
+    def show_for_operation(operation_name: str) -> None:
+        """Show progress tracker untuk operation tertentu"""
+        operation_state['current_operation'] = operation_name
+        operation_state['is_visible'] = True
+        progress_container.layout.visibility = 'visible'
+        progress_bar.value = 0
+        progress_message.value = f"<div style='margin: 5px 0; color: #007bff;'>🚀 Memulai {operation_name}...</div>"
+    
+    def update_progress(category: str, value: int, message: str) -> None:
+        """Update progress dengan message"""
+        if operation_state['is_visible']:
+            progress_bar.value = min(max(value, 0), 100)
+            progress_message.value = f"<div style='margin: 5px 0; color: #333;'>{message}</div>"
+    
+    def complete_operation(final_message: str) -> None:
+        """Complete operation dengan success message"""
+        if operation_state['is_visible']:
+            progress_bar.value = 100
+            progress_bar.bar_style = 'success'
+            progress_message.value = f"<div style='margin: 5px 0; color: #28a745;'>✅ {final_message}</div>"
+            # Auto hide setelah delay
+            _auto_hide_after_delay()
+    
+    def error_operation(error_message: str) -> None:
+        """Handle error operation dengan error styling"""
+        if operation_state['is_visible']:
+            progress_bar.bar_style = 'danger'
+            progress_message.value = f"<div style='margin: 5px 0; color: #dc3545;'>❌ {error_message}</div>"
+            # Auto hide setelah delay
+            _auto_hide_after_delay()
+    
+    def reset_all() -> None:
+        """Reset progress tracker ke initial state"""
+        operation_state['current_operation'] = None
+        operation_state['is_visible'] = False
+        progress_container.layout.visibility = 'hidden'
+        progress_bar.value = 0
+        progress_bar.bar_style = ''
+        progress_message.value = "<div style='margin: 5px 0; color: #666;'>Siap memulai operasi...</div>"
+    
+    def _auto_hide_after_delay() -> None:
+        """Auto hide progress tracker setelah operation selesai"""
+        import threading
+        threading.Timer(3.0, lambda: reset_all()).start()
+    
+    return {
+        'container': progress_container,
+        'progress_bar': progress_bar,
+        'progress_message': progress_message,
+        'show_for_operation': show_for_operation,
+        'update_progress': update_progress,
+        'complete_operation': complete_operation,
+        'error_operation': error_operation,
+        'reset_all': reset_all,
+        'operation_state': operation_state
     }
 
 def _create_model_config_form(config: Dict[str, Any]) -> Dict[str, Any]:

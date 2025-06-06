@@ -120,8 +120,8 @@ def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
 def update_summary_card(ui_components: Dict[str, Any], config: Dict[str, Any], last_saved: str = None) -> None:
     """Update summary card dengan timestamp"""
     if 'summary_card' in ui_components:
-        import datetime
         if not last_saved:
+            import datetime
             last_saved = datetime.datetime.now().strftime("%H:%M:%S")
         summary_card_widget = create_config_summary_card(config, last_saved)
         ui_components['summary_card'].value = summary_card_widget.value

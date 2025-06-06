@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/strategy/components/ui_layout.py
-Deskripsi: Layout responsive untuk strategy config dengan overflow fixes
+Deskripsi: Layout responsive dengan CSS Grid tanpa horizontal overflow
 """
 
 from typing import Dict, Any
@@ -11,94 +11,127 @@ from smartcash.ui.strategy.components.ui_form import create_config_summary_card
 
 
 def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Create responsive layout dengan overflow protection"""
+    """Create responsive layout dengan CSS Grid untuk prevent overflow"""
     
-    # One-liner untuk widget wrapper dengan overflow protection
-    vbox_wrapper = lambda children, margin='0 4px 0 0': widgets.VBox(children, layout=widgets.Layout(flex='1 1 auto', margin=margin, min_width='0', overflow='hidden'))
+    # Grid styling untuk responsive layout - one-liner grid
+    grid_style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; width: 100%; max-width: 100%;"
+    section_style = "padding: 12px; margin: 6px 0; border-radius: 8px; overflow: hidden; border: 2px solid transparent;"
     
-    # Validation section dengan overflow fixes
+    # Validation section dengan CSS Grid
+    validation_grid = widgets.HTML(f"""
+    <div style="{section_style} background: linear-gradient(white, white) padding-box, linear-gradient(45deg, #4ecdc4, #44b8b5) border-box;">
+        <h4 style="margin: 8px 0; color: #333; font-size: 14px;">✅ Strategi Validasi</h4>
+        <div style="{grid_style}">
+            <div id="val-col-1"></div>
+            <div id="val-col-2"></div>
+        </div>
+    </div>
+    """)
+    
+    validation_col1 = widgets.VBox([
+        form_components['val_frequency_slider'],
+        form_components['iou_thres_slider']
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    
+    validation_col2 = widgets.VBox([
+        form_components['conf_thres_slider'],
+        form_components['max_detections_slider']
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    
     validation_section = widgets.VBox([
         widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>✅ Strategi Validasi</h4>"),
-        widgets.HBox([
-            vbox_wrapper([
-                form_components['val_frequency_slider'],
-                form_components['iou_thres_slider']
-            ]),
-            vbox_wrapper([
-                form_components['conf_thres_slider'],
-                form_components['max_detections_slider']
-            ], '0 0 0 4px')
-        ], layout=widgets.Layout(display='flex', width='100%', max_width='100%', overflow='hidden'))
+        widgets.GridBox([validation_col1, validation_col2], 
+                       layout=widgets.Layout(
+                           width='100%', 
+                           max_width='100%',
+                           grid_template_columns='repeat(auto-fit, minmax(200px, 1fr))',
+                           grid_gap='8px',
+                           overflow='hidden'
+                       ))
     ], layout=widgets.Layout(
-        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden', min_width='0',
-        border='2px solid transparent', 
+        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden',
+        border='2px solid transparent', width='100%', max_width='100%',
         background='linear-gradient(white, white) padding-box, linear-gradient(45deg, #4ecdc4, #44b8b5) border-box'
     ))
     
-    # Utils section dengan overflow fixes
+    # Utils section dengan GridBox
+    utils_col1 = widgets.VBox([
+        form_components['experiment_name_text'],
+        form_components['checkpoint_dir_text'],
+        form_components['log_metrics_slider']
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    
+    utils_col2 = widgets.VBox([
+        form_components['visualize_batch_slider'],
+        form_components['gradient_clipping_slider'],
+        form_components['layer_mode_dropdown']
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    
     utils_section = widgets.VBox([
         widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>🔧 Utilitas Training</h4>"),
-        widgets.HBox([
-            vbox_wrapper([
-                form_components['experiment_name_text'],
-                form_components['checkpoint_dir_text'],
-                form_components['log_metrics_slider']
-            ]),
-            vbox_wrapper([
-                form_components['visualize_batch_slider'],
-                form_components['gradient_clipping_slider'],
-                form_components['layer_mode_dropdown']
-            ], '0 0 0 4px')
-        ], layout=widgets.Layout(display='flex', width='100%', max_width='100%', overflow='hidden')),
+        widgets.GridBox([utils_col1, utils_col2], 
+                       layout=widgets.Layout(
+                           width='100%', 
+                           max_width='100%',
+                           grid_template_columns='repeat(auto-fit, minmax(200px, 1fr))',
+                           grid_gap='8px',
+                           overflow='hidden'
+                       )),
         form_components['tensorboard_checkbox']
     ], layout=widgets.Layout(
-        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden', min_width='0',
-        border='2px solid transparent',
+        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden',
+        border='2px solid transparent', width='100%', max_width='100%',
         background='linear-gradient(white, white) padding-box, linear-gradient(45deg, #ff6b6b, #ee5a5a) border-box'
     ))
     
-    # Multi-scale section dengan stacked layout untuk narrow screens
-    multiscale_section = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>🔄 Multi-scale Training</h4>"),
+    # Multi-scale section dengan single column
+    multiscale_col = widgets.VBox([
         form_components['multi_scale_checkbox'],
-        widgets.VBox([
+        widgets.GridBox([
             form_components['img_size_min_slider'],
             form_components['img_size_max_slider']
-        ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+        ], layout=widgets.Layout(
+            width='100%', 
+            max_width='100%',
+            grid_template_columns='repeat(auto-fit, minmax(150px, 1fr))',
+            grid_gap='8px',
+            overflow='hidden'
+        ))
+    ], layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
+    
+    multiscale_section = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 8px 0; color: #333; font-size: 14px;'>🔄 Multi-scale Training</h4>"),
+        multiscale_col
     ], layout=widgets.Layout(
-        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden', min_width='0',
-        border='2px solid transparent',
+        padding='12px', margin='6px 0', border_radius='8px', overflow='hidden',
+        border='2px solid transparent', width='100%', max_width='100%',
         background='linear-gradient(white, white) padding-box, linear-gradient(45deg, #45b7d1, #3aa3d0) border-box'
     ))
     
-    # Content area dengan full overflow protection
+    # Content area dengan vertical stack
     content_area = widgets.VBox([
         validation_section,
         utils_section,
         multiscale_section
     ], layout=widgets.Layout(
-        display='flex', 
-        flex_flow='column',
         width='100%', 
         max_width='100%',
-        overflow='hidden',
-        min_width='0'
+        overflow='hidden'
     ))
     
-    # Header
+    # Header dan summary
     header = create_header(
         title="Konfigurasi Strategi Training",
         description="Pengaturan strategi training (hyperparameters tersedia di modul terpisah)",
         icon=ICONS.get('training', '🏋️')
     )
     
-    # Summary card placeholder dengan overflow protection
     summary_card = widgets.HTML(
-        value="<div style='padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 8px 0; overflow: hidden;'>📊 Loading konfigurasi...</div>",
+        value="<div style='padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 8px 0;'>📊 Loading konfigurasi...</div>",
         layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden')
     )
     
-    # Main container dengan complete overflow protection
+    # Main container dengan overflow control
     main_container = widgets.VBox([
         header,
         summary_card,
@@ -108,10 +141,7 @@ def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         width='100%', 
         max_width='100%', 
         padding='8px', 
-        overflow='hidden',
-        display='flex',
-        flex_flow='column',
-        min_width='0'
+        overflow='hidden'
     ))
     
     return {
@@ -126,7 +156,7 @@ def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def update_summary_card(ui_components: Dict[str, Any], config: Dict[str, Any], last_saved: str = None) -> None:
-    """Update summary card dengan timestamp - one-liner conditional timestamp"""
+    """Update summary card dengan overflow protection"""
     if 'summary_card' in ui_components:
         timestamp = last_saved or __import__('datetime').datetime.now().strftime("%H:%M:%S")
         summary_widget = create_config_summary_card(config, timestamp)

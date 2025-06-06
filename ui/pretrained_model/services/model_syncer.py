@@ -1,30 +1,33 @@
 """
 File: smartcash/ui/pretrained_model/services/model_syncer.py
-Deskripsi: Optimized model syncer dengan enhanced progress tracker integration
+Deskripsi: Service untuk sync model ke Google Drive dengan progress tracker integration
 """
 
 import shutil
 from pathlib import Path
 from typing import Dict, Any
-from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, ProgressHelper
+from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, SimpleProgressDelegate
 
 class ModelSyncer:
-    """Service untuk sync model ke Google Drive dengan enhanced progress integration"""
+    """Service untuk sync model ke Google Drive dengan UI progress tracker"""
     
     def __init__(self, ui_components: Dict[str, Any], logger=None):
         self.ui_components, self.logger = ui_components, logger
-        self.progress_helper = ProgressHelper(ui_components)
+        self.progress_delegate = SimpleProgressDelegate(ui_components)
         self.config = ModelUtils.get_models_from_ui_config(ui_components)
         self.models_dir = Path(self.config['models_dir'])
         self.drive_models_dir = Path(self.config['drive_models_dir'])
     
     def sync_to_drive(self) -> Dict[str, Any]:
-        """Sync local models ke Google Drive dengan enhanced progress tracking"""
+        """Sync local models ke Google Drive dengan progress tracking"""
         try:
+            self._start_sync_operation()
+            
             # Check Drive availability
             if not self._is_drive_available():
-                self.logger and self.logger.warning("⚠️ Google Drive tidak tersedia")
-                return {'success': False, 'message': 'Drive tidak tersedia'}
+                error_msg = "Google Drive tidak tersedia"
+                self._error_sync_operation(error_msg)
+                return {'success': False, 'message': error_msg}
             
             # Ensure drive directory exists
             self.drive_models_dir.mkdir(parents=True, exist_ok=True)
@@ -35,27 +38,52 @@ class ModelSyncer:
                           if (self.models_dir / config['filename']).exists()]
             
             if not model_files:
-                self.logger and self.logger.info("ℹ️ Tidak ada model untuk disinkronkan")
+                success_msg = "Tidak ada model untuk disinkronkan"
+                self._complete_sync_operation(0, success_msg)
                 return {'success': True, 'synced_count': 0}
             
             synced_count = 0
             for i, model_file in enumerate(model_files):
-                # Update current operation progress
-                current_progress = ((i + 1) * 100) // len(model_files)
-                self.progress_helper.update_current_step(
-                    current_progress, 
-                    f"Sync {model_file.name} ({i+1}/{len(model_files)})"
-                )
-                
-                if self._sync_single_file(model_file):
-                    synced_count += 1
+                self._update_sync_progress(i, len(model_files), model_file.name)
+                synced_count += (1 if self._sync_single_file(model_file) else 0)
             
-            self.logger and self.logger.success(f"☁️ {synced_count} model disinkronkan ke Drive")
+            self._complete_sync_operation(synced_count, f"{synced_count} model disinkronkan")
             return {'success': True, 'synced_count': synced_count}
             
         except Exception as e:
-            self.logger and self.logger.error(f"💥 Sync gagal: {str(e)}")
+            self._error_sync_operation(str(e))
             return {'success': False, 'message': str(e)}
+    
+    def _start_sync_operation(self) -> None:
+        """Start sync operation dengan progress tracker"""
+        tracker = self.ui_components.get('tracker')
+        tracker and tracker.show("Drive Sync", ["Check Drive", "Copy Files", "Validation"])
+        self._safe_update_progress(10, "☁️ Memulai sinkronisasi ke Drive")
+    
+    def _update_sync_progress(self, current: int, total: int, filename: str) -> None:
+        """Update progress untuk current sync"""
+        progress = int((current / total) * 100) if total > 0 else 0
+        self._safe_update_progress(progress, f"Sync {filename} ({current+1}/{total})")
+    
+    def _complete_sync_operation(self, synced_count: int, message: str) -> None:
+        """Complete sync operation"""
+        self._safe_update_progress(100, f"☁️ {message}")
+        self.logger and self.logger.success(f"☁️ {message}")
+        
+        tracker = self.ui_components.get('tracker')
+        tracker and tracker.complete(message)
+    
+    def _error_sync_operation(self, error_msg: str) -> None:
+        """Error sync operation"""
+        self.logger and self.logger.error(f"💥 Sync gagal: {error_msg}")
+        
+        tracker = self.ui_components.get('tracker')
+        tracker and tracker.error(f"Sync gagal: {error_msg}")
+    
+    def _safe_update_progress(self, progress: int, message: str) -> None:
+        """Safe update progress dengan fallback"""
+        update_fn = self.ui_components.get('update_primary')
+        update_fn and update_fn(progress, message)
     
     def _is_drive_available(self) -> bool:
         """Check if Google Drive is mounted dengan one-liner"""

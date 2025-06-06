@@ -1,43 +1,44 @@
 """
 File: smartcash/ui/pretrained_model/services/model_checker.py
-Deskripsi: Optimized model checker dengan enhanced progress tracker integration
+Deskripsi: Service untuk check existing models dengan progress tracker integration
 """
 
 from pathlib import Path
 from typing import Dict, Any, List
-from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, ProgressHelper
+from smartcash.ui.pretrained_model.utils.model_utils import ModelUtils, SimpleProgressDelegate
 
 class ModelChecker:
-    """Service untuk check existing models dengan enhanced progress integration"""
+    """Service untuk check existing models dengan UI progress tracker integration"""
     
     def __init__(self, ui_components: Dict[str, Any], logger=None):
         self.ui_components, self.logger = ui_components, logger
-        self.progress_helper = ProgressHelper(ui_components)
+        self.progress_delegate = SimpleProgressDelegate(ui_components)
         self.config = ModelUtils.get_models_from_ui_config(ui_components)
         self.models_dir = Path(self.config['models_dir'])
         self.models_dir.mkdir(parents=True, exist_ok=True)
     
     def check_all_models(self) -> Dict[str, Any]:
-        """Check semua model dengan enhanced progress tracking"""
+        """Check semua model dengan UI progress tracking"""
         try:
+            self._start_check_operation()
+            
             model_names = list(self.config['models'].keys())
             existing_models, missing_models, model_details = [], [], {}
             
             self.logger and self.logger.info(f"🔍 Checking {len(model_names)} models di {self.models_dir}")
             
             for i, model_name in enumerate(model_names):
-                # Update current operation progress
-                current_progress = ((i + 1) * 100) // len(model_names)
-                self.progress_helper.update_current_step(current_progress, f"Check {model_name} ({i+1}/{len(model_names)})")
+                self._update_check_progress(i, len(model_names), model_name)
                 
                 model_detail = self._check_single_model(model_name)
                 model_details[model_name] = model_detail
                 
-                # Categorize models dengan one-liner
                 (existing_models.append(model_name) if model_detail['exists'] and model_detail['valid'] 
                  else missing_models.append(model_name))
                 
                 self._log_model_status(model_detail)
+            
+            self._complete_check_operation(len(existing_models), len(model_names))
             
             return {
                 'existing_models': existing_models, 'missing_models': missing_models,
@@ -51,6 +52,30 @@ class ModelChecker:
             return {'existing_models': [], 'missing_models': list(self.config['models'].keys()),
                    'total_count': len(self.config['models']), 'existing_count': 0,
                    'missing_count': len(self.config['models']), 'error': str(e), 'models_dir': str(self.models_dir)}
+    
+    def _start_check_operation(self) -> None:
+        """Start check operation dengan progress tracker"""
+        tracker = self.ui_components.get('tracker')
+        tracker and tracker.show("Model Check", ["Scanning", "Validation", "Results"])
+        self._safe_update_progress(10, "🔍 Memulai pemeriksaan model")
+    
+    def _update_check_progress(self, current: int, total: int, model_name: str) -> None:
+        """Update progress untuk current check"""
+        progress = int((current / total) * 100) if total > 0 else 0
+        self._safe_update_progress(progress, f"Check {model_name} ({current+1}/{total})")
+    
+    def _complete_check_operation(self, existing_count: int, total_count: int) -> None:
+        """Complete check operation"""
+        summary_msg = f"Check selesai: {existing_count}/{total_count} model tersedia"
+        self._safe_update_progress(100, summary_msg)
+        
+        tracker = self.ui_components.get('tracker')
+        tracker and tracker.complete(summary_msg)
+    
+    def _safe_update_progress(self, progress: int, message: str) -> None:
+        """Safe update progress dengan fallback"""
+        update_fn = self.ui_components.get('update_primary')
+        update_fn and update_fn(progress, message)
     
     def _check_single_model(self, model_name: str) -> Dict[str, Any]:
         """Check single model dengan detailed validation"""

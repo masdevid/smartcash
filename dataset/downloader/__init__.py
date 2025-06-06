@@ -3,7 +3,7 @@ File: smartcash/dataset/downloader/__init__.py
 Deskripsi: Enhanced factory dan exports dengan UUID file renaming support dan one-liner style
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from smartcash.common.logger import get_logger
 
 def get_downloader_instance(config: Dict[str, Any], logger=None) -> Optional['DownloadService']:

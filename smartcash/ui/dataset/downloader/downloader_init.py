@@ -58,14 +58,20 @@ class DownloaderInitializer(CommonInitializer):
             ui_components.update(updated_components)
             
             # Verify handlers setup
-            if self._verify_handlers_setup(ui_components, logger):
+            buttons_setup = all(btn in ui_components for btn in ['download_button', 'check_button', 'cleanup_button'])
+            handlers_setup = all(h in ui_components for h in ['download_handler', 'check_handler', 'cleanup_handler'])
+            
+            if buttons_setup and handlers_setup:
                 logger.success("✅ Action buttons dan handlers berhasil di-setup")
                 # Log button status untuk debugging
-                button_status = self._get_button_status(ui_components)
-                logger.debug(f"🔧 Button Status: {button_status}")
+                button_names = [k for k in ui_components.keys() if k.endswith('_button')]
+                handler_names = [k for k in ui_components.keys() if k.endswith('_handler')]
+                logger.debug(f"🔧 Buttons: {len(button_names)}, Handlers: {len(handler_names)}")
             else:
                 logger.warning("⚠️ Beberapa handlers mungkin tidak ter-setup dengan benar")
-                self._debug_handler_setup(ui_components, logger)
+                logger.debug(f"🔧 Missing buttons: {[b for b in ['download_button', 'check_button', 'cleanup_button'] if b not in ui_components]}")
+                logger.debug(f"🔧 Missing handlers: {[h for h in ['download_handler', 'check_handler', 'cleanup_handler'] if h not in ui_components]}")
+            
             
             return ui_components
                 

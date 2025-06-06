@@ -137,11 +137,18 @@ def _execute_download(ui_components: Dict[str, Any], config: Dict[str, Any], log
         logger.info(f"📥 Memulai download {roboflow.get('workspace', '')}/{roboflow.get('project', '')}:v{roboflow.get('version', '')}")
         
         # Create downloader service
-        downloader = get_downloader_instance(download_service_config, logger)
-        if not downloader:
-            error_msg = "❌ Gagal membuat download service"
+        try:
+            downloader = get_downloader_instance(download_service_config, logger)
+            if not downloader:
+                error_msg = "❌ Gagal membuat download service"
+                progress_tracker.error(error_msg)
+                show_status_safe(error_msg, "error", ui_components)
+                return
+        except Exception as e:
+            error_msg = f"❌ Gagal membuat download service: {str(e)}"
             progress_tracker.error(error_msg)
             show_status_safe(error_msg, "error", ui_components)
+            logger.error(error_msg)
             return
         
         # Setup progress callback
@@ -151,9 +158,12 @@ def _execute_download(ui_components: Dict[str, Any], config: Dict[str, Any], log
                 progress_tracker.update_progress(percentage, f"{step}: {message}")
         
         try:
-            downloader.set_progress_callback(progress_callback)
-        except Exception:
-            pass  # Progress callback is optional
+            if hasattr(downloader, 'set_progress_callback') and callable(downloader.set_progress_callback):
+                downloader.set_progress_callback(progress_callback)
+            else:
+                logger.debug("⚠️ Downloader tidak mendukung progress callback")
+        except Exception as e:
+            logger.debug(f"⚠️ Error saat setup progress callback: {str(e)}")  # Progress callback is optional
         
         # Execute download
         result = downloader.download_dataset()

@@ -1,11 +1,9 @@
 """
 File: smartcash/ui/pretrained_model/pretrained_initializer.py
-Deskripsi: Fixed initializer dengan proper inheritance dan imports
+Deskripsi: Optimized initializer dengan UI form integration dan config handler
 """
 
 from typing import Dict, Any, List
-from smartcash.common.environment import get_environment_manager
-from smartcash.common.constants.paths import get_paths_for_environment
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger_namespace import PRETRAINED_MODEL_LOGGER_NAMESPACE, KNOWN_NAMESPACES
 from smartcash.ui.pretrained_model.components.ui_components import create_pretrained_main_ui
@@ -15,38 +13,39 @@ from smartcash.ui.pretrained_model.handlers.config_handler import PretrainedMode
 MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PRETRAINED_MODEL_LOGGER_NAMESPACE]
 
 class PretrainedModelInitializer(CommonInitializer):
-    """Initializer pretrained model terintegrasi dengan architecture yang konsisten"""
+    """Optimized initializer dengan UI form integration"""
     
     def __init__(self):
         super().__init__(MODULE_LOGGER_NAME, PretrainedModelConfigHandler)
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan integrasi pretrained model services"""
+        """Create UI components dengan form integration"""
         ui_components = create_pretrained_main_ui(config)
-        ui_components.update({
-            'pretrained_model_initialized': True,
-            'models_dir': config.get('models_dir', '/content/models'),
-            'drive_models_dir': config.get('drive_models_dir', '/content/drive/MyDrive/SmartCash/models')
-        })
+        ui_components.update({'pretrained_model_initialized': True})
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan integrasi pretrained model services"""
+        """Setup handlers dengan UI integration"""
         return setup_pretrained_handlers(ui_components, config, env)
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default config dengan constants dari single source"""
-        from smartcash.ui.pretrained_model.constants.model_constants import DEFAULT_MODELS_DIR, DEFAULT_DRIVE_MODELS_DIR
+        """Default config dari pretrained_config.yaml"""
         return {
-            'models_dir': DEFAULT_MODELS_DIR,
-            'drive_models_dir': DEFAULT_DRIVE_MODELS_DIR
+            'pretrained_models': {
+                'models_dir': '/content/models',
+                'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
+                'models': {
+                    'yolov5': {'name': 'YOLOv5s', 'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
+                              'filename': 'yolov5s.pt', 'min_size_mb': 10, 'description': 'Object detection backbone'},
+                    'efficientnet_b4': {'name': 'EfficientNet-B4', 'url': 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin',
+                                       'filename': 'efficientnet_b4_huggingface.bin', 'min_size_mb': 60, 'description': 'Feature extraction backbone'}
+                }
+            }
         }
     
     def _get_critical_components(self) -> List[str]:
-        return [
-            'ui', 'download_sync_button', 'reset_ui_button',
-            'log_output', 'status_panel', 'progress_tracker', 'progress_container'
-        ]
+        """Critical components untuk validasi"""
+        return ['ui', 'download_sync_button', 'log_output', 'status_panel', 'progress_tracker', 'config_form']
 
 # Global instance dan public API
 _pretrained_initializer = PretrainedModelInitializer()

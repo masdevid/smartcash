@@ -30,15 +30,12 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Save/Reset buttons menggunakan komponen yang sudah ada
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-    save_reset_components = create_save_reset_buttons(save_label="Simpan Konfigurasi", 
-                                                     reset_label="Reset Konfigurasi",
-                                                     with_sync_info=True,
-                                                     sync_message="Konfigurasi model akan otomatis disinkronkan.")
+    save_reset_components = create_save_reset_buttons(save_label="Simpan", reset_label="Reset")
     
     # Button group dengan download dan save/reset
     button_group = widgets.VBox([
         download_button,
-        save_reset_components['container']
+        
     ], layout=widgets.Layout(width='100%', margin='5px 0'))
     
     # Simple log output
@@ -61,8 +58,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Main UI assembly
     ui = widgets.VBox([
-        header, status_panel, config_form['container'],
-        create_divider(), action_header, button_group,
+        header, status_panel, config_form['container'], save_reset_components['container'], action_header, button_group,
         progress_display['container'], log_header, log_output
     ], layout=get_layout('container'))
     
@@ -71,7 +67,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'config_form': config_form, 'download_sync_button': download_button,
         'save_button': save_reset_components['save_button'], 
         'reset_button': save_reset_components['reset_button'],
-        'save_reset_components': save_reset_components,  # Include full component untuk handler access
+        'save_reset_components': save_reset_components,
         'log_output': log_output, 'status': log_output, 'progress_display': progress_display,
         'models_dir_input': config_form['models_dir'], 'drive_models_dir_input': config_form['drive_models_dir'],
         'yolov5_url_input': config_form['yolov5_url'], 'efficientnet_url_input': config_form['efficientnet_url'],

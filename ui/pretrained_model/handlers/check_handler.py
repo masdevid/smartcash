@@ -18,9 +18,17 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             _reset_ui_logger(ui_components)
             logger and logger.info("🔍 Memulai auto-check model")
             
-            # Show progress tracker
-            ui_components.get('show_for_operation', lambda x: None)('check')
-            ui_components.get('update_progress', lambda *a: None)('overall', 10, "🔍 Memeriksa model yang tersedia")
+            # Show progress tracker dengan API yang benar
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker:
+                # Gunakan metode show dengan parameter yang benar
+                progress_tracker.show("Check Model", ["scan", "verify"], {"scan": 50, "verify": 50})
+                # Update progress dengan API yang benar
+                progress_tracker.update_overall(10, "🔍 Memeriksa model yang tersedia")
+            else:
+                # Fallback ke metode lama jika tersedia
+                ui_components.get('show_progress', lambda x: None)("Check Model")
+                ui_components.get('update_progress', lambda *a: None)('overall', 10, "🔍 Memeriksa model yang tersedia")
             
             # Check existing models
             checker = ModelChecker(ui_components, logger)
@@ -39,13 +47,24 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
                 logger and logger.success("✅ Semua model sudah tersedia")
                 _update_status_panel(ui_components, "✅ Semua model sudah tersedia", "success")
             
-            # Complete operation
-            ui_components.get('complete_operation', lambda x: None)("Auto-check selesai")
+            # Complete operation dengan API yang benar
+            if progress_tracker:
+                progress_tracker.complete("✅ Auto-check selesai")
+            else:
+                # Fallback ke metode lama jika tersedia
+                ui_components.get('complete_operation', lambda x: None)("Auto-check selesai")
             
         except Exception as e:
             error_msg = f"Auto-check gagal: {str(e)}"
             logger and logger.error(f"💥 {error_msg}")
-            ui_components.get('error_operation', lambda x: None)(error_msg)
+            
+            # Error operation dengan API yang benar
+            if progress_tracker:
+                progress_tracker.error(error_msg)
+            else:
+                # Fallback ke metode lama jika tersedia
+                ui_components.get('error_operation', lambda x: None)(error_msg)
+                
             _update_status_panel(ui_components, error_msg, "error")
     
     # Execute auto-check jika diaktifkan

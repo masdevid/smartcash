@@ -37,9 +37,20 @@ class ModelDownloader:
     
     def _start_download_operation(self, model_count: int) -> None:
         """Start download operation dengan progress tracker"""
-        tracker = self.ui_components.get('tracker')
-        tracker and tracker.show("Model Download")
-        self._safe_update_progress(5, f"Memulai download {model_count} model")
+        progress_tracker = self.ui_components.get('progress_tracker')
+        
+        if progress_tracker:
+            # Gunakan API yang benar untuk show
+            download_steps = ["prepare", "download", "verify"]
+            step_weights = {"prepare": 10, "download": 80, "verify": 10}
+            progress_tracker.show("Model Download", download_steps, step_weights)
+            # Update progress dengan API yang benar
+            progress_tracker.update_overall(5, f"Memulai download {model_count} model")
+        else:
+            # Fallback ke metode lama
+            tracker = self.ui_components.get('tracker')
+            tracker and tracker.show("Model Download")
+            self._safe_update_progress(5, f"Memulai download {model_count} model")
     
     def _update_download_progress(self, current: int, total: int, model_name: str) -> None:
         """Update progress untuk current download"""
@@ -51,18 +62,37 @@ class ModelDownloader:
         summary_msg = f"Download selesai: {downloaded}/{total} model berhasil"
         self._safe_update_progress(100, summary_msg)
         
-        tracker = self.ui_components.get('tracker')
-        tracker and tracker.complete(summary_msg)
+        progress_tracker = self.ui_components.get('progress_tracker')
+        if progress_tracker:
+            # Gunakan API yang benar untuk complete
+            progress_tracker.complete(summary_msg)
+        else:
+            # Fallback ke metode lama
+            tracker = self.ui_components.get('tracker')
+            tracker and tracker.complete(summary_msg)
     
     def _error_download_operation(self, error_msg: str) -> None:
         """Error download operation"""
-        tracker = self.ui_components.get('tracker')
-        tracker and tracker.error(f"Download gagal: {error_msg}")
+        progress_tracker = self.ui_components.get('progress_tracker')
+        if progress_tracker:
+            # Gunakan API yang benar untuk error
+            progress_tracker.error(f"Download gagal: {error_msg}")
+        else:
+            # Fallback ke metode lama
+            tracker = self.ui_components.get('tracker')
+            tracker and tracker.error(f"Download gagal: {error_msg}")
     
     def _safe_update_progress(self, progress: int, message: str) -> None:
         """Safe update progress dengan fallback"""
-        update_fn = self.ui_components.get('update_primary')
-        update_fn and update_fn(progress, message)
+        progress_tracker = self.ui_components.get('progress_tracker')
+        
+        if progress_tracker:
+            # Gunakan API yang benar untuk update progress
+            progress_tracker.update_overall(progress, message)
+        else:
+            # Fallback ke metode lama
+            update_fn = self.ui_components.get('update_primary')
+            update_fn and update_fn(progress, message)
     
     def _download_single_model(self, model_name: str) -> bool:
         """Download single model dengan UI config"""
@@ -101,11 +131,20 @@ class ModelDownloader:
                     if chunk:
                         f.write(chunk), setattr(self, 'downloaded', downloaded := downloaded + len(chunk))
                         
-                        # Update progress setiap 10%
+                        # Update progress setiap 10% dengan API yang benar
                         if total_size > 0 and downloaded % (total_size // 10) < 8192:
                             percent = int(100 * downloaded / total_size)
                             size_downloaded, size_total = ModelUtils.format_file_size(downloaded), ModelUtils.format_file_size(total_size)
-                            self._safe_update_progress(percent, f"Download {model_name}: {percent}% ({size_downloaded}/{size_total})")
+                            
+                            progress_tracker = self.ui_components.get('progress_tracker')
+                            if progress_tracker:
+                                # Update keduanya: overall dan current progress
+                                overall_progress = int(30 + (percent * 0.5))  # Map ke range 30-80%
+                                progress_tracker.update_overall(overall_progress, f"Downloading models: {overall_progress}%")
+                                progress_tracker.update_current(percent, f"Download {model_name}: {percent}% ({size_downloaded}/{size_total})")
+                            else:
+                                # Fallback ke metode lama
+                                self._safe_update_progress(percent, f"Download {model_name}: {percent}% ({size_downloaded}/{size_total})")
             
             # Validate download
             if self._validate_download(file_path, total_size):

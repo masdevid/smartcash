@@ -83,10 +83,17 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'efficientnet_url_input': config_form['efficientnet_url'],
         'module_name': 'pretrained_model', 
         'auto_check_enabled': True,
-        # Progress tracker methods
+        # Progress tracker dengan API yang benar
+        'progress_tracker': progress_tracker,
         'tracker': progress_tracker,
         'update_primary': progress_tracker.update_primary,
-        'update_progress': progress_tracker.update
+        'update_overall': progress_tracker.update_overall,
+        'update_current': progress_tracker.update_current,
+        'update_progress': progress_tracker.update,
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_progress': progress_tracker.reset,
+        'show_progress': progress_tracker.show
     }
     
     return ui_components

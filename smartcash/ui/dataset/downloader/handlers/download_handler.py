@@ -106,9 +106,13 @@ def _show_download_confirmation_fixed(ui_components: Dict[str, Any], config: Dic
     workspace, project, version = config.get('workspace', ''), config.get('project', ''), config.get('version', '')
     dataset_id = f"{workspace}/{project}:v{version}"
     
-    # Fixed handlers dengan one-liner
-    on_confirm_handler = lambda button: (_clear_confirmation_area_fixed(ui_components), _execute_download_sync_fixed(ui_components, config, logger))
-    on_cancel_handler = lambda button: _clear_confirmation_area_fixed(ui_components)
+    # Fixed handlers dengan proper function definitions
+    def on_confirm_handler(button):
+        _clear_confirmation_area_fixed(ui_components)
+        _execute_download_sync_fixed(ui_components, config, logger)
+    
+    def on_cancel_handler(button):
+        _clear_confirmation_area_fixed(ui_components)
     
     confirmation_dialog = create_confirmation_dialog(
         title="Konfirmasi Download Dataset",
@@ -237,23 +241,29 @@ def _bind_button_handlers_fixed(ui_components: Dict[str, Any], handlers: Dict[st
      if btn_name in ui_components and handler is not None and hasattr(ui_components[btn_name], 'on_click')]
 
 def _show_in_confirmation_area_fixed(ui_components: Dict[str, Any], dialog_widget) -> None:
-    """Show dialog dalam confirmation area dengan fixed display - one-liner"""
+    """Show dialog dalam confirmation area dengan fixed display"""
     confirmation_area = ui_components.get('confirmation_area')
-    confirmation_area and (
-        setattr(confirmation_area.layout, 'display', 'block'),
-        setattr(confirmation_area.layout, 'visibility', 'visible'),
-        confirmation_area.clear_output(wait=True),
-        __import__('IPython.display', fromlist=['display']).display(dialog_widget)
-    ) if confirmation_area else None
+    if confirmation_area:
+        try:
+            confirmation_area.layout.display = 'block'
+            confirmation_area.layout.visibility = 'visible'
+            with confirmation_area:
+                confirmation_area.clear_output(wait=True)
+                from IPython.display import display
+                display(dialog_widget)
+        except Exception:
+            pass
 
 def _clear_confirmation_area_fixed(ui_components: Dict[str, Any]) -> None:
-    """Clear confirmation area dengan fixed approach - one-liner"""
+    """Clear confirmation area dengan fixed approach"""
     confirmation_area = ui_components.get('confirmation_area')
-    confirmation_area and (
-        confirmation_area.clear_output(wait=True),
-        setattr(confirmation_area.layout, 'display', 'none'),
-        setattr(confirmation_area.layout, 'visibility', 'hidden')
-    ) if confirmation_area else None
+    if confirmation_area:
+        try:
+            confirmation_area.clear_output(wait=True)
+            confirmation_area.layout.display = 'none'
+            confirmation_area.layout.visibility = 'hidden'
+        except Exception:
+            pass
 
 # Fixed utilities dengan one-liner style
 get_download_status_fixed = lambda ui: {'ready': 'progress_tracker' in ui, 'handlers_count': len([k for k in ui.keys() if k.endswith('_handler')]), 'buttons_available': all(btn in ui for btn in ['check_button', 'download_button', 'cleanup_button'])}

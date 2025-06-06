@@ -22,6 +22,20 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
         try:
             logger and logger.info("🚀 Memulai download dan sinkronisasi model")
             
+            # Show progress tracker dengan API yang benar
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker:
+                # Gunakan metode show dengan parameter yang benar
+                download_steps = ["check", "download", "sync"]
+                step_weights = {"check": 30, "download": 50, "sync": 20}
+                progress_tracker.show("Download & Sync Model", download_steps, step_weights)
+                # Update progress untuk phase 1
+                progress_tracker.update_overall(10, "🔍 Memeriksa model yang tersedia")
+            else:
+                # Fallback ke metode lama jika tersedia
+                ui_components.get('show_progress', lambda x: None)("Download & Sync Model")
+                ui_components.get('update_primary', lambda *a: None)(10, "🔍 Memeriksa model yang tersedia")
+            
             # Phase 1: Check existing models (0-30%)
             checker = ModelChecker(ui_components, logger)
             check_result = checker.check_all_models()
@@ -31,6 +45,10 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             
             # Log results
             existing_models and logger and logger.info(f"✅ Model tersedia: {', '.join(existing_models)}")
+            
+            # Update progress setelah check selesai
+            if progress_tracker:
+                progress_tracker.update_overall(30, "✅ Pemeriksaan model selesai")
             
             # Phase 2: Download missing models (30-80%)
             if models_to_download:
@@ -46,9 +64,13 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                 logger and logger.success(f"✅ {downloaded_count} model berhasil diunduh")
             else:
                 logger and logger.info("ℹ️ Semua model sudah tersedia, skip download")
-                # Update progress untuk skip download
-                update_primary = ui_components.get('update_primary')
-                update_primary and update_primary(80, "Skip download - semua model tersedia")
+                # Update progress untuk skip download dengan API yang benar
+                if progress_tracker:
+                    progress_tracker.update_overall(80, "Skip download - semua model tersedia")
+                else:
+                    # Fallback ke metode lama
+                    update_primary = ui_components.get('update_primary')
+                    update_primary and update_primary(80, "Skip download - semua model tersedia")
             
             # Phase 3: Sync to Drive (80-100%)
             syncer = ModelSyncer(ui_components, logger)
@@ -61,9 +83,13 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             total_models = len(existing_models) + len(models_to_download)
             final_message = f"Setup model selesai: {total_models} model siap digunakan"
             
-            # Complete progress tracker
-            tracker = ui_components.get('tracker')
-            tracker and tracker.complete(final_message)
+            # Complete progress tracker dengan API yang benar
+            if progress_tracker:
+                progress_tracker.complete(final_message)
+            else:
+                # Fallback ke metode lama
+                tracker = ui_components.get('tracker')
+                tracker and tracker.complete(final_message)
             _update_status_panel(ui_components, f"✅ {final_message}", "success")
             
         except Exception as e:
@@ -71,9 +97,13 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             logger and logger.error(f"💥 {error_msg}")
             _update_status_panel(ui_components, error_msg, "error")
             
-            # Error progress tracker
-            tracker = ui_components.get('tracker')
-            tracker and tracker.error(error_msg)
+            # Error progress tracker dengan API yang benar
+            if progress_tracker:
+                progress_tracker.error(error_msg)
+            else:
+                # Fallback ke metode lama
+                tracker = ui_components.get('tracker')
+                tracker and tracker.error(error_msg)
         
         finally:
             button and setattr(button, 'disabled', False)

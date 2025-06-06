@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/handlers/environment_config_orchestrator.py
-Deskripsi: Complete orchestrator dengan SmartProgressTracker integration dan proper phase management
+Deskripsi: Complete orchestrator dengan DRY utils integration dan proper error handling
 """
 
 from typing import Dict, Any, Tuple
@@ -11,12 +11,11 @@ from smartcash.ui.setup.env_config.handlers.drive_setup_handler import DriveSetu
 from smartcash.ui.setup.env_config.utils import (
     update_progress_safe, hide_progress_safe, reset_progress_safe,
     refresh_environment_state_silent, get_system_summary_minimal,
-    get_status_message, get_progress_message, start_progress_phase,
-    next_progress_phase, complete_progress_safe, error_progress_safe
+    get_status_message, get_progress_message
 )
 
 class EnvironmentConfigOrchestrator:
-    """Complete orchestrator dengan SmartProgressTracker integration untuk environment setup"""
+    """Complete orchestrator dengan DRY utils integration untuk environment setup"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -62,35 +61,31 @@ class EnvironmentConfigOrchestrator:
         return status
     
     def perform_environment_setup(self) -> bool:
-        """Environment setup dengan SmartProgressTracker phase management"""
+        """Environment setup dengan complete progress tracking dan error handling"""
         if self.logger is None:
             self.init_logger()
             
         self.logger.info(get_status_message('setup_start'))
-        start_progress_phase(self.ui_components, "environment setup")
+        update_progress_safe(self.ui_components, 1, get_progress_message('start'))
         
         try:
-            # Phase 1: Analysis - Pre-setup refresh (silent)
-            next_progress_phase(self.ui_components, "🔍 Analyzing current state")
-            update_progress_safe(self.ui_components, 10, "🔄 Refreshing environment state...")
+            # Step 1: Pre-setup refresh (silent)
+            update_progress_safe(self.ui_components, 2, get_progress_message('refresh'))
             refresh_environment_state_silent(self.env_manager)
             
-            # Check current status
-            update_progress_safe(self.ui_components, 30, "📊 Checking environment status...")
+            # Step 2: Check current status
+            update_progress_safe(self.ui_components, 5, get_progress_message('analysis'))
             status = self.status_checker.get_comprehensive_status()
             self._log_current_status_minimal(status)
             
             if status['ready']:
                 self.logger.success("✅ Environment sudah siap digunakan!")
-                complete_progress_safe(self.ui_components, "✅ Environment ready")
+                update_progress_safe(self.ui_components, 100, "✅ Environment ready")
                 hide_progress_safe(self.ui_components)
                 return True
             
-            # Phase 2: Setup - Drive operations
-            next_progress_phase(self.ui_components, "🚀 Setting up environment")
-            
-            # Ensure Drive mounted
-            update_progress_safe(self.ui_components, 20, "📱 Checking Drive connection...")
+            # Step 3: Ensure Drive mounted
+            update_progress_safe(self.ui_components, 10, get_progress_message('drive_connect'))
             if status['drive']['type'] == 'colab':
                 success, message = self.drive_handler.ensure_drive_mounted()
                 if success:
@@ -107,10 +102,10 @@ class EnvironmentConfigOrchestrator:
                     
                 else:
                     self.logger.error(f"❌ Drive Error: {message}")
-                    error_progress_safe(self.ui_components, "Drive connection failed")
+                    reset_progress_safe(self.ui_components, "Drive connection failed")
                     return False
             
-            # Validate Drive path
+            # Step 4: Validate Drive path
             drive_path = status['drive']['path']
             if not drive_path:
                 # Retry get path setelah refresh
@@ -122,43 +117,39 @@ class EnvironmentConfigOrchestrator:
                 
                 if not drive_path:
                     self.logger.error(get_status_message('drive_error'))
-                    error_progress_safe(self.ui_components, "Setup gagal")
+                    reset_progress_safe(self.ui_components, "Setup gagal")
                     return False
             
             self.logger.info(f"🎯 Target setup path: {drive_path}")
             
-            # Perform complete setup (SmartProgressTracker akan handle detail progress)
+            # Step 5: Perform complete setup (progress 30-100% handled by drive_handler)
             self.logger.info("🔧 Melakukan setup lengkap...")
             setup_results = self.drive_handler.perform_complete_setup(drive_path)
             
-            # Log setup results dengan detail
+            # Step 6: Log setup results dengan detail
             self._log_setup_results(setup_results)
             
-            # Phase 3: Validation - Initialize managers
-            next_progress_phase(self.ui_components, "🔧 Initializing managers")
+            # Step 7: Initialize managers
             self._initialize_managers()
             
-            # Final verification dengan comprehensive refresh
-            update_progress_safe(self.ui_components, 80, "🔍 Final verification...")
+            # Step 8: Final verification dengan comprehensive refresh
             refresh_environment_state_silent(self.env_manager)
             final_status = self.status_checker.get_comprehensive_status()
             
             if final_status['ready'] or setup_results['success']:
                 self.logger.success(get_status_message('setup_success'))
                 self.logger.info("🔗 Symlinks aktif, data akan tersimpan di Drive")
-                complete_progress_safe(self.ui_components, "✅ Environment siap digunakan")
                 hide_progress_safe(self.ui_components)
                 return True
             else:
                 self.logger.warning("⚠️ Setup selesai dengan beberapa komponen belum optimal")
                 self.logger.info("💡 Environment tetap bisa digunakan untuk development")
-                complete_progress_safe(self.ui_components, "✅ Setup selesai dengan warnings")
                 return True
             
         except Exception as e:
             if self.logger:
                 self.logger.error(f"❌ Error setup environment: {str(e)}")
-            error_progress_safe(self.ui_components, f"Setup gagal: {str(e)}")
+            reset_progress_safe(self.ui_components, "Setup gagal")
             return False
     
     def _log_current_status_minimal(self, status: Dict[str, Any]):
@@ -214,8 +205,6 @@ class EnvironmentConfigOrchestrator:
             from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
             self.ui_components['config_manager'] = config_manager
-            
-            update_progress_safe(self.ui_components, 90, "⚙️ Config manager initialized")
             
             if self.logger:
                 self.logger.info("⚙️ Config manager ready")

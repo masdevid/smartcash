@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/components/env_config_component.py
-Deskripsi: Component dengan SmartProgressTracker integration untuk consistent UX
+Deskripsi: Component dengan constants dan utils integration untuk clean code
 """
 
 from typing import Dict, Any
@@ -12,11 +12,11 @@ from smartcash.ui.utils.logging_utils import setup_ipython_logging
 from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
 from smartcash.ui.setup.env_config.utils import (
     show_progress_safe, hide_progress_safe, get_prioritized_missing_items,
-    refresh_environment_state_silent, error_progress_safe, reset_progress_safe
+    refresh_environment_state_silent
 )
 
 class EnvConfigComponent:
-    """Component UI dengan SmartProgressTracker integration untuk environment setup"""
+    """Component UI dengan constants dan utils integration"""
     
     def __init__(self):
         self.ui_components = UIFactory.create_ui_components()
@@ -120,7 +120,7 @@ class EnvConfigComponent:
             pass
     
     def _handle_setup_click(self, button):
-        """Handle setup dengan SmartProgressTracker integration"""
+        """Handle setup dengan utils integration"""
         button.disabled = True
         
         try:
@@ -129,7 +129,6 @@ class EnvConfigComponent:
             if hasattr(self.orchestrator, 'init_logger'):
                 self.orchestrator.init_logger()
             
-            # Setup dengan SmartProgressTracker akan handle semua progress
             success = self.orchestrator.perform_environment_setup()
             
             if success:
@@ -139,35 +138,32 @@ class EnvConfigComponent:
             else:
                 button.disabled = False
                 self._update_status("❌ Setup gagal - Coba lagi", "error")
-                error_progress_safe(self.ui_components, "Setup gagal - Silakan coba lagi")
+                show_progress_safe(self.ui_components)
                 
         except Exception as e:
             if hasattr(self, 'logger'):
                 self.logger.error(f"❌ Error setup: {str(e)}")
             button.disabled = False
             self._update_status(f"❌ Error: {str(e)}", "error")
-            error_progress_safe(self.ui_components, f"Error: {str(e)}")
+            show_progress_safe(self.ui_components)
     
     def _reset_ui_state(self):
-        """Reset UI state dengan SmartProgressTracker"""
+        """Reset UI state dengan utils"""
         if 'log_output' in self.ui_components:
             self.ui_components['log_output'].clear_output(wait=True)
-        
-        # Reset dan show progress dengan SmartProgressTracker
-        reset_progress_safe(self.ui_components, "🔄 Preparing setup...")
         show_progress_safe(self.ui_components)
     
     def _update_status(self, message: str, status_type: str = "info"):
         """Update status panel"""
         if 'status_panel' in self.ui_components:
             try:
-                from smartcash.ui.components.status_panel import update_status_panel
+                from smartcash.ui.utils.alert_utils import update_status_panel
                 update_status_panel(self.ui_components['status_panel'], message, status_type)
             except ImportError:
                 pass
     
     def display(self):
-        """Display UI dengan SmartProgressTracker integration"""
+        """Display UI dengan utils integration"""
         display(self.ui_components['ui_layout'])
         
         self.logger = setup_ipython_logging(self.ui_components, ENV_CONFIG_LOGGER_NAMESPACE, redirect_all_logs=False)
@@ -199,7 +195,7 @@ class EnvConfigComponent:
             show_progress_safe(self.ui_components)
     
     def _check_environment_status_with_retry(self, max_retries: int = 3) -> Dict[str, Any]:
-        """Check status dengan retry dan SmartProgressTracker integration"""
+        """Check status dengan retry dan utils integration"""
         import time
         
         for attempt in range(max_retries):
@@ -227,5 +223,5 @@ class EnvConfigComponent:
 
 
 def create_env_config_component() -> EnvConfigComponent:
-    """Factory function dengan SmartProgressTracker integration"""
+    """Factory function dengan constants/utils integration"""
     return EnvConfigComponent()

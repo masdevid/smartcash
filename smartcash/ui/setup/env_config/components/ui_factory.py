@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/components/ui_factory.py
-Deskripsi: UI Factory dengan SmartProgressTracker integration untuk consistent progress tracking
+Deskripsi: UI Factory dengan constants integration dan clean structure
 """
 
 from typing import Dict, Any
@@ -9,12 +9,12 @@ from ipywidgets import HBox, VBox, Label, Button, Output, HTML
 
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.components.status_panel import create_status_panel
-from smartcash.ui.components.progress_tracker import create_progress_tracker
+from smartcash.ui.components.progress_tracker import create_single_progress_tracker
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.setup.env_config.constants import CONFIG_TEMPLATES
 
 class UIFactory:
-    """UI Factory dengan SmartProgressTracker integration untuk environment setup"""
+    """UI Factory dengan constants integration untuk consistent styling"""
     
     @staticmethod
     def create_setup_button() -> Button:
@@ -72,7 +72,7 @@ class UIFactory:
     
     @classmethod
     def create_ui_components(cls) -> Dict[str, Any]:
-        """Create UI components dengan SmartProgressTracker integration"""
+        """Create UI components dengan constants integration"""
         # Core components dengan one-liner creation
         header = create_header("🏗️ Konfigurasi Environment SmartCash", 
                               "Setup environment untuk development dan training model dengan info sistem lengkap")
@@ -88,18 +88,15 @@ class UIFactory:
         status_panel = create_status_panel("🔍 Siap untuk konfigurasi environment", "info")
         log_components = create_log_accordion("env_config", height='180px', width='100%')
         
-        # SmartProgressTracker dengan dual mode configuration
-        progress_tracker = create_progress_tracker(
-            mode='dual',
-            phases=['analysis', 'setup', 'validation'],
-            steps=['mount', 'folders', 'configs', 'symlinks'],
-            show_timer=True,
-            height='140px'
-        )
+        # Progress tracker dengan proper integration
+        progress_tracker = create_single_progress_tracker(operation="Environment Setup")
+        progress_container = progress_tracker.container
+        progress_container.layout.width = '100%'
+        progress_container.layout.visibility = 'visible'
         
         # Main layout dengan urutan optimal
         ui_layout = VBox([
-            header, button_container, status_panel, progress_tracker.container,
+            header, button_container, status_panel, progress_container,
             log_components['log_accordion'], env_summary_panel, requirements_panel
         ], layout=widgets.Layout(width='100%', padding='15px', border='1px solid #ddd',
                                 border_radius='8px', background_color='#fafafa'))
@@ -109,5 +106,7 @@ class UIFactory:
             'requirements_panel': requirements_panel, 'setup_button': setup_button,
             'button_container': button_container, 'log_accordion': log_components['log_accordion'],
             'log_output': log_components['log_output'], 'progress_tracker': progress_tracker,
-            'progress_container': progress_tracker.container, 'ui_layout': ui_layout
+            'progress_bar': progress_tracker.progress_bars.get('main'),
+            'progress_message': progress_tracker.status_widget,
+            'progress_container': progress_container, 'ui_layout': ui_layout
         }

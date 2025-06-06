@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/utils.py  
-Deskripsi: Utils untuk environment config dengan SmartProgressTracker integration dan one-liner functions
+Deskripsi: Utils untuk environment config dengan DRY pattern dan one-liner functions
 """
 
 import time
@@ -12,32 +12,28 @@ from .constants import (
     REPO_CONFIG_PATH, STATUS_MESSAGES, PROGRESS_MESSAGES, RETRY_CONFIG
 )
 
-# === SMARTPROGRESSTRACKER UTILS ===
+# === PROGRESS UTILS ===
 def update_progress_safe(ui_components: Dict[str, Any], value: int, message: str = "") -> None:
-    """Update progress dengan SmartProgressTracker atau fallback - one-liner safe"""
+    """Update progress dengan progress_tracker atau fallback - one-liner safe"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'update_progress'):
-            # Determine level berdasarkan range progress
-            if value <= 30:
-                progress_tracker.update_progress('phase', value * 3, message)  # Scale untuk phase
-            elif value <= 90:
-                progress_tracker.update_progress('step', (value - 30) * 1.67, message)  # Scale untuk step
-            else:
-                progress_tracker.update_progress('overall', value, message)
+        if progress_tracker:
+            progress_tracker.update('main', value, message)
         elif 'progress_bar' in ui_components:
-            # Legacy fallback
             progress_bar = ui_components['progress_bar']
             setattr(progress_bar, 'value', value) if hasattr(progress_bar, 'value') else None
             setattr(progress_bar, 'description', f"{value}%") if hasattr(progress_bar, 'description') else None
+            if 'progress_message' in ui_components and message:
+                message_widget = ui_components['progress_message']
+                setattr(message_widget, 'value', message) if hasattr(message_widget, 'value') else None
     except Exception:
         pass
 
 def hide_progress_safe(ui_components: Dict[str, Any]) -> None:
-    """Hide progress dengan SmartProgressTracker atau fallback - one-liner"""
+    """Hide progress dengan progress_tracker atau fallback - one-liner"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'hide'):
+        if progress_tracker:
             progress_tracker.hide()
         elif 'progress_container' in ui_components:
             ui_components['progress_container'].layout.visibility = 'hidden'
@@ -45,10 +41,10 @@ def hide_progress_safe(ui_components: Dict[str, Any]) -> None:
         pass
 
 def show_progress_safe(ui_components: Dict[str, Any]) -> None:
-    """Show progress dengan SmartProgressTracker atau fallback - one-liner"""
+    """Show progress dengan progress_tracker atau fallback - one-liner"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'show'):
+        if progress_tracker:
             progress_tracker.show()
         elif 'progress_container' in ui_components:
             ui_components['progress_container'].layout.visibility = 'visible'
@@ -56,59 +52,20 @@ def show_progress_safe(ui_components: Dict[str, Any]) -> None:
         pass
 
 def reset_progress_safe(ui_components: Dict[str, Any], message: str = "") -> None:
-    """Reset progress dengan SmartProgressTracker atau fallback - one-liner"""
+    """Reset progress dengan progress_tracker atau fallback - one-liner"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'reset'):
+        if progress_tracker:
             progress_tracker.reset()
-            message and progress_tracker.update_status(message)
+            progress_tracker.update('main', 0, message) if message else None
         elif 'progress_bar' in ui_components:
             progress_bar = ui_components['progress_bar']
             setattr(progress_bar, 'value', 0) if hasattr(progress_bar, 'value') else None
             setattr(progress_bar, 'description', "0%") if hasattr(progress_bar, 'description') else None
+            if 'progress_message' in ui_components:
+                message_widget = ui_components['progress_message']
+                setattr(message_widget, 'value', message) if hasattr(message_widget, 'value') else None
             show_progress_safe(ui_components)
-    except Exception:
-        pass
-
-def start_progress_phase(ui_components: Dict[str, Any], phase_name: str = "setup") -> None:
-    """Start progress phase dengan SmartProgressTracker - one-liner"""
-    try:
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'start'):
-            progress_tracker.start(f"🚀 Memulai {phase_name}")
-        else:
-            update_progress_safe(ui_components, 0, f"🚀 Memulai {phase_name}")
-    except Exception:
-        pass
-
-def next_progress_phase(ui_components: Dict[str, Any], phase_name: str = None) -> None:
-    """Next phase dalam SmartProgressTracker - one-liner"""
-    try:
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'next_phase'):
-            progress_tracker.next_phase(phase_name)
-    except Exception:
-        pass
-
-def complete_progress_safe(ui_components: Dict[str, Any], message: str = "Selesai") -> None:
-    """Complete progress dengan SmartProgressTracker - one-liner"""
-    try:
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'complete'):
-            progress_tracker.complete(message)
-        else:
-            update_progress_safe(ui_components, 100, message)
-    except Exception:
-        pass
-
-def error_progress_safe(ui_components: Dict[str, Any], message: str = "Error") -> None:
-    """Set error state dengan SmartProgressTracker - one-liner"""
-    try:
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'error'):
-            progress_tracker.error(message)
-        else:
-            reset_progress_safe(ui_components, message)
     except Exception:
         pass
 
@@ -160,7 +117,7 @@ def check_drive_mount_comprehensive() -> Dict[str, Any]:
     }
 
 def wait_for_drive_ready(max_wait: int = None, ui_components: Dict[str, Any] = None) -> Tuple[bool, str]:
-    """Wait untuk Drive ready dengan SmartProgressTracker updates - one-liner loop"""
+    """Wait untuk Drive ready dengan progress updates - one-liner loop"""
     max_wait = max_wait or RETRY_CONFIG['drive_mount_timeout']
     
     for i in range(max_wait):

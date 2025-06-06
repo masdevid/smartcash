@@ -213,14 +213,17 @@ class ProgressTracker:
                color: str = None, trigger_callbacks: bool = True):
         """Update specific progress level dengan auto show dan callback support"""
         if level_name not in self.active_levels:
+            print(f"⚠️ Level {level_name} not in active levels: {self.active_levels}")
             return
         
         if not self.is_visible:
             self.container.layout.display = 'flex'
             self.container.layout.visibility = 'visible'
             self.is_visible = True
+            print(f"📱 Progress tracker shown for {level_name}")
         
         progress = max(0, min(100, progress))
+        print(f"📊 Updating {level_name}: {progress}% - {message}")
         
         if level_name in self.progress_bars:
             self._update_progress_bar(level_name, progress, message, color)
@@ -321,17 +324,21 @@ class ProgressTracker:
         bar_color = color or config.color
         display_message = self._clean_message(message or config.description)
         
+        # Force update dengan unique timestamp untuk trigger re-render
+        timestamp = int(time.time() * 1000)
+        
         bar_html = f"""
-        <div style="margin-bottom: 8px;">
+        <div style="margin-bottom: 8px;" data-update="{timestamp}">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <span style="font-size: 14px; font-weight: 500; color: #333;">
                     {config.emoji} {self._truncate_message(display_message, 40)}
                 </span>
-                <span style="font-size: 12px; color: #666;">{value}%</span>
+                <span style="font-size: 12px; color: #666; font-weight: bold;">{value}%</span>
             </div>
-            <div style="background: #e9ecef; border-radius: 10px; overflow: hidden; height: 16px;">
+            <div style="background: #e9ecef; border-radius: 10px; overflow: hidden; height: 18px; position: relative;">
                 <div style="background: {bar_color}; height: 100%; width: {value}%; 
-                           transition: width 0.3s ease; border-radius: 10px;"></div>
+                           transition: width 0.5s ease-in-out; border-radius: 10px; 
+                           min-width: {2 if value > 0 else 0}px;"></div>
             </div>
         </div>
         """

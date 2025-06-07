@@ -1,379 +1,263 @@
 """
 File: smartcash/dataset/downloader/file_processor.py
-Deskripsi: Enhanced file processor dengan UUID file renaming dan one-liner methods
+Deskripsi: Simplified file processor menggunakan base components
 """
 
 import shutil
 import zipfile
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor
-from smartcash.common.logger import get_logger
+from smartcash.dataset.downloader.base import BaseDownloaderComponent, FileHelper
 from smartcash.common.utils.file_naming_manager import FileNamingManager
 
-class FileProcessor:
-    """Enhanced file processor dengan UUID renaming dan optimized operations."""
+
+class FileProcessor(BaseDownloaderComponent):
+    """Simplified file processor dengan shared components"""
     
     def __init__(self, logger=None, max_workers: int = 4):
-        self.logger, self.max_workers, self._progress_callback = logger or get_logger(), max_workers, None
+        super().__init__(logger)
+        self.max_workers = max_workers
         self.naming_manager = FileNamingManager(logger=logger)
     
-    def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """One-liner callback setter"""
-        self._progress_callback = callback
-    
     def extract_zip(self, zip_path: Path, extract_to: Path) -> Dict[str, Any]:
-        """Extract ZIP dengan optimized one-liner validation dan parallel extraction"""
+        """Extract ZIP dengan validation"""
         try:
-            # One-liner validation
             if not zipfile.is_zipfile(zip_path):
-                return self._return_error('File bukan ZIP valid')
+                return self._create_error_result('File bukan ZIP valid')
             
             self._notify_progress("extract", 0, 100, "📦 Memulai ekstraksi...")
             
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 file_list = zip_ref.infolist()
-                total_files = len(file_list)
                 
-                # One-liner empty check
-                if total_files == 0:
-                    return self._return_error('ZIP file kosong')
+                if not file_list:
+                    return self._create_error_result('ZIP file kosong')
                 
-                extract_to.mkdir(parents=True, exist_ok=True)
-                
-                # Parallel extraction dengan ThreadPoolExecutor
-                extracted_count = self._extract_files_parallel(zip_ref, file_list, extract_to)
-                
-                self._notify_progress("extract", 100, 100, f"✅ Ekstraksi selesai: {extracted_count} file")
-                return {'status': 'success', 'extracted_files': extracted_count, 'total_files': total_files, 'extract_path': str(extract_to)}
-                
+                FileHelper.ensure_directory(extract_to)
+                zip_ref.extractall(extract_to)
+            
+            self._notify_progress("extract", 100, 100, "✅ Ekstraksi selesai")
+            return self._create_success_result(
+                extracted_files=len(file_list),
+                extract_path=str(extract_to)
+            )
+            
         except Exception as e:
-            return {'status': 'error', 'message': f'Error ekstraksi: {str(e)}'}
-    
-    def _extract_files_parallel(self, zip_ref, file_list: List, extract_to: Path) -> int:
-        """Parallel file extraction dengan optimized progress tracking"""
-        extracted_count, batch_size = 0, max(1, len(file_list) // 20)  # Update setiap 5%
-        
-        # One-liner parallel extraction
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for i, file_info in enumerate(file_list):
-                try:
-                    zip_ref.extract(file_info, extract_to)
-                    extracted_count += 1
-                    
-                    # One-liner progress update dengan batch
-                    if i % batch_size == 0:
-                        self._notify_progress("extract", int((i / len(file_list)) * 100), 100, f"📦 {i + 1}/{len(file_list)}")
-                    
-                except Exception as e:
-                    self.logger.warning(f"⚠️ Gagal ekstrak {file_info.filename}: {str(e)}")
-        
-        return extracted_count
+            return self._create_error_result(f'Error ekstraksi: {str(e)}')
     
     def organize_dataset_with_renaming(self, source_dir: Path, target_dir: Path) -> Dict[str, Any]:
-        """Organize dataset dengan UUID renaming dan optimized structure detection"""
+        """Organize dataset dengan UUID renaming"""
         try:
-            # One-liner existence check
             if not source_dir.exists():
-                return self._return_error(f'Source tidak ditemukan: {source_dir}')
+                return self._create_error_result(f'Source tidak ditemukan: {source_dir}')
             
             self._notify_progress("organize", 0, 100, "🗂️ Memulai organisasi...")
             
-            # One-liner structure detection
-            structure = self._detect_structure_optimized(source_dir)
+            structure = self._detect_structure(source_dir)
             if not structure['valid']:
-                return self._return_error('Struktur dataset tidak valid')
+                return self._create_error_result('Struktur dataset tidak valid')
             
-            target_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Process splits dengan renaming
-            organized_stats = self._organize_splits_with_renaming(source_dir, target_dir, structure['splits'])
-            
-            # One-liner additional files copy
-            self._copy_additional_files_optimized(source_dir, target_dir)
-            
-            # One-liner stats calculation
-            total_images, total_labels = (sum(stats.get('images', 0) for stats in organized_stats.values()),
-                                        sum(stats.get('labels', 0) for stats in organized_stats.values()))
-            
-            self._notify_progress("organize", 100, 100, f"✅ Organisasi selesai: {total_images} gambar dengan UUID format")
-            return {'status': 'success', 'total_images': total_images, 'total_labels': total_labels, 
-                   'splits': organized_stats, 'target_dir': str(target_dir), 'uuid_renamed': True}
-            
-        except Exception as e:
-            return {'status': 'error', 'message': f'Error organisasi: {str(e)}'}
-    
-    def _organize_splits_with_renaming(self, source_dir: Path, target_dir: Path, splits: List[str]) -> Dict[str, Any]:
-        """Parallel split organization dengan UUID renaming"""
-        organized_stats = {}
-        
-        # Sequential processing untuk setiap split (parallel dalam split)
-        for i, split in enumerate(splits):
-            normalized_split = 'valid' if split == 'val' else split
-            start_progress, end_progress = (i * 80) // len(splits), ((i + 1) * 80) // len(splits)
-            
-            organized_stats[normalized_split] = self._organize_single_split_with_renaming(
-                source_dir, target_dir, split, start_progress, end_progress
+            FileHelper.ensure_directory(target_dir)
+            organized_stats = self._organize_splits_with_renaming(
+                source_dir, target_dir, structure['splits']
             )
-        
-        return organized_stats
-    
-    def _organize_single_split_with_renaming(self, source_dir: Path, target_dir: Path, split: str, 
-                                           start_progress: int, end_progress: int) -> Dict[str, Any]:
-        """Optimized single split organization dengan UUID file renaming"""
-        try:
-            normalized_split = 'valid' if split == 'val' else split
-            source_split, target_split = source_dir / split, target_dir / normalized_split
             
-            # One-liner directory creation
-            [(target_split / subdir).mkdir(parents=True, exist_ok=True) for subdir in ['images', 'labels']]
+            self._copy_additional_files(source_dir, target_dir)
             
-            # One-liner file collection
-            source_images, source_labels = source_split / 'images', source_split / 'labels'
-            image_files = list(source_images.glob('*.*')) if source_images.exists() else []
-            label_files = list(source_labels.glob('*.txt')) if source_labels.exists() else []
+            total_images = sum(stats.get('images', 0) for stats in organized_stats.values())
+            total_labels = sum(stats.get('labels', 0) for stats in organized_stats.values())
             
-            # Process dengan UUID renaming
-            renamed_images = self._copy_and_rename_images(image_files, target_split / 'images', source_labels, split, start_progress, end_progress)
-            renamed_labels = self._copy_and_rename_labels(label_files, target_split / 'labels', split)
+            self._notify_progress("organize", 100, 100, f"✅ Organisasi selesai: {total_images} gambar")
             
-            return {'status': 'success', 'images': renamed_images, 'labels': renamed_labels, 'path': str(target_split), 'uuid_format': True}
+            return self._create_success_result(
+                total_images=total_images,
+                total_labels=total_labels,
+                splits=organized_stats,
+                target_dir=str(target_dir),
+                uuid_renamed=True
+            )
             
         except Exception as e:
-            return {'status': 'error', 'message': f'Error split {split}: {str(e)}'}
+            return self._create_error_result(f'Error organisasi: {str(e)}')
     
-    def _copy_and_rename_images(self, image_files: List[Path], target_dir: Path, labels_dir: Path,
-                               split: str, start_progress: int, end_progress: int) -> int:
-        """Copy dan rename images dengan UUID format"""
-        if not image_files:
-            return 0
-        
-        renamed_count, batch_size = 0, max(1, len(image_files) // 10)
-        
-        for i, img_file in enumerate(image_files):
-            try:
-                # Extract primary class dari corresponding label
-                label_path = labels_dir / f"{img_file.stem}.txt"
-                primary_class = self.naming_manager.extract_primary_class_from_label(label_path)
-                
-                # Generate new filename dengan UUID
-                file_info = self.naming_manager.generate_file_info(img_file.name, primary_class, 'raw')
-                new_filename = file_info.get_filename()
-                
-                # Copy dengan nama baru
-                target_path = target_dir / new_filename
-                shutil.copy2(img_file, target_path)
-                renamed_count += 1
-                
-                # Progress update dengan batch
-                if i % batch_size == 0:
-                    progress = start_progress + int(((i + 1) / len(image_files)) * (end_progress - start_progress))
-                    self._notify_progress("organize", progress, 100, f"📸 Rename {split}: {i + 1}/{len(image_files)}")
-                
-            except Exception as e:
-                self.logger.warning(f"⚠️ Error rename image {img_file.name}: {str(e)}")
-        
-        return renamed_count
+    def organize_dataset(self, source_dir: Path, target_dir: Path) -> Dict[str, Any]:
+        """Organize dataset tanpa renaming"""
+        try:
+            if not source_dir.exists():
+                return self._create_error_result(f'Source tidak ditemukan: {source_dir}')
+            
+            # Simple copy operation
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            
+            shutil.copytree(source_dir, target_dir)
+            
+            # Count files
+            stats = self._count_dataset_files(target_dir)
+            
+            return self._create_success_result(
+                total_images=stats['total_images'],
+                total_labels=stats['total_labels'],
+                splits=stats['splits'],
+                target_dir=str(target_dir),
+                uuid_renamed=False
+            )
+            
+        except Exception as e:
+            return self._create_error_result(f'Error copy: {str(e)}')
     
-    def _copy_and_rename_labels(self, label_files: List[Path], target_dir: Path, split: str) -> int:
-        """Copy dan rename labels dengan UUID consistency"""
-        if not label_files:
-            return 0
-        
-        renamed_count = 0
-        
-        for label_file in label_files:
-            try:
-                # Extract primary class dari label content
-                primary_class = self.naming_manager.extract_primary_class_from_label(label_file)
-                
-                # Generate new filename dengan same UUID as corresponding image
-                original_stem = label_file.stem
-                if original_stem in self.naming_manager.uuid_registry:
-                    # Use existing UUID dari image
-                    file_info = self.naming_manager.generate_file_info(label_file.name, primary_class, 'raw')
-                    new_filename = f"{Path(file_info.get_filename()).stem}.txt"
-                    
-                    # Copy dengan nama baru
-                    target_path = target_dir / new_filename
-                    shutil.copy2(label_file, target_path)
-                    renamed_count += 1
-                
-            except Exception as e:
-                self.logger.warning(f"⚠️ Error rename label {label_file.name}: {str(e)}")
-        
-        return renamed_count
+    def validate_dataset_structure(self, dataset_dir: Path) -> Dict[str, Any]:
+        """Validate dataset structure"""
+        from smartcash.dataset.downloader.base import ValidationHelper
+        return ValidationHelper.validate_dataset_structure(dataset_dir)
     
-    def _detect_structure_optimized(self, source_dir: Path) -> Dict[str, Any]:
-        """One-liner optimized structure detection"""
+    def _detect_structure(self, source_dir: Path) -> Dict[str, Any]:
+        """Detect dataset structure"""
         splits = [split for split in ['train', 'valid', 'test', 'val'] 
                  if (source_dir / split).exists() and (source_dir / split / 'images').exists()]
         
-        # Fallback detection untuk dataset tanpa split
         if not splits and (source_dir / 'images').exists():
             splits.append('train')
         
         return {'valid': bool(splits), 'splits': splits}
     
-    def _copy_additional_files_optimized(self, source_dir: Path, target_dir: Path) -> None:
-        """One-liner optimized additional files copying"""
-        additional_files = ['data.yaml', 'dataset.yaml', 'classes.txt', 'README.md']
+    def _organize_splits_with_renaming(self, source_dir: Path, target_dir: Path, 
+                                     splits: List[str]) -> Dict[str, Any]:
+        """Organize splits dengan UUID renaming"""
+        organized_stats = {}
         
-        # One-liner parallel copy dengan error handling
-        [shutil.copy2(source_file, target_dir / filename) if (source_file := source_dir / filename).exists() else None
-         for filename in additional_files]
+        for i, split in enumerate(splits):
+            normalized_split = 'valid' if split == 'val' else split
+            progress = int((i / len(splits)) * 80)
+            
+            self._notify_progress("organize", progress, 100, f"📁 Processing {split}...")
+            
+            organized_stats[normalized_split] = self._organize_single_split(
+                source_dir, target_dir, split, with_renaming=True
+            )
+        
+        return organized_stats
     
-    def cleanup_temp_files(self, temp_dir: Path) -> Dict[str, Any]:
-        """One-liner cleanup dengan safe removal"""
+    def _organize_single_split(self, source_dir: Path, target_dir: Path, 
+                             split: str, with_renaming: bool = False) -> Dict[str, Any]:
+        """Organize single split"""
         try:
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            return {'status': 'success', 'message': f'✅ Temp cleaned: {temp_dir}'}
-        except Exception as e:
-            return {'status': 'error', 'message': f'❌ Cleanup error: {str(e)}'}
-    
-    def validate_dataset_structure(self, dataset_dir: Path) -> Dict[str, Any]:
-        """Optimized structure validation dengan UUID format checking"""
-        try:
-            if not dataset_dir.exists():
-                return self._return_error('Dataset directory tidak ditemukan')
+            normalized_split = 'valid' if split == 'val' else split
+            source_split = source_dir / split
+            target_split = target_dir / normalized_split
             
-            validation_result = {'valid': True, 'splits': {}, 'total_images': 0, 'total_labels': 0, 'issues': [], 'uuid_format': True}
+            # Create directories
+            for subdir in ['images', 'labels']:
+                FileHelper.ensure_directory(target_split / subdir)
             
-            # Parallel split validation
-            splits_to_check = [split for split in ['train', 'valid', 'test'] if (dataset_dir / split).exists()]
-            
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                split_futures = {split: executor.submit(self._validate_single_split_with_uuid, dataset_dir / split, split) 
-                               for split in splits_to_check}
-                
-                # Result aggregation dengan validasi
-                for split, future in split_futures.items():
-                    result = future.result()
-                    validation_result['splits'][split] = result
-                    
-                    # Update totals
-                    validation_result['total_images'] += result.get('images', 0)
-                    validation_result['total_labels'] += result.get('labels', 0)
-                    
-                    # Validasi UUID format
-                    if not result.get('uuid_consistent', True):
-                        validation_result['uuid_format'] = False
-                        validation_result['issues'].append(f"Split {split}: Inconsistent UUID format")
-                    
-                    # Validasi images
-                    if result.get('images', 0) == 0:
-                        validation_result['issues'].append(f"Split {split}: No images")
-                    
-                    # Validasi image-label mismatch
-                    if abs(result.get('images', 0) - result.get('labels', 0)) > result.get('images', 0) * 0.1:
-                        validation_result['issues'].append(f"Split {split}: Image-label mismatch")
-            
-            # Overall validation
-            if validation_result['total_images'] == 0:
-                validation_result.update({'valid': False})
-                validation_result['issues'].append("No images found")
-            
-            return validation_result
-            
-        except Exception as e:
-            return {'valid': False, 'message': f'❌ Validation error: {str(e)}'}
-    
-    def _validate_single_split_with_uuid(self, split_path: Path, split: str) -> Dict[str, Any]:
-        """One-liner optimized split validation dengan UUID format checking"""
-        if not split_path.exists():
-            return {'exists': False, 'images': 0, 'labels': 0, 'path': str(split_path), 'uuid_consistent': False}
-        
-        images_dir, labels_dir = split_path / 'images', split_path / 'labels'
-        
-        # One-liner file counting dan UUID validation
-        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
-        image_files = [f for f in images_dir.glob('*.*') if f.suffix.lower() in image_extensions] if images_dir.exists() else []
-        label_files = list(labels_dir.glob('*.txt')) if labels_dir.exists() else []
-        
-        # Check UUID consistency
-        uuid_consistent = self._check_uuid_consistency(image_files, label_files)
-        
-        return {
-            'exists': True, 'images': len(image_files), 'labels': len(label_files), 
-            'path': str(split_path), 'uuid_consistent': uuid_consistent
-        }
-    
-    def _check_uuid_consistency(self, image_files: List[Path], label_files: List[Path]) -> bool:
-        """Check UUID consistency antara images dan labels"""
-        try:
-            # Sample check untuk performance (check 10 files atau semua jika < 10)
-            sample_size = min(10, len(image_files))
-            sample_images = image_files[:sample_size]
-            
-            uuid_consistent_count = 0
-            for img_file in sample_images:
-                parsed_img = self.naming_manager.parse_existing_filename(img_file.name)
-                if parsed_img:
-                    # Check corresponding label
-                    label_stem = f"{Path(img_file.name).stem}"
-                    corresponding_label = next((lf for lf in label_files if lf.stem == label_stem), None)
-                    
-                    if corresponding_label:
-                        parsed_label = self.naming_manager.parse_existing_filename(corresponding_label.name)
-                        if parsed_label and parsed_img['uuid'] == parsed_label['uuid']:
-                            uuid_consistent_count += 1
-            
-            # Consider consistent jika > 80% sample konsisten
-            return (uuid_consistent_count / sample_size) > 0.8 if sample_size > 0 else True
-            
-        except Exception:
-            return False
-    
-    def get_file_stats_optimized(self, file_path: Path) -> Dict[str, Any]:
-        """One-liner optimized file stats dengan UUID info"""
-        try:
-            stat = file_path.stat()
-            parsed_filename = self.naming_manager.parse_existing_filename(file_path.name)
+            # Process files
+            if with_renaming:
+                images, labels = self._copy_and_rename_files(source_split, target_split)
+            else:
+                images, labels = self._copy_files_simple(source_split, target_split)
             
             return {
-                'size_bytes': stat.st_size, 'size_mb': stat.st_size / 1048576, 'exists': True,
-                'is_zip': zipfile.is_zipfile(file_path) if file_path.suffix.lower() == '.zip' else False,
-                'modified': stat.st_mtime, 'uuid_format': parsed_filename is not None,
-                'nominal': parsed_filename['nominal'] if parsed_filename else None
+                'status': 'success',
+                'images': images,
+                'labels': labels,
+                'path': str(target_split)
             }
-        except Exception:
-            return {'size_bytes': 0, 'size_mb': 0, 'exists': False, 'is_zip': False, 'modified': 0, 'uuid_format': False}
-    
-    def batch_copy_files(self, file_mapping: Dict[Path, Path]) -> Dict[str, Any]:
-        """Optimized batch file copying dengan parallel execution"""
-        try:
-            if not file_mapping:
-                return {'status': 'success', 'copied': 0, 'message': 'No files to copy'}
-            
-            # Parallel batch copying
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = [executor.submit(shutil.copy2, src, dst) for src, dst in file_mapping.items()]
-                
-                # One-liner result aggregation
-                successful_copies = sum(1 for future in futures if future.result() or True)
-            
-            return {'status': 'success', 'copied': successful_copies, 'total': len(file_mapping), 'message': f'✅ Copied {successful_copies} files'}
             
         except Exception as e:
-            return {'status': 'error', 'message': f'❌ Batch copy error: {str(e)}'}
+            return {'status': 'error', 'message': f'Error split {split}: {str(e)}'}
+    
+    def _copy_and_rename_files(self, source_split: Path, target_split: Path) -> tuple:
+        """Copy dan rename files dengan UUID"""
+        source_images = source_split / 'images'
+        source_labels = source_split / 'labels'
+        target_images = target_split / 'images'
+        target_labels = target_split / 'labels'
+        
+        image_files = list(source_images.glob('*.*')) if source_images.exists() else []
+        renamed_images = 0
+        renamed_labels = 0
+        
+        for img_file in image_files:
+            try:
+                # Extract class dari label
+                label_path = source_labels / f"{img_file.stem}.txt"
+                primary_class = self.naming_manager.extract_primary_class_from_label(label_path)
+                
+                # Generate UUID filename
+                file_info = self.naming_manager.generate_file_info(img_file.name, primary_class)
+                new_filename = file_info.get_filename()
+                
+                # Copy image
+                shutil.copy2(img_file, target_images / new_filename)
+                renamed_images += 1
+                
+                # Copy corresponding label
+                if label_path.exists():
+                    label_filename = f"{Path(new_filename).stem}.txt"
+                    shutil.copy2(label_path, target_labels / label_filename)
+                    renamed_labels += 1
+                    
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error rename {img_file.name}: {str(e)}")
+        
+        return renamed_images, renamed_labels
+    
+    def _copy_files_simple(self, source_split: Path, target_split: Path) -> tuple:
+        """Simple file copy tanpa renaming"""
+        source_images = source_split / 'images'
+        source_labels = source_split / 'labels'
+        
+        images_count = 0
+        labels_count = 0
+        
+        if source_images.exists():
+            for img_file in source_images.glob('*.*'):
+                shutil.copy2(img_file, target_split / 'images' / img_file.name)
+                images_count += 1
+        
+        if source_labels.exists():
+            for label_file in source_labels.glob('*.txt'):
+                shutil.copy2(label_file, target_split / 'labels' / label_file.name)
+                labels_count += 1
+        
+        return images_count, labels_count
+    
+    def _copy_additional_files(self, source_dir: Path, target_dir: Path) -> None:
+        """Copy additional files"""
+        additional_files = ['data.yaml', 'dataset.yaml', 'classes.txt', 'README.md']
+        
+        for filename in additional_files:
+            source_file = source_dir / filename
+            if source_file.exists():
+                shutil.copy2(source_file, target_dir / filename)
+    
+    def _count_dataset_files(self, dataset_dir: Path) -> Dict[str, Any]:
+        """Count files dalam dataset"""
+        stats = {'total_images': 0, 'total_labels': 0, 'splits': {}}
+        
+        for split in ['train', 'valid', 'test']:
+            split_dir = dataset_dir / split
+            if split_dir.exists():
+                images_dir = split_dir / 'images'
+                labels_dir = split_dir / 'labels'
+                
+                image_count = len(list(images_dir.glob('*.*'))) if images_dir.exists() else 0
+                label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
+                
+                stats['splits'][split] = {'images': image_count, 'labels': label_count}
+                stats['total_images'] += image_count
+                stats['total_labels'] += label_count
+        
+        return stats
     
     def get_naming_statistics(self) -> Dict[str, Any]:
-        """Get statistics dari naming manager"""
+        """Get naming statistics"""
         return self.naming_manager.get_nominal_statistics()
-    
-    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """Progress notification dengan safe execution"""
-        if self._progress_callback:
-            self._progress_callback(step, current, total, message)
-    
-    def _return_error(self, message: str) -> None:
-        """One-liner error return"""
-        raise Exception(message)
 
-# One-liner factory dengan optimized defaults
+
 def create_file_processor(logger=None, max_workers: int = None) -> FileProcessor:
-    """Factory untuk optimized FileProcessor dengan auto-detected workers dan UUID support"""
+    """Factory untuk FileProcessor"""
     import os
     optimal_workers = max_workers or min(4, (os.cpu_count() or 1) + 1)
     return FileProcessor(logger, optimal_workers)

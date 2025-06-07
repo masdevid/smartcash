@@ -1,156 +1,83 @@
 """
 File: smartcash/dataset/downloader/roboflow_client.py
-Deskripsi: Optimized Roboflow client dengan one-liner methods dan enhanced performance
+Deskripsi: Simplified Roboflow client menggunakan base components
 """
 
-import requests
-import time
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any
 from pathlib import Path
-from smartcash.common.logger import get_logger
+from smartcash.dataset.downloader.base import BaseDownloaderComponent, RequestsHelper
 
-class RoboflowClient:
-    """Optimized Roboflow client dengan one-liner methods dan caching."""
+
+class RoboflowClient(BaseDownloaderComponent):
+    """Simplified Roboflow client dengan shared components"""
     
-    def __init__(self, api_key: str, timeout: int = 30, retry_count: int = 3, logger=None):
-        self.api_key, self.timeout, self.retry_count, self.logger = api_key, timeout, retry_count, logger or get_logger()
-        self.base_url, self._progress_callback, self._metadata_cache = "https://api.roboflow.com", None, {}
+    def __init__(self, api_key: str, logger=None):
+        super().__init__(logger)
+        self.api_key = api_key
+        self.base_url = "https://api.roboflow.com"
+        self._metadata_cache = {}
     
-    def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """Set callback dengan one-liner assignment"""
-        self._progress_callback = callback
-    
-    def get_dataset_metadata(self, workspace: str, project: str, version: str, format: str = "yolov5pytorch") -> Dict[str, Any]:
-        """Get metadata dengan one-liner caching dan optimized retry"""
+    def get_dataset_metadata(self, workspace: str, project: str, version: str, 
+                           format: str = "yolov5pytorch") -> Dict[str, Any]:
+        """Get dataset metadata dengan caching"""
         cache_key = f"{workspace}/{project}:{version}:{format}"
         
-        # One-liner cache check
         if cache_key in self._metadata_cache:
-            cached_result = self._metadata_cache[cache_key]
             self._notify_progress("metadata", 100, 100, "✅ Metadata dari cache")
-            return cached_result
+            return self._metadata_cache[cache_key]
         
-        url, params = f"{self.base_url}/{workspace}/{project}/{version}/{format}", {'api_key': self.api_key}
+        url = f"{self.base_url}/{workspace}/{project}/{version}/{format}"
+        params = {'api_key': self.api_key}
+        
         self._notify_progress("metadata", 0, 100, "🌐 Mengambil metadata...")
         
-        # Optimized retry loop dengan one-liner error handling
-        for attempt in range(1, self.retry_count + 1):
-            try:
-                response = requests.get(url, params=params, timeout=self.timeout)
-                response.raise_for_status()
-                metadata = response.json()
-                
-                # Validasi response
-                if 'export' not in metadata or 'link' not in metadata['export']:
-                    self._raise_error("Response tidak lengkap")
-                
-                result = {
-                    'status': 'success', 'data': metadata, 'download_url': metadata['export']['link'],
-                    'size_mb': metadata.get('export', {}).get('size', 0), 'message': 'Metadata berhasil'
-                }
-                
-                # Caching dan logging
-                self._metadata_cache[cache_key] = result
-                self._notify_progress("metadata", 100, 100, "✅ Metadata diperoleh")
-                if 'project' in metadata:
-                    self.logger.info(f"📊 Dataset: {len(metadata['project'].get('classes', []))} kelas, {metadata.get('version', {}).get('images', 0)} gambar")
-                
-                return result
-                
-            except requests.HTTPError as e:
-                error_msg = self._handle_http_error(e.response.status_code, workspace, project, version)
-                if attempt == self.retry_count:
-                    return self._return_error_result(error_msg)
-                
-            except requests.RequestException as e:
-                if attempt < self.retry_count:
-                    wait_time = attempt * 2
-                    self.logger.warning(f"⚠️ Retry {attempt} dalam {wait_time}s: {str(e)}")
-                    time.sleep(wait_time)
-                else:
-                    return self._return_error_result(f"Koneksi gagal: {str(e)}")
-                    
-            except Exception as e:
-                return self._return_error_result(f"Error metadata: {str(e)}")
-        
-        return self._return_error_result('Gagal setelah retry')
-    
-    def download_dataset(self, download_url: str, output_path: Path, chunk_size: int = 8192) -> Dict[str, Any]:
-        """Download dengan optimized progress tracking dan one-liner updates"""
         try:
-            self._notify_progress("download", 0, 100, "📥 Memulai download...")
+            response = RequestsHelper.get_with_retry(url, params, timeout=30, retry_count=3)
+            metadata = response.json()
             
-            response = requests.get(download_url, stream=True, timeout=self.timeout)
-            response.raise_for_status()
+            if 'export' not in metadata or 'link' not in metadata['export']:
+                return self._create_error_result("Response tidak lengkap")
             
-            total_size, downloaded, last_progress = int(response.headers.get('content-length', 0)), 0, 0
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+            result = self._create_success_result(
+                data=metadata,
+                download_url=metadata['export']['link'],
+                size_mb=metadata.get('export', {}).get('size', 0)
+            )
             
-            with open(output_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        
-                        # Progress update dengan threshold
-                        if total_size > 0:
-                            progress = int((downloaded / total_size) * 100)
-                            
-                            if progress - last_progress >= 5 or downloaded - (last_progress * total_size / 100) >= 1048576:
-                                self._notify_progress("download", progress, 100, f"📥 {downloaded/1048576:.1f}/{total_size/1048576:.1f} MB")
-                                setattr(self, '_temp_last_progress', progress)  # Update last_progress
-                                
-                            last_progress = progress
+            self._metadata_cache[cache_key] = result
+            self._notify_progress("metadata", 100, 100, "✅ Metadata diperoleh")
             
-            self._notify_progress("download", 100, 100, "✅ Download selesai")
-            return {
-                'status': 'success', 'file_path': str(output_path), 'size_bytes': downloaded,
-                'size_mb': downloaded / 1048576, 'message': 'Download berhasil'
-            }
+            return result
             
         except Exception as e:
-            return {'status': 'error', 'message': f"Download gagal: {str(e)}"}
+            return self._create_error_result(f"Metadata failed: {str(e)}")
     
-    def validate_credentials(self, workspace: str, project: str) -> Dict[str, Any]:
-        """One-liner credential validation dengan optimized error mapping"""
+    def download_dataset(self, download_url: str, output_path: Path) -> Dict[str, Any]:
+        """Download dataset menggunakan shared helper"""
+        self._notify_progress("download", 0, 100, "📥 Memulai download...")
+        
+        result = RequestsHelper.download_with_progress(
+            download_url, output_path, self._notify_progress
+        )
+        
+        if result['status'] == 'success':
+            self._notify_progress("download", 100, 100, "✅ Download selesai")
+        
+        return result
+    
+    def validate_credentials(self, workspace: str) -> Dict[str, Any]:
+        """Validate API credentials"""
         try:
-            response = requests.get(f"{self.base_url}/{workspace}", params={'api_key': self.api_key}, timeout=10)
-            return {200: {'valid': True, 'message': 'Kredensial valid'},
-                    401: {'valid': False, 'message': 'API key tidak valid'}, 
-                    403: {'valid': False, 'message': 'Tidak memiliki akses'},
-                    404: {'valid': False, 'message': f'Workspace "{workspace}" tidak ditemukan'}}.get(
-                    response.status_code, {'valid': False, 'message': f'Error API: {response.status_code}'})
-        except requests.RequestException as e:
-            return {'valid': False, 'message': f'Koneksi gagal: {str(e)}'}
-    
-    def _handle_http_error(self, status_code: int, workspace: str, project: str, version: str) -> str:
-        """One-liner HTTP error mapping"""
-        return {400: "Request tidak valid", 401: "API key tidak valid", 403: "Tidak memiliki akses",
-                404: f"Dataset {workspace}/{project}:{version} tidak ditemukan", 429: "Terlalu banyak request",
-                500: "Server error"}.get(status_code, f"HTTP Error {status_code}")
-    
-    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """Progress notification dengan safe execution"""
-        if self._progress_callback:
-            self._progress_callback(step, current, total, message)
-    
-    def _return_error_result(self, message: str) -> Dict[str, Any]:
-        """One-liner error result creation"""
-        return {'status': 'error', 'message': message}
-    
-    def _raise_error(self, message: str) -> None:
-        """One-liner error raising"""
-        raise ValueError(message)
-    
-    def clear_cache(self) -> None:
-        """One-liner cache clearing"""
-        self._metadata_cache.clear()
-    
-    def get_cache_info(self) -> Dict[str, Any]:
-        """One-liner cache info"""
-        return {'cached_datasets': len(self._metadata_cache), 'cache_keys': list(self._metadata_cache.keys())}
+            url = f"{self.base_url}/{workspace}"
+            params = {'api_key': self.api_key}
+            
+            response = RequestsHelper.get_with_retry(url, params, timeout=10, retry_count=1)
+            return {'valid': True, 'message': 'Kredensial valid'}
+            
+        except Exception as e:
+            return {'valid': False, 'message': f'Kredensial tidak valid: {str(e)}'}
 
-# One-liner factory
+
 def create_roboflow_client(api_key: str, logger=None) -> RoboflowClient:
-    """Factory untuk optimized RoboflowClient"""
-    return RoboflowClient(api_key, timeout=30, retry_count=3, logger=logger)
+    """Factory untuk RoboflowClient"""
+    return RoboflowClient(api_key, logger)

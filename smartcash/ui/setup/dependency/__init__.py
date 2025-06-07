@@ -16,9 +16,6 @@ from .dependency_init import (
     get_installation_settings,
     get_analysis_settings,
     is_auto_analyze_enabled,
-    debug_generator_count,
-    debug_button_status,
-    debug_config_summary
 )
 
 # Main public API
@@ -42,9 +39,4 @@ __all__ = [
     'get_installation_settings',
     'get_analysis_settings',
     'is_auto_analyze_enabled',
-    
-    # Debug utilities
-    'debug_generator_count',
-    'debug_button_status',
-    'debug_config_summary'
 ]

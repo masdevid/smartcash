@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/downloader/__init__.py
-Deskripsi: Fixed factory exports dengan standardized interface untuk UI compatibility
+Deskripsi: UPDATED factory exports dengan backend services baru
 """
 
 from typing import Dict, Any, Optional
@@ -9,7 +9,7 @@ from smartcash.common.logger import get_logger
 
 def get_downloader_instance(config: Dict[str, Any], logger=None) -> Optional['DownloadService']:
     """
-    FIXED: Main factory untuk downloader instance - matching UI expectation
+    Main factory untuk downloader instance - matching UI expectation
     
     Args:
         config: Configuration dengan format yang diharapkan UI
@@ -25,6 +25,25 @@ def get_downloader_instance(config: Dict[str, Any], logger=None) -> Optional['Do
         logger = logger or get_logger('downloader.factory')
         logger.error(f"❌ Error creating downloader: {str(e)}")
         return None
+
+
+# Backend services exports - NEW
+def get_dataset_scanner(logger=None):
+    """Get dataset scanner service"""
+    from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
+    return create_dataset_scanner(logger)
+
+
+def get_cleanup_service(logger=None):
+    """Get cleanup service"""
+    from smartcash.dataset.downloader.cleanup_service import create_cleanup_service
+    return create_cleanup_service(logger)
+
+
+def get_progress_tracker(callback=None):
+    """Get progress tracker"""
+    from smartcash.dataset.downloader.progress_tracker import create_progress_tracker
+    return create_progress_tracker(callback)
 
 
 def create_download_session(api_key: str, workspace: str = None, project: str = None, 
@@ -51,9 +70,7 @@ def create_download_session(api_key: str, workspace: str = None, project: str = 
 
 
 def get_default_config(api_key: str = '') -> Dict[str, Any]:
-    """
-    FIXED: Get default configuration dengan format yang konsisten dengan UI
-    """
+    """Get default configuration dengan format yang konsisten dengan UI"""
     return {
         # Core Roboflow parameters
         'api_key': api_key,
@@ -63,7 +80,7 @@ def get_default_config(api_key: str = '') -> Dict[str, Any]:
         'output_format': 'yolov5pytorch',
         
         # Processing options (matching UI expectations)
-        'rename_files': True,  # FIXED: Boolean value, bukan callable
+        'rename_files': True,
         'validate_download': True,
         'organize_dataset': True,
         'backup_existing': False,
@@ -76,12 +93,7 @@ def get_default_config(api_key: str = '') -> Dict[str, Any]:
 
 
 def validate_service_compatibility(service) -> Dict[str, Any]:
-    """
-    Validate service compatibility dengan UI expectations
-    
-    Returns:
-        Dictionary berisi compatibility check results
-    """
+    """Validate service compatibility dengan UI expectations"""
     if not service:
         return {'compatible': False, 'missing': ['service_instance']}
     
@@ -98,15 +110,7 @@ def validate_service_compatibility(service) -> Dict[str, Any]:
 
 
 def create_ui_compatible_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    FIXED: Convert UI config format ke format yang diharapkan core service
-    
-    Args:
-        ui_config: Config dari UI handler (extract_config_from_ui result)
-        
-    Returns:
-        Config yang compatible dengan core service
-    """
+    """Convert UI config format ke format yang diharapkan core service"""
     roboflow = ui_config.get('data', {}).get('roboflow', {})
     download = ui_config.get('download', {})
     
@@ -128,7 +132,7 @@ def create_ui_compatible_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# FIXED: Convenience functions dengan consistent naming
+# Convenience functions
 create_roboflow_downloader = lambda api_key, **kwargs: get_downloader_instance(
     {**get_default_config(api_key), **kwargs}
 )
@@ -137,13 +141,19 @@ validate_config_quick = lambda config: all(
     config.get(f, '').strip() for f in ['api_key', 'workspace', 'project', 'version']
 )
 
-# FIXED: Export dengan nama yang diharapkan UI
+# UPDATED exports dengan backend services
 __all__ = [
-    'get_downloader_instance',  # CRITICAL: UI mengharapkan nama ini
+    # Core factory (UI dependency)
+    'get_downloader_instance',
     'create_download_session', 
     'get_default_config',
     'create_roboflow_downloader',
     'validate_config_quick',
     'validate_service_compatibility',
-    'create_ui_compatible_config'
+    'create_ui_compatible_config',
+    
+    # Backend services (NEW)
+    'get_dataset_scanner',
+    'get_cleanup_service', 
+    'get_progress_tracker'
 ]

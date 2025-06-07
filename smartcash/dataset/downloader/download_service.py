@@ -1,46 +1,47 @@
 """
 File: smartcash/dataset/downloader/download_service.py
-Deskripsi: FIXED download service dengan standardized response format dan progress callback
+Deskripsi: REFACTORED download service dengan progress tracking yang konsisten
 """
 
 import time
-import requests
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from pathlib import Path
-from smartcash.dataset.downloader.base import (
-    BaseDownloaderComponent, ValidationHelper, PathHelper, FileHelper
-)
+from smartcash.dataset.downloader.base import BaseDownloaderComponent, ValidationHelper, PathHelper, FileHelper
 from smartcash.dataset.downloader.roboflow_client import create_roboflow_client
 from smartcash.dataset.downloader.file_processor import create_file_processor
 from smartcash.dataset.downloader.validators import create_dataset_validator
-
+from smartcash.dataset.downloader.progress_tracker import DownloadProgressTracker, DownloadStage
+from smartcash.common.environment import get_environment_manager
 
 class DownloadService(BaseDownloaderComponent):
-    """FIXED download service dengan UI compatibility dan standardized interface"""
+    """REFACTORED download service dengan consistent progress tracking"""
     
     def __init__(self, config: Dict[str, Any], logger=None):
         super().__init__(logger)
         self.config = config
+        self.env_manager = get_environment_manager()
+        self.progress_tracker = None
         
         # Lazy initialization
         self._roboflow_client = None
         self._file_processor = None
         self._validator = None
     
+    def set_progress_callback(self, callback) -> None:
+        """Set progress callback dan create tracker"""
+        super().set_progress_callback(callback)
+        self.progress_tracker = DownloadProgressTracker(callback)
+    
     @property
     def roboflow_client(self):
         if not self._roboflow_client:
             self._roboflow_client = create_roboflow_client(self.config.get('api_key', ''), self.logger)
-            if self._progress_callback:
-                self._roboflow_client.set_progress_callback(self._create_standardized_callback())
         return self._roboflow_client
     
     @property
     def file_processor(self):
         if not self._file_processor:
             self._file_processor = create_file_processor(self.logger)
-            if self._progress_callback:
-                self._file_processor.set_progress_callback(self._create_standardized_callback())
         return self._file_processor
     
     @property
@@ -49,180 +50,131 @@ class DownloadService(BaseDownloaderComponent):
             self._validator = create_dataset_validator(self.logger)
         return self._validator
     
-    def set_progress_callback(self, callback: Callable[[str, int, int, str], None]) -> None:
-        """
-        FIXED: Set progress callback dengan signature yang diharapkan UI
-        
-        Args:
-            callback: Function dengan signature (step, current, total, message)
-        """
-        self._progress_callback = callback
-        
-        # Update existing components jika sudah diinisialisasi
-        if self._roboflow_client:
-            self._roboflow_client.set_progress_callback(self._create_standardized_callback())
-        if self._file_processor:
-            self._file_processor.set_progress_callback(self._create_standardized_callback())
-    
-    def _create_standardized_callback(self) -> Callable:
-        """Create standardized callback wrapper untuk internal components"""
-        def standardized_callback(*args, **kwargs):
-            if not self._progress_callback:
-                return
-                
-            try:
-                # Handle berbagai signature dari internal components
-                if len(args) == 4:
-                    # Already standardized: (step, current, total, message)
-                    self._progress_callback(*args)
-                elif len(args) == 3:
-                    # Format: (step, progress_percent, message)
-                    step, progress, message = args
-                    self._progress_callback(step, progress, 100, message)
-                elif len(args) == 2:
-                    # Format: (progress_percent, message)
-                    progress, message = args
-                    self._progress_callback("progress", progress, 100, message)
-                elif len(args) == 1 and isinstance(args[0], dict):
-                    # Format: dict dengan keys yang diperlukan
-                    data = args[0]
-                    step = data.get('step', 'progress')
-                    current = data.get('current', 0)
-                    total = data.get('total', 100)
-                    message = data.get('message', '')
-                    self._progress_callback(step, current, total, message)
-                elif kwargs:
-                    # Format: keyword arguments
-                    step = kwargs.get('step', 'progress')
-                    current = kwargs.get('current', 0)
-                    total = kwargs.get('total', 100)
-                    message = kwargs.get('message', '')
-                    self._progress_callback(step, current, total, message)
-            except Exception as e:
-                # Silent exception untuk mencegah kegagalan callback menghentikan proses
-                if self.logger:
-                    self.logger.warning(f"⚠️ Error dalam standardized_callback: {str(e)}")
-        
-        return standardized_callback
-    
-    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
-        """Notify progress dengan standardized format"""
-        try:
-            if self._progress_callback:
-                # Tambahkan emoji yang sesuai berdasarkan step
-                emoji_map = {
-                    'init': '🔧',
-                    'metadata': '📋',
-                    'backup': '💾',
-                    'download': '📥',
-                    'extract': '📦',
-                    'organize': '🗂️',
-                    'validate': '✅',
-                    'error': '❌',
-                    'complete': '✅',
-                    'warning': '⚠️'
-                }
-                
-                # Ambil emoji berdasarkan step atau gunakan default
-                step_key = step.lower().split('_')[0]
-                emoji = emoji_map.get(step_key, '🔄')
-                
-                # Jika message belum memiliki emoji, tambahkan emoji
-                if not any(e in message for e in emoji_map.values()):
-                    message = f"{emoji} {message}"
-                    
-                self._progress_callback(step, current, total, message)
-        except Exception as e:
-            # Silent exception untuk mencegah kegagalan callback menghentikan proses
-            if self.logger:
-                self.logger.warning(f"⚠️ Error dalam _notify_progress: {str(e)}")
-    
     def download_dataset(self) -> Dict[str, Any]:
         """
-        FIXED: Download dataset dengan response format yang diharapkan UI
+        Download dataset dengan consistent progress tracking
         
         Returns:
-            Dictionary dengan format:
-            {
-                'status': 'success'|'error',
-                'message': str,
-                'stats': {...},
-                'output_dir': str,
-                'duration': float
-            }
+            Dictionary dengan format yang diharapkan UI
         """
         start_time = time.time()
         
         try:
-            # Notify start
-            self._notify_progress('init', 0, 100, "Memulai proses download dataset")
+            # Stage 1: Initialization
+            if self.progress_tracker:
+                self.progress_tracker.start_stage(DownloadStage.INIT, "Memulai proses download...")
             
             # Validate config
-            self._notify_progress('init', 5, 100, "Memvalidasi konfigurasi...")
-            validation = ValidationHelper.validate_config(
-                self.config, ['workspace', 'project', 'version', 'api_key']
-            )
-            
+            validation = self._validate_config()
             if not validation['valid']:
                 error_msg = f"Konfigurasi tidak valid: {'; '.join(validation['errors'])}"
-                self._notify_progress('error', 0, 100, error_msg)
+                if self.progress_tracker:
+                    self.progress_tracker.error(error_msg)
                 return self._create_error_response(error_msg)
             
+            if self.progress_tracker:
+                self.progress_tracker.update_stage(50, "✅ Konfigurasi valid")
+            
             # Extract parameters
-            self._notify_progress('init', 10, 100, "Mengekstrak parameter...")
             params = self._extract_params()
             
-            # Setup paths
-            self._notify_progress('init', 15, 100, "Menyiapkan direktori...")
-            paths = PathHelper.setup_download_paths(
-                params['workspace'], params['project'], params['version']
-            )
+            # Setup paths using environment manager
+            dataset_path = self.env_manager.get_dataset_path()
+            paths = self._setup_download_paths(dataset_path, params)
             
-            # Execute download flow dengan progress tracking
-            self._notify_progress("init_complete", 20, 100, "✅ Inisialisasi selesai")
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("✅ Inisialisasi selesai")
             
-            # Get metadata - _get_metadata sudah memiliki notifikasi progress sendiri
+            # Stage 2: Get metadata
+            if self.progress_tracker:
+                self.progress_tracker.start_stage(DownloadStage.METADATA, "Mengambil metadata dataset...")
+            
             metadata = self._get_metadata(params)
             download_url = metadata.get('download_url')
             if not download_url:
                 error_msg = "URL download tidak ditemukan dalam metadata"
-                self._notify_progress('error', 0, 100, error_msg)
-                self.logger.error(f"❌ {error_msg}")
+                if self.progress_tracker:
+                    self.progress_tracker.error(error_msg)
                 return self._create_error_response(error_msg)
             
-            self._download_and_extract(download_url, paths)
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("✅ Metadata berhasil diperoleh")
             
-            # Backup existing dataset if needed - _handle_backup sudah memiliki notifikasi progress sendiri
-            if params['backup_existing'] and self._has_existing_dataset(paths['final_dir']):
-                self._handle_backup(paths)
+            # Stage 3: Backup if needed
+            if params['backup_existing'] and self._has_existing_dataset(dataset_path):
+                if self.progress_tracker:
+                    self.progress_tracker.start_stage(DownloadStage.BACKUP, "Membuat backup...")
+                
+                self._handle_backup(dataset_path)
+                
+                if self.progress_tracker:
+                    self.progress_tracker.complete_stage("✅ Backup selesai")
             
-            # Organize dataset - _organize_dataset sudah memiliki notifikasi progress sendiri
+            # Stage 4: Download
+            if self.progress_tracker:
+                self.progress_tracker.start_stage(DownloadStage.DOWNLOAD, "Mengunduh dataset...")
+            
+            self._download_dataset_file(download_url, paths)
+            
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("✅ Download selesai")
+            
+            # Stage 5: Extract
+            if self.progress_tracker:
+                self.progress_tracker.start_stage(DownloadStage.EXTRACT, "Mengekstrak dataset...")
+            
+            self._extract_dataset(paths)
+            
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("✅ Ekstraksi selesai")
+            
+            # Stage 6: Organize
+            if self.progress_tracker:
+                self.progress_tracker.start_stage(DownloadStage.ORGANIZE, "Mengorganisasi dataset...")
+            
             stats = self._organize_dataset(paths, params)
             
-            # Validate results if needed - _validate_results sudah memiliki notifikasi progress sendiri
-            if params['validate_download']:
-                self._validate_results(paths['final_dir'])
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("✅ Organisasi selesai")
             
-            # Cleanup
-            self._notify_progress('cleanup', 95, 100, "🧹 Membersihkan file sementara...")
+            # Stage 7: Validate
+            if params['validate_download']:
+                if self.progress_tracker:
+                    self.progress_tracker.start_stage(DownloadStage.VALIDATE, "Memvalidasi hasil...")
+                
+                self._validate_results(dataset_path)
+                
+                if self.progress_tracker:
+                    self.progress_tracker.complete_stage("✅ Validasi selesai")
+            
+            # Stage 8: Cleanup
+            if self.progress_tracker:
+                self.progress_tracker.start_stage(DownloadStage.CLEANUP, "Membersihkan file sementara...")
+            
             FileHelper.cleanup_temp(paths['temp_dir'])
             
-            # Prepare response
-            success_msg = f"Dataset berhasil didownload ke {paths['final_dir']}"
-            self._notify_progress('complete', 100, 100, f"✅ {success_msg}")
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("✅ Cleanup selesai")
+            
+            # Complete
+            duration = time.time() - start_time
+            success_msg = f"Dataset berhasil didownload: {stats.get('total_images', 0):,} gambar"
+            
+            if self.progress_tracker:
+                self.progress_tracker.complete_all(success_msg)
             
             return {
                 'status': 'success',
                 'message': success_msg,
                 'stats': {
-                    'file_count': stats.get('file_count', 0),
-                    'image_count': stats.get('image_count', 0),
-                    'label_count': stats.get('label_count', 0),
+                    'total_images': stats.get('total_images', 0),
+                    'total_labels': stats.get('total_labels', 0),
+                    'splits': stats.get('splits', {}),
                     'uuid_renamed': params['rename_files'],
                     'naming_stats': stats.get('naming_stats', {}) if params['rename_files'] else None
                 },
-                'output_dir': str(paths['final_dir']),
-                'duration': time.time() - start_time,
+                'output_dir': str(dataset_path),
+                'duration': duration,
                 'metadata': {
                     'workspace': params['workspace'],
                     'project': params['project'],
@@ -232,21 +184,15 @@ class DownloadService(BaseDownloaderComponent):
             }
             
         except Exception as e:
-            duration = time.time() - start_time
             error_msg = f"Error downloading dataset: {str(e)}"
-            self.logger.error(error_msg)
-            self._notify_progress('error', 0, 100, error_msg)
+            if self.progress_tracker:
+                self.progress_tracker.error(error_msg)
             return self._create_error_response(error_msg)
     
-    def _create_error_response(self, message: str) -> Dict[str, Any]:
-        """FIXED: Create error response dengan format yang konsisten"""
-        return {
-            'status': 'error',
-            'message': message,
-            'stats': {'total_images': 0, 'total_labels': 0, 'splits': {}},
-            'output_dir': '',
-            'duration': 0.0
-        }
+    def _validate_config(self) -> Dict[str, Any]:
+        """Validate config dengan required fields"""
+        required_fields = ['workspace', 'project', 'version', 'api_key']
+        return ValidationHelper.validate_config(self.config, required_fields)
     
     def _extract_params(self) -> Dict[str, Any]:
         """Extract parameters dengan proper defaults"""
@@ -258,12 +204,29 @@ class DownloadService(BaseDownloaderComponent):
             'output_format': self.config.get('output_format', 'yolov5pytorch'),
             'validate_download': self.config.get('validate_download', True),
             'backup_existing': self.config.get('backup_existing', False),
-            'rename_files': self.config.get('rename_files', True)  # FIXED: Always boolean
+            'rename_files': self.config.get('rename_files', True)
         }
     
+    def _setup_download_paths(self, dataset_path: Path, params: Dict[str, Any]) -> Dict[str, Path]:
+        """Setup download paths using environment-aware dataset path"""
+        dataset_name = f"{params['workspace']}_{params['project']}_v{params['version']}"
+        
+        paths = {
+            'dataset_dir': dataset_path,
+            'temp_dir': dataset_path / 'downloads' / f"{dataset_name}_temp",
+            'temp_zip': dataset_path / 'downloads' / f"{dataset_name}_temp" / 'dataset.zip',
+            'extract_dir': dataset_path / 'downloads' / f"{dataset_name}_temp" / 'extracted'
+        }
+        
+        # Create temp directories
+        FileHelper.ensure_directory(paths['temp_dir'])
+        
+        return paths
+    
     def _get_metadata(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Get metadata dengan progress notification"""
-        self._notify_progress('metadata', 10, 100, "📊 Getting metadata...")
+        """Get metadata dengan progress tracking"""
+        if self.progress_tracker:
+            self.progress_tracker.update_stage(20, "📊 Connecting to Roboflow...")
         
         result = self.roboflow_client.get_dataset_metadata(
             params['workspace'], params['project'], 
@@ -273,42 +236,24 @@ class DownloadService(BaseDownloaderComponent):
         if result['status'] != 'success':
             raise Exception(f"Metadata failed: {result['message']}")
         
-        self._notify_progress('metadata', 30, 100, "✅ Metadata obtained")
+        if self.progress_tracker:
+            self.progress_tracker.update_stage(80, "📊 Metadata response received")
+        
         return result
     
-    def _handle_backup(self, paths: Dict[str, Path]) -> None:
-        """Handle backup dengan progress notification"""
-        if self._has_existing_dataset(paths['final_dir']):
-            self._notify_progress('backup', 35, 100, "💾 Creating backup...")
-            self.logger.info("💾 Creating backup...")
-            
-            backup_result = FileHelper.backup_directory(paths['final_dir'])
-            
-            if backup_result['success']:
-                self.logger.info(f"✅ Backup: {backup_result['backup_path']}")
-            else:
-                self.logger.warning(f"⚠️ Backup failed: {backup_result['message']}")
-    
-    def _download_and_extract(self, download_url: str, paths: Dict[str, Path]) -> None:
-        """Download dan extract dengan progress tracking dan detailed logging per step"""
-        # Log download start dengan detail
-        self.logger.info(f"📥 Memulai download dataset dari URL: {download_url}")
-        self.logger.info(f"📥 Target file: {paths['temp_zip']}")
+    def _download_dataset_file(self, download_url: str, paths: Dict[str, Path]) -> None:
+        """Download dataset file dengan progress tracking"""
+        if self.progress_tracker:
+            self.progress_tracker.update_stage(10, "📥 Starting download...")
         
-        # Download (40-70%) dengan notifikasi per step
-        self._notify_progress('download_start', 40, 100, "📥 Memulai proses download...")
-        self.logger.info("📥 Menjalankan download via Roboflow client...")
+        import requests
         
-        # Implementasi download dengan notifikasi per step
         try:
             response = requests.get(download_url, stream=True, timeout=30)
             response.raise_for_status()
             
             total_size = int(response.headers.get('content-length', 0))
             downloaded = 0
-            last_percent = 0
-            
-            paths['temp_zip'].parent.mkdir(parents=True, exist_ok=True)
             
             with open(paths['temp_zip'], 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
@@ -316,281 +261,250 @@ class DownloadService(BaseDownloaderComponent):
                         f.write(chunk)
                         downloaded += len(chunk)
                         
-                        if total_size > 0:
-                            # Hitung progress dalam persen
-                            current_percent = int((downloaded / total_size) * 100)
-                            
-                            # Notifikasi setiap 5% kemajuan
-                            if current_percent >= last_percent + 5 or current_percent == 100:
-                                last_percent = current_percent
-                                progress_overall = 40 + int((current_percent / 100) * 30)  # Map ke 40-70% overall
-                                self._notify_progress(
-                                    'download_progress', 
-                                    progress_overall, 
-                                    100, 
-                                    f"📥 Downloading: {current_percent}% ({downloaded/1048576:.1f}/{total_size/1048576:.1f} MB)"
-                                )
+                        if total_size > 0 and self.progress_tracker:
+                            progress = int((downloaded / total_size) * 80) + 10  # 10-90%
+                            size_mb = downloaded / (1024 * 1024)
+                            total_mb = total_size / (1024 * 1024)
+                            self.progress_tracker.update_stage(
+                                progress, 
+                                f"📥 Downloaded: {size_mb:.1f}/{total_mb:.1f} MB"
+                            )
             
-            download_result = {'status': 'success'}
             file_size_mb = paths['temp_zip'].stat().st_size / (1024 * 1024)
-            self.logger.success(f"✅ Download berhasil: {file_size_mb:.2f} MB")
-            self._notify_progress('download_complete', 70, 100, f"✅ Download selesai: {file_size_mb:.2f} MB")
+            self.logger.success(f"✅ Download selesai: {file_size_mb:.2f} MB")
             
         except Exception as e:
-            self.logger.error(f"❌ Download gagal: {str(e)}")
             raise Exception(f"Download failed: {str(e)}")
-        
-        # Extract (70-80%) dengan notifikasi per step
-        self.logger.info(f"📦 Mengekstrak file dari {paths['temp_zip']} ke {paths['extract_dir']}")
-        self._notify_progress('extract_start', 70, 100, "📦 Memulai ekstraksi file...")
+    
+    def _extract_dataset(self, paths: Dict[str, Path]) -> None:
+        """Extract dataset dengan progress tracking"""
+        import zipfile
         
         try:
-            import zipfile
-            import os
-            
-            # Pastikan direktori ekstrak ada
-            paths['extract_dir'].mkdir(parents=True, exist_ok=True)
+            if self.progress_tracker:
+                self.progress_tracker.update_stage(10, "📦 Opening archive...")
             
             with zipfile.ZipFile(paths['temp_zip'], 'r') as zip_ref:
-                # Dapatkan total file untuk progress tracking
                 file_list = zip_ref.namelist()
                 total_files = len(file_list)
-                extracted_files = 0
-                last_percent = 0
                 
-                # Ekstrak file satu per satu dengan progress tracking
-                for file in file_list:
+                if self.progress_tracker:
+                    self.progress_tracker.update_stage(20, f"📦 Extracting {total_files} files...")
+                
+                for i, file in enumerate(file_list):
                     zip_ref.extract(file, paths['extract_dir'])
-                    extracted_files += 1
                     
-                    # Hitung progress dalam persen
-                    current_percent = int((extracted_files / total_files) * 100)
-                    
-                    # Notifikasi setiap 10% kemajuan
-                    if current_percent >= last_percent + 10 or current_percent == 100:
-                        last_percent = current_percent
-                        progress_overall = 70 + int((current_percent / 100) * 10)  # Map ke 70-80% overall
-                        self._notify_progress(
-                            'extract_progress', 
-                            progress_overall, 
-                            100, 
-                            f"📦 Extracting: {current_percent}% ({extracted_files}/{total_files} files)"
+                    if self.progress_tracker and i % max(1, total_files // 10) == 0:
+                        progress = 20 + int((i / total_files) * 70)  # 20-90%
+                        self.progress_tracker.update_stage(
+                            progress, 
+                            f"📦 Extracted: {i+1}/{total_files} files"
                         )
             
-            extract_result = {'status': 'success', 'file_count': total_files}
-            self.logger.success(f"✅ Ekstraksi berhasil: {total_files} file")
-            self._notify_progress('extract_complete', 80, 100, f"✅ Ekstraksi selesai: {total_files} file")
+            self.logger.success(f"✅ Ekstraksi selesai: {total_files} files")
             
         except Exception as e:
-            self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
             raise Exception(f"Extract failed: {str(e)}")
     
     def _organize_dataset(self, paths: Dict[str, Path], params: Dict[str, Any]) -> Dict[str, Any]:
-        """Organize dataset dengan progress tracking dan notifikasi per step"""
-        # Notifikasi awal proses pengorganisasian
-        self._notify_progress('organize_start', 80, 100, "🗂️ Memulai pengorganisasian dataset...")
+        """Organize dataset dengan progress tracking termasuk UUID renaming"""
+        if self.progress_tracker:
+            self.progress_tracker.update_stage(10, "🗂️ Analyzing structure...")
         
         try:
-            # Scan direktori ekstrak untuk mendapatkan informasi file
-            self._notify_progress('organize_scan', 81, 100, "🔍 Scanning files...")
-            
-            # Hitung jumlah file di direktori ekstrak
-            image_files = list(paths['extract_dir'].glob('**/*.jpg')) + list(paths['extract_dir'].glob('**/*.jpeg')) + \
-                         list(paths['extract_dir'].glob('**/*.png'))
-            label_files = list(paths['extract_dir'].glob('**/*.txt'))
-            yaml_files = list(paths['extract_dir'].glob('**/*.yaml'))
-            
-            total_files = len(image_files) + len(label_files) + len(yaml_files)
-            self._notify_progress(
-                'organize_scan_complete', 
-                82, 
-                100, 
-                f"🔍 Scan selesai: {len(image_files)} gambar, {len(label_files)} label, {len(yaml_files)} yaml"
+            # Phase 1: Basic organization
+            result = self.file_processor.organize_dataset(
+                paths['extract_dir'], paths['dataset_dir']
             )
             
-            # Notifikasi proses pengorganisasian
-            if params['rename_files']:
-                self._notify_progress('organize_rename', 83, 100, "🔄 Mengorganisasi dataset dengan UUID renaming...")
-                self.logger.info(f"🔄 Mengorganisasi {total_files} file dengan UUID renaming...")
-            else:
-                self._notify_progress('organize_copy', 83, 100, "💾 Mengorganisasi dataset dengan simple copy...")
-                self.logger.info(f"💾 Mengorganisasi {total_files} file dengan simple copy...")
-            
-            # Proses pengorganisasian dengan progress tracking
-            processed_files = 0
-            last_percent = 0
-            
-            # Definisikan callback untuk progress tracking
-            def organize_progress_callback(file_path, is_copied):
-                nonlocal processed_files, last_percent
-                processed_files += 1
-                
-                # Hitung progress dalam persen
-                if total_files > 0:
-                    current_percent = int((processed_files / total_files) * 100)
-                    
-                    # Notifikasi setiap 10% kemajuan
-                    if current_percent >= last_percent + 10 or current_percent == 100 or processed_files <= 5:
-                        last_percent = current_percent
-                        progress_overall = 83 + int((current_percent / 100) * 12)  # Map ke 83-95% overall
-                        self._notify_progress(
-                            'organize_progress', 
-                            progress_overall, 
-                            100, 
-                            f"🗂️ Organizing: {current_percent}% ({processed_files}/{total_files} files)"
-                        )
-            
-            # Set callback ke file processor jika memungkinkan
-            if hasattr(self.file_processor, 'set_file_callback'):
-                self.file_processor.set_file_callback(organize_progress_callback)
-            
-            # Jalankan pengorganisasian
-            if params['rename_files']:
-                result = self.file_processor.organize_dataset_with_renaming(
-                    paths['extract_dir'], paths['final_dir']
-                )
-            else:
-                result = self.file_processor.organize_dataset(
-                    paths['extract_dir'], paths['final_dir']
-                )
-            
-            # Reset callback
-            if hasattr(self.file_processor, 'set_file_callback'):
-                self.file_processor.set_file_callback(None)
-            
-            # Validasi hasil
             if result['status'] != 'success':
-                self._notify_progress('organize_failed', 85, 100, f"❌ Pengorganisasian gagal: {result['message']}")
                 raise Exception(f"Organization failed: {result['message']}")
             
-            # Notifikasi selesai
-            stats = {
-                'total_images': result.get('total_images', 0),
-                'total_labels': result.get('total_labels', 0),
-                'splits': result.get('splits', {})
-            }
+            if self.progress_tracker:
+                self.progress_tracker.complete_stage("🗂️ Basic organization complete")
             
-            # Notifikasi statistik per split
-            splits = stats.get('splits', {})
-            for split_name, split_stats in splits.items():
-                self._notify_progress(
-                    f'organize_split_{split_name}', 
-                    90, 
-                    100, 
-                    f"📁 {split_name}: {split_stats.get('images', 0)} gambar, {split_stats.get('labels', 0)} label"
-                )
-            
-            # Notifikasi UUID renaming jika diaktifkan
+            # Phase 2: UUID Renaming (if enabled)
             if params['rename_files']:
-                naming_stats = self.file_processor.get_naming_statistics()
-                stats['naming_stats'] = naming_stats
-                renamed_files = naming_stats.get('total_files', 0)
-                self.logger.info(f"🔄 UUID renaming: {renamed_files} files")
-                self._notify_progress(
-                    'organize_rename_complete', 
-                    92, 
-                    100, 
-                    f"🔄 UUID renaming selesai: {renamed_files} files"
-                )
+                if self.progress_tracker:
+                    self.progress_tracker.start_stage(DownloadStage.UUID_RENAME, "🔄 Memulai UUID renaming...")
+                
+                rename_result = self._execute_uuid_renaming(paths['dataset_dir'], params)
+                
+                # Merge rename results
+                result['naming_stats'] = rename_result.get('naming_stats', {})
+                result['uuid_renamed'] = True
+                
+                if self.progress_tracker:
+                    renamed_count = rename_result.get('naming_stats', {}).get('total_files', 0)
+                    self.progress_tracker.complete_stage(f"🔄 UUID renaming selesai: {renamed_count} files")
             
-            # Notifikasi pengorganisasian selesai
-            self._notify_progress(
-                'organize_complete', 
-                95, 
-                100, 
-                f"✅ Pengorganisasian selesai: {stats['total_images']} gambar, {stats['total_labels']} label"
-            )
+            if self.progress_tracker:
+                total_images = result.get('total_images', 0)
+                self.progress_tracker.update_stage(90, f"🗂️ Final organization: {total_images} images")
             
-            return stats
+            return result
             
         except Exception as e:
-            self.logger.error(f"❌ Pengorganisasian gagal: {str(e)}")
-            self._notify_progress('organize_error', 85, 100, f"❌ Pengorganisasian gagal: {str(e)}")
             raise Exception(f"Organization failed: {str(e)}")
     
-    def _validate_results(self, final_dir: Path) -> None:
-        """Validate results dengan progress tracking dan notifikasi per step"""
-        self._notify_progress('validate_start', 95, 100, "✅ Memulai validasi hasil...")
-        self.logger.info(f"✅ Memvalidasi hasil di {final_dir}")
-        
+    def _execute_uuid_renaming(self, dataset_path: Path, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute UUID renaming dengan detailed progress tracking"""
         try:
-            # Notifikasi awal validasi
-            self._notify_progress('validate_structure', 96, 100, "🔍 Memeriksa struktur dataset...")
+            from smartcash.common.utils.file_naming_manager import FileNamingManager
             
-            # Validasi struktur dataset
-            validation_result = self.validator.validate_extracted_dataset(final_dir)
+            if self.progress_tracker:
+                self.progress_tracker.update_stage(10, "🔄 Initializing UUID naming manager...")
             
-            # Notifikasi hasil validasi
-            if validation_result['valid']:
-                self._notify_progress(
-                    'validate_success', 
-                    98, 
-                    100, 
-                    f"✅ Validasi berhasil: {validation_result.get('splits', [])} splits"
-                )
-                self.logger.success(f"✅ Dataset valid dengan {len(validation_result.get('splits', []))} splits")
-            else:
-                issues = validation_result.get('issues', [])
-                self._notify_progress(
-                    'validate_issues', 
-                    97, 
-                    100, 
-                    f"⚠️ Validasi menemukan {len(issues)} masalah"
-                )
+            naming_manager = FileNamingManager(logger=self.logger)
+            
+            # Scan all splits for renaming
+            splits = ['train', 'valid', 'test']
+            total_renamed = 0
+            split_stats = {}
+            
+            for i, split in enumerate(splits):
+                split_dir = dataset_path / split
+                if not split_dir.exists():
+                    continue
                 
-                # Notifikasi per masalah (maksimal 3)
-                for i, issue in enumerate(issues[:3]):
-                    self._notify_progress(
-                        f'validate_issue_{i+1}', 
-                        97, 
-                        100, 
-                        f"⚠️ Issue {i+1}: {issue}"
+                split_progress = 20 + (i / len(splits)) * 60  # 20-80%
+                
+                if self.progress_tracker:
+                    self.progress_tracker.update_stage(
+                        int(split_progress), 
+                        f"🔄 Renaming {split} files..."
+                    )
+                
+                # Rename files in this split
+                renamed_count = self._rename_split_files(split_dir, naming_manager)
+                split_stats[split] = renamed_count
+                total_renamed += renamed_count
+                
+                if self.progress_tracker:
+                    self.progress_tracker.update_stage(
+                        int(split_progress + 15), 
+                        f"🔄 {split}: {renamed_count} files renamed"
                     )
             
-            # Notifikasi validasi selesai
-            self._notify_progress('validate_complete', 99, 100, "✅ Validasi selesai")
+            # Generate statistics
+            naming_stats = {
+                'total_files': total_renamed,
+                'splits': split_stats,
+                'uuid_format': True,
+                'naming_strategy': 'research_uuid'
+            }
             
-            if not validation_result['valid'] and validation_result.get('issues'):
-                issues = validation_result['issues'][:3]  # Limit issues shown
-                self.logger.warning(f"⚠️ Validation issues: {', '.join(issues)}")
-                
+            if self.progress_tracker:
+                self.progress_tracker.update_stage(90, f"🔄 UUID statistics generated")
+            
+            return {
+                'status': 'success',
+                'naming_stats': naming_stats,
+                'total_renamed': total_renamed
+            }
+            
         except Exception as e:
-            self.logger.error(f"❌ Validasi gagal: {str(e)}")
-            self._notify_progress('validate_error', 97, 100, f"❌ Validasi gagal: {str(e)}")
-            # Tidak raise exception karena validasi bukan langkah kritis
+            raise Exception(f"UUID renaming failed: {str(e)}")
     
-    def _has_existing_dataset(self, dataset_dir: Path) -> bool:
+    def _rename_split_files(self, split_dir: Path, naming_manager) -> int:
+        """Rename files dalam single split directory"""
+        images_dir = split_dir / 'images'
+        labels_dir = split_dir / 'labels'
+        
+        if not images_dir.exists():
+            return 0
+        
+        renamed_count = 0
+        
+        # Process each image file
+        for img_file in images_dir.glob('*.*'):
+            if img_file.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.bmp'}:
+                continue
+            
+            try:
+                # Get corresponding label
+                label_file = labels_dir / f"{img_file.stem}.txt"
+                primary_class = None
+                
+                if label_file.exists():
+                    primary_class = naming_manager.extract_primary_class_from_label(label_file)
+                
+                # Generate new filename
+                file_info = naming_manager.generate_file_info(img_file.name, primary_class)
+                new_filename = file_info.get_filename()
+                
+                # Skip if already in UUID format
+                if naming_manager.parse_existing_filename(img_file.name):
+                    continue
+                
+                # Rename image
+                new_img_path = images_dir / new_filename
+                if not new_img_path.exists():
+                    img_file.rename(new_img_path)
+                    renamed_count += 1
+                
+                # Rename corresponding label
+                if label_file.exists():
+                    new_label_filename = f"{Path(new_filename).stem}.txt"
+                    new_label_path = labels_dir / new_label_filename
+                    if not new_label_path.exists():
+                        label_file.rename(new_label_path)
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error renaming {img_file.name}: {str(e)}")
+        
+        return renamed_count
+    
+    def _validate_results(self, dataset_path: Path) -> None:
+        """Validate results dengan progress tracking"""
+        if self.progress_tracker:
+            self.progress_tracker.update_stage(20, "✅ Validating structure...")
+        
+        try:
+            validation_result = self.validator.validate_extracted_dataset(dataset_path)
+            
+            if self.progress_tracker:
+                if validation_result['valid']:
+                    splits_count = len(validation_result.get('splits', []))
+                    self.progress_tracker.update_stage(80, f"✅ Valid dataset: {splits_count} splits")
+                else:
+                    issues = validation_result.get('issues', [])
+                    self.progress_tracker.update_stage(60, f"⚠️ Issues found: {len(issues)}")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Validation warning: {str(e)}")
+    
+    def _handle_backup(self, dataset_path: Path) -> None:
+        """Handle backup dengan progress tracking"""
+        if self.progress_tracker:
+            self.progress_tracker.update_stage(20, "💾 Creating backup...")
+        
+        backup_result = FileHelper.backup_directory(dataset_path)
+        
+        if self.progress_tracker:
+            if backup_result['success']:
+                self.progress_tracker.update_stage(80, "💾 Backup created successfully")
+            else:
+                self.progress_tracker.update_stage(60, "⚠️ Backup failed")
+    
+    def _has_existing_dataset(self, dataset_path: Path) -> bool:
         """Check existing dataset"""
-        return (dataset_dir.exists() and 
-                any((dataset_dir / split).exists() and any((dataset_dir / split).iterdir())
+        return (dataset_path.exists() and 
+                any((dataset_path / split).exists() and any((dataset_path / split).iterdir())
                     for split in ['train', 'valid', 'test']))
     
-    def get_service_info(self) -> Dict[str, Any]:
-        """Get service information untuk debugging"""
-        from smartcash.common.environment import get_environment_manager
-        env_manager = get_environment_manager()
-        
+    def _create_error_response(self, message: str) -> Dict[str, Any]:
+        """Create error response dengan format yang konsisten"""
         return {
-            'has_progress_callback': self._progress_callback is not None,
-            'callback_signature': 'step, current, total, message',
-            'environment': {
-                'is_colab': env_manager.is_colab,
-                'drive_mounted': env_manager.is_drive_mounted
-            },
-            'components_loaded': {
-                'roboflow_client': self._roboflow_client is not None,
-                'file_processor': self._file_processor is not None,
-                'validator': self._validator is not None
-            },
-            'config_keys': list(self.config.keys()),
-            'uuid_support': True
+            'status': 'error',
+            'message': message,
+            'stats': {'total_images': 0, 'total_labels': 0, 'splits': {}},
+            'output_dir': '',
+            'duration': 0.0
         }
 
-
 def create_download_service(config: Dict[str, Any], logger=None) -> Optional[DownloadService]:
-    """
-    FIXED: Factory dengan comprehensive validation dan UI compatibility
-    """
+    """Factory dengan comprehensive validation"""
     from smartcash.common.logger import get_logger
     logger = logger or get_logger('downloader.factory')
     
@@ -599,7 +513,7 @@ def create_download_service(config: Dict[str, Any], logger=None) -> Optional[Dow
             logger.error("❌ Config kosong")
             return None
         
-        # Apply defaults untuk missing keys
+        # Apply defaults
         defaults = {
             'workspace': 'smartcash-wo2us',
             'project': 'rupiah-emisi-2022',
@@ -613,7 +527,6 @@ def create_download_service(config: Dict[str, Any], logger=None) -> Optional[Dow
             'timeout': 30
         }
         
-        # Merge dengan defaults
         merged_config = {**defaults, **config}
         
         # Validate required fields

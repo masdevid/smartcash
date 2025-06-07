@@ -1,16 +1,15 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: FIXED UI components menggunakan shared components dan fixed overflow issues
+Deskripsi: FIXED UI components menggunakan progress_tracker yang benar
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+from smartcash.ui.components.progress_tracker import create_triple_progress_tracker  # ✅ FIXED
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.header import create_header
 from smartcash.ui.utils.layout_utils import create_responsive_container, create_responsive_two_column
-from smartcash.ui.utils.ui_logger_namespace import get_namespace_color
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -57,10 +56,15 @@ def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflo
     # 6. Action buttons dengan proper state management
     action_components = _create_action_buttons_fixed()
     
-    # 7. Progress tracker menggunakan shared component
-    progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
-    progress_container = progress_tracker.container
-    progress_container.layout.display = 'none'
+    # 7. Progress tracker - ✅ FIXED: Menggunakan triple untuk Overall + Step + Current
+    progress_components = create_triple_progress_tracker(
+        operation="Dataset Download",
+        steps=["Inisialisasi", "Download", "Organisasi", "UUID Rename", "Validasi", "Cleanup"],
+        auto_hide=True
+    )
+    
+    # Hide progress container initially
+    progress_components['container'].layout.display = 'none'
     
     # 8. Log accordion menggunakan shared component dengan FIXED overflow
     log_components = create_log_accordion(
@@ -77,7 +81,7 @@ def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflo
         save_reset_components['container'],
         _create_action_header(),
         action_components['container'],
-        progress_container,
+        progress_components['container'],
         log_components['log_accordion']
     ], container_type='vbox')
     
@@ -92,8 +96,10 @@ def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflo
         # Buttons menggunakan shared components
         **save_reset_components, **action_components,
         
-        # Progress tracker
-        'progress_tracker': progress_tracker, 'progress_container': progress_container,
+        # Progress tracker - ✅ FIXED: Menggunakan komponen yang benar
+        'progress_tracker': progress_components['tracker'],
+        'progress_container': progress_components['container'],
+        **progress_components,
         
         # Log components dengan fixed overflow
         **log_components

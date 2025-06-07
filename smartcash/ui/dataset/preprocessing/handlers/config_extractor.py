@@ -6,7 +6,6 @@ Deskripsi: Ekstraksi konfigurasi preprocessing dari UI components sesuai dengan 
 from typing import Dict, Any
 from datetime import datetime
 
-
 def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Ekstraksi konfigurasi preprocessing yang konsisten dengan preprocessing_config.yaml"""
     # One-liner value extraction dengan fallback

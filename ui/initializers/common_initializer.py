@@ -218,7 +218,17 @@ class CommonInitializer(ABC):
             'initialized_by': self.__class__.__name__,
             'config': config
         })
-    
+    def _clear_existing_widgets(self) -> None:
+        """Clear existing widgets untuk avoid conflicts"""
+        try:
+            import gc
+            from IPython.display import clear_output
+            # Force garbage collection
+            gc.collect()
+            # Clear any existing outputs
+            clear_output(wait=True)
+        except Exception:
+            pass  # Silent fail jika clear tidak berhasil
     # One-liner utilities
     _get_return_value = lambda self, ui_components: ui_components.get('ui', ui_components)
     get_module_status = lambda self: {'module_name': self.module_name, 'initialized': True, 'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}

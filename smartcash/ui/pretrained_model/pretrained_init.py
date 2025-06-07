@@ -45,17 +45,7 @@ class PretrainedInit(CommonInitializer):
         """Critical components untuk validasi"""
         return ['ui', 'download_sync_button', 'log_output']
     
-    def _clear_existing_widgets(self) -> None:
-        """Clear existing widgets untuk avoid conflicts"""
-        try:
-            import gc
-            from IPython.display import clear_output
-            # Force garbage collection
-            gc.collect()
-            # Clear any existing outputs
-            clear_output(wait=True)
-        except Exception:
-            pass  # Silent fail jika clear tidak berhasil
+    
 
 # Global instance dan public API
 _pretrained_init = PretrainedInit()

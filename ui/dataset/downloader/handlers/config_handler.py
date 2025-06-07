@@ -1,21 +1,20 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/config_handler.py
-Deskripsi: FIXED config handler dengan proper file save ke dataset_config.yaml
+Deskripsi: config handler dengan proper file save ke dataset_config.yaml
 """
 
 from typing import Dict, Any
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
 from smartcash.ui.dataset.downloader.utils.colab_secrets import set_api_key_to_config
 from smartcash.common.config.manager import get_config_manager
 
 class DownloaderConfigHandler(ConfigHandler):
-    """FIXED config handler dengan proper file save functionality"""
+    """config handler dengan proper file save functionality"""
     
     def __init__(self, module_name: str = 'downloader', parent_module: str = 'dataset'):
         super().__init__(module_name, parent_module)
         self.config_manager = get_config_manager()
-        self.config_filename = 'dataset_config.yaml'  # Explicitly use dataset_config.yaml
+        self.config_filename = 'dataset_config.yaml' 
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract config dari downloader UI components"""
@@ -24,14 +23,9 @@ class DownloaderConfigHandler(ConfigHandler):
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Update UI dari config"""
         self.update_ui_from_config(ui_components, config)
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default config dengan API key auto-detection"""
-        config = get_default_downloader_config()
-        return set_api_key_to_config(config, force_refresh=False)
     
     def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """FIXED save config ke dataset_config.yaml dengan proper merging"""
+        """save config ke dataset_config.yaml dengan proper merging"""
         try:
             # Use dataset_config.yaml sebagai target file
             filename = config_filename or self.config_filename
@@ -42,7 +36,7 @@ class DownloaderConfigHandler(ConfigHandler):
             # Load existing config dari file untuk merge
             existing_config = self.config_manager.load_config(filename)
             
-            # FIXED: Merge config dengan strategy yang benar
+            # Merge config dengan strategy yang benar
             merged_config = self._merge_downloader_config(existing_config, current_config)
             
             # Save merged config ke file
@@ -60,7 +54,7 @@ class DownloaderConfigHandler(ConfigHandler):
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """FIXED reset config dengan proper default loading"""
+        """reset config dengan proper default loading"""
         try:
             # Get default config
             default_config = self.get_default_config()
@@ -84,7 +78,7 @@ class DownloaderConfigHandler(ConfigHandler):
             return False
     
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """FIXED load config dari dataset_config.yaml dengan fallback"""
+        """load config dari dataset_config.yaml dengan fallback"""
         try:
             filename = config_filename or self.config_filename
             
@@ -109,7 +103,7 @@ class DownloaderConfigHandler(ConfigHandler):
             return self.get_default_config()
     
     def _merge_downloader_config(self, existing: Dict[str, Any], new_downloader: Dict[str, Any]) -> Dict[str, Any]:
-        """FIXED merge downloader config dengan existing dataset_config.yaml"""
+        """merge downloader config dengan existing dataset_config.yaml"""
         # Start dengan existing config
         merged = dict(existing) if existing else {}
         

@@ -5,7 +5,6 @@ Deskripsi: Pembaruan UI components dari konfigurasi preprocessing sesuai dengan 
 
 from typing import Dict, Any
 
-
 def update_preprocessing_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update UI components dari config preprocessing sesuai dengan preprocessing_config.yaml"""
     preprocessing_config = config.get('preprocessing', {})
@@ -95,8 +94,9 @@ def reset_preprocessing_ui(ui_components: Dict[str, Any]) -> None:
     """Reset UI components ke default konfigurasi preprocessing"""
     try:
         from smartcash.common.config.manager import get_config_manager
+        from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
         config_manager = get_config_manager()
-        default_config = config_manager.get_default_config('preprocessing_config')
+        default_config = get_default_preprocessing_config()
         update_preprocessing_ui(ui_components, default_config)
     except Exception:
         # Fallback to basic reset jika config manager gagal

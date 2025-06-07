@@ -24,7 +24,7 @@ class DownloaderInitializer(CommonInitializer):
 
         ui_components = create_downloader_main_ui(config)
         ui_components.update({
-            'dataset_downloader_initialized': True,
+            'downloader_initialized': True,
             'module_name': 'downloader'
         })
         return ui_components
@@ -51,18 +51,6 @@ class DownloaderInitializer(CommonInitializer):
             'save_button', 'reset_button', 'log_output', 'progress_tracker'
         ]
     
-    def _clear_existing_widgets(self) -> None:
-        """Clear existing widgets untuk avoid conflicts"""
-        try:
-            import gc
-            from IPython.display import clear_output
-            # Force garbage collection
-            gc.collect()
-            # Clear any existing outputs
-            clear_output(wait=True)
-        except Exception:
-            pass  # Silent fail jika clear tidak berhasil
-
 _downloader_init = DownloaderInitializer()
 
 def initialize_downloader(env=None, config=None, **kwargs) -> Any:

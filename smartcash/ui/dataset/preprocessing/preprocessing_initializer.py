@@ -3,68 +3,23 @@ File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
 Deskripsi: Initializer preprocessing yang terintegrasi dengan dataset/preprocessors tanpa duplikasi
 """
 
-from typing import Dict, Any, List, Optional, Type
-from smartcash.common.environment import get_environment_manager
-from smartcash.common.constants.paths import get_paths_for_environment
-from smartcash.ui.initializers.common_initializer import CommonInitializer, create_common_initializer
-from smartcash.ui.utils.ui_logger_namespace import PREPROCESSING_LOGGER_NAMESPACE, KNOWN_NAMESPACES
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from typing import Dict, Any, List
+from smartcash.ui.initializers.common_initializer import CommonInitializer  
 
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[PREPROCESSING_LOGGER_NAMESPACE]
-
+from smartcash.ui.dataset.preprocessing.handlers.config_handler import PreprocessingConfigHandler
 # Import components
 from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
 from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import setup_preprocessing_handlers
 
-class PreprocessingConfigHandler(ConfigHandler):
-    """Config handler untuk preprocessing dengan fixed implementation"""
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dari UI components"""
-        # Implementasi sederhana untuk extract config dari UI
-        config = {}
-        if 'img_size_slider' in ui_components:
-            config['img_size'] = ui_components['img_size_slider'].value
-        if 'normalize_checkbox' in ui_components:
-            config['normalize'] = ui_components['normalize_checkbox'].value
-        if 'num_workers_slider' in ui_components:
-            config['num_workers'] = ui_components['num_workers_slider'].value
-        return {'preprocessing': config}
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari config"""
-        preprocessing_config = config.get('preprocessing', {})
-        if 'img_size_slider' in ui_components and 'img_size' in preprocessing_config:
-            ui_components['img_size_slider'].value = preprocessing_config['img_size']
-        if 'normalize_checkbox' in ui_components and 'normalize' in preprocessing_config:
-            ui_components['normalize_checkbox'].value = preprocessing_config['normalize']
-        if 'num_workers_slider' in ui_components and 'num_workers' in preprocessing_config:
-            ui_components['num_workers_slider'].value = preprocessing_config['num_workers']
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default config untuk preprocessing"""
-        try:
-            env_manager = get_environment_manager()
-            paths = get_paths_for_environment(env_manager.is_colab, env_manager.is_drive_mounted)
-            return {
-                'data': {'dir': paths['data_root']},
-                'preprocessing': {
-                    'img_size': [640, 640], 'normalize': True, 'num_workers': 4,
-                    'output_dir': paths.get('preprocessed', 'data/preprocessed')
-                }
-            }
-        except Exception:
-            return {
-                'data': {'dir': 'data'},
-                'preprocessing': {'img_size': [640, 640], 'normalize': True, 'num_workers': 4}
-            }
-
 class PreprocessingInitializer(CommonInitializer):
     """Initializer preprocessing terintegrasi dengan dataset/preprocessors"""
     
-    def __init__(self, module_name: str = 'preprocessing', config_handler_class: Optional[Type[ConfigHandler]] = None, 
-                 parent_module: Optional[str] = 'dataset'):
-        super().__init__(module_name, config_handler_class or PreprocessingConfigHandler, parent_module)
+    def __init__(self):
+        super().__init__(
+            module_name='preprocessing',
+            config_handler_class=PreprocessingConfigHandler,
+            parent_module='dataset'
+        )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components dengan integrasi preprocessors"""
@@ -83,8 +38,8 @@ class PreprocessingInitializer(CommonInitializer):
     def _get_default_config(self) -> Dict[str, Any]:
         """Default config dengan environment awareness"""
         # Menggunakan config handler untuk mendapatkan default config
-        config_handler = self._create_config_handler()
-        return config_handler.get_default_config()
+        from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
+        return get_default_preprocessing_config()
     
     def _get_critical_components(self) -> List[str]:
         return [
@@ -97,8 +52,7 @@ class PreprocessingInitializer(CommonInitializer):
 # Global instance dan public API
 _preprocessing_initializer = PreprocessingInitializer()
 
-def initialize_dataset_preprocessing_ui(env=None, config=None, parent_callbacks=None, **kwargs):
+def initialize_preprocessing_ui(env=None, config=None, **kwargs):
     """Factory function untuk preprocessing UI dengan parent module support"""
-    return _preprocessing_initializer.initialize(env=env, config=config, parent_callbacks=parent_callbacks, **kwargs)
+    return _preprocessing_initializer.initialize(env=env, config=config, **kwargs)
     
-initialize_preprocessing_ui = initialize_dataset_preprocessing_ui

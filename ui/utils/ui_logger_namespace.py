@@ -4,97 +4,100 @@ Deskripsi: Fixed UI logger namespace untuk prevent duplicate formatting dan clea
 """
 
 from typing import Dict, Any, Optional
-
-# ENHANCED KNOWN_NAMESPACES dengan UUID support
+# KNOWN_NAMESPACES dengan UUID support
 KNOWN_NAMESPACES = {
-    # Setup & Environment (existing)
-    "smartcash.ui.setup.dependency_installer": "DEPS",
+    # Setup & Environment
     "smartcash.ui.setup.env_config": "ENV",
+    "smartcash.ui.setup.dependency": "DEPS",
     "smartcash.ui.setup": "SETUP",
-    # Dataset modules (existing + enhanced)
-    "smartcash.dataset.download": "DOWNLOAD",
-    "smartcash.dataset.preprocessing": "PREPROC",
-    "smartcash.dataset.augmentation": "AUGMENT",
-    "smartcash.dataset.validation": "VALID",
-    "smartcash.dataset.analysis": "ANALYZE",
     
-    # NEW: Enhanced dataset modules dengan UUID support
-    "smartcash.dataset.downloader": "DL_ENH",
-    "smartcash.dataset.downloader.enhanced": "DL_ENH",
-    "smartcash.dataset.file_renamer": "RENAME",
-    "smartcash.dataset.organizer.enhanced": "ORG_ENH",
+    # Dataset related
+    "smartcash.ui.dataset.downloader": "DOWNLOAD",
+    "smartcash.ui.dataset.split": "SPLIT",
+    "smartcash.ui.dataset.preprocessing": "PREPROC",
+    "smartcash.ui.dataset.augmentation": "AUGMENT",
+    "smartcash.ui.pretrained_model": "PRETRAIN",
+    "smartcash.ui.backbone": "BACKBONE",
+    "smartcash.ui.hyperparameters": "HYPER",
+    "smartcash.ui.strategy": "STRATEGY",
+    "smartcash.ui.training": "TRAINING",
+    "smartcash.ui.evaluation": "EVAL",
+
+    "smartcash.dataset.preprocessing": "DATASET_PREPROC",
+    "smartcash.dataset.augmentation": "DATASET_AUGMENT",
+    "smartcash.dataset.validation": "DATASET_VALID",
+    "smartcash.dataset.analysis": "DATASET_ANALYZE",
+    "smartcash.dataset.downloader": "DATASET_DOWNLOADER",
+    "smartcash.dataset.file_renamer": "DATASET_RENAME",
+    "smartcash.dataset.organizer": "DATASET_ORG",
+    # Model related
+    "smartcash.model.training": "MOD_TRAIN",
+    "smartcash.model.evaluation": "MOD_EVAL",
+    "smartcash.model.inference": "MOD_INFER",
+    "smartcash.model.export": "MOD_EXPORT",
+    "smartcash.model.config": "MOD_CONFIG",
+    
+    # Common utilities
     "smartcash.common.file_naming": "NAMING",
     "smartcash.common.threadpools": "THREAD",
-    
-    # Model modules (existing)
-    "smartcash.model.training": "TRAIN",
-    "smartcash.model.evaluation": "EVAL",
-    "smartcash.model.inference": "INFER",
-    "smartcash.model.export": "EXPORT",
-    "smartcash.model.config": "CONFIG",
-    
-    # UI modules (existing)
-    "smartcash.ui.main": "MAIN",
-    "smartcash.ui.dashboard": "DASH",
-    "smartcash.ui.components": "COMP",
-    "smartcash.ui.handlers": "HAND",
-    "smartcash.ui.observers": "OBS",
-    
-    # Common modules (existing + enhanced)
     "smartcash.common.logger": "LOG",
     "smartcash.common.config": "CFG",
     "smartcash.common.utils": "UTILS",
     
-    # Detection modules (existing)
+    # Detection
     "smartcash.detection.service": "DETECT",
-    "smartcash.detection.postprocess": "POST",
-    
-    # Pretrained model modules (existing)
-    "smartcash.ui.pretrained_model": "PRETRAIN"
+    "smartcash.detection.postprocess": "POST"
 }
 
 # ENHANCED NAMESPACE_COLORS dengan UUID modules
 NAMESPACE_COLORS = {
-    # Existing colors tetap sama...
+    # Setup & Environment colors
     "DEPS": "#FF6B6B",      # Red untuk dependency
     "ENV": "#4ECDC4",       # Teal untuk environment
     "SETUP": "#45B7D1",     # Blue untuk setup
+    
+    # Dataset related colors
     "DOWNLOAD": "#96CEB4",  # Green untuk download
+    "SPLIT": "#7DCEA0",     # Medium green untuk split
     "PREPROC": "#FFEAA7",   # Yellow untuk preprocessing
     "AUGMENT": "#DDA0DD",   # Plum untuk augmentation
     "VALID": "#98D8C8",     # Mint untuk validation
     "ANALYZE": "#F7DC6F",   # Light yellow untuk analysis
     
-    # NEW: Enhanced dataset colors
-    "DL_ENH": "#2ECC71",    # Green untuk enhanced downloader
-    "RENAME": "#E74C3C",    # Red untuk renaming operations
-    "ORG_ENH": "#9B59B6",   # Purple untuk enhanced organizer
-    "NAMING": "#3498DB",    # Blue untuk naming operations
-    "THREAD": "#F39C12",    # Orange untuk threading operations
+    # Enhanced dataset colors
+    "DATASET_DOWNLOADER": "#2ECC71",    # Green untuk enhanced downloader
+    "DATASET_RENAME": "#E74C3C",    # Red untuk renaming operations
+    "DATASET_ORG": "#9B59B6",   # Purple untuk enhanced organizer
+    "DATASET_PREPROC": "#3498DB",    # Blue untuk naming operations
+    "DATASET_AUGMENT": "#F39C12",    # Orange untuk threading operations
     
-    # Existing model colors tetap sama...
-    "TRAIN": "#85C1E9",     # Light blue untuk training
-    "EVAL": "#F8C471",      # Orange untuk evaluation
-    "INFER": "#BB8FCE",     # Purple untuk inference
-    "EXPORT": "#82E0AA",    # Light green untuk export
-    "CONFIG": "#F1948A",    # Pink untuk config
+    # Model related colors
+    "PRETRAIN": "#D7BDE2",  # Light purple untuk pretrained model
+    "BACKBONE": "#A9CCE3",  # Sky blue untuk backbone
+    "HYPER": "#A3E4D7",     # Aqua untuk hyperparameters
+    "STRATEGY": "#FAD7A0",  # Light orange untuk strategy
+    "TRAINING": "#D2B4DE",  # Lavender untuk training
+    "MOD_TRAIN": "#85C1E9",     # Light blue untuk training
+    "MOD_EVAL": "#F8C471",      # Orange untuk evaluation
+    "MOD_INFER": "#BB8FCE",     # Purple untuk inference
+    "MOD_EXPORT": "#82E0AA",    # Light green untuk export
+    "MOD_CONFIG": "#F1948A",    # Pink untuk config
     
-    # Existing UI colors tetap sama...
+    # UI components colors
     "MAIN": "#AED6F1",      # Light blue untuk main
     "DASH": "#D5DBDB",      # Gray untuk dashboard
     "COMP": "#E8DAEF",      # Light purple untuk components
     "HAND": "#FADBD8",      # Light pink untuk handlers
     "OBS": "#D4EDDA",       # Light green untuk observers
     
-    # Existing common colors tetap sama...
+    # Common utilities colors
     "LOG": "#FCF3CF",       # Light yellow untuk logger
     "CFG": "#EBDEF0",       # Light lavender untuk config
     "UTILS": "#E5E7E9",     # Light gray untuk utils
     
-    # Existing detection colors tetap sama...
+    # Detection colors
     "DETECT": "#ABEBC6",    # Light green untuk detection
-    "POST": "#F9E79F",      # Light yellow untuk postprocess
-    "PRETRAIN": "#D7BDE2"   # Light purple untuk pretrained model
+    "POST": "#F9E79F"       # Light yellow untuk postprocess
 }
 
 # ENHANCED namespace color helper function
@@ -116,15 +119,18 @@ def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
     # Enhanced flag mapping dengan UUID support
     flag_mapping = {
         # Existing flags
-        'dependency_installer_initialized': "smartcash.setup.dependency_installer",
-        'download_initialized': "smartcash.dataset.download",
-        'env_config_initialized': "smartcash.ui.env_config",
+        'env_config_initialized': "smartcash.ui.setup.env_config",
+        'dependency_installer_initialized': "smartcash.ui.setup.dependency",
+        'split_initialized': "smartcash.ui.split",
+        'downloader_initialized': "smartcash.dataset.download",
         'augmentation_initialized': "smartcash.dataset.augmentation",
         'preprocessing_initialized': "smartcash.dataset.preprocessing",
-        'training_initialized': "smartcash.model.training",
-        'evaluation_initialized': "smartcash.model.evaluation",
-        'main_ui_initialized': "smartcash.ui.main",
-        'dashboard_initialized': "smartcash.ui.dashboard",
+        'backbone_initialized': "smartcash.ui.backbone",
+        'hyperparameters_initialized': "smartcash.ui.hyperparameters",
+        'pretrained_model': 'smartcash.ui.pretrained_model',
+        'strategy_initialized': "smartcash.ui.strategy",
+        'training_initialized': "smartcash.ui.training",
+        'evaluation_initialized': "smartcash.ui.evaluation",
         
         # NEW: Enhanced flags untuk UUID support
         'file_renamer_initialized': "smartcash.dataset.file_renamer",
@@ -283,14 +289,7 @@ def get_namespace_summary() -> Dict[str, Any]:
     
     return base_summary
 
-# Backward compatibility constants untuk module-specific namespaces
-PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
-DEPENDENCY_LOGGER_NAMESPACE = "smartcash.ui.setup.dependency"
-AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
-EVALUATION_LOGGER_NAMESPACE = "smartcash.model.evaluation"
-DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
-TRAINING_LOGGER_NAMESPACE = "smartcash.model.training"
-ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.setup.env_config"
+
 
 # Export constants for backward compatibility
 __all__ = [
@@ -301,9 +300,4 @@ __all__ = [
     
     # NEW: UUID-specific exports
     'register_uuid_namespace', 'get_uuid_operation_context', 'format_uuid_progress_message',
-    
-    # Backward compatibility constants
-    'PREPROCESSING_LOGGER_NAMESPACE', 'DEPENDENCY_LOGGER_NAMESPACE', 'AUGMENTATION_LOGGER_NAMESPACE',
-    'EVALUATION_LOGGER_NAMESPACE', 'DOWNLOAD_LOGGER_NAMESPACE', 'TRAINING_LOGGER_NAMESPACE',
-    'ENV_CONFIG_LOGGER_NAMESPACE'
 ]

@@ -5,17 +5,11 @@ Deskripsi: Dependency installer init dengan fixed logger, generator cleanup, dan
 
 from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.utils.logger_bridge import get_logger
-from smartcash.ui.utils.ui_logger_namespace import DEPENDENCY_LOGGER_NAMESPACE, KNOWN_NAMESPACES
-
 # Import handlers
 from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependency_config
 from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
 from smartcash.ui.setup.dependency.handlers.dependency_handler import setup_dependency_handlers
 from smartcash.ui.setup.dependency.handlers.config_handler import DependencyConfigHandler
-
-MODULE_LOGGER_NAME = KNOWN_NAMESPACES[DEPENDENCY_LOGGER_NAMESPACE]
-
 
 class DependencyInitializer(CommonInitializer):
     """Fixed dependency initializer dengan proper handlers"""

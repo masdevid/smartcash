@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/downloader_initializer.py
-Deskripsi: FIXED downloader initializer dengan unified handlers dan environment fix
+Deskripsi: FIXED downloader initializer dengan proper error handling tanpa fallbacks
 """
 
 from typing import Dict, Any, Optional, List
@@ -12,7 +12,7 @@ from smartcash.ui.utils.logging_utils import setup_ipython_logging
 from smartcash.common.logger import get_logger
 
 class DownloaderInitializer(CommonInitializer):
-    """FIXED downloader initializer dengan unified handlers dan environment fix"""
+    """FIXED downloader initializer dengan proper error resolution"""
     
     def __init__(self):
         super().__init__(
@@ -22,54 +22,42 @@ class DownloaderInitializer(CommonInitializer):
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create downloader UI components dengan proper environment"""
-        try:
-            # Create UI components
-            ui_components = create_downloader_main_ui(config)
-            
-            # Setup logger with UI integration
-            logger = setup_ipython_logging(
-                ui_components, 
-                module_name='smartcash.dataset.downloader',
-                log_to_file=False,
-                redirect_all_logs=False
-            )
-            ui_components['logger'] = logger
-            ui_components['download_initialized'] = True
-            
-            # Log successful creation
-            logger.success(f"✅ Downloader UI components created successfully")
-            
-            return ui_components
-            
-        except Exception as e:
-            logger = get_logger('smartcash.dataset.downloader')
-            logger.error(f"❌ Error creating downloader UI: {str(e)}")
-            return self._create_fallback_ui(str(e))
+        """Create downloader UI components dengan error resolution"""
+        # Create UI components
+        ui_components = create_downloader_main_ui(config)
+        
+        # Setup logger with UI integration
+        logger = setup_ipython_logging(
+            ui_components, 
+            module_name='smartcash.dataset.downloader',
+            log_to_file=False,
+            redirect_all_logs=False
+        )
+        ui_components['logger'] = logger
+        ui_components['download_initialized'] = True
+        
+        # Log successful creation
+        logger.success(f"✅ Downloader UI components created successfully")
+        
+        return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup unified handlers dengan backend integration"""
-        try:
-            logger = ui_components.get('logger')
-            
-            # Setup unified handlers
-            ui_components = setup_download_handlers(ui_components, config, env)
-            
-            # Verify handlers setup
-            handlers_status = self._verify_handlers_setup(ui_components)
-            
-            if handlers_status['all_present']:
-                logger.success("✅ Semua handlers berhasil di-setup")
-            else:
-                missing = handlers_status['missing']
-                logger.warning(f"⚠️ Beberapa handlers tidak ditemukan: {', '.join(missing)}")
-            
-            return ui_components
-                
-        except Exception as e:
-            logger = ui_components.get('logger') or get_logger('smartcash.dataset.downloader')
-            logger.error(f"❌ Error setup handlers: {str(e)}")
-            return ui_components
+        logger = ui_components.get('logger')
+        
+        # Setup unified handlers
+        ui_components = setup_download_handlers(ui_components, config, env)
+        
+        # Verify handlers setup
+        handlers_status = self._verify_handlers_setup(ui_components)
+        
+        if handlers_status['all_present']:
+            logger.success("✅ Semua handlers berhasil di-setup")
+        else:
+            missing = handlers_status['missing']
+            logger.warning(f"⚠️ Beberapa handlers tidak ditemukan: {', '.join(missing)}")
+        
+        return ui_components
     
     def _verify_handlers_setup(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Verify handlers setup status"""
@@ -94,23 +82,16 @@ class DownloaderInitializer(CommonInitializer):
         return get_default_downloader_config()
 
     def _get_critical_components(self) -> List[str]:
-        """Get critical components yang harus ada - FIXED key names"""
+        """Get critical components yang harus ada"""
         return [
             'ui', 'download_button', 'check_button', 'cleanup_button',
             'save_button', 'reset_button', 'log_output', 'progress_tracker'
         ]
 
 def initialize_downloader(env=None, config=None, **kwargs) -> Any:
-    """Initialize downloader UI dengan FIXED environment dan unified handlers"""
-    try:
-        # Create initializer
-        initializer = DownloaderInitializer()
-        result = initializer.initialize(env, config, **kwargs)
-        return result
-        
-    except Exception as e:
-        logger = get_logger('smartcash.dataset.downloader')
-        logger.error(f"❌ Critical error initializing downloader: {str(e)}")
+    """Initialize downloader UI"""
+    initializer = DownloaderInitializer()
+    return initializer.initialize(env, config, **kwargs)
 
 # Export
 __all__ = ['initialize_downloader', 'DownloaderInitializer']

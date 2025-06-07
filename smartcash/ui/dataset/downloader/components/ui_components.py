@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: FIXED UI components dengan proper button creation dan component mapping
+Deskripsi: FIXED UI components dengan proper imports dan component creation
 """
 
 import ipywidgets as widgets
@@ -13,7 +13,7 @@ from smartcash.ui.utils.layout_utils import create_responsive_container, create_
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """FIXED: Create main downloader UI dengan proper component creation dan mapping"""
+    """Create main downloader UI dengan proper component creation"""
     config = config or {}
     roboflow = config.get('data', {}).get('roboflow', {})
     download = config.get('download', {})
@@ -27,14 +27,14 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     )
     
     # 2. Status panel
-    status_panel = widgets.HTML(_get_dynamic_status_html(), 
+    status_panel = widgets.HTML(_get_status_html(), 
                                layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
     
-    # 3. Form fields - FIXED: Proper creation
+    # 3. Form fields
     form_fields = _create_form_fields(roboflow, detected_api_key, download)
-    form_container = _create_form_container_with_shared_layout(form_fields)
+    form_container = _create_form_container(form_fields)
     
-    # 4. Save/Reset buttons - FIXED: Proper extraction
+    # 4. Save/Reset buttons
     save_reset_components = create_save_reset_buttons(
         save_label="Simpan",
         reset_label="Reset", 
@@ -43,14 +43,14 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         sync_message="Konfigurasi tersimpan ke dataset_config.yaml"
     )
     
-    # 5. Action buttons - FIXED: Proper creation
+    # 5. Action buttons
     action_components = _create_action_buttons()
     
-    # 6. Progress tracker - FIXED: Proper creation
+    # 6. Progress tracker
     progress_components = create_triple_progress_tracker(auto_hide=True)
     progress_components['container'].layout.display = 'none'
     
-    # 7. Log accordion - FIXED: Proper creation
+    # 7. Log accordion
     log_components = create_log_accordion(
         module_name='downloader',
         height='250px',
@@ -69,8 +69,8 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         log_components['log_accordion']
     ], container_type='vbox')
     
-    # FIXED: Proper component mapping dengan explicit keys
-    result = {
+    # Component mapping
+    return {
         # Main UI
         'ui': main_ui,
         'main_container': main_ui,
@@ -78,7 +78,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'status_panel': status_panel,
         'form_container': form_container,
         
-        # Form fields - explicit mapping
+        # Form fields
         'workspace_input': form_fields['workspace_input'],
         'project_input': form_fields['project_input'],
         'version_input': form_fields['version_input'],
@@ -86,38 +86,29 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'validate_checkbox': form_fields['validate_checkbox'],
         'backup_checkbox': form_fields['backup_checkbox'],
         
-        # Save/Reset buttons - FIXED: Explicit mapping
+        # Save/Reset buttons
         'save_button': save_reset_components['save_button'],
         'reset_button': save_reset_components['reset_button'],
         'save_reset_container': save_reset_components['container'],
         
-        # Action buttons - FIXED: Explicit mapping dengan fallback protection
-        'download_button': action_components.get('download_button'),
-        'check_button': action_components.get('check_button'), 
-        'cleanup_button': action_components.get('cleanup_button'),
+        # Action buttons
+        'download_button': action_components['download_button'],
+        'check_button': action_components['check_button'], 
+        'cleanup_button': action_components['cleanup_button'],
         'action_container': action_components['container'],
         
-        # Progress tracker - FIXED: Explicit mapping
+        # Progress tracker
         'progress_tracker': progress_components['tracker'],
         'progress_container': progress_components['container'],
         'progress_status_widget': progress_components.get('status_widget'),
         
-        # Log components - FIXED: Explicit mapping
+        # Log components
         'log_output': log_components['log_output'],
         'log_accordion': log_components['log_accordion'],
     }
-    
-    # FIXED: Validation dan debugging
-    critical_components = ['download_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button', 'log_output', 'progress_tracker']
-    missing_components = [comp for comp in critical_components if result.get(comp) is None]
-    
-    if missing_components:
-        print(f"⚠️ MISSING COMPONENTS: {missing_components}")
-    
-    return result
 
 def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[str, Any]) -> Dict[str, widgets.Widget]:
-    """Create form fields dengan consistent layout - unchanged"""
+    """Create form fields dengan consistent layout"""
     common_layout = widgets.Layout(width='100%', margin='2px 0')
     common_style = {'description_width': '100px'}
     
@@ -162,8 +153,8 @@ def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[s
         )
     }
 
-def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Widget]) -> widgets.Widget:
-    """Create form container - unchanged"""
+def _create_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.Widget:
+    """Create form container"""
     format_info = widgets.HTML("""
     <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin-bottom: 8px; 
                 width: 100%; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word;">
@@ -201,7 +192,7 @@ def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Wid
     ))
 
 def _create_action_buttons() -> Dict[str, widgets.Widget]:
-    """FIXED: Create action buttons dengan proper creation dan guaranteed components"""
+    """Create action buttons"""
     button_layout = widgets.Layout(
         width='auto', 
         min_width='140px', 
@@ -211,7 +202,6 @@ def _create_action_buttons() -> Dict[str, widgets.Widget]:
         overflow='hidden'
     )
     
-    # FIXED: Guaranteed button creation
     download_button = widgets.Button(
         description='📥 Download', 
         button_style='primary', 
@@ -233,7 +223,6 @@ def _create_action_buttons() -> Dict[str, widgets.Widget]:
         tooltip='Hapus dataset existing'
     )
     
-    # FIXED: Container dengan proper children
     container = widgets.HBox([download_button, check_button, cleanup_button], layout=widgets.Layout(
         width='100%', 
         justify_content='flex-start', 
@@ -245,18 +234,16 @@ def _create_action_buttons() -> Dict[str, widgets.Widget]:
         box_sizing='border-box'
     ))
     
-    # FIXED: Return dengan guaranteed components
     return {
         'download_button': download_button, 
         'check_button': check_button, 
         'cleanup_button': cleanup_button, 
         'container': container,
-        'buttons': [download_button, check_button, cleanup_button]  # Explicit list
+        'buttons': [download_button, check_button, cleanup_button]
     }
 
-
 def _create_action_header() -> widgets.HTML:
-    """Create action section header - unchanged"""
+    """Create action section header"""
     return widgets.HTML("""
     <h4 style='color: #333; margin: 15px 0 10px 0; font-size: 16px; font-weight: 600;
                border-bottom: 2px solid #28a745; padding-bottom: 6px; overflow: hidden;
@@ -264,8 +251,8 @@ def _create_action_header() -> widgets.HTML:
         ▶️ Actions
     </h4>""", layout=widgets.Layout(width='100%', margin='0', overflow='hidden'))
 
-def _get_dynamic_status_html() -> str:
-    """Get status HTML dengan environment detection - unchanged"""
+def _get_status_html() -> str:
+    """Get status HTML dengan environment detection"""
     try:
         import google.colab
         from pathlib import Path

@@ -43,7 +43,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         button_width='130px'
     )
     
-    # Confirmation area - VISIBLE dan di bawah action buttons
+    # Confirmation area - VISIBLE dan di bawah action buttons dengan padding
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
             width='100%', 
@@ -51,7 +51,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             min_height='0px',
             max_height='400px',
             margin='10px 0',
-            padding='0px',
+            padding='10px',  # Added padding
             border='1px solid #dee2e6',
             border_radius='4px',
             overflow='auto',

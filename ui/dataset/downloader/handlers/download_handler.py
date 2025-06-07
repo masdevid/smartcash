@@ -146,7 +146,12 @@ def _show_cleanup_confirmation_in_area(ui_components: Dict[str, Any], targets_re
         logger = ui_components.get('logger')
         if logger:
             logger.info("🚫 Cleanup dibatalkan oleh user")
+        
+        # Re-enable all buttons properly
         button_manager.enable_buttons()
+        
+        # Show cancellation status
+        show_status_safe("🚫 Cleanup dibatalkan", 'info', ui_components)
     
     # Store di builtins untuk JavaScript access
     import builtins

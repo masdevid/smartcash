@@ -51,10 +51,10 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             min_height='0px',
             max_height='400px',
             margin='10px 0',
-            padding='10px',  # Added padding
             border='1px solid #dee2e6',
             border_radius='4px',
             overflow='auto',
+            justify_content='center',
             display='block'  # Always visible
         )
     )

@@ -23,31 +23,31 @@ class UIComponentsManager:
         self._create_widgets()
     
     def _create_widgets(self):
-        """Create UI widgets tanpa step info"""
+        """Create UI widgets dengan flexbox layout dan full width"""
         self.header_widget = widgets.HTML("", layout=widgets.Layout(
-            margin='0 0 10px 0', width='100%'
+            width='100%', margin='0 0 10px 0'
         ))
         
         self.status_widget = widgets.HTML("", layout=widgets.Layout(
-            margin='0 0 8px 0', width='100%'
+            width='100%', margin='0 0 8px 0'
         ))
         
         self.progress_output = widgets.Output(layout=widgets.Layout(
             width='100%', margin='5px 0', border='1px solid #ddd',
-            border_radius='4px', padding='8px', min_height='60px'
+            border_radius='4px', padding='8px', min_height='60px',
+            display='flex', flex_direction='column'
         ))
         
         self._create_container()
     
     def _create_container(self):
-        """Create main container tanpa step info widget"""
+        """Create main container dengan flexbox layout"""
         self.container = widgets.VBox(
             [self.header_widget, self.status_widget, self.progress_output],
             layout=widgets.Layout(
-                display='none', flex_flow='column nowrap', align_items='stretch',
-                margin='10px 0', padding='15px', border='1px solid #28a745',
-                border_radius='8px', background_color='#f8fff8', width='100%',
-                min_height=self.config.get_container_height(),
+                display='none', width='100%', margin='10px 0', padding='15px',
+                border='1px solid #28a745', border_radius='8px', 
+                background_color='#f8fff8', min_height=self.config.get_container_height(),
                 max_height='300px', overflow='hidden', box_sizing='border-box'
             )
         )
@@ -95,20 +95,33 @@ class UIComponentsManager:
         """
     
     def update_status(self, message: str, style: str = None):
-        """Update status message dengan styling"""
+        """Update status message dengan flexbox layout dan emoji handling"""
         color_map = {
             'success': '#28a745', 'info': '#007bff', 
             'warning': '#ffc107', 'error': '#dc3545'
         }
         color = color_map.get(style, '#495057')
         
+        # Clean message dari emoji duplikat jika ada
+        clean_message = self._clean_status_message(message)
+        
         self.status_widget.value = f"""
-        <div style="color: {color}; font-size: 13px; font-weight: 500; margin: 0; 
+        <div style="display: flex; align-items: center; width: 100%; 
+                    color: {color}; font-size: 13px; font-weight: 500; margin: 0; 
                     padding: 8px 12px; background: rgba(233, 236, 239, 0.5); 
                     border-radius: 6px; border-left: 3px solid {color}; 
-                    width: 100%; box-sizing: border-box; word-wrap: break-word; 
-                    overflow-wrap: break-word; line-height: 1.4; 
-                    display: flex; align-items: center;">
-            {message}
+                    box-sizing: border-box; word-wrap: break-word; 
+                    overflow-wrap: break-word; line-height: 1.4;">
+            {clean_message}
         </div>
         """
+    
+    @staticmethod
+    def _clean_status_message(message: str) -> str:
+        """Clean status message dari emoji duplikat"""
+        import re
+        # Check jika sudah ada emoji status di awal
+        if re.match(r'^[✅❌⚠️ℹ️🚀]\s', message):
+            return message
+        # Jika tidak ada, return message as is (emoji akan ditambah di level yang memanggil)
+        return message

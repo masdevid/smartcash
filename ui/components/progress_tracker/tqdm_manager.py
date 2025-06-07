@@ -29,23 +29,23 @@ class TqdmManager:
             
             for bar_config in bar_configs:
                 if bar_config.visible:
-                    # Format: [message][bar][percentage] - emoji removed from here, added in message
+                    # Format: [message][bar][percentage] - full width
                     tqdm_bar = tqdm(
                         total=100,
                         desc=f"{bar_config.description}",
-                        bar_format='{desc}: {bar:25}| {percentage:3.0f}%',
+                        bar_format='{desc}: {bar}| {percentage:3.0f}%',
                         colour=bar_config.get_tqdm_color(),
                         position=bar_config.position,
                         leave=True,
                         file=sys.stdout,
-                        dynamic_ncols=False,
-                        ncols=80
+                        dynamic_ncols=True,
+                        ncols=None
                     )
                     self.tqdm_bars[bar_config.name] = tqdm_bar
     
     def update_bar(self, level_name: str, progress: int, message: str = "", 
                    bar_configs: list[ProgressBarConfig] = None):
-        """Update progress bar dengan format [message][bar][percentage]"""
+        """Update progress bar dengan format [message][bar][percentage] tanpa double icon"""
         if level_name not in self.tqdm_bars:
             return
         
@@ -57,10 +57,13 @@ class TqdmManager:
         if message:
             clean_message = self._clean_message(message)
             config = next((c for c in (bar_configs or []) if c.name == level_name), None)
-            emoji = config.emoji if config else "📊"
             
-            # Format: [emoji + message] akan menjadi desc di format bar
-            formatted_desc = f"{emoji} {self._truncate_message(clean_message, 35)}"
+            # Cek apakah message sudah ada emoji, jika belum tambahkan
+            if not self._has_emoji(clean_message) and config:
+                formatted_desc = f"{config.emoji} {self._truncate_message(clean_message, 40)}"
+            else:
+                formatted_desc = self._truncate_message(clean_message, 45)
+            
             bar.set_description(formatted_desc)
         
         self.progress_values[level_name] = progress
@@ -114,12 +117,18 @@ class TqdmManager:
     def _clean_message(message: str) -> str:
         """Clean message dari emoji duplikat dan format tidak perlu"""
         # Remove leading emojis yang akan ditambahkan ulang
-        cleaned = re.sub(r'^[📊🔄⚡🔍📥☁️✅❌🚀]+\s*', '', message)
+        cleaned = re.sub(r'^[📊🔄⚡🔍📥☁️✅❌🚀💾🧹📁🔤🔄⚠️ℹ️]+\s*', '', message)
         # Remove progress indicators seperti (1/10), [50%], dll
         cleaned = re.sub(r'\[[\d%/]+\]|\(\d+/\d+\)', '', cleaned)
         # Clean multiple spaces
         cleaned = re.sub(r'\s+', ' ', cleaned)
         return cleaned.strip() or message
+    
+    @staticmethod
+    def _has_emoji(text: str) -> bool:
+        """Check apakah text sudah mengandung emoji untuk avoid double icon"""
+        emoji_pattern = re.compile(r'[📊🔄⚡🔍📥☁️✅❌🚀💾🧹📁🔤⚠️ℹ️]')
+        return bool(emoji_pattern.search(text))
     
     @staticmethod
     def _truncate_message(message: str, max_length: int) -> str:

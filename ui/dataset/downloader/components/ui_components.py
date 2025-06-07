@@ -1,11 +1,11 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: FIXED UI components menggunakan progress_tracker yang benar
+Deskripsi: DEBUG version untuk trace missing components
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.components.progress_tracker import create_triple_progress_tracker  # ✅ FIXED
+from smartcash.ui.components.progress_tracker import create_triple_progress_tracker
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.header import create_header
@@ -13,38 +13,36 @@ from smartcash.ui.utils.layout_utils import create_responsive_container, create_
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI menggunakan shared components"""
+    """Create main downloader UI dengan debug logging"""
     config = config or {}
     roboflow = config.get('data', {}).get('roboflow', {})
     download = config.get('download', {})
     detected_api_key = get_api_key_from_secrets()
     
-    ui_components = _create_downloader_ui_with_shared_components(config, roboflow, download, detected_api_key)
-    ui_components['layout_optimized'] = True
-    return ui_components
-
-def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflow: Dict[str, Any], 
-                                               download: Dict[str, Any], api_key: str) -> Dict[str, Any]:
-    """Create downloader UI menggunakan shared components dari ui/components"""
+    print(f"🔍 DEBUG: Creating UI with config keys: {list(config.keys())}")
     
-    # 1. Header menggunakan shared component
+    # 1. Header
     header = create_header(
         title="Dataset Downloader",
         description="Download dataset Roboflow untuk SmartCash training (format YOLOv5)",
         icon="📥"
     )
+    print(f"✅ Header created: {type(header)}")
     
-    # 2. Status panel dengan environment detection
+    # 2. Status panel
     status_panel = widgets.HTML(_get_dynamic_status_html(), 
                                layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
+    print(f"✅ Status panel created: {type(status_panel)}")
     
-    # 3. Form fields dengan proper layout
-    form_fields = _create_form_fields(roboflow, api_key, download)
+    # 3. Form fields
+    form_fields = _create_form_fields(roboflow, detected_api_key, download)
+    print(f"✅ Form fields created: {list(form_fields.keys())}")
     
-    # 4. Two-column form menggunakan shared layout
+    # 4. Form container
     form_container = _create_form_container_with_shared_layout(form_fields)
+    print(f"✅ Form container created: {type(form_container)}")
     
-    # 5. Save/Reset buttons menggunakan shared component
+    # 5. Save/Reset buttons
     save_reset_components = create_save_reset_buttons(
         save_label="Simpan",
         reset_label="Reset",
@@ -52,28 +50,30 @@ def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflo
         with_sync_info=True,
         sync_message="Konfigurasi tersimpan ke dataset_config.yaml"
     )
+    print(f"✅ Save/Reset components: {list(save_reset_components.keys())}")
     
-    # 6. Action buttons dengan proper state management
+    # 6. Action buttons
     action_components = _create_action_buttons_fixed()
+    print(f"✅ Action components: {list(action_components.keys())}")
     
-    # 7. Progress tracker - ✅ FIXED: Menggunakan triple untuk Overall + Step + Current
+    # 7. Progress tracker
     progress_components = create_triple_progress_tracker(
         operation="Dataset Download",
         steps=["Inisialisasi", "Download", "Organisasi", "UUID Rename", "Validasi", "Cleanup"],
         auto_hide=True
     )
-    
-    # Hide progress container initially
+    print(f"✅ Progress components: {list(progress_components.keys())}")
     progress_components['container'].layout.display = 'none'
     
-    # 8. Log accordion menggunakan shared component dengan FIXED overflow
+    # 8. Log accordion
     log_components = create_log_accordion(
         module_name='downloader',
         height='250px',
         width='100%'
     )
+    print(f"✅ Log components: {list(log_components.keys())}")
     
-    # 9. Main container menggunakan responsive layout
+    # 9. Main container
     main_ui = create_responsive_container([
         header,
         status_panel,
@@ -84,29 +84,49 @@ def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflo
         progress_components['container'],
         log_components['log_accordion']
     ], container_type='vbox')
+    print(f"✅ Main UI created: {type(main_ui)}")
     
-    return {
+    # Build final result
+    result = {
         # Main UI
-        'ui': main_ui, 'main_container': main_ui, 'header': header, 
-        'status_panel': status_panel, 'form_container': form_container,
+        'ui': main_ui,
+        'main_container': main_ui,
+        'header': header,
+        'status_panel': status_panel,
+        'form_container': form_container,
         
-        # Form fields
+        # Form fields - spread
         **form_fields,
         
-        # Buttons menggunakan shared components
-        **save_reset_components, **action_components,
+        # Save/Reset buttons - spread with explicit mapping
+        'save_button': save_reset_components['save_button'],
+        'reset_button': save_reset_components['reset_button'],
+        'save_reset_container': save_reset_components['container'],
         
-        # Progress tracker - ✅ FIXED: Menggunakan komponen yang benar
+        # Action buttons - spread with explicit mapping  
+        'download_button': action_components['download_button'],
+        'check_button': action_components['check_button'],
+        'cleanup_button': action_components['cleanup_button'],
+        'action_container': action_components['container'],
+        
+        # Progress tracker - explicit mapping
         'progress_tracker': progress_components['tracker'],
         'progress_container': progress_components['container'],
+        'progress_status_widget': progress_components.get('status_widget'),
         
-        # Log components - ✅ FIXED: Key names yang benar
+        # Log components - explicit mapping
         'log_output': log_components['log_output'],
         'log_accordion': log_components['log_accordion'],
-        
-        # Additional progress components
-        **{k: v for k, v in progress_components.items() if k not in ['tracker', 'container']}
     }
+    
+    print(f"🔍 DEBUG: Final UI components keys: {list(result.keys())}")
+    print(f"🔍 DEBUG: Critical components check:")
+    critical = ['ui', 'download_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button', 'log_output', 'progress_tracker']
+    for comp in critical:
+        status = "✅" if comp in result else "❌"
+        print(f"  {status} {comp}: {type(result.get(comp, 'MISSING'))}")
+    
+    return result
 
 def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[str, Any]) -> Dict[str, widgets.Widget]:
     """Create form fields dengan consistent layout"""
@@ -114,7 +134,6 @@ def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[s
     common_style = {'description_width': '100px'}
     
     return {
-        # Dataset configuration
         'workspace_input': widgets.Text(
             value=roboflow.get('workspace', 'smartcash-wo2us'), 
             description='Workspace:', 
@@ -143,8 +162,6 @@ def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[s
             layout=common_layout, 
             style=common_style
         ),
-        
-        # Options
         'validate_checkbox': widgets.Checkbox(
             value=download.get('validate_download', True), 
             description='Validasi download', 
@@ -159,15 +176,12 @@ def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[s
 
 def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Widget]) -> widgets.Widget:
     """Create form container menggunakan shared layout utilities"""
-    
-    # Format info
     format_info = widgets.HTML("""
     <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin-bottom: 8px; 
                 width: 100%; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word;">
         <small style="color: #1976d2;"><strong>📦 Format:</strong> YOLOv5 PyTorch (hardcoded)</small>
     </div>""", layout=widgets.Layout(width='100%', margin='0'))
     
-    # Left column - dataset config
     left_content = create_responsive_container([
         form_fields['workspace_input'], 
         form_fields['project_input'], 
@@ -175,14 +189,12 @@ def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Wid
         form_fields['api_key_input']
     ], container_type='vbox')
     
-    # Right column - options
     right_content = create_responsive_container([
         format_info, 
         form_fields['validate_checkbox'], 
         form_fields['backup_checkbox']
     ], container_type='vbox')
     
-    # Two-column layout menggunakan shared utility
     form_container = create_responsive_two_column(
         left_content, 
         right_content,
@@ -190,7 +202,6 @@ def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Wid
         right_width='48%'
     )
     
-    # Wrapper dengan border
     wrapper = widgets.VBox([form_container], layout=widgets.Layout(
         width='100%', 
         border='1px solid #ddd', 
@@ -204,14 +215,14 @@ def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Wid
     return wrapper
 
 def _create_action_buttons_fixed() -> Dict[str, widgets.Widget]:
-    """Create action buttons dengan proper state management dan FIXED overflow"""
+    """Create action buttons dengan proper state management"""
     button_layout = widgets.Layout(
         width='auto', 
         min_width='140px', 
-        max_width='200px',  # Prevent overflow
+        max_width='200px',
         height='35px', 
         margin='5px',
-        overflow='hidden'  # FIXED: Prevent text overflow
+        overflow='hidden'
     )
     
     download_button = widgets.Button(
@@ -235,18 +246,14 @@ def _create_action_buttons_fixed() -> Dict[str, widgets.Widget]:
         tooltip='Hapus dataset existing'
     )
     
-    # State management attributes
-    all_buttons = [download_button, check_button, cleanup_button]
-    [setattr(btn, '_all_buttons', all_buttons) for btn in all_buttons]
-    
-    container = widgets.HBox(all_buttons, layout=widgets.Layout(
+    container = widgets.HBox([download_button, check_button, cleanup_button], layout=widgets.Layout(
         width='100%', 
         justify_content='flex-start', 
         margin='15px 0',
         display='flex', 
         flex_flow='row wrap', 
         align_items='center', 
-        overflow='hidden',  # FIXED: Prevent container overflow
+        overflow='hidden',
         box_sizing='border-box'
     ))
     
@@ -294,7 +301,3 @@ def _get_dynamic_status_html() -> str:
         return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; 
                   border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
                   <span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
-
-# Utilities dengan overflow fixes
-validate_ui_layout = lambda ui: all(key in ui for key in ['ui', 'form_container', 'save_button', 'download_button', 'log_output', 'progress_tracker'])
-get_ui_status = lambda ui: f"✅ UI Ready: {len([k for k in ui.keys() if not k.startswith('_')])} components"

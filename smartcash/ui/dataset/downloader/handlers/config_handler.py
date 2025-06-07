@@ -250,6 +250,17 @@ class DownloaderConfigHandler(ConfigHandler):
                 'key_preview': '****'
             }
     
-    def validate_ui_inputs(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate UI inputs dengan comprehensive checks"""
-        return validate_ui_inputs(ui_components)
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default config dengan optimal workers"""
+        from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
+        from smartcash.common.threadpools import get_download_workers, get_rename_workers, optimal_io_workers, get_optimal_thread_count
+        
+        default_config = get_default_downloader_config()
+        
+        # Update dengan optimal workers
+        default_config['download']['max_workers'] = get_download_workers()
+        default_config['uuid_renaming']['parallel_workers'] = get_rename_workers(5000)
+        default_config['validation']['parallel_workers'] = get_optimal_thread_count('io')
+        default_config['cleanup']['parallel_workers'] = optimal_io_workers()
+        
+        return default_config

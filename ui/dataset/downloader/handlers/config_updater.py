@@ -82,12 +82,24 @@ def update_downloader_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) 
 def reset_downloader_ui(ui_components: Dict[str, Any]) -> None:
     """Reset UI components ke default konfigurasi downloader"""
     try:
+        # Preserve current API key
+        current_api_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
+        
         from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
         default_config = get_default_downloader_config()
+        
+        # Preserve API key di config
+        if current_api_key:
+            default_config['data']['roboflow']['api_key'] = current_api_key
+        
         update_downloader_ui(ui_components, default_config)
     except Exception:
-        # Fallback to basic reset jika config manager gagal
+        # Fallback with preserved API key
+        current_api_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
         _apply_basic_defaults(ui_components)
+        # Restore API key after basic defaults
+        if current_api_key and 'api_key_input' in ui_components:
+            ui_components['api_key_input'].value = current_api_key
 
 
 def _apply_basic_defaults(ui_components: Dict[str, Any]) -> None:

@@ -8,20 +8,27 @@ from smartcash.ui.utils.fallback_utils import show_status_safe
 from smartcash.ui.components.dialogs import confirm
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup download handlers dengan simplified progress callback"""
+    """Setup download handlers dengan minimal logging progress callback"""
     
-    # Simplified progress callback
+    # Minimal progress callback - no verbose logging during download
     def create_progress_callback():
         def progress_callback(step: str, current: int, total: int, message: str):
             try:
                 progress_tracker = ui_components.get('progress_tracker')
-                if progress_tracker and hasattr(progress_tracker, 'update_overall'):
-                    progress_tracker.update_overall(current, message)
+                if progress_tracker:
+                    # Update both overall and current operation progress
+                    if hasattr(progress_tracker, 'update_overall'):
+                        progress_tracker.update_overall(current, message)
+                    if hasattr(progress_tracker, 'update_current'):
+                        # Map step to current operation progress
+                        step_progress = _map_step_to_current_progress(step, current)
+                        progress_tracker.update_current(step_progress, f"Step: {step}")
                 
-                # Simple logging
-                logger = ui_components.get('logger')
-                if logger:
-                    logger.info(message)
+                # Only log important milestones, not every progress update
+                if _is_milestone_step(step, current):
+                    logger = ui_components.get('logger')
+                    if logger:
+                        logger.info(message)
             except Exception:
                 pass  # Silent fail to prevent blocking
         
@@ -327,21 +334,31 @@ def _show_download_confirmation(ui_config: Dict[str, Any], ui_components: Dict[s
     )
 
 def _execute_download_with_backend(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager):
-    """Execute download dengan enhanced debugging dan safe error handling"""
+    """Execute download dengan enhanced debugging dan config-aware backend"""
     try:
         from smartcash.dataset.downloader import get_downloader_instance, create_ui_compatible_config
         
         logger = ui_components.get('logger')
         
-        # Debug: Config conversion
+        # Debug: Config conversion dengan worker optimization
         if logger:
             logger.info("🔧 Converting UI config to backend format...")
         
         service_config = create_ui_compatible_config(ui_config)
         
+        # Enhanced service config dengan optimal workers
+        download_config = ui_config.get('download', {})
+        service_config.update({
+            'max_workers': download_config.get('max_workers', 4),
+            'parallel_downloads': download_config.get('parallel_downloads', True),
+            'chunk_size': download_config.get('chunk_size', 8192),
+            'timeout': download_config.get('timeout', 30),
+            'retry_count': download_config.get('retry_count', 3)
+        })
+        
         # Debug: Service creation
         if logger:
-            logger.info("🏗️ Creating downloader service...")
+            logger.info(f"🏗️ Creating downloader service with {service_config.get('max_workers', 4)} workers...")
         
         downloader = get_downloader_instance(service_config, logger)
         if not downloader:
@@ -613,6 +630,27 @@ def _handle_ui_error(ui_components: Dict[str, Any], error_msg: str, button=None,
     # Enable buttons
     if button_manager:
         button_manager.enable_buttons()
+
+def _map_step_to_current_progress(step: str, overall_progress: int) -> int:
+    """Map step progress to current operation progress bar"""
+    step_mapping = {
+        'init': (0, 10), 'metadata': (10, 20), 'backup': (20, 25),
+        'download': (25, 70), 'extract': (70, 80), 'organize': (80, 90),
+        'uuid_rename': (90, 95), 'validate': (95, 98), 'cleanup': (98, 100)
+    }
+    
+    step_key = step.lower().split('_')[0]
+    if step_key in step_mapping:
+        start, end = step_mapping[step_key]
+        range_size = end - start
+        step_progress = start + (overall_progress * range_size / 100)
+        return min(100, max(0, int(step_progress)))
+    return overall_progress
+
+def _is_milestone_step(step: str, progress: int) -> bool:
+    """Only log major milestones to prevent browser crash"""
+    milestone_steps = ['init', 'metadata', 'backup', 'extract', 'organize', 'validate', 'complete']
+    return (step.lower() in milestone_steps or progress in [0, 25, 50, 75, 100] or progress % 25 == 0)
 
 def _show_ui_success(ui_components: Dict[str, Any], message: str, button=None, button_manager=None):
     """Show success dengan UI updates"""

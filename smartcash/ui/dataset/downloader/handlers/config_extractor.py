@@ -57,15 +57,15 @@ def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'retry_count': 3,
             'timeout': 30,
             'chunk_size': 8192,
-            'parallel_downloads': False,
-            'max_workers': 4
+            'parallel_downloads': True,
+            'max_workers': get_value('max_workers', _get_optimal_download_workers())
         },
         
         'uuid_renaming': {
             'enabled': True,
             'backup_before_rename': get_value('backup_checkbox', False),
             'batch_size': 1000,
-            'parallel_workers': 4,
+            'parallel_workers': _get_optimal_rename_workers(),
             'validate_consistency': True,
             'target_splits': ['train', 'valid', 'test'],
             'file_patterns': ['*.jpg', '*.jpeg', '*.png', '*.bmp'],
@@ -86,7 +86,8 @@ def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             },
             'allowed_extensions': ['.jpg', '.jpeg', '.png', '.bmp'],
             'max_image_size_mb': 50,
-            'generate_report': True
+            'generate_report': True,
+            'parallel_workers': _get_optimal_validation_workers()
         },
         
         'cleanup': {
@@ -100,6 +101,27 @@ def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 '*.zip'
             ],
             'keep_download_logs': True,
-            'cleanup_on_error': True
+            'cleanup_on_error': True,
+            'parallel_workers': _get_optimal_io_workers()
         }
     }
+
+def _get_optimal_download_workers() -> int:
+    """Get optimal workers untuk download operations"""
+    from smartcash.common.threadpools import get_download_workers
+    return get_download_workers()
+
+def _get_optimal_rename_workers() -> int:
+    """Get optimal workers untuk file renaming operations"""
+    from smartcash.common.threadpools import get_rename_workers
+    return get_rename_workers(5000)  # Estimate 5k files
+
+def _get_optimal_validation_workers() -> int:
+    """Get optimal workers untuk validation operations"""
+    from smartcash.common.threadpools import get_optimal_thread_count
+    return get_optimal_thread_count('io')
+
+def _get_optimal_io_workers() -> int:
+    """Get optimal workers untuk I/O operations"""
+    from smartcash.common.threadpools import optimal_io_workers
+    return optimal_io_workers()

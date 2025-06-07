@@ -1,41 +1,110 @@
 # File: configs/preprocessing_config.yaml
-# Author: Alfrida Sabar (direvisi)
-# Deskripsi: Konfigurasi khusus untuk preprocessing dataset yang konsisten dengan base_config
+# Author: Alfrida Sabar (Enhanced untuk compatibility dengan form UI)
+# Deskripsi: Konfigurasi preprocessing yang match dengan form components
 
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Override konfigurasi preprocessing dari base_config
+# ========================================
+# PREPROCESSING CONFIGURATION - Form Compatible
+# ========================================
+
+# Override preprocessing dari base_config dengan form-compatible structure
 preprocessing:
-  vis_dir: 'visualizations/preprocessing'  # Override dari base_config (visualizations)
-  sample_size: 500  # Override dari base_config (0)
+  # Output settings
+  output_dir: 'data/preprocessed'
+  save_visualizations: false
+  vis_dir: 'visualizations/preprocessing'
+  sample_size: 0  # 0 = semua file
   
-  # Override validasi dataset
+  # Target split dari form dropdown
+  target_split: 'all'  # all, train, valid, test
+  force_reprocess: false
+  
+  # Validasi dataset selama preprocessing
   validate:
-    visualize: false  # Override dari base_config (false)
-
-  # Override opsi analisis dataset
+    enabled: true
+    fix_issues: true
+    move_invalid: true
+    visualize: false
+    check_image_quality: true
+    check_labels: true
+    check_coordinates: true
+    check_uuid_consistency: true
+  
+  # Normalisasi sesuai form UI (resolution + normalization dropdown)
+  normalization:
+    enabled: true
+    method: 'minmax'  # minmax, standard, none (dari dropdown)
+    target_size: [640, 640]  # dari resolution_dropdown (640x640)
+    preserve_aspect_ratio: true
+    normalize_pixel_values: true
+    pixel_range: [0, 1]
+  
+  # Analysis settings (tidak ada di form, default disabled)
   analysis:
-    enabled: true  # Override dari base_config (false)
+    enabled: false
+    class_balance: true
+    image_size_distribution: true
+    bbox_statistics: true
+    layer_balance: true
+  
+  # Balance settings (tidak ada di form, default disabled)
+  balance:
+    enabled: false
+    target_distribution: 'auto'
+    methods:
+      undersampling: false
+      oversampling: true
+      augmentation: true
+    min_samples_per_class: 100
+    max_samples_per_class: 1000
 
-# Override konfigurasi cleanup dari base_config
+# ========================================
+# PERFORMANCE CONFIGURATION - Worker Slider
+# ========================================
+
+# Performance settings dari worker_slider
+performance:
+  num_workers: 8  # dari worker_slider di form
+  batch_size: 32
+  use_gpu: true
+  compression_level: 90
+  max_memory_usage_gb: 4.0
+  use_mixed_precision: true
+
+# ========================================
+# CLEANUP CONFIGURATION
+# ========================================
+
+# Cleanup settings (tidak ada di form UI)
 cleanup:
   augmentation_patterns:
     - 'aug_.*'
     - '.*_augmented.*'
     - '.*_modified.*'
     - '.*_processed.*'
-    - '.*_norm.*'  # Pattern tambahan
+    - '.*_norm.*'
   ignored_patterns:
     - '.*\.gitkeep'
     - '.*\.DS_Store'
-    - '.*\.gitignore'  # Pattern tambahan
-  backup_dir: 'data/backup/preprocessing'  # Override dari base_config (data/backup)
+    - '.*\.gitignore'
+  backup_dir: 'data/backup/preprocessing'
+  backup_enabled: false
+  auto_cleanup_preprocessed: false
 
-# Override pengaturan performa dari base_config
-performance:
-  num_workers: 4  # Override dari base_config (4)
-  batch_size: 32  # Override dari base_config (16)
-  compression_level: 90  # Parameter baru
-  max_memory_usage_gb: 4.0  # Override dari base_config
-  use_mixed_precision: true  # Override dari base_config (false)
+# ========================================
+# FORM UI MAPPING REFERENCE
+# ========================================
+
+# UI Components yang ada di form:
+# - resolution_dropdown: ['320x320', '416x416', '512x512', '640x640']
+# - normalization_dropdown: ['minmax', 'standard', 'none']  
+# - worker_slider: 1-10 workers
+# - split_dropdown: ['all', 'train', 'valid', 'test']
+#
+# Mapping ke config:
+# resolution_dropdown -> preprocessing.normalization.target_size
+# normalization_dropdown -> preprocessing.normalization.method + enabled
+# worker_slider -> performance.num_workers
+# split_dropdown -> preprocessing.target_split

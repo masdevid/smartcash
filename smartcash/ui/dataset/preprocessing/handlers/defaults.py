@@ -1,36 +1,33 @@
+"""
+File: smartcash/ui/dataset/preprocessing/handlers/defaults.py
+Deskripsi: Hardcoded default configuration untuk preprocessing reset operations
+"""
 
 from typing import Dict, Any
 
 def get_default_preprocessing_config() -> Dict[str, Any]:
-    """
-    Get hardcoded default configuration untuk downloader reset operations.
-    Tidak bergantung pada yaml files untuk menghindari circular dependency.
-    
-    Returns:
-        Dictionary berisi default configuration
-    """
+    """Get hardcoded default configuration untuk preprocessing reset operations"""
     return {
         'config_version': '1.0',
         '_base_': 'base_config.yaml',
         
         'preprocessing': {
             'output_dir': 'data/preprocessed',
-            'save_visualizations': True,
+            'save_visualizations': False,
             'vis_dir': 'visualizations/preprocessing',
-            'sample_size': 500,
+            'sample_size': 0,
             
-            # Validasi dataset selama preprocessing
             'validate': {
                 'enabled': True,
                 'fix_issues': True,
                 'move_invalid': True,
-                'visualize': True,
+                'visualize': False,
                 'check_image_quality': True,
                 'check_labels': True,
-                'check_coordinates': True
+                'check_coordinates': True,
+                'check_uuid_consistency': True
             },
             
-            # Opsi normalisasi
             'normalization': {
                 'enabled': True,
                 'method': 'minmax',
@@ -40,16 +37,17 @@ def get_default_preprocessing_config() -> Dict[str, Any]:
                 'pixel_range': [0, 1]
             },
             
-            # Opsi analisis dataset
+            'target_split': 'all',
+            'force_reprocess': False,
+            
             'analysis': {
-                'enabled': True,
+                'enabled': False,
                 'class_balance': True,
                 'image_size_distribution': True,
                 'bbox_statistics': True,
                 'layer_balance': True
             },
             
-            # Opsi balancing dataset
             'balance': {
                 'enabled': False,
                 'target_distribution': 'auto',
@@ -63,14 +61,15 @@ def get_default_preprocessing_config() -> Dict[str, Any]:
             }
         },
         
-        # Referensi ke konfigurasi augmentasi terpisah
-        'augmentation_reference': {
-            'config_file': 'augmentation_config.yaml',
-            'use_for_preprocessing': True,
-            'preprocessing_variations': 3
+        'performance': {
+            'num_workers': 8,
+            'batch_size': 32,
+            'use_gpu': True,
+            'compression_level': 90,
+            'max_memory_usage_gb': 4.0,
+            'use_mixed_precision': True
         },
         
-        # Konfigurasi cleanup
         'cleanup': {
             'augmentation_patterns': [
                 'aug_.*',
@@ -87,15 +86,12 @@ def get_default_preprocessing_config() -> Dict[str, Any]:
             'backup_dir': 'data/backup/preprocessing',
             'backup_enabled': False,
             'auto_cleanup_preprocessed': False
-        },
-        
-        # Pengaturan performa preprocessing
-        'performance': {
-            'num_workers': 8,
-            'batch_size': 32,
-            'use_gpu': True,
-            'compression_level': 90,
-            'max_memory_usage_gb': 4.0,
-            'use_mixed_precision': True
         }
     }
+
+# One-liner utilities
+get_default_resolution = lambda: '640x640'
+get_default_normalization = lambda: 'minmax'
+get_default_workers = lambda: 8
+get_default_split = lambda: 'all'
+is_validation_enabled_by_default = lambda: True

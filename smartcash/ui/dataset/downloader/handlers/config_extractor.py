@@ -56,7 +56,7 @@ def extract_downloader_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'rename_files': True,
             'retry_count': 3,
             'timeout': 30,
-            'chunk_size': 8192,
+            'chunk_size': 262144,
             'parallel_downloads': True,
             'max_workers': get_value('max_workers', _get_optimal_download_workers())
         },

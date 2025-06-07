@@ -89,7 +89,10 @@ class DownloaderConfigHandler(ConfigHandler):
         """Reset config dengan default dan preserve API key dari UI/Colab"""
         try:
             # Preserve current API key dari UI
-            current_api_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
+            current_api_key = ''
+            api_key_widget = ui_components.get('api_key_input')
+            if api_key_widget and hasattr(api_key_widget, 'value'):
+                current_api_key = api_key_widget.value.strip()
             
             # Get default config
             default_config = self.get_default_config()

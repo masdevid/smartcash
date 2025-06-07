@@ -1,6 +1,6 @@
-# 🏗️ Guide Pola Backend Module SmartCash
+# 🏗️ Guide Pola UI Module SmartCash
 
-## Struktur Wajib Backend Module
+## Struktur Wajib UI Module with CommonInitializer
 
 ### 📁 Directory Structure
 ```

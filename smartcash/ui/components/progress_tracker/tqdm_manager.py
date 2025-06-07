@@ -42,7 +42,7 @@ class TqdmManager:
                     clear_output(wait=True)
                     tqdm_bar = tqdm(
                         total=100,
-                        desc=f"{bar_config.emoji} {bar_config.description}",
+                        desc=f"{bar_config.description}",  # No emoji here
                         bar_format='{desc}: {bar}| {percentage:3.0f}%',
                         colour=bar_config.get_tqdm_color(),
                         leave=True,
@@ -53,7 +53,7 @@ class TqdmManager:
     
     def update_bar(self, level_name: str, progress: int, message: str = "", 
                    bar_configs: list[ProgressBarConfig] = None):
-        """Update progress bar dengan format [message][bar][percentage] tanpa double icon"""
+        """Update progress bar tanpa double emoji"""
         if level_name not in self.tqdm_bars:
             return
         
@@ -64,14 +64,8 @@ class TqdmManager:
         
         if message:
             clean_message = self._clean_message(message)
-            config = next((c for c in (bar_configs or []) if c.name == level_name), None)
-            
-            # Cek apakah message sudah ada emoji, jika belum tambahkan
-            if not self._has_emoji(clean_message) and config:
-                formatted_desc = f"{config.emoji} {self._truncate_message(clean_message, 40)}"
-            else:
-                formatted_desc = self._truncate_message(clean_message, 45)
-            
+            # Simple description tanpa emoji tambahan
+            formatted_desc = self._truncate_message(clean_message, 45)
             bar.set_description(formatted_desc)
         
         self.progress_values[level_name] = progress
@@ -79,21 +73,21 @@ class TqdmManager:
             self.progress_messages[level_name] = message
     
     def set_all_complete(self, message: str, bar_configs: list[ProgressBarConfig] = None):
-        """Set all bars ke complete state dengan format konsisten"""
+        """Set all bars ke complete state tanpa emoji duplikat"""
         for level_name, bar in self.tqdm_bars.items():
             bar.n = 100
             bar.refresh()
-            clean_message = self._truncate_message(message, 30)
-            bar.set_description(f"✅ {clean_message}")
+            clean_message = self._truncate_message(message, 40)
+            bar.set_description(clean_message)
     
     def set_all_error(self, message: str):
-        """Set all bars ke error state dengan format konsisten"""
+        """Set all bars ke error state tanpa emoji duplikat"""
         for level_name, bar in self.tqdm_bars.items():
             current_value = self.progress_values.get(level_name, 0)
             bar.n = current_value
             bar.refresh()
-            clean_message = self._truncate_message(message, 30)
-            bar.set_description(f"❌ {clean_message}")
+            clean_message = self._truncate_message(message, 40)
+            bar.set_description(clean_message)
     
     def close_all_bars(self):
         """Close semua tqdm bars dengan cleanup per output"""

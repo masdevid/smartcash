@@ -49,19 +49,19 @@ class ProgressConfig:
     show_step_info: bool = False  # Hapus step info
     
     def get_level_configs(self) -> List[ProgressBarConfig]:
-        """Get bar configurations berdasarkan level"""
+        """Get bar configurations dengan warna hijau seragam"""
         level_configs = {
             ProgressLevel.SINGLE: [
                 ProgressBarConfig("primary", "Progress", "📊", "#28a745", 0)
             ],
             ProgressLevel.DUAL: [
                 ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
-                ProgressBarConfig("current", "Current Operation", "⚡", "#ffc107", 1)
+                ProgressBarConfig("current", "Current Operation", "⚡", "#28a745", 1)
             ],
             ProgressLevel.TRIPLE: [
                 ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
-                ProgressBarConfig("step", "Step Progress", "🔄", "#007bff", 1),
-                ProgressBarConfig("current", "Current Operation", "⚡", "#ffc107", 2)
+                ProgressBarConfig("step", "Step Progress", "🔄", "#28a745", 1),
+                ProgressBarConfig("current", "Current Operation", "⚡", "#28a745", 2)
             ]
         }
         return level_configs[self.level]

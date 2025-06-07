@@ -32,17 +32,17 @@ class UIComponentsManager:
             width='100%', margin='0 0 8px 0'
         ))
         
-        # Separate output widgets untuk setiap level
+        # Separate output widgets dengan minimal Y spacing
         self.overall_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='2px 0', min_height='25px', max_height='35px'
+            width='100%', margin='1px 0', min_height='25px', max_height='30px'
         ))
         
         self.step_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='2px 0', min_height='25px', max_height='35px'
+            width='100%', margin='1px 0', min_height='25px', max_height='30px'
         ))
         
         self.current_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='2px 0', min_height='25px', max_height='35px'
+            width='100%', margin='1px 0', min_height='25px', max_height='30px'
         ))
         
         self._create_container()

@@ -99,10 +99,13 @@ def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflo
         # Progress tracker - ✅ FIXED: Menggunakan komponen yang benar
         'progress_tracker': progress_components['tracker'],
         'progress_container': progress_components['container'],
-        **progress_components,
         
-        # Log components dengan fixed overflow
-        **log_components
+        # Log components - ✅ FIXED: Key names yang benar
+        'log_output': log_components['log_output'],
+        'log_accordion': log_components['log_accordion'],
+        
+        # Additional progress components
+        **{k: v for k, v in progress_components.items() if k not in ['tracker', 'container']}
     }
 
 def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[str, Any]) -> Dict[str, widgets.Widget]:

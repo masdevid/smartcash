@@ -123,7 +123,7 @@ class DownloaderInitializer(CommonInitializer):
         return get_default_downloader_config()
 
     def _get_critical_components(self) -> List[str]:
-        """Get critical components yang harus ada"""
+        """Get critical components yang harus ada - FIXED key names"""
         return [
             'ui', 'download_button', 'check_button', 'cleanup_button',
             'save_button', 'reset_button', 'log_output', 'progress_tracker'

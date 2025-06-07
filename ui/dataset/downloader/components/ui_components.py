@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: Main UI components creation untuk downloader dengan consistent layout dan progress tracking
+Deskripsi: Fixed UI components dengan confirmation area yang visible
 """
 
 import ipywidgets as widgets
@@ -17,7 +17,7 @@ from .input_options import create_downloader_input_options
 
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI dengan integrated components dan consistent layout"""
+    """Create main downloader UI dengan visible confirmation area"""
     
     get_icon = lambda key, fallback="📥": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
     get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
@@ -41,6 +41,22 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         secondary_buttons=[("Check Dataset", "search", "info")],
         cleanup_enabled=True,
         button_width='130px'
+    )
+    
+    # Confirmation area - VISIBLE dan di bawah action buttons
+    confirmation_area = widgets.Output(
+        layout=widgets.Layout(
+            width='100%', 
+            height='auto',
+            min_height='0px',
+            max_height='400px',
+            margin='10px 0',
+            padding='0px',
+            border='1px solid #dee2e6',
+            border_radius='4px',
+            overflow='auto',
+            display='block'  # Always visible
+        )
     )
     
     # Save & reset buttons
@@ -95,11 +111,20 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     </h4>
     """)
     
-    # Main UI assembly
+    # Main UI assembly dengan confirmation area yang visible
     ui = widgets.VBox([
-        header, status_panel, config_header, input_options, save_reset_buttons['container'], action_header, action_buttons['container'],
-        progress_tracker.container, log_components['log_accordion'], 
-        create_divider(), help_panel
+        header, 
+        status_panel, 
+        config_header, 
+        input_options, 
+        save_reset_buttons['container'], 
+        action_header, 
+        action_buttons['container'],
+        confirmation_area,  # Visible confirmation area di bawah action buttons
+        progress_tracker.container, 
+        log_components['log_accordion'], 
+        create_divider(), 
+        help_panel
     ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
     
     # Compile components
@@ -121,6 +146,9 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'download_button': action_buttons['download_button'],
         'check_button': action_buttons['check_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
+        
+        # Confirmation area - IMPORTANT!
+        'confirmation_area': confirmation_area,
         
         # Save/reset buttons
         'save_reset_buttons': save_reset_buttons,

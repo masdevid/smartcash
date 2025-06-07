@@ -66,8 +66,11 @@ class DownloadService(BaseDownloaderComponent):
     
     def _create_standardized_callback(self) -> Callable:
         """Create standardized callback wrapper untuk internal components"""
-        def standardized_callback(*args):
-            if self._progress_callback:
+        def standardized_callback(*args, **kwargs):
+            if not self._progress_callback:
+                return
+                
+            try:
                 # Handle berbagai signature dari internal components
                 if len(args) == 4:
                     # Already standardized: (step, current, total, message)
@@ -80,8 +83,59 @@ class DownloadService(BaseDownloaderComponent):
                     # Format: (progress_percent, message)
                     progress, message = args
                     self._progress_callback("progress", progress, 100, message)
+                elif len(args) == 1 and isinstance(args[0], dict):
+                    # Format: dict dengan keys yang diperlukan
+                    data = args[0]
+                    step = data.get('step', 'progress')
+                    current = data.get('current', 0)
+                    total = data.get('total', 100)
+                    message = data.get('message', '')
+                    self._progress_callback(step, current, total, message)
+                elif kwargs:
+                    # Format: keyword arguments
+                    step = kwargs.get('step', 'progress')
+                    current = kwargs.get('current', 0)
+                    total = kwargs.get('total', 100)
+                    message = kwargs.get('message', '')
+                    self._progress_callback(step, current, total, message)
+            except Exception as e:
+                # Silent exception untuk mencegah kegagalan callback menghentikan proses
+                if self.logger:
+                    self.logger.warning(f"⚠️ Error dalam standardized_callback: {str(e)}")
         
         return standardized_callback
+    
+    def _notify_progress(self, step: str, current: int, total: int, message: str) -> None:
+        """Notify progress dengan standardized format"""
+        try:
+            if self._progress_callback:
+                # Tambahkan emoji yang sesuai berdasarkan step
+                emoji_map = {
+                    'init': '🔧',
+                    'metadata': '📋',
+                    'backup': '💾',
+                    'download': '📥',
+                    'extract': '📦',
+                    'organize': '🗂️',
+                    'validate': '✅',
+                    'error': '❌',
+                    'complete': '✅',
+                    'warning': '⚠️'
+                }
+                
+                # Ambil emoji berdasarkan step atau gunakan default
+                step_key = step.lower().split('_')[0]
+                emoji = emoji_map.get(step_key, '🔄')
+                
+                # Jika message belum memiliki emoji, tambahkan emoji
+                if not any(e in message for e in emoji_map.values()):
+                    message = f"{emoji} {message}"
+                    
+                self._progress_callback(step, current, total, message)
+        except Exception as e:
+            # Silent exception untuk mencegah kegagalan callback menghentikan proses
+            if self.logger:
+                self.logger.warning(f"⚠️ Error dalam _notify_progress: {str(e)}")
     
     def download_dataset(self) -> Dict[str, Any]:
         """
@@ -100,46 +154,70 @@ class DownloadService(BaseDownloaderComponent):
         start_time = time.time()
         
         try:
+            # Notify start
+            self._notify_progress('init', 0, 100, "Memulai proses download dataset")
+            
             # Validate config
+            self._notify_progress('init', 5, 100, "Memvalidasi konfigurasi...")
             validation = ValidationHelper.validate_config(
                 self.config, ['workspace', 'project', 'version', 'api_key']
             )
+            
             if not validation['valid']:
-                return self._create_error_response(f"Config tidak valid: {'; '.join(validation['errors'])}")
+                error_msg = f"Konfigurasi tidak valid: {'; '.join(validation['errors'])}"
+                self._notify_progress('error', 0, 100, error_msg)
+                return self._create_error_response(error_msg)
             
             # Extract parameters
+            self._notify_progress('init', 10, 100, "Mengekstrak parameter...")
             params = self._extract_params()
             
             # Setup paths
+            self._notify_progress('init', 15, 100, "Menyiapkan direktori...")
             paths = PathHelper.setup_download_paths(
                 params['workspace'], params['project'], params['version']
             )
             
             # Execute download flow dengan progress tracking
-            self._notify_progress("validate", 0, 100, "🔧 Validating configuration...")
+            self._notify_progress("init_complete", 20, 100, "✅ Inisialisasi selesai")
             
+            # Get metadata - _get_metadata sudah memiliki notifikasi progress sendiri
             metadata = self._get_metadata(params)
+            download_url = metadata.get('download_url')
+            if not download_url:
+                error_msg = "URL download tidak ditemukan dalam metadata"
+                self._notify_progress('error', 0, 100, error_msg)
+                self.logger.error(f"❌ {error_msg}")
+                return self._create_error_response(error_msg)
             
-            if params['backup_existing']:
+            self._download_and_extract(download_url, paths)
+            
+            # Backup existing dataset if needed - _handle_backup sudah memiliki notifikasi progress sendiri
+            if params['backup_existing'] and self._has_existing_dataset(paths['final_dir']):
                 self._handle_backup(paths)
             
-            self._download_and_extract(metadata['download_url'], paths)
+            # Organize dataset - _organize_dataset sudah memiliki notifikasi progress sendiri
             stats = self._organize_dataset(paths, params)
             
+            # Validate results if needed - _validate_results sudah memiliki notifikasi progress sendiri
             if params['validate_download']:
                 self._validate_results(paths['final_dir'])
             
             # Cleanup
+            self._notify_progress('cleanup', 95, 100, "🧹 Membersihkan file sementara...")
             FileHelper.cleanup_temp(paths['temp_dir'])
             
-            # FIXED: Return format yang diharapkan UI
+            # Prepare response
+            success_msg = f"Dataset berhasil didownload ke {paths['final_dir']}"
+            self._notify_progress('complete', 100, 100, f"✅ {success_msg}")
+            
             return {
                 'status': 'success',
-                'message': f"Dataset berhasil didownload: {stats.get('total_images', 0):,} gambar",
+                'message': success_msg,
                 'stats': {
-                    'total_images': stats.get('total_images', 0),
-                    'total_labels': stats.get('total_labels', 0),
-                    'splits': stats.get('splits', {}),
+                    'file_count': stats.get('file_count', 0),
+                    'image_count': stats.get('image_count', 0),
+                    'label_count': stats.get('label_count', 0),
                     'uuid_renamed': params['rename_files'],
                     'naming_stats': stats.get('naming_stats', {}) if params['rename_files'] else None
                 },
@@ -154,8 +232,11 @@ class DownloadService(BaseDownloaderComponent):
             }
             
         except Exception as e:
-            self.logger.error(f"❌ Download failed: {str(e)}")
-            return self._create_error_response(f"Download error: {str(e)}")
+            duration = time.time() - start_time
+            error_msg = f"Error downloading dataset: {str(e)}"
+            self.logger.error(error_msg)
+            self._notify_progress('error', 0, 100, error_msg)
+            return self._create_error_response(error_msg)
     
     def _create_error_response(self, message: str) -> Dict[str, Any]:
         """FIXED: Create error response dengan format yang konsisten"""

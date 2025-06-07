@@ -127,9 +127,8 @@ def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
         'dashboard_initialized': "smartcash.ui.dashboard",
         
         # NEW: Enhanced flags untuk UUID support
-        'enhanced_download_initialized': "smartcash.dataset.downloader.enhanced",
         'file_renamer_initialized': "smartcash.dataset.file_renamer",
-        'enhanced_organizer_initialized': "smartcash.dataset.organizer.enhanced",
+        'organizer_initialized': "smartcash.dataset.organizer",
         'uuid_naming_initialized': "smartcash.common.file_naming",
         'threading_initialized': "smartcash.common.threadpools"
     }

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracker.py
-Deskripsi: Progress tracker menggunakan ipywidgets IntProgress untuk visual yang lebih baik
+Deskripsi: Progress tracker menggunakan tqdm untuk visual yang lebih baik di Colab environment
 """
 
 import ipywidgets as widgets
@@ -9,6 +9,9 @@ import time
 import threading
 from enum import Enum
 from dataclasses import dataclass, field
+from tqdm.auto import tqdm
+from IPython.display import display, clear_output
+import sys
 
 class ProgressLevel(Enum):
     """Progress level enum untuk type safety"""
@@ -70,19 +73,19 @@ class CallbackManager:
                 if callback_id in self.one_time_callbacks:
                     callbacks_to_remove.append(callback_id)
             except Exception as e:
-                print(f"Callback error for {event}: {e}")
+                print(f"🚨 Callback error for {event}: {e}")
                 callbacks_to_remove.append(callback_id)
         
         for callback_id in callbacks_to_remove:
             self.unregister(callback_id)
 
 class ProgressTracker:
-    """Progress tracker menggunakan ipywidgets IntProgress"""
+    """Progress tracker menggunakan tqdm untuk Colab environment"""
     
     def __init__(self, config: Optional[ProgressConfig] = None):
         self.config = config or ProgressConfig()
         self.callback_manager = CallbackManager()
-        self.progress_bars: Dict[str, widgets.IntProgress] = {}
+        self.tqdm_bars: Dict[str, tqdm] = {}
         self.progress_labels: Dict[str, widgets.HTML] = {}
         self.active_levels: List[str] = []
         self.current_step_index = 0
@@ -100,16 +103,16 @@ class ProgressTracker:
         """Setup level configuration berdasarkan ProgressLevel"""
         level_configs = {
             ProgressLevel.SINGLE: [
-                ProgressBarConfig("primary", "Progress", "📊", "success", 0)
+                ProgressBarConfig("primary", "Progress", "📊", "#28a745", 0)
             ],
             ProgressLevel.DUAL: [
-                ProgressBarConfig("overall", "Overall Progress", "📊", "success", 0),
-                ProgressBarConfig("current", "Current Operation", "⚡", "warning", 1)
+                ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
+                ProgressBarConfig("current", "Current Operation", "⚡", "#ffc107", 1)
             ],
             ProgressLevel.TRIPLE: [
-                ProgressBarConfig("overall", "Overall Progress", "📊", "success", 0),
-                ProgressBarConfig("step", "Step Progress", "🔄", "info", 1),
-                ProgressBarConfig("current", "Current Operation", "⚡", "warning", 2)
+                ProgressBarConfig("overall", "Overall Progress", "📊", "#28a745", 0),
+                ProgressBarConfig("step", "Step Progress", "🔄", "#007bff", 1),
+                ProgressBarConfig("current", "Current Operation", "⚡", "#ffc107", 2)
             ]
         }
         
@@ -117,7 +120,7 @@ class ProgressTracker:
         self.active_levels = [config.name for config in self.bar_configs if config.visible]
     
     def _create_ui_components(self):
-        """Create UI components dengan ipywidgets IntProgress"""
+        """Create UI components dengan tqdm integration"""
         self.header_widget = widgets.HTML("", layout=widgets.Layout(margin='0 0 10px 0', width='100%'))
         self.status_widget = widgets.HTML("", layout=widgets.Layout(margin='0 0 8px 0', width='100%'))
         self.step_info_widget = widgets.HTML("", layout=widgets.Layout(
@@ -125,19 +128,25 @@ class ProgressTracker:
             display='block' if self.config.level == ProgressLevel.TRIPLE else 'none'
         ))
         
+        # Output widget untuk tqdm bars
+        self.progress_output = widgets.Output(layout=widgets.Layout(
+            width='100%', 
+            margin='5px 0',
+            border='1px solid #ddd',
+            border_radius='4px',
+            padding='5px'
+        ))
+        
         self._initialize_progress_bars()
         
         container_heights = {
-            ProgressLevel.SINGLE: '120px',
-            ProgressLevel.DUAL: '180px',
-            ProgressLevel.TRIPLE: '240px'
+            ProgressLevel.SINGLE: '180px',
+            ProgressLevel.DUAL: '220px',
+            ProgressLevel.TRIPLE: '280px'
         }
         
-        # Combine all progress components
-        progress_components = []
-        for level in self.active_levels:
-            if level in self.progress_labels and level in self.progress_bars:
-                progress_components.extend([self.progress_labels[level], self.progress_bars[level]])
+        # Combine all components
+        progress_components = [self.progress_output]
         
         self.container = widgets.VBox(
             [self.header_widget, self.status_widget, self.step_info_widget] + progress_components,
@@ -212,11 +221,11 @@ class ProgressTracker:
         self.is_complete = False
         self.is_error = False
         
-        self._update_status("Starting operation...", 'info')
+        self._update_status("🚀 Starting operation...", 'info')
     
     def update(self, level_name: str, progress: int, message: str = "", 
                color: str = None, trigger_callbacks: bool = True):
-        """Update specific progress level dengan auto show dan callback support"""
+        """Update specific progress level dengan tqdm dan callback support"""
         if level_name not in self.active_levels:
             return
         
@@ -227,13 +236,18 @@ class ProgressTracker:
         
         progress = max(0, min(100, progress))
         
-        # Update IntProgress bar
-        if level_name in self.progress_bars:
-            self.progress_bars[level_name].value = progress
-        
-        # Update label
-        if level_name in self.progress_labels:
-            self._update_progress_label(level_name, progress, message, color)
+        # Update tqdm bar
+        if level_name in self.tqdm_bars:
+            bar = self.tqdm_bars[level_name]
+            bar.n = progress
+            bar.refresh()
+            
+            # Update description dengan message
+            if message:
+                clean_message = self._clean_message(message)
+                config = next((c for c in self.bar_configs if c.name == level_name), None)
+                emoji = config.emoji if config else "📊"
+                bar.set_description(f"{emoji} {self._truncate_message(clean_message, 40)}")
         
         self.progress_values[level_name] = progress
         if message:
@@ -299,6 +313,16 @@ class ProgressTracker:
         self.current_step_index = 0
         self.is_complete = False
         self.is_error = False
+        
+        # Close existing tqdm bars
+        for bar in self.tqdm_bars.values():
+            bar.close()
+        self.tqdm_bars.clear()
+        
+        # Clear output
+        with self.progress_output:
+            clear_output(wait=True)
+        
         self._initialize_progress_bars()
         self.hide()
         self.callback_manager.trigger('reset')
@@ -310,54 +334,41 @@ class ProgressTracker:
         self.is_visible = False
     
     def _initialize_progress_bars(self):
-        """Initialize progress bars menggunakan ipywidgets IntProgress"""
-        for bar_config in self.bar_configs:
-            if bar_config.visible:
-                # Create IntProgress widget
-                self.progress_bars[bar_config.name] = widgets.IntProgress(
-                    value=0, min=0, max=100, 
-                    bar_style=bar_config.color,
-                    layout=widgets.Layout(width='100%', margin='2px 0 8px 0')
-                )
-                
-                # Create label widget
-                self.progress_labels[bar_config.name] = widgets.HTML(
-                    value="", 
-                    layout=widgets.Layout(width='100%', margin='0 0 2px 0')
-                )
-                
-                # Initialize label
-                self._update_progress_label(bar_config.name, 0, bar_config.description)
-    
-    def _update_progress_label(self, level_name: str, value: int, message: str = "", color: str = None):
-        """Update progress label dengan message dan percentage"""
-        if level_name not in self.progress_labels:
-            return
+        """Initialize tqdm progress bars untuk setiap level"""
+        # Close existing bars first
+        for bar in self.tqdm_bars.values():
+            bar.close()
+        self.tqdm_bars.clear()
+        
+        with self.progress_output:
+            clear_output(wait=True)
             
-        config = next((c for c in self.bar_configs if c.name == level_name), None)
-        if not config:
-            return
-        
-        display_message = self._clean_message(message or config.description)
-        
-        label_html = f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;
-                    width: 100%; box-sizing: border-box; overflow: hidden;">
-            <span style="font-size: 14px; font-weight: 500; color: #333; flex: 1; 
-                         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                {config.emoji} {self._truncate_message(display_message, 35)}
-            </span>
-            <span style="font-size: 12px; color: #666; font-weight: bold; margin-left: 8px; 
-                         flex-shrink: 0;">{value}%</span>
-        </div>
-        """
-        
-        self.progress_labels[level_name].value = label_html
+            # Create tqdm bars untuk setiap active level
+            for bar_config in self.bar_configs:
+                if bar_config.visible:
+                    # Create tqdm bar dengan styling
+                    tqdm_bar = tqdm(
+                        total=100,
+                        desc=f"{bar_config.emoji} {bar_config.description}",
+                        bar_format='{l_bar}{bar:30}| {n_fmt}/{total_fmt} [{percentage:3.0f}%]',
+                        colour=self._get_tqdm_color(bar_config.color),
+                        position=bar_config.position,
+                        leave=True,
+                        file=sys.stdout,
+                        dynamic_ncols=True
+                    )
+                    
+                    self.tqdm_bars[bar_config.name] = tqdm_bar
+    
+    def _get_tqdm_color(self, hex_color: str) -> str:
+        """Convert hex color ke tqdm color name"""
+        color_mapping = {'#28a745': 'green','#007bff': 'blue','#ffc107': 'yellow','#dc3545': 'red','#6c757d': 'white'}
+        return color_mapping.get(hex_color, 'blue')
     
     def _clean_message(self, message: str) -> str:
         """Clean message dari emoji duplikat"""
         import re
-        cleaned = re.sub(r'^[📊🔄⚡🔍📥☁️✅❌]+\s*', '', message)
+        cleaned = re.sub(r'^[📊🔄⚡🔍📥☁️✅❌🚀]+\s*', '', message)
         return cleaned.strip() or message
     
     def _calculate_weighted_overall_progress(self, step_progress: int) -> int:
@@ -412,19 +423,22 @@ class ProgressTracker:
     
     def _set_all_bars_complete(self, message: str):
         """Set all bars ke complete state"""
-        for level_name in self.progress_bars:
-            self.progress_bars[level_name].value = 100
-            self.progress_bars[level_name].bar_style = 'success'
-            if level_name in self.progress_labels:
-                self._update_progress_label(level_name, 100, f"✅ {self._truncate_message(message, 35)}")
+        for level_name, bar in self.tqdm_bars.items():
+            bar.n = 100
+            bar.refresh()
+            clean_message = self._truncate_message(message, 35)
+            config = next((c for c in self.bar_configs if c.name == level_name), None)
+            emoji = config.emoji if config else "✅"
+            bar.set_description(f"✅ {clean_message}")
     
     def _set_all_bars_error(self, message: str):
         """Set all bars ke error state"""
-        for level_name in self.progress_bars:
-            self.progress_bars[level_name].bar_style = 'danger'
-            if level_name in self.progress_labels:
-                current_value = self.progress_values.get(level_name, 0)
-                self._update_progress_label(level_name, current_value, f"❌ {self._truncate_message(message, 35)}")
+        for level_name, bar in self.tqdm_bars.items():
+            current_value = self.progress_values.get(level_name, 0)
+            bar.n = current_value
+            bar.refresh()
+            clean_message = self._truncate_message(message, 35)
+            bar.set_description(f"❌ {clean_message}")
     
     def _delayed_hide(self):
         """Hide container after delay"""
@@ -510,20 +524,4 @@ def create_flexible_tracker(config: ProgressConfig) -> ProgressTracker:
 def create_three_progress_tracker() -> Dict[str, Any]:
     """Backward compatibility untuk existing code"""
     tracker = create_triple_progress_tracker()
-    return {
-        'container': tracker.container,
-        'progress_container': tracker.container,
-        'status_widget': tracker.status_widget,
-        'step_info_widget': tracker.step_info_widget,
-        'tracker': tracker,
-        'show_container': tracker.show,
-        'hide_container': tracker.hide,
-        'show_for_operation': tracker.show,
-        'update_overall': tracker.update_overall,
-        'update_step': tracker.update_step,
-        'update_current': tracker.update_current,
-        'update_progress': tracker.update,
-        'complete_operation': tracker.complete,
-        'error_operation': tracker.error,
-        'reset_all': tracker.reset
-    }
+    return {'container': tracker.container,'progress_container': tracker.container,'status_widget': tracker.status_widget,'step_info_widget': tracker.step_info_widget,'tracker': tracker,'show_container': tracker.show,'hide_container': tracker.hide,'show_for_operation': tracker.show,'update_overall': tracker.update_overall,'update_step': tracker.update_step,'update_current': tracker.update_current,'update_progress': tracker.update,'complete_operation': tracker.complete,'error_operation': tracker.error,'reset_all': tracker.reset}

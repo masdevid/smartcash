@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/downloader_initializer.py
-Deskripsi: Downloader initializer dengan handler integration
+Deskripsi: Downloader initializer dengan integrasi handler yang telah direfaktor
 """
 
 from typing import Dict, Any, Optional, List
@@ -8,6 +8,9 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
 from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
 from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
+from smartcash.ui.dataset.downloader.handlers.check_handler import DatasetCheckHandler
+from smartcash.ui.dataset.downloader.handlers.cleanup_handler import DatasetCleanupHandler
+from smartcash.ui.dataset.downloader.handlers.button_handler import ButtonHandler
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
 from smartcash.common.logger import get_logger
 
@@ -33,7 +36,7 @@ class DownloaderInitializer(CommonInitializer):
                 redirect_all_logs=False
             )
             ui_components['logger'] = logger
-            ui_components['enhanced_download_initialized'] = True
+            ui_components['download_initialized'] = True
             
             return ui_components
             
@@ -50,12 +53,19 @@ class DownloaderInitializer(CommonInitializer):
             # Setup handlers - single call untuk semua handlers
             ui_components = setup_download_handlers(ui_components, config, env)
             
-            # Verify handler setup
-            handler = ui_components.get('handler')
-            if handler:
-                logger.success("✅ Handler berhasil di-setup")
+            # Verifikasi setup handler
+            download_handler = ui_components.get('download_handler')
+            check_handler = ui_components.get('check_handler')
+            cleanup_handler = ui_components.get('cleanup_handler')
+            
+            if download_handler and check_handler and cleanup_handler:
+                logger.success("✅ Semua handlers berhasil di-setup")
             else:
-                logger.warning("⚠️ Handler tidak ditemukan")
+                missing = []
+                if not download_handler: missing.append('download_handler')
+                if not check_handler: missing.append('check_handler')
+                if not cleanup_handler: missing.append('cleanup_handler')
+                logger.warning(f"⚠️ Beberapa handler tidak ditemukan: {', '.join(missing)}")
             
             return ui_components
                 
@@ -74,19 +84,19 @@ class DownloaderInitializer(CommonInitializer):
         return [
             'ui', 'download_button', 'check_button', 'cleanup_button',
             'save_button', 'reset_button', 'log_output', 'progress_tracker',
-            'handler'  # Added handler
+            'download_handler', 'check_handler', 'cleanup_handler'  # Handler yang direfaktor
         ]
 
 
 def initialize_downloader(env=None, config=None, **kwargs) -> Any:
-    """Initialize downloader UI dengan handlers"""
+    """Initialize downloader UI dengan handlers yang telah direfaktor"""
     try:
         initializer = DownloaderInitializer()
         return initializer.initialize(env, config, **kwargs)
         
     except Exception as e:
         logger = get_logger('downloader.factory')
-        logger.error(f"❌ Factory error: {str(e)}")
+        logger.error(f"❌ Error initializing downloader: {str(e)}")
         
         import ipywidgets as widgets
         return widgets.HTML(f"""

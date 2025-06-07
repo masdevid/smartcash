@@ -35,7 +35,7 @@ class UIComponentsManager:
         self.progress_output = widgets.Output(layout=widgets.Layout(
             width='100%', margin='5px 0', border='1px solid #ddd',
             border_radius='4px', padding='8px', min_height='60px',
-            display='flex', flex_direction='column'
+            display='flex', flex_direction='row'
         ))
         
         self._create_container()

@@ -3,6 +3,7 @@ File: smartcash/ui/dataset/downloader/handlers/download_handler.py
 Deskripsi: FIXED download handler dengan proper state management, log clearing, dan parameter fixes
 """
 
+import time
 from typing import Dict, Any, Callable, Optional
 from pathlib import Path
 from smartcash.ui.utils.fallback_utils import show_status_safe
@@ -45,7 +46,23 @@ class DownloadHandler:
                 button._click_handlers.callbacks.clear()
         except Exception:
             pass
-    
+
+    def _get_all_buttons(self):
+        # Disable semua buttons
+        all_buttons = [
+            self.ui_components.get('download_button'),
+            self.ui_components.get('check_button'), 
+            self.ui_components.get('cleanup_button'),
+            self.ui_components.get('save_button'),
+            self.ui_components.get('reset_button')
+        ]
+        return all_buttons
+
+    def _change_all_buttons_stat(self, enabled=True):
+        for btn in self._get_all_buttons():
+            if btn and hasattr(btn, 'disabled'):
+                btn.disabled = not enabled
+
     def _prepare_button_state(self, active_button) -> None:
         """Prepare button state dan clear log"""
         # Clear log output
@@ -53,29 +70,11 @@ class DownloadHandler:
         if log_output and hasattr(log_output, 'clear_output'):
             with log_output:
                 log_output.clear_output(wait=True)
-        
-        # Disable semua buttons
-        all_buttons = [
-            self.ui_components.get('download_button'),
-            self.ui_components.get('check_button'), 
-            self.ui_components.get('cleanup_button')
-        ]
-        
-        for btn in all_buttons:
-            if btn and hasattr(btn, 'disabled'):
-                btn.disabled = True
+        self._change_all_buttons_stat(False)
     
     def _restore_button_state(self) -> None:
         """Restore button state setelah operation"""
-        all_buttons = [
-            self.ui_components.get('download_button'),
-            self.ui_components.get('check_button'),
-            self.ui_components.get('cleanup_button')
-        ]
-        
-        for btn in all_buttons:
-            if btn and hasattr(btn, 'disabled'):
-                btn.disabled = False
+        self._change_all_buttons_stat(True)
     
     def _handle_download_click(self, button) -> None:
         """FIXED download handler dengan proper parameter handling"""
@@ -84,7 +83,7 @@ class DownloadHandler:
             
             if self.progress_tracker:
                 self.progress_tracker.show("Dataset Download")
-                self.progress_tracker.update_overall(10, "🔧 Validating configuration...")
+                self.progress_tracker.update_overall(10, "🔧 Memvalidasi konfigurasi...")
             
             # Extract dan validate config
             config_handler = self.ui_components.get('config_handler')
@@ -124,7 +123,18 @@ class DownloadHandler:
     
     def _execute_download(self, service_config: Dict[str, Any], button) -> None:
         """FIXED execute download dengan proper parameter validation dan detailed logging"""
+        download_start_time = time.time()
         try:
+            # Debug: Log full service config untuk troubleshooting
+            self.logger.info("🔍 DEBUG: Service config full details:")
+            for key, value in service_config.items():
+                # Mask API key untuk keamanan
+                if key == 'api_key':
+                    masked_key = value[:4] + '*' * (len(value) - 8) + value[-4:] if len(value) > 8 else '****'
+                    self.logger.info(f"🔑 {key}: {masked_key}")
+                else:
+                    self.logger.info(f"🔧 {key}: {value}")
+            
             # Validate required fields
             required = ['workspace', 'project', 'version', 'api_key']
             missing = [f for f in required if not service_config.get(f, '').strip()]
@@ -145,12 +155,28 @@ class DownloadHandler:
             # Log service config untuk debugging
             self.logger.info(f"🔧 Service config: rename_files={service_config.get('rename_files')}, organize_dataset={service_config.get('organize_dataset')}, validate_download={service_config.get('validate_download')}")
             
+            # Debug: Log environment info
+            try:
+                from smartcash.common.environment import get_environment_manager
+                env_manager = get_environment_manager()
+                self.logger.info(f"🔍 DEBUG: Environment - is_colab: {env_manager.is_colab}, drive_mounted: {env_manager.is_drive_mounted}")
+                self.logger.info(f"🔍 DEBUG: Dataset path: {env_manager.get_dataset_path()}")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Tidak dapat mengambil info environment: {str(e)}")
+            
             # Create service dengan config yang sudah validated
             self.logger.info("🔧 Membuat download service...")
             downloader = get_downloader_instance(service_config, self.logger)
             if not downloader:
                 self._handle_error("Gagal membuat download service", button)
                 return
+            
+            # Debug: Log service info
+            try:
+                service_info = downloader.get_service_info() if hasattr(downloader, 'get_service_info') else {}
+                self.logger.info(f"🔍 DEBUG: Service info: {service_info}")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Tidak dapat mengambil service info: {str(e)}")
             
             self.logger.info("✅ Download service berhasil dibuat")
             
@@ -159,14 +185,25 @@ class DownloadHandler:
                 self.logger.info("🔄 Mengatur progress callback...")
                 downloader.set_progress_callback(self._create_progress_callback())
                 self.logger.info("✅ Progress callback berhasil diatur")
+            else:
+                self.logger.warning("⚠️ Service tidak mendukung progress callback")
             
             if self.progress_tracker:
                 self.progress_tracker.update_overall(50, "📥 Starting download...")
             
-            # Execute download
+            # Execute download dengan timing
             self.logger.info("🚀 Memulai proses download dataset...")
+            download_exec_start = time.time()
             result = downloader.download_dataset()
-            self.logger.info("✅ Proses download selesai")
+            download_exec_time = time.time() - download_exec_start
+            self.logger.info(f"✅ Proses download selesai dalam {download_exec_time:.2f} detik")
+            
+            # Debug: Log hasil download
+            self.logger.info(f"🔍 DEBUG: Download result keys: {list(result.keys()) if result else 'None'}")
+            if result and 'status' in result:
+                self.logger.info(f"🔍 DEBUG: Download status: {result.get('status')}")
+            if result and 'message' in result:
+                self.logger.info(f"🔍 DEBUG: Download message: {result.get('message')}")
             
             # Handle response
             if result and result.get('status') == 'success':
@@ -174,14 +211,22 @@ class DownloadHandler:
                 total_images = stats.get('total_images', 0)
                 success_msg = f"Dataset berhasil didownload: {total_images:,} gambar"
                 
-                # Log detail hasil download
-                self.logger.info(f"📊 Total gambar: {total_images:,}")
-                self.logger.info(f"📊 Total label: {stats.get('total_labels', 0):,}")
+                # Log detail hasil download dengan format yang lebih jelas
+                self.logger.info(f"📊 Total gambar: {total_images:,} gambar")
+                self.logger.info(f"📊 Total label: {stats.get('total_labels', 0):,} label")
                 
-                # Log detail per split
+                # Log detail per split dengan statistik lebih lengkap
                 splits = stats.get('splits', {})
+                self.logger.info("📊 Detail per split:")
                 for split_name, split_stats in splits.items():
-                    self.logger.info(f"📊 {split_name}: {split_stats.get('images', 0)} gambar, {split_stats.get('labels', 0)} label")
+                    img_count = split_stats.get('images', 0)
+                    label_count = split_stats.get('labels', 0)
+                    img_percent = (img_count / total_images * 100) if total_images > 0 else 0
+                    self.logger.info(f"📊 {split_name}: {img_count} gambar ({img_percent:.1f}%), {label_count} label")
+                    
+                # Debug: Log statistik lainnya jika tersedia
+                if 'classes' in stats:
+                    self.logger.info(f"🔍 DEBUG: Classes detected: {stats.get('classes')}")
                 
                 if self.progress_tracker:
                     self.progress_tracker.complete(success_msg)
@@ -189,16 +234,42 @@ class DownloadHandler:
                 show_status_safe(success_msg, "success", self.ui_components)
                 self.logger.success(f"✅ {success_msg}")
                 
-                # Log additional stats jika tersedia
+                # Log additional stats jika tersedia dengan detail lebih lengkap
                 if stats.get('uuid_renamed'):
                     naming_stats = stats.get('naming_stats', {})
                     if naming_stats:
-                        self.logger.info(f"🔄 UUID renaming: {naming_stats.get('total_files', 0)} files processed")
+                        total_renamed = naming_stats.get('total_files', 0)
+                        self.logger.info(f"🔄 UUID renaming: {total_renamed} files processed")
+                        
+                        # Debug: Log detail renaming stats jika tersedia
+                        for key, value in naming_stats.items():
+                            if key != 'total_files':
+                                self.logger.info(f"🔄 {key}: {value}")
                 
-                # Log output directory
+                # Log output directory dengan verifikasi
                 output_dir = result.get('output_dir', '')
                 if output_dir:
-                    self.logger.info(f"📂 Output directory: {output_dir}")
+                    output_path = Path(output_dir)
+                    exists = output_path.exists()
+                    self.logger.info(f"📂 Output directory: {output_dir} ({'exists' if exists else 'not found'})")
+                    
+                    # Debug: Log beberapa file yang ada di output directory
+                    if exists:
+                        try:
+                            files = list(output_path.glob('*'))
+                            subdirs = [f for f in files if f.is_dir()]
+                            self.logger.info(f"📂 Output contains {len(files)} items, {len(subdirs)} directories")
+                            
+                            # Log beberapa subdirectory jika ada
+                            if subdirs:
+                                subdir_names = [d.name for d in subdirs[:5]]
+                                self.logger.info(f"📂 Subdirectories: {', '.join(subdir_names)}{' and more...' if len(subdirs) > 5 else ''}")
+                        except Exception as e:
+                            self.logger.warning(f"⚠️ Tidak dapat scan output directory: {str(e)}")
+                            
+                # Log total waktu eksekusi
+                total_time = time.time() - download_start_time
+                self.logger.info(f"⏱️ Total waktu eksekusi: {total_time:.2f} detik")
                 
             else:
                 error_msg = f"Download gagal: {result.get('message', 'Unknown error') if result else 'No response from service'}"
@@ -260,12 +331,12 @@ Lanjutkan download?"""
             
             if self.progress_tracker:
                 self.progress_tracker.show("Check Dataset")
-                self.progress_tracker.update_overall(50, "🔍 Scanning dataset...")
+                self.progress_tracker.update_overall(50, "🔍 Memeriksa dataset...")
             
             dataset_status = self._check_existing_dataset_detailed()
             
             if self.progress_tracker:
-                self.progress_tracker.update_overall(100, "✅ Check completed")
+                self.progress_tracker.update_overall(100, "✅ Check selesai")
                 self.progress_tracker.complete("Dataset check selesai")
             
             self._display_dataset_summary(dataset_status)
@@ -471,7 +542,7 @@ Lanjutkan download?"""
         try:
             if self.progress_tracker:
                 self.progress_tracker.show("Cleanup Dataset")
-                self.progress_tracker.update_overall(20, "🧹 Starting cleanup...")
+                self.progress_tracker.update_overall(20, "🧹 Mempersiapkan pembersihan...")
             
             self.logger.info("🧹 Memulai cleanup file gambar dan label...")
             
@@ -628,7 +699,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
             'handler': handler
         })
         
-        logger.success("✅ Download handlers berhasil disetup")
+        logger.success("✅ Download handlers berhasil dikonfigurasi")
         return ui_components
         
     except Exception as e:

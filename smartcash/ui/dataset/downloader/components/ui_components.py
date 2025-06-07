@@ -1,281 +1,162 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: FIXED UI components dengan proper imports dan component creation
+Deskripsi: Main UI components creation untuk downloader dengan consistent layout dan progress tracking
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
-from smartcash.ui.components.progress_tracker import create_triple_progress_tracker
+from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.utils.layout_utils import create_divider
+from smartcash.ui.components.action_buttons import create_action_buttons
+from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-from smartcash.ui.components.header import create_header
-from smartcash.ui.utils.layout_utils import create_responsive_container, create_responsive_two_column
-from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
+from .input_options import create_downloader_input_options
+
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI dengan proper component creation"""
-    config = config or {}
-    roboflow = config.get('data', {}).get('roboflow', {})
-    download = config.get('download', {})
-    detected_api_key = get_api_key_from_secrets()
+    """Create main downloader UI dengan integrated components dan consistent layout"""
     
-    # 1. Header
+    get_icon = lambda key, fallback="📥": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
+    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
+    
+    # Header
     header = create_header(
-        title="Dataset Downloader",
-        description="Download dataset Roboflow untuk SmartCash training (format YOLOv5)",
-        icon="📥"
+        f"{get_icon('download', '📥')} Dataset Downloader", 
+        "Download dataset Roboflow untuk SmartCash training dengan UUID renaming otomatis"
     )
     
-    # 2. Status panel
-    status_panel = widgets.HTML(_get_status_html(), 
-                               layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
+    # Status panel
+    status_panel = create_status_panel("Siap untuk download dataset", "info")
     
-    # 3. Form fields
-    form_fields = _create_form_fields(roboflow, detected_api_key, download)
-    form_container = _create_form_container(form_fields)
+    # Input options
+    input_options = create_downloader_input_options(config)
     
-    # 4. Save/Reset buttons
-    save_reset_components = create_save_reset_buttons(
-        save_label="Simpan",
-        reset_label="Reset", 
-        button_width="100px",
+    # Action buttons
+    action_buttons = create_action_buttons(
+        primary_label="Download Dataset",
+        primary_icon="download",
+        secondary_buttons=[("Check Dataset", "search", "info")],
+        cleanup_enabled=True,
+        button_width='130px'
+    )
+    
+    # Save & reset buttons
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan", reset_label="Reset",
+        save_tooltip="Simpan konfigurasi downloader",
+        reset_tooltip="Reset konfigurasi ke default",
         with_sync_info=True,
         sync_message="Konfigurasi tersimpan ke dataset_config.yaml"
     )
     
-    # 5. Action buttons
-    action_components = _create_action_buttons()
+    # Log accordion
+    log_components = create_log_accordion(module_name='downloader', height='220px')
     
-    # 6. Progress tracker
-    progress_components = create_triple_progress_tracker(auto_hide=True)
-    progress_components['container'].layout.display = 'none'
+    # Progress tracking dengan dual level untuk overall dan step progress
+    progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
     
-    # 7. Log accordion
-    log_components = create_log_accordion(
-        module_name='downloader',
-        height='250px',
-        width='100%'
-    )
+    # Help panel
+    help_content = """
+    <div style="padding: 8px; background: #ffffff;">
+        <p style="margin: 6px 0; font-size: 13px;">Download dataset dari Roboflow dengan UUID renaming dan validasi otomatis.</p>
+        <div style="margin: 8px 0;">
+            <strong style="color: #495057; font-size: 13px;">Parameter Utama:</strong>
+            <ul style="margin: 4px 0; padding-left: 18px; color: #495057; font-size: 12px;">
+                <li><strong>Workspace/Project:</strong> Identifikasi dataset Roboflow</li>
+                <li><strong>Version:</strong> Versi dataset yang akan didownload</li>
+                <li><strong>API Key:</strong> Auto-detect dari Colab secrets</li>
+                <li><strong>UUID Renaming:</strong> Penamaan ulang otomatis untuk konsistensi</li>
+            </ul>
+        </div>
+        <div style="margin-top: 8px; padding: 6px; background: #e7f3ff; border-radius: 3px; font-size: 12px;">
+            <strong>💡 Tips:</strong> API key dapat diatur di Colab Secrets dengan nama 'ROBOFLOW_API_KEY'.
+        </div>
+    </div>
+    """
     
-    # 8. Main container
-    main_ui = create_responsive_container([
-        header,
-        status_panel, 
-        form_container,
-        save_reset_components['container'],
-        _create_action_header(),
-        action_components['container'],
-        progress_components['container'],
-        log_components['log_accordion']
-    ], container_type='vbox')
+    help_panel = widgets.Accordion([widgets.HTML(value=help_content)])
+    help_panel.set_title(0, "💡 Info Download")
+    help_panel.selected_index = None
     
-    # Component mapping
-    return {
+    # Section headers
+    config_header = widgets.HTML(f"""
+        <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 8px 0; font-size: 16px;'>
+            {get_icon('settings', '⚙️')} Konfigurasi Download
+        </h4>
+    """)
+    
+    action_header = widgets.HTML(f"""
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('primary', '#007bff')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Actions
+    </h4>
+    """)
+    
+    # Main UI assembly
+    ui = widgets.VBox([
+        header, status_panel, config_header, input_options, save_reset_buttons['container'], action_header, action_buttons['container'],
+        progress_tracker.container, log_components['log_accordion'], 
+        create_divider(), help_panel
+    ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
+    
+    # Compile components
+    ui_components = {
         # Main UI
-        'ui': main_ui,
-        'main_container': main_ui,
-        'header': header,
-        'status_panel': status_panel,
-        'form_container': form_container,
+        'ui': ui, 'header': header, 'status_panel': status_panel,
         
-        # Form fields
-        'workspace_input': form_fields['workspace_input'],
-        'project_input': form_fields['project_input'],
-        'version_input': form_fields['version_input'],
-        'api_key_input': form_fields['api_key_input'],
-        'validate_checkbox': form_fields['validate_checkbox'],
-        'backup_checkbox': form_fields['backup_checkbox'],
-        
-        # Save/Reset buttons
-        'save_button': save_reset_components['save_button'],
-        'reset_button': save_reset_components['reset_button'],
-        'save_reset_container': save_reset_components['container'],
+        # Input components
+        'input_options': input_options,
+        'workspace_input': getattr(input_options, 'workspace_input', None),
+        'project_input': getattr(input_options, 'project_input', None), 
+        'version_input': getattr(input_options, 'version_input', None),
+        'api_key_input': getattr(input_options, 'api_key_input', None),
+        'validate_checkbox': getattr(input_options, 'validate_checkbox', None),
+        'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
         
         # Action buttons
-        'download_button': action_components['download_button'],
-        'check_button': action_components['check_button'], 
-        'cleanup_button': action_components['cleanup_button'],
-        'action_container': action_components['container'],
+        'action_buttons': action_buttons,
+        'download_button': action_buttons['download_button'],
+        'check_button': action_buttons['check_button'],
+        'cleanup_button': action_buttons.get('cleanup_button'),
         
-        # Progress tracker
-        'progress_tracker': progress_components['tracker'],
-        'progress_container': progress_components['container'],
-        'progress_status_widget': progress_components.get('status_widget'),
+        # Save/reset buttons
+        'save_reset_buttons': save_reset_buttons,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_button': save_reset_buttons['reset_button'],
+        
+        # Progress components
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'show_for_operation': progress_tracker.show,
+        'update_progress': progress_tracker.update,
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_all': progress_tracker.reset,
         
         # Log components
-        'log_output': log_components['log_output'],
+        'log_components': log_components,
         'log_accordion': log_components['log_accordion'],
-    }
-
-def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[str, Any]) -> Dict[str, widgets.Widget]:
-    """Create form fields dengan consistent layout"""
-    common_layout = widgets.Layout(width='100%', margin='2px 0')
-    common_style = {'description_width': '100px'}
-    
-    return {
-        'workspace_input': widgets.Text(
-            value=roboflow.get('workspace', 'smartcash-wo2us'), 
-            description='Workspace:', 
-            placeholder='Nama workspace Roboflow', 
-            layout=common_layout, 
-            style=common_style
-        ),
-        'project_input': widgets.Text(
-            value=roboflow.get('project', 'rupiah-emisi-2022'), 
-            description='Project:', 
-            placeholder='Nama project Roboflow', 
-            layout=common_layout, 
-            style=common_style
-        ),
-        'version_input': widgets.Text(
-            value=str(roboflow.get('version', '3')), 
-            description='Version:', 
-            placeholder='Versi dataset', 
-            layout=common_layout, 
-            style=common_style
-        ),
-        'api_key_input': widgets.Password(
-            value=api_key or roboflow.get('api_key', ''), 
-            description='API Key:', 
-            placeholder='🔑 Auto-detect dari Colab secrets' if api_key else 'Masukkan API Key Roboflow', 
-            layout=common_layout, 
-            style=common_style
-        ),
-        'validate_checkbox': widgets.Checkbox(
-            value=download.get('validate_download', True), 
-            description='Validasi download', 
-            layout=widgets.Layout(width='100%', margin='2px 0')
-        ),
-        'backup_checkbox': widgets.Checkbox(
-            value=download.get('backup_existing', False), 
-            description='Backup existing data', 
-            layout=widgets.Layout(width='100%', margin='2px 0')
-        )
-    }
-
-def _create_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.Widget:
-    """Create form container"""
-    format_info = widgets.HTML("""
-    <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin-bottom: 8px; 
-                width: 100%; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word;">
-        <small style="color: #1976d2;"><strong>📦 Format:</strong> YOLOv5 PyTorch (hardcoded)</small>
-    </div>""", layout=widgets.Layout(width='100%', margin='0'))
-    
-    left_content = create_responsive_container([
-        form_fields['workspace_input'], 
-        form_fields['project_input'], 
-        form_fields['version_input'], 
-        form_fields['api_key_input']
-    ], container_type='vbox')
-    
-    right_content = create_responsive_container([
-        format_info, 
-        form_fields['validate_checkbox'], 
-        form_fields['backup_checkbox']
-    ], container_type='vbox')
-    
-    form_container = create_responsive_two_column(
-        left_content, 
-        right_content,
-        left_width='48%', 
-        right_width='48%'
-    )
-    
-    return widgets.VBox([form_container], layout=widgets.Layout(
-        width='100%', 
-        border='1px solid #ddd', 
-        border_radius='5px',
-        padding='15px', 
-        margin='0 0 15px 0', 
-        box_sizing='border-box',
-        overflow='hidden'
-    ))
-
-def _create_action_buttons() -> Dict[str, widgets.Widget]:
-    """Create action buttons"""
-    button_layout = widgets.Layout(
-        width='auto', 
-        min_width='140px', 
-        max_width='200px',
-        height='35px', 
-        margin='5px',
-        overflow='hidden'
-    )
-    
-    download_button = widgets.Button(
-        description='📥 Download', 
-        button_style='primary', 
-        layout=button_layout,
-        tooltip='Download dataset dari Roboflow'
-    )
-    
-    check_button = widgets.Button(
-        description='🔍 Check', 
-        button_style='info', 
-        layout=button_layout,
-        tooltip='Check status dataset existing'
-    )
-    
-    cleanup_button = widgets.Button(
-        description='🧹 Cleanup', 
-        button_style='danger', 
-        layout=button_layout,
-        tooltip='Hapus dataset existing'
-    )
-    
-    container = widgets.HBox([download_button, check_button, cleanup_button], layout=widgets.Layout(
-        width='100%', 
-        justify_content='flex-start', 
-        margin='15px 0',
-        display='flex', 
-        flex_flow='row wrap', 
-        align_items='center', 
-        overflow='hidden',
-        box_sizing='border-box'
-    ))
-    
-    return {
-        'download_button': download_button, 
-        'check_button': check_button, 
-        'cleanup_button': cleanup_button, 
-        'container': container,
-        'buttons': [download_button, check_button, cleanup_button]
-    }
-
-def _create_action_header() -> widgets.HTML:
-    """Create action section header"""
-    return widgets.HTML("""
-    <h4 style='color: #333; margin: 15px 0 10px 0; font-size: 16px; font-weight: 600;
-               border-bottom: 2px solid #28a745; padding-bottom: 6px; overflow: hidden;
-               text-overflow: ellipsis; white-space: nowrap;'>
-        ▶️ Actions
-    </h4>""", layout=widgets.Layout(width='100%', margin='0', overflow='hidden'))
-
-def _get_status_html() -> str:
-    """Get status HTML dengan environment detection"""
-    try:
-        import google.colab
-        from pathlib import Path
-        is_drive_mounted = Path('/content/drive/MyDrive/SmartCash').exists()
-        api_key = get_api_key_from_secrets()
+        'log_output': log_components['log_output'],
+        'status': log_components['log_output'],
         
-        if is_drive_mounted and api_key:
-            return """<div style="padding: 12px; background: #e8f5e8; border-left: 4px solid #4caf50; 
-                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
-                      <span style="color: #2e7d32;">✅ Drive terhubung + API Key terdeteksi - Siap download!</span></div>"""
-        elif is_drive_mounted:
-            return """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; 
-                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
-                      <span style="color: #856404;">⚠️ Drive terhubung - Masukkan API Key untuk mulai</span></div>"""
-        elif api_key:
-            return """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; 
-                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
-                      <span style="color: #856404;">⚠️ API Key tersedia - Mount Drive untuk penyimpanan permanen</span></div>"""
-        else:
-            return """<div style="padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; 
-                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
-                      <span style="color: #721c24;">❌ Perlu mount Drive dan setup API Key</span></div>"""
-    except ImportError:
-        return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; 
-                  border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
-                  <span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
+        # UI info
+        'help_panel': help_panel,
+        'module_name': 'downloader'
+    }
+    
+    # Validate critical components - create fallback buttons if missing
+    critical_components = ['download_button', 'check_button', 'save_button', 'reset_button']
+    for comp_name in critical_components:
+        if ui_components.get(comp_name) is None:
+            ui_components[comp_name] = widgets.Button(
+                description=comp_name.replace('_', ' ').title(),
+                button_style='primary' if 'download' in comp_name else '',
+                disabled=True,
+                tooltip=f"Component {comp_name} tidak tersedia",
+                layout=widgets.Layout(width='auto', max_width='150px')
+            )
+    
+    return ui_components

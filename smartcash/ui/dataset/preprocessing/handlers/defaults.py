@@ -1,4 +1,6 @@
 
+from typing import Dict, Any
+
 def get_default_preprocessing_config() -> Dict[str, Any]:
     """
     Get hardcoded default configuration untuk downloader reset operations.

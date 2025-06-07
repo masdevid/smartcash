@@ -285,7 +285,7 @@ def get_namespace_summary() -> Dict[str, Any]:
 
 # Backward compatibility constants untuk module-specific namespaces
 PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
-DEPENDENCY_LOGGER_NAMESPACE = "smartcash.ui.setup.dependency_installer"
+DEPENDENCY_LOGGER_NAMESPACE = "smartcash.ui.setup.dependency"
 AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
 EVALUATION_LOGGER_NAMESPACE = "smartcash.model.evaluation"
 DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"

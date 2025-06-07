@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained_model/pretrained_init.py
-Deskripsi: Fixed pretrained initializer dengan CommonInitializer inheritance untuk resolve weak reference error
+Deskripsi: Pretrained initializer
 """
 
 from typing import Dict, Any, List
@@ -8,8 +8,7 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.pretrained_model.handlers.config_handler import PretrainedModelConfigHandler
 
 class PretrainedInit(CommonInitializer):
-    """Fixed pretrained initializer dengan proper CommonInitializer inheritance"""
-    
+    """Pretrained initializer"""
     def __init__(self):
         super().__init__('pretrained_model', PretrainedModelConfigHandler)
     
@@ -39,7 +38,7 @@ class PretrainedInit(CommonInitializer):
             return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default config menggunakan ConfigHandler untuk avoid redundancy"""
+        """Default config menggunakan ConfigHandler"""
         return self.config_handler_class('pretrained_model').get_default_config() if self.config_handler_class else {}
     
     def _get_critical_components(self) -> List[str]:
@@ -51,13 +50,10 @@ class PretrainedInit(CommonInitializer):
         try:
             import gc
             from IPython.display import clear_output
-            
             # Force garbage collection
             gc.collect()
-            
             # Clear any existing outputs
             clear_output(wait=True)
-            
         except Exception:
             pass  # Silent fail jika clear tidak berhasil
 

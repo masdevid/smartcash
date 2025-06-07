@@ -24,16 +24,6 @@ class DownloaderInitializer(CommonInitializer):
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create downloader UI components dengan proper environment"""
         try:
-            # Log environment info at start
-            from smartcash.common.environment import get_environment_manager
-            env_manager = get_environment_manager()
-            
-            env_info = env_manager.get_system_info()
-            temp_logger = get_logger('downloader.init')
-            temp_logger.info(f"🌍 Environment: {env_info['environment']}")
-            temp_logger.info(f"📂 Dataset path: {env_manager.get_dataset_path()}")
-            temp_logger.info(f"💾 Drive mounted: {env_info['drive_mounted']}")
-            
             # Create UI components
             ui_components = create_downloader_main_ui(config)
             
@@ -53,7 +43,7 @@ class DownloaderInitializer(CommonInitializer):
             return ui_components
             
         except Exception as e:
-            logger = get_logger('downloader.init')
+            logger = get_logger('smartcash.dataset.downloader')
             logger.error(f"❌ Error creating downloader UI: {str(e)}")
             return self._create_fallback_ui(str(e))
     
@@ -77,7 +67,7 @@ class DownloaderInitializer(CommonInitializer):
             return ui_components
                 
         except Exception as e:
-            logger = ui_components.get('logger') or get_logger('downloader.handlers')
+            logger = ui_components.get('logger') or get_logger('smartcash.dataset.downloader')
             logger.error(f"❌ Error setup handlers: {str(e)}")
             return ui_components
     
@@ -98,25 +88,6 @@ class DownloaderInitializer(CommonInitializer):
             'total_present': len(present_handlers)
         }
     
-    def _create_fallback_ui(self, error_message: str) -> Dict[str, Any]:
-        """Create fallback UI untuk error cases"""
-        import ipywidgets as widgets
-        
-        error_widget = widgets.HTML(f"""
-        <div style="padding: 15px; background: #f8d7da; border-radius: 5px; color: #721c24; margin: 10px 0;">
-            <h4>❌ Downloader Initialization Failed</h4>
-            <p>Error: {error_message}</p>
-            <small>💡 Try restarting cell atau check environment setup</small>
-        </div>
-        """)
-        
-        return {
-            'ui': error_widget,
-            'main_container': error_widget,
-            'error': True,
-            'error_message': error_message
-        }
-    
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default config untuk downloader"""
         from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
@@ -132,34 +103,14 @@ class DownloaderInitializer(CommonInitializer):
 def initialize_downloader(env=None, config=None, **kwargs) -> Any:
     """Initialize downloader UI dengan FIXED environment dan unified handlers"""
     try:
-        # Pre-initialize environment manager
-        from smartcash.common.environment import get_environment_manager
-        env_manager = get_environment_manager()
-        
-        # Log environment status
-        temp_logger = get_logger('downloader.factory')
-        temp_logger.info(f"🌍 Initializing in: {env_manager.get_system_info()['environment']}")
-        temp_logger.info(f"📂 Dataset path: {env_manager.get_dataset_path()}")
-        
         # Create initializer
         initializer = DownloaderInitializer()
         result = initializer.initialize(env, config, **kwargs)
-        
-        temp_logger.success("✅ Downloader initialization completed")
         return result
         
     except Exception as e:
-        logger = get_logger('downloader.factory')
+        logger = get_logger('smartcash.dataset.downloader')
         logger.error(f"❌ Critical error initializing downloader: {str(e)}")
-        
-        import ipywidgets as widgets
-        return widgets.HTML(f"""
-        <div style="padding: 15px; background: #f8d7da; border-radius: 5px; color: #721c24;">
-            <h4>❌ Critical Downloader Error</h4>
-            <p>Error: {str(e)}</p>
-            <small>Check environment setup dan restart kernel jika diperlukan</small>
-        </div>
-        """)
 
 # Export
 __all__ = ['initialize_downloader', 'DownloaderInitializer']

@@ -8,7 +8,7 @@ from smartcash.ui.dataset.downloader.handlers.base_ui_handler import (
     DownloadUIHandler, CheckUIHandler, CleanupUIHandler
 )
 
-class UnifiedDownloadHandler:
+class DownloadHandler:
     """Unified handler yang menggabungkan semua UI handlers"""
     
     def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any], logger=None):
@@ -106,7 +106,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     
     try:
         # Create unified handler
-        unified_handler = UnifiedDownloadHandler(ui_components, config, logger)
+        unified_handler = DownloadHandler(ui_components, config, logger)
         
         # Setup handlers
         ui_components = unified_handler.setup_handlers()
@@ -119,4 +119,4 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
         return ui_components
 
 # Export
-__all__ = ['setup_download_handlers', 'UnifiedDownloadHandler']
+__all__ = ['setup_download_handlers', 'DownloadHandler']

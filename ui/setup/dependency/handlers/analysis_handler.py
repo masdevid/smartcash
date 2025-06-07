@@ -40,64 +40,69 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
     progress_tracker = ui_components.get('progress_tracker')
     
     try:
-        # Step 1: Initialize analysis
+        # Step 1: Initialize analysis dengan emoji untuk visual feedback
         if progress_tracker:
-            progress_tracker.show("Analisis Dependensi", ["Persiapan", "Scanning", "Evaluasi", "Laporan"])
-            progress_tracker.update_overall(10, "Memulai analisis...")
-            progress_tracker.update_current(25, "Inisialisasi...")
+            progress_tracker.show("Analisis Dependensi", [
+                "🔧 Persiapan", 
+                "🔍 Scanning", 
+                "📊 Evaluasi", 
+                "📝 Laporan"
+            ])
+            progress_tracker.update_overall(10, "🚀 Memulai analisis...")
+            progress_tracker.update_current(25, "⚙️ Inisialisasi...")
         else:
-            ctx.stepped_progress('ANALYSIS_INIT', "Memulai analisis...")
+            ctx.stepped_progress('ANALYSIS_INIT', "🚀 Memulai analisis...")
             
         log_to_ui_safe(ui_components, "🔍 Memulai analisis dependensi...")
 
-        # Step 2: Get installed packages
+        # Step 2: Get installed packages dengan emoji untuk visual feedback
         if progress_tracker:
-            progress_tracker.update_overall(30, "Scanning packages...")
-            progress_tracker.update_current(50, "Mendapatkan daftar packages...")
+            progress_tracker.update_overall(30, "🔍 Scanning packages...")
+            progress_tracker.update_current(50, "📜 Mendapatkan daftar packages...")
         else:
-            ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "Mendapatkan daftar packages...")
+            ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "📜 Mendapatkan daftar packages...")
             
         installed_packages = get_installed_packages_dict()
         log_to_ui_safe(ui_components, f"📦 Found {len(installed_packages)} installed packages")
 
-        # Step 3: Get package categories dan reset status
+        # Step 3: Get package categories dan reset status dengan emoji
         if progress_tracker:
-            progress_tracker.update_overall(50, "Evaluasi packages...")
-            progress_tracker.update_current(75, "Menganalisis categories...")
+            progress_tracker.update_overall(50, "📊 Evaluasi packages...")
+            progress_tracker.update_current(75, "📁 Menganalisis categories...")
         else:
-            ctx.stepped_progress('ANALYSIS_CATEGORIES', "Menganalisis categories...")
+            ctx.stepped_progress('ANALYSIS_CATEGORIES', "📁 Menganalisis categories...")
             
         package_categories = get_package_categories()
         _reset_all_package_status_to_checking(ui_components, package_categories)
         
-        # Step 4: Analyze packages status
+        # Step 4: Analyze packages status dengan emoji
         if progress_tracker:
-            progress_tracker.update_overall(70, "Checking packages...")
-            progress_tracker.update_current(85, "Memulai pengecekan")
+            progress_tracker.update_overall(70, "🔎 Checking packages...")
+            progress_tracker.update_current(85, "📚 Memulai pengecekan")
         else:
-            ctx.stepped_progress('ANALYSIS_CHECK', "Checking package status...")
+            ctx.stepped_progress('ANALYSIS_CHECK', "🔎 Checking package status...")
             
         analysis_results = _analyze_packages_with_utils(
             package_categories, installed_packages, ui_components, ctx, logger
         )
         
-        # Step 5: Update UI dan generate report
+        # Step 5: Update UI dan generate report dengan emoji
         if progress_tracker:
-            progress_tracker.update_overall(90, "Generating report...")
-            progress_tracker.update_current(95, "Updating UI...")
+            progress_tracker.update_overall(90, "📝 Generating report...")
+            progress_tracker.update_current(95, "📱 Updating UI...")
         else:
-            ctx.stepped_progress('ANALYSIS_UPDATE_UI', "Updating UI...")
+            ctx.stepped_progress('ANALYSIS_UPDATE_UI', "📱 Updating UI...")
             
         _finalize_analysis_results(ui_components, analysis_results, ctx, logger)
         
-        # Complete operation
+        # Complete operation dengan emoji dan delay
         if progress_tracker:
-            progress_tracker.update_overall(100, "Analisis selesai")
-            progress_tracker.update_current(100, "Complete")
-            progress_tracker.complete("✅ Analisis selesai")
+            progress_tracker.update_overall(100, "✅ Analisis selesai")
+            progress_tracker.update_current(100, "✅ Complete")
+            progress_tracker.complete("✅ Analisis dependensi selesai", delay=1.0)
         else:
-            ctx.stepped_progress('ANALYSIS_COMPLETE', "Analisis selesai", "overall")
-            ctx.stepped_progress('ANALYSIS_COMPLETE', "Complete", "step")
+            ctx.stepped_progress('ANALYSIS_COMPLETE', "✅ Analisis selesai", "overall")
+            ctx.stepped_progress('ANALYSIS_COMPLETE', "✅ Complete", "step")
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menganalisis dependensi: {str(e)}", "error")
@@ -126,19 +131,29 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
         current_package += 1
         progress = int((current_package / total_packages) * 100)
         
-        # Update progress
+        # Update progress dengan emoji untuk visual feedback
+        status_emoji = "✅" if requirement in installed_packages else "⚠️" if extract_package_name_from_requirement(requirement) in installed_packages else "❌"
+        
         if progress_tracker:
+            # Update level1 (overall) progress
             progress_tracker.update_overall(70 + int((current_package / total_packages) * 20), 
-                                  f"Checking {current_package}/{total_packages}")
-            progress_tracker.update_current(progress, f"Analyzing {package['name']}...")
+                                  f"🔄 Checking {current_package}/{total_packages}")
+            
+            # Update level2 (current) progress
+            progress_tracker.update_current(progress, f"{status_emoji} Analyzing {package['name']}...")
+            
+            # Update level3 (step_progress) jika tersedia
+            if hasattr(progress_tracker, 'update_step_progress'):
+                step_progress = int((current_package % 10) / 10 * 100)  # Cycle through 0-100% untuk visual feedback
+                progress_tracker.update_step_progress(step_progress, f"{package['name']}")
         else:
             progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
             # Gunakan metode yang benar untuk progress tracking
             if hasattr(ctx, 'update_progress'):
-                ctx.update_progress(progress, f"Analyzing {package['name']}...")
+                ctx.update_progress(progress, f"{status_emoji} Analyzing {package['name']}...")
             elif hasattr(ctx, 'progress_tracker') and callable(ctx.progress_tracker):
                 # Fallback untuk kompatibilitas dengan context lama
-                ctx.progress_tracker('overall', progress, f"Analyzing {package['name']}...")
+                ctx.progress_tracker('overall', progress, f"{status_emoji} Analyzing {package['name']}...")
         
         package_key, status_info = package['key'], batch_status[requirement]
         

@@ -10,7 +10,7 @@ from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.layout_utils import create_divider
 from smartcash.ui.components.action_buttons import create_action_buttons
-from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+from smartcash.ui.components.progress_tracker import create_triple_progress_tracker
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
@@ -55,8 +55,13 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         custom_packages
     ], layout=widgets.Layout(width='100%', margin='10px 0'))
     
-    # Progress tracker dengan nama operasi yang konsisten
-    progress_tracker = create_dual_progress_tracker("Dependency Installation")
+    # Progress tracker dengan triple-level untuk tracking yang lebih detail
+    progress_tracker = create_triple_progress_tracker(
+        operation="Dependency Installation",
+        level1_label="Overall Progress",
+        level2_label="Current Step",
+        level3_label="Detail Progress"
+    )
     
     # Log components
     log_components = create_log_accordion(

@@ -21,7 +21,7 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     # Force cleanup generators terlebih dahulu
     _cleanup_existing_generators(ui_components)
     
-    # Setup progress callback dengan support untuk progress tracker baru
+    # Setup progress callback dengan support untuk progress tracker baru (triple level)
     def progress_callback(**kwargs):
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker:
@@ -30,11 +30,18 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
             message = kwargs.get('message', 'Processing...')
             color = kwargs.get('color', None)
             
-            # Gunakan metode yang benar sesuai API progress tracker
+            # Gunakan metode yang benar sesuai API progress tracker baru
             if level == 'overall' or level == 'level1':
                 progress_tracker.update_overall(progress, message, color)
             elif level == 'step' or level == 'level2':
                 progress_tracker.update_current(progress, message, color)
+            elif level == 'step_progress' or level == 'level3':
+                # Untuk triple level progress tracker
+                if hasattr(progress_tracker, 'update_step_progress'):
+                    progress_tracker.update_step_progress(progress, message, color)
+                else:
+                    # Fallback ke level2 jika tidak ada level3
+                    progress_tracker.update_current(progress, message, color)
         else:
             # Fallback untuk progress tracking lama
             ui_components.get('update_progress', lambda *a: None)(

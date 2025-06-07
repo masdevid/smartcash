@@ -38,46 +38,172 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
     
     logger = ui_components.get('logger')  # Get logger from ui_components
     
+    # Get progress tracker jika tersedia
+    progress_tracker = ui_components.get('progress_tracker')
+    
     try:
-        # Step 1: Initialize check
-        ctx.stepped_progress('STATUS_INIT', "Memulai status check...")
+        # Step 1: Initialize check dengan emoji untuk visual feedback yang lebih detail
+        if progress_tracker:
+            # Gunakan show() untuk triple-level progress tracking jika tersedia
+            if hasattr(progress_tracker, 'show') and hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.show("Status Check", [
+                    "🔧 Persiapan", 
+                    "💻 Sistem Info", 
+                    "📦 Package Check", 
+                    "📝 Laporan"
+                ])
+                # Inisialisasi level-3 progress
+                progress_tracker.update_step_progress(0, "⚙️ Mempersiapkan analisis")
+            
+            # Update level-1 dan level-2 progress
+            progress_tracker.update_overall(10, "🚀 Memulai status check...")
+            progress_tracker.update_current(25, "🔍 Inisialisasi analisis dependensi...")
+        else:
+            # Fallback untuk progress tracking lama
+            ctx.stepped_progress('STATUS_INIT', "🚀 Memulai status check...")
+        
         log_to_ui_safe(ui_components, "🔍 Memeriksa status dependensi...")
         
-        # Step 2: Get system information
-        ctx.stepped_progress('STATUS_SYSTEM_INFO', "Mengumpulkan informasi sistem...")
+        # Step 2: Get system information dengan emoji dan detail progress
+        if progress_tracker:
+            # Update level-1 progress
+            progress_tracker.update_overall(30, "💻 Mengumpulkan informasi sistem...")
+            
+            # Update level-2 progress
+            progress_tracker.update_current(50, "💻 Scanning hardware dan software...")
+            
+            # Update level-3 progress jika tersedia
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(25, "💽 Memeriksa hardware")
+        else:
+            # Fallback untuk progress tracking lama
+            ctx.stepped_progress('STATUS_SYSTEM_INFO', "💻 Mengumpulkan informasi sistem...")
+        
+        # Dapatkan informasi sistem
         system_info, system_requirements = get_comprehensive_system_info(), check_system_requirements()
+        
+        # Update progress setelah mendapatkan informasi sistem
+        if progress_tracker and hasattr(progress_tracker, 'update_step_progress'):
+            progress_tracker.update_step_progress(100, "✅ Informasi sistem terkumpul")
+            
         log_to_ui_safe(ui_components, "💻 System information collected")
         
-        # Step 3: Get comprehensive package status
-        ctx.stepped_progress('STATUS_PACKAGE_CHECK', "Checking package status...")
+        # Step 3: Get comprehensive package status dengan emoji dan detail progress
+        if progress_tracker:
+            # Update level-1 progress
+            progress_tracker.update_overall(50, "📦 Checking package status...")
+            
+            # Update level-2 progress
+            progress_tracker.update_current(0, "🔍 Memulai scanning packages...")
+            
+            # Reset level-3 progress jika tersedia
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(0, "📚 Mempersiapkan analisis paket")
+        else:
+            # Fallback untuk progress tracking lama
+            ctx.stepped_progress('STATUS_PACKAGE_CHECK', "📦 Checking package status...")
+            
         package_status = _get_comprehensive_package_status_with_utils(ui_components, ctx, logger)
         
-        # Step 4: Generate detailed report
-        ctx.stepped_progress('STATUS_REPORT', "Generating report...")
+        # Step 4: Generate detailed report dengan emoji dan detail progress
+        if progress_tracker:
+            # Update level-1 progress
+            progress_tracker.update_overall(70, "📝 Generating report...")
+            
+            # Update level-2 progress
+            progress_tracker.update_current(85, "📊 Compiling data...")
+            
+            # Update level-3 progress jika tersedia
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(50, "📈 Menyusun statistik paket")
+        else:
+            # Fallback untuk progress tracking lama
+            ctx.stepped_progress('STATUS_REPORT', "📝 Generating report...")
+            
         _display_comprehensive_report_with_utils(ui_components, system_info, system_requirements, package_status, ctx, logger)
         
-        # Step 5: Update UI status
-        ctx.stepped_progress('STATUS_UI_UPDATE', "Updating UI status...")
+        # Step 5: Update UI status dengan emoji dan detail progress
+        if progress_tracker:
+            # Update level-1 progress
+            progress_tracker.update_overall(90, "👌 Updating UI status...")
+            
+            # Update level-2 progress
+            progress_tracker.update_current(95, "📈 Refreshing UI components...")
+            
+            # Update level-3 progress jika tersedia
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(75, "🔄 Memperbarui komponen UI")
+        else:
+            # Fallback untuk progress tracking lama
+            ctx.stepped_progress('STATUS_UI_UPDATE', "👌 Updating UI status...")
+            
         _update_ui_status_from_check_with_utils(ui_components, package_status)
         
-        # Summary
-        total_packages, installed_packages = len(package_status), sum(1 for status in package_status.values() if status['installed'])
-        summary_msg = f"📊 Status Check: {installed_packages}/{total_packages} packages terinstall"
+        # Hitung statistik paket untuk laporan
+        total_packages = len(package_status)
+        installed_count = sum(1 for status in package_status.values() if status.get('installed', False))
+        missing_count = total_packages - installed_count
+        
+        # Summary dengan emoji dan progress tracker
+        summary_msg = f"📊 Status Check: {installed_count}/{total_packages} packages terinstall"
         log_to_ui_safe(ui_components, f"✅ {summary_msg}")
         update_status_panel(ui_components, summary_msg, "success")
         
-        log_to_ui_safe(ui_components, "✅ Pemeriksaan status dependensi selesai")
-        ctx.stepped_progress('STATUS_COMPLETE', "Status check selesai", "overall")
-        ctx.stepped_progress('STATUS_COMPLETE', "Complete", "step")
+        # Complete operation dengan emoji, delay, dan informasi yang lebih detail
+        if progress_tracker:
+            # Update level-1 dan level-2 progress ke 100%
+            progress_tracker.update_overall(100, "✅ Status check selesai")
+            progress_tracker.update_current(100, f"✅ {installed_count}/{total_packages} paket terinstall")
+            
+            # Update level-3 progress jika tersedia dengan ringkasan akhir
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(100, f"📊 {installed_count}/{total_packages} paket terinstall")
+                
+            # Tandai operasi selesai dengan delay untuk UX yang lebih baik
+            progress_tracker.complete("✅ Pemeriksaan status dependensi selesai", delay=1.5)
+        else:
+            # Fallback untuk progress tracking lama
+            ctx.stepped_progress('STATUS_COMPLETE', "✅ Status check selesai", "overall")
+            ctx.stepped_progress('STATUS_COMPLETE', "✅ Complete", "step")
         
     except Exception as e:
-        log_to_ui_safe(ui_components, f"❌ Gagal memeriksa status dependensi: {str(e)}", "error")
+        # Buat pesan error yang informatif dengan emoji untuk visual feedback
+        error_msg = f"❌ Gagal memeriksa status dependensi: {str(e)}"
+        
+        # Log error ke UI dan console
+        log_to_ui_safe(ui_components, error_msg, "error")
         if logger:
             logger.error(f"💥 Status check error: {str(e)}")
+        
+        # Update status panel dengan pesan error
+        update_status_panel(ui_components, error_msg, "error")
+            
+        # Tampilkan error dengan progress tracker jika tersedia
+        if progress_tracker:
+            # Update level-1 progress untuk menunjukkan error
+            progress_tracker.update_overall(100, "❌ Error pada status check")
+            
+            # Update level-2 progress dengan detail error
+            progress_tracker.update_current(100, f"❌ {str(e)[:30]}..." if len(str(e)) > 30 else f"❌ {str(e)}")
+            
+            # Update level-3 progress jika tersedia
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(100, "⚠️ Lihat log untuk detail")
+            
+            # Tandai operasi error dengan delay untuk UX yang lebih baik
+            progress_tracker.error(error_msg, delay=1.5)
+        else:
+            # Fallback untuk progress tracking lama
+            ui_components.get('error_operation', lambda x: None)(error_msg)
+            
+        # Re-raise exception untuk penanganan di level yang lebih tinggi
         raise
 
 def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], ctx, logger) -> Dict[str, Dict[str, Any]]:
-    """Get comprehensive status dengan fixed logger reference"""
+    """Get comprehensive status dengan fixed logger reference dan progress tracker"""
+    
+    # Get progress tracker jika tersedia
+    progress_tracker = ui_components.get('progress_tracker')
     
     package_status = {}
     package_categories = get_package_categories()
@@ -86,14 +212,57 @@ def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], 
     if logger:
         logger.info("🔍 Analyzing package categories...")
     
-    # Process all packages
-    for category in package_categories:
+    # Persiapkan progress tracker untuk triple-level tracking
+    if progress_tracker:
+        # Inisialisasi progress tracker dengan label yang informatif
+        progress_tracker.update_overall(10, "🔍 Memulai analisis status paket...")
+        
+        # Tampilkan step labels jika mendukung triple-level
+        if hasattr(progress_tracker, 'show') and hasattr(progress_tracker, 'update_step_progress'):
+            progress_tracker.show("Status Check", [
+                "🔍 Scanning", 
+                "📊 Analisis", 
+                "📝 Laporan"
+            ])
+    
+    # Process all packages dengan progress tracking yang lebih detail
+    total_categories = len(package_categories)
+    for cat_idx, category in enumerate(package_categories):
+        # Update progress level-2 (current) dengan emoji untuk visual feedback
+        cat_progress = int(((cat_idx + 1) / total_categories) * 100)
+        cat_message = f"📚 Checking {category['name']} category..."
+        
+        if progress_tracker:
+            # Update level-1 (overall) dengan progress keseluruhan
+            overall_progress = 10 + int((cat_idx / total_categories) * 80)  # 10-90% range
+            progress_tracker.update_overall(overall_progress, f"🔍 Analyzing {cat_idx+1}/{total_categories} categories")
+            
+            # Update level-2 (current) dengan progress kategori
+            progress_tracker.update_current(cat_progress, cat_message)
+            
+            # Reset level-3 (step) untuk kategori baru
+            if hasattr(progress_tracker, 'update_step_progress'):
+                progress_tracker.update_step_progress(0, f"📓 {category['name']}")
+        
         if logger:
             logger.info(f"🔍 Checking {category['name']} category...")
-        for package in category['packages']:
+        
+        # Process packages dalam category dengan weight-based progress
+        total_packages = len(category['packages'])
+        for pkg_idx, package in enumerate(category['packages']):
             package_key = package['key']
             package_name = package['pip_name'].split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
             
+            # Tentukan status dengan emoji yang sesuai
+            is_installed = package_name in installed_packages
+            status_emoji = "✅" if is_installed else "❌"
+            
+            # Update step progress (level-3) jika tersedia
+            if progress_tracker and hasattr(progress_tracker, 'update_step_progress'):
+                pkg_progress = int(((pkg_idx + 1) / total_packages) * 100)
+                progress_tracker.update_step_progress(pkg_progress, f"{status_emoji} {package['name']}")
+            
+            # Dapatkan informasi detail paket
             package_status[package_key] = {
                 'name': package['name'], 
                 'pip_name': package['pip_name'], 
@@ -101,6 +270,27 @@ def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], 
                 'package_name': package_name,
                 **_get_detailed_package_info_with_utils(package_name, installed_packages, logger)
             }
+    
+    # Finalisasi progress tracking dengan informasi lengkap
+    if progress_tracker:
+        # Update level-1 (overall) ke 100%
+        progress_tracker.update_overall(100, "✅ Analisis status paket selesai")
+        
+        # Update level-2 (current) dengan ringkasan
+        total_packages = sum(len(cat['packages']) for cat in package_categories)
+        installed_count = sum(1 for status in package_status.values() if status.get('is_installed', False))
+        progress_tracker.update_current(100, f"📊 {installed_count}/{total_packages} paket terinstall")
+        
+        # Update level-3 (step) dengan status akhir
+        if hasattr(progress_tracker, 'update_step_progress'):
+            progress_tracker.update_step_progress(100, "📝 Laporan status lengkap")
+            
+        # Tandai operasi selesai dengan delay untuk UX yang lebih baik
+        if hasattr(progress_tracker, 'complete'):
+            progress_tracker.complete("✅ Status check selesai", delay=1.5)
+    
+    if logger:
+        logger.info(f"✅ Status check selesai: {len(package_status)} paket dianalisis")
     
     return package_status
 

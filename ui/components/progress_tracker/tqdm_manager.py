@@ -9,7 +9,7 @@ from typing import Dict
 from tqdm.auto import tqdm
 from IPython.display import clear_output
 import ipywidgets as widgets
-from .progress_config import ProgressBarConfig
+from smartcash.ui.components.progress_tracker.progress_config import ProgressBarConfig
 
 class TqdmManager:
     """Manager untuk tqdm progress bars dengan Colab optimization"""

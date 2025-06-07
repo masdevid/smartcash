@@ -42,7 +42,7 @@ class ProgressConfig:
     steps: List[str] = field(default_factory=list)
     step_weights: Dict[str, int] = field(default_factory=dict)
     auto_advance: bool = True
-    auto_hide_delay: float = 5.0
+    auto_hide_delay: float = 60.0
     animation_speed: float = 0.1
     width_adjustment: int = 0
     

@@ -58,9 +58,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Progress tracker dengan triple-level untuk tracking yang lebih detail
     progress_tracker = create_triple_progress_tracker(
         operation="Dependency Installation",
-        level1_label="Overall Progress",
-        level2_label="Current Step",
-        level3_label="Detail Progress"
+        steps=["🔍 Analisis", "📦 Instalasi", "✅ Verifikasi"]
     )
     
     # Log components
@@ -214,14 +212,24 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'save_button': save_reset_buttons['save_button'],
         'reset_button': save_reset_buttons['reset_button'],
         
-        # Progress components
+        # Progress components dengan API yang benar
         'progress_tracker': progress_tracker,
         'progress_container': progress_tracker.container,
         'show_for_operation': progress_tracker.show,
-        'update_progress': progress_tracker.update,
+        'update_overall': progress_tracker.update_overall,  # API yang benar untuk level 1
+        'update_current': progress_tracker.update_current,  # API yang benar untuk level 2
+        'update_step_progress': progress_tracker.update_step_progress if hasattr(progress_tracker, 'update_step_progress') else None,  # API untuk level 3 dengan fallback
         'complete_operation': progress_tracker.complete,
         'error_operation': progress_tracker.error,
         'reset_all': progress_tracker.reset,
+        
+        # Backward compatibility untuk kode lama
+        'update_progress': lambda type='overall', progress=0, message='', color=None: (
+            progress_tracker.update_overall(progress, message, color) if type == 'overall' or type == 'level1' else
+            progress_tracker.update_current(progress, message, color) if type == 'step' or type == 'level2' else
+            progress_tracker.update_step_progress(progress, message, color) if hasattr(progress_tracker, 'update_step_progress') else
+            progress_tracker.update_current(progress, message, color)
+        ),
         
         # Log components
         'log_components': log_components,

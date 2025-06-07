@@ -41,17 +41,28 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
     
     try:
         # Step 1: Get selected packages dengan emoji untuk visual feedback
-        if progress_tracker:
-            progress_tracker.show("Instalasi Packages", [
-                "🔧 Persiapan", 
-                "🔍 Analisis", 
-                "📦 Instalasi", 
-                "✅ Finalisasi"
-            ])
-            progress_tracker.update_overall(10, "🚀 Mempersiapkan instalasi...")
-            progress_tracker.update_current(25, "📜 Mengumpulkan packages...")
-        else:
-            ctx.stepped_progress('INSTALL_INIT', "🚀 Mempersiapkan instalasi...")
+        try:
+            if progress_tracker and hasattr(progress_tracker, 'show'):
+                # Gunakan steps yang konsisten dengan yang dibuat di create_triple_progress_tracker
+                progress_tracker.show("Instalasi Packages", [
+                    "🔍 Analisis", 
+                    "📦 Instalasi", 
+                    "✅ Verifikasi"
+                ])
+                
+                # Update progress dengan safe error handling
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(10, "🚀 Mempersiapkan instalasi...")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(25, "📜 Mengumpulkan packages...")
+            else:
+                # Fallback untuk progress tracking lama
+                ctx.stepped_progress('INSTALL_INIT', "🚀 Mempersiapkan instalasi...")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
         
         log_to_ui_safe(ui_components, "🚀 Memulai proses instalasi packages")
         
@@ -62,11 +73,19 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             return
         
         # Step 2: Filter uninstalled packages dengan emoji untuk visual feedback
-        if progress_tracker:
-            progress_tracker.update_overall(30, "📊 Menganalisis packages...")
-            progress_tracker.update_current(50, f"🔍 Menganalisis {len(selected_packages)} packages...")
-        else:
-            ctx.stepped_progress('INSTALL_ANALYSIS', "📊 Menganalisis packages...")
+        try:
+            if progress_tracker:
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(30, "📊 Menganalisis packages...")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(50, f"🔍 Menganalisis {len(selected_packages)} packages...")
+            else:
+                ctx.stepped_progress('INSTALL_ANALYSIS', "📊 Menganalisis packages...")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
         
         log_to_ui_safe(ui_components, f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
         
@@ -78,17 +97,31 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         if not packages_to_install:
             log_to_ui_safe(ui_components, "✅ Semua packages sudah terinstall dengan benar")
             
-            # Complete operation dengan progress tracker baru dan emoji
-            progress_tracker = ui_components.get('progress_tracker')
-            if progress_tracker:
-                progress_tracker.update_overall(100, "✅ Semua packages sudah terinstall")
-                progress_tracker.update_current(100, "✅ Complete")
-                progress_tracker.complete("✅ Semua packages sudah terinstall dengan benar", delay=1.0)
-            else:
-                # Fallback untuk progress tracking lama
-                ui_components.get('update_progress', lambda *a: None)('overall', 100, "✅ Semua packages sudah terinstall")
-                ui_components.get('update_progress', lambda *a: None)('step', 100, "✅ Complete")
-                ui_components.get('complete_operation', lambda x: None)("✅ Semua packages sudah terinstall dengan benar")
+            # Complete operation dengan progress tracker baru dan emoji dengan safe error handling
+            try:
+                progress_tracker = ui_components.get('progress_tracker')
+                if progress_tracker:
+                    if hasattr(progress_tracker, 'update_overall'):
+                        progress_tracker.update_overall(100, "✅ Semua packages sudah terinstall")
+                    if hasattr(progress_tracker, 'update_current'):
+                        progress_tracker.update_current(100, "✅ Complete")
+                    if hasattr(progress_tracker, 'complete'):
+                        progress_tracker.complete("✅ Semua packages sudah terinstall dengan benar", delay=1.0)
+                else:
+                    # Fallback untuk progress tracking lama
+                    update_progress = ui_components.get('update_progress')
+                    if update_progress and callable(update_progress):
+                        update_progress('overall', 100, "✅ Semua packages sudah terinstall")
+                        update_progress('step', 100, "✅ Complete")
+                    
+                    complete_operation = ui_components.get('complete_operation')
+                    if complete_operation and callable(complete_operation):
+                        complete_operation("✅ Semua packages sudah terinstall dengan benar")
+            except Exception as e:
+                # Silent fail untuk compatibility
+                if logger:
+                    logger.debug(f"🔄 Progress tracker completion error (non-critical): {str(e)}")
+                # Tetap lanjutkan proses
             
             update_status_panel(ui_components, "✅ Semua packages sudah terinstall", "success")
             
@@ -96,9 +129,14 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             import threading
             def hide_progress_delayed():
                 time.sleep(2)
-                if progress_tracker:
-                    # Reset semua level progress tracker
-                    progress_tracker.reset()
+                try:
+                    if progress_tracker and hasattr(progress_tracker, 'reset'):
+                        # Reset semua level progress tracker dengan safe error handling
+                        progress_tracker.reset()
+                except Exception as e:
+                    # Silent fail untuk compatibility
+                    if logger:
+                        logger.debug(f"🔄 Progress tracker reset error (non-critical): {str(e)}")
                     if hasattr(progress_tracker, 'update_current'):
                         progress_tracker.update_current(0, "")
                     if hasattr(progress_tracker, 'update_step_progress'):
@@ -109,12 +147,20 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             threading.Thread(target=hide_progress_delayed, daemon=True).start()
             return
         
-        # Step 3: Install packages dengan parallel processing dan emoji
-        if progress_tracker:
-            progress_tracker.update_overall(50, f"📦 Installing packages...")
-            progress_tracker.update_current(75, f"🚀 Memulai instalasi {len(packages_to_install)} packages...")
-        else:
-            ctx.stepped_progress('INSTALL_START', f"📦 Installing {len(packages_to_install)} packages...")
+        # Step 3: Install packages dengan emoji untuk visual feedback
+        try:
+            if progress_tracker:
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(50, "📦 Menginstall packages...")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(0, f"📦 Memulai instalasi {len(packages_to_install)} packages...")
+            else:
+                ctx.stepped_progress('INSTALL_PACKAGES', "📦 Menginstall packages...")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
         
         log_to_ui_safe(ui_components, f"📦 Installing {len(packages_to_install)} packages dengan parallel processing")
         
@@ -122,12 +168,20 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             packages_to_install, ui_components, config, package_logger_func, ctx, logger
         )
         
-        # Step 4: Finalize dan generate report dengan emoji
-        if progress_tracker:
-            progress_tracker.update_overall(80, "🔧 Finalizing installation...")
-            progress_tracker.update_current(90, "📝 Generating report...")
-        else:
-            ctx.stepped_progress('INSTALL_FINALIZE', "🔧 Finalizing installation...")
+        # Step 4: Generate report dengan emoji untuk visual feedback
+        try:
+            if progress_tracker:
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(80, "📊 Membuat laporan...")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(0, "📊 Membuat laporan instalasi...")
+            else:
+                ctx.stepped_progress('INSTALL_REPORT', "📊 Membuat laporan...")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
         
         log_to_ui_safe(ui_components, "📊 Generating installation report...")
         
@@ -136,14 +190,30 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         # Update all package status dan generate report
         _finalize_installation_results(ui_components, installation_results, time.time() - start_time, logger)
         
-        # Complete operation dengan emoji dan delay
-        if progress_tracker:
-            progress_tracker.update_overall(100, "✅ Installation complete")
-            progress_tracker.update_current(100, "✅ Complete")
-            progress_tracker.complete("✅ Instalasi packages selesai", delay=1.0)
-        else:
-            ctx.stepped_progress('INSTALL_COMPLETE', "✅ Installation complete", "overall")
-            ctx.stepped_progress('INSTALL_COMPLETE', "✅ Complete", "step")
+        # Complete operation dengan progress tracker baru dan emoji dengan safe error handling
+        try:
+            if progress_tracker:
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(100, "✅ Instalasi selesai")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(100, "✅ Complete")
+                if hasattr(progress_tracker, 'complete'):
+                    progress_tracker.complete("✅ Instalasi package selesai", delay=1.0)
+            else:
+                # Fallback untuk progress tracking lama
+                update_progress = ui_components.get('update_progress')
+                if update_progress and callable(update_progress):
+                    update_progress('overall', 100, "✅ Instalasi selesai")
+                    update_progress('step', 100, "✅ Complete")
+                
+                complete_operation = ui_components.get('complete_operation')
+                if complete_operation and callable(complete_operation):
+                    complete_operation("✅ Instalasi package selesai")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker completion error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
         
     except Exception as e:
         log_to_ui_safe(ui_components, f"❌ Gagal menginstal dependensi: {str(e)}", "error")
@@ -237,10 +307,24 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
                             logger.warning(f"⚠️ {package}: {message}")
                         
                 except Exception as e:
-                    error_msg = f"💥 Error installing {package}: {str(e)}"
+                    error_msg = f"❌ Instalasi gagal: {str(e)}"
                     logger_func(error_msg)
-                    if logger:
-                        logger.error(error_msg)
+                    
+                    try:
+                        if progress_tracker:
+                            if hasattr(progress_tracker, 'error'):
+                                progress_tracker.error(error_msg, delay=1.0)
+                        else:
+                            # Fallback untuk progress tracking lama
+                            error_operation = ui_components.get('error_operation')
+                            if error_operation and callable(error_operation):
+                                error_operation(error_msg)
+                    except Exception as err:
+                        # Silent fail untuk compatibility
+                        if logger:
+                            logger.debug(f"🔄 Progress tracker error handling failed (non-critical): {str(err)}")
+                    
+                    update_status_panel(ui_components, error_msg, "error")
                     results[package] = False
                     update_installation_progress(package, False)
         

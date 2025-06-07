@@ -26,14 +26,14 @@ def create_triple_progress_tracker(operation: str = "Process",
     config = ProgressConfig(
         level=ProgressLevel.TRIPLE, operation=operation,
         steps=steps, step_weights=step_weights or {},
-        auto_hide_delay=0.0  # Disable auto hide to avoid threading
+        auto_hide_delay=60.0  # Disable auto hide to avoid threading
     )
     return ProgressTracker(config)
 
 def create_flexible_tracker(config: ProgressConfig) -> ProgressTracker:
     """Create tracker dengan custom configuration"""
     # Disable auto hide untuk avoid threading
-    config.auto_hide_delay = 0.0
+    config.auto_hide_delay = 60.0
     return ProgressTracker(config)
 
 def create_three_progress_tracker() -> Dict[str, Any]:

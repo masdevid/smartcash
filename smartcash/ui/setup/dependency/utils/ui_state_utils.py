@@ -27,21 +27,37 @@ def reset_ui_logger(ui_components: Dict[str, Any]):
 
 def update_progress_step(ui_components: Dict[str, Any], progress_type: str, value: int, 
                          message: str = "", color: str = None):
-    """Update progress dengan API progress tracker baru"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        # Gunakan metode yang benar sesuai API progress tracker baru
-        if progress_type == 'overall' or progress_type == 'level1':
-            progress_tracker.update_overall(value, message, color)
-        elif progress_type == 'step' or progress_type == 'level2':
-            progress_tracker.update_current(value, message, color)
-        elif progress_type == 'step_progress' or progress_type == 'level3':
-            # Untuk triple level progress tracker
-            if hasattr(progress_tracker, 'update_step_progress'):
-                progress_tracker.update_step_progress(value, message, color)
-    else:
-        # Fallback untuk progress tracking lama
-        ui_components.get('update_progress', lambda *a: None)(progress_type, value, message, color)
+    """Update progress dengan API progress tracker baru dan safe error handling"""
+    try:
+        # Gunakan fungsi update_progress dari ui_components jika tersedia (backward compatibility wrapper)
+        update_progress = ui_components.get('update_progress')
+        if update_progress and callable(update_progress):
+            update_progress(progress_type, value, message, color)
+            return
+        
+        # Jika tidak ada update_progress, gunakan progress_tracker langsung
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            # Gunakan metode yang benar sesuai API progress tracker baru
+            if progress_type == 'overall' or progress_type == 'level1':
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(value, message, color)
+            elif progress_type == 'step' or progress_type == 'level2':
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(value, message, color)
+            elif progress_type == 'step_progress' or progress_type == 'level3':
+                # Untuk triple level progress tracker
+                if hasattr(progress_tracker, 'update_step_progress'):
+                    progress_tracker.update_step_progress(value, message, color)
+                elif hasattr(progress_tracker, 'update_current'):
+                    # Fallback ke current jika tidak ada step_progress
+                    progress_tracker.update_current(value, message, color)
+    except Exception as e:
+        # Silent fail untuk compatibility
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"🔄 Progress update error (non-critical): {str(e)}")
+        pass
 
 def show_operation_progress(ui_components: Dict[str, Any], operation: str, 
                            steps: List[str] = None, weights: Dict[str, int] = None):

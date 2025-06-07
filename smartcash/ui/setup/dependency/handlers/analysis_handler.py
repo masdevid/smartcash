@@ -41,23 +41,43 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
     
     try:
         # Step 1: Initialize analysis dengan emoji untuk visual feedback
-        if progress_tracker:
-            progress_tracker.show("Analisis Dependensi", [
-                "🔧 Persiapan", 
-                "🔍 Scanning", 
-                "📊 Evaluasi", 
-                "📝 Laporan"
-            ])
-            progress_tracker.update_overall(10, "🚀 Memulai analisis...")
-            progress_tracker.update_current(25, "⚙️ Inisialisasi...")
-        else:
-            ctx.stepped_progress('ANALYSIS_INIT', "🚀 Memulai analisis...")
+        try:
+            if progress_tracker and hasattr(progress_tracker, 'show'):
+                # Gunakan steps yang konsisten dengan yang dibuat di create_triple_progress_tracker
+                progress_tracker.show("Analisis Dependensi", [
+                    "🔍 Analisis", 
+                    "📊 Evaluasi", 
+                    "✅ Verifikasi"
+                ])
+                
+                # Update progress dengan safe error handling
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(10, "🚀 Memulai analisis...")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(25, "🔧 Mempersiapkan analisis...")
+            else:
+                # Fallback untuk progress tracking lama
+                ctx.stepped_progress('ANALYSIS_INIT', "🚀 Memulai analisis...")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
             
         log_to_ui_safe(ui_components, "🔍 Memulai analisis dependensi...")
 
         # Step 2: Get installed packages dengan emoji untuk visual feedback
         if progress_tracker:
-            progress_tracker.update_overall(30, "🔍 Scanning packages...")
+            try:
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(30, "🔍 Scanning packages...")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(50, "📜 Mendapatkan daftar packages...")
+            except Exception as e:
+                # Silent fail untuk compatibility
+                if logger:
+                    logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+                # Tetap lanjutkan proses
             progress_tracker.update_current(50, "📜 Mendapatkan daftar packages...")
         else:
             ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "📜 Mendapatkan daftar packages...")
@@ -95,19 +115,54 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
             
         _finalize_analysis_results(ui_components, analysis_results, ctx, logger)
         
-        # Complete operation dengan emoji dan delay
-        if progress_tracker:
-            progress_tracker.update_overall(100, "✅ Analisis selesai")
-            progress_tracker.update_current(100, "✅ Complete")
-            progress_tracker.complete("✅ Analisis dependensi selesai", delay=1.0)
-        else:
-            ctx.stepped_progress('ANALYSIS_COMPLETE', "✅ Analisis selesai", "overall")
-            ctx.stepped_progress('ANALYSIS_COMPLETE', "✅ Complete", "step")
+        # Complete operation dengan progress tracker baru dan emoji dengan safe error handling
+        try:
+            if progress_tracker:
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(100, "✅ Analisis selesai")
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(100, "✅ Complete")
+                if hasattr(progress_tracker, 'complete'):
+                    progress_tracker.complete("✅ Analisis dependensi selesai", delay=1.0)
+            else:
+                # Fallback untuk progress tracking lama
+                update_progress = ui_components.get('update_progress')
+                if update_progress and callable(update_progress):
+                    update_progress('overall', 100, "✅ Analisis selesai")
+                    update_progress('step', 100, "✅ Complete")
+                
+                complete_operation = ui_components.get('complete_operation')
+                if complete_operation and callable(complete_operation):
+                    complete_operation("✅ Analisis dependensi selesai")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker completion error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
         
     except Exception as e:
-        log_to_ui_safe(ui_components, f"❌ Gagal menganalisis dependensi: {str(e)}", "error")
+        # Error handling dengan progress tracker baru dan emoji dengan safe error handling
+        error_msg = f"❌ Analisis gagal: {str(e)}"
+        log_to_ui_safe(ui_components, error_msg, "error")
+        
+        try:
+            if progress_tracker:
+                if hasattr(progress_tracker, 'error'):
+                    progress_tracker.error(error_msg, delay=1.0)
+            else:
+                # Fallback untuk progress tracking lama
+                error_operation = ui_components.get('error_operation')
+                if error_operation and callable(error_operation):
+                    error_operation(error_msg)
+        except Exception as err:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker error handling failed (non-critical): {str(err)}")
+        
         if logger:
             logger.error(f"💥 Analysis error: {str(e)}")
+        
+        update_status_panel(ui_components, error_msg, "error")
         raise
 
 def _analyze_packages_with_utils(package_categories: list, installed_packages: Dict[str, str], 
@@ -134,19 +189,27 @@ def _analyze_packages_with_utils(package_categories: list, installed_packages: D
         # Update progress dengan emoji untuk visual feedback
         status_emoji = "✅" if requirement in installed_packages else "⚠️" if extract_package_name_from_requirement(requirement) in installed_packages else "❌"
         
-        if progress_tracker:
-            # Update level1 (overall) progress
-            progress_tracker.update_overall(70 + int((current_package / total_packages) * 20), 
-                                  f"🔄 Checking {current_package}/{total_packages}")
-            
-            # Update level2 (current) progress
-            progress_tracker.update_current(progress, f"{status_emoji} Analyzing {package['name']}...")
-            
-            # Update level3 (step_progress) jika tersedia
-            if hasattr(progress_tracker, 'update_step_progress'):
-                step_progress = int((current_package % 10) / 10 * 100)  # Cycle through 0-100% untuk visual feedback
-                progress_tracker.update_step_progress(step_progress, f"{package['name']}")
-        else:
+        try:
+            if progress_tracker:
+                # Update level1 (overall) progress dengan safe error handling
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(70 + int((current_package / total_packages) * 20), 
+                                      f"🔄 Checking {current_package}/{total_packages}")
+                
+                # Update level2 (current) progress dengan safe error handling
+                if hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(progress, f"{status_emoji} Analyzing {package['name']}...")
+                
+                # Update level3 (step_progress) jika tersedia dengan safe error handling
+                if hasattr(progress_tracker, 'update_step_progress'):
+                    progress_tracker.update_step_progress(progress, f"{status_emoji} {requirement}")
+        except Exception as e:
+            # Silent fail untuk compatibility
+            if logger:
+                logger.debug(f"🔄 Progress tracker update error (non-critical): {str(e)}")
+            # Tetap lanjutkan proses
+        
+        if not progress_tracker:
             progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
             # Gunakan metode yang benar untuk progress tracking
             if hasattr(ctx, 'update_progress'):

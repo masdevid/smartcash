@@ -1,17 +1,17 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py
-Deskripsi: Fixed download handler dengan unified progress tracker dan proper service integration
+Deskripsi: FIXED download handler dengan proper service integration dan standardized response handling
 """
 
 from typing import Dict, Any, Callable, Optional
 from pathlib import Path
 from smartcash.ui.utils.fallback_utils import show_status_safe
 from smartcash.ui.components.dialogs import confirm
-from smartcash.dataset.downloader import get_downloader_instance
+from smartcash.dataset.downloader import get_downloader_instance, create_ui_compatible_config
 
 
 class DownloadHandler:
-    """Handler untuk download, check, dan cleanup dengan integrated progress tracker"""
+    """FIXED handler dengan proper service integration dan response format compatibility"""
     
     def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any], logger):
         self.ui_components = ui_components
@@ -20,54 +20,52 @@ class DownloadHandler:
         self.progress_tracker = ui_components.get('progress_tracker')
         
     def setup_handlers(self) -> Dict[str, Any]:
-        """Setup semua handlers dengan proper binding"""
-        # Setup download handler
-        download_button = self.ui_components.get('download_button')
-        if download_button:
-            self._clear_button_handlers(download_button)
-            download_button.on_click(self._handle_download_click)
-            
-        # Setup check handler  
-        check_button = self.ui_components.get('check_button')
-        if check_button:
-            self._clear_button_handlers(check_button)
-            check_button.on_click(self._handle_check_click)
-            
-        # Setup cleanup handler
-        cleanup_button = self.ui_components.get('cleanup_button')
-        if cleanup_button:
-            self._clear_button_handlers(cleanup_button)
-            cleanup_button.on_click(self._handle_cleanup_click)
-            
+        """Setup handlers dengan proper binding"""
+        handlers = [
+            ('download_button', self._handle_download_click),
+            ('check_button', self._handle_check_click),
+            ('cleanup_button', self._handle_cleanup_click)
+        ]
+        
+        for button_name, handler in handlers:
+            button = self.ui_components.get(button_name)
+            if button:
+                self._clear_button_handlers(button)
+                button.on_click(handler)
+        
         self.logger.success("✅ Handlers berhasil disetup")
         return self.ui_components
     
     def _clear_button_handlers(self, button) -> None:
-        """Clear existing button handlers dengan safe execution"""
+        """Clear existing handlers"""
         try:
             if hasattr(button, '_click_handlers') and hasattr(button._click_handlers, 'callbacks'):
                 button._click_handlers.callbacks.clear()
         except Exception:
-            pass  # Silent fail untuk handler cleanup
+            pass
     
     def _handle_download_click(self, button) -> None:
-        """Handle download button click dengan unified progress"""
+        """FIXED download handler dengan proper service integration"""
         try:
-            # Disable button dan show progress
             button.disabled = True
+            
             if self.progress_tracker:
                 self.progress_tracker.show("Dataset Download")
                 self.progress_tracker.update_overall(10, "🔧 Validating configuration...")
             
-            # Extract dan validate config
+            # Extract config dalam format yang diharapkan service
             config_handler = self.ui_components.get('config_handler')
             if not config_handler:
                 self._handle_error("Config handler tidak tersedia", button)
                 return
-                
-            current_config = config_handler.extract_config_from_ui(self.ui_components)
-            validation = config_handler.validate_config(current_config)
             
+            ui_config = config_handler.extract_config_from_ui(self.ui_components)
+            
+            # FIXED: Convert UI config ke format yang diharapkan core service
+            service_config = create_ui_compatible_config(ui_config)
+            
+            # Validate config
+            validation = config_handler.validate_config(ui_config)
             if not validation['valid']:
                 error_msg = f"Config tidak valid: {'; '.join(validation['errors'])}"
                 self._handle_error(error_msg, button)
@@ -80,15 +78,113 @@ class DownloadHandler:
             has_existing = self._check_existing_dataset_quick()
             
             if has_existing:
-                self._show_download_confirmation(current_config, button)
+                self._show_download_confirmation(service_config, button)
             else:
-                self._execute_download(current_config, button)
+                self._execute_download(service_config, button)
                 
         except Exception as e:
             self._handle_error(f"Error download handler: {str(e)}", button)
     
+    def _execute_download(self, service_config: Dict[str, Any], button) -> None:
+        """FIXED execute download dengan proper service integration"""
+        try:
+            # Validate required fields
+            required = ['workspace', 'project', 'version', 'api_key']
+            missing = [f for f in required if not service_config.get(f, '').strip()]
+            
+            if missing:
+                self._handle_error(f"Field wajib kosong: {', '.join(missing)}", button)
+                return
+            
+            if self.progress_tracker:
+                self.progress_tracker.update_overall(40, "🏭 Creating download service...")
+            
+            # FIXED: Create service dengan config yang sudah diconvert
+            downloader = get_downloader_instance(service_config, self.logger)
+            if not downloader:
+                self._handle_error("Gagal membuat download service", button)
+                return
+            
+            # FIXED: Setup progress callback dengan signature yang benar
+            if hasattr(downloader, 'set_progress_callback'):
+                downloader.set_progress_callback(self._create_progress_callback())
+            
+            if self.progress_tracker:
+                self.progress_tracker.update_overall(50, "📥 Starting download...")
+            
+            # Execute download
+            result = downloader.download_dataset()
+            
+            # FIXED: Handle response format yang sudah distandarisasi
+            if result and result.get('status') == 'success':
+                stats = result.get('stats', {})
+                total_images = stats.get('total_images', 0)
+                success_msg = f"Dataset berhasil didownload: {total_images:,} gambar"
+                
+                if self.progress_tracker:
+                    self.progress_tracker.complete(success_msg)
+                
+                show_status_safe(success_msg, "success", self.ui_components)
+                self.logger.success(f"✅ {success_msg}")
+                
+                # Log additional stats jika tersedia
+                if stats.get('uuid_renamed'):
+                    naming_stats = stats.get('naming_stats', {})
+                    if naming_stats:
+                        self.logger.info(f"🔄 UUID renaming: {naming_stats.get('total_files', 0)} files processed")
+                
+            else:
+                error_msg = f"Download gagal: {result.get('message', 'Unknown error') if result else 'No response from service'}"
+                self._handle_error(error_msg, button)
+                
+        except Exception as e:
+            self._handle_error(f"Error saat download: {str(e)}", button)
+        finally:
+            button.disabled = False
+    
+    def _create_progress_callback(self) -> Callable[[str, int, int, str], None]:
+        """FIXED create progress callback dengan signature yang standardized"""
+        def progress_callback(step: str, current: int, total: int, message: str):
+            """Standardized progress callback: (step, current, total, message)"""
+            if self.progress_tracker and total > 0:
+                # Map download progress ke overall progress (50-90%)
+                base_progress = 50
+                download_range = 40
+                percentage = base_progress + int((current / total) * download_range)
+                self.progress_tracker.update_overall(percentage, f"{step}: {message}")
+        
+        return progress_callback
+    
+    def _show_download_confirmation(self, service_config: Dict[str, Any], button) -> None:
+        """Show confirmation dialog"""
+        workspace = service_config.get('workspace', '')
+        project = service_config.get('project', '')
+        version = service_config.get('version', '')
+        
+        dataset_id = f"{workspace}/{project}:v{version}"
+        
+        message = f"""Dataset existing akan ditimpa!
+
+🎯 Target: {dataset_id}
+🔄 UUID Renaming: {'✅' if service_config.get('rename_files', True) else '❌'}
+✅ Validasi: {'✅' if service_config.get('validate_download', True) else '❌'}
+💾 Backup: {'✅' if service_config.get('backup_existing', False) else '❌'}
+
+Lanjutkan download?"""
+        
+        confirm(
+            "Konfirmasi Download Dataset", 
+            message,
+            on_yes=lambda btn: self._execute_download(service_config, button),
+            on_no=lambda btn: (
+                self.logger.info("🚫 Download dibatalkan"),
+                setattr(button, 'disabled', False),
+                self.progress_tracker and self.progress_tracker.hide()
+            )
+        )
+    
     def _handle_check_click(self, button) -> None:
-        """Handle check button click dengan progress feedback"""
+        """Handle check button click"""
         try:
             button.disabled = True
             
@@ -96,14 +192,12 @@ class DownloadHandler:
                 self.progress_tracker.show("Check Dataset")
                 self.progress_tracker.update_overall(50, "🔍 Scanning dataset...")
             
-            # Check existing dataset
             dataset_status = self._check_existing_dataset_detailed()
             
             if self.progress_tracker:
                 self.progress_tracker.update_overall(100, "✅ Check completed")
                 self.progress_tracker.complete("Dataset check selesai")
             
-            # Display summary
             self._display_dataset_summary(dataset_status)
             
         except Exception as e:
@@ -112,18 +206,16 @@ class DownloadHandler:
             button.disabled = False
     
     def _handle_cleanup_click(self, button) -> None:
-        """Handle cleanup button click dengan confirmation"""
+        """Handle cleanup button click"""
         try:
             button.disabled = True
             
-            # Scan directories untuk cleanup info
             cleanup_info = self._scan_cleanup_directories()
             
             if not cleanup_info['has_files']:
                 self.logger.info("✨ Tidak ada file untuk dibersihkan")
                 return
             
-            # Show confirmation dengan cleanup details
             confirm(
                 "Konfirmasi Cleanup Dataset",
                 self._create_cleanup_message(cleanup_info),
@@ -135,110 +227,6 @@ class DownloadHandler:
             self._handle_error(f"Error cleanup handler: {str(e)}", button)
         finally:
             button.disabled = False
-    
-    def _execute_download(self, config: Dict[str, Any], button) -> None:
-        """Execute download dengan proper service integration"""
-        try:
-            # Prepare download config - FIX: Remove callable parameter
-            roboflow = config.get('data', {}).get('roboflow', {})
-            download_config = config.get('download', {})
-            
-            service_config = {
-                'workspace': roboflow.get('workspace', ''),
-                'project': roboflow.get('project', ''),
-                'version': roboflow.get('version', ''),
-                'api_key': roboflow.get('api_key', ''),
-                'output_format': 'yolov5pytorch',
-                'validate_download': download_config.get('validate_download', True),
-                'organize_dataset': True,
-                'backup_existing': download_config.get('backup_existing', False),
-                'rename_files': True  # FIX: Boolean instead of callable
-            }
-            
-            # Validate required fields
-            required = ['workspace', 'project', 'version', 'api_key']
-            missing = [f for f in required if not service_config[f]]
-            
-            if missing:
-                self._handle_error(f"Field wajib kosong: {', '.join(missing)}", button)
-                return
-            
-            if self.progress_tracker:
-                self.progress_tracker.update_overall(40, "🏭 Creating download service...")
-            
-            # Create downloader service - FIX: Proper error handling
-            downloader = get_downloader_instance(service_config, self.logger)
-            if not downloader:
-                self._handle_error("Gagal membuat download service", button)
-                return
-            
-            # Setup progress callback - FIX: Proper callback integration
-            if hasattr(downloader, 'set_progress_callback'):
-                downloader.set_progress_callback(self._create_progress_callback())
-            
-            if self.progress_tracker:
-                self.progress_tracker.update_overall(50, "📥 Starting download...")
-            
-            # Execute download
-            result = downloader.download_dataset()
-            
-            # Handle result
-            if result and result.get('status') == 'success':
-                stats = result.get('stats', {})
-                success_msg = f"Dataset berhasil didownload: {stats.get('total_images', 0):,} gambar"
-                
-                if self.progress_tracker:
-                    self.progress_tracker.complete(success_msg)
-                
-                show_status_safe(success_msg, "success", self.ui_components)
-                self.logger.success(f"✅ {success_msg}")
-            else:
-                error_msg = f"Download gagal: {result.get('message', 'Unknown error') if result else 'No response'}"
-                self._handle_error(error_msg, button)
-                
-        except Exception as e:
-            self._handle_error(f"Error saat download: {str(e)}", button)
-        finally:
-            button.disabled = False
-    
-    def _create_progress_callback(self) -> Callable[[str, int, int, str], None]:
-        """Create progress callback untuk downloader service"""
-        def progress_callback(step: str, current: int, total: int, message: str):
-            if self.progress_tracker and total > 0:
-                # Map download progress ke overall progress (50-90%)
-                base_progress = 50
-                download_range = 40
-                percentage = base_progress + int((current / total) * download_range)
-                self.progress_tracker.update_overall(percentage, f"{step}: {message}")
-        
-        return progress_callback
-    
-    def _show_download_confirmation(self, config: Dict[str, Any], button) -> None:
-        """Show confirmation dialog untuk download"""
-        roboflow = config.get('data', {}).get('roboflow', {})
-        download_config = config.get('download', {})
-        
-        dataset_id = f"{roboflow.get('workspace', '')}/{roboflow.get('project', '')}:v{roboflow.get('version', '')}"
-        
-        message = f"""Dataset existing akan ditimpa!
-
-🎯 Target: {dataset_id}
-🔄 UUID Renaming: ✅ Enabled
-✅ Validasi: {'✅' if download_config.get('validate_download', True) else '❌'}
-💾 Backup: {'✅' if download_config.get('backup_existing', False) else '❌'}
-
-Lanjutkan download?"""
-        
-        confirm(
-            "Konfirmasi Download Dataset", 
-            message,
-            on_yes=lambda btn: self._execute_download(config, button),
-            on_no=lambda btn: (
-                self.logger.info("🚫 Download dibatalkan"),
-                setattr(button, 'disabled', False),
-                self.progress_tracker and self.progress_tracker.hide()
-            )
-        )
     
     def _check_existing_dataset_quick(self) -> bool:
         """Quick check existing dataset"""
@@ -439,7 +427,6 @@ Lanjutkan download?"""
                 except Exception as e:
                     self.logger.error(f"❌ Error cleaning {dir_name}: {str(e)}")
             
-            # Summary
             if cleaned_files > 0:
                 success_msg = f"Cleanup selesai: {cleaned_files} files dari {cleaned_dirs} directories"
                 
@@ -472,7 +459,7 @@ Lanjutkan download?"""
 
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup download handlers dengan proper integration"""
+    """FIXED setup download handlers dengan proper integration"""
     logger = ui_components.get('logger')
     
     try:
@@ -482,7 +469,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
         # Setup handlers
         ui_components = handler.setup_handlers()
         
-        # Add handler references untuk compatibility
+        # Add handler references
         ui_components.update({
             'download_handler': handler,
             'check_handler': handler, 

@@ -86,13 +86,22 @@ class DownloaderConfigHandler(ConfigHandler):
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Reset config dengan default dan auto-detect API key"""
+        """Reset config dengan default dan preserve API key dari UI/Colab"""
         try:
-            # Get default config dengan API key auto-detection
-            default_config = self.get_default_config()
-            default_config = set_api_key_to_config(default_config, force_refresh=True)
+            # Preserve current API key dari UI
+            current_api_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
             
-            # Update UI dengan default
+            # Get default config
+            default_config = self.get_default_config()
+            
+            # Preserve API key jika ada
+            if current_api_key:
+                default_config['data']['roboflow']['api_key'] = current_api_key
+            else:
+                # Auto-detect dari Colab secrets tanpa force refresh
+                default_config = set_api_key_to_config(default_config, force_refresh=False)
+            
+            # Update UI dengan default (tapi preserve API key)
             self.update_ui(ui_components, default_config)
             
             # Save default ke file
@@ -100,7 +109,7 @@ class DownloaderConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(default_config, filename)
             
             if success:
-                self.logger.success(f"🔄 Config direset ke default dan tersimpan ke {filename}")
+                self.logger.success(f"🔄 Config direset ke default (API key dipertahankan)")
                 return True
             else:
                 self.logger.warning("⚠️ Config direset di UI tapi gagal tersimpan ke file")

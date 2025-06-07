@@ -34,6 +34,45 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     setup_check_handler(ui_components, config)
     setup_cleanup_handler(ui_components, config)
     
+    # Setup save/reset handlers
+    def save_config_handler(button=None):
+        try:
+            config_handler = ui_components.get('config_handler')
+            if not config_handler:
+                _handle_ui_error(ui_components, "Config handler tidak tersedia", button, None)
+                return
+            
+            success = config_handler.save_config(ui_components)
+            if success:
+                _show_ui_success(ui_components, "✅ Konfigurasi berhasil disimpan", button, None)
+            else:
+                _handle_ui_error(ui_components, "❌ Gagal menyimpan konfigurasi", button, None)
+        except Exception as e:
+            _handle_ui_error(ui_components, f"❌ Error saat save: {str(e)}", button, None)
+    
+    def reset_config_handler(button=None):
+        try:
+            config_handler = ui_components.get('config_handler')
+            if not config_handler:
+                _handle_ui_error(ui_components, "Config handler tidak tersedia", button, None)
+                return
+            
+            success = config_handler.reset_config(ui_components)
+            if success:
+                _show_ui_success(ui_components, "🔄 Konfigurasi berhasil direset", button, None)
+            else:
+                _handle_ui_error(ui_components, "❌ Gagal reset konfigurasi", button, None)
+        except Exception as e:
+            _handle_ui_error(ui_components, f"❌ Error saat reset: {str(e)}", button, None)
+    
+    # Bind save/reset handlers
+    save_button = ui_components.get('save_button')
+    reset_button = ui_components.get('reset_button')
+    if save_button:
+        save_button.on_click(save_config_handler)
+    if reset_button:
+        reset_button.on_click(reset_config_handler)
+    
     return ui_components
 
 def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
@@ -163,29 +202,102 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
         cleanup_button.on_click(execute_cleanup)
 
 def _check_and_confirm_download(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager):
-    """Safe check existing dataset dengan enhanced error handling"""
+    """Enhanced check dengan proper content validation"""
     try:
-        from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
-        
         logger = ui_components.get('logger')
         if logger:
             logger.info("🔍 Checking for existing dataset...")
         
-        scanner = create_dataset_scanner(logger)
-        has_existing = scanner.quick_check_existing()
+        # Enhanced check - validate actual content, not just directories
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        dataset_path = env_manager.get_dataset_path()
+        
+        # Check for actual files in splits
+        has_content = False
+        total_images = 0
+        
+        for split in ['train', 'valid', 'test']:
+            split_dir = dataset_path / split / 'images'
+            if split_dir.exists():
+                images = list(split_dir.glob('*.jpg')) + list(split_dir.glob('*.png'))
+                if images:
+                    total_images += len(images)
+                    has_content = True
         
         if logger:
-            logger.info(f"📊 Existing dataset check: {'Found' if has_existing else 'Not found'}")
+            logger.info(f"📊 Existing dataset check: {'Found' if has_content else 'Empty'} ({total_images} images)")
         
-        if has_existing:
-            _show_download_confirmation(ui_config, ui_components, button, button_manager)
+        if has_content:
+            # Show explicit confirmation dengan file count
+            _show_explicit_download_confirmation(ui_config, ui_components, button, button_manager, total_images)
         else:
+            # No existing content, proceed directly
             _execute_download_with_backend(ui_config, ui_components, button, button_manager)
             
     except Exception as e:
         if ui_components.get('logger'):
             ui_components['logger'].error(f"❌ Error checking existing dataset: {str(e)}")
-        # Proceed with download anyway jika check gagal
+        # Proceed anyway jika check gagal
+        _execute_download_with_backend(ui_config, ui_components, button, button_manager)
+
+def _show_explicit_download_confirmation(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager, existing_count: int):
+    """Show explicit confirmation dengan IPython display"""
+    try:
+        from IPython.display import display, HTML
+        
+        roboflow = ui_config.get('data', {}).get('roboflow', {})
+        download = ui_config.get('download', {})
+        
+        # Show confirmation in log_output
+        log_output = ui_components.get('log_output')
+        if log_output:
+            confirmation_html = f"""
+            <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; margin: 10px 0;">
+                <h4 style="color: #856404; margin-top: 0;">⚠️ Konfirmasi Download Dataset</h4>
+                <p><strong>Dataset existing akan ditimpa!</strong></p>
+                <p>📊 Dataset saat ini: <strong>{existing_count:,} gambar</strong></p>
+                <p>🎯 Target: <strong>{roboflow.get('workspace')}/{roboflow.get('project')}:v{roboflow.get('version')}</strong></p>
+                <p>🔄 UUID Renaming: {'✅' if download.get('rename_files', True) else '❌'}</p>
+                <p>💾 Backup: {'✅' if download.get('backup_existing', False) else '❌'}</p>
+                <div style="margin-top: 15px;">
+                    <button onclick="confirm_download()" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-right: 10px; cursor: pointer;">Ya, Lanjutkan Download</button>
+                    <button onclick="cancel_download()" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Batal</button>
+                </div>
+            </div>
+            <script>
+                function confirm_download() {{
+                    // Call Python function
+                    IPython.notebook.kernel.execute("_confirmed_download()");
+                }}
+                function cancel_download() {{
+                    IPython.notebook.kernel.execute("_cancelled_download()");
+                }}
+            </script>
+            """
+            
+            with log_output:
+                display(HTML(confirmation_html))
+        
+        # Set up response handlers
+        def confirmed_download():
+            _execute_download_with_backend(ui_config, ui_components, button, button_manager)
+        
+        def cancelled_download():
+            logger = ui_components.get('logger')
+            if logger:
+                logger.info("🚫 Download dibatalkan oleh user")
+            button_manager.enable_buttons()
+        
+        # Store handlers globally for JavaScript access
+        import builtins
+        builtins._confirmed_download = confirmed_download
+        builtins._cancelled_download = cancelled_download
+        
+    except Exception as e:
+        if ui_components.get('logger'):
+            ui_components['logger'].error(f"❌ Error showing confirmation: {str(e)}")
+        # Fallback: proceed with download
         _execute_download_with_backend(ui_config, ui_components, button, button_manager)
 
 def _show_download_confirmation(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager):

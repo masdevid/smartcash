@@ -147,13 +147,13 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
                 progress_tracker.show("Dataset Check")
                 progress_tracker.update_overall(0, "🔍 Memulai scan...")
             
-            # Use backend scanner
+            # Use backend scanner dengan method yang benar
             from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
             scanner = create_dataset_scanner(logger)
             scanner.set_progress_callback(ui_components['progress_callback'])
             
-            # Execute scan
-            result = scanner.scan_existing_dataset()
+            # Execute scan - gunakan method yang ada di scanner
+            result = scanner.scan_existing_dataset_parallel()  # Method yang ada di updated scanner
             
             # Display results
             if result.get('status') == 'success':

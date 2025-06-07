@@ -1,16 +1,16 @@
 """
 File: smartcash/ui/dataset/downloader/utils/confirmation_dialog.py
-Deskripsi: Fixed confirmation dialog khusus untuk downloader dengan cleanup behavior
+Deskripsi: Fixed confirmation dialog dengan sync execution dan debugging
 """
 
 from typing import Callable, Dict, Any
 from IPython.display import display, clear_output
-from smartcash.ui.components.dialogs import show_destructive_confirmation
+import ipywidgets as widgets
 
 def show_downloader_confirmation_dialog(ui_components: Dict[str, Any], existing_count: int, 
                                        config: Dict[str, Any], on_confirm: Callable):
     """
-    Show confirmation dialog khusus downloader dengan cleanup warning yang spesifik.
+    Show confirmation dialog dengan sync execution dan force display.
     
     Args:
         ui_components: UI components dict dengan confirmation_area
@@ -19,140 +19,268 @@ def show_downloader_confirmation_dialog(ui_components: Dict[str, Any], existing_
         on_confirm: Callback saat user confirm
     """
     confirmation_area = ui_components.get('confirmation_area')
+    logger = ui_components.get('logger')
+    
+    # Debug confirmation area
+    if logger:
+        area_status = _debug_confirmation_area(confirmation_area)
+        logger.info(f"🔍 Confirmation area status: {area_status}")
+    
     if not confirmation_area:
         # Fallback ke console confirmation
-        _console_confirmation(existing_count, config, on_confirm)
+        if logger:
+            logger.warning("⚠️ No confirmation_area, using console fallback")
+        _console_confirmation(existing_count, config, on_confirm, logger)
         return
     
-    # Force confirmation area visible
-    _ensure_confirmation_area_visible(confirmation_area)
-    
-    # Build downloader-specific message
-    message = _build_downloader_confirmation_message(existing_count, config)
-    
-    def safe_confirm(btn):
-        """Safe confirm dengan cleanup confirmation area"""
+    try:
+        # Force confirmation area visible dan ready
+        _force_confirmation_area_ready(confirmation_area, logger)
+        
+        # Build message
+        message = _build_downloader_confirmation_message(existing_count, config)
+        
+        # Create confirmation widget langsung tanpa external dialog
+        confirmation_widget = _create_inline_confirmation_widget(
+            message, 
+            lambda: _handle_confirm(confirmation_area, on_confirm, logger),
+            lambda: _handle_cancel(confirmation_area, ui_components, logger)
+        )
+        
+        # Display dengan force update
         with confirmation_area:
             clear_output(wait=True)
-        on_confirm(btn)
+            display(confirmation_widget)
+        
+        if logger:
+            logger.info("✅ Confirmation dialog displayed successfully")
+            
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error showing confirmation: {str(e)}")
+        # Fallback to console
+        _console_confirmation(existing_count, config, on_confirm, logger)
+
+def _debug_confirmation_area(confirmation_area) -> str:
+    """Debug confirmation area untuk troubleshooting"""
+    if not confirmation_area:
+        return "None"
+    
+    info = {
+        'type': type(confirmation_area).__name__,
+        'has_layout': hasattr(confirmation_area, 'layout'),
+        'has_clear_output': hasattr(confirmation_area, 'clear_output')
+    }
+    
+    if hasattr(confirmation_area, 'layout'):
+        layout = confirmation_area.layout
+        info.update({
+            'display': getattr(layout, 'display', 'not_set'),
+            'visibility': getattr(layout, 'visibility', 'not_set'),
+            'height': getattr(layout, 'height', 'not_set')
+        })
+    
+    return str(info)
+
+def _force_confirmation_area_ready(confirmation_area, logger):
+    """Force confirmation area ready untuk display"""
+    if not hasattr(confirmation_area, 'layout'):
+        if logger:
+            logger.warning("⚠️ Confirmation area has no layout attribute")
+        return
+    
+    # Force visibility settings
+    layout_updates = {
+        'display': 'block',
+        'visibility': 'visible', 
+        'height': 'auto',
+        'min_height': '200px',
+        'max_height': '600px',
+        'overflow': 'auto',
+        'border': '1px solid #ddd',
+        'padding': '10px',
+        'background_color': 'white'
+    }
+    
+    for attr, value in layout_updates.items():
+        try:
+            setattr(confirmation_area.layout, attr, value)
+        except Exception as e:
+            if logger:
+                logger.debug(f"Could not set {attr}: {str(e)}")
+
+def _create_inline_confirmation_widget(message: str, on_confirm: Callable, on_cancel: Callable) -> widgets.VBox:
+    """Create inline confirmation widget tanpa external dialog dependency"""
+    
+    # Title
+    title = widgets.HTML(
+        '<h3 style="color: #dc3545; margin: 0 0 15px 0;">⚠️ Konfirmasi Download Dataset</h3>',
+        layout=widgets.Layout(margin='0 0 10px 0')
+    )
+    
+    # Message
+    message_widget = widgets.HTML(
+        f'<div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #ffc107;"><pre style="white-space: pre-wrap; margin: 0; font-family: monospace; font-size: 12px;">{message}</pre></div>',
+        layout=widgets.Layout(margin='10px 0')
+    )
+    
+    # Buttons
+    confirm_button = widgets.Button(
+        description="Ya, Lanjutkan Download",
+        button_style='danger',
+        icon='download',
+        layout=widgets.Layout(width='200px', height='35px', margin='0 10px 0 0')
+    )
+    
+    cancel_button = widgets.Button(
+        description="Batal",
+        button_style='',
+        icon='times',
+        layout=widgets.Layout(width='100px', height='35px')
+    )
+    
+    # Button handlers
+    def safe_confirm(btn):
+        btn.disabled = True
+        cancel_button.disabled = True
+        btn.description = "Processing..."
+        on_confirm()
     
     def safe_cancel(btn):
-        """Safe cancel dengan proper button state reset"""
+        btn.disabled = True
+        confirm_button.disabled = True
+        on_cancel()
+    
+    confirm_button.on_click(safe_confirm)
+    cancel_button.on_click(safe_cancel)
+    
+    # Button container
+    button_container = widgets.HBox(
+        [confirm_button, cancel_button],
+        layout=widgets.Layout(justify_content='flex-end', margin='15px 0 0 0')
+    )
+    
+    # Main container
+    return widgets.VBox([
+        title,
+        message_widget,
+        button_container
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='20px',
+        border='2px solid #dc3545',
+        border_radius='8px',
+        background_color='#fff'
+    ))
+
+def _handle_confirm(confirmation_area, on_confirm: Callable, logger):
+    """Handle confirm dengan cleanup"""
+    try:
+        if logger:
+            logger.info("✅ User confirmed download")
+        
+        # Clear confirmation area
         with confirmation_area:
             clear_output(wait=True)
-        _handle_download_cancellation(ui_components)
-    
-    # Display dialog dalam confirmation area
-    with confirmation_area:
-        clear_output(wait=True)
-        dialog = show_destructive_confirmation(
-            "⚠️ Konfirmasi Download Dataset",
-            message,
-            "dataset existing", 
-            safe_confirm, 
-            safe_cancel
-        )
-        display(dialog)
+        
+        # Execute callback
+        on_confirm(None)
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error in confirm handler: {str(e)}")
+
+def _handle_cancel(confirmation_area, ui_components: Dict[str, Any], logger):
+    """Handle cancel dengan proper state reset"""
+    try:
+        if logger:
+            logger.info("🚫 User cancelled download")
+        
+        # Clear confirmation area
+        with confirmation_area:
+            clear_output(wait=True)
+        
+        # Reset button states
+        from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
+        button_manager = get_button_manager(ui_components)
+        button_manager.enable_buttons()
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error in cancel handler: {str(e)}")
 
 def _build_downloader_confirmation_message(existing_count: int, config: Dict[str, Any]) -> str:
-    """Build message yang spesifik untuk downloader cleanup behavior"""
+    """Build confirmation message dengan cleanup info"""
     roboflow = config.get('data', {}).get('roboflow', {})
     download = config.get('download', {})
     backup_enabled = download.get('backup_existing', False)
     
     lines = [
-        f"🗂️ Dataset existing: {existing_count:,} file akan DIHAPUS PERMANEN",
+        f"🗂️ Dataset Existing: {existing_count:,} file akan DIHAPUS PERMANEN",
         f"🎯 Target: {roboflow.get('workspace')}/{roboflow.get('project')}:v{roboflow.get('version')}",
         "",
-        "📋 Proses Download Downloader:",
+        "📋 Proses Download:",
         "  1️⃣ Download dataset baru dari Roboflow",
         "  2️⃣ Extract ke direktori temporary",
-        "  3️⃣ 🚨 HAPUS dataset lama (train/valid/test)",
-        "  4️⃣ Organize dataset baru ke struktur final", 
+        "  3️⃣ 🚨 HAPUS dataset lama (train/valid/test)", 
+        "  4️⃣ Organize dataset baru ke struktur final",
         "  5️⃣ UUID renaming untuk konsistensi research",
         "",
-        f"🔄 UUID Renaming: {'✅' if download.get('rename_files', True) else '❌'} Aktif",
-        f"✅ Validasi: {'✅' if download.get('validate_download', True) else '❌'} Aktif",
-        f"💾 Backup: {'✅' if backup_enabled else '❌'} {_get_backup_status_text(backup_enabled)}",
+        f"💾 Backup: {'✅ AKTIF' if backup_enabled else '❌ TIDAK AKTIF'}",
+        f"🔄 UUID Rename: {'✅' if download.get('rename_files', True) else '❌'}",
+        f"✅ Validasi: {'✅' if download.get('validate_download', True) else '❌'}",
         "",
-        _get_safety_warning(backup_enabled)
     ]
+    
+    if backup_enabled:
+        lines.append("✅ Dataset lama akan dibackup sebelum dihapus")
+    else:
+        lines.append("🚨 PERINGATAN: DATA AKAN HILANG PERMANEN!")
     
     return '\n'.join(lines)
 
-def _get_backup_status_text(backup_enabled: bool) -> str:
-    """Get backup status text yang sesuai"""
-    if backup_enabled:
-        return "Dataset lama akan dibackup ke data/backup/"
-    else:
-        return "TIDAK ADA BACKUP - DATA HILANG PERMANEN!"
-
-def _get_safety_warning(backup_enabled: bool) -> str:
-    """Get safety warning berdasarkan backup status"""
-    if backup_enabled:
-        return "⚠️ Dataset lama akan dihapus tapi ada backup untuk recovery"
-    else:
-        return "🚨 BAHAYA: Dataset lama akan HILANG PERMANEN tanpa backup!"
-
-def _ensure_confirmation_area_visible(confirmation_area):
-    """Ensure confirmation area visible dan siap display dialog"""
-    if hasattr(confirmation_area, 'layout'):
-        confirmation_area.layout.display = 'block'
-        confirmation_area.layout.visibility = 'visible'
-        confirmation_area.layout.height = 'auto'
-        confirmation_area.layout.min_height = '100px'
-        confirmation_area.layout.overflow = 'visible'
-
-def _console_confirmation(existing_count: int, config: Dict[str, Any], on_confirm: Callable):
-    """Fallback console confirmation jika UI tidak tersedia"""
+def _console_confirmation(existing_count: int, config: Dict[str, Any], on_confirm: Callable, logger):
+    """Fallback console confirmation"""
     backup_enabled = config.get('download', {}).get('backup_existing', False)
     
+    print("\n" + "="*50)
     print("⚠️ KONFIRMASI DOWNLOAD DATASET")
-    print("=" * 40)
+    print("="*50)
     print(f"🗂️ File existing: {existing_count:,} akan dihapus")
     print(f"💾 Backup: {'✅ Aktif' if backup_enabled else '❌ TIDAK AKTIF'}")
     
     if not backup_enabled:
         print("🚨 PERINGATAN: DATA AKAN HILANG PERMANEN!")
     
-    response = input("\nLanjutkan download? (y/n): ")
-    if response.lower() in ['y', 'yes', 'ya']:
-        on_confirm(None)
+    try:
+        response = input("\nLanjutkan download? (y/n): ")
+        if response.lower() in ['y', 'yes', 'ya']:
+            if logger:
+                logger.info("✅ Console confirmation: YES")
+            on_confirm(None)
+        else:
+            if logger:
+                logger.info("🚫 Console confirmation: NO")
+    except KeyboardInterrupt:
+        if logger:
+            logger.info("🚫 Console confirmation: Interrupted")
+        print("\nDownload cancelled.")
 
-def _handle_download_cancellation(ui_components: Dict[str, Any]):
-    """Handle download cancellation dengan proper state reset"""
-    logger = ui_components.get('logger')
-    if logger:
-        logger.info("🚫 Download dibatalkan oleh user")
-    
-    # Reset button states
-    from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
-    button_manager = get_button_manager(ui_components)
-    button_manager.enable_buttons()
-
-def check_confirmation_area_availability(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Check availability dan status confirmation area untuk debugging.
-    
-    Returns:
-        Status dict untuk troubleshooting
-    """
+# Debug utility
+def test_confirmation_area_display(ui_components: Dict[str, Any]) -> str:
+    """Test function untuk debug confirmation area"""
     confirmation_area = ui_components.get('confirmation_area')
     
-    status = {
-        'exists': confirmation_area is not None,
-        'has_layout': hasattr(confirmation_area, 'layout') if confirmation_area else False,
-        'has_clear_output': hasattr(confirmation_area, 'clear_output') if confirmation_area else False,
-        'widget_type': type(confirmation_area).__name__ if confirmation_area else None
-    }
+    if not confirmation_area:
+        return "❌ No confirmation_area found"
     
-    if confirmation_area and hasattr(confirmation_area, 'layout'):
-        layout = confirmation_area.layout
-        status.update({
-            'display': getattr(layout, 'display', 'not_set'),
-            'visibility': getattr(layout, 'visibility', 'not_set'),
-            'height': getattr(layout, 'height', 'not_set'),
-            'width': getattr(layout, 'width', 'not_set')
-        })
+    # Test display simple widget
+    test_widget = widgets.HTML("<div style='background: lightgreen; padding: 10px;'>✅ Test Widget Displayed Successfully</div>")
     
-    return status
+    try:
+        with confirmation_area:
+            clear_output(wait=True)
+            display(test_widget)
+        return "✅ Test widget displayed successfully"
+    except Exception as e:
+        return f"❌ Error displaying test widget: {str(e)}"

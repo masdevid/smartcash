@@ -236,14 +236,13 @@ class DownloaderCleanupBehavior:
     
     def _show_detailed_confirmation(self, cleanup_plan: Dict[str, Any], ui_components: Dict[str, Any]):
         """Show detailed confirmation dengan cleanup plan"""
-        from smartcash.ui.dataset.downloader.utils.dialog_utils import show_download_confirmation_with_cleanup_info
+        from smartcash.ui.dataset.downloader.utils.confirmation_dialog import show_downloader_confirmation_dialog
         
         # Calculate totals
         total_files = sum(item['file_count'] for item in cleanup_plan['will_be_deleted'])
-        total_dirs = len(cleanup_plan['will_be_deleted'])
         
-        # Show enhanced confirmation
-        show_download_confirmation_with_cleanup_info(
+        # Show enhanced confirmation menggunakan domain-specific dialog
+        show_downloader_confirmation_dialog(
             ui_components, 
             total_files,
             {'cleanup_plan': cleanup_plan, 'safety_status': cleanup_plan['safety_status']},

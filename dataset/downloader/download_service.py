@@ -1,13 +1,13 @@
 """
 File: smartcash/dataset/downloader/download_service.py
-Deskripsi: Complete download service yang menggunakan config workers dan optimal performance
+Deskripsi: Fixed download service dengan proper imports dan Path handling
 """
 
 import time
 import shutil
 from typing import Dict, Any, Optional
 from pathlib import Path
-from smartcash.dataset.downloader.base import BaseDownloaderComponent, ValidationHelper, PathHelper, FileHelper
+from smartcash.dataset.downloader.base import BaseDownloaderComponent, ValidationHelper, PathHelper, FileHelper, DirectoryManager
 from smartcash.dataset.downloader.roboflow_client import create_roboflow_client
 from smartcash.dataset.downloader.file_processor import create_file_processor
 from smartcash.dataset.downloader.validators import create_dataset_validator
@@ -15,13 +15,14 @@ from smartcash.dataset.downloader.progress_tracker import DownloadProgressTracke
 from smartcash.common.environment import get_environment_manager
 
 class DownloadService(BaseDownloaderComponent):
-    """Complete download service dengan config-aware workers dan optimal performance"""
+    """Fixed download service dengan proper imports dan enhanced directory management"""
     
     def __init__(self, config: Dict[str, Any], logger=None):
         super().__init__(logger)
         self.config = config
         self.env_manager = get_environment_manager()
         self.progress_tracker = None
+        self.directory_manager = DirectoryManager()
         
         # Extract config dengan optimal workers
         self.max_workers = config.get('max_workers', self._get_default_workers())
@@ -70,7 +71,7 @@ class DownloadService(BaseDownloaderComponent):
         return self._validator
     
     def download_dataset(self) -> Dict[str, Any]:
-        """Complete download dengan config-aware performance optimization"""
+        """Enhanced download dengan proper directory management dan error handling"""
         start_time = time.time()
         
         try:
@@ -92,7 +93,7 @@ class DownloadService(BaseDownloaderComponent):
             # Extract parameters
             params = self._extract_params()
             
-            # Setup paths using environment manager
+            # Setup paths using environment manager dengan enhanced validation
             dataset_path = self.env_manager.get_dataset_path()
             paths = self._setup_download_paths(dataset_path, params)
             
@@ -224,7 +225,7 @@ class DownloadService(BaseDownloaderComponent):
         }
     
     def _setup_download_paths(self, dataset_path: Path, params: Dict[str, Any]) -> Dict[str, Path]:
-        """Setup download paths dengan environment awareness"""
+        """Enhanced setup download paths dengan directory validation"""
         dataset_name = f"{params['workspace']}_{params['project']}_v{params['version']}"
         
         paths = {
@@ -234,8 +235,17 @@ class DownloadService(BaseDownloaderComponent):
             'extract_dir': dataset_path / 'downloads' / f"{dataset_name}_temp" / 'extracted'
         }
         
-        # Create temp directories
-        FileHelper.ensure_directory(paths['temp_dir'])
+        # Create temp directories dengan error handling
+        try:
+            FileHelper.ensure_directory(paths['temp_dir'])
+            
+            # Ensure dataset structure exists
+            structure_result = self.directory_manager.ensure_dataset_structure(dataset_path)
+            if structure_result['status'] == 'error':
+                raise Exception(f"Failed to create dataset structure: {structure_result['message']}")
+                
+        except Exception as e:
+            raise Exception(f"Failed to setup download paths: {str(e)}")
         
         return paths
     
@@ -386,7 +396,7 @@ class DownloadService(BaseDownloaderComponent):
                 self.progress_tracker.update_stage(60, "⚠️ Backup failed")
     
     def _has_existing_dataset(self, dataset_path: Path) -> bool:
-        """Check existing dataset dengan smart detection"""
+        """Enhanced check existing dataset dengan smart detection"""
         if not dataset_path.exists():
             return False
             
@@ -416,7 +426,7 @@ class DownloadService(BaseDownloaderComponent):
 
 
 def create_download_service(config: Dict[str, Any], logger=None) -> Optional[DownloadService]:
-    """Factory dengan comprehensive config validation dan optimal workers"""
+    """Enhanced factory dengan comprehensive config validation dan optimal workers"""
     from smartcash.common.logger import get_logger
     logger = logger or get_logger('downloader.factory')
     

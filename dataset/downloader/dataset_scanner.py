@@ -1,22 +1,23 @@
 """
 File: smartcash/dataset/downloader/dataset_scanner.py
-Deskripsi: Dataset scanner dengan content validation dan optimal workers
+Deskripsi: Fixed dataset scanner dengan automatic directory creation dan enhanced validation
 """
 
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor
-from smartcash.dataset.downloader.base import BaseDownloaderComponent
+from smartcash.dataset.downloader.base import BaseDownloaderComponent, DirectoryManager
 from smartcash.common.environment import get_environment_manager
 
 class DatasetScanner(BaseDownloaderComponent):
-    """Dataset scanner dengan deep content validation dan parallel processing"""
+    """Enhanced dataset scanner dengan auto directory creation dan deep content validation"""
     
     def __init__(self, logger=None, max_workers: int = None):
         super().__init__(logger)
         self.env_manager = get_environment_manager()
         self.dataset_path = self.env_manager.get_dataset_path()
         self.img_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
+        self.directory_manager = DirectoryManager()
         
         if max_workers is None:
             from smartcash.common.threadpools import get_optimal_thread_count
@@ -24,41 +25,70 @@ class DatasetScanner(BaseDownloaderComponent):
         
         self.max_workers = max_workers
         self.logger.info(f"🔍 DatasetScanner initialized with {self.max_workers} workers")
+        
+        # Ensure basic dataset structure exists
+        self._ensure_dataset_structure()
+    
+    def _ensure_dataset_structure(self):
+        """Ensure basic dataset structure exists on initialization"""
+        try:
+            structure_result = self.directory_manager.ensure_dataset_structure(self.dataset_path)
+            if structure_result['status'] == 'success':
+                created_count = structure_result['total_created']
+                if created_count > 0:
+                    self.logger.info(f"📁 Created {created_count} missing directories")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error ensuring dataset structure: {str(e)}")
     
     def quick_check_existing(self) -> bool:
-        """Quick check dengan actual content validation"""
+        """Enhanced quick check dengan automatic directory creation"""
         try:
+            # Ensure dataset path exists
             if not self.dataset_path.exists():
-                return False
+                self.directory_manager.ensure_directory(self.dataset_path)
+                self._ensure_dataset_structure()
+                return False  # Newly created, no content yet
             
             # Check actual image files, not just directories
             total_images = 0
             for split in ['train', 'valid', 'test']:
                 split_images_dir = self.dataset_path / split / 'images'
-                if split_images_dir.exists():
-                    images = [f for f in split_images_dir.glob('*.*') 
-                             if f.suffix.lower() in self.img_extensions]
-                    total_images += len(images)
+                
+                # Create directory if missing
+                if not split_images_dir.exists():
+                    self.directory_manager.ensure_directory(split_images_dir)
+                    self.directory_manager.ensure_directory(split_images_dir.parent / 'labels')
+                    continue
+                
+                images = [f for f in split_images_dir.glob('*.*') 
+                         if f.suffix.lower() in self.img_extensions]
+                total_images += len(images)
             
             # Also check downloads for content
             downloads_dir = self.dataset_path / 'downloads'
-            if downloads_dir.exists():
+            if not downloads_dir.exists():
+                self.directory_manager.ensure_directory(downloads_dir)
+            else:
                 download_files = list(downloads_dir.glob('*.*'))
                 if download_files:
                     total_images += len(download_files)
             
             return total_images > 0
             
-        except Exception:
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error in quick check: {str(e)}")
             return False
     
     def scan_existing_dataset_parallel(self) -> Dict[str, Any]:
-        """Comprehensive scan dengan parallel content validation"""
-        self._notify_progress("scan_start", 0, 100, f"🔍 Starting deep scan with {self.max_workers} workers...")
+        """Enhanced comprehensive scan dengan directory creation dan parallel processing"""
+        self._notify_progress("scan_start", 0, 100, f"🔍 Starting enhanced scan with {self.max_workers} workers...")
         
         try:
+            # Ensure dataset path exists
             if not self.dataset_path.exists():
-                return self._create_empty_scan_result("Dataset directory tidak ditemukan")
+                self.directory_manager.ensure_directory(self.dataset_path)
+                self._ensure_dataset_structure()
+                return self._create_empty_scan_result("Dataset directory baru dibuat")
             
             self._notify_progress("scan_structure", 20, 100, "🔍 Analyzing dataset structure...")
             structure = self._analyze_dataset_structure()
@@ -83,20 +113,22 @@ class DatasetScanner(BaseDownloaderComponent):
             }
             
             total_content = result['summary']['total_images'] + result['summary']['download_files']
-            self._notify_progress("scan_complete", 100, 100, f"✅ Deep scan complete: {total_content} files found")
+            self._notify_progress("scan_complete", 100, 100, f"✅ Enhanced scan complete: {total_content} files found")
             return result
             
         except Exception as e:
-            error_msg = f"Error during deep scanning: {str(e)}"
+            error_msg = f"Error during enhanced scanning: {str(e)}"
             self._notify_progress("scan_error", 0, 100, f"❌ {error_msg}")
             return self._create_error_result(error_msg)
     
     def _scan_downloads_content(self) -> Dict[str, Any]:
-        """Scan downloads dengan content validation"""
+        """Enhanced scan downloads dengan auto-creation"""
         downloads_dir = self.dataset_path / 'downloads'
         
+        # Create downloads directory if not exists
         if not downloads_dir.exists():
-            return {'status': 'not_found', 'file_count': 0, 'total_size': 0}
+            self.directory_manager.ensure_directory(downloads_dir)
+            return {'status': 'created', 'file_count': 0, 'total_size': 0}
         
         try:
             all_files = [f for f in downloads_dir.rglob('*') if f.is_file()]
@@ -143,7 +175,7 @@ class DatasetScanner(BaseDownloaderComponent):
             return {'status': 'error', 'message': str(e), 'file_count': 0, 'total_size': 0}
     
     def _scan_splits_content_parallel(self) -> Dict[str, Any]:
-        """Parallel scan splits dengan deep content validation"""
+        """Enhanced parallel scan splits dengan auto-creation"""
         splits = ['train', 'valid', 'test']
         split_results = {}
         
@@ -166,14 +198,29 @@ class DatasetScanner(BaseDownloaderComponent):
         return split_results
     
     def _scan_single_split_content(self, split_name: str) -> Dict[str, Any]:
-        """Deep scan single split dengan actual file validation"""
+        """Enhanced scan single split dengan automatic directory creation"""
         split_dir = self.dataset_path / split_name
-        
-        if not split_dir.exists():
-            return {'status': 'not_found', 'images': 0, 'labels': 0}
-        
         images_dir = split_dir / 'images'
         labels_dir = split_dir / 'labels'
+        
+        # Create directories if missing
+        if not split_dir.exists():
+            self.directory_manager.ensure_directory(images_dir)
+            self.directory_manager.ensure_directory(labels_dir)
+            return {
+                'status': 'created',
+                'images': 0, 'labels': 0,
+                'image_size': 0, 'label_size': 0, 'total_size': 0,
+                'size_formatted': '0 B',
+                'images_dir_exists': True, 'labels_dir_exists': True,
+                'paired_files': 0, 'pairing_ratio': 0
+            }
+        
+        # Ensure subdirectories exist
+        if not images_dir.exists():
+            self.directory_manager.ensure_directory(images_dir)
+        if not labels_dir.exists():
+            self.directory_manager.ensure_directory(labels_dir)
         
         # Actual file counting dengan validation
         image_count = 0
@@ -266,8 +313,11 @@ class DatasetScanner(BaseDownloaderComponent):
         return chunk_stats, chunk_files, chunk_size
     
     def get_cleanup_targets(self) -> Dict[str, Any]:
-        """Get cleanup targets dengan actual content counting"""
+        """Enhanced get cleanup targets dengan directory validation"""
         try:
+            # Ensure base structure exists first
+            self._ensure_dataset_structure()
+            
             cleanup_targets = {
                 'downloads': self.dataset_path / 'downloads',
                 'train_images': self.dataset_path / 'train' / 'images',
@@ -286,26 +336,36 @@ class DatasetScanner(BaseDownloaderComponent):
                 future_to_target = {
                     executor.submit(self._count_files_recursive, target_path): target_name
                     for target_name, target_path in cleanup_targets.items()
-                    if target_path.exists()
                 }
                 
                 for future in future_to_target:
                     target_name = future_to_target[future]
                     try:
                         file_count, size_bytes = future.result()
+                        target_path = cleanup_targets[target_name]
                         
-                        if file_count > 0:
-                            existing_targets[target_name] = {
-                                'path': str(cleanup_targets[target_name]),
-                                'file_count': file_count,
-                                'size_bytes': size_bytes,
-                                'size_formatted': self._format_file_size(size_bytes)
-                            }
-                            total_files += file_count
-                            total_size += size_bytes
+                        # Always include target, even if empty (for directory preservation)
+                        existing_targets[target_name] = {
+                            'path': str(target_path),
+                            'file_count': file_count,
+                            'size_bytes': size_bytes,
+                            'size_formatted': self._format_file_size(size_bytes),
+                            'exists': target_path.exists()
+                        }
+                        
+                        total_files += file_count
+                        total_size += size_bytes
                             
                     except Exception as e:
                         self.logger.warning(f"⚠️ Error counting {target_name}: {str(e)}")
+                        # Still include with zero counts
+                        existing_targets[target_name] = {
+                            'path': str(cleanup_targets[target_name]),
+                            'file_count': 0,
+                            'size_bytes': 0,
+                            'size_formatted': '0 B',
+                            'exists': False
+                        }
             
             return {
                 'status': 'success',
@@ -321,7 +381,7 @@ class DatasetScanner(BaseDownloaderComponent):
             return self._create_error_result(f"Error getting cleanup targets: {str(e)}")
     
     def _count_files_recursive(self, directory: Path) -> Tuple[int, int]:
-        """Count files recursively dengan size calculation"""
+        """Enhanced count files recursively dengan error handling"""
         if not directory.exists():
             return 0, 0
             
@@ -331,25 +391,35 @@ class DatasetScanner(BaseDownloaderComponent):
         try:
             for file_path in directory.rglob('*'):
                 if file_path.is_file():
-                    file_count += 1
-                    total_size += file_path.stat().st_size
+                    try:
+                        file_count += 1
+                        total_size += file_path.stat().st_size
+                    except Exception:
+                        # File might be inaccessible, continue counting
+                        continue
         except Exception:
             pass
             
         return file_count, total_size
     
     def _analyze_dataset_structure(self) -> Dict[str, Any]:
-        """Analyze dataset structure dengan content awareness"""
+        """Enhanced analyze dataset structure dengan auto-creation awareness"""
         structure = {
-            'has_downloads': (self.dataset_path / 'downloads').exists(),
+            'has_downloads': False,
             'has_splits': False,
             'split_dirs': [],
             'additional_files': [],
             'total_directories': 0,
-            'empty_directories': []
+            'empty_directories': [],
+            'created_directories': []
         }
         
         try:
+            # Check downloads
+            downloads_dir = self.dataset_path / 'downloads'
+            if downloads_dir.exists():
+                structure['has_downloads'] = True
+            
             # Check split directories dengan content validation
             split_candidates = ['train', 'valid', 'test', 'val']
             for split in split_candidates:
@@ -360,7 +430,8 @@ class DatasetScanner(BaseDownloaderComponent):
                     if images_dir.exists():
                         images = [f for f in images_dir.glob('*.*') if f.suffix.lower() in self.img_extensions]
                         if images:  # Only count splits with actual images
-                            structure['split_dirs'].append(split)
+                            normalized_split = 'valid' if split == 'val' else split
+                            structure['split_dirs'].append(normalized_split)
                         else:
                             structure['empty_directories'].append(f"{split}/images")
                     else:
@@ -369,20 +440,22 @@ class DatasetScanner(BaseDownloaderComponent):
             structure['has_splits'] = len(structure['split_dirs']) > 0
             
             # Count total directories
-            structure['total_directories'] = len([d for d in self.dataset_path.rglob('*') if d.is_dir()])
+            if self.dataset_path.exists():
+                structure['total_directories'] = len([d for d in self.dataset_path.rglob('*') if d.is_dir()])
             
             # Check additional files
-            for item in self.dataset_path.iterdir():
-                if item.is_file() and item.name.endswith(('.yaml', '.yml', '.txt', '.md')):
-                    structure['additional_files'].append(item.name)
-                    
+            if self.dataset_path.exists():
+                for item in self.dataset_path.iterdir():
+                    if item.is_file() and item.name.endswith(('.yaml', '.yml', '.txt', '.md')):
+                        structure['additional_files'].append(item.name)
+                        
         except Exception as e:
             self.logger.warning(f"⚠️ Error analyzing structure: {str(e)}")
         
         return structure
     
     def _create_summary(self, downloads_result: Dict, splits_result: Dict) -> Dict[str, Any]:
-        """Create comprehensive summary dengan content metrics"""
+        """Enhanced create summary dengan content metrics"""
         total_images = sum(split.get('images', 0) for split in splits_result.values())
         total_labels = sum(split.get('labels', 0) for split in splits_result.values())
         download_files = downloads_result.get('file_count', 0)
@@ -400,16 +473,20 @@ class DatasetScanner(BaseDownloaderComponent):
             'valid_splits': len(valid_splits),
             'dataset_complete': total_images > 0 and total_labels > 0,
             'average_pairing_quality': avg_pairing,
-            'has_content': total_images > 0 or download_files > 0
+            'has_content': total_images > 0 or download_files > 0,
+            'structure_created': True  # Indicates directories were ensured
         }
     
     def _create_empty_scan_result(self, message: str) -> Dict[str, Any]:
-        """Create empty scan result"""
+        """Enhanced empty scan result dengan structure info"""
         return {
             'status': 'empty',
             'message': message,
             'dataset_path': str(self.dataset_path),
-            'summary': {'total_images': 0, 'total_labels': 0, 'download_files': 0, 'has_content': False}
+            'summary': {
+                'total_images': 0, 'total_labels': 0, 'download_files': 0, 
+                'has_content': False, 'structure_created': True
+            }
         }
     
     def _get_scan_timestamp(self) -> str:
@@ -430,5 +507,5 @@ class DatasetScanner(BaseDownloaderComponent):
 
 
 def create_dataset_scanner(logger=None, max_workers: int = None) -> DatasetScanner:
-    """Factory dengan optimal workers support"""
+    """Factory dengan enhanced directory management support"""
     return DatasetScanner(logger, max_workers)

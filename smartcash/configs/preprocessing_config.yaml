@@ -18,12 +18,6 @@ preprocessing:
   analysis:
     enabled: true  # Override dari base_config (false)
 
-# Parameter referensi ke konfigurasi augmentasi terpisah (parameter baru)
-augmentation_reference:
-  config_file: 'augmentation_config.yaml'
-  use_for_preprocessing: true
-  preprocessing_variations: 3
-
 # Override konfigurasi cleanup dari base_config
 cleanup:
   augmentation_patterns:

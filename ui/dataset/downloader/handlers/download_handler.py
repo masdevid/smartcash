@@ -8,23 +8,22 @@ from smartcash.ui.utils.fallback_utils import show_status_safe
 from smartcash.ui.components.dialogs import confirm
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup download handlers dengan integrasi backend services dan UI progress"""
+    """Setup download handlers dengan simplified progress callback"""
     
-    # Setup safe progress callback
+    # Simplified progress callback
     def create_progress_callback():
         def progress_callback(step: str, current: int, total: int, message: str):
-            progress_tracker = ui_components.get('progress_tracker')
-            if progress_tracker:
-                # Map backend progress ke UI progress tracker
-                if step in ['init', 'metadata', 'backup', 'complete']:
+            try:
+                progress_tracker = ui_components.get('progress_tracker')
+                if progress_tracker and hasattr(progress_tracker, 'update_overall'):
                     progress_tracker.update_overall(current, message)
-                elif step in ['download', 'extract', 'organize']:
-                    progress_tracker.update_current(current, message)
-                else:
-                    progress_tracker.update_step(current, message)
-            
-            # Log to accordion
-            _log_to_accordion(ui_components, message, _get_log_level(step))
+                
+                # Simple logging
+                logger = ui_components.get('logger')
+                if logger:
+                    logger.info(message)
+            except Exception:
+                pass  # Silent fail to prevent blocking
         
         return progress_callback
     
@@ -164,12 +163,19 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
         cleanup_button.on_click(execute_cleanup)
 
 def _check_and_confirm_download(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager):
-    """Check existing dataset dan show confirmation jika perlu"""
+    """Safe check existing dataset dengan enhanced error handling"""
     try:
         from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
         
-        scanner = create_dataset_scanner(ui_components.get('logger'))
+        logger = ui_components.get('logger')
+        if logger:
+            logger.info("🔍 Checking for existing dataset...")
+        
+        scanner = create_dataset_scanner(logger)
         has_existing = scanner.quick_check_existing()
+        
+        if logger:
+            logger.info(f"📊 Existing dataset check: {'Found' if has_existing else 'Not found'}")
         
         if has_existing:
             _show_download_confirmation(ui_config, ui_components, button, button_manager)
@@ -177,7 +183,10 @@ def _check_and_confirm_download(ui_config: Dict[str, Any], ui_components: Dict[s
             _execute_download_with_backend(ui_config, ui_components, button, button_manager)
             
     except Exception as e:
-        _handle_ui_error(ui_components, f"Error checking existing dataset: {str(e)}", button, button_manager)
+        if ui_components.get('logger'):
+            ui_components['logger'].error(f"❌ Error checking existing dataset: {str(e)}")
+        # Proceed with download anyway jika check gagal
+        _execute_download_with_backend(ui_config, ui_components, button, button_manager)
 
 def _show_download_confirmation(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager):
     """Show download confirmation dialog"""
@@ -206,41 +215,63 @@ def _show_download_confirmation(ui_config: Dict[str, Any], ui_components: Dict[s
     )
 
 def _execute_download_with_backend(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button, button_manager):
-    """Execute download menggunakan backend service"""
+    """Execute download dengan enhanced debugging dan safe error handling"""
     try:
         from smartcash.dataset.downloader import get_downloader_instance, create_ui_compatible_config
         
         logger = ui_components.get('logger')
         
-        # Convert config untuk backend
+        # Debug: Config conversion
+        if logger:
+            logger.info("🔧 Converting UI config to backend format...")
+        
         service_config = create_ui_compatible_config(ui_config)
         
-        # Create downloader service
+        # Debug: Service creation
+        if logger:
+            logger.info("🏗️ Creating downloader service...")
+        
         downloader = get_downloader_instance(service_config, logger)
         if not downloader:
-            _handle_ui_error(ui_components, "Gagal membuat download service", button, button_manager)
+            _handle_ui_error(ui_components, "❌ Gagal membuat download service", button, button_manager)
             return
         
-        # Set progress callback
+        if logger:
+            logger.info(f"✅ Downloader service created: {type(downloader).__name__}")
+        
+        # Debug: Progress callback setup
         if hasattr(downloader, 'set_progress_callback'):
+            if logger:
+                logger.info("📊 Setting up progress callback...")
             downloader.set_progress_callback(ui_components['progress_callback'])
+            if logger:
+                logger.info("✅ Progress callback configured")
+        else:
+            if logger:
+                logger.warning("⚠️ Downloader tidak support progress callback")
         
         # Log download config
         _log_download_config(ui_components, ui_config)
         
-        # Execute download
-        _log_to_accordion(ui_components, "🚀 Memulai download dataset...", 'info')
+        # Debug: Starting download
+        if logger:
+            logger.info("🚀 Starting backend download operation...")
+        
         result = downloader.download_dataset()
+        
+        # Debug: Download result
+        if logger:
+            logger.info(f"📋 Download result status: {result.get('status') if result else 'None'}")
         
         # Handle result
         if result and result.get('status') == 'success':
             _show_download_success(ui_components, result, button, button_manager)
         else:
-            error_msg = result.get('message', 'Download gagal') if result else 'No response from service'
+            error_msg = result.get('message', 'Download gagal - no error message') if result else 'No response from backend service'
             _handle_ui_error(ui_components, error_msg, button, button_manager)
             
     except Exception as e:
-        _handle_ui_error(ui_components, f"Error saat download: {str(e)}", button, button_manager)
+        _handle_ui_error(ui_components, f"❌ Exception in download execution: {str(e)}", button, button_manager)
 
 def _show_cleanup_confirmation(ui_components: Dict[str, Any], targets_result: Dict[str, Any], button, button_manager):
     """Show cleanup confirmation dengan detail"""
@@ -415,28 +446,18 @@ def _get_button_manager(ui_components: Dict[str, Any]) -> SimpleButtonManager:
     return ui_components['button_manager']
 
 def _log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Log message to accordion dengan auto-expand untuk errors"""
-    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-        from IPython.display import display, HTML
-        
-        level_colors = {
-            'info': '#007bff', 'success': '#28a745', 
-            'warning': '#ffc107', 'error': '#dc3545'
+    """Log message menggunakan ui_logger yang sudah ada"""
+    logger = ui_components.get('logger')
+    if logger:
+        # Map level ke ui_logger method
+        log_methods = {
+            'info': logger.info,
+            'success': logger.success,
+            'warning': logger.warning,
+            'error': logger.error
         }
-        
-        color = level_colors.get(level, '#007bff')
-        timestamp = __import__('datetime').datetime.now().strftime('%H:%M:%S')
-        
-        html = f"""
-        <div style="margin:2px 0;padding:4px 8px;border-radius:4px;
-                   background-color:rgba(248,249,250,0.8);border-left:3px solid {color};">
-            <span style="color:#6c757d;font-size:11px;">[{timestamp}]</span>
-            <span style="color:{color};margin-left:4px;">{message}</span>
-        </div>
-        """
-        
-        with ui_components['log_output']:
-            display(HTML(html))
+        log_method = log_methods.get(level, logger.info)
+        log_method(message)
     
     # Auto-expand untuk errors/warnings
     if level in ['error', 'warning'] and 'log_accordion' in ui_components:

@@ -217,9 +217,12 @@ class CleanupExecutor:
         return safety_result
     
     def _execute_cleanup_operation(self, analysis_result: Dict[str, Any], safe_mode: bool) -> Dict[str, Any]:
-        """Execute cleanup operation dengan progress tracking."""
-        cleanup_stats = {'files_removed': 0, 'splits_cleaned': 0, 'bytes_freed': 0, 'symlinks_removed': 0}
+        """Execute cleanup operation dengan progress tracking.
+        Hanya menghapus file gambar dan label, mempertahankan symlink augmentasi 'aug_*'"""
+        cleanup_stats = {'files_removed': 0, 'splits_cleaned': 0, 'bytes_freed': 0, 'symlinks_preserved': 0}
         targets = analysis_result['targets']
+        
+        import os
         
         for i, target in enumerate(targets):
             target_path = target['path']
@@ -232,21 +235,31 @@ class CleanupExecutor:
             try:
                 # Calculate size before cleanup
                 target_size = target['stats']['total_size_bytes']
+                files_removed = 0
+                bytes_freed = 0
                 
-                # Safe symlink cleanup jika enabled
-                if safe_mode:
-                    symlink_result = self.safe_symlink_cleanup(target_path)
-                    if symlink_result['success']:
-                        cleanup_stats['symlinks_removed'] += symlink_result['symlink_stats']['removed_symlinks']
-                
-                # Remove directory
                 if target_path.exists():
-                    shutil.rmtree(target_path, ignore_errors=True)
-                    cleanup_stats['files_removed'] += target['stats']['total_files']
-                    cleanup_stats['bytes_freed'] += target_size
+                    # Hapus file di subdirektori images dan labels, pertahankan struktur direktori
+                    for subdir in ['images', 'labels']:
+                        subdir_path = target_path / subdir
+                        if subdir_path.exists():
+                            # Hapus file satu per satu, pertahankan symlink aug_*
+                            for file_path in subdir_path.glob('*.*'):
+                                if file_path.is_file() and not file_path.is_symlink() and not file_path.name.startswith('aug_'):
+                                    # Hanya hapus file reguler (bukan symlink) dan bukan file aug_*
+                                    file_size = file_path.stat().st_size
+                                    os.remove(file_path)
+                                    files_removed += 1
+                                    bytes_freed += file_size
+                                elif file_path.is_symlink() and file_path.name.startswith('aug_'):
+                                    # Hitung symlink yang dipertahankan
+                                    cleanup_stats['symlinks_preserved'] += 1
+                    
+                    cleanup_stats['files_removed'] += files_removed
+                    cleanup_stats['bytes_freed'] += bytes_freed
                     cleanup_stats['splits_cleaned'] += 1
                     
-                    self.logger.info(f"🧹 Cleaned {split_name}: {target['stats']['total_files']} files")
+                    self.logger.info(f"🧹 Cleaned {split_name}: {files_removed} files, {cleanup_stats['symlinks_preserved']} symlinks preserved")
             
             except Exception as e:
                 self.logger.warning(f"⚠️ Error cleaning {split_name}: {str(e)}")

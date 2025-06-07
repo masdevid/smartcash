@@ -4,6 +4,7 @@ Deskripsi: FIXED download service dengan standardized response format dan progre
 """
 
 import time
+import requests
 from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 from smartcash.dataset.downloader.base import (
@@ -208,59 +209,274 @@ class DownloadService(BaseDownloaderComponent):
                 self.logger.warning(f"⚠️ Backup failed: {backup_result['message']}")
     
     def _download_and_extract(self, download_url: str, paths: Dict[str, Path]) -> None:
-        """Download dan extract dengan progress tracking"""
-        # Download (40-70%)
-        self._notify_progress('download', 40, 100, "📥 Starting download...")
-        download_result = self.roboflow_client.download_dataset(download_url, paths['temp_zip'])
+        """Download dan extract dengan progress tracking dan detailed logging per step"""
+        # Log download start dengan detail
+        self.logger.info(f"📥 Memulai download dataset dari URL: {download_url}")
+        self.logger.info(f"📥 Target file: {paths['temp_zip']}")
         
-        if download_result['status'] != 'success':
-            raise Exception(f"Download failed: {download_result['message']}")
+        # Download (40-70%) dengan notifikasi per step
+        self._notify_progress('download_start', 40, 100, "📥 Memulai proses download...")
+        self.logger.info("📥 Menjalankan download via Roboflow client...")
         
-        # Extract (70-80%)
-        self._notify_progress('extract', 70, 100, "📦 Extracting files...")
-        extract_result = self.file_processor.extract_zip(paths['temp_zip'], paths['extract_dir'])
+        # Implementasi download dengan notifikasi per step
+        try:
+            response = requests.get(download_url, stream=True, timeout=30)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
+            last_percent = 0
+            
+            paths['temp_zip'].parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(paths['temp_zip'], 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        
+                        if total_size > 0:
+                            # Hitung progress dalam persen
+                            current_percent = int((downloaded / total_size) * 100)
+                            
+                            # Notifikasi setiap 5% kemajuan
+                            if current_percent >= last_percent + 5 or current_percent == 100:
+                                last_percent = current_percent
+                                progress_overall = 40 + int((current_percent / 100) * 30)  # Map ke 40-70% overall
+                                self._notify_progress(
+                                    'download_progress', 
+                                    progress_overall, 
+                                    100, 
+                                    f"📥 Downloading: {current_percent}% ({downloaded/1048576:.1f}/{total_size/1048576:.1f} MB)"
+                                )
+            
+            download_result = {'status': 'success'}
+            file_size_mb = paths['temp_zip'].stat().st_size / (1024 * 1024)
+            self.logger.success(f"✅ Download berhasil: {file_size_mb:.2f} MB")
+            self._notify_progress('download_complete', 70, 100, f"✅ Download selesai: {file_size_mb:.2f} MB")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Download gagal: {str(e)}")
+            raise Exception(f"Download failed: {str(e)}")
         
-        if extract_result['status'] != 'success':
-            raise Exception(f"Extract failed: {extract_result['message']}")
+        # Extract (70-80%) dengan notifikasi per step
+        self.logger.info(f"📦 Mengekstrak file dari {paths['temp_zip']} ke {paths['extract_dir']}")
+        self._notify_progress('extract_start', 70, 100, "📦 Memulai ekstraksi file...")
+        
+        try:
+            import zipfile
+            import os
+            
+            # Pastikan direktori ekstrak ada
+            paths['extract_dir'].mkdir(parents=True, exist_ok=True)
+            
+            with zipfile.ZipFile(paths['temp_zip'], 'r') as zip_ref:
+                # Dapatkan total file untuk progress tracking
+                file_list = zip_ref.namelist()
+                total_files = len(file_list)
+                extracted_files = 0
+                last_percent = 0
+                
+                # Ekstrak file satu per satu dengan progress tracking
+                for file in file_list:
+                    zip_ref.extract(file, paths['extract_dir'])
+                    extracted_files += 1
+                    
+                    # Hitung progress dalam persen
+                    current_percent = int((extracted_files / total_files) * 100)
+                    
+                    # Notifikasi setiap 10% kemajuan
+                    if current_percent >= last_percent + 10 or current_percent == 100:
+                        last_percent = current_percent
+                        progress_overall = 70 + int((current_percent / 100) * 10)  # Map ke 70-80% overall
+                        self._notify_progress(
+                            'extract_progress', 
+                            progress_overall, 
+                            100, 
+                            f"📦 Extracting: {current_percent}% ({extracted_files}/{total_files} files)"
+                        )
+            
+            extract_result = {'status': 'success', 'file_count': total_files}
+            self.logger.success(f"✅ Ekstraksi berhasil: {total_files} file")
+            self._notify_progress('extract_complete', 80, 100, f"✅ Ekstraksi selesai: {total_files} file")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
+            raise Exception(f"Extract failed: {str(e)}")
     
     def _organize_dataset(self, paths: Dict[str, Path], params: Dict[str, Any]) -> Dict[str, Any]:
-        """Organize dataset dengan progress tracking"""
-        self._notify_progress('organize', 80, 100, "🗂️ Organizing dataset...")
+        """Organize dataset dengan progress tracking dan notifikasi per step"""
+        # Notifikasi awal proses pengorganisasian
+        self._notify_progress('organize_start', 80, 100, "🗂️ Memulai pengorganisasian dataset...")
         
-        if params['rename_files']:
-            result = self.file_processor.organize_dataset_with_renaming(
-                paths['extract_dir'], paths['final_dir']
+        try:
+            # Scan direktori ekstrak untuk mendapatkan informasi file
+            self._notify_progress('organize_scan', 81, 100, "🔍 Scanning files...")
+            
+            # Hitung jumlah file di direktori ekstrak
+            image_files = list(paths['extract_dir'].glob('**/*.jpg')) + list(paths['extract_dir'].glob('**/*.jpeg')) + \
+                         list(paths['extract_dir'].glob('**/*.png'))
+            label_files = list(paths['extract_dir'].glob('**/*.txt'))
+            yaml_files = list(paths['extract_dir'].glob('**/*.yaml'))
+            
+            total_files = len(image_files) + len(label_files) + len(yaml_files)
+            self._notify_progress(
+                'organize_scan_complete', 
+                82, 
+                100, 
+                f"🔍 Scan selesai: {len(image_files)} gambar, {len(label_files)} label, {len(yaml_files)} yaml"
             )
-        else:
-            result = self.file_processor.organize_dataset(
-                paths['extract_dir'], paths['final_dir']
+            
+            # Notifikasi proses pengorganisasian
+            if params['rename_files']:
+                self._notify_progress('organize_rename', 83, 100, "🔄 Mengorganisasi dataset dengan UUID renaming...")
+                self.logger.info(f"🔄 Mengorganisasi {total_files} file dengan UUID renaming...")
+            else:
+                self._notify_progress('organize_copy', 83, 100, "💾 Mengorganisasi dataset dengan simple copy...")
+                self.logger.info(f"💾 Mengorganisasi {total_files} file dengan simple copy...")
+            
+            # Proses pengorganisasian dengan progress tracking
+            processed_files = 0
+            last_percent = 0
+            
+            # Definisikan callback untuk progress tracking
+            def organize_progress_callback(file_path, is_copied):
+                nonlocal processed_files, last_percent
+                processed_files += 1
+                
+                # Hitung progress dalam persen
+                if total_files > 0:
+                    current_percent = int((processed_files / total_files) * 100)
+                    
+                    # Notifikasi setiap 10% kemajuan
+                    if current_percent >= last_percent + 10 or current_percent == 100 or processed_files <= 5:
+                        last_percent = current_percent
+                        progress_overall = 83 + int((current_percent / 100) * 12)  # Map ke 83-95% overall
+                        self._notify_progress(
+                            'organize_progress', 
+                            progress_overall, 
+                            100, 
+                            f"🗂️ Organizing: {current_percent}% ({processed_files}/{total_files} files)"
+                        )
+            
+            # Set callback ke file processor jika memungkinkan
+            if hasattr(self.file_processor, 'set_file_callback'):
+                self.file_processor.set_file_callback(organize_progress_callback)
+            
+            # Jalankan pengorganisasian
+            if params['rename_files']:
+                result = self.file_processor.organize_dataset_with_renaming(
+                    paths['extract_dir'], paths['final_dir']
+                )
+            else:
+                result = self.file_processor.organize_dataset(
+                    paths['extract_dir'], paths['final_dir']
+                )
+            
+            # Reset callback
+            if hasattr(self.file_processor, 'set_file_callback'):
+                self.file_processor.set_file_callback(None)
+            
+            # Validasi hasil
+            if result['status'] != 'success':
+                self._notify_progress('organize_failed', 85, 100, f"❌ Pengorganisasian gagal: {result['message']}")
+                raise Exception(f"Organization failed: {result['message']}")
+            
+            # Notifikasi selesai
+            stats = {
+                'total_images': result.get('total_images', 0),
+                'total_labels': result.get('total_labels', 0),
+                'splits': result.get('splits', {})
+            }
+            
+            # Notifikasi statistik per split
+            splits = stats.get('splits', {})
+            for split_name, split_stats in splits.items():
+                self._notify_progress(
+                    f'organize_split_{split_name}', 
+                    90, 
+                    100, 
+                    f"📁 {split_name}: {split_stats.get('images', 0)} gambar, {split_stats.get('labels', 0)} label"
+                )
+            
+            # Notifikasi UUID renaming jika diaktifkan
+            if params['rename_files']:
+                naming_stats = self.file_processor.get_naming_statistics()
+                stats['naming_stats'] = naming_stats
+                renamed_files = naming_stats.get('total_files', 0)
+                self.logger.info(f"🔄 UUID renaming: {renamed_files} files")
+                self._notify_progress(
+                    'organize_rename_complete', 
+                    92, 
+                    100, 
+                    f"🔄 UUID renaming selesai: {renamed_files} files"
+                )
+            
+            # Notifikasi pengorganisasian selesai
+            self._notify_progress(
+                'organize_complete', 
+                95, 
+                100, 
+                f"✅ Pengorganisasian selesai: {stats['total_images']} gambar, {stats['total_labels']} label"
             )
-        
-        if result['status'] != 'success':
-            raise Exception(f"Organization failed: {result['message']}")
-        
-        stats = {
-            'total_images': result.get('total_images', 0),
-            'total_labels': result.get('total_labels', 0),
-            'splits': result.get('splits', {})
-        }
-        
-        if params['rename_files']:
-            naming_stats = self.file_processor.get_naming_statistics()
-            stats['naming_stats'] = naming_stats
-            self.logger.info(f"🔄 UUID renaming: {naming_stats.get('total_files', 0)} files")
-        
-        return stats
+            
+            return stats
+            
+        except Exception as e:
+            self.logger.error(f"❌ Pengorganisasian gagal: {str(e)}")
+            self._notify_progress('organize_error', 85, 100, f"❌ Pengorganisasian gagal: {str(e)}")
+            raise Exception(f"Organization failed: {str(e)}")
     
     def _validate_results(self, final_dir: Path) -> None:
-        """Validate results dengan progress tracking"""
-        self._notify_progress('validate', 95, 100, "✅ Validating results...")
+        """Validate results dengan progress tracking dan notifikasi per step"""
+        self._notify_progress('validate_start', 95, 100, "✅ Memulai validasi hasil...")
+        self.logger.info(f"✅ Memvalidasi hasil di {final_dir}")
         
-        validation_result = self.validator.validate_extracted_dataset(final_dir)
-        
-        if not validation_result['valid'] and validation_result.get('issues'):
-            issues = validation_result['issues'][:3]  # Limit issues shown
-            self.logger.warning(f"⚠️ Validation issues: {', '.join(issues)}")
+        try:
+            # Notifikasi awal validasi
+            self._notify_progress('validate_structure', 96, 100, "🔍 Memeriksa struktur dataset...")
+            
+            # Validasi struktur dataset
+            validation_result = self.validator.validate_extracted_dataset(final_dir)
+            
+            # Notifikasi hasil validasi
+            if validation_result['valid']:
+                self._notify_progress(
+                    'validate_success', 
+                    98, 
+                    100, 
+                    f"✅ Validasi berhasil: {validation_result.get('splits', [])} splits"
+                )
+                self.logger.success(f"✅ Dataset valid dengan {len(validation_result.get('splits', []))} splits")
+            else:
+                issues = validation_result.get('issues', [])
+                self._notify_progress(
+                    'validate_issues', 
+                    97, 
+                    100, 
+                    f"⚠️ Validasi menemukan {len(issues)} masalah"
+                )
+                
+                # Notifikasi per masalah (maksimal 3)
+                for i, issue in enumerate(issues[:3]):
+                    self._notify_progress(
+                        f'validate_issue_{i+1}', 
+                        97, 
+                        100, 
+                        f"⚠️ Issue {i+1}: {issue}"
+                    )
+            
+            # Notifikasi validasi selesai
+            self._notify_progress('validate_complete', 99, 100, "✅ Validasi selesai")
+            
+            if not validation_result['valid'] and validation_result.get('issues'):
+                issues = validation_result['issues'][:3]  # Limit issues shown
+                self.logger.warning(f"⚠️ Validation issues: {', '.join(issues)}")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Validasi gagal: {str(e)}")
+            self._notify_progress('validate_error', 97, 100, f"❌ Validasi gagal: {str(e)}")
+            # Tidak raise exception karena validasi bukan langkah kritis
     
     def _has_existing_dataset(self, dataset_dir: Path) -> bool:
         """Check existing dataset"""

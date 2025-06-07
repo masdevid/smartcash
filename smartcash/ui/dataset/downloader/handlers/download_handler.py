@@ -24,7 +24,9 @@ class DownloadHandler:
         handlers = [
             ('download_button', self._handle_download_click),
             ('check_button', self._handle_check_click),
-            ('cleanup_button', self._handle_cleanup_click)
+            ('cleanup_button', self._handle_cleanup_click),
+            ('save_button', self._handle_save_click),
+            ('reset_button', self._handle_reset_click)
         ]
         
         for button_name, handler in handlers:
@@ -121,7 +123,7 @@ class DownloadHandler:
             self._handle_error(f"Error download handler: {str(e)}", button)
     
     def _execute_download(self, service_config: Dict[str, Any], button) -> None:
-        """FIXED execute download dengan proper parameter validation"""
+        """FIXED execute download dengan proper parameter validation dan detailed logging"""
         try:
             # Validate required fields
             required = ['workspace', 'project', 'version', 'api_key']
@@ -131,33 +133,55 @@ class DownloadHandler:
                 self._handle_error(f"Field wajib kosong: {', '.join(missing)}", button)
                 return
             
+            # Log detail konfigurasi
+            self.logger.info(f"🔍 Workspace: {service_config.get('workspace')}")
+            self.logger.info(f"🔍 Project: {service_config.get('project')}")
+            self.logger.info(f"🔍 Version: {service_config.get('version')}")
+            self.logger.info(f"🔍 Output format: {service_config.get('output_format')}")
+            
             if self.progress_tracker:
                 self.progress_tracker.update_overall(40, "🏭 Creating download service...")
             
             # Log service config untuk debugging
-            self.logger.info(f"🔧 Service config: rename_files={service_config.get('rename_files')}, type={type(service_config.get('rename_files'))}")
+            self.logger.info(f"🔧 Service config: rename_files={service_config.get('rename_files')}, organize_dataset={service_config.get('organize_dataset')}, validate_download={service_config.get('validate_download')}")
             
             # Create service dengan config yang sudah validated
+            self.logger.info("🔧 Membuat download service...")
             downloader = get_downloader_instance(service_config, self.logger)
             if not downloader:
                 self._handle_error("Gagal membuat download service", button)
                 return
             
+            self.logger.info("✅ Download service berhasil dibuat")
+            
             # Setup progress callback
             if hasattr(downloader, 'set_progress_callback'):
+                self.logger.info("🔄 Mengatur progress callback...")
                 downloader.set_progress_callback(self._create_progress_callback())
+                self.logger.info("✅ Progress callback berhasil diatur")
             
             if self.progress_tracker:
                 self.progress_tracker.update_overall(50, "📥 Starting download...")
             
             # Execute download
+            self.logger.info("🚀 Memulai proses download dataset...")
             result = downloader.download_dataset()
+            self.logger.info("✅ Proses download selesai")
             
             # Handle response
             if result and result.get('status') == 'success':
                 stats = result.get('stats', {})
                 total_images = stats.get('total_images', 0)
                 success_msg = f"Dataset berhasil didownload: {total_images:,} gambar"
+                
+                # Log detail hasil download
+                self.logger.info(f"📊 Total gambar: {total_images:,}")
+                self.logger.info(f"📊 Total label: {stats.get('total_labels', 0):,}")
+                
+                # Log detail per split
+                splits = stats.get('splits', {})
+                for split_name, split_stats in splits.items():
+                    self.logger.info(f"📊 {split_name}: {split_stats.get('images', 0)} gambar, {split_stats.get('labels', 0)} label")
                 
                 if self.progress_tracker:
                     self.progress_tracker.complete(success_msg)
@@ -171,11 +195,19 @@ class DownloadHandler:
                     if naming_stats:
                         self.logger.info(f"🔄 UUID renaming: {naming_stats.get('total_files', 0)} files processed")
                 
+                # Log output directory
+                output_dir = result.get('output_dir', '')
+                if output_dir:
+                    self.logger.info(f"📂 Output directory: {output_dir}")
+                
             else:
                 error_msg = f"Download gagal: {result.get('message', 'Unknown error') if result else 'No response from service'}"
                 self._handle_error(error_msg, button)
                 
         except Exception as e:
+            import traceback
+            self.logger.error(f"❌ Error saat download: {str(e)}")
+            self.logger.error(f"❌ Traceback: {traceback.format_exc()}")
             self._handle_error(f"Error saat download: {str(e)}", button)
         finally:
             self._restore_button_state()
@@ -435,15 +467,15 @@ Lanjutkan download?"""
         return "\n".join(message_parts)
     
     def _execute_cleanup(self, cleanup_info: Dict[str, Any]) -> None:
-        """Execute cleanup dengan progress"""
+        """Execute cleanup dengan progress - hanya menghapus file gambar dan label, pertahankan direktori"""
         try:
             if self.progress_tracker:
                 self.progress_tracker.show("Cleanup Dataset")
                 self.progress_tracker.update_overall(20, "🧹 Starting cleanup...")
             
-            self.logger.info("🧹 Memulai cleanup...")
+            self.logger.info("🧹 Memulai cleanup file gambar dan label...")
             
-            import shutil
+            import os
             cleaned_dirs = 0
             cleaned_files = 0
             total_dirs = len([d for d in cleanup_info['directories'].values() if d['file_count'] > 0])
@@ -456,10 +488,33 @@ Lanjutkan download?"""
                 
                 try:
                     if dir_path.exists():
-                        shutil.rmtree(dir_path)
+                        # Buat daftar subdirektori yang perlu dipertahankan
+                        if dir_name in ['train', 'valid', 'test']:
+                            # Hapus hanya file di subdirektori images dan labels
+                            for subdir in ['images', 'labels']:
+                                subdir_path = dir_path / subdir
+                                if subdir_path.exists():
+                                    file_count = 0
+                                    # Hapus file satu per satu, pertahankan direktori
+                                    for file_path in subdir_path.glob('*.*'):
+                                        if file_path.is_file():
+                                            os.remove(file_path)
+                                            file_count += 1
+                                    
+                                    cleaned_files += file_count
+                                    self.logger.info(f"🗑️ Cleaned {dir_name}/{subdir}: {file_count} files")
+                        else:
+                            # Untuk direktori lain seperti 'downloads', hapus semua file
+                            file_count = 0
+                            for file_path in dir_path.glob('**/*.*'):
+                                if file_path.is_file():
+                                    os.remove(file_path)
+                                    file_count += 1
+                            
+                            cleaned_files += file_count
+                            self.logger.info(f"🗑️ Cleaned {dir_name}: {file_count} files")
+                        
                         cleaned_dirs += 1
-                        cleaned_files += dir_info['file_count']
-                        self.logger.info(f"🗑️ Cleaned {dir_name}: {dir_info['file_count']} files")
                         
                         if self.progress_tracker:
                             progress = 20 + int((i + 1) / total_dirs * 70)
@@ -491,14 +546,67 @@ Lanjutkan download?"""
         finally:
             self._restore_button_state()
     
-    def _handle_error(self, message: str, button) -> None:
-        """Handle error dengan unified feedback"""
-        if self.progress_tracker:
-            self.progress_tracker.error(message)
+    def _handle_error(self, error_msg: str, button) -> None:
+        """Handle error dengan proper UI update dan button restore"""
+        self.logger.error(f"❌ {error_msg}")
         
-        show_status_safe(f"❌ {message}", "error", self.ui_components)
-        self.logger.error(f"❌ {message}")
+        if self.progress_tracker:
+            self.progress_tracker.error(error_msg)
+        
+        show_status_safe(error_msg, "error", self.ui_components)
         self._restore_button_state()
+        
+    def _handle_save_click(self, button) -> None:
+        """Handle save button click dengan proper logging"""
+        try:
+            self._prepare_button_state(button)
+            
+            # Get config handler
+            config_handler = self.ui_components.get('config_handler')
+            if not config_handler:
+                self._handle_error("Config handler tidak tersedia", button)
+                return
+            
+            # Save config
+            success = config_handler.save_config(self.ui_components)
+            
+            if success:
+                success_msg = "✅ Konfigurasi berhasil disimpan"
+                self.logger.success(success_msg)
+                show_status_safe(success_msg, "success", self.ui_components)
+            else:
+                self._handle_error("Gagal menyimpan konfigurasi", button)
+                
+        except Exception as e:
+            self._handle_error(f"Error saat menyimpan: {str(e)}", button)
+        finally:
+            self._restore_button_state()
+    
+    def _handle_reset_click(self, button) -> None:
+        """Handle reset button click dengan proper logging"""
+        try:
+            self._prepare_button_state(button)
+            
+            # Get config handler
+            config_handler = self.ui_components.get('config_handler')
+            if not config_handler:
+                self._handle_error("Config handler tidak tersedia", button)
+                return
+            
+            # Reset config
+            success = config_handler.reset_config(self.ui_components)
+            
+            if success:
+                success_msg = "🔄 Konfigurasi berhasil direset ke default"
+                self.logger.success(success_msg)
+                show_status_safe(success_msg, "success", self.ui_components)
+            else:
+                self._handle_error("Gagal mereset konfigurasi", button)
+                
+        except Exception as e:
+            self._handle_error(f"Error saat reset: {str(e)}", button)
+        finally:
+            self._restore_button_state()
 
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:

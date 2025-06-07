@@ -125,7 +125,10 @@ def _apply_basic_defaults(ui_components: Dict[str, Any]) -> None:
     
     for key, value in basic_defaults.items():
         if key in ui_components and hasattr(ui_components[key], 'value'):
-            ui_components[key].value = value
+            try:
+                ui_components[key].value = value
+            except Exception:
+                pass  # Silent fail untuk widget issues
 
 
 def update_api_key_status(ui_components: Dict[str, Any], api_key_info: Dict[str, Any]) -> None:

@@ -42,6 +42,22 @@ class ProgressTracker:
         """Expose step info widget untuk backward compatibility"""
         return self.ui_manager.step_info_widget
     
+    @property
+    def progress_bars(self):
+        """Expose tqdm_bars untuk backward compatibility dengan kode lama"""
+        # Mapping untuk kompatibilitas dengan kode lama yang mengakses progress_bars
+        # Kode lama mengharapkan {'main': progress_bar} untuk single level tracker
+        if not hasattr(self.tqdm_manager, 'tqdm_bars'):
+            return {'main': None}
+            
+        # Jika level adalah SINGLE, gunakan bar pertama sebagai 'main'
+        if self.config.level == ProgressLevel.SINGLE and self.tqdm_manager.tqdm_bars:
+            first_key = next(iter(self.tqdm_manager.tqdm_bars))
+            return {'main': self.tqdm_manager.tqdm_bars.get(first_key)}
+        
+        # Untuk level lain, kembalikan mapping yang sama
+        return self.tqdm_manager.tqdm_bars
+    
     def _register_default_callbacks(self):
         """Register default callbacks untuk common operations"""
         if self.config.level == ProgressLevel.TRIPLE and self.config.auto_advance:

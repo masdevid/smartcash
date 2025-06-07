@@ -1,26 +1,26 @@
 """
 File: smartcash/ui/utils/logging_utils.py
-Deskripsi: Fixed logging utilities tanpa tqdm dependencies untuk avoid weak reference error
+Deskripsi: Fixed logging utilities tanpa tqdm suppression untuk avoid AttributeError
 """
 
 import logging
 import sys
 import warnings
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from IPython.display import display, HTML
 
 def setup_aggressive_log_suppression() -> None:
-    """Setup aggressive log suppression untuk prevent pollution dari backend services"""
+    """Setup aggressive log suppression untuk prevent pollution dari backend services tanpa tqdm manipulation"""
     # Clear dan disable root logger
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(logging.CRITICAL)
     root.propagate = False
     
-    # Suppression targets termasuk tqdm
+    # Suppression targets TANPA tqdm untuk avoid AttributeError
     suppression_targets = [
         'requests', 'urllib3', 'tensorflow', 'torch', 'sklearn', 'ipywidgets',
-        'google', 'yaml', 'tqdm', 'matplotlib', 'pandas', 'numpy', 'PIL',
+        'google', 'yaml', 'matplotlib', 'pandas', 'numpy', 'PIL',
         'smartcash.dataset', 'smartcash.model', 'smartcash.training',
         'smartcash.common', 'smartcash.ui.dataset', 'smartcash.detection',
         'IPython', 'traitlets', 'tornado', 'seaborn', 'cv2', 'pathlib',
@@ -28,29 +28,18 @@ def setup_aggressive_log_suppression() -> None:
         'h5py', 'scipy', 'plotly', 'bokeh', 'altair', 'streamlit'
     ]
     
-    # Suppress semua targets
-    [setattr(logging.getLogger(t), 'level', logging.CRITICAL) or 
-     setattr(logging.getLogger(t), 'propagate', False) or
-     logging.getLogger(t).handlers.clear() for t in suppression_targets]
+    # Suppress semua targets dengan safe error handling
+    for target in suppression_targets:
+        try:
+            logger = logging.getLogger(target)
+            logger.setLevel(logging.CRITICAL)
+            logger.propagate = False
+            logger.handlers.clear()
+        except Exception:
+            pass  # Silent fail untuk compatibility
     
-    # Suppress warnings
+    # Suppress warnings secara global
     warnings.filterwarnings('ignore')
-    
-    # Suppress tqdm specifically
-    _suppress_tqdm_completely()
-
-def _suppress_tqdm_completely() -> None:
-    """Suppress tqdm completely untuk avoid weak reference issues"""
-    try:
-        import tqdm
-        # Disable tqdm globally
-        tqdm.tqdm.__init__ = lambda self, *args, **kwargs: None
-        tqdm.tqdm.update = lambda self, n=1: None
-        tqdm.tqdm.close = lambda self: None
-        tqdm.tqdm.__enter__ = lambda self: self
-        tqdm.tqdm.__exit__ = lambda self, *args: None
-    except ImportError:
-        pass
 
 def setup_stdout_suppression() -> None:
     """Setup stdout/stderr suppression dengan anonymous class pattern"""
@@ -87,7 +76,7 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
                          log_dir: str = "logs",
                          log_level: int = logging.INFO,
                          redirect_all_logs: bool = False) -> Any:
-    """Setup logger untuk IPython dengan integrasi UI yang disederhanakan"""
+    """Setup logger untuk IPython dengan integrasi UI yang disederhanakan tanpa tqdm manipulation"""
     try:
         setup_aggressive_log_suppression()
         if redirect_all_logs:
@@ -119,7 +108,7 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
         return logging.getLogger(module_name or 'ipython')
 
 def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
-    """Register cleanup function ke IPython events"""
+    """Register cleanup function ke IPython events tanpa tqdm manipulation"""
     try:
         from IPython import get_ipython
         ipython = get_ipython()
@@ -134,7 +123,7 @@ def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
                 observer_group = ui_components.get('observer_group')
                 observer_manager.unregister_group(observer_group)
             
-            # Clean resources
+            # Clean resources safely
             resources = ui_components.get('resources', [])
             for resource, cleanup_func in resources:
                 try:
@@ -147,18 +136,24 @@ def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
             
             ui_components['resources'] = []
             
-            # Hide UI elements
+            # Hide UI elements safely
             for key in ['progress_bar', 'progress_message', 'progress_container']:
                 widget = ui_components.get(key)
                 if widget and hasattr(widget, 'layout'):
-                    widget.layout.visibility = 'hidden'
+                    try:
+                        widget.layout.visibility = 'hidden'
+                    except Exception:
+                        pass
         
-        # Unregister existing handlers
-        if hasattr(ipython.events, '_events') and 'pre_run_cell' in ipython.events._events:
-            existing_handlers = list(ipython.events._events['pre_run_cell'])
-            for handler in existing_handlers:
-                if hasattr(handler, '__qualname__') and 'cleanup' in handler.__qualname__:
-                    ipython.events.unregister('pre_run_cell', handler)
+        # Unregister existing handlers safely
+        try:
+            if hasattr(ipython.events, '_events') and 'pre_run_cell' in ipython.events._events:
+                existing_handlers = list(ipython.events._events['pre_run_cell'])
+                for handler in existing_handlers:
+                    if hasattr(handler, '__qualname__') and 'cleanup' in handler.__qualname__:
+                        ipython.events.unregister('pre_run_cell', handler)
+        except Exception:
+            pass
         
         ui_components['cleanup'] = cleanup_func
         ipython.events.register('pre_run_cell', cleanup_func)
@@ -166,19 +161,33 @@ def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
     except (ImportError, AttributeError):
         pass
 
-# One-liner utilities
+def allow_tqdm_display() -> None:
+    """Allow tqdm untuk display normal progress bars tanpa manipulation yang bermasalah"""
+    try:
+        import tqdm
+        # Restore tqdm ke behavior normal jika sebelumnya di-suppress
+        if hasattr(tqdm.tqdm, '_original_init'):
+            tqdm.tqdm.__init__ = tqdm.tqdm._original_init
+        if hasattr(tqdm.tqdm, '_original_update'):
+            tqdm.tqdm.update = tqdm.tqdm._original_update
+        if hasattr(tqdm.tqdm, '_original_close'):
+            tqdm.tqdm.close = tqdm.tqdm._original_close
+    except ImportError:
+        pass
+
+# One-liner utilities dengan safe tqdm handling
 redirect_all_logs_to_ui = lambda ui_components: setup_stdout_suppression() if ui_components else None
 restore_console_logs = lambda ui_components: restore_stdout() if ui_components else None
 suppress_backend_logs = lambda: setup_aggressive_log_suppression()
 suppress_all_outputs = lambda: (setup_aggressive_log_suppression(), setup_stdout_suppression())
 
 def get_clean_logger(module_name: str = "clean_ui") -> logging.Logger:
-    """Get logger dengan suppression sudah applied"""
+    """Get logger dengan suppression sudah applied tanpa tqdm issues"""
     setup_aggressive_log_suppression()
     return logging.getLogger(module_name)
 
 def create_silent_context():
-    """Context manager untuk operasi silent tanpa logs"""
+    """Context manager untuk operasi silent tanpa logs dan tanpa tqdm manipulation"""
     class SilentContext:
         def __enter__(self):
             setup_aggressive_log_suppression()
@@ -190,10 +199,27 @@ def create_silent_context():
     
     return SilentContext()
 
-# Specific suppression functions
-suppress_ml_logs = lambda: [logging.getLogger(lib).setLevel(logging.CRITICAL) 
-                           for lib in ['tensorflow', 'torch', 'sklearn', 'cv2']]
-suppress_viz_logs = lambda: [logging.getLogger(lib).setLevel(logging.CRITICAL) 
-                            for lib in ['matplotlib', 'seaborn', 'plotly', 'bokeh']]
-suppress_data_logs = lambda: [logging.getLogger(lib).setLevel(logging.CRITICAL) 
-                             for lib in ['pandas', 'numpy', 'scipy', 'h5py']]
+# Specific suppression functions dengan safe error handling
+def suppress_ml_logs() -> None:
+    """Suppress ML library logs dengan safe handling"""
+    for lib in ['tensorflow', 'torch', 'sklearn', 'cv2']:
+        try:
+            logging.getLogger(lib).setLevel(logging.CRITICAL)
+        except Exception:
+            pass
+
+def suppress_viz_logs() -> None:
+    """Suppress visualization library logs dengan safe handling"""
+    for lib in ['matplotlib', 'seaborn', 'plotly', 'bokeh']:
+        try:
+            logging.getLogger(lib).setLevel(logging.CRITICAL)
+        except Exception:
+            pass
+
+def suppress_data_logs() -> None:
+    """Suppress data processing library logs dengan safe handling"""
+    for lib in ['pandas', 'numpy', 'scipy', 'h5py']:
+        try:
+            logging.getLogger(lib).setLevel(logging.CRITICAL)
+        except Exception:
+            pass

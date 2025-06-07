@@ -341,11 +341,14 @@ class ProgressTracker:
         display_message = self._clean_message(message or config.description)
         
         label_html = f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-            <span style="font-size: 14px; font-weight: 500; color: #333;">
-                {config.emoji} {self._truncate_message(display_message, 45)}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;
+                    width: 100%; box-sizing: border-box; overflow: hidden;">
+            <span style="font-size: 14px; font-weight: 500; color: #333; flex: 1; 
+                         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {config.emoji} {self._truncate_message(display_message, 35)}
             </span>
-            <span style="font-size: 12px; color: #666; font-weight: bold;">{value}%</span>
+            <span style="font-size: 12px; color: #666; font-weight: bold; margin-left: 8px; 
+                         flex-shrink: 0;">{value}%</span>
         </div>
         """
         

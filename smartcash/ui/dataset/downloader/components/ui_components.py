@@ -1,241 +1,291 @@
 """
 File: smartcash/ui/dataset/downloader/components/ui_components.py
-Deskripsi: Fixed UI components dengan API progress_tracker yang benar dan optimasi progress tracker
+Deskripsi: FIXED UI components menggunakan shared components dan fixed overflow issues
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+from smartcash.ui.components.log_accordion import create_log_accordion
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from smartcash.ui.components.header import create_header
+from smartcash.ui.utils.layout_utils import create_responsive_container, create_responsive_two_column
 from smartcash.ui.utils.ui_logger_namespace import get_namespace_color
 from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Create main downloader UI dengan API progress tracker yang benar"""
+    """Create main downloader UI menggunakan shared components"""
     config = config or {}
-    roboflow = config.get('roboflow', {})
+    roboflow = config.get('data', {}).get('roboflow', {})
+    download = config.get('download', {})
     detected_api_key = get_api_key_from_secrets()
     
-    ui_components = _create_streamlined_downloader_ui(config, roboflow, detected_api_key)
+    ui_components = _create_downloader_ui_with_shared_components(config, roboflow, download, detected_api_key)
     ui_components['layout_optimized'] = True
     return ui_components
 
-def _create_streamlined_downloader_ui(config: Dict[str, Any], roboflow: Dict[str, Any], api_key: str) -> Dict[str, Any]:
-    """Create streamlined downloader UI dengan API progress tracker yang benar"""
+def _create_downloader_ui_with_shared_components(config: Dict[str, Any], roboflow: Dict[str, Any], 
+                                               download: Dict[str, Any], api_key: str) -> Dict[str, Any]:
+    """Create downloader UI menggunakan shared components dari ui/components"""
     
-    # 1. Header dengan gradient design
-    header = widgets.HTML(f"""
-    <div style="background: linear-gradient(135deg, {get_namespace_color('DOWNLOAD')}, {get_namespace_color('DOWNLOAD')}CC); 
-                padding: 20px; color: white; border-radius: 8px; margin-bottom: 15px; 
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
-        <h3 style="margin: 0; color: white; font-weight: 600;">📥 Dataset Downloader</h3>
-        <p style="margin: 8px 0 0; opacity: 0.95; font-size: 14px;">Download dataset Roboflow untuk SmartCash training (format YOLOv5)</p>
-    </div>""", layout=widgets.Layout(width='100%', margin='0'))
+    # 1. Header menggunakan shared component
+    header = create_header(
+        title="Dataset Downloader",
+        description="Download dataset Roboflow untuk SmartCash training (format YOLOv5)",
+        icon="📥"
+    )
     
-    # 2. Status panel dinamis
-    status_panel = widgets.HTML(_get_dynamic_status_html(), layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
+    # 2. Status panel dengan environment detection
+    status_panel = widgets.HTML(_get_dynamic_status_html(), 
+                               layout=widgets.Layout(width='100%', margin='0 0 15px 0'))
     
-    # 3. Streamlined form fields tanpa path config
-    form_fields = _create_streamlined_form_fields(roboflow, api_key, config)
+    # 3. Form fields dengan proper layout
+    form_fields = _create_form_fields(roboflow, api_key, download)
     
-    # 4. 2-column form container (dataset config + options)
-    form_container = _create_two_column_form_container(form_fields)
+    # 4. Two-column form menggunakan shared layout
+    form_container = _create_form_container_with_shared_layout(form_fields)
     
-    # 5. Save/Reset buttons
-    save_reset_components = _create_save_reset_buttons()
+    # 5. Save/Reset buttons menggunakan shared component
+    save_reset_components = create_save_reset_buttons(
+        save_label="Simpan",
+        reset_label="Reset",
+        button_width="100px",
+        with_sync_info=True,
+        sync_message="Konfigurasi tersimpan ke dataset_config.yaml"
+    )
     
-    # 6. Confirmation area
-    confirmation_area = widgets.Output(layout=widgets.Layout(width='100%', max_height='400px', overflow='auto', display='none', margin='10px 0'))
+    # 6. Action buttons dengan proper state management
+    action_components = _create_action_buttons_fixed()
     
-    # 7. Action buttons dengan state management
-    action_components = _create_action_buttons()
-    
-    # 8. Progress tracker dengan dual level - API yang benar
+    # 7. Progress tracker menggunakan shared component
     progress_tracker = create_dual_progress_tracker(operation="Dataset Download")
     progress_container = progress_tracker.container
     progress_container.layout.display = 'none'
     
-    # 9. Log accordion terbuka by default
-    log_components = _create_log_accordion()
+    # 8. Log accordion menggunakan shared component dengan FIXED overflow
+    log_components = create_log_accordion(
+        module_name='downloader',
+        height='250px',
+        width='100%'
+    )
     
-    # 10. Action header
-    action_header = widgets.HTML("""
-    <h4 style='color: #333; margin: 15px 0 10px 0; font-size: 16px; 
-               border-bottom: 2px solid #28a745; padding-bottom: 6px;'>
-        ▶️ Actions
-    </h4>""")
-    
-    # 11. Main container streamlined
-    main_ui = widgets.VBox([
+    # 9. Main container menggunakan responsive layout
+    main_ui = create_responsive_container([
         header,
         status_panel,
         form_container,
         save_reset_components['container'],
-        action_header,
-        confirmation_area,
+        _create_action_header(),
         action_components['container'],
         progress_container,
-        log_components['accordion']
-    ], layout=widgets.Layout(
-        width='100%', max_width='100%', padding='0', margin='0',
-        display='flex', flex_flow='column nowrap', align_items='stretch',
-        overflow='hidden', box_sizing='border-box'
-    ))
+        log_components['log_accordion']
+    ], container_type='vbox')
     
     return {
         # Main UI
-        'ui': main_ui, 'main_container': main_ui, 'header': header, 'status_panel': status_panel,
-        'form_container': form_container, 'confirmation_area': confirmation_area,
+        'ui': main_ui, 'main_container': main_ui, 'header': header, 
+        'status_panel': status_panel, 'form_container': form_container,
         
-        # Form fields tanpa path fields
+        # Form fields
         **form_fields,
         
-        # Buttons
+        # Buttons menggunakan shared components
         **save_reset_components, **action_components,
         
-        # Progress tracker dengan API yang benar
+        # Progress tracker
         'progress_tracker': progress_tracker, 'progress_container': progress_container,
         
-        # Log components
+        # Log components dengan fixed overflow
         **log_components
     }
 
-def _create_streamlined_form_fields(roboflow: Dict[str, Any], api_key: str, config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
-    """Create streamlined form fields tanpa backup/preprocessing directories"""
+def _create_form_fields(roboflow: Dict[str, Any], api_key: str, download: Dict[str, Any]) -> Dict[str, widgets.Widget]:
+    """Create form fields dengan consistent layout"""
     common_layout = widgets.Layout(width='100%', margin='2px 0')
     common_style = {'description_width': '100px'}
     
     return {
-        # Dataset configuration only
+        # Dataset configuration
         'workspace_input': widgets.Text(
             value=roboflow.get('workspace', 'smartcash-wo2us'), 
-            description='Workspace:', placeholder='Nama workspace Roboflow', 
-            layout=common_layout, style=common_style
+            description='Workspace:', 
+            placeholder='Nama workspace Roboflow', 
+            layout=common_layout, 
+            style=common_style
         ),
         'project_input': widgets.Text(
             value=roboflow.get('project', 'rupiah-emisi-2022'), 
-            description='Project:', placeholder='Nama project Roboflow', 
-            layout=common_layout, style=common_style
+            description='Project:', 
+            placeholder='Nama project Roboflow', 
+            layout=common_layout, 
+            style=common_style
         ),
         'version_input': widgets.Text(
             value=str(roboflow.get('version', '3')), 
-            description='Version:', placeholder='Versi dataset', 
-            layout=common_layout, style=common_style
+            description='Version:', 
+            placeholder='Versi dataset', 
+            layout=common_layout, 
+            style=common_style
         ),
         'api_key_input': widgets.Password(
             value=api_key or roboflow.get('api_key', ''), 
             description='API Key:', 
             placeholder='🔑 Auto-detect dari Colab secrets' if api_key else 'Masukkan API Key Roboflow', 
-            layout=common_layout, style=common_style
+            layout=common_layout, 
+            style=common_style
         ),
         
-        # Options only (no path configuration)
+        # Options
         'validate_checkbox': widgets.Checkbox(
-            value=config.get('validate_download', True), 
+            value=download.get('validate_download', True), 
             description='Validasi download', 
             layout=widgets.Layout(width='100%', margin='2px 0')
         ),
         'backup_checkbox': widgets.Checkbox(
-            value=config.get('backup_existing', False), 
+            value=download.get('backup_existing', False), 
             description='Backup existing data', 
             layout=widgets.Layout(width='100%', margin='2px 0')
         )
     }
 
-def _create_two_column_form_container(form_fields: Dict[str, widgets.Widget]) -> widgets.VBox:
-    """Create 2-column form container tanpa path configuration"""
+def _create_form_container_with_shared_layout(form_fields: Dict[str, widgets.Widget]) -> widgets.Widget:
+    """Create form container menggunakan shared layout utilities"""
     
-    # Format info hardcoded
+    # Format info
     format_info = widgets.HTML("""
-    <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin-bottom: 8px; width: 100%; box-sizing: border-box;">
+    <div style="padding: 8px; background: #e3f2fd; border-radius: 4px; margin-bottom: 8px; 
+                width: 100%; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word;">
         <small style="color: #1976d2;"><strong>📦 Format:</strong> YOLOv5 PyTorch (hardcoded)</small>
     </div>""", layout=widgets.Layout(width='100%', margin='0'))
     
     # Left column - dataset config
-    left_column = widgets.VBox([
-        form_fields['workspace_input'], form_fields['project_input'], 
-        form_fields['version_input'], form_fields['api_key_input']
-    ], layout=widgets.Layout(width='48%', padding='8px', box_sizing='border-box', flex='1 1 48%'))
+    left_content = create_responsive_container([
+        form_fields['workspace_input'], 
+        form_fields['project_input'], 
+        form_fields['version_input'], 
+        form_fields['api_key_input']
+    ], container_type='vbox')
     
     # Right column - options
-    right_column = widgets.VBox([
-        format_info, form_fields['validate_checkbox'], form_fields['backup_checkbox'],
-        widgets.HTML("""<div style="height: 60px;"></div>""")  # Spacer
-    ], layout=widgets.Layout(width='48%', padding='8px', box_sizing='border-box', flex='1 1 48%'))
+    right_content = create_responsive_container([
+        format_info, 
+        form_fields['validate_checkbox'], 
+        form_fields['backup_checkbox']
+    ], container_type='vbox')
     
-    # Form row responsive
-    form_row = widgets.HBox([left_column, right_column], layout=widgets.Layout(
-        width='100%', display='flex', flex_flow='row wrap', justify_content='space-between',
-        align_items='flex-start', border='1px solid #ddd', border_radius='5px',
-        padding='15px', margin='0 0 15px 0', box_sizing='border-box', overflow='hidden'
+    # Two-column layout menggunakan shared utility
+    form_container = create_responsive_two_column(
+        left_content, 
+        right_content,
+        left_width='48%', 
+        right_width='48%'
+    )
+    
+    # Wrapper dengan border
+    wrapper = widgets.VBox([form_container], layout=widgets.Layout(
+        width='100%', 
+        border='1px solid #ddd', 
+        border_radius='5px',
+        padding='15px', 
+        margin='0 0 15px 0', 
+        box_sizing='border-box',
+        overflow='hidden'
     ))
     
-    return widgets.VBox([form_row], layout=widgets.Layout(width='100%', margin='0'))
+    return wrapper
 
-def _create_save_reset_buttons() -> Dict[str, widgets.Widget]:
-    """Create save/reset buttons tanpa icon"""
-    save_button = widgets.Button(description='Simpan', button_style='primary', 
-                                layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px'))
-    reset_button = widgets.Button(description='Reset', button_style='', 
-                                 layout=widgets.Layout(width='auto', min_width='100px', height='32px', margin='3px'))
+def _create_action_buttons_fixed() -> Dict[str, widgets.Widget]:
+    """Create action buttons dengan proper state management dan FIXED overflow"""
+    button_layout = widgets.Layout(
+        width='auto', 
+        min_width='140px', 
+        max_width='200px',  # Prevent overflow
+        height='35px', 
+        margin='5px',
+        overflow='hidden'  # FIXED: Prevent text overflow
+    )
     
-    container = widgets.HBox([save_button, reset_button], layout=widgets.Layout(
-        width='100%', justify_content='flex-end', margin='10px 0',
-        display='flex', flex_flow='row nowrap', align_items='center'
-    ))
+    download_button = widgets.Button(
+        description='📥 Download', 
+        button_style='primary', 
+        layout=button_layout,
+        tooltip='Download dataset dari Roboflow'
+    )
     
-    return {'save_button': save_button, 'reset_button': reset_button, 'container': container}
-
-def _create_action_buttons() -> Dict[str, widgets.Widget]:
-    """Create action buttons dengan state management"""
-    button_layout = widgets.Layout(width='auto', min_width='140px', height='35px', margin='5px', flex='0 1 auto')
+    check_button = widgets.Button(
+        description='🔍 Check', 
+        button_style='info', 
+        layout=button_layout,
+        tooltip='Check status dataset existing'
+    )
     
-    download_button = widgets.Button(description='📥 Download', button_style='primary', layout=button_layout)
-    check_button = widgets.Button(description='🔍 Check', button_style='info', layout=button_layout)
-    cleanup_button = widgets.Button(description='🧹 Cleanup', button_style='danger', layout=button_layout)
+    cleanup_button = widgets.Button(
+        description='🧹 Cleanup', 
+        button_style='danger', 
+        layout=button_layout,
+        tooltip='Hapus dataset existing'
+    )
     
-    # State management attributes - one-liner setup
+    # State management attributes
     all_buttons = [download_button, check_button, cleanup_button]
     [setattr(btn, '_all_buttons', all_buttons) for btn in all_buttons]
     
     container = widgets.HBox(all_buttons, layout=widgets.Layout(
-        width='100%', justify_content='flex-start', margin='15px 0',
-        display='flex', flex_flow='row wrap', align_items='center', overflow='hidden'
+        width='100%', 
+        justify_content='flex-start', 
+        margin='15px 0',
+        display='flex', 
+        flex_flow='row wrap', 
+        align_items='center', 
+        overflow='hidden',  # FIXED: Prevent container overflow
+        box_sizing='border-box'
     ))
     
-    return {'download_button': download_button, 'check_button': check_button, 'cleanup_button': cleanup_button, 'container': container}
+    return {
+        'download_button': download_button, 
+        'check_button': check_button, 
+        'cleanup_button': cleanup_button, 
+        'container': container
+    }
 
-def _create_log_accordion() -> Dict[str, widgets.Widget]:
-    """Create log accordion terbuka by default"""
-    log_output = widgets.Output(layout=widgets.Layout(
-        width='100%', max_height='300px', border='1px solid #ddd', 
-        border_radius='4px', padding='8px', overflow='auto', box_sizing='border-box'
-    ))
-    
-    log_accordion = widgets.Accordion([log_output], layout=widgets.Layout(width='100%', margin='10px 0', box_sizing='border-box'))
-    log_accordion.set_title(0, '📋 Download Logs')
-    log_accordion.selected_index = 0  # Terbuka by default
-    
-    return {'log_output': log_output, 'log_accordion': log_accordion, 'accordion': log_accordion}
+def _create_action_header() -> widgets.HTML:
+    """Create action section header"""
+    return widgets.HTML("""
+    <h4 style='color: #333; margin: 15px 0 10px 0; font-size: 16px; font-weight: 600;
+               border-bottom: 2px solid #28a745; padding-bottom: 6px; overflow: hidden;
+               text-overflow: ellipsis; white-space: nowrap;'>
+        ▶️ Actions
+    </h4>""", layout=widgets.Layout(width='100%', margin='0', overflow='hidden'))
 
 def _get_dynamic_status_html() -> str:
-    """Get status HTML dengan environment detection - one-liner nested conditionals"""
+    """Get status HTML dengan environment detection"""
     try:
         import google.colab
         from pathlib import Path
         is_drive_mounted = Path('/content/drive/MyDrive').exists()
         api_key = get_api_key_from_secrets()
         
-        # Status generation dengan nested conditionals - one-liner
-        return ("""<div style="padding: 12px; background: #e8f5e8; border-left: 4px solid #4caf50; border-radius: 4px; margin-bottom: 15px;"><span style="color: #2e7d32;">✅ Drive terhubung + API Key terdeteksi - Siap download!</span></div>""" if (is_drive_mounted and api_key) else
-                """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;"><span style="color: #856404;">⚠️ Drive terhubung - Masukkan API Key untuk mulai</span></div>""" if is_drive_mounted else
-                """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;"><span style="color: #856404;">⚠️ API Key tersedia - Mount Drive untuk penyimpanan permanen</span></div>""" if api_key else
-                """<div style="padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px; margin-bottom: 15px;"><span style="color: #721c24;">❌ Perlu mount Drive dan setup API Key</span></div>""")
+        if is_drive_mounted and api_key:
+            return """<div style="padding: 12px; background: #e8f5e8; border-left: 4px solid #4caf50; 
+                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
+                      <span style="color: #2e7d32;">✅ Drive terhubung + API Key terdeteksi - Siap download!</span></div>"""
+        elif is_drive_mounted:
+            return """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; 
+                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
+                      <span style="color: #856404;">⚠️ Drive terhubung - Masukkan API Key untuk mulai</span></div>"""
+        elif api_key:
+            return """<div style="padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; 
+                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
+                      <span style="color: #856404;">⚠️ API Key tersedia - Mount Drive untuk penyimpanan permanen</span></div>"""
+        else:
+            return """<div style="padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; 
+                      border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
+                      <span style="color: #721c24;">❌ Perlu mount Drive dan setup API Key</span></div>"""
     except ImportError:
-        return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; margin-bottom: 15px;"><span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
+        return """<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; 
+                  border-radius: 4px; margin-bottom: 15px; word-wrap: break-word; overflow-wrap: break-word;">
+                  <span style="color: #1976d2;">📊 Status: Local environment - Ready</span></div>"""
 
-# Utilities dengan one-liner style
-detect_api_key = lambda: get_api_key_from_secrets() or ''
+# Utilities dengan overflow fixes
 validate_ui_layout = lambda ui: all(key in ui for key in ['ui', 'form_container', 'save_button', 'download_button', 'log_output', 'progress_tracker'])
-get_ui_status = lambda ui: f"✅ Streamlined UI Ready: {len([k for k in ui.keys() if not k.startswith('_')])} components | API: {'✅' if detect_api_key() else '❌'} | Progress: {'✅' if 'progress_tracker' in ui else '❌'}"
-disable_other_buttons = lambda btn: hasattr(btn, '_all_buttons') and [setattr(b, 'disabled', True) for b in btn._all_buttons if b != btn]
-enable_all_buttons = lambda btns: [setattr(btn, 'disabled', False) for btn in btns if hasattr(btn, 'disabled')]
+get_ui_status = lambda ui: f"✅ UI Ready: {len([k for k in ui.keys() if not k.startswith('_')])} components"

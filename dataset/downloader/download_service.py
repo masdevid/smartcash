@@ -4,6 +4,7 @@ Deskripsi: Complete download service yang menggunakan config workers dan optimal
 """
 
 import time
+import shutil
 from typing import Dict, Any, Optional
 from pathlib import Path
 from smartcash.dataset.downloader.base import BaseDownloaderComponent, ValidationHelper, PathHelper, FileHelper
@@ -26,7 +27,7 @@ class DownloadService(BaseDownloaderComponent):
         self.max_workers = config.get('max_workers', self._get_default_workers())
         self.timeout = config.get('timeout', 30)
         self.retry_count = config.get('retry_count', 3)
-        self.chunk_size = config.get('chunk_size', 8192)
+        self.chunk_size = config.get('chunk_size', 8192*4)
         self.parallel_downloads = config.get('parallel_downloads', True)
         
         self.logger.info(f"🔧 DownloadService initialized with {self.max_workers} workers")

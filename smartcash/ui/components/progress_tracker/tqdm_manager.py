@@ -12,34 +12,42 @@ import ipywidgets as widgets
 from smartcash.ui.components.progress_tracker.progress_config import ProgressBarConfig
 
 class TqdmManager:
-    """Manager untuk tqdm progress bars dengan layout [message][bar][percentage]"""
+    """Manager untuk tqdm progress bars dengan separate outputs per level"""
     
-    def __init__(self, output_widget: widgets.Output):
-        self.output_widget = output_widget
+    def __init__(self, ui_manager):
+        self.ui_manager = ui_manager
         self.tqdm_bars: Dict[str, tqdm] = {}
         self.progress_values: Dict[str, int] = {}
         self.progress_messages: Dict[str, str] = {}
+        self.output_mapping = {
+            'overall': 'overall_output',
+            'primary': 'overall_output',  # Single level uses overall
+            'step': 'step_output',
+            'current': 'current_output'
+        }
     
     def initialize_bars(self, bar_configs: list[ProgressBarConfig]):
-        """Initialize tqdm progress bars dengan format layout [message][bar][percentage]"""
+        """Initialize tqdm progress bars di separate output widgets"""
         self.close_all_bars()
         
-        with self.output_widget:
-            clear_output(wait=True)
-            
-            for bar_config in bar_configs:
-                if bar_config.visible:
-                    # Format: [message][bar][percentage] - full width
+        for bar_config in bar_configs:
+            if bar_config.visible:
+                output_attr = self.output_mapping.get(bar_config.name)
+                if not output_attr or not hasattr(self.ui_manager, output_attr):
+                    continue
+                
+                output_widget = getattr(self.ui_manager, output_attr)
+                
+                with output_widget:
+                    clear_output(wait=True)
                     tqdm_bar = tqdm(
                         total=100,
-                        desc=f"{bar_config.description}",
+                        desc=f"{bar_config.emoji} {bar_config.description}",
                         bar_format='{desc}: {bar}| {percentage:3.0f}%',
                         colour=bar_config.get_tqdm_color(),
-                        position=bar_config.position,
                         leave=True,
                         file=sys.stdout,
-                        dynamic_ncols=True,
-                        ncols=None
+                        dynamic_ncols=True
                     )
                     self.tqdm_bars[bar_config.name] = tqdm_bar
     
@@ -88,16 +96,19 @@ class TqdmManager:
             bar.set_description(f"❌ {clean_message}")
     
     def close_all_bars(self):
-        """Close semua tqdm bars dengan cleanup"""
-        for bar in self.tqdm_bars.values():
+        """Close semua tqdm bars dengan cleanup per output"""
+        for bar_name, bar in self.tqdm_bars.items():
             try:
                 bar.close()
+                # Clear specific output widget
+                output_attr = self.output_mapping.get(bar_name)
+                if output_attr and hasattr(self.ui_manager, output_attr):
+                    output_widget = getattr(self.ui_manager, output_attr)
+                    with output_widget:
+                        clear_output(wait=True)
             except Exception:
-                pass  # Silent fail untuk avoid error saat cleanup
+                pass
         self.tqdm_bars.clear()
-        
-        with self.output_widget:
-            clear_output(wait=True)
     
     def reset(self):
         """Reset manager state"""

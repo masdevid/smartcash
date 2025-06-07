@@ -23,7 +23,7 @@ class UIComponentsManager:
         self._create_widgets()
     
     def _create_widgets(self):
-        """Create UI widgets dengan flexbox layout dan full width"""
+        """Create UI widgets dengan layout vertikal untuk setiap progress bar"""
         self.header_widget = widgets.HTML("", layout=widgets.Layout(
             width='100%', margin='0 0 10px 0'
         ))
@@ -32,23 +32,44 @@ class UIComponentsManager:
             width='100%', margin='0 0 8px 0'
         ))
         
-        self.progress_output = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='5px 0', border='1px solid #ddd',
-            border_radius='4px', padding='8px', min_height='60px',
-            display='flex', flex_direction='row'
+        # Separate output widgets untuk setiap level
+        self.overall_output = widgets.Output(layout=widgets.Layout(
+            width='100%', margin='2px 0', min_height='25px', max_height='35px'
+        ))
+        
+        self.step_output = widgets.Output(layout=widgets.Layout(
+            width='100%', margin='2px 0', min_height='25px', max_height='35px'
+        ))
+        
+        self.current_output = widgets.Output(layout=widgets.Layout(
+            width='100%', margin='2px 0', min_height='25px', max_height='35px'
         ))
         
         self._create_container()
     
     def _create_container(self):
-        """Create main container dengan flexbox layout"""
+        """Create main container dengan separate progress outputs"""
+        progress_widgets = []
+        
+        # Add progress outputs berdasarkan level
+        if self.config.level.value >= 2:  # DUAL atau TRIPLE
+            progress_widgets.append(self.overall_output)
+        
+        if self.config.level.value >= 3:  # TRIPLE
+            progress_widgets.append(self.step_output)
+            progress_widgets.append(self.current_output)
+        elif self.config.level.value == 2:  # DUAL
+            progress_widgets.append(self.current_output)
+        elif self.config.level.value == 1:  # SINGLE
+            progress_widgets.append(self.overall_output)  # Use overall for single
+        
         self.container = widgets.VBox(
-            [self.header_widget, self.status_widget, self.progress_output],
+            [self.header_widget, self.status_widget] + progress_widgets,
             layout=widgets.Layout(
                 display='none', width='100%', margin='10px 0', padding='15px',
                 border='1px solid #28a745', border_radius='8px', 
                 background_color='#f8fff8', min_height=self.config.get_container_height(),
-                max_height='300px', overflow='hidden', box_sizing='border-box'
+                max_height='400px', overflow='hidden', box_sizing='border-box'
             )
         )
     

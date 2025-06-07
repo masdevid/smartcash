@@ -17,7 +17,7 @@ class ProgressTracker:
         self.config = config or ProgressConfig()
         self.callback_manager = CallbackManager()
         self.ui_manager = UIComponentsManager(self.config)
-        self.tqdm_manager = TqdmManager(self.ui_manager.progress_output)
+        self.tqdm_manager = TqdmManager(self.ui_manager)  # Pass ui_manager instead of single output
         
         self.bar_configs = self.config.get_level_configs()
         self.active_levels = [config.name for config in self.bar_configs if config.visible]

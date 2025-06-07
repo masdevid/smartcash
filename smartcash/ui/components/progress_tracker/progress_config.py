@@ -82,10 +82,10 @@ class ProgressConfig:
         return weights
     
     def get_container_height(self) -> str:
-        """Get container height berdasarkan level tanpa step info"""
+        """Get container height berdasarkan level dengan separate bars"""
         heights = {
-            ProgressLevel.SINGLE: '140px',  # Reduced tanpa step info
-            ProgressLevel.DUAL: '180px',    # Reduced tanpa step info
-            ProgressLevel.TRIPLE: '220px'   # Reduced tanpa step info
+            ProgressLevel.SINGLE: '120px',   # Header + Status + 1 bar
+            ProgressLevel.DUAL: '160px',     # Header + Status + 2 bars  
+            ProgressLevel.TRIPLE: '200px'    # Header + Status + 3 bars
         }
         return heights[self.level]

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracker/progress_config.py
-Deskripsi: Configuration classes untuk progress tracking dengan type safety
+Deskripsi: Updated configuration dengan auto hide 1 jam dan tanpa step info
 """
 
 from enum import Enum
@@ -36,15 +36,17 @@ class ProgressBarConfig:
 
 @dataclass
 class ProgressConfig:
-    """Configuration untuk progress tracking"""
+    """Configuration untuk progress tracking dengan 1 jam auto hide"""
     level: ProgressLevel = ProgressLevel.SINGLE
     operation: str = "Process"
     steps: List[str] = field(default_factory=list)
     step_weights: Dict[str, int] = field(default_factory=dict)
     auto_advance: bool = True
-    auto_hide_delay: float = 60.0
+    auto_hide: bool = False  # Default false
+    auto_hide_delay: float = 3600.0  # 1 jam dalam detik
     animation_speed: float = 0.1
     width_adjustment: int = 0
+    show_step_info: bool = False  # Hapus step info
     
     def get_level_configs(self) -> List[ProgressBarConfig]:
         """Get bar configurations berdasarkan level"""
@@ -80,10 +82,10 @@ class ProgressConfig:
         return weights
     
     def get_container_height(self) -> str:
-        """Get container height berdasarkan level"""
+        """Get container height berdasarkan level tanpa step info"""
         heights = {
-            ProgressLevel.SINGLE: '180px',
-            ProgressLevel.DUAL: '220px',
-            ProgressLevel.TRIPLE: '280px'
+            ProgressLevel.SINGLE: '140px',  # Reduced tanpa step info
+            ProgressLevel.DUAL: '180px',    # Reduced tanpa step info
+            ProgressLevel.TRIPLE: '220px'   # Reduced tanpa step info
         }
         return heights[self.level]

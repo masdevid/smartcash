@@ -106,7 +106,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
                     if hasattr(progress_tracker, 'update_current'):
                         progress_tracker.update_current(100, "✅ Complete")
                     if hasattr(progress_tracker, 'complete'):
-                        progress_tracker.complete("✅ Semua packages sudah terinstall dengan benar", delay=1.0)
+                        progress_tracker.complete("✅ Semua packages sudah terinstall dengan benar")
                 else:
                     # Fallback untuk progress tracking lama
                     update_progress = ui_components.get('update_progress')
@@ -198,7 +198,7 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
                 if hasattr(progress_tracker, 'update_current'):
                     progress_tracker.update_current(100, "✅ Complete")
                 if hasattr(progress_tracker, 'complete'):
-                    progress_tracker.complete("✅ Instalasi package selesai", delay=1.0)
+                    progress_tracker.complete("✅ Instalasi package selesai")
             else:
                 # Fallback untuk progress tracking lama
                 update_progress = ui_components.get('update_progress')

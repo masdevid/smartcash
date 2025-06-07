@@ -160,7 +160,7 @@ def _execute_status_check_with_utils(ui_components: Dict[str, Any], config: Dict
                 progress_tracker.update_step_progress(100, f"📊 {installed_count}/{total_packages} paket terinstall")
                 
             # Tandai operasi selesai dengan delay untuk UX yang lebih baik
-            progress_tracker.complete("✅ Pemeriksaan status dependensi selesai", delay=1.5)
+            progress_tracker.complete("✅ Pemeriksaan status dependensi selesai")
         else:
             # Fallback untuk progress tracking lama
             ctx.stepped_progress('STATUS_COMPLETE', "✅ Status check selesai", "overall")
@@ -287,7 +287,7 @@ def _get_comprehensive_package_status_with_utils(ui_components: Dict[str, Any], 
             
         # Tandai operasi selesai dengan delay untuk UX yang lebih baik
         if hasattr(progress_tracker, 'complete'):
-            progress_tracker.complete("✅ Status check selesai", delay=1.5)
+            progress_tracker.complete("✅ Status check selesai")
     
     if logger:
         logger.info(f"✅ Status check selesai: {len(package_status)} paket dianalisis")

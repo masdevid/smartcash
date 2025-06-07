@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/progress_tracker/progress_tracker.py
-Deskripsi: Main progress tracker class dengan tqdm integration dan callback system
+Deskripsi: Main progress tracker tanpa step info dan dengan auto hide 1 jam
 """
 
 import time
@@ -11,7 +11,7 @@ from smartcash.ui.components.progress_tracker.tqdm_manager import TqdmManager
 from smartcash.ui.components.progress_tracker.ui_components import UIComponentsManager
 
 class ProgressTracker:
-    """Main progress tracker dengan tqdm integration dan callback system"""
+    """Main progress tracker tanpa step info dengan auto hide dan layout [message][bar][percentage]"""
     
     def __init__(self, config: Optional[ProgressConfig] = None):
         self.config = config or ProgressConfig()
@@ -39,29 +39,23 @@ class ProgressTracker:
     
     @property
     def step_info_widget(self):
-        """Expose step info widget untuk backward compatibility"""
-        return self.ui_manager.step_info_widget
+        """Dummy property untuk backward compatibility - always None"""
+        return None
     
     @property
     def progress_bars(self):
-        """Expose tqdm_bars untuk backward compatibility dengan kode lama"""
-        # Mapping untuk kompatibilitas dengan kode lama yang mengakses progress_bars
-        # Kode lama mengharapkan {'main': progress_bar} untuk single level tracker
+        """Expose tqdm_bars untuk backward compatibility"""
         if not hasattr(self.tqdm_manager, 'tqdm_bars'):
             return {'main': None}
             
-        # Jika level adalah SINGLE, gunakan bar pertama sebagai 'main'
         if self.config.level == ProgressLevel.SINGLE and self.tqdm_manager.tqdm_bars:
             first_key = next(iter(self.tqdm_manager.tqdm_bars))
             return {'main': self.tqdm_manager.tqdm_bars.get(first_key)}
         
-        # Untuk level lain, kembalikan mapping yang sama
         return self.tqdm_manager.tqdm_bars
     
     def _register_default_callbacks(self):
-        """Register default callbacks untuk common operations"""
-        if self.config.level == ProgressLevel.TRIPLE and self.config.auto_advance:
-            self.on_step_complete(self._auto_advance_step)
+        """Register default callbacks tanpa step logic"""
         self.on_complete(lambda: self._delayed_hide())
         self.on_progress_update(self._sync_progress_state)
     
@@ -70,7 +64,7 @@ class ProgressTracker:
         return self.callback_manager.register('progress_update', callback)
     
     def on_step_complete(self, callback: Callable[[str, int], None]) -> str:
-        """Register callback untuk step completion (TRIPLE level only)"""
+        """Register callback untuk step completion (untuk compatibility)"""
         return self.callback_manager.register('step_complete', callback)
     
     def on_complete(self, callback: Callable[[], None]) -> str:
@@ -90,8 +84,9 @@ class ProgressTracker:
         self.callback_manager.unregister(callback_id)
     
     def show(self, operation: str = None, steps: List[str] = None, 
-             step_weights: Dict[str, int] = None, level: ProgressLevel = None):
-        """Show progress tracker dengan dynamic configuration"""
+             step_weights: Dict[str, int] = None, level: ProgressLevel = None,
+             auto_hide: bool = None):
+        """Show progress tracker dengan optional auto hide override"""
         if operation:
             self.config.operation = operation
         if steps:
@@ -102,16 +97,13 @@ class ProgressTracker:
             self.config.level = level
             self.bar_configs = self.config.get_level_configs()
             self.active_levels = [config.name for config in self.bar_configs if config.visible]
+        if auto_hide is not None:
+            self.config.auto_hide = auto_hide
         
         self.ui_manager.update_header(self.config.operation)
         
-        if not self.config.steps and self.config.level == ProgressLevel.TRIPLE:
-            self.config.steps = ["Step 1", "Step 2", "Step 3"]
-            self.config.step_weights = self.config.get_default_weights()
-        
         self.ui_manager.show()
         self.tqdm_manager.initialize_bars(self.bar_configs)
-        self._update_step_info()
         
         self.current_step_index = 0
         self.is_complete = False
@@ -121,7 +113,7 @@ class ProgressTracker:
     
     def update(self, level_name: str, progress: int, message: str = "", 
                color: str = None, trigger_callbacks: bool = True):
-        """Update specific progress level dengan tqdm dan callback support"""
+        """Update progress dengan format [message][bar][percentage]"""
         if level_name not in self.active_levels:
             return
         
@@ -133,12 +125,6 @@ class ProgressTracker:
         
         if trigger_callbacks:
             self.callback_manager.trigger('progress_update', level_name, progress, message)
-            
-            if (self.config.level == ProgressLevel.TRIPLE and 
-                level_name == 'step' and progress >= 100):
-                self.callback_manager.trigger('step_complete', 
-                                            self.config.steps[self.current_step_index], 
-                                            self.current_step_index)
     
     def update_primary(self, progress: int, message: str = "", color: str = None):
         """Update primary progress (SINGLE level)"""
@@ -146,8 +132,6 @@ class ProgressTracker:
     
     def update_overall(self, progress: int, message: str = "", color: str = None):
         """Update overall progress (DUAL/TRIPLE level)"""
-        if self.config.level == ProgressLevel.TRIPLE:
-            progress = self._calculate_weighted_overall_progress(progress)
         self.update('overall', progress, message, color)
     
     def update_step(self, progress: int, message: str = "", color: str = None):
@@ -160,7 +144,7 @@ class ProgressTracker:
         self.update('current', progress, message, color)
     
     def complete(self, message: str = "Operation completed successfully!"):
-        """Complete operation dengan callback triggering"""
+        """Complete operation dengan auto hide timer"""
         if self.is_complete:
             return
         
@@ -168,20 +152,18 @@ class ProgressTracker:
         self.tqdm_manager.set_all_complete(message, self.bar_configs)
         self.ui_manager.update_status(f"✅ {message}", 'success')
         
-        if self.config.level == ProgressLevel.TRIPLE:
-            self.current_step_index = len(self.config.steps)
-            self._update_step_info()
-        
         self.callback_manager.trigger('complete')
     
     def error(self, message: str = "Operation failed"):
-        """Set error state dengan callback triggering"""
+        """Set error state dan cancel auto hide"""
         if self.is_error:
             return
         
         self.is_error = True
         self.tqdm_manager.set_all_error(message)
         self.ui_manager.update_status(f"❌ {message}", 'error')
+        # Cancel auto hide saat error
+        self.ui_manager._cancel_auto_hide_timer()
         self.callback_manager.trigger('error', message)
     
     def reset(self):
@@ -195,50 +177,15 @@ class ProgressTracker:
         self.callback_manager.trigger('reset')
     
     def hide(self):
-        """Hide progress container"""
+        """Hide progress container dan cancel auto hide timer"""
         self.ui_manager.hide()
     
-    def _calculate_weighted_overall_progress(self, step_progress: int) -> int:
-        """Calculate weighted overall progress untuk TRIPLE level"""
-        if not self.config.steps or not self.config.step_weights:
-            return step_progress
-        
-        completed_weight = sum(
-            self.config.step_weights.get(step, 0) 
-            for step in self.config.steps[:self.current_step_index]
-        )
-        
-        current_step = (self.config.steps[self.current_step_index] 
-                       if self.current_step_index < len(self.config.steps) else '')
-        current_weight = self.config.step_weights.get(current_step, 0)
-        current_contribution = (step_progress / 100) * current_weight
-        
-        total_weight = sum(self.config.step_weights.values())
-        if total_weight == 0:
-            return step_progress
-        
-        return int((completed_weight + current_contribution) / total_weight * 100)
-    
-    def _auto_advance_step(self, step_name: str, step_index: int):
-        """Auto advance ke step berikutnya"""
-        if self.current_step_index < len(self.config.steps) - 1:
-            self.current_step_index += 1
-            self._update_step_info()
-            self.update('step', 0, f"Starting {self.config.steps[self.current_step_index]}", 
-                      trigger_callbacks=False)
-    
-    def _update_step_info(self):
-        """Update step information display untuk TRIPLE level"""
-        self.ui_manager.update_step_info(
-            self.current_step_index, 
-            self.config.steps, 
-            self.config.step_weights
-        )
-    
     def _delayed_hide(self):
-        """Hide container after delay - immediate hide untuk avoid threading"""
-        if self.is_complete and not self.is_error:
-            self.hide()
+        """Hide sesuai dengan auto_hide setting"""
+        if self.is_complete and not self.is_error and not self.config.auto_hide:
+            # Jika auto_hide disabled, tetap tampilkan sampai manual hide
+            return
+        # Auto hide akan dihandle oleh UIComponentsManager
     
     def _sync_progress_state(self, level_name: str, progress: int, message: str):
         """Sync progress state untuk internal tracking"""

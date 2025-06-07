@@ -123,7 +123,7 @@ def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str
                 if hasattr(progress_tracker, 'update_current'):
                     progress_tracker.update_current(100, "✅ Complete")
                 if hasattr(progress_tracker, 'complete'):
-                    progress_tracker.complete("✅ Analisis dependensi selesai", delay=1.0)
+                    progress_tracker.complete("✅ Analisis dependensi selesai")
             else:
                 # Fallback untuk progress tracking lama
                 update_progress = ui_components.get('update_progress')

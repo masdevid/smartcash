@@ -1,171 +1,48 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/download_handler.py  
-Deskripsi: Fixed download handler dengan domain-specific confirmation dialog
+Deskripsi: Enable enhanced handler dengan cleanup analysis integration
 """
 
-from typing import Dict, Any
-from smartcash.ui.dataset.downloader.utils.ui_utils import log_download_config, display_check_results, show_download_success, clear_outputs, handle_ui_error, show_ui_success
-from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
-from smartcash.ui.dataset.downloader.utils.confirmation_dialog import show_downloader_confirmation_dialog
-from smartcash.ui.dataset.downloader.utils.progress_utils import create_progress_callback
-from smartcash.ui.dataset.downloader.utils.backend_utils import check_existing_dataset, create_backend_downloader
-
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup download handlers dengan cleanup behavior integration"""
+    """Setup download handlers dengan cleanup behavior integration - ENABLED"""
     ui_components['progress_callback'] = create_progress_callback(ui_components)
     
-    # Use enhanced handler dengan cleanup analysis
+    # CHANGED: Use enhanced handler dengan cleanup analysis (was commented out)
     from smartcash.ui.dataset.downloader.handlers.download_handler_with_cleanup import setup_download_handler_with_cleanup_analysis
     setup_download_handler_with_cleanup_analysis(ui_components, config)
     
     setup_check_handler(ui_components, config)
-    setup_cleanup_handler(ui_components, config)
+    setup_cleanup_handler_with_enhanced_analysis(ui_components, config)  # Enhanced cleanup too
     setup_config_handlers(ui_components)
     
     return ui_components
 
-def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup download handler dengan domain-specific confirmation"""
+def setup_cleanup_handler_with_enhanced_analysis(ui_components: Dict[str, Any], config: Dict[str, Any]):
+    """Setup cleanup handler dengan enhanced analysis (NEW)"""
     
-    def execute_download(button=None):
-        button_manager = get_button_manager(ui_components)
-        
-        clear_outputs(ui_components)
-        button_manager.disable_buttons('download_button')
-        
-        try:
-            # Extract dan validate config
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "Config handler tidak tersedia", button_manager)
-                return
-            
-            ui_config = config_handler.extract_config(ui_components)
-            validation = config_handler.validate_config(ui_config)
-            
-            if not validation['valid']:
-                error_msg = f"Konfigurasi tidak valid:\n• {chr(10).join(validation['errors'])}"
-                handle_ui_error(ui_components, error_msg, button_manager)
-                return
-            
-            # Setup progress tracker
-            _setup_progress_tracker(ui_components, "Dataset Download")
-            
-            # Check existing dan konfirmasi dengan domain-specific dialog
-            _check_and_confirm_download_with_domain_dialog(ui_config, ui_components, button_manager)
-            
-        except Exception as e:
-            handle_ui_error(ui_components, f"Error download handler: {str(e)}", button_manager)
-    
-    download_button = ui_components.get('download_button')
-    if download_button:
-        download_button.on_click(execute_download)
-
-def _check_and_confirm_download_with_domain_dialog(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button_manager):
-    """Check existing dataset dan show domain-specific confirmation"""
-    try:
-        logger = ui_components.get('logger')
-        
-        # Use backend scanner untuk check existing
-        has_content, total_images, summary_data = check_existing_dataset(logger)
-        
-        if logger:
-            logger.info(f"📊 Dataset check: {'Found' if has_content else 'Empty'} ({total_images} images)")
-        
-        if has_content:
-            # Show downloader-specific confirmation dialog
-            show_downloader_confirmation_dialog(
-                ui_components,
-                total_images,
-                ui_config,
-                lambda btn: _execute_confirmed_download(ui_config, ui_components, button_manager)
-            )
-        else:
-            # No existing content, proceed directly
-            _execute_confirmed_download(ui_config, ui_components, button_manager)
-            
-    except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.error(f"❌ Error checking existing dataset: {str(e)}")
-        # Proceed anyway
-        _execute_confirmed_download(ui_config, ui_components, button_manager)
-
-def _execute_confirmed_download(ui_config: Dict[str, Any], ui_components: Dict[str, Any], button_manager):
-    """Execute download setelah konfirmasi user"""
-    try:
-        logger = ui_components.get('logger')
-        
-        # Create downloader using backend utils
-        downloader = create_backend_downloader(ui_config, logger)
-        if not downloader:
-            handle_ui_error(ui_components, "❌ Gagal membuat download service", button_manager)
-            return
-        
-        # Setup progress callback
-        if hasattr(downloader, 'set_progress_callback'):
-            downloader.set_progress_callback(ui_components['progress_callback'])
-        
-        # Log config dan execute
-        log_download_config(ui_components, ui_config)
-        result = downloader.download_dataset()
-        
-        # Handle result
-        if result and result.get('status') == 'success':
-            show_download_success(ui_components, result)
-            show_ui_success(ui_components, "Download dataset berhasil", button_manager)
-        else:
-            error_msg = result.get('message', 'Download gagal') if result else 'No response from backend service'
-            handle_ui_error(ui_components, error_msg, button_manager)
-            
-    except Exception as e:
-        handle_ui_error(ui_components, f"❌ Exception in download execution: {str(e)}", button_manager)
-
-def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup check handler dengan backend scanner integration"""
-    
-    def execute_check(button=None):
-        button_manager = get_button_manager(ui_components)
-        
-        clear_outputs(ui_components)
-        button_manager.disable_buttons('check_button')
-        
-        try:
-            _setup_progress_tracker(ui_components, "Dataset Check")
-            
-            # Use backend scanner
-            from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
-            scanner = create_dataset_scanner(ui_components.get('logger'))
-            scanner.set_progress_callback(ui_components['progress_callback'])
-            
-            result = scanner.scan_existing_dataset_parallel()
-            
-            if result.get('status') == 'success':
-                display_check_results(ui_components, result)
-                show_ui_success(ui_components, "Dataset check selesai", button_manager)
-            else:
-                handle_ui_error(ui_components, result.get('message', 'Scan failed'), button_manager)
-                
-        except Exception as e:
-            handle_ui_error(ui_components, f"Error check handler: {str(e)}", button_manager)
-    
-    check_button = ui_components.get('check_button')
-    if check_button:
-        check_button.on_click(execute_check)
-
-def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup cleanup handler dengan proper dialog confirmation"""
-    
-    def execute_cleanup(button=None):
+    def execute_cleanup_with_analysis(button=None):
         button_manager = get_button_manager(ui_components)
         
         clear_outputs(ui_components)
         button_manager.disable_buttons('cleanup_button')
         
         try:
-            # Get cleanup targets using backend utils
-            from smartcash.ui.dataset.downloader.utils.backend_utils import get_cleanup_targets
-            targets_result = get_cleanup_targets(ui_components.get('logger'))
+            logger = ui_components.get('logger')
+            
+            # 1. Initialize cleanup behavior analyzer
+            from smartcash.dataset.downloader.cleanup_behavior import DownloaderCleanupBehavior
+            cleanup_analyzer = DownloaderCleanupBehavior(logger)
+            
+            # 2. Analyze cleanup behavior
+            cleanup_analysis = cleanup_analyzer.analyze_current_cleanup_process(config)
+            
+            if logger:
+                logger.info("🔍 Cleanup behavior analysis completed")
+                safety_measures = len(cleanup_analysis.get('safety_measures', []))
+                logger.info(f"🛡️ Found {safety_measures} safety measures")
+            
+            # 3. Get cleanup targets dengan analysis context
+            targets_result = get_cleanup_targets(logger)
             
             if targets_result.get('status') != 'success':
                 handle_ui_error(ui_components, "Gagal mendapatkan cleanup targets", button_manager)
@@ -178,99 +55,272 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
                 show_ui_success(ui_components, "Tidak ada file untuk dibersihkan", button_manager)
                 return
             
-            # Show cleanup confirmation (existing implementation)
-            from smartcash.ui.dataset.downloader.utils.dialog_utils import show_cleanup_confirmation_dialog, create_confirm_callback, create_cancel_callback
-            
-            show_cleanup_confirmation_dialog(
-                ui_components,
-                targets_result,
-                create_confirm_callback(ui_components, "cleanup", 
-                    lambda: _execute_cleanup_with_backend(targets_result, ui_components, button_manager)),
-                create_cancel_callback(ui_components, "cleanup")
+            # 4. Enhanced confirmation dengan cleanup analysis
+            _show_enhanced_cleanup_confirmation_with_analysis(
+                ui_components, targets_result, cleanup_analysis,
+                lambda: _execute_analyzed_cleanup(targets_result, ui_components, button_manager, cleanup_analysis)
             )
             
         except Exception as e:
-            handle_ui_error(ui_components, f"Error cleanup handler: {str(e)}", button_manager)
+            handle_ui_error(ui_components, f"Error cleanup analysis: {str(e)}", button_manager)
     
     cleanup_button = ui_components.get('cleanup_button')
     if cleanup_button:
-        cleanup_button.on_click(execute_cleanup)
+        cleanup_button.on_click(execute_cleanup_with_analysis)
 
-def _execute_cleanup_with_backend(targets_result: Dict[str, Any], ui_components: Dict[str, Any], button_manager):
-    """Execute cleanup menggunakan backend utils"""
+def _show_enhanced_cleanup_confirmation_with_analysis(ui_components: Dict[str, Any], 
+                                                    targets_result: Dict[str, Any],
+                                                    cleanup_analysis: Dict[str, Any],
+                                                    on_confirm_callback):
+    """Show enhanced cleanup confirmation dengan behavior analysis"""
+    from IPython.display import display, clear_output
+    
+    confirmation_area = ui_components.get('confirmation_area')
+    logger = ui_components.get('logger')
+    
+    if not confirmation_area:
+        if logger:
+            logger.warning("⚠️ No confirmation area, executing cleanup directly")
+        on_confirm_callback()
+        return
+    
+    try:
+        # Force confirmation area visible
+        if hasattr(confirmation_area, 'layout'):
+            confirmation_area.layout.display = 'block'
+            confirmation_area.layout.visibility = 'visible'
+            confirmation_area.layout.height = 'auto'
+            confirmation_area.layout.min_height = '200px'
+            confirmation_area.layout.max_height = '600px'
+        
+        # Build enhanced message dengan cleanup analysis
+        message = _build_enhanced_cleanup_message_with_analysis(targets_result, cleanup_analysis)
+        
+        # Create enhanced confirmation widget
+        confirmation_widget = _create_enhanced_cleanup_confirmation_widget(
+            message,
+            lambda: _handle_enhanced_cleanup_confirm(confirmation_area, on_confirm_callback, logger),
+            lambda: _handle_enhanced_cleanup_cancel(confirmation_area, ui_components, logger)
+        )
+        
+        # Display dengan force update
+        with confirmation_area:
+            clear_output(wait=True)
+            display(confirmation_widget)
+        
+        if logger:
+            logger.info("✅ Enhanced cleanup confirmation with analysis displayed")
+            
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error showing enhanced cleanup confirmation: {str(e)}")
+        on_confirm_callback()
+
+def _build_enhanced_cleanup_message_with_analysis(targets_result: Dict[str, Any], 
+                                                cleanup_analysis: Dict[str, Any]) -> str:
+    """Build enhanced cleanup message dengan behavior analysis"""
+    summary = targets_result.get('summary', {})
+    targets = targets_result.get('targets', {})
+    
+    total_files = summary.get('total_files', 0)
+    size_formatted = summary.get('size_formatted', '0 B')
+    
+    lines = [
+        f"🗑️ Enhanced Cleanup Analysis: {total_files:,} file akan dihapus",
+        f"📊 Total Size: {size_formatted}",
+        "",
+        "🔍 Cleanup Behavior Analysis:",
+    ]
+    
+    # Add cleanup phases dari analysis
+    cleanup_phases = cleanup_analysis.get('cleanup_phases', [])
+    for phase in cleanup_phases[:3]:  # Show first 3 phases
+        phase_desc = phase.get('description', 'Unknown phase')
+        lines.append(f"  📋 {phase_desc}")
+    
+    lines.extend([
+        "",
+        "📂 Target Cleanup dengan Analysis:",
+    ])
+    
+    # Add target details dengan safety assessment
+    safety_measures = cleanup_analysis.get('safety_measures', [])
+    safety_count = len(safety_measures)
+    
+    for target_name, target_info in targets.items():
+        file_count = target_info.get('file_count', 0)
+        target_size = target_info.get('size_formatted', '0 B')
+        lines.append(f"  • {target_name}: {file_count:,} file ({target_size})")
+    
+    lines.extend([
+        "",
+        f"🛡️ Safety Measures Active: {safety_count}/4",
+        "🔒 Backup Behavior: Analysis completed",
+        "",
+        "⚠️ ENHANCED WARNING: Cleanup analysis menunjukkan:",
+    ])
+    
+    # Add recommendations dari analysis
+    recommendations = cleanup_analysis.get('recommendations', [])
+    if recommendations:
+        lines.append(f"  💡 {recommendations[0]}")  # Show first recommendation
+    
+    lines.append("  🚨 File yang dihapus TIDAK BISA di-recovery!")
+    
+    return '\n'.join(lines)
+
+def _create_enhanced_cleanup_confirmation_widget(message: str, on_confirm, on_cancel):
+    """Create enhanced cleanup confirmation widget"""
+    import ipywidgets as widgets
+    
+    # Enhanced title dengan analysis indicator
+    title = widgets.HTML(
+        '<h3 style="color: #dc3545; margin: 0 0 15px 0;">🔍 Enhanced Cleanup dengan Behavior Analysis</h3>',
+        layout=widgets.Layout(margin='0 0 10px 0')
+    )
+    
+    # Enhanced message dengan analysis styling
+    message_widget = widgets.HTML(
+        f'<div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #e17055;"><pre style="white-space: pre-wrap; margin: 0; font-family: monospace; font-size: 12px; color: #2d3436;">{message}</pre></div>',
+        layout=widgets.Layout(margin='10px 0')
+    )
+    
+    # Enhanced buttons
+    confirm_button = widgets.Button(
+        description="Ya, Analisis Selesai - Hapus",
+        button_style='danger',
+        icon='trash',
+        layout=widgets.Layout(width='220px', height='35px', margin='0 10px 0 0')
+    )
+    
+    cancel_button = widgets.Button(
+        description="Batal",
+        button_style='',
+        icon='times', 
+        layout=widgets.Layout(width='100px', height='35px')
+    )
+    
+    # Button handlers
+    def safe_confirm(btn):
+        btn.disabled = True
+        cancel_button.disabled = True
+        btn.description = "Executing Analysis..."
+        on_confirm()
+    
+    def safe_cancel(btn):
+        btn.disabled = True
+        confirm_button.disabled = True
+        on_cancel()
+    
+    confirm_button.on_click(safe_confirm)
+    cancel_button.on_click(safe_cancel)
+    
+    # Button container
+    button_container = widgets.HBox(
+        [confirm_button, cancel_button],
+        layout=widgets.Layout(justify_content='flex-end', margin='15px 0 0 0')
+    )
+    
+    # Enhanced main container dengan gradient border
+    return widgets.VBox([
+        title,
+        message_widget,
+        button_container
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='20px',
+        border='2px solid #e17055',
+        border_radius='8px',
+        background_color='#fff'
+    ))
+
+def _execute_analyzed_cleanup(targets_result: Dict[str, Any], ui_components: Dict[str, Any], 
+                            button_manager, cleanup_analysis: Dict[str, Any]):
+    """Execute cleanup dengan analysis monitoring"""
     try:
         logger = ui_components.get('logger')
         
-        # Setup progress tracker
-        _setup_progress_tracker(ui_components, "Dataset Cleanup")
+        # Log cleanup analysis summary
+        if logger:
+            safety_measures = len(cleanup_analysis.get('safety_measures', []))
+            logger.info(f"🔍 Executing cleanup dengan {safety_measures} safety measures")
         
-        # Create cleanup service using backend utils
-        from smartcash.ui.dataset.downloader.utils.backend_utils import create_backend_cleanup_service
+        # Setup progress tracker
+        _setup_progress_tracker(ui_components, "Enhanced Dataset Cleanup")
+        
+        # Create cleanup service
         cleanup_service = create_backend_cleanup_service(logger)
         if not cleanup_service:
-            handle_ui_error(ui_components, "❌ Gagal membuat cleanup service", button_manager)
+            handle_ui_error(ui_components, "Gagal membuat cleanup service", button_manager)
             return
         
-        cleanup_service.set_progress_callback(ui_components['progress_callback'])
+        # Enhanced progress callback dengan analysis context
+        enhanced_callback = _create_analysis_aware_progress_callback(ui_components, cleanup_analysis)
+        cleanup_service.set_progress_callback(enhanced_callback)
         
         # Execute cleanup
         result = cleanup_service.cleanup_dataset_files(targets_result.get('targets', {}))
         
+        # Enhanced result handling
         if result.get('status') == 'success':
             cleaned_count = len(result.get('cleaned_targets', []))
-            show_ui_success(ui_components, f"Cleanup selesai: {cleaned_count} direktori dibersihkan", button_manager)
+            success_msg = f"Enhanced cleanup selesai: {cleaned_count} direktori dibersihkan dengan analysis"
+            show_ui_success(ui_components, success_msg, button_manager)
+            
+            if logger:
+                logger.success(f"✅ {success_msg}")
         else:
-            handle_ui_error(ui_components, result.get('message', 'Cleanup failed'), button_manager)
+            handle_ui_error(ui_components, result.get('message', 'Enhanced cleanup failed'), button_manager)
             
     except Exception as e:
-        handle_ui_error(ui_components, f"Error saat cleanup: {str(e)}", button_manager)
+        handle_ui_error(ui_components, f"Error enhanced cleanup: {str(e)}", button_manager)
 
-def setup_config_handlers(ui_components: Dict[str, Any]):
-    """Setup save/reset handlers"""
-    def save_config_handler(button=None):
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "Config handler tidak tersedia")
-                return
-            
-            success = config_handler.save_config(ui_components)
-            if success:
-                show_ui_success(ui_components, "✅ Konfigurasi berhasil disimpan")
-            else:
-                handle_ui_error(ui_components, "❌ Gagal menyimpan konfigurasi")
-        except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error saat save: {str(e)}")
-    
-    def reset_config_handler(button=None):
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "Config handler tidak tersedia")
-                return
-            
-            success = config_handler.reset_config(ui_components)
-            if success:
-                show_ui_success(ui_components, "🔄 Konfigurasi berhasil direset")
-            else:
-                handle_ui_error(ui_components, "❌ Gagal reset konfigurasi")
-        except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error saat reset: {str(e)}")
-    
-    save_button = ui_components.get('save_button')
-    reset_button = ui_components.get('reset_button')
-    if save_button:
-        save_button.on_click(save_config_handler)
-    if reset_button:
-        reset_button.on_click(reset_config_handler)
-
-def _setup_progress_tracker(ui_components: Dict[str, Any], operation_name: str):
-    """Setup progress tracker untuk operation"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        progress_tracker.show(operation_name)
-        progress_tracker.update_overall(0, f"🚀 Memulai {operation_name.lower()}...")
-    
+def _create_analysis_aware_progress_callback(ui_components: Dict[str, Any], cleanup_analysis: Dict[str, Any]):
+    """Create progress callback yang aware dengan cleanup analysis"""
+    original_callback = ui_components.get('progress_callback')
     logger = ui_components.get('logger')
-    if logger:
-        logger.info(f"🚀 Memulai {operation_name.lower()}")
+    
+    def enhanced_callback(step: str, current: int, total: int, message: str):
+        # Call original callback
+        if original_callback:
+            original_callback(step, current, total, message)
+        
+        # Enhanced logging dengan analysis context
+        if logger and step in ['cleanup', 'analyze', 'validate']:
+            analysis_emoji = "🔍" if step == 'analyze' else "🗑️" if step == 'cleanup' else "✅"
+            logger.info(f"{analysis_emoji} Analysis Step: {step} - {message}")
+    
+    return enhanced_callback
+
+def _handle_enhanced_cleanup_confirm(confirmation_area, on_confirm_callback, logger):
+    """Handle enhanced cleanup confirm"""
+    try:
+        if logger:
+            logger.info("✅ User confirmed enhanced cleanup with analysis")
+        
+        from IPython.display import clear_output
+        with confirmation_area:
+            clear_output(wait=True)
+        
+        on_confirm_callback()
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error in enhanced cleanup confirm: {str(e)}")
+
+def _handle_enhanced_cleanup_cancel(confirmation_area, ui_components: Dict[str, Any], logger):
+    """Handle enhanced cleanup cancel"""
+    try:
+        if logger:
+            logger.info("🚫 User cancelled enhanced cleanup analysis")
+        
+        from IPython.display import clear_output
+        with confirmation_area:
+            clear_output(wait=True)
+        
+        button_manager = get_button_manager(ui_components)
+        button_manager.enable_buttons()
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error in enhanced cleanup cancel: {str(e)}")

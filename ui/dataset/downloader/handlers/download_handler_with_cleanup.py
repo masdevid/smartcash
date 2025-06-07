@@ -244,6 +244,10 @@ def _handle_download_cancellation(ui_components: Dict[str, Any]):
     if logger:
         logger.info("🚫 Download dibatalkan setelah cleanup analysis")
     
+
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.height = '0px'
     from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
     button_manager = get_button_manager(ui_components)
     button_manager.enable_buttons()

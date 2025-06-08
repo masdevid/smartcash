@@ -15,7 +15,7 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
     """Membuat komponen log accordion dengan FIXED overflow issues."""
     output_widget = output_widget or widgets.Output(layout=widgets.Layout(
         max_height=height, 
-        width='100%',
+        width='95%',
         max_width="100%",
         overflow='hidden', 
         border='1px solid #ddd', 

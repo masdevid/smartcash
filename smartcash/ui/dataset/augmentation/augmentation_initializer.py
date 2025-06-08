@@ -69,11 +69,9 @@ class AugmentationInitializer(CommonInitializer):
         return get_default_augmentation_config()
     
     def _get_critical_components(self) -> List[str]:
-        """Critical components untuk augmentation module"""
+        """Critical components yang harus ada dalam ui_components - sesuai dengan UI creation"""
         return [
-            'ui', 'augment_button', 'check_button', 'cleanup_button',
-            'save_button', 'reset_button', 'log_output', 'status_panel',
-            'progress_tracker', 'num_variations', 'target_count', 'augmentation_types'
+            'ui', 'augment_button', 'check_button', 'save_button', 'reset_button', 'log_output'
         ]
 
 # Global instance

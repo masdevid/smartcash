@@ -46,7 +46,7 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Split information panel
     split_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color:#e3f2fd; 
+        <div style="padding: 8px; background-color:#2196f315; 
                     border-radius: 4px; margin: 5px 0; font-size: 11px;
                     border: 1px solid #2196f3;">
             <strong style="color:#2196f3">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
@@ -61,7 +61,7 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Types information panel
     types_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color:#e3f2fd; 
+        <div style="padding: 8px; background-color:#2196f315; 
                     border-radius: 4px; margin: 5px 0; font-size: 11px;
                     border: 1px solid #2196f3;">
             <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>

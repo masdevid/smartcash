@@ -1,19 +1,21 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/progress_utils.py
-Deskripsi: Unified progress tracking yang menggantikan backend progress tracker
+Deskripsi: Fixed progress utilities menggunakan shared progress tracker dari ui/components
 """
 
 from typing import Dict, Any, Callable, Optional
 import time
 
 class UnifiedProgressManager:
-    """Unified progress manager yang menggantikan backend progress tracker"""
+    """Fixed progress manager yang menggunakan shared components progress tracker"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.last_update = {'time': 0, 'percentage': -1, 'step': ''}
         self.current_operation = None
         self.operation_start_time = None
+        # FIXED: Akses shared progress tracker dari ui_components
+        self.progress_tracker = ui_components.get('progress_tracker')
     
     def create_backend_communicator(self):
         """Create communicator interface untuk backend service"""
@@ -41,7 +43,13 @@ class UnifiedProgressManager:
         else:
             final_msg = f"{'✅' if success else '❌'} {message}"
         
-        self._update_progress_tracker('overall', 100, final_msg)
+        # FIXED: Gunakan shared progress tracker methods
+        if self.progress_tracker:
+            if success:
+                self.progress_tracker.complete(final_msg)
+            else:
+                self.progress_tracker.error(final_msg)
+        
         self._log_ui(final_msg, 'success' if success else 'error')
         self.current_operation = None
     
@@ -68,8 +76,8 @@ class UnifiedProgressManager:
                 'step': step
             })
             
-            # Update UI tracker
-            self._update_progress_tracker(step, percentage, message)
+            # FIXED: Update menggunakan shared progress tracker
+            self._update_shared_progress_tracker(step, percentage, message)
             
             # Log milestone progress
             if percentage in [0, 25, 50, 75, 100]:
@@ -77,35 +85,33 @@ class UnifiedProgressManager:
                 progress_msg = f"{step_emoji} {step.title()}: {percentage}% - {message}"
                 self._log_ui(progress_msg, 'info')
     
-    def _update_progress_tracker(self, level: str, percentage: int, message: str):
-        """Update progress tracker dengan safe method calls"""
+    def _update_shared_progress_tracker(self, level: str, percentage: int, message: str):
+        """FIXED: Update shared progress tracker dengan proper method calls"""
+        if not self.progress_tracker:
+            return
+        
         try:
-            progress_tracker = self.ui_components.get('progress_tracker')
-            if not progress_tracker:
-                return
-            
-            # Map level ke method yang sesuai
-            if level == 'overall' and hasattr(progress_tracker, 'update_overall'):
-                progress_tracker.update_overall(percentage, message)
-            elif level == 'step' and hasattr(progress_tracker, 'update_step'):
-                progress_tracker.update_step(percentage, message)
-            elif level == 'current' and hasattr(progress_tracker, 'update_current'):
-                progress_tracker.update_current(percentage, message)
-            elif hasattr(progress_tracker, 'update'):
-                progress_tracker.update(level, percentage, message)
+            # Map level ke method yang sesuai untuk shared tracker
+            if level == 'overall' and hasattr(self.progress_tracker, 'update_overall'):
+                self.progress_tracker.update_overall(percentage, message)
+            elif level == 'step' and hasattr(self.progress_tracker, 'update_step'):
+                self.progress_tracker.update_step(percentage, message)
+            elif level == 'current' and hasattr(self.progress_tracker, 'update_current'):
+                self.progress_tracker.update_current(percentage, message)
+            elif hasattr(self.progress_tracker, 'update'):
+                self.progress_tracker.update(percentage, message)
         except Exception:
             pass
     
     def _show_progress_container(self):
         """Show progress container untuk operation"""
         try:
-            # Show progress tracker jika ada method show
-            progress_tracker = self.ui_components.get('progress_tracker')
-            if progress_tracker and hasattr(progress_tracker, 'show'):
-                progress_tracker.show()
+            # FIXED: Show progress tracker dari shared components
+            if self.progress_tracker and hasattr(self.progress_tracker, 'show'):
+                self.progress_tracker.show()
             
-            # Alternative: show via function reference
-            show_func = self.ui_components.get('show_for_operation')
+            # Alternative: gunakan show function dari ui_components
+            show_func = self.ui_components.get('show_container')
             if show_func and callable(show_func):
                 show_func(self.current_operation)
         except Exception:

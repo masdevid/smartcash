@@ -1,19 +1,19 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_handlers.py
-Deskripsi: Updated handlers dengan unified progress tracking integration
+Deskripsi: Fixed handlers dengan shared progress tracker integration
 """
 
 from typing import Dict, Any
 
 def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handlers dengan unified progress tracking"""
+    """Setup handlers dengan shared progress tracker"""
     
     # Setup config handler
     config_handler = ui_components.get('config_handler')
     if config_handler and hasattr(config_handler, 'set_ui_components'):
         config_handler.set_ui_components(ui_components)
     
-    # Setup unified progress manager
+    # Setup unified progress manager dengan shared tracker
     progress_manager = _create_progress_manager(ui_components)
     ui_components['progress_manager'] = progress_manager
     
@@ -24,7 +24,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str,
     return ui_components
 
 def _create_progress_manager(ui_components: Dict[str, Any]):
-    """Create unified progress manager"""
+    """Create unified progress manager menggunakan shared tracker"""
     try:
         from smartcash.ui.dataset.augmentation.utils.progress_utils import create_unified_progress_manager
         return create_unified_progress_manager(ui_components)
@@ -32,15 +32,20 @@ def _create_progress_manager(ui_components: Dict[str, Any]):
         return None
 
 def _setup_operation_handlers(ui_components: Dict[str, Any], progress_manager):
-    """Setup operation handlers dengan unified progress"""
+    """Setup operation handlers dengan shared progress"""
     
     def augment_handler(button):
-        """Augmentation handler dengan unified progress tracking"""
+        """Augmentation handler dengan shared progress tracking"""
         _clear_outputs(ui_components)
         
         try:
             if progress_manager:
                 progress_manager.start_operation("Dataset Augmentation")
+            
+            # FIXED: Show progress menggunakan shared tracker
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
             
             # Create service dengan UI integration
             from smartcash.dataset.augmentor.service import create_service_from_ui
@@ -61,13 +66,18 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], progress_manager):
                 _log_ui(ui_components, f"❌ Pipeline error: {str(e)}", 'error')
     
     def check_handler(button):
-        """Check dataset handler"""
+        """Check dataset handler dengan shared progress"""
         _clear_outputs(ui_components)
         
         try:
             if progress_manager:
                 progress_manager.start_operation("Dataset Check")
                 progress_manager._update_progress_with_throttling('overall', 10, 100, "Mencari lokasi data")
+            
+            # FIXED: Show progress menggunakan shared tracker
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
             
             from smartcash.dataset.augmentor.utils.dataset_detector import detect_split_structure
             from smartcash.dataset.augmentor.utils.path_operations import get_best_data_location
@@ -103,13 +113,18 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], progress_manager):
                 _log_ui(ui_components, f"❌ Check error: {str(e)}", 'error')
     
     def cleanup_handler(button):
-        """Cleanup handler dengan confirmation"""
+        """Cleanup handler dengan shared progress dan confirmation"""
         _clear_outputs(ui_components)
         
         def confirm_cleanup(confirm_button):
             try:
                 if progress_manager:
                     progress_manager.start_operation("Cleanup Dataset")
+                
+                # FIXED: Show progress menggunakan shared tracker
+                progress_tracker = ui_components.get('progress_tracker')
+                if progress_tracker and hasattr(progress_tracker, 'show'):
+                    progress_tracker.show()
                 
                 from smartcash.dataset.augmentor.service import create_service_from_ui
                 service = create_service_from_ui(ui_components)

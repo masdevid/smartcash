@@ -1,84 +1,73 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_updater.py
-Deskripsi: Pembaruan UI components dari konfigurasi preprocessing sesuai form yang ada
+Deskripsi: Fixed pembaruan UI components dari konfigurasi dengan inheritance handling yang tepat
 """
 
 from typing import Dict, Any
 
 def update_preprocessing_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI components dari config preprocessing dengan struktur lengkap"""
+    """Update UI components dari config dengan proper structure handling"""
     preprocessing_config = config.get('preprocessing', {})
     normalization_config = preprocessing_config.get('normalization', {})
     performance_config = config.get('performance', {})
-    validate_config = preprocessing_config.get('validate', {})
-    analysis_config = preprocessing_config.get('analysis', {})
-    balance_config = preprocessing_config.get('balance', {})
-    cleanup_config = config.get('cleanup', {})
     
     safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
     
-    # Field mappings sesuai dengan form UI dan defaults.py structure
-    field_mappings = [
-        # Performance settings
-        ('worker_slider', performance_config, 'num_workers', 8),
-        
-        # Preprocessing settings
-        ('split_dropdown', preprocessing_config, 'target_split', 'all'),
-        
-        # Note: resolution dan normalization perlu special handling karena complex structure
-    ]
+    # Update worker slider dari performance config
+    num_workers = performance_config.get('num_workers', 8)
+    safe_update('worker_slider', min(max(num_workers, 1), 10))
     
-    # Apply basic mappings
-    [safe_update(component_key, source_config.get(config_key, default_value)) 
-     for component_key, source_config, config_key, default_value in field_mappings]
+    # Update split dropdown dari preprocessing config  
+    target_split = preprocessing_config.get('target_split', 'all')
+    valid_splits = ['all', 'train', 'valid', 'test']
+    safe_update('split_dropdown', target_split if target_split in valid_splits else 'all')
     
-    # Special handling untuk resolution dropdown dari normalization.target_size
+    # Update resolution dari normalization.target_size dengan validation
     try:
         target_size = normalization_config.get('target_size', [640, 640])
         if isinstance(target_size, list) and len(target_size) >= 2:
             resolution_str = f"{target_size[0]}x{target_size[1]}"
-            safe_update('resolution_dropdown', resolution_str)
+            valid_resolutions = ['320x320', '416x416', '512x512', '640x640']
+            safe_update('resolution_dropdown', resolution_str if resolution_str in valid_resolutions else '640x640')
         else:
             safe_update('resolution_dropdown', '640x640')
     except Exception:
         safe_update('resolution_dropdown', '640x640')
     
-    # Special handling untuk normalization method dari complete normalization structure
+    # Update normalization method dengan proper enabled/disabled handling
     try:
-        if normalization_config.get('enabled', True):
-            method = normalization_config.get('method', 'minmax')
-            # Validate method exists in dropdown options
-            valid_methods = ['minmax', 'standard', 'none']
-            if method in valid_methods:
-                safe_update('normalization_dropdown', method)
-            else:
-                safe_update('normalization_dropdown', 'minmax')
-        else:
+        normalization_enabled = normalization_config.get('enabled', True)
+        normalization_method = normalization_config.get('method', 'minmax')
+        
+        if not normalization_enabled:
             safe_update('normalization_dropdown', 'none')
+        else:
+            valid_methods = ['minmax', 'standard', 'none']
+            safe_update('normalization_dropdown', normalization_method if normalization_method in valid_methods else 'minmax')
     except Exception:
         safe_update('normalization_dropdown', 'minmax')
 
 def reset_preprocessing_ui(ui_components: Dict[str, Any]) -> None:
-    """Reset UI components ke default konfigurasi preprocessing"""
+    """Reset UI components ke default konfigurasi dari defaults.py"""
     try:
         from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
         default_config = get_default_preprocessing_config()
         update_preprocessing_ui(ui_components, default_config)
     except Exception:
-        _apply_basic_defaults(ui_components)
+        _apply_hardcoded_defaults(ui_components)
 
-def _apply_basic_defaults(ui_components: Dict[str, Any]) -> None:
-    """Apply basic defaults jika config manager tidak tersedia"""
-    basic_defaults = {
+def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
+    """Apply hardcoded defaults jika config manager tidak tersedia"""
+    defaults = {
         'resolution_dropdown': '640x640',
-        'normalization_dropdown': 'minmax',
+        'normalization_dropdown': 'minmax', 
         'worker_slider': 8,
         'split_dropdown': 'all'
     }
     
-    for key, value in basic_defaults.items():
+    for key, value in defaults.items():
         if key in ui_components and hasattr(ui_components[key], 'value'):
             try:
                 ui_components[key].value = value
             except Exception:
-                pass  # Silent fail untuk widget issues
+                pass  # Silent fail untuk widget compatibility issues

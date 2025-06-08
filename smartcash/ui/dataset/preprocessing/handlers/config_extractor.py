@@ -1,36 +1,52 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_extractor.py
-Deskripsi: Ekstraksi konfigurasi preprocessing dari UI components sesuai form yang ada
+Deskripsi: Fixed ekstraksi konfigurasi preprocessing sesuai struktur preprocessing_config.yaml dengan inheritance yang tepat
 """
 
 from typing import Dict, Any
 from datetime import datetime
 
 def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Ekstraksi konfigurasi preprocessing sesuai dengan form UI yang ada"""
+    """Ekstraksi konfigurasi preprocessing sesuai dengan struktur preprocessing_config.yaml"""
     get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Extract resolution value dan convert ke target_size
+    # Extract resolution dan convert ke target_size
     resolution = get_value('resolution_dropdown', '640x640')
     width, height = map(int, resolution.split('x')) if 'x' in resolution else (640, 640)
+    
+    # Extract normalization method dengan proper structure
+    normalization_method = get_value('normalization_dropdown', 'minmax')
+    normalization_enabled = normalization_method != 'none'
     
     return {
         'config_version': '1.0',
         'updated_at': current_time,
         '_base_': 'base_config.yaml',
         
+        # PRIMARY CONFIGURATION - Sering Diubah (sesuai preprocessing_config.yaml)
         'preprocessing': {
+            # Basic settings
             'output_dir': 'data/preprocessed',
             'save_visualizations': False,
             'vis_dir': 'visualizations/preprocessing',
-            'sample_size': 0,  # 0 = semua file
+            'sample_size': 0,
             
-            # Target split dari form
+            # UI controlled settings
             'target_split': get_value('split_dropdown', 'all'),
             'force_reprocess': False,
             
-            # Validasi preprocessing sesuai defaults.py
+            # Complete normalization structure sesuai config
+            'normalization': {
+                'enabled': normalization_enabled,
+                'method': normalization_method if normalization_enabled else 'minmax',
+                'target_size': [width, height],
+                'preserve_aspect_ratio': True,
+                'normalize_pixel_values': True,
+                'pixel_range': [0, 1]
+            },
+            
+            # Validation settings - preserve defaults
             'validate': {
                 'enabled': True,
                 'fix_issues': True,
@@ -42,17 +58,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
                 'check_uuid_consistency': True
             },
             
-            # Normalisasi sesuai defaults.py structure
-            'normalization': {
-                'enabled': get_value('normalization_dropdown', 'minmax') != 'none',
-                'method': get_value('normalization_dropdown', 'minmax'),
-                'target_size': [width, height],
-                'preserve_aspect_ratio': True,
-                'normalize_pixel_values': True,
-                'pixel_range': [0, 1]
-            },
-            
-            # Analysis settings sesuai defaults.py
+            # Analysis settings - default disabled
             'analysis': {
                 'enabled': False,
                 'class_balance': True,
@@ -61,7 +67,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
                 'layer_balance': True
             },
             
-            # Balance settings sesuai defaults.py
+            # Balance settings - default disabled
             'balance': {
                 'enabled': False,
                 'target_distribution': 'auto',
@@ -75,7 +81,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
             }
         },
         
-        # Performance settings sesuai defaults.py
+        # Performance settings dari UI
         'performance': {
             'num_workers': get_value('worker_slider', _get_optimal_workers()),
             'batch_size': 32,
@@ -85,7 +91,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
             'use_mixed_precision': True
         },
         
-        # Cleanup settings sesuai defaults.py
+        # Cleanup settings - preserve defaults
         'cleanup': {
             'augmentation_patterns': [
                 'aug_.*',
@@ -107,5 +113,8 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
 
 def _get_optimal_workers() -> int:
     """Get optimal workers untuk preprocessing operations"""
-    from smartcash.common.threadpools import get_optimal_thread_count
-    return get_optimal_thread_count('io')
+    try:
+        from smartcash.common.threadpools import get_optimal_thread_count
+        return get_optimal_thread_count('io')
+    except ImportError:
+        return 8  # Fallback default

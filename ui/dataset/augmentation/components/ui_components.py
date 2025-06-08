@@ -97,7 +97,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             action_section,
             progress_tracker.container,
             log_components['log_accordion']
-        ], layout=widgets.Layout(width='100%'))
+        ], layout=widgets.Layout(width='100%', overflow='hidden', display="flex", flex_flow="column", justify_content="space-between"))
         
         # Component mapping
         return {

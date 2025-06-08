@@ -15,7 +15,7 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
     """Membuat komponen log accordion dengan FIXED overflow issues."""
     output_widget = output_widget or widgets.Output(layout=widgets.Layout(
         max_height=height, 
-        width='100%',
+        width='98%',
         overflow='hidden', 
         border='1px solid #ddd', 
         padding='8px',
@@ -46,13 +46,11 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
     
     setattr(output_widget, 'append_log', append_log)
     log_accordion = widgets.Accordion(children=[output_widget], layout=widgets.Layout(
-        width=width, 
+        width=width,
+        max_width="100%",
         margin='10px 0',
         overflow='hidden',
         box_sizing='border-box',
-        display="flex",
-        flex_flow="column",
-        align_items="stretch"
     ))
     log_accordion.set_title(0, f"{ICONS.get('log', '📋')} Log {module_name.capitalize()}")
     log_accordion.selected_index = 0  # Open by default

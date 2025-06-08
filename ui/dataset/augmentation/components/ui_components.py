@@ -59,7 +59,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         # Layout dengan border dan balanced 2x2 grid
         settings_grid = _create_balanced_settings_grid([
-            basic_options, advanced_options, augmentation_types
+            basic_options, advanced_options
         ])
         
         # Action section dengan styling
@@ -71,7 +71,6 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         # Config section dengan styling
         config_section = widgets.VBox([
-            _create_section_header("💾 Manajemen Konfigurasi", "#f6ad55"),
             widgets.Box([config_buttons['container']], 
                 layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
         ])
@@ -81,6 +80,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             header,
             status_panel,
             settings_grid,
+            augmentation_types,
             config_section,
             action_section,
             progress_tracker.container,
@@ -151,9 +151,8 @@ def _create_balanced_settings_grid(widget_groups):
 def _create_section_header(title: str, color: str) -> widgets.HTML:
     """Create styled section header"""
     return widgets.HTML(f"""
-    <div style="padding: 12px; margin: 15px 0 10px 0; 
-                background: linear-gradient(135deg, {color} 0%, {color}99 100%);
-                border-radius: 8px; border-left: 4px solid {color};">
+    <div style="margin: 15px 0 10px 0; 
+                border-bottom: 4px solid {color};">
         <h4 style="color: white; margin: 0; font-size: 16px;">
             {title}
         </h4>

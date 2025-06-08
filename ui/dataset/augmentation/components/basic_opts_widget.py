@@ -56,12 +56,13 @@ def create_basic_options_widget() -> Dict[str, Any]:
     # Info panel dengan guidance
     info_panel = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: {COLORS.get('bg_light', '#f8f9fa')}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;">
-            <strong>{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
-            • <strong>Variasi:</strong> 2-5 optimal untuk dataset research<br>
-            • <strong>Target Count:</strong> 500-1000 untuk training yang efektif<br>
-            • <strong>Balance Classes:</strong> Hanya Layer 1 & 2 (denominasi utama)
+        <div style="padding: 8px; background-color: #4caf5015; 
+                    border-radius: 4px; margin: 5px 0; font-size: 11px;
+                    border: 1px solid #4caf5040;" >
+            <strong style="color: #2e7d32;">{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
+            • <strong style="color: #2e7d32;">Variasi:</strong> 2-5 optimal untuk dataset research<br>
+            • <strong style="color: #2e7d32;">Target Count:</strong> 500-1000 untuk training yang efektif<br>
+            • <strong style="color: #2e7d32;">Balance Classes:</strong> Hanya Layer 1 & 2 (denominasi utama)
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')

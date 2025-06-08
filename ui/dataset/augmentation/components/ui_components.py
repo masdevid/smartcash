@@ -74,8 +74,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         ui = widgets.VBox([
             header,
             status_panel,
-            widgets.HBox([basic_options['container'], advanced_options['container']],  layout=widgets.Layout(width='100%', justify_content='space-between', gap='10px')),
-            widgets.HBox([augmentation_types['container']], layout=widgets.Layout(width='100%', justify_content='space-between', gap='10px')),
+            widgets.HBox([basic_options['container'], advanced_options['container']],  layout=widgets.Layout(width='100%', display="flex", justify_content='space-between', gap='10px')),
+            widgets.HBox([augmentation_types['container']], layout=widgets.Layout(width='100%', display="flex", justify_content='space-between', gap='10px')),
             config_section,
             action_section,
             progress_tracker.container,

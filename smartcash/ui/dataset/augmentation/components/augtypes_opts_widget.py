@@ -46,12 +46,13 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Split information panel
     split_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: {COLORS.get('bg_light', '#f8f9fa')}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;">
-            <strong>{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
-            • <strong>train</strong>: Augmentasi pada data training (rekomendasi)<br>
-            • <strong>valid</strong>: Augmentasi pada data validasi (jarang diperlukan)<br>
-            • <strong>test</strong>: Augmentasi pada data testing (tidak direkomendasikan)
+        <div style="padding: 8px; background-color: {COLORS.get('bg_light', '#2196f340')}; 
+                    border-radius: 4px; margin: 5px 0; font-size: 11px;
+                    border: 1px solid #2196f3;">
+            <strong style="color:#2196f3">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
+            • <strong style="color:#2196f3">train</strong>: Augmentasi pada data training (rekomendasi)<br>
+            • <strong style="color:#2196f3">valid</strong>: Augmentasi pada data validasi (jarang diperlukan)<br>
+            • <strong style="color:#2196f3">test</strong>: Augmentasi pada data testing (tidak direkomendasikan)
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
@@ -60,12 +61,13 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Types information panel
     types_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: {COLORS.get('bg_light', '#f8f9fa')}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;">
-            <strong>{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
-            • <strong>Combined</strong>: Gabungan transformasi posisi dan pencahayaan<br>
-            • <strong>Position</strong>: Hanya transformasi geometri (rotasi, flip, scale)<br>
-            • <strong>Lighting</strong>: Hanya transformasi pencahayaan (HSV, brightness)
+        <div style="padding: 8px; background-color:{COLORS.get('bg_light', '#2196f340')}; 
+                    border-radius: 4px; margin: 5px 0; font-size: 11px;
+                    border: 1px solid #2196f3;">
+            <strong style="color:#f8f9fa">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
+            • <strong style="color:#f8f9fa">Combined</strong>: Gabungan transformasi posisi dan pencahayaan<br>
+            • <strong style="color:#f8f9fa">Position</strong>: Hanya transformasi geometri (rotasi, flip, scale)<br>
+            • <strong style="color:#f8f9fa">Lighting</strong>: Hanya transformasi pencahayaan (HSV, brightness)
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')

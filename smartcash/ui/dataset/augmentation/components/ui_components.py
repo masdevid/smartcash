@@ -37,15 +37,15 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         # Config buttons
         config_buttons = create_save_reset_buttons(
-            save_label="💾 Simpan Config", 
-            reset_label="🔄 Reset Config"
+            save_label="Simpan", 
+            reset_label="Reset"
         )
         
         # Action buttons dengan enhanced labels
         action_buttons = create_action_buttons(
             primary_label="🎯 Run Augmentation Pipeline", 
             primary_icon="play",
-            secondary_buttons=[("🔍 Check Dataset & Preprocessed", "search", "info")],
+            secondary_buttons=[("🔍 Check Dataset", "search", "info")],
             cleanup_enabled=True, 
             button_width="200px"
         )

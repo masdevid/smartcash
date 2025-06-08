@@ -126,12 +126,9 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
 def _create_section_header(title: str, color: str) -> widgets.HTML:
     """Create styled section header"""
     return widgets.HTML(f"""
-    <div style="margin: 15px 0 10px 0; 
-                border-bottom: 4px solid {color};">
-        <h4 style="color: white; margin: 0; font-size: 16px;">
-            {title}
-        </h4>
-    </div>
+    <h4 style="color: #333; margin: 15px 0 10px 0; border-bottom: 2px solid {color}; font-size: 16px; padding-bottom: 6px;">
+        {title}
+    </h4>
     """)
 
 def _create_basic_options_group() -> Dict[str, Any]:

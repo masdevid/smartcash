@@ -122,6 +122,14 @@ def _convert_ui_to_backend_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     """Convert UI config ke backend service format"""
     preprocessing = ui_config.get('preprocessing', {})
     performance = ui_config.get('performance', {})
+    normalization = preprocessing.get('normalization', {})
+    
+    # Extract target_size dari params atau config
+    target_size = normalization.get('target_size', [640, 640])
+    if isinstance(target_size, list) and len(target_size) >= 2:
+        img_size = target_size
+    else:
+        img_size = [640, 640]
     
     return {
         'data': ui_config.get('data', {}),
@@ -129,10 +137,15 @@ def _convert_ui_to_backend_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
         'performance': performance,
         'cleanup': ui_config.get('cleanup', {}),
         
-        # Derived settings
-        'img_size': preprocessing.get('normalization', {}).get('target_size', [640, 640]),
-        'normalize': preprocessing.get('normalization', {}).get('enabled', True),
+        # Backend compatibility format
+        'img_size': img_size,
+        'normalize': normalization.get('enabled', True),
+        'normalization_method': normalization.get('method', 'minmax'),
         'num_workers': performance.get('num_workers', 8),
         'split': preprocessing.get('target_split', 'all'),
-        'force_reprocess': preprocessing.get('force_reprocess', False)
+        'force_reprocess': preprocessing.get('force_reprocess', False),
+        
+        # Output settings
+        'output_dir': preprocessing.get('output_dir', 'data/preprocessed'),
+        'validate_enabled': preprocessing.get('validate', {}).get('enabled', True)
     }

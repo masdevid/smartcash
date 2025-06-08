@@ -87,11 +87,7 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     ], layout=widgets.Layout(width='48%', padding='5px'))
     
     # Main container dengan responsive layout
-    container = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0; font-size: 14px;'>{ICONS.get('settings', '⚙️')} Jenis Augmentasi & Target Split</h6>"),
-        widgets.HBox([left_column, right_column], 
-                    layout=widgets.Layout(width='100%', display="flex", gap="10px", justify_content='space-between'))
-    ], layout=widgets.Layout(padding='10px', width='100%', display="flex", justify_content="flex-start"))
+    container = widgets.HBox([left_column, right_column], layout=widgets.Layout(width='100%', display="flex", gap="10px", justify_content='space-between'))
     
     return {
         'container': container,

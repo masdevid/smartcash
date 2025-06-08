@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augtypes_opts_widget.py
-Deskripsi: Augmentation types dan target split widget dengan informasi yang jelas
+Deskripsi: Fixed augmentation types widget dengan full width layout dan informasi yang jelas
 """
 
 import ipywidgets as widgets
@@ -8,86 +8,84 @@ from typing import Dict, Any
 
 def create_augmentation_types_widget() -> Dict[str, Any]:
     """
-    Create augmentation types dan target split selection widget
+    Create augmentation types dan target split selection widget dengan full width layout
     
     Returns:
         Dictionary berisi container dan widget mapping
     """
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Jenis augmentasi dengan deskripsi yang jelas
+    # Jenis augmentasi dengan deskripsi yang jelas - full width
     augmentation_types = widgets.SelectMultiple(
         options=[
-            ('Combined: Kombinasi posisi dan pencahayaan (direkomendasikan)', 'combined'),
-            ('Position: Variasi posisi seperti rotasi, flipping, dan scaling', 'position'),
-            ('Lighting: Variasi pencahayaan seperti brightness, contrast dan HSV', 'lighting')
+            ('🎯 Combined: Kombinasi posisi dan pencahayaan (direkomendasikan)', 'combined'),
+            ('📍 Position: Variasi posisi seperti rotasi, flipping, dan scaling', 'position'),
+            ('💡 Lighting: Variasi pencahayaan seperti brightness, contrast dan HSV', 'lighting')
         ],
         value=['combined'],
         description='Jenis Augmentasi:',
         disabled=False,
-        layout=widgets.Layout(width='95%', height='100px'),
+        layout=widgets.Layout(width='100%', height='120px'),
         style={'description_width': '130px'}
     )
     
     # Target split dengan guidance
     target_split = widgets.Dropdown(
         options=[
-            ('Train - Dataset training (direkomendasikan)', 'train'),
-            ('Valid - Dataset validasi (jarang diperlukan)', 'valid'),
-            ('Test - Dataset testing (tidak direkomendasikan)', 'test')
+            ('🎯 Train - Dataset training (direkomendasikan)', 'train'),
+            ('📊 Valid - Dataset validasi (jarang diperlukan)', 'valid'),
+            ('🧪 Test - Dataset testing (tidak direkomendasikan)', 'test')
         ],
         value='train',
         description='Target Split:',
         disabled=False,
-        layout=widgets.Layout(width='95%'),
+        layout=widgets.Layout(width='100%'),
         style={'description_width': '130px'}
+    )
+    
+    # Types information panel dengan detail
+    types_info = widgets.HTML(
+        f"""
+        <div style="padding: 10px; background-color:#2196f315; 
+                    border-radius: 6px; margin: 8px 0; font-size: 12px;
+                    border: 1px solid #2196f3;">
+            <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
+            • <strong style="color:#2196f3">Combined</strong>: Gabungan transformasi posisi dan pencahayaan (pipeline penelitian)<br>
+            • <strong style="color:#2196f3">Position</strong>: Hanya transformasi geometri (rotasi, flip, scale, translate)<br>
+            • <strong style="color:#2196f3">Lighting</strong>: Hanya transformasi pencahayaan (HSV, brightness, contrast)
+        </div>
+        """,
+        layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
     # Split information panel
     split_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color:#2196f315; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;
-                    border: 1px solid #2196f3;">
-            <strong style="color:#2196f3">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
-            • <strong style="color:#2196f3">train</strong>: Augmentasi pada data training (rekomendasi)<br>
-            • <strong style="color:#2196f3">valid</strong>: Augmentasi pada data validasi (jarang diperlukan)<br>
-            • <strong style="color:#2196f3">test</strong>: Augmentasi pada data testing (tidak direkomendasikan)
+        <div style="padding: 10px; background-color:#4caf5015; 
+                    border-radius: 6px; margin: 8px 0; font-size: 12px;
+                    border: 1px solid #4caf50;">
+            <strong style="color:#2e7d32">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
+            • <strong style="color:#2e7d32">train</strong>: Augmentasi pada data training untuk meningkatkan variasi data<br>
+            • <strong style="color:#2e7d32">valid</strong>: Augmentasi pada data validasi (hanya jika dataset sangat kecil)<br>
+            • <strong style="color:#2e7d32">test</strong>: Augmentasi pada data testing (tidak direkomendasikan untuk evaluasi)
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Types information panel
-    types_info = widgets.HTML(
-        f"""
-        <div style="padding: 8px; background-color:#2196f315; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;
-                    border: 1px solid #2196f3;">
-            <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
-            • <strong style="color:#2196f3">Combined</strong>: Gabungan transformasi posisi dan pencahayaan<br>
-            • <strong style="color:#2196f3">Position</strong>: Hanya transformasi geometri (rotasi, flip, scale)<br>
-            • <strong style="color:#2196f3">Lighting</strong>: Hanya transformasi pencahayaan (HSV, brightness)
-        </div>
-        """,
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    # Layout dengan 2 kolom
-    left_column = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0;'>{ICONS.get('augmentation', '🔄')} Pilih Jenis Augmentasi:</h6>"),
+    # FIXED: Layout full width dengan proper spacing
+    container = widgets.VBox([
+        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 8px 0;'>{ICONS.get('augmentation', '🔄')} Pilih Jenis Augmentasi:</h6>"),
         augmentation_types,
-        types_info
-    ], layout=widgets.Layout(width='48%', padding='5px'))
-    
-    right_column = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0;'>{ICONS.get('split', '📂')} Target Split:</h6>"),
+        types_info,
+        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 8px 0;'>{ICONS.get('split', '📂')} Target Split Dataset:</h6>"),
         target_split,
         split_info
-    ], layout=widgets.Layout(width='48%', padding='5px'))
-    
-    # Main container dengan responsive layout
-    container = widgets.HBox([left_column, right_column], layout=widgets.Layout(width='100%', display="flex", gap="10px", justify_content='space-between'))
+    ], layout=widgets.Layout(
+        width='100%',           # FIXED: Full width
+        padding='10px',
+        margin='5px 0'
+    ))
     
     return {
         'container': container,
@@ -103,7 +101,7 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
                 'target_split': 'train'
             }
         },
-        # Options mapping untuk validation
+        # Extended options mapping
         'options': {
             'augmentation_types': ['combined', 'position', 'lighting'],
             'target_split': ['train', 'valid', 'test']

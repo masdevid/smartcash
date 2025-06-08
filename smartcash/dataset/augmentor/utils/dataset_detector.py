@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/utils/dataset_detector.py
-Deskripsi: SRP module untuk dataset structure detection dengan comprehensive analysis
+Deskripsi: Enhanced dataset detector dengan perbandingan raw vs preprocessed untuk kesiapan augmentasi
 """
 
 from typing import Dict, Any, List
@@ -90,6 +90,61 @@ def detect_split_structure(data_dir: str) -> Dict[str, Any]:
             f'📁 Splits: {", ".join(available_splits)}' if available_splits else 'No splits detected'
         ]
     }
+
+def compare_raw_vs_preprocessed(raw_dir: str, preprocessed_dir: str) -> Dict[str, Any]:
+    """🆕 Compare raw dataset dengan preprocessed untuk kesiapan augmentasi"""
+    # Detect raw dataset
+    raw_info = detect_split_structure(raw_dir)
+    prep_info = detect_split_structure(preprocessed_dir) if path_exists(preprocessed_dir) else {
+        'status': 'error', 'available_splits': [], 'split_details': {}
+    }
+    
+    comparison = {
+        'raw_ready': raw_info['status'] == 'success' and raw_info.get('total_images', 0) > 0,
+        'preprocessed_exists': prep_info['status'] == 'success',
+        'augmentation_ready': False,
+        'split_comparison': {},
+        'recommendations': []
+    }
+    
+    # Compare per split
+    if comparison['raw_ready']:
+        for split in raw_info.get('available_splits', []):
+            raw_split = raw_info['split_details'].get(split, {})
+            prep_split = prep_info.get('split_details', {}).get(split, {})
+            
+            raw_count = raw_split.get('images', 0)
+            prep_count = prep_split.get('images', 0)
+            
+            comparison['split_comparison'][split] = {
+                'raw_images': raw_count,
+                'preprocessed_images': prep_count,
+                'ratio': prep_count / raw_count if raw_count > 0 else 0,
+                'status': 'ready' if raw_count > 0 else 'missing',
+                'needs_preprocessing': raw_count > 0 and prep_count == 0
+            }
+    
+    # Overall assessment
+    total_raw = raw_info.get('total_images', 0)
+    total_prep = prep_info.get('total_images', 0)
+    
+    if total_raw > 0:
+        if total_prep > 0:
+            comparison['augmentation_ready'] = True
+            comparison['recommendations'].append(f"✅ Siap augmentasi: {total_raw} raw → {total_prep} preprocessed")
+        else:
+            comparison['recommendations'].append(f"🔄 Perlu preprocessing: {total_raw} raw images tersedia")
+    else:
+        comparison['recommendations'].append("❌ Dataset raw tidak ditemukan")
+    
+    # Split-specific recommendations
+    for split, details in comparison['split_comparison'].items():
+        if details['needs_preprocessing']:
+            comparison['recommendations'].append(f"🔄 {split}: perlu preprocessing {details['raw_images']} images")
+        elif details['status'] == 'ready':
+            comparison['recommendations'].append(f"✅ {split}: siap augmentasi ({details['preprocessed_images']} preprocessed)")
+    
+    return comparison
 
 # One-liner utilities
 validate_dataset = lambda data_dir: detect_structure(data_dir)['total_images'] > 0

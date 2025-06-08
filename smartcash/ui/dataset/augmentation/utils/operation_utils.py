@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/operation_utils.py
-Deskripsi: Operation utilities yang dipindahkan dari handlers ke utils untuk better separation
+Deskripsi: Enhanced operation utilities dengan granular progress dan dataset comparison
 """
 
 from typing import Dict, Any
 
 def execute_augmentation(ui_components: Dict[str, Any]):
-    """Execute augmentation dengan new progress tracker API"""
+    """Execute augmentation dengan granular progress tracking"""
     try:
         _disable_operation_buttons(ui_components)
         _show_progress_for_operation(ui_components, 'augmentation')
@@ -34,44 +34,39 @@ def execute_augmentation(ui_components: Dict[str, Any]):
     finally:
         _enable_operation_buttons(ui_components)
 
-def execute_check(ui_components: Dict[str, Any]):
-    """Execute check dengan new progress tracker API"""
+def execute_enhanced_check(ui_components: Dict[str, Any]):
+    """🆕 Execute enhanced check dengan raw vs preprocessed comparison"""
     try:
         _disable_operation_buttons(ui_components)
         _show_progress_for_operation(ui_components, 'check_dataset')
-        _log_to_ui(ui_components, "🔍 Memulai pengecekan dataset...", 'info')
+        _log_to_ui(ui_components, "🔍 Memulai pengecekan dataset comprehensive...", 'info')
         
-        from smartcash.dataset.augmentor.utils.dataset_detector import detect_split_structure
-        from smartcash.dataset.augmentor.utils.path_operations import get_best_data_location
+        service = _create_service_safely(ui_components)
+        if not service:
+            _log_to_ui(ui_components, "❌ Gagal membuat service untuk check", 'error')
+            return
         
-        _update_progress_safe(ui_components, 'overall', 10, "🔍 Mencari lokasi data")
+        target_split = _get_target_split_safe(ui_components)
         
-        data_location = get_best_data_location()
-        _log_to_ui(ui_components, f"📁 Data location: {data_location}", 'info')
+        # Execute enhanced dataset check
+        result = service.check_dataset_readiness(target_split)
         
-        _update_progress_safe(ui_components, 'step', 30, "📊 Menganalisis raw dataset")
-        
-        raw_info = detect_split_structure(data_location)
-        if raw_info['status'] == 'success':
-            raw_images = raw_info.get('total_images', 0)
-            raw_labels = raw_info.get('total_labels', 0)
-            available_splits = raw_info.get('available_splits', [])
+        # Handle enhanced results
+        if result.get('status') == 'success':
+            _log_enhanced_check_results(ui_components, result)
             
-            _log_to_ui(ui_components, f"✅ Raw Dataset: {raw_images} gambar, {raw_labels} label", 'success')
-            _log_to_ui(ui_components, f"📂 Available splits: {', '.join(available_splits) if available_splits else 'flat structure'}", 'info')
+            if result.get('ready_for_augmentation'):
+                success_msg = "✅ Dataset siap untuk augmentasi"
+                _log_to_ui(ui_components, success_msg, 'success')
+                _complete_progress_safe(ui_components, success_msg)
+            else:
+                warning_msg = "⚠️ Dataset perlu preprocessing sebelum augmentasi"
+                _log_to_ui(ui_components, warning_msg, 'warning')
+                _complete_progress_safe(ui_components, warning_msg)
         else:
-            _log_to_ui(ui_components, f"❌ Raw dataset tidak ditemukan: {raw_info.get('message', 'Unknown error')}", 'error')
-        
-        _update_progress_safe(ui_components, 'step', 60, "🔄 Mengecek augmented dataset")
-        _check_augmented_dataset(ui_components, data_location)
-        
-        _update_progress_safe(ui_components, 'step', 80, "🔧 Mengecek preprocessed dataset")
-        _check_preprocessed_dataset(ui_components, data_location)
-        
-        ready_status = "✅ Siap" if raw_info['status'] == 'success' and raw_images > 0 else "❌ Tidak siap"
-        _log_to_ui(ui_components, f"🎯 Status augmentasi: {ready_status}", 'success' if ready_status.startswith('✅') else 'warning')
-        
-        _complete_progress_safe(ui_components, "✅ Check dataset selesai")
+            error_msg = f"❌ Check gagal: {result.get('message', 'Unknown error')}"
+            _log_to_ui(ui_components, error_msg, 'error')
+            _error_progress_safe(ui_components, error_msg)
         
     except Exception as e:
         error_msg = f"❌ Check error: {str(e)}"
@@ -81,19 +76,18 @@ def execute_check(ui_components: Dict[str, Any]):
         _enable_operation_buttons(ui_components)
 
 def execute_cleanup_with_progress(ui_components: Dict[str, Any]):
-    """Execute cleanup dengan new progress tracker"""
+    """Execute cleanup dengan granular progress tracking"""
     try:
         _disable_operation_buttons(ui_components)
         _show_progress_for_operation(ui_components, 'cleanup')
         _log_to_ui(ui_components, "🧹 Memulai cleanup dataset...", 'info')
         
-        from smartcash.dataset.augmentor.service import create_service_from_ui
-        
-        service = create_service_from_ui(ui_components)
-        _update_progress_safe(ui_components, 'step', 30, "🔍 Mencari file augmented")
+        service = _create_service_safely(ui_components)
+        if not service:
+            _log_to_ui(ui_components, "❌ Gagal membuat service untuk cleanup", 'error')
+            return
         
         result = service.cleanup_augmented_data(include_preprocessed=True)
-        _update_progress_safe(ui_components, 'step', 80, "🧹 Menyelesaikan cleanup")
         
         if result.get('status') == 'success':
             total_deleted = result.get('total_deleted', 0)
@@ -116,6 +110,54 @@ def execute_cleanup_with_progress(ui_components: Dict[str, Any]):
         _error_progress_safe(ui_components, error_msg)
     finally:
         _enable_operation_buttons(ui_components)
+
+def _log_enhanced_check_results(ui_components: Dict[str, Any], result: Dict[str, Any]):
+    """🆕 Log enhanced check results dengan detail comparison"""
+    data_location = result.get('data_location', 'Unknown')
+    comparison = result.get('comparison', {})
+    
+    _log_to_ui(ui_components, f"📁 Data location: {data_location}", 'info')
+    
+    # Raw dataset info
+    raw_info = result.get('raw_dataset', {})
+    if raw_info.get('status') == 'success':
+        total_raw = raw_info.get('total_images', 0)
+        splits = raw_info.get('available_splits', [])
+        _log_to_ui(ui_components, f"✅ Raw Dataset: {total_raw} gambar di {len(splits)} splits", 'success')
+        if splits:
+            _log_to_ui(ui_components, f"📂 Available splits: {', '.join(splits)}", 'info')
+    else:
+        _log_to_ui(ui_components, f"❌ Raw dataset: {raw_info.get('message', 'Not found')}", 'error')
+    
+    # Preprocessed comparison
+    if comparison.get('preprocessed_exists'):
+        split_comparison = comparison.get('split_comparison', {})
+        total_prep = sum(details.get('preprocessed_images', 0) for details in split_comparison.values())
+        _log_to_ui(ui_components, f"✅ Preprocessed Dataset: {total_prep} file", 'success')
+        
+        # Per-split details
+        for split, details in split_comparison.items():
+            raw_count = details.get('raw_images', 0)
+            prep_count = details.get('preprocessed_images', 0)
+            if details.get('needs_preprocessing'):
+                _log_to_ui(ui_components, f"🔄 {split}: {raw_count} raw → perlu preprocessing", 'warning')
+            elif prep_count > 0:
+                _log_to_ui(ui_components, f"✅ {split}: {prep_count} preprocessed siap", 'success')
+    else:
+        _log_to_ui(ui_components, "🔄 Preprocessed Dataset: Belum tersedia", 'warning')
+    
+    # Augmented dataset info
+    aug_info = result.get('augmented_dataset', {})
+    if aug_info.get('status') == 'success' and aug_info.get('total_images', 0) > 0:
+        aug_images = aug_info.get('total_images', 0)
+        _log_to_ui(ui_components, f"✅ Augmented Dataset: {aug_images} file", 'success')
+    else:
+        _log_to_ui(ui_components, "🔄 Augmented Dataset: Belum ada file", 'info')
+    
+    # Recommendations
+    recommendations = result.get('recommendations', [])
+    for rec in recommendations[:3]:  # Show top 3 recommendations
+        _log_to_ui(ui_components, f"💡 {rec}", 'info')
 
 # Helper functions
 def _create_service_safely(ui_components: Dict[str, Any]):
@@ -156,40 +198,6 @@ def _error_progress_safe(ui_components: Dict[str, Any], message: str):
     from smartcash.ui.dataset.augmentation.utils.progress_utils import create_progress_manager
     progress_manager = create_progress_manager(ui_components)
     progress_manager.error_operation(message)
-
-def _check_augmented_dataset(ui_components: Dict[str, Any], data_location: str):
-    """Check augmented dataset dengan detail"""
-    try:
-        from smartcash.dataset.augmentor.utils.dataset_detector import detect_split_structure
-        
-        aug_info = detect_split_structure(f"{data_location}/augmented")
-        if aug_info['status'] == 'success' and aug_info.get('total_images', 0) > 0:
-            aug_images = aug_info.get('total_images', 0)
-            aug_splits = aug_info.get('available_splits', [])
-            _log_to_ui(ui_components, f"✅ Augmented Dataset: {aug_images} file", 'success')
-            if aug_splits:
-                _log_to_ui(ui_components, f"📂 Augmented splits: {', '.join(aug_splits)}", 'info')
-        else:
-            _log_to_ui(ui_components, "🔄 Augmented Dataset: Belum ada file augmented", 'info')
-    except Exception:
-        _log_to_ui(ui_components, "🔄 Augmented Dataset: Belum ada file augmented", 'info')
-
-def _check_preprocessed_dataset(ui_components: Dict[str, Any], data_location: str):
-    """Check preprocessed dataset dengan detail"""
-    try:
-        from smartcash.dataset.augmentor.utils.dataset_detector import detect_split_structure
-        
-        prep_info = detect_split_structure(f"{data_location}/preprocessed")
-        if prep_info['status'] == 'success' and prep_info.get('total_images', 0) > 0:
-            prep_images = prep_info.get('total_images', 0)
-            prep_splits = prep_info.get('available_splits', [])
-            _log_to_ui(ui_components, f"✅ Preprocessed Dataset: {prep_images} file", 'success')
-            if prep_splits:
-                _log_to_ui(ui_components, f"📂 Preprocessed splits: {', '.join(prep_splits)}", 'info')
-        else:
-            _log_to_ui(ui_components, "🔧 Preprocessed Dataset: Belum ada file preprocessed", 'info')
-    except Exception:
-        _log_to_ui(ui_components, "🔧 Preprocessed Dataset: Belum ada file preprocessed", 'info')
 
 def _handle_service_result(ui_components: Dict[str, Any], result: Dict[str, Any], operation: str):
     """Handle service result dengan detailed feedback"""

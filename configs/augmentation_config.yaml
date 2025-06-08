@@ -1,139 +1,133 @@
 # File: configs/augmentation_config.yaml
-# Author: Alfrida Sabar (Enhanced dengan CommonInitializer support)
-# Deskripsi: Konfigurasi augmentasi yang kompatibel dengan UI form mapping
-
-# Inherit dari base_config.yaml
+# Enhanced augmentation config dengan progress tracking dan dataset comparison
 _base_: 'base_config.yaml'
 
-# Override dan enhance konfigurasi augmentasi
+# Augmentation specific config
 augmentation:
-  # Parameter dasar - mapping dari basic_opts_widget
+  # Basic options (UI: basic_opts_widget)
   enabled: true
-  num_variations: 3               # IntSlider: 1-10
-  target_count: 500              # IntSlider: 100-2000
-  output_prefix: 'aug'           # Text input
-  balance_classes: true          # Checkbox - Layer 1 & 2 only
-  target_split: 'train'          # Dropdown: train/valid/test
-  move_to_preprocessed: true     # Move hasil ke preprocessed
+  num_variations: 3                    # IntSlider 1-10
+  target_count: 500                   # IntSlider 100-2000
+  output_prefix: 'aug'                # Text input
+  balance_classes: true               # Checkbox
+  target_split: 'train'               # Dropdown: train/valid/test
   
-  # Jenis augmentasi - mapping dari augtypes_opts_widget
-  types:
-    - 'combined'                 # SelectMultiple: combined/position/lighting
-    - 'position'
-    - 'lighting'
+  # Augmentation types (UI: augtypes_opts_widget)
+  types: ['combined']                 # SelectMultiple: position/lighting/combined
   
-  # Parameter posisi - mapping dari advanced_opts_widget position tab
+  # Position parameters (UI: advanced_opts_widget position tab)
   position:
-    fliplr: 0.5                  # FloatSlider: 0.0-1.0
-    degrees: 10                  # IntSlider: 0-30 (reduced dari 15)
-    translate: 0.1               # FloatSlider: 0.0-0.25 (reduced dari 0.15)
-    scale: 0.1                   # FloatSlider: 0.0-0.25 (reduced dari 0.15)
+    fliplr: 0.5                      # FloatSlider 0.0-1.0
+    degrees: 10                      # IntSlider 0-30
+    translate: 0.1                   # FloatSlider 0.0-0.25
+    scale: 0.1                       # FloatSlider 0.0-0.25
   
-  # Parameter pencahayaan - mapping dari advanced_opts_widget lighting tab
+  # Lighting parameters (UI: advanced_opts_widget lighting tab)
   lighting:
-    hsv_h: 0.015                 # FloatSlider: 0.0-0.05 (reduced dari 0.025)
-    hsv_s: 0.7                   # FloatSlider: 0.0-1.0
-    brightness: 0.2              # FloatSlider: 0.0-0.4 (reduced dari 0.3)
-    contrast: 0.2                # FloatSlider: 0.0-0.4 (reduced dari 0.3)
+    hsv_h: 0.015                     # FloatSlider 0.0-0.05
+    hsv_s: 0.7                       # FloatSlider 0.0-1.0
+    brightness: 0.2                  # FloatSlider 0.0-0.4
+    contrast: 0.2                    # FloatSlider 0.0-0.4
   
-  # Parameter processing
+  # Processing settings
   process_bboxes: true
   validate_results: true
-  resume: false
+  move_to_preprocessed: true
   output_dir: 'data/augmented'
-  
-  # Progress tracking steps - untuk progress tracker baru
-  pipeline_steps:
-    prepare: 10                  # Data preparation
-    augment: 50                  # Main augmentation process
-    normalize: 30                # Normalization step
-    verify: 10                   # Verification step
-  
-  # Step weights untuk granular progress
-  step_weights:
-    prepare: 10
-    augment: 50
-    normalize: 30
-    verify: 10
-
-# Override konfigurasi cleanup
-cleanup:
-  backup_enabled: true
-  backup_dir: 'data/backup/augmentation'
-  backup_count: 5
-  patterns:
-    - 'aug_*'
-    - '*_augmented*'
-    - '*_processed*'
-  
-  # Cleanup steps untuk progress tracker
-  cleanup_steps:
-    locate: 10                   # Find files to cleanup
-    analyze: 20                  # Analyze cleanup scope
-    backup: 30                   # Backup before cleanup
-    execute: 40                  # Execute cleanup
-
-# Pengaturan visualisasi
-visualization:
-  enabled: true
-  sample_count: 5
-  save_visualizations: true
-  vis_dir: 'visualizations/augmentation'
-  show_original: true
-  show_bboxes: true
 
 # Enhanced progress tracking configuration
 progress:
-  # Operation steps mapping
   operations:
     augmentation:
-      steps: ["prepare", "augment", "normalize", "verify"]
-      weights: {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10}
-      auto_hide: true
-      
+      steps: ["validate", "balance", "augment", "normalize", "complete"]
+      weights: 
+        validate: 15
+        balance: 10
+        augment: 45
+        normalize: 25
+        complete: 5
+      granular_tracking: true
+      milestone_logging: true
+    
     check_dataset:
-      steps: ["locate", "analyze_raw", "analyze_augmented", "analyze_preprocessed"]
-      weights: {"locate": 10, "analyze_raw": 30, "analyze_augmented": 30, "analyze_preprocessed": 30}
-      auto_hide: false
-      
+      steps: ["locate", "analyze_raw", "analyze_preprocessed", "compare", "report"]
+      weights:
+        locate: 10
+        analyze_raw: 30
+        analyze_preprocessed: 20
+        compare: 20
+        report: 20
+      comparison_enabled: true
+    
     cleanup:
-      steps: ["locate", "analyze", "backup", "execute"]
-      weights: {"locate": 10, "analyze": 20, "backup": 30, "execute": 40}
-      auto_hide: true
-  
-  # Progress display settings
-  display:
-    level: 'triple'              # single/dual/triple
-    show_step_info: false        # Disable step info widget
-    auto_hide_delay: 3600.0      # 1 hour auto hide
-    animation_speed: 0.1
+      steps: ["scan", "analyze", "confirm", "execute", "verify"]
+      weights:
+        scan: 15
+        analyze: 10
+        confirm: 5
+        execute: 60
+        verify: 10
+      confirmation_required: true
 
-# UI form validation ranges - untuk frontend validation
+# Dataset comparison settings
+dataset_comparison:
+  enabled: true
+  check_preprocessing: true
+  validate_consistency: true
+  readiness_threshold: 0.8
+  splits_to_check: ['train', 'valid', 'test']
+  
+  # Recommendations
+  recommendations:
+    missing_preprocessed: "🔄 Dataset perlu preprocessing sebelum augmentasi"
+    partial_preprocessed: "⚠️ Beberapa split perlu preprocessing tambahan" 
+    ready_for_augmentation: "✅ Dataset siap untuk augmentasi"
+    no_raw_data: "❌ Dataset raw tidak ditemukan"
+
+# Enhanced validation
 validation:
-  ranges:
-    num_variations: [1, 10]
-    target_count: [100, 2000]
-    fliplr: [0.0, 1.0]
-    degrees: [0, 30]
-    translate: [0.0, 0.25]
-    scale: [0.0, 0.25]
-    hsv_h: [0.0, 0.05]
-    hsv_s: [0.0, 1.0]
-    brightness: [0.0, 0.4]
-    contrast: [0.0, 0.4]
+  enabled: true
+  check_raw_dataset: true
+  check_preprocessed_dataset: true
+  compare_datasets: true
+  validate_splits: true
   
-  # Required fields
-  required:
-    - 'num_variations'
-    - 'target_count'
-    - 'types'
-    - 'target_split'
+  # Validation rules
+  rules:
+    min_images_per_split: 10
+    max_size_mb: 1000
+    required_splits: ['train']
+    optional_splits: ['valid', 'test']
+    
+# UI Integration settings
+ui_integration:
+  shared_progress_tracker: true
+  shared_dialog_components: true
+  granular_feedback: true
+  real_time_updates: true
   
-  # Default values untuk form reset
-  defaults:
-    num_variations: 3
-    target_count: 500
-    output_prefix: 'aug'
-    balance_classes: true
-    target_split: 'train'
-    types: ['combined']
+  # Button behavior
+  buttons:
+    disable_during_operation: true
+    restore_after_completion: true
+    show_processing_indicator: true
+  
+  # Confirmation dialogs
+  confirmations:
+    cleanup_required: true
+    reset_required: true
+    destructive_operations: true
+
+# Backend service configuration
+service:
+  communicator_enabled: true
+  progress_callback_enabled: true
+  error_handling: 'comprehensive'
+  logging_level: 'info'
+  
+  # Service methods
+  methods:
+    check_dataset_readiness: true
+    run_full_pipeline: true
+    cleanup_augmented_data: true
+    get_status: true

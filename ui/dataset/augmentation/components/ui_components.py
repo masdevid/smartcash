@@ -3,6 +3,7 @@ File: smartcash/ui/dataset/augmentation/components/ui_components.py
 Deskripsi: Fixed UI components dengan augmentation types full width dan layout yang diperbaiki
 """
 
+from IPython.display import display
 import ipywidgets as widgets
 from typing import Dict, Any
 
@@ -97,7 +98,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             action_section,
             progress_tracker.container,
             log_components['log_accordion']
-        ], layout=widgets.Layout(width='100%', overflow='hidden'))
+        ], layout=widgets.Layout(width='100%', max_width='100%'))
         
         # Component mapping
         return {

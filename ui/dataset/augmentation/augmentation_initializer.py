@@ -1,14 +1,16 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Initializer yang disederhanakan dengan reuse service dan SRP modules
+Deskripsi: Augmentation initializer dengan CommonInitializer pattern yang diperbaiki
 """
 
-from typing import Dict, Any, List, Optional, Type
+from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.augmentation.handlers.config_handler import AugmentationConfigHandler
+from smartcash.ui.dataset.augmentation.components.ui_components import create_augmentation_main_ui
+from smartcash.ui.dataset.augmentation.handlers.main_handlers import setup_augmentation_handlers
 
 class AugmentationInitializer(CommonInitializer):
-    """Initializer dengan service reuse dan consolidated functionality"""
+    """Augmentation initializer dengan CommonInitializer inheritance dan config management"""
     
     def __init__(self):
         super().__init__(
@@ -16,64 +18,67 @@ class AugmentationInitializer(CommonInitializer):
             config_handler_class=AugmentationConfigHandler,
             parent_module='dataset'
         )
+    
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan full reuse dari existing components"""
-        from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
-        ui_components = create_augmentation_ui(env=env, config=config)
+        """Create augmentation UI components dengan config integration"""
+        ui_components = create_augmentation_main_ui(config)
         ui_components.update({
-            'module_initialized': True,
-            'augmentation_initialized': True
+            'augmentation_initialized': True,
+            'module_name': 'augmentation',
+            'data_dir': config.get('data', {}).get('dir', 'data'),
+            'env': env
         })
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan service layer integration"""
+        """Setup handlers dengan auto config load dan UI update"""
+        # Setup handlers terlebih dahulu
+        result = setup_augmentation_handlers(ui_components, config, env)
+        
+        # CRITICAL: Load config dari file dan update UI
+        self._load_and_update_ui(ui_components)
+        
+        return result
+    
+    def _load_and_update_ui(self, ui_components: Dict[str, Any]):
+        """CRITICAL: Load config dari file dan update UI saat initialization"""
         try:
-            from smartcash.ui.dataset.augmentation.handlers.main_handler import register_all_handlers
-            
-            # Clear existing handlers untuk avoid duplication
-            button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
-            for key in button_keys:
-                button = ui_components.get(key)
-                if button and hasattr(button, '_click_handlers'):
-                    try:
-                        button._click_handlers.callbacks.clear()
-                    except Exception:
-                        pass
-            
-            # Register handlers dengan service layer integration
-            ui_components = register_all_handlers(ui_components)
-            
-            if 'logger' in ui_components:
-                ui_components['logger'].info(f"✅ Handlers registered dengan service integration")
-            
-            return ui_components
-            
+            config_handler = ui_components.get('config_handler')
+            if config_handler:
+                # Set UI components untuk logging
+                if hasattr(config_handler, 'set_ui_components'):
+                    config_handler.set_ui_components(ui_components)
+                
+                # Load config dari file dengan inheritance
+                loaded_config = config_handler.load_config()
+                
+                # Update UI dengan loaded config
+                config_handler.update_ui(ui_components, loaded_config)
+                
+                # Update config reference
+                ui_components['config'] = loaded_config
+                
         except Exception as e:
-            if 'logger' in ui_components:
-                ui_components['logger'].error(f"❌ Handler setup error: {str(e)}")
-            return ui_components
+            logger = ui_components.get('logger')
+            if logger:
+                logger.warning(f"⚠️ Error loading config: {str(e)}")
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Default config dengan aligned parameters untuk service layer"""
-        # Menggunakan config handler untuk mendapatkan default config
-        config_handler = self._create_config_handler()
-        return config_handler.get_default_config()
+        """Get default config dari defaults.py"""
+        from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
+        return get_default_augmentation_config()
     
     def _get_critical_components(self) -> List[str]:
-        """Critical components untuk service layer integration"""
+        """Critical components untuk augmentation module"""
         return [
-            'ui', 'augment_button', 'check_button', 'save_button', 'reset_button',
-            'num_variations', 'target_count', 'augmentation_types', 'target_split',
-            'log_output', 'log_accordion',
-            'progress_tracker', 'progress_container', 'show_for_operation', 
-            'update_progress', 'complete_operation', 'error_operation', 'reset_all'
+            'ui', 'augment_button', 'check_button', 'cleanup_button',
+            'save_button', 'reset_button', 'log_output', 'status_panel',
+            'progress_tracker', 'num_variations', 'target_count', 'augmentation_types'
         ]
 
-# Global instance dengan service layer integration
-_aug_initializer = AugmentationInitializer()
+# Global instance
+_augmentation_initializer = AugmentationInitializer()
 
-# Public API dengan service layer reuse dan parent module support
-def init_augmentation(env=None, config=None, **kwargs):
-    """Initialize augmentation UI dengan parent module support"""
-    return _aug_initializer.initialize(env=env, config=config, **kwargs)
+def initialize_augmentation_ui(env=None, config=None, **kwargs):
+    """Factory function untuk augmentation UI dengan auto config load"""
+    return _augmentation_initializer.initialize(env=env, config=config, **kwargs)

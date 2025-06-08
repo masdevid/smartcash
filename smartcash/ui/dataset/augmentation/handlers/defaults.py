@@ -1,61 +1,69 @@
+"""
+File: smartcash/ui/dataset/augmentation/handlers/defaults.py
+Deskripsi: Default config untuk augmentation dengan mapping lengkap form UI
+"""
 
 from typing import Dict, Any
+from datetime import datetime
 
 def get_default_augmentation_config() -> Dict[str, Any]:
-    """Default config sesuai dengan augmentation_config.yaml"""
-    from datetime import datetime
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    """Default config dengan mapping lengkap ke UI form components"""
     return {
-        'config_version': '1.0',
-        'updated_at': current_time,
         '_base_': 'base_config.yaml',
+        'config_version': '2.0',
+        'updated_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         
-        # Konfigurasi augmentasi utama
+        # Augmentation config - mapping ke UI forms
         'augmentation': {
-            # Parameter dasar
+            # Basic options mapping (basic_opts_widget)
             'enabled': True,
-            'types': ['combined', 'position', 'lighting'],
-            'num_variations': 3,
-            'target_count': 1000,
-            'output_prefix': 'aug',
-            'process_bboxes': True,
-            'output_dir': 'data/augmented',
-            'validate_results': True,
-            'resume': False,
-            'balance_classes': True,
+            'num_variations': 3,          # IntSlider 1-10
+            'target_count': 500,          # IntSlider 100-2000
+            'output_prefix': 'aug',       # Text input
+            'balance_classes': True,      # Checkbox
+            'target_split': 'train',      # Dropdown
             'move_to_preprocessed': True,
             
-            # Parameter augmentasi posisi
+            # Augmentation types mapping (augtypes_opts_widget)
+            'types': ['combined'],        # SelectMultiple
+            
+            # Position parameters mapping (advanced_opts_widget position tab)
             'position': {
-                'fliplr': 0.5,
-                'degrees': 15,
-                'translate': 0.15,
-                'scale': 0.15,
-                'shear_max': 10
+                'fliplr': 0.5,           # FloatSlider 0.0-1.0
+                'degrees': 10,           # IntSlider 0-30
+                'translate': 0.1,        # FloatSlider 0.0-0.25
+                'scale': 0.1             # FloatSlider 0.0-0.25
             },
             
-            # Parameter augmentasi pencahayaan
+            # Lighting parameters mapping (advanced_opts_widget lighting tab)
             'lighting': {
-                'hsv_h': 0.025,
-                'hsv_s': 0.7,
-                'hsv_v': 0.4,
-                'contrast': [0.7, 1.3],
-                'brightness': [0.7, 1.3],
-                'blur': 0.2,
-                'noise': 0.1
-            }
+                'hsv_h': 0.015,          # FloatSlider 0.0-0.05
+                'hsv_s': 0.7,            # FloatSlider 0.0-1.0
+                'brightness': 0.2,       # FloatSlider 0.0-0.4
+                'contrast': 0.2          # FloatSlider 0.0-0.4
+            },
+            
+            # Processing settings
+            'process_bboxes': True,
+            'validate_results': True,
+            'resume': False,
+            'output_dir': 'data/augmented',
+            
+            # Progress tracking untuk new progress tracker
+            'pipeline_steps': ["prepare", "augment", "normalize", "verify"],
+            'step_weights': {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10}
         },
         
-        # Pengaturan pengelolaan data augmentasi
+        # Cleanup config
         'cleanup': {
             'backup_enabled': True,
             'backup_dir': 'data/backup/augmentation',
             'backup_count': 5,
-            'patterns': ['aug_*', '*_augmented*']
+            'patterns': ['aug_*', '*_augmented*', '*_processed*'],
+            'cleanup_steps': ["locate", "analyze", "backup", "execute"]
         },
         
-        # Pengaturan visualisasi
+        # Visualization config
         'visualization': {
             'enabled': True,
             'sample_count': 5,
@@ -65,10 +73,55 @@ def get_default_augmentation_config() -> Dict[str, Any]:
             'show_bboxes': True
         },
         
-        # Pengaturan performa
-        'performance': {
-            'num_workers': 4,
-            'batch_size': 16,
-            'use_gpu': True
+        # Progress config untuk new progress tracker
+        'progress': {
+            'operations': {
+                'augmentation': {
+                    'steps': ["prepare", "augment", "normalize", "verify"],
+                    'weights': {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10},
+                    'auto_hide': True
+                },
+                'check_dataset': {
+                    'steps': ["locate", "analyze_raw", "analyze_augmented", "analyze_preprocessed"],
+                    'weights': {"locate": 10, "analyze_raw": 30, "analyze_augmented": 30, "analyze_preprocessed": 30},
+                    'auto_hide': False
+                },
+                'cleanup': {
+                    'steps': ["locate", "analyze", "backup", "execute"],
+                    'weights': {"locate": 10, "analyze": 20, "backup": 30, "execute": 40},
+                    'auto_hide': True
+                }
+            },
+            'display': {
+                'level': 'triple',
+                'show_step_info': False,
+                'auto_hide_delay': 3600.0,
+                'animation_speed': 0.1
+            }
+        },
+        
+        # Validation ranges untuk form validation
+        'validation': {
+            'ranges': {
+                'num_variations': [1, 10],
+                'target_count': [100, 2000],
+                'fliplr': [0.0, 1.0],
+                'degrees': [0, 30],
+                'translate': [0.0, 0.25],
+                'scale': [0.0, 0.25],
+                'hsv_h': [0.0, 0.05],
+                'hsv_s': [0.0, 1.0],
+                'brightness': [0.0, 0.4],
+                'contrast': [0.0, 0.4]
+            },
+            'required': ['num_variations', 'target_count', 'types', 'target_split'],
+            'defaults': {
+                'num_variations': 3,
+                'target_count': 500,
+                'output_prefix': 'aug',
+                'balance_classes': True,
+                'target_split': 'train',
+                'types': ['combined']
+            }
         }
     }

@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/dataset/augmentation/components/advanced_options_widget.py
-Deskripsi: Advanced options widget dengan nilai yang moderat untuk pipeline research
+File: smartcash/ui/dataset/augmentation/components/advanced_opts_widget.py
+Deskripsi: Advanced options widget dengan tab layout dan parameter yang moderat
 """
 
 import ipywidgets as widgets
@@ -8,127 +8,88 @@ from typing import Dict, Any
 
 def create_advanced_options_widget() -> Dict[str, Any]:
     """
-    Buat widget UI untuk opsi lanjutan dengan nilai moderat untuk penelitian.
+    Create advanced options dengan tab layout dan range validation
     
     Returns:
-        Dictionary berisi container dan mapping widget individual
+        Dictionary berisi container dan widget mapping
     """
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Parameter posisi dengan nilai moderat untuk penelitian
+    # Position Parameters Tab
     fliplr = widgets.FloatSlider(
-        value=0.5,
-        min=0.0,
-        max=1.0,
-        step=0.05,
+        value=0.5, min=0.0, max=1.0, step=0.05,
         description='Flip Horizontal:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.2f',
+        readout=True, readout_format='.2f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
     degrees = widgets.IntSlider(
-        value=10,  # Reduced dari 15 - lebih konservatif untuk uang kertas
-        min=0,
-        max=30,    # Reduced dari 45 - range yang lebih realistic
-        step=2,    # Step lebih kecil untuk fine-tuning
+        value=10, min=0, max=30, step=2,
         description='Rotasi (°):',
         continuous_update=False,
-        orientation='horizontal',
         readout=True,
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
     translate = widgets.FloatSlider(
-        value=0.1,  # Reduced dari 0.15 - translasi minimal
-        min=0.0,
-        max=0.25,   # Reduced dari 0.5 - range lebih kecil
-        step=0.02,  # Step lebih halus
+        value=0.1, min=0.0, max=0.25, step=0.02,
         description='Translasi:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.2f',
+        readout=True, readout_format='.2f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
     scale = widgets.FloatSlider(
-        value=0.1,  # Reduced dari 0.15 - scaling minimal
-        min=0.0,
-        max=0.25,   # Reduced dari 0.5 - tidak terlalu ekstrim
-        step=0.02,  # Step lebih halus
+        value=0.1, min=0.0, max=0.25, step=0.02,
         description='Skala:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.2f',
+        readout=True, readout_format='.2f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
-    # Parameter pencahayaan dengan nilai penelitian yang optimal
+    # Lighting Parameters Tab
     hsv_h = widgets.FloatSlider(
-        value=0.015,  # Reduced dari 0.025 - hue shift minimal
-        min=0.0,
-        max=0.05,     # Reduced dari 0.1 - range lebih kecil
-        step=0.002,   # Step lebih halus
+        value=0.015, min=0.0, max=0.05, step=0.002,
         description='HSV Hue:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.3f',
+        readout=True, readout_format='.3f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
     hsv_s = widgets.FloatSlider(
-        value=0.7,
-        min=0.0,
-        max=1.0,
-        step=0.05,  # Step lebih halus
+        value=0.7, min=0.0, max=1.0, step=0.05,
         description='HSV Saturation:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.2f',
+        readout=True, readout_format='.2f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
     brightness = widgets.FloatSlider(
-        value=0.2,  # Reduced dari 0.3 - brightness moderat
-        min=0.0,
-        max=0.4,    # Reduced dari 1.0 - range lebih realistic
-        step=0.05,  # Step lebih halus
+        value=0.2, min=0.0, max=0.4, step=0.05,
         description='Brightness:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.2f',
+        readout=True, readout_format='.2f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
     contrast = widgets.FloatSlider(
-        value=0.2,  # Reduced dari 0.3 - contrast moderat
-        min=0.0,
-        max=0.4,    # Reduced dari 1.0 - range lebih realistic
-        step=0.05,  # Step lebih halus
+        value=0.2, min=0.0, max=0.4, step=0.05,
         description='Contrast:',
         continuous_update=False,
-        orientation='horizontal',
-        readout=True,
-        readout_format='.2f',
+        readout=True, readout_format='.2f',
         layout=widgets.Layout(width='95%'),
         style={'description_width': '120px'}
     )
     
-    # Info panel untuk parameter guidance
+    # Parameter guidance info
     parameter_info = widgets.HTML(
         f"""
         <div style="padding: 8px; background-color: {COLORS.get('bg_light', '#f8f9fa')}; 
@@ -143,7 +104,7 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Tab layout dengan info yang lebih informatif
+    # Tab content dengan organized layout
     position_tab = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0;'>📍 Parameter Posisi</h6>"),
         widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Transformasi geometri untuk variasi posisi uang kertas</p>"),
@@ -156,10 +117,12 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         hsv_h, hsv_s, brightness, contrast
     ], layout=widgets.Layout(padding='5px'))
     
+    # Tab widget
     tabs = widgets.Tab(children=[position_tab, lighting_tab])
     tabs.set_title(0, "📍 Posisi")
     tabs.set_title(1, "💡 Pencahayaan")
     
+    # Main container
     container = widgets.VBox([
         tabs,
         parameter_info
@@ -168,19 +131,33 @@ def create_advanced_options_widget() -> Dict[str, Any]:
     return {
         'container': container,
         'widgets': {
+            # Position parameters
             'fliplr': fliplr,
             'degrees': degrees,
             'translate': translate,
             'scale': scale,
+            # Lighting parameters
             'hsv_h': hsv_h,
             'hsv_s': hsv_s,
             'brightness': brightness,
             'contrast': contrast
         },
-        # Research pipeline mapping untuk easy access
-        'research_params': {
+        # Parameter mapping untuk easy access
+        'parameter_groups': {
             'position': ['fliplr', 'degrees', 'translate', 'scale'],
-            'lighting': ['hsv_h', 'hsv_s', 'brightness', 'contrast'],
-            'combined': ['fliplr', 'degrees', 'translate', 'scale', 'hsv_h', 'hsv_s', 'brightness', 'contrast']
+            'lighting': ['hsv_h', 'hsv_s', 'brightness', 'contrast']
+        },
+        # Validation ranges
+        'validation': {
+            'ranges': {
+                'fliplr': (0.0, 1.0),
+                'degrees': (0, 30),
+                'translate': (0.0, 0.25),
+                'scale': (0.0, 0.25),
+                'hsv_h': (0.0, 0.05),
+                'hsv_s': (0.0, 1.0),
+                'brightness': (0.0, 0.4),
+                'contrast': (0.0, 0.4)
+            }
         }
     }

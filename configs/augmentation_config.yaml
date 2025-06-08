@@ -1,54 +1,79 @@
 # File: configs/augmentation_config.yaml
-# Author: Alfrida Sabar (direvisi)
-# Deskripsi: Konfigurasi augmentasi yang dioptimalkan untuk deteksi mata uang Rupiah
+# Author: Alfrida Sabar (Enhanced dengan CommonInitializer support)
+# Deskripsi: Konfigurasi augmentasi yang kompatibel dengan UI form mapping
 
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Override konfigurasi augmentasi dari base_config
+# Override dan enhance konfigurasi augmentasi
 augmentation:
-  # Parameter yang di-override dari base_config
-  num_variations: 3               # Override dari base_config (2)
-  validate_results: true          # Override dari base_config (false)
+  # Parameter dasar - mapping dari basic_opts_widget
+  enabled: true
+  num_variations: 3               # IntSlider: 1-10
+  target_count: 500              # IntSlider: 100-2000
+  output_prefix: 'aug'           # Text input
+  balance_classes: true          # Checkbox - Layer 1 & 2 only
+  target_split: 'train'          # Dropdown: train/valid/test
+  move_to_preprocessed: true     # Move hasil ke preprocessed
   
-  # Parameter tambahan yang tidak ada di base_config
-  balance_classes: true           # Seimbangkan jumlah gambar per kelas
-  target_count: 500               # Target jumlah gambar per kelas
-  move_to_preprocessed: true      # Pindahkan hasil ke direktori preprocessed
-  
-  # Jenis augmentasi yang didukung
+  # Jenis augmentasi - mapping dari augtypes_opts_widget
   types:
-    - 'flip'                      # Flip horizontal
-    - 'rotate'                    # Rotasi gambar
-    - 'brightness'                # Ubah kecerahan
-    - 'contrast'                  # Ubah kontras
-    - 'hsv'                       # Ubah HSV
-    - 'noise'                     # Tambahkan noise
-    - 'blur'                      # Tambahkan blur
+    - 'combined'                 # SelectMultiple: combined/position/lighting
+    - 'position'
+    - 'lighting'
   
-  # Parameter augmentasi posisi yang di-override
-  fliplr: 0.5                     # Probabilitas flip horizontal
-  degrees: 15                     # Derajat maksimum rotasi (override dari base_config 10)
-  translate: 0.15                 # Translasi maksimum (override dari base_config 0.1)
-  scale: 0.15                     # Skala maksimum (override dari base_config 0.1)
+  # Parameter posisi - mapping dari advanced_opts_widget position tab
+  position:
+    fliplr: 0.5                  # FloatSlider: 0.0-1.0
+    degrees: 10                  # IntSlider: 0-30 (reduced dari 15)
+    translate: 0.1               # FloatSlider: 0.0-0.25 (reduced dari 0.15)
+    scale: 0.1                   # FloatSlider: 0.0-0.25 (reduced dari 0.15)
   
-  # Parameter augmentasi pencahayaan yang di-override
-  hsv_h: 0.025                    # Perubahan hue maksimum (override dari base_config 0.015)
-  hsv_s: 0.7                      # Perubahan saturation maksimum
-  brightness: 0.2                 # Perubahan brightness maksimum
-  contrast: 0.2                   # Perubahan contrast maksimum
-  blur: 0.2                       # Parameter blur (baru)
-  noise: 0.1                      # Parameter noise (baru)
+  # Parameter pencahayaan - mapping dari advanced_opts_widget lighting tab
+  lighting:
+    hsv_h: 0.015                 # FloatSlider: 0.0-0.05 (reduced dari 0.025)
+    hsv_s: 0.7                   # FloatSlider: 0.0-1.0
+    brightness: 0.2              # FloatSlider: 0.0-0.4 (reduced dari 0.3)
+    contrast: 0.2                # FloatSlider: 0.0-0.4 (reduced dari 0.3)
+  
+  # Parameter processing
+  process_bboxes: true
+  validate_results: true
+  resume: false
+  output_dir: 'data/augmented'
+  
+  # Progress tracking steps - untuk progress tracker baru
+  pipeline_steps:
+    prepare: 10                  # Data preparation
+    augment: 50                  # Main augmentation process
+    normalize: 30                # Normalization step
+    verify: 10                   # Verification step
+  
+  # Step weights untuk granular progress
+  step_weights:
+    prepare: 10
+    augment: 50
+    normalize: 30
+    verify: 10
 
-# Override konfigurasi cleanup dari base_config
+# Override konfigurasi cleanup
 cleanup:
-  backup_dir: 'data/backup/augmentation'  # Override dari base_config (data/backup)
-  backup_count: 5  # Override dari base_config (3)
-  patterns:  # Parameter baru yang menggantikan augmentation_patterns
+  backup_enabled: true
+  backup_dir: 'data/backup/augmentation'
+  backup_count: 5
+  patterns:
     - 'aug_*'
     - '*_augmented*'
+    - '*_processed*'
+  
+  # Cleanup steps untuk progress tracker
+  cleanup_steps:
+    locate: 10                   # Find files to cleanup
+    analyze: 20                  # Analyze cleanup scope
+    backup: 30                   # Backup before cleanup
+    execute: 40                  # Execute cleanup
 
-# Pengaturan visualisasi (parameter baru)
+# Pengaturan visualisasi
 visualization:
   enabled: true
   sample_count: 5
@@ -56,3 +81,59 @@ visualization:
   vis_dir: 'visualizations/augmentation'
   show_original: true
   show_bboxes: true
+
+# Enhanced progress tracking configuration
+progress:
+  # Operation steps mapping
+  operations:
+    augmentation:
+      steps: ["prepare", "augment", "normalize", "verify"]
+      weights: {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10}
+      auto_hide: true
+      
+    check_dataset:
+      steps: ["locate", "analyze_raw", "analyze_augmented", "analyze_preprocessed"]
+      weights: {"locate": 10, "analyze_raw": 30, "analyze_augmented": 30, "analyze_preprocessed": 30}
+      auto_hide: false
+      
+    cleanup:
+      steps: ["locate", "analyze", "backup", "execute"]
+      weights: {"locate": 10, "analyze": 20, "backup": 30, "execute": 40}
+      auto_hide: true
+  
+  # Progress display settings
+  display:
+    level: 'triple'              # single/dual/triple
+    show_step_info: false        # Disable step info widget
+    auto_hide_delay: 3600.0      # 1 hour auto hide
+    animation_speed: 0.1
+
+# UI form validation ranges - untuk frontend validation
+validation:
+  ranges:
+    num_variations: [1, 10]
+    target_count: [100, 2000]
+    fliplr: [0.0, 1.0]
+    degrees: [0, 30]
+    translate: [0.0, 0.25]
+    scale: [0.0, 0.25]
+    hsv_h: [0.0, 0.05]
+    hsv_s: [0.0, 1.0]
+    brightness: [0.0, 0.4]
+    contrast: [0.0, 0.4]
+  
+  # Required fields
+  required:
+    - 'num_variations'
+    - 'target_count'
+    - 'types'
+    - 'target_split'
+  
+  # Default values untuk form reset
+  defaults:
+    num_variations: 3
+    target_count: 500
+    output_prefix: 'aug'
+    balance_classes: true
+    target_split: 'train'
+    types: ['combined']

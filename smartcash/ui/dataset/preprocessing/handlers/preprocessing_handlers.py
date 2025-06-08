@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py
-Deskripsi: Refactored handlers dengan utils separation dan progress_tracker baru
+Deskripsi: Fixed handlers dengan proper config handler UI logger integration
 """
 
 from typing import Dict, Any
@@ -11,27 +11,80 @@ from smartcash.ui.dataset.preprocessing.utils.backend_utils import validate_data
 from smartcash.ui.components.confirmation_dialog import create_destructive_confirmation
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup preprocessing handlers dengan utils separation"""
+    """Setup preprocessing handlers dengan config handler UI integration"""
     
     # Setup progress callback
     ui_components['progress_callback'] = create_progress_callback(ui_components)
+    
+    # Setup config handler dengan UI logger integration
+    config_handler = ui_components.get('config_handler')
+    if config_handler and hasattr(config_handler, 'set_ui_components'):
+        config_handler.set_ui_components(ui_components)
     
     # Setup handlers
     setup_preprocessing_handler(ui_components, config)
     setup_check_handler(ui_components, config)
     setup_cleanup_handler(ui_components, config)
-    setup_config_handlers(ui_components, config)
+    setup_config_handlers_fixed(ui_components, config)
     
     return ui_components
 
+def setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]):
+    """Setup config save/reset handlers dengan proper UI logging"""
+    
+    def save_config(button=None):
+        clear_outputs(ui_components)
+        
+        try:
+            config_handler = ui_components.get('config_handler')
+            if not config_handler:
+                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                return
+            
+            # Set UI components untuk logging
+            if hasattr(config_handler, 'set_ui_components'):
+                config_handler.set_ui_components(ui_components)
+            
+            success = config_handler.save_config(ui_components)
+            # Logger sudah handle di config_handler
+            
+        except Exception as e:
+            handle_ui_error(ui_components, f"❌ Error save: {str(e)}")
+    
+    def reset_config(button=None):
+        clear_outputs(ui_components)
+        
+        try:
+            config_handler = ui_components.get('config_handler')
+            if not config_handler:
+                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                return
+            
+            # Set UI components untuk logging
+            if hasattr(config_handler, 'set_ui_components'):
+                config_handler.set_ui_components(ui_components)
+            
+            success = config_handler.reset_config(ui_components)
+            # Logger sudah handle di config_handler
+            
+        except Exception as e:
+            handle_ui_error(ui_components, f"❌ Error reset: {str(e)}")
+    
+    # Bind handlers
+    save_button = ui_components.get('save_button')
+    reset_button = ui_components.get('reset_button')
+    if save_button:
+        save_button.on_click(save_config)
+    if reset_button:
+        reset_button.on_click(reset_config)
+
 def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup preprocessing handler dengan new progress tracker"""
+    """Setup preprocessing handler"""
     
     def execute_preprocessing(button=None):
         button_manager = get_button_manager(ui_components)
         logger = ui_components.get('logger')
         
-        # Clear outputs FIRST
         clear_outputs(ui_components)
         button_manager.disable_buttons('preprocess_button')
         
@@ -39,16 +92,13 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
             if logger:
                 logger.info("🚀 Memulai preprocessing dataset")
             
-            # Validate dataset ready
             valid, msg = validate_dataset_ready(config, logger)
             if not valid:
                 handle_ui_error(ui_components, f"❌ {msg}", button_manager)
                 return
             
-            # Setup progress tracker dengan steps
             setup_progress_tracker(ui_components, "Dataset Preprocessing")
             
-            # Extract processing params dengan normalization
             params = _extract_processing_params(ui_components)
             processing_config = {
                 **config, 
@@ -63,10 +113,8 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
                 }
             }
             
-            # Log config
             log_preprocessing_config(ui_components, processing_config)
             
-            # Create dan execute preprocessor
             preprocessor = create_backend_preprocessor(processing_config, logger)
             if not preprocessor:
                 handle_ui_error(ui_components, "❌ Gagal membuat preprocessing service", button_manager)
@@ -100,13 +148,12 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
         preprocess_button.on_click(execute_preprocessing)
 
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup check handler dengan backend checker"""
+    """Setup check handler"""
     
     def execute_check(button=None):
         button_manager = get_button_manager(ui_components)
         logger = ui_components.get('logger')
         
-        # Clear outputs FIRST
         clear_outputs(ui_components)
         button_manager.disable_buttons('check_button')
         
@@ -116,14 +163,12 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             
             setup_progress_tracker(ui_components, "Dataset Check")
             
-            # Check source dataset
             valid, source_msg = validate_dataset_ready(config, logger)
             
             if valid:
                 if logger:
                     logger.success(f"✅ {source_msg}")
                 
-                # Check preprocessed data
                 preprocessed_exists, preprocessed_count = check_preprocessed_exists(config)
                 
                 if preprocessed_exists:
@@ -151,19 +196,17 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
         check_button.on_click(execute_check)
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup cleanup handler dengan confirmation"""
+    """Setup cleanup handler"""
     
     def execute_cleanup(button=None):
         logger = ui_components.get('logger')
         
-        # Clear outputs FIRST
         clear_outputs(ui_components)
         
         try:
             if logger:
                 logger.info("🧹 Checking cleanup targets")
             
-            # Check existing preprocessed data
             has_data, count = check_preprocessed_exists(config)
             if not has_data:
                 show_ui_success(ui_components, "ℹ️ Tidak ada data preprocessed untuk dibersihkan")
@@ -205,7 +248,6 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
                 finally:
                     button_manager.enable_buttons()
             
-            # Show confirmation dialog
             confirmation_area = ui_components.get('confirmation_area')
             if confirmation_area:
                 from IPython.display import display, clear_output
@@ -225,56 +267,6 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
     cleanup_button = ui_components.get('cleanup_button')
     if cleanup_button:
         cleanup_button.on_click(execute_cleanup)
-
-def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup config save/reset handlers dengan single logging"""
-    
-    def save_config(button=None):
-        # Clear outputs FIRST
-        clear_outputs(ui_components)
-        
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
-                return
-            
-            success = config_handler.save_config(ui_components)
-            if success:
-                # Only log via UI, config_handler already logs internally
-                from smartcash.ui.utils.fallback_utils import show_status_safe
-                show_status_safe("✅ Konfigurasi berhasil disimpan", "success", ui_components)
-            else:
-                handle_ui_error(ui_components, "❌ Gagal simpan konfigurasi")
-        except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error save: {str(e)}")
-    
-    def reset_config(button=None):
-        # Clear outputs FIRST
-        clear_outputs(ui_components)
-        
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
-                return
-            
-            success = config_handler.reset_config(ui_components)
-            if success:
-                # Only log via UI, config_handler already logs internally
-                from smartcash.ui.utils.fallback_utils import show_status_safe
-                show_status_safe("🔄 Konfigurasi berhasil direset", "success", ui_components)
-            else:
-                handle_ui_error(ui_components, "❌ Gagal reset konfigurasi")
-        except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error reset: {str(e)}")
-    
-    save_button = ui_components.get('save_button')
-    reset_button = ui_components.get('reset_button')
-    if save_button:
-        save_button.on_click(save_config)
-    if reset_button:
-        reset_button.on_click(reset_config)
 
 def _extract_processing_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract parameters dari UI components"""
@@ -317,7 +309,6 @@ def _show_preprocessed_breakdown(ui_components: Dict[str, Any], config: Dict[str
                 if logger:
                     logger.info(f"📂 {split}: {count:,} gambar preprocessed")
     
-    # Display detailed report
     if ui_components.get('log_output') and breakdown:
         report_html = f"""
         <div style="background:#f0f8ff;padding:10px;border-radius:5px;margin:10px 0;">

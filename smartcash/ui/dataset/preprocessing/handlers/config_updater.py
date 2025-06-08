@@ -6,38 +6,53 @@ Deskripsi: Pembaruan UI components dari konfigurasi preprocessing sesuai form ya
 from typing import Dict, Any
 
 def update_preprocessing_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI components dari config preprocessing sesuai form yang tersedia"""
+    """Update UI components dari config preprocessing dengan struktur lengkap"""
     preprocessing_config = config.get('preprocessing', {})
     normalization_config = preprocessing_config.get('normalization', {})
     performance_config = config.get('performance', {})
+    validate_config = preprocessing_config.get('validate', {})
+    analysis_config = preprocessing_config.get('analysis', {})
+    balance_config = preprocessing_config.get('balance', {})
+    cleanup_config = config.get('cleanup', {})
     
     safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
     
-    # Field mappings sesuai dengan form UI yang ada
+    # Field mappings sesuai dengan form UI dan defaults.py structure
     field_mappings = [
-        # Resolution mapping dari target_size
+        # Performance settings
         ('worker_slider', performance_config, 'num_workers', 8),
+        
+        # Preprocessing settings
         ('split_dropdown', preprocessing_config, 'target_split', 'all'),
+        
+        # Note: resolution dan normalization perlu special handling karena complex structure
     ]
     
-    # Apply mappings
+    # Apply basic mappings
     [safe_update(component_key, source_config.get(config_key, default_value)) 
      for component_key, source_config, config_key, default_value in field_mappings]
     
-    # Special handling untuk resolution dropdown
+    # Special handling untuk resolution dropdown dari normalization.target_size
     try:
         target_size = normalization_config.get('target_size', [640, 640])
         if isinstance(target_size, list) and len(target_size) >= 2:
             resolution_str = f"{target_size[0]}x{target_size[1]}"
             safe_update('resolution_dropdown', resolution_str)
+        else:
+            safe_update('resolution_dropdown', '640x640')
     except Exception:
         safe_update('resolution_dropdown', '640x640')
     
-    # Special handling untuk normalization method
+    # Special handling untuk normalization method dari complete normalization structure
     try:
         if normalization_config.get('enabled', True):
             method = normalization_config.get('method', 'minmax')
-            safe_update('normalization_dropdown', method)
+            # Validate method exists in dropdown options
+            valid_methods = ['minmax', 'standard', 'none']
+            if method in valid_methods:
+                safe_update('normalization_dropdown', method)
+            else:
+                safe_update('normalization_dropdown', 'minmax')
         else:
             safe_update('normalization_dropdown', 'none')
     except Exception:

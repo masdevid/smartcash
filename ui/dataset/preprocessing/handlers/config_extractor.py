@@ -26,7 +26,11 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
             'vis_dir': 'visualizations/preprocessing',
             'sample_size': 0,  # 0 = semua file
             
-            # Validasi preprocessing
+            # Target split dari form
+            'target_split': get_value('split_dropdown', 'all'),
+            'force_reprocess': False,
+            
+            # Validasi preprocessing sesuai defaults.py
             'validate': {
                 'enabled': True,
                 'fix_issues': True,
@@ -38,7 +42,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
                 'check_uuid_consistency': True
             },
             
-            # Normalisasi sesuai form UI
+            # Normalisasi sesuai defaults.py structure
             'normalization': {
                 'enabled': get_value('normalization_dropdown', 'minmax') != 'none',
                 'method': get_value('normalization_dropdown', 'minmax'),
@@ -48,11 +52,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
                 'pixel_range': [0, 1]
             },
             
-            # Split target dari form
-            'target_split': get_value('split_dropdown', 'all'),
-            'force_reprocess': False,
-            
-            # Analysis settings (default disabled)
+            # Analysis settings sesuai defaults.py
             'analysis': {
                 'enabled': False,
                 'class_balance': True,
@@ -61,7 +61,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
                 'layer_balance': True
             },
             
-            # Balance settings (default disabled)
+            # Balance settings sesuai defaults.py
             'balance': {
                 'enabled': False,
                 'target_distribution': 'auto',
@@ -75,7 +75,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
             }
         },
         
-        # Performance settings dari form
+        # Performance settings sesuai defaults.py
         'performance': {
             'num_workers': get_value('worker_slider', _get_optimal_workers()),
             'batch_size': 32,
@@ -85,7 +85,7 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
             'use_mixed_precision': True
         },
         
-        # Cleanup settings
+        # Cleanup settings sesuai defaults.py
         'cleanup': {
             'augmentation_patterns': [
                 'aug_.*',

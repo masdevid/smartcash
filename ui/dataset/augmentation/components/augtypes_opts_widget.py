@@ -78,19 +78,19 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0;'>{ICONS.get('augmentation', '🔄')} Pilih Jenis Augmentasi:</h6>"),
         augmentation_types,
         types_info
-    ], layout=widgets.Layout(width='49%', padding='5px'))
+    ], layout=widgets.Layout(width='48%', padding='5px'))
     
     right_column = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0;'>{ICONS.get('split', '📂')} Target Split:</h6>"),
         target_split,
         split_info
-    ], layout=widgets.Layout(width='49%', padding='5px'))
+    ], layout=widgets.Layout(width='48%', padding='5px'))
     
     # Main container dengan responsive layout
     container = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 5px 0; font-size: 14px;'>{ICONS.get('settings', '⚙️')} Jenis Augmentasi & Target Split</h6>"),
         widgets.HBox([left_column, right_column], 
-                    layout=widgets.Layout(width='100%', justify_content='space-between'))
+                    layout=widgets.Layout(width='100%', display="flex", gap="10px", justify_content='space-between'))
     ], layout=widgets.Layout(padding='10px', width='100%'))
     
     return {

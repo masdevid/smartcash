@@ -46,7 +46,7 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Split information panel
     split_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: {COLORS.get('bg_light', '#2196f340')}; 
+        <div style="padding: 8px; background-color:#e3f2fd; 
                     border-radius: 4px; margin: 5px 0; font-size: 11px;
                     border: 1px solid #2196f3;">
             <strong style="color:#2196f3">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
@@ -61,13 +61,13 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Types information panel
     types_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color:{COLORS.get('bg_light', '#2196f340')}; 
+        <div style="padding: 8px; background-color:#e3f2fd; 
                     border-radius: 4px; margin: 5px 0; font-size: 11px;
                     border: 1px solid #2196f3;">
-            <strong style="color:#f8f9fa">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
-            • <strong style="color:#f8f9fa">Combined</strong>: Gabungan transformasi posisi dan pencahayaan<br>
-            • <strong style="color:#f8f9fa">Position</strong>: Hanya transformasi geometri (rotasi, flip, scale)<br>
-            • <strong style="color:#f8f9fa">Lighting</strong>: Hanya transformasi pencahayaan (HSV, brightness)
+            <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
+            • <strong style="color:#2196f3">Combined</strong>: Gabungan transformasi posisi dan pencahayaan<br>
+            • <strong style="color:#2196f3">Position</strong>: Hanya transformasi geometri (rotasi, flip, scale)<br>
+            • <strong style="color:#2196f3">Lighting</strong>: Hanya transformasi pencahayaan (HSV, brightness)
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')

@@ -41,6 +41,10 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             auto_hide=True
         )
         
+        # Ensure progress_result is a dict
+        if not isinstance(progress_result, dict):
+            progress_result = {'container': progress_result, 'tracker': progress_result}
+        
         # Config buttons
         config_buttons = create_save_reset_buttons(
             save_label="Simpan Config", 

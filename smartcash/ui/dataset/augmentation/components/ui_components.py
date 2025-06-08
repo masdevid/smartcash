@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/ui_components.py
-Deskripsi: Main UI assembly dengan reuse komponen dan progress tracker baru
+Deskripsi: Fixed main UI assembly dengan reuse komponen existing dan proper widget extraction
 """
 
 import ipywidgets as widgets
@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Main UI assembly dengan CommonInitializer pattern dan progress tracker baru
+    Main UI assembly dengan CommonInitializer pattern - fixed version
     
     Args:
         config: Konfigurasi untuk initialize UI values
@@ -26,7 +26,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
     from smartcash.ui.components.progress_tracker import create_triple_progress_tracker
     
-    # Import widget components
+    # Import existing widget components - KEEP EXISTING STRUCTURE
     from smartcash.ui.dataset.augmentation.components.basic_opts_widget import create_basic_options_widget
     from smartcash.ui.dataset.augmentation.components.advanced_opts_widget import create_advanced_options_widget
     from smartcash.ui.dataset.augmentation.components.augtypes_opts_widget import create_augmentation_types_widget
@@ -40,16 +40,15 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Status panel initial
     status_panel = create_status_panel("✅ Augmentation UI siap digunakan", "success")
     
-    # Widget groups
+    # Widget groups - KEEP EXISTING STRUCTURE
     basic_options = create_basic_options_widget()
     advanced_options = create_advanced_options_widget()
     augmentation_types = create_augmentation_types_widget()
     
-    # Progress tracking dengan triple level dan step mapping dari config
+    # Progress tracking dengan config dari defaults
     progress_config = config.get('progress', {}) if config else {}
     operations_config = progress_config.get('operations', {})
     
-    # Get augmentation operation config dengan fallback
     aug_operation = operations_config.get('augmentation', {
         'steps': ["prepare", "augment", "normalize", "verify"],
         'weights': {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10},
@@ -63,7 +62,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         auto_hide=aug_operation.get('auto_hide', True)
     )
     
-    # Control buttons dengan enhanced tooltips
+    # Control buttons
     config_buttons = create_save_reset_buttons(
         save_label="Simpan Config", 
         reset_label="Reset Config",
@@ -73,7 +72,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         sync_message="Konfigurasi akan tersimpan di configs/augmentation_config.yaml"
     )
     
-    # Action buttons dengan enhanced operations
+    # Action buttons
     action_buttons = create_action_buttons(
         primary_label="🎯 Run Augmentation Pipeline", 
         primary_icon="play",
@@ -96,7 +95,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Help info panel dengan augmentation guidance
     help_panel = _create_augmentation_help_panel()
     
-    # Layout assembly dengan responsive design
+    # Layout assembly dengan responsive design - KEEP EXISTING STRUCTURE
     settings_row1 = widgets.HBox([
         _create_settings_section("Opsi Dasar", basic_options['container']),
         _create_settings_section("Opsi Lanjutan", advanced_options['container'])
@@ -136,7 +135,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         help_panel
     ], layout=widgets.Layout(width='100%', overflow='hidden'))
     
-    # Comprehensive component mapping untuk handlers
+    # FIXED: Comprehensive component mapping untuk handlers
     return {
         'ui': ui,
         'header': header,
@@ -145,7 +144,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         'confirmation_area': confirmation_area,
         'help_panel': help_panel,
         
-        # Widget mappings dari form components
+        # FIXED: Widget mappings dari form components - proper extraction
         **basic_options['widgets'],
         **advanced_options['widgets'], 
         **augmentation_types['widgets'],

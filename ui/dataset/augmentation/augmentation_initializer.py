@@ -1,16 +1,16 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Augmentation initializer dengan CommonInitializer pattern yang diperbaiki
+Deskripsi: Fixed augmentation initializer dengan proper import paths
 """
 
 from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.augmentation.handlers.config_handler import AugmentationConfigHandler
 from smartcash.ui.dataset.augmentation.components.ui_components import create_augmentation_main_ui
-from smartcash.ui.dataset.augmentation.handlers.main_handlers import setup_augmentation_handlers
+from smartcash.ui.dataset.augmentation.handlers.augmentation_handlers import setup_augmentation_handlers
 
 class AugmentationInitializer(CommonInitializer):
-    """Augmentation initializer dengan CommonInitializer inheritance dan config management"""
+    """Fixed augmentation initializer dengan proper import paths dan config management"""
     
     def __init__(self):
         super().__init__(

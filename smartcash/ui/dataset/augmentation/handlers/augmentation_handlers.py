@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/dataset/augmentation/handlers/main_handlers.py
-Deskripsi: Main handlers dengan dialog integration dan config handler yang diperbaiki
+File: smartcash/ui/dataset/augmentation/handlers/augmentation_handlers.py
+Deskripsi: Fixed main handlers dengan dialog integration dan config handler yang diperbaiki
 """
 
 from typing import Dict, Any
@@ -22,18 +22,18 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str,
     return ui_components
 
 def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None):
-    """Setup operation handlers dengan progress tracking baru"""
+    """Setup operation handlers dengan progress tracking"""
     
     def augment_handler(button):
         """Augmentation handler dengan progress tracking"""
         _clear_outputs(ui_components)
-        from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_augmentation
+        from smartcash.ui.dataset.augmentation.utils.operation_utils import execute_augmentation
         execute_augmentation(ui_components)
     
     def check_handler(button):
         """Check dataset handler dengan detailed analysis"""
         _clear_outputs(ui_components)
-        from smartcash.ui.dataset.augmentation.handlers.operation_handlers import execute_check
+        from smartcash.ui.dataset.augmentation.utils.operation_utils import execute_check
         execute_check(ui_components)
     
     def cleanup_handler(button):
@@ -51,7 +51,6 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     for button_name, handler in operation_buttons.items():
         button = ui_components.get(button_name)
         if button and hasattr(button, 'on_click'):
-            # Clear existing handlers
             if hasattr(button, '_click_handlers'):
                 button._click_handlers.callbacks.clear()
             button.on_click(handler)
@@ -68,12 +67,10 @@ def _setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str
                 _handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
                 return
             
-            # CRITICAL: Set UI components untuk logging
             if hasattr(config_handler, 'set_ui_components'):
                 config_handler.set_ui_components(ui_components)
             
-            success = config_handler.save_config(ui_components)
-            # Logger sudah handle di config_handler
+            config_handler.save_config(ui_components)
             
         except Exception as e:
             _handle_ui_error(ui_components, f"❌ Error save: {str(e)}")
@@ -87,81 +84,42 @@ def _setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str
                 _handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
                 return
             
-            # CRITICAL: Set UI components untuk logging
             if hasattr(config_handler, 'set_ui_components'):
                 config_handler.set_ui_components(ui_components)
             
-            success = config_handler.reset_config(ui_components)
-            # Logger sudah handle di config_handler
+            config_handler.reset_config(ui_components)
             
         except Exception as e:
             _handle_ui_error(ui_components, f"❌ Error reset: {str(e)}")
     
     # Bind config handlers
-    config_buttons = {
-        'save_button': save_config,
-        'reset_button': reset_config
-    }
+    config_buttons = {'save_button': save_config, 'reset_button': reset_config}
     
     for button_name, handler in config_buttons.items():
         button = ui_components.get(button_name)
         if button and hasattr(button, 'on_click'):
-            # Clear existing handlers
             if hasattr(button, '_click_handlers'):
                 button._click_handlers.callbacks.clear()
             button.on_click(handler)
 
 def _show_cleanup_confirmation_dialog(ui_components: Dict[str, Any]):
-    """Show cleanup confirmation dengan shared dialog component"""
-    try:
-        from smartcash.ui.components.dialogs import show_destructive_confirmation
-        
-        def confirm_cleanup(button):
-            """Execute cleanup setelah konfirmasi"""
-            from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import execute_cleanup_with_progress
-            execute_cleanup_with_progress(ui_components)
-        
-        def cancel_cleanup(button):
-            """Cancel cleanup operation"""
-            _log_to_ui(ui_components, "❌ Cleanup dibatalkan", 'info')
-        
-        # Show destructive confirmation dialog
-        dialog = show_destructive_confirmation(
-            title="Konfirmasi Cleanup Dataset",
-            message="Apakah Anda yakin ingin menghapus semua file augmented?\n\n⚠️ Tindakan ini tidak dapat dibatalkan!",
-            item_name="file augmented",
-            on_confirm=confirm_cleanup,
-            on_cancel=cancel_cleanup
-        )
-        
-        # Display dalam confirmation area
-        confirmation_area = ui_components.get('confirmation_area')
-        if confirmation_area and hasattr(confirmation_area, 'clear_output'):
-            confirmation_area.clear_output()
-            with confirmation_area:
-                from IPython.display import display
-                display(dialog)
-        else:
-            # Fallback direct display
-            from IPython.display import display
-            display(dialog)
-            
-    except ImportError:
-        # Fallback ke simple confirmation jika dialog tidak tersedia
-        _log_to_ui(ui_components, "⚠️ Dialog tidak tersedia, gunakan cleanup langsung", 'warning')
-        from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import execute_cleanup_with_progress
+    """Show cleanup confirmation menggunakan existing dialog_utils"""
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_cleanup_confirmation
+    from smartcash.ui.dataset.augmentation.utils.operation_utils import execute_cleanup_with_progress
+    
+    def confirm_cleanup(button):
         execute_cleanup_with_progress(ui_components)
+    
+    show_cleanup_confirmation(ui_components, confirm_cleanup)
 
 def _clear_outputs(ui_components: Dict[str, Any]):
     """Clear output areas dan reset progress"""
-    # Reset progress tracker
     progress_tracker = ui_components.get('progress_tracker')
     if progress_tracker and hasattr(progress_tracker, 'reset'):
         progress_tracker.reset()
     elif 'reset_all' in ui_components:
         ui_components['reset_all']()
     
-    # Clear confirmation area
     confirmation_area = ui_components.get('confirmation_area')
     if confirmation_area and hasattr(confirmation_area, 'clear_output'):
         confirmation_area.clear_output(wait=True)
@@ -173,13 +131,11 @@ def _handle_ui_error(ui_components: Dict[str, Any], message: str):
 def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
     """Log ke UI dengan fallback chain"""
     try:
-        # Priority 1: UI Logger
         logger = ui_components.get('logger')
         if logger and hasattr(logger, level):
             getattr(logger, level)(message)
             return
         
-        # Priority 2: Log widget
         widget = ui_components.get('log_output') or ui_components.get('status')
         if widget and hasattr(widget, 'clear_output'):
             from IPython.display import display, HTML
@@ -194,5 +150,4 @@ def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info')
     except Exception:
         pass
     
-    # Fallback
     print(message)

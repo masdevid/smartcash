@@ -16,7 +16,7 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
     output_widget = output_widget or widgets.Output(layout=widgets.Layout(
         max_height=height, 
         width='100%',
-        overflow='auto', 
+        overflow='hidden', 
         border='1px solid #ddd', 
         padding='8px',
         box_sizing='border-box',
@@ -48,7 +48,10 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
         width=width, 
         margin='10px 0',
         overflow='hidden',
-        box_sizing='border-box'
+        box_sizing='border-box',
+        display='flex',
+        flex_flow='column',
+        justify_content='space-between'
     ))
     log_accordion.set_title(0, f"{ICONS.get('log', '📋')} Log {module_name.capitalize()}")
     log_accordion.selected_index = 0  # Open by default

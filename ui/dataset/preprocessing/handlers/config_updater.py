@@ -1,28 +1,29 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_updater.py
-Deskripsi: Fixed pembaruan UI components dari konfigurasi dengan inheritance handling yang tepat
+Deskripsi: Fixed config updater dengan proper inheritance handling
 """
 
 from typing import Dict, Any
 
 def update_preprocessing_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI components dari config dengan proper structure handling"""
+    """Update UI components dari config dengan inheritance handling"""
+    # Extract sections dengan safe defaults
     preprocessing_config = config.get('preprocessing', {})
     normalization_config = preprocessing_config.get('normalization', {})
     performance_config = config.get('performance', {})
     
     safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
     
-    # Update worker slider dari performance config
+    # Update worker slider
     num_workers = performance_config.get('num_workers', 8)
     safe_update('worker_slider', min(max(num_workers, 1), 10))
     
-    # Update split dropdown dari preprocessing config  
+    # Update split dropdown
     target_split = preprocessing_config.get('target_split', 'all')
     valid_splits = ['all', 'train', 'valid', 'test']
     safe_update('split_dropdown', target_split if target_split in valid_splits else 'all')
     
-    # Update resolution dari normalization.target_size dengan validation
+    # Update resolution dari target_size
     try:
         target_size = normalization_config.get('target_size', [640, 640])
         if isinstance(target_size, list) and len(target_size) >= 2:
@@ -34,7 +35,7 @@ def update_preprocessing_ui(ui_components: Dict[str, Any], config: Dict[str, Any
     except Exception:
         safe_update('resolution_dropdown', '640x640')
     
-    # Update normalization method dengan proper enabled/disabled handling
+    # Update normalization method
     try:
         normalization_enabled = normalization_config.get('enabled', True)
         normalization_method = normalization_config.get('method', 'minmax')
@@ -48,7 +49,7 @@ def update_preprocessing_ui(ui_components: Dict[str, Any], config: Dict[str, Any
         safe_update('normalization_dropdown', 'minmax')
 
 def reset_preprocessing_ui(ui_components: Dict[str, Any]) -> None:
-    """Reset UI components ke default konfigurasi dari defaults.py"""
+    """Reset UI ke defaults"""
     try:
         from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
         default_config = get_default_preprocessing_config()
@@ -57,7 +58,7 @@ def reset_preprocessing_ui(ui_components: Dict[str, Any]) -> None:
         _apply_hardcoded_defaults(ui_components)
 
 def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
-    """Apply hardcoded defaults jika config manager tidak tersedia"""
+    """Hardcoded defaults fallback"""
     defaults = {
         'resolution_dropdown': '640x640',
         'normalization_dropdown': 'minmax', 
@@ -70,4 +71,4 @@ def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
             try:
                 ui_components[key].value = value
             except Exception:
-                pass  # Silent fail untuk widget compatibility issues
+                pass

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_handler.py
-Deskripsi: DRY config handler dengan defaults sebagai base structure
+Deskripsi: Fixed config handler dengan proper logging ke UI dan load config yang benar
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.preprocessing.handlers.config_updater import update_pr
 from smartcash.common.config.manager import get_config_manager
 
 class PreprocessingConfigHandler(ConfigHandler):
-    """DRY config handler dengan defaults sebagai base"""
+    """Fixed config handler dengan proper UI logging dan load"""
     
     def __init__(self, module_name: str = 'preprocessing', parent_module: str = 'dataset'):
         super().__init__(module_name, parent_module)
@@ -31,49 +31,65 @@ class PreprocessingConfigHandler(ConfigHandler):
         return get_default_preprocessing_config()
     
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """Load dengan fallback ke defaults"""
+        """Load config dengan proper inheritance handling"""
         try:
             filename = config_filename or self.config_filename
+            
+            # Load preprocessing_config.yaml
             config = self.config_manager.load_config(filename)
             
             if not config:
-                self.logger.warning("⚠️ Config kosong, menggunakan default")
+                self._log_to_ui("⚠️ Config kosong, menggunakan default", "warning")
                 return self.get_default_config()
             
-            # Merge dengan defaults untuk missing keys
-            return self._merge_with_defaults(config)
+            # Handle inheritance dari _base_
+            if '_base_' in config:
+                base_config = self.config_manager.load_config(config['_base_']) or {}
+                merged_config = self._merge_configs(base_config, config)
+                self._log_to_ui(f"📂 Config loaded dari {filename} dengan inheritance", "info")
+                return merged_config
+            
+            self._log_to_ui(f"📂 Config loaded dari {filename}", "info")
+            return config
             
         except Exception as e:
-            self.logger.error(f"❌ Error loading config: {str(e)}")
+            self._log_to_ui(f"❌ Error loading config: {str(e)}", "error")
             return self.get_default_config()
     
-    def _merge_with_defaults(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge config dengan defaults untuk missing keys"""
+    def _merge_configs(self, base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge base config dengan override config"""
         import copy
         
-        defaults = self.get_default_config()
-        merged = copy.deepcopy(defaults)
+        merged = copy.deepcopy(base_config)
         
-        # Deep merge untuk preserve structure
-        for section in ['preprocessing', 'performance', 'cleanup']:
-            if section in config:
-                merged[section].update(config[section])
+        # Override sections yang ada di preprocessing_config.yaml
+        for key, value in override_config.items():
+            if key == '_base_':
+                continue
                 
+            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
                 # Deep merge untuk nested dicts
-                if section == 'preprocessing':
-                    for nested in ['validate', 'normalization', 'analysis', 'balance']:
-                        if nested in config[section] and nested in merged[section]:
-                            if isinstance(merged[section][nested], dict):
-                                merged[section][nested].update(config[section][nested])
-        
-        # Preserve inheritance marker
-        if '_base_' in config:
-            merged['_base_'] = config['_base_']
+                merged[key] = self._deep_merge(merged[key], value)
+            else:
+                merged[key] = value
         
         return merged
     
+    def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """Deep merge two dictionaries"""
+        import copy
+        result = copy.deepcopy(base)
+        
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        
+        return result
+    
     def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Save dengan auto refresh"""
+        """Save dengan proper UI logging"""
         try:
             filename = config_filename or self.config_filename
             ui_config = self.extract_config(ui_components)
@@ -81,19 +97,19 @@ class PreprocessingConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(ui_config, filename)
             
             if success:
-                self.logger.success(f"✅ Config tersimpan ke {filename}")
-                self._refresh_ui(ui_components, filename)
+                self._log_to_ui(f"✅ Config tersimpan ke {filename}", "success")
+                self._refresh_ui_after_save(ui_components, filename)
                 return True
             else:
-                self.logger.error(f"❌ Gagal simpan config")
+                self._log_to_ui(f"❌ Gagal simpan config ke {filename}", "error")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Error save: {str(e)}")
+            self._log_to_ui(f"❌ Error save config: {str(e)}", "error")
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Reset dengan auto refresh"""
+        """Reset dengan proper UI logging"""
         try:
             filename = config_filename or self.config_filename
             default_config = self.get_default_config()
@@ -101,23 +117,52 @@ class PreprocessingConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(default_config, filename)
             
             if success:
-                self.logger.success(f"🔄 Config direset ke default")
+                self._log_to_ui(f"🔄 Config direset ke default", "success")
+                # Direct update UI dengan default config
                 self.update_ui(ui_components, default_config)
                 return True
             else:
-                self.logger.error(f"❌ Gagal reset config")
+                self._log_to_ui(f"❌ Gagal reset config", "error")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Error reset: {str(e)}")
+            self._log_to_ui(f"❌ Error reset config: {str(e)}", "error")
             return False
     
-    def _refresh_ui(self, ui_components: Dict[str, Any], filename: str):
-        """Auto refresh UI setelah save"""
+    def _refresh_ui_after_save(self, ui_components: Dict[str, Any], filename: str):
+        """Refresh UI dengan reload dari file"""
         try:
-            saved_config = self.config_manager.load_config(filename)
+            # Reload dari file dengan inheritance handling
+            saved_config = self.load_config(filename)
+            
             if saved_config:
+                # Update UI dengan config yang direload
                 self.update_ui(ui_components, saved_config)
-                self.logger.info("🔄 UI direfresh")
+                self._log_to_ui("🔄 UI direfresh dengan config tersimpan", "info")
+            
         except Exception as e:
-            self.logger.warning(f"⚠️ Error refresh: {str(e)}")
+            self._log_to_ui(f"⚠️ Error refresh UI: {str(e)}", "warning")
+    
+    def _log_to_ui(self, message: str, level: str = "info"):
+        """Log langsung ke UI components"""
+        try:
+            # Coba log ke UI logger dulu
+            ui_components = getattr(self, '_ui_components', {})
+            logger = ui_components.get('logger')
+            
+            if logger and hasattr(logger, level):
+                log_method = getattr(logger, level)
+                log_method(message)
+                return
+            
+            # Fallback ke log_to_accordion
+            from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
+            log_to_accordion(ui_components, message, level)
+                
+        except Exception:
+            # Final fallback
+            print(f"[{level.upper()}] {message}")
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]):
+        """Set UI components untuk logging"""
+        self._ui_components = ui_components

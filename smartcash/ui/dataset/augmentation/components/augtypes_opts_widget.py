@@ -72,19 +72,25 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
     )
-    
-    # FIXED: Layout full width dengan proper spacing
-    container = widgets.VBox([
+    aug_types = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 8px 0;'>{ICONS.get('augmentation', '🔄')} Pilih Jenis Augmentasi:</h6>"),
         augmentation_types,
-        types_info,
+        types_info], layout=widgets.Layout(width='48%'))
+    split_selcetion  = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 8px 0;'>{ICONS.get('split', '📂')} Target Split Dataset:</h6>"),
         target_split,
         split_info
+    ], layout=widgets.Layout(width='48%'))
+    # FIXED: Layout full width dengan proper spacing
+    container = widgets.HBox([
+        aug_types,
+        split_selcetion
     ], layout=widgets.Layout(
         width='100%',           # FIXED: Full width
         padding='10px',
-        margin='5px 0'
+        margin='5px 0',
+        display='flex',
+        justify_content="space-between"
     ))
     
     return {

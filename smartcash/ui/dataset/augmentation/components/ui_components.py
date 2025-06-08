@@ -57,11 +57,6 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         log_components = create_log_accordion('augmentation', '200px')
         
-        # Layout dengan border dan balanced 2x2 grid
-        # settings_grid = _create_balanced_settings_grid([
-        #     basic_options, advanced_options
-        # ])
-        
         # Action section dengan styling
         action_section = widgets.VBox([
             _create_section_header("▶️ Aksi Augmentasi", "#667eea"),
@@ -79,9 +74,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         ui = widgets.VBox([
             header,
             status_panel,
-            basic_options['container'],
-            advanced_options['container'],
-            augmentation_types['container'],
+            widgets.HBox([basic_options['container'], advanced_options['container']],  layout=widgets.Layout(width='100%', justify_content='space-between', gap='10px')),
+            widgets.HBox([augmentation_types['container']], layout=widgets.Layout(width='100%', justify_content='space-between', gap='10px')),
             config_section,
             action_section,
             progress_tracker.container,
@@ -128,22 +122,6 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
     except Exception as e:
         return _create_fallback_ui(str(e))
-
-# def _create_balanced_settings_grid(widget_groups):
-#     """Create balanced 2x2 grid layout dengan border"""
-#     if len(widget_groups) >= 2:
-#         # 2x2 grid layout
-#         top_row = widgets.HBox([
-#             widget_groups[0]['container'],  # Basic options
-#             widget_groups[1]['container']   # Advanced options
-#         ], layout=widgets.Layout(
-#             width='100%', justify_content='space-between'
-#         ))
-        
-#         return widgets.VBox([top_row], 
-#                            layout=widgets.Layout(width='100%', margin='10px 0'))
-#     else:
-#         return widgets.VBox([wg['container'] for wg in widget_groups])
 
 def _create_section_header(title: str, color: str) -> widgets.HTML:
     """Create styled section header"""

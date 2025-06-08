@@ -88,9 +88,20 @@ def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = '
 
 def clear_outputs(ui_components: Dict[str, Any]):
     """Clear UI output areas"""
+    # Clear log output
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         with ui_components['log_output']:
             ui_components['log_output'].clear_output(wait=True)
+    
+    # Clear confirmation area if exists
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        with ui_components['confirmation_area']:
+            ui_components['confirmation_area'].clear_output(wait=True)
+    
+    # Reset progress tracker if exists
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker and hasattr(progress_tracker, 'reset'):
+        progress_tracker.reset()
 
 def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, button_manager=None):
     """Handle error dengan UI updates dan proper state reset"""

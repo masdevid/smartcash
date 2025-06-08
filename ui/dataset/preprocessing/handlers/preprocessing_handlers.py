@@ -29,13 +29,18 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
     
     def execute_preprocessing(button=None):
         button_manager = get_button_manager(ui_components)
+        logger = ui_components.get('logger')
         
+        # Clear outputs FIRST
         clear_outputs(ui_components)
         button_manager.disable_buttons('preprocess_button')
         
         try:
+            if logger:
+                logger.info("🚀 Memulai preprocessing dataset")
+            
             # Validate dataset ready
-            valid, msg = validate_dataset_ready(config, ui_components.get('logger'))
+            valid, msg = validate_dataset_ready(config, logger)
             if not valid:
                 handle_ui_error(ui_components, f"❌ {msg}", button_manager)
                 return
@@ -62,7 +67,7 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
             log_preprocessing_config(ui_components, processing_config)
             
             # Create dan execute preprocessor
-            preprocessor = create_backend_preprocessor(processing_config, ui_components.get('logger'))
+            preprocessor = create_backend_preprocessor(processing_config, logger)
             if not preprocessor:
                 handle_ui_error(ui_components, "❌ Gagal membuat preprocessing service", button_manager)
                 return
@@ -70,7 +75,7 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
             preprocessor.register_progress_callback(ui_components['progress_callback'])
             
             result = preprocessor.preprocess_with_uuid_consistency(
-                split=params.get('split', 'all'),
+                split=params.get('target_split', 'all'),
                 force_reprocess=params.get('force_reprocess', False)
             )
             
@@ -99,18 +104,22 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
     
     def execute_check(button=None):
         button_manager = get_button_manager(ui_components)
+        logger = ui_components.get('logger')
         
+        # Clear outputs FIRST
         clear_outputs(ui_components)
         button_manager.disable_buttons('check_button')
         
         try:
+            if logger:
+                logger.info("🔍 Memulai dataset check")
+            
             setup_progress_tracker(ui_components, "Dataset Check")
             
             # Check source dataset
-            valid, source_msg = validate_dataset_ready(config, ui_components.get('logger'))
+            valid, source_msg = validate_dataset_ready(config, logger)
             
             if valid:
-                logger = ui_components.get('logger')
                 if logger:
                     logger.success(f"✅ {source_msg}")
                 
@@ -145,90 +154,118 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
     """Setup cleanup handler dengan confirmation"""
     
     def execute_cleanup(button=None):
+        logger = ui_components.get('logger')
+        
+        # Clear outputs FIRST
         clear_outputs(ui_components)
         
-        # Check existing preprocessed data
-        has_data, count = check_preprocessed_exists(config)
-        if not has_data:
-            show_ui_success(ui_components, "ℹ️ Tidak ada data preprocessed untuk dibersihkan")
-            return
-        
-        def confirmed_cleanup():
-            button_manager = get_button_manager(ui_components)
-            button_manager.disable_buttons('cleanup_button')
+        try:
+            if logger:
+                logger.info("🧹 Checking cleanup targets")
             
-            try:
-                setup_progress_tracker(ui_components, "Dataset Cleanup")
-                
-                cleanup_service = create_backend_cleanup_service(config, ui_components.get('logger'))
-                if not cleanup_service:
-                    handle_ui_error(ui_components, "❌ Gagal membuat cleanup service", button_manager)
-                    return
-                
-                cleanup_service.register_progress_callback(ui_components['progress_callback'])
-                
-                result = cleanup_service.cleanup_preprocessed_data(safe_mode=True)
-                
-                if result and result.get('success', False):
-                    stats = result.get('stats', {})
-                    files_removed = stats.get('files_removed', 0)
-                    
-                    complete_progress_tracker(ui_components, f"Cleanup selesai: {files_removed:,} file dihapus")
-                    show_ui_success(ui_components, f"🧹 Cleanup berhasil: {files_removed:,} file", button_manager)
-                else:
-                    error_msg = result.get('message', 'Unknown cleanup error') if result else 'No response from service'
-                    handle_ui_error(ui_components, error_msg, button_manager)
-                    
-            except Exception as e:
-                error_progress_tracker(ui_components, f"Cleanup gagal: {str(e)}")
-                handle_ui_error(ui_components, f"❌ Error cleanup: {str(e)}", button_manager)
+            # Check existing preprocessed data
+            has_data, count = check_preprocessed_exists(config)
+            if not has_data:
+                show_ui_success(ui_components, "ℹ️ Tidak ada data preprocessed untuk dibersihkan")
+                return
             
-            finally:
-                button_manager.enable_buttons()
-        
-        # Show confirmation dialog
-        confirmation_area = ui_components.get('confirmation_area')
-        if confirmation_area:
-            from IPython.display import display, clear_output
-            with confirmation_area:
-                clear_output(wait=True)
-                dialog = create_destructive_confirmation(
-                    title="⚠️ Konfirmasi Cleanup Dataset",
-                    message=f"Operasi ini akan menghapus {count:,} file preprocessed.\n\nData asli tetap aman. Lanjutkan?",
-                    on_confirm=lambda b: (confirmed_cleanup(), clear_outputs(ui_components)),
-                    on_cancel=lambda b: clear_outputs(ui_components),
-                    item_name="data preprocessed"
-                )
-                display(dialog)
+            def confirmed_cleanup():
+                button_manager = get_button_manager(ui_components)
+                button_manager.disable_buttons('cleanup_button')
+                
+                try:
+                    if logger:
+                        logger.info("🧹 Memulai cleanup preprocessed data")
+                    
+                    setup_progress_tracker(ui_components, "Dataset Cleanup")
+                    
+                    cleanup_service = create_backend_cleanup_service(config, logger)
+                    if not cleanup_service:
+                        handle_ui_error(ui_components, "❌ Gagal membuat cleanup service", button_manager)
+                        return
+                    
+                    cleanup_service.register_progress_callback(ui_components['progress_callback'])
+                    
+                    result = cleanup_service.cleanup_preprocessed_data(safe_mode=True)
+                    
+                    if result and result.get('success', False):
+                        stats = result.get('stats', {})
+                        files_removed = stats.get('files_removed', 0)
+                        
+                        complete_progress_tracker(ui_components, f"Cleanup selesai: {files_removed:,} file dihapus")
+                        show_ui_success(ui_components, f"🧹 Cleanup berhasil: {files_removed:,} file", button_manager)
+                    else:
+                        error_msg = result.get('message', 'Unknown cleanup error') if result else 'No response from service'
+                        handle_ui_error(ui_components, error_msg, button_manager)
+                        
+                except Exception as e:
+                    error_progress_tracker(ui_components, f"Cleanup gagal: {str(e)}")
+                    handle_ui_error(ui_components, f"❌ Error cleanup: {str(e)}", button_manager)
+                
+                finally:
+                    button_manager.enable_buttons()
+            
+            # Show confirmation dialog
+            confirmation_area = ui_components.get('confirmation_area')
+            if confirmation_area:
+                from IPython.display import display, clear_output
+                with confirmation_area:
+                    clear_output(wait=True)
+                    dialog = create_destructive_confirmation(
+                        title="⚠️ Konfirmasi Cleanup Dataset",
+                        message=f"Operasi ini akan menghapus {count:,} file preprocessed.\n\nData asli tetap aman. Lanjutkan?",
+                        on_confirm=lambda b: (confirmed_cleanup(), clear_outputs(ui_components)),
+                        on_cancel=lambda b: clear_outputs(ui_components),
+                        item_name="data preprocessed"
+                    )
+                    display(dialog)
+        except Exception as e:
+            handle_ui_error(ui_components, f"❌ Error cleanup check: {str(e)}")
     
     cleanup_button = ui_components.get('cleanup_button')
     if cleanup_button:
         cleanup_button.on_click(execute_cleanup)
 
 def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup config save/reset handlers"""
+    """Setup config save/reset handlers dengan single logging"""
     
     def save_config(button=None):
+        # Clear outputs FIRST
+        clear_outputs(ui_components)
+        
         try:
             config_handler = ui_components.get('config_handler')
-            if config_handler:
-                success = config_handler.save_config(ui_components)
-                if success:
-                    show_ui_success(ui_components, "✅ Konfigurasi tersimpan")
-                else:
-                    handle_ui_error(ui_components, "❌ Gagal simpan konfigurasi")
+            if not config_handler:
+                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                return
+            
+            success = config_handler.save_config(ui_components)
+            if success:
+                # Only log via UI, config_handler already logs internally
+                from smartcash.ui.utils.fallback_utils import show_status_safe
+                show_status_safe("✅ Konfigurasi berhasil disimpan", "success", ui_components)
+            else:
+                handle_ui_error(ui_components, "❌ Gagal simpan konfigurasi")
         except Exception as e:
             handle_ui_error(ui_components, f"❌ Error save: {str(e)}")
     
     def reset_config(button=None):
+        # Clear outputs FIRST
+        clear_outputs(ui_components)
+        
         try:
             config_handler = ui_components.get('config_handler')
-            if config_handler:
-                success = config_handler.reset_config(ui_components)
-                if success:
-                    show_ui_success(ui_components, "🔄 Konfigurasi direset")
-                else:
-                    handle_ui_error(ui_components, "❌ Gagal reset konfigurasi")
+            if not config_handler:
+                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                return
+            
+            success = config_handler.reset_config(ui_components)
+            if success:
+                # Only log via UI, config_handler already logs internally
+                from smartcash.ui.utils.fallback_utils import show_status_safe
+                show_status_safe("🔄 Konfigurasi berhasil direset", "success", ui_components)
+            else:
+                handle_ui_error(ui_components, "❌ Gagal reset konfigurasi")
         except Exception as e:
             handle_ui_error(ui_components, f"❌ Error reset: {str(e)}")
     

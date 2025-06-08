@@ -95,28 +95,53 @@ class PreprocessingConfigHandler(ConfigHandler):
         # Extract UI values
         preprocessing_ui = ui_values.get('preprocessing', {})
         performance_ui = ui_values.get('performance', {})
+        cleanup_ui = ui_values.get('cleanup', {})
         
-        # Apply ke structure yang benar
-        if 'preprocessing' in merged:
-            # Normalization settings
+        # Apply preprocessing settings dengan struktur lengkap
+        if 'preprocessing' in merged and preprocessing_ui:
+            # Complete normalization structure
             if 'normalization' in preprocessing_ui:
                 norm_ui = preprocessing_ui['normalization']
-                merged['preprocessing']['normalization'].update({
+                merged['preprocessing']['normalization'] = {
                     'enabled': norm_ui.get('enabled', True),
                     'method': norm_ui.get('method', 'minmax'),
-                    'target_size': norm_ui.get('target_size', [640, 640])
-                })
+                    'target_size': norm_ui.get('target_size', [640, 640]),
+                    'preserve_aspect_ratio': norm_ui.get('preserve_aspect_ratio', True),
+                    'normalize_pixel_values': norm_ui.get('normalize_pixel_values', True),
+                    'pixel_range': norm_ui.get('pixel_range', [0, 1])
+                }
             
             # Target split
             if 'target_split' in preprocessing_ui:
                 merged['preprocessing']['target_split'] = preprocessing_ui['target_split']
+            
+            # Force reprocess
+            if 'force_reprocess' in preprocessing_ui:
+                merged['preprocessing']['force_reprocess'] = preprocessing_ui['force_reprocess']
+            
+            # Validate settings
+            if 'validate' in preprocessing_ui:
+                merged['preprocessing']['validate'].update(preprocessing_ui['validate'])
+            
+            # Analysis settings  
+            if 'analysis' in preprocessing_ui:
+                merged['preprocessing']['analysis'].update(preprocessing_ui['analysis'])
+            
+            # Balance settings
+            if 'balance' in preprocessing_ui:
+                merged['preprocessing']['balance'].update(preprocessing_ui['balance'])
         
-        # Performance settings
+        # Apply performance settings
         if 'performance' in merged and performance_ui:
-            merged['performance']['num_workers'] = performance_ui.get('num_workers', 8)
+            merged['performance'].update(performance_ui)
+        
+        # Apply cleanup settings
+        if 'cleanup' in merged and cleanup_ui:
+            merged['cleanup'].update(cleanup_ui)
         
         # Update metadata
         merged['updated_at'] = ui_values.get('updated_at')
+        merged['config_version'] = ui_values.get('config_version', '1.0')
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate preprocessing config"""

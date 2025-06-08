@@ -61,13 +61,13 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     # Split information panel
     split_info = widgets.HTML(
         f"""
-        <div style="padding: 10px; background-color:#4caf5015; 
+        <div style="padding: 10px; background-color:#2196f315; 
                     border-radius: 6px; margin: 8px 0; font-size: 12px;
-                    border: 1px solid #4caf50;">
-            <strong style="color:#2e7d32">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
-            • <strong style="color:#2e7d32">train</strong>: Augmentasi pada data training untuk meningkatkan variasi data<br>
-            • <strong style="color:#2e7d32">valid</strong>: Augmentasi pada data validasi (hanya jika dataset sangat kecil)<br>
-            • <strong style="color:#2e7d32">test</strong>: Augmentasi pada data testing (tidak direkomendasikan untuk evaluasi)
+                    border: 1px solid #2196f3;">
+            <strong style="color:#2196f3">{ICONS.get('info', 'ℹ️')} Informasi Split:</strong><br>
+            • <strong style="color:#2196f3">train</strong>: Augmentasi pada data training untuk meningkatkan variasi data<br>
+            • <strong style="color:#2196f3">valid</strong>: Augmentasi pada data validasi (hanya jika dataset sangat kecil)<br>
+            • <strong style="color:#2196f3">test</strong>: Augmentasi pada data testing (tidak direkomendasikan untuk evaluasi)
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
@@ -90,7 +90,8 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         padding='10px',
         margin='5px 0',
         display='flex',
-        justify_content="space-between"
+        justify_content="space-between",
+        align_items="stretch"
     ))
     
     return {

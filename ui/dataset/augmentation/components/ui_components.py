@@ -72,7 +72,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         # Row 2: Augmentation types full width
         types_row = widgets.VBox([
             augmentation_types['container']
-        ], layout=widgets.Layout(width='100%'))
+        ], layout=widgets.Layout(width='100%', overflow='hidden'))
         
         # Action section
         action_section = widgets.VBox([
@@ -97,7 +97,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             action_section,
             progress_tracker.container,
             log_components['log_accordion']
-        ], layout=widgets.Layout(width='100%', overflow='hidden', display="flex", flex_flow="column", justify_content="space-between"))
+        ], layout=widgets.Layout(width='100%', overflow='hidden'))
         
         # Component mapping
         return {

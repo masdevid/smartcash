@@ -75,12 +75,12 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     aug_types = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 8px 0;'>{ICONS.get('augmentation', '🔄')} Pilih Jenis Augmentasi:</h6>"),
         augmentation_types,
-        types_info], layout=widgets.Layout(width='46%'))
+        types_info], layout=widgets.Layout(width='64%'))
     split_selcetion  = widgets.VBox([
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 15px 0 8px 0;'>{ICONS.get('split', '📂')} Target Split Dataset:</h6>"),
         target_split,
         split_info
-    ], layout=widgets.Layout(width='46%', overflow='hidden', display='flex', flex_flow='column'))
+    ], layout=widgets.Layout(width='32%', overflow='hidden', display='flex', flex_flow='column'))
     # FIXED: Layout full width dengan proper spacing
     container = widgets.HBox([
         aug_types,

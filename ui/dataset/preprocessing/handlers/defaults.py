@@ -1,14 +1,13 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/defaults.py
-Deskripsi: Hardcoded default configuration untuk preprocessing reset operations
+Deskripsi: Default configuration sesuai preprocessing_config.yaml structure
 """
 
 from typing import Dict, Any
 
 def get_default_preprocessing_config() -> Dict[str, Any]:
-    """Get hardcoded default configuration untuk preprocessing reset operations"""
+    """Get default configuration sesuai preprocessing_config.yaml"""
     return {
-        'config_version': '1.0',
         '_base_': 'base_config.yaml',
         
         'preprocessing': {
@@ -16,6 +15,8 @@ def get_default_preprocessing_config() -> Dict[str, Any]:
             'save_visualizations': False,
             'vis_dir': 'visualizations/preprocessing',
             'sample_size': 0,
+            'target_split': 'all',
+            'force_reprocess': False,
             
             'validate': {
                 'enabled': True,
@@ -36,9 +37,6 @@ def get_default_preprocessing_config() -> Dict[str, Any]:
                 'normalize_pixel_values': True,
                 'pixel_range': [0, 1]
             },
-            
-            'target_split': 'all',
-            'force_reprocess': False,
             
             'analysis': {
                 'enabled': False,
@@ -94,4 +92,3 @@ get_default_resolution = lambda: '640x640'
 get_default_normalization = lambda: 'minmax'
 get_default_workers = lambda: 8
 get_default_split = lambda: 'all'
-is_validation_enabled_by_default = lambda: True

@@ -1,120 +1,30 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_extractor.py
-Deskripsi: Fixed ekstraksi konfigurasi preprocessing sesuai struktur preprocessing_config.yaml dengan inheritance yang tepat
+Deskripsi: Extract config dengan DRY approach - base dari defaults lalu update form values
 """
 
 from typing import Dict, Any
-from datetime import datetime
 
 def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Ekstraksi konfigurasi preprocessing sesuai dengan struktur preprocessing_config.yaml"""
-    get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    """Extract config dengan DRY approach - base dari defaults + form values"""
+    from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
     
-    # Extract resolution dan convert ke target_size
+    # Base structure dari defaults
+    config = get_default_preprocessing_config()
+    
+    # Helper untuk get form values
+    get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
+    
+    # Update hanya nilai dari form
     resolution = get_value('resolution_dropdown', '640x640')
     width, height = map(int, resolution.split('x')) if 'x' in resolution else (640, 640)
-    
-    # Extract normalization method dengan proper structure
     normalization_method = get_value('normalization_dropdown', 'minmax')
-    normalization_enabled = normalization_method != 'none'
     
-    return {
-        'config_version': '1.0',
-        'updated_at': current_time,
-        '_base_': 'base_config.yaml',
-        
-        # PRIMARY CONFIGURATION - Sering Diubah (sesuai preprocessing_config.yaml)
-        'preprocessing': {
-            # Basic settings
-            'output_dir': 'data/preprocessed',
-            'save_visualizations': False,
-            'vis_dir': 'visualizations/preprocessing',
-            'sample_size': 0,
-            
-            # UI controlled settings
-            'target_split': get_value('split_dropdown', 'all'),
-            'force_reprocess': False,
-            
-            # Complete normalization structure sesuai config
-            'normalization': {
-                'enabled': normalization_enabled,
-                'method': normalization_method if normalization_enabled else 'minmax',
-                'target_size': [width, height],
-                'preserve_aspect_ratio': True,
-                'normalize_pixel_values': True,
-                'pixel_range': [0, 1]
-            },
-            
-            # Validation settings - preserve defaults
-            'validate': {
-                'enabled': True,
-                'fix_issues': True,
-                'move_invalid': True,
-                'visualize': False,
-                'check_image_quality': True,
-                'check_labels': True,
-                'check_coordinates': True,
-                'check_uuid_consistency': True
-            },
-            
-            # Analysis settings - default disabled
-            'analysis': {
-                'enabled': False,
-                'class_balance': True,
-                'image_size_distribution': True,
-                'bbox_statistics': True,
-                'layer_balance': True
-            },
-            
-            # Balance settings - default disabled
-            'balance': {
-                'enabled': False,
-                'target_distribution': 'auto',
-                'methods': {
-                    'undersampling': False,
-                    'oversampling': True,
-                    'augmentation': True
-                },
-                'min_samples_per_class': 100,
-                'max_samples_per_class': 1000
-            }
-        },
-        
-        # Performance settings dari UI
-        'performance': {
-            'num_workers': get_value('worker_slider', _get_optimal_workers()),
-            'batch_size': 32,
-            'use_gpu': True,
-            'compression_level': 90,
-            'max_memory_usage_gb': 4.0,
-            'use_mixed_precision': True
-        },
-        
-        # Cleanup settings - preserve defaults
-        'cleanup': {
-            'augmentation_patterns': [
-                'aug_.*',
-                '.*_augmented.*',
-                '.*_modified.*',
-                '.*_processed.*',
-                '.*_norm.*'
-            ],
-            'ignored_patterns': [
-                '.*\.gitkeep',
-                '.*\.DS_Store',
-                '.*\.gitignore'
-            ],
-            'backup_dir': 'data/backup/preprocessing',
-            'backup_enabled': False,
-            'auto_cleanup_preprocessed': False
-        }
-    }
-
-def _get_optimal_workers() -> int:
-    """Get optimal workers untuk preprocessing operations"""
-    try:
-        from smartcash.common.threadpools import get_optimal_thread_count
-        return get_optimal_thread_count('io')
-    except ImportError:
-        return 8  # Fallback default
+    # Update form-controlled values
+    config['preprocessing']['target_split'] = get_value('split_dropdown', 'all')
+    config['preprocessing']['normalization']['enabled'] = normalization_method != 'none'
+    config['preprocessing']['normalization']['method'] = normalization_method if normalization_method != 'none' else 'minmax'
+    config['preprocessing']['normalization']['target_size'] = [width, height]
+    config['performance']['num_workers'] = get_value('worker_slider', 8)
+    
+    return config

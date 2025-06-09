@@ -147,7 +147,7 @@ def _execute_backend_operation(ui_components: Dict[str, Any], operation_type: st
                 
                 log_to_ui(ui_components, "🧹 Memulai cleanup augmented files...", "info")
                 # Membersihkan file augmented saja untuk kompatibilitas dengan kode yang ada
-                result = service.cleanup_processed_data(target='augmented')
+                result = service.cleanup_augmented_data(target='augmented')
                 
                 if progress_tracker:
                     progress_tracker.update_overall(100, "Cleanup selesai")
@@ -301,7 +301,7 @@ def _execute_cleanup_then_augmentation(ui_components: Dict[str, Any]):
             # Phase 1: Cleanup
             log_to_ui(ui_components, f"🧹 Menghapus file augmented untuk {target_split}...", "info")
             # Membersihkan file augmented saja untuk kompatibilitas dengan kode yang ada
-            cleanup_result = service.cleanup_processed_data(target='augmented', target_split=target_split)
+            cleanup_result = service.cleanup_augmented_data(target_split=target_split)
             
             if cleanup_result.get('status') != 'success':
                 error_msg = f"❌ Cleanup gagal: {cleanup_result.get('message', 'Unknown error')}"

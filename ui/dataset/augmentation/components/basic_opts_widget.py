@@ -1,21 +1,17 @@
 """
 File: smartcash/ui/dataset/augmentation/components/basic_opts_widget.py
-Deskripsi: Fixed basic options dengan augmentation intensity slider
+Deskripsi: Basic options dengan target split dipindahkan dari types widget
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_basic_options_widget() -> Dict[str, Any]:
-    """
-    Create enhanced basic options widget dengan intensity slider
+    """Create basic options widget dengan target split"""
     
-    Returns:
-        Dictionary berisi container dan widget mapping
-    """
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Jumlah variasi per gambar (1-10)
+    # Jumlah variasi per gambar
     num_variations = widgets.IntSlider(
         value=2, min=1, max=10, step=1,
         description='Jumlah Variasi:',
@@ -25,7 +21,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
-    # Target count dengan range optimal (100-2000)
+    # Target count
     target_count = widgets.IntSlider(
         value=500, min=100, max=2000, step=50,
         description='Target Count:',
@@ -35,7 +31,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
-    # NEW: Augmentation Intensity slider
+    # Augmentation Intensity
     intensity = widgets.FloatSlider(
         value=0.7, min=0.1, max=1.0, step=0.1,
         description='Intensitas:',
@@ -45,10 +41,24 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
+    # Target Split - MOVED from types widget
+    target_split = widgets.Dropdown(
+        options=[
+            ('🎯 Train - Dataset training (Recommended)', 'train'),
+            ('📊 Valid - Dataset validasi', 'valid'),
+            ('🧪 Test - Dataset testing (Not Recommended)', 'test')
+        ],
+        value='train',
+        description='Target Split:',
+        disabled=False,
+        layout=widgets.Layout(width='95%'),
+        style={'description_width': '120px'}
+    )
+    
     # Output prefix
     output_prefix = widgets.Text(
         value='aug',
-        placeholder='Prefix untuk file hasil augmentasi (alphanumeric)',
+        placeholder='Prefix untuk file hasil augmentasi',
         description='Output Prefix:',
         disabled=False,
         layout=widgets.Layout(width='95%'),
@@ -63,7 +73,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
         layout=widgets.Layout(width='auto', margin='8px 0')
     )
     
-    # Enhanced info panel dengan intensity info
+    # Info panel
     info_panel = widgets.HTML(
         f"""
         <div style="padding: 10px; background-color: #4caf5015; 
@@ -73,7 +83,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
             • <strong style="color: #2e7d32;">Variasi:</strong> 2-5 optimal untuk research pipeline<br>
             • <strong style="color: #2e7d32;">Target Count:</strong> 500-1000 untuk training efektif<br>
             • <strong style="color: #2e7d32;">Intensitas:</strong> 0.7 optimal, 0.3-0.5 conservative, 0.8-1.0 aggressive<br>
-            • <strong style="color: #2e7d32;">Balance Classes:</strong> Layer 1 & 2 (denominasi) optimal
+            • <strong style="color: #2e7d32;">Target Split:</strong> Train primary untuk augmentasi dataset
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
@@ -84,7 +94,8 @@ def create_basic_options_widget() -> Dict[str, Any]:
         widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 8px 0;'>{ICONS.get('settings', '⚙️')} Opsi Dasar</h6>"),
         num_variations,
         target_count,
-        intensity,  # NEW: Added intensity slider
+        intensity,
+        target_split,  # MOVED here
         output_prefix,
         balance_classes,
         info_panel
@@ -95,7 +106,8 @@ def create_basic_options_widget() -> Dict[str, Any]:
         'widgets': {
             'num_variations': num_variations,
             'target_count': target_count,
-            'intensity': intensity,  # NEW: Added to widgets dict
+            'intensity': intensity,
+            'target_split': target_split,  # MOVED here
             'output_prefix': output_prefix,
             'balance_classes': balance_classes
         },
@@ -103,15 +115,16 @@ def create_basic_options_widget() -> Dict[str, Any]:
             'ranges': {
                 'num_variations': (1, 10),
                 'target_count': (100, 2000),
-                'intensity': (0.1, 1.0)  # NEW: Added intensity range
+                'intensity': (0.1, 1.0)
             },
-            'required': ['num_variations', 'target_count', 'intensity', 'output_prefix'],
+            'required': ['num_variations', 'target_count', 'intensity', 'target_split', 'output_prefix'],
             'backend_compatible': True
         },
         'backend_mapping': {
             'num_variations': 'augmentation.num_variations',
             'target_count': 'augmentation.target_count',
-            'intensity': 'augmentation.intensity',  # NEW: Added intensity mapping
+            'intensity': 'augmentation.intensity',
+            'target_split': 'augmentation.target_split',  # MOVED here
             'output_prefix': 'augmentation.output_prefix',
             'balance_classes': 'augmentation.balance_classes'
         }

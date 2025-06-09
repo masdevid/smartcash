@@ -5,13 +5,12 @@ Deskripsi: Normalization options widget yang dioptimasi dengan styling terkonsol
 
 import ipywidgets as widgets
 from typing import Dict, Any
+from smartcash.ui.dataset.augmentation.utils.style_utils import (
+    flex_layout, info_panel, create_info_content, section_header
+)
 
 def create_normalization_options_widget() -> Dict[str, Any]:
     """Create normalization options dengan styling terkonsolidasi"""
-    
-    from smartcash.ui.dataset.augmentation.utils.style_utils import (
-        style_widget, flex_layout, info_panel, create_info_content, section_header
-    )
     
     # Create widgets dengan consistent styling
     widgets_dict = {

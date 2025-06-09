@@ -5,14 +5,12 @@ Deskripsi: Advanced options widget yang dioptimasi dengan tabbed layout dan styl
 
 import ipywidgets as widgets
 from typing import Dict, Any
+from smartcash.ui.dataset.augmentation.utils.style_utils import (
+    tabbed_container, create_info_content, info_panel
+)
 
 def create_advanced_options_widget() -> Dict[str, Any]:
     """Create advanced options dengan tabbed layout dan styling terkonsolidasi"""
-    
-    from smartcash.ui.dataset.augmentation.utils.style_utils import (
-        style_widget, tabbed_container, create_info_content, info_panel
-    )
-    
     # Position parameters dengan overflow-safe styling
     position_widgets = {
         'fliplr': widgets.FloatSlider(

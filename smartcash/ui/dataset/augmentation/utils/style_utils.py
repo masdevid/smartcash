@@ -4,7 +4,14 @@ Deskripsi: Fungsi styling terkonsolidasi untuk augmentation components
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Tuple, List
+from IPython.display import display, HTML
+from typing import Dict, Any, Tuple, List, Union, Optional
+
+BASIC = 'basic'
+ADVANCED = 'advanced'
+TYPES = 'types'
+NORMALIZATION = 'normalization'
+INFO = 'info'
 
 # Style constants dengan color mapping
 COMPONENT_THEMES = {

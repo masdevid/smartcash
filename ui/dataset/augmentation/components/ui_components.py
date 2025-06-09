@@ -3,9 +3,14 @@ File: smartcash/ui/dataset/augmentation/components/ui_components.py
 Deskripsi: UI components assembly yang dioptimasi dengan styling terkonsolidasi dan 2x2 grid
 """
 
-from IPython.display import display
+from IPython.display import display, HTML
 import ipywidgets as widgets
 from typing import Dict, Any
+
+# Import internal components
+from smartcash.ui.dataset.augmentation.utils.style_utils import (
+    styled_container, flex_layout
+)
 
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Main UI dengan styling terkonsolidasi dan 2x2 grid responsif"""
@@ -18,8 +23,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         from smartcash.ui.components.log_accordion import create_log_accordion
         from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
         from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
-        from smartcash.ui.dataset.augmentation.utils.style_utils import styled_container, widget_grid
-        
+
         # Header dan status panel
         header = create_header(
             f"{ICONS.get('augmentation', '🔄')} Dataset Augmentation", 

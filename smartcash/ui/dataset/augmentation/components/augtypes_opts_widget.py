@@ -5,13 +5,12 @@ Deskripsi: Augmentation types widget yang dioptimasi dengan styling terkonsolida
 
 import ipywidgets as widgets
 from typing import Dict, Any
+from smartcash.ui.dataset.augmentation.utils.style_utils import (
+    flex_layout, info_panel, create_info_content, section_header
+)
 
 def create_augmentation_types_widget() -> Dict[str, Any]:
     """Create compact augmentation types widget dengan styling terkonsolidasi"""
-    
-    from smartcash.ui.dataset.augmentation.utils.style_utils import (
-        flex_layout, info_panel, create_info_content, section_header
-    )
     
     # Augmentation types widget
     augmentation_types = widgets.SelectMultiple(

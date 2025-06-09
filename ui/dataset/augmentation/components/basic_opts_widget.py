@@ -5,13 +5,12 @@ Deskripsi: Basic options widget yang dioptimasi dengan fungsi styling terkonsoli
 
 import ipywidgets as widgets
 from typing import Dict, Any
+from smartcash.ui.dataset.augmentation.utils.style_utils import (
+    style_widget, flex_layout, info_panel, create_info_content
+)
 
 def create_basic_options_widget() -> Dict[str, Any]:
     """Create basic options dengan styling terkonsolidasi"""
-    
-    from smartcash.ui.dataset.augmentation.utils.style_utils import (
-        style_widget, flex_layout, info_panel, create_info_content
-    )
     
     # Create widgets dengan overflow-safe styling
     widgets_dict = {

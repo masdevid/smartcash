@@ -15,15 +15,17 @@ def create_normalization_options_widget() -> Dict[str, Any]:
     
     # Create widgets dengan consistent styling
     widgets_dict = {
-        'norm_method': style_widget(widgets.Dropdown(
+        'norm_method': widgets.Dropdown(
             options=[
                 ('MinMax (0-1): YOLOv5 compatible', 'minmax'),
                 ('Standard (z-score): Statistical normalization', 'standard'),
                 ('ImageNet: Transfer learning preset', 'imagenet'),
                 ('None: Raw values (0-255)', 'none')
             ],
-            value='minmax', description='Norm Method:', disabled=False
-        ), description_width='100px'),
+            value='minmax', description='Norm Method:', disabled=False,
+            style={'description_width': '100px'},
+            layout=widgets.Layout(width='95%')
+        ),
         'denormalize': widgets.Checkbox(
             value=False,
             description='Denormalize setelah preprocessing (save as uint8)',

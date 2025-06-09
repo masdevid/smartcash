@@ -88,10 +88,17 @@ def create_widget_grid(widgets_list: List[widgets.Widget], columns: int = 2,
 def style_form_widget(widget: widgets.Widget, description_width: str = '120px', 
                      widget_width: str = '95%') -> widgets.Widget:
     """Apply consistent styling to form widgets"""
-    if hasattr(widget, 'style'):
-        widget.style = {'description_width': description_width}
+    # Set style untuk widgets yang support description_width
+    if hasattr(widget, 'style') and hasattr(widget, 'description'):
+        try:
+            widget.style = {'description_width': description_width}
+        except Exception:
+            pass  # Some widgets don't support style modification
+    
+    # Set layout width
     if hasattr(widget, 'layout'):
         widget.layout = widgets.Layout(width=widget_width)
+    
     return widget
 
 def create_tabbed_container(tabs_config: List[Tuple[str, widgets.Widget]], 

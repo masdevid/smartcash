@@ -1,110 +1,130 @@
 # File: configs/preprocessing_config.yaml
-# Author: Alfrida Sabar (Enhanced untuk compatibility dengan form UI)
-# Deskripsi: Konfigurasi preprocessing yang match dengan form components
+# Deskripsi: Standalone preprocessing config untuk normalisasi dan validasi dataset
 
-# Inherit dari base_config.yaml
-_base_: 'base_config.yaml'
+# Data configuration
+data:
+  dir: 'data'
+  splits:
+    train: 'data/train'
+    valid: 'data/valid'
+    test: 'data/test'
+  output:
+    preprocessed: 'data/preprocessed'
 
-# ========================================
-# PREPROCESSING CONFIGURATION - Form Compatible
-# ========================================
-
-# Override preprocessing dari base_config dengan form-compatible structure
+# Preprocessing configuration
 preprocessing:
-  # Output settings
-  output_dir: 'data/preprocessed'
-  save_visualizations: false
-  vis_dir: 'visualizations/preprocessing'
-  sample_size: 0  # 0 = semua file
+  # Basic settings
+  enabled: true
+  process_splits: ['train', 'valid']     # Splits to process
+  skip_existing: false                   # Skip if preprocessed file exists
   
-  # Target split dari form dropdown
-  target_split: 'all'  # all, train, valid, test
-  force_reprocess: false
+  # Validation settings
+  validation:
+    enabled: true                        # Enable comprehensive validation
+    move_invalid: true                   # Move invalid files to invalid folder
+    fix_issues: false                    # Try to fix minor issues automatically
+    check_image_integrity: true          # Check image file integrity
+    check_label_format: true             # Check YOLO label format
+    check_pair_consistency: true         # Check image-label pairs
+    validate_bbox_coords: true           # Validate bbox coordinates [0,1]
+    validate_class_ids: true             # Validate class ID ranges
+    
+    # Error thresholds
+    max_error_rate: 0.1                  # Max acceptable error rate (10%)
+    min_success_rate: 0.8                # Min required success rate (80%)
   
-  # Validasi dataset selama preprocessing
-  validate:
-    enabled: true
-    fix_issues: true
-    move_invalid: true
-    visualize: false
-    check_image_quality: true
-    check_labels: true
-    check_coordinates: true
-    check_uuid_consistency: true
-  
-  # Normalisasi sesuai form UI (resolution + normalization dropdown)
+  # Normalization settings
   normalization:
     enabled: true
-    method: 'minmax'  # minmax, standard, none (dari dropdown)
-    target_size: [640, 640]  # dari resolution_dropdown (640x640)
-    preserve_aspect_ratio: true
-    normalize_pixel_values: true
-    pixel_range: [0, 1]
-  
-  # Analysis settings (tidak ada di form, default disabled)
-  analysis:
-    enabled: false
-    class_balance: true
-    image_size_distribution: true
-    bbox_statistics: true
-    layer_balance: true
-  
-  # Balance settings (tidak ada di form, default disabled)
-  balance:
-    enabled: false
-    target_distribution: 'auto'
-    methods:
-      undersampling: false
-      oversampling: true
-      augmentation: true
-    min_samples_per_class: 100
-    max_samples_per_class: 1000
+    method: 'minmax'                     # minmax|standard|imagenet|none
+    target_size: [640, 640]              # Fixed size untuk YOLO
+    preserve_aspect_ratio: false         # Force exact size
+    denormalize: false                   # Save as normalized (default)
+    
+    # Method-specific parameters
+    minmax:
+      input_range: [0, 255]              # Input range (uint8)
+      output_range: [0.0, 1.0]           # Output range for training
+    
+    standard:
+      per_channel: true                  # Per-channel standardization
+      clip_values: true                  # Clip extreme values
+      clip_range: [-3.0, 3.0]            # Clipping range (std deviations)
+    
+    imagenet:
+      mean: [0.485, 0.456, 0.406]        # ImageNet mean (RGB)
+      std: [0.229, 0.224, 0.225]         # ImageNet std (RGB)
+      input_normalized: false            # Input already normalized [0,1]
+# File naming configuration
+file_naming:
+  preprocessed_pattern: 'pre_{nominal}_{uuid}_{increment}'
+  preserve_uuid: true                    # Maintain UUID consistency
+  sequence_padding: 3                    # Padding untuk increment (001, 002, dst)
 
-# ========================================
-# PERFORMANCE CONFIGURATION - Worker Slider
-# ========================================
+# Quality control configuration
+quality_control:
+  # Image quality checks
+  min_image_size: [32, 32]               # Minimum image dimensions
+  max_image_size: [4096, 4096]           # Maximum image dimensions
+  supported_formats: ['.jpg', '.jpeg', '.png', '.bmp']
+  max_file_size_mb: 50                   # Maximum file size in MB
+  
+  # Label quality checks
+  min_bbox_size: 0.001                   # Minimum bbox width/height
+  max_bbox_size: 1.0                     # Maximum bbox width/height
+  valid_class_ids: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  
+  # Consistency checks
+  check_filename_format: true            # Check filename format
+  check_uuid_consistency: true           # Check UUID consistency
+  require_labels: true                   # Require label files for all images
 
-# Performance settings dari worker_slider
+# File processing configuration
+file_processing:
+  # Threading settings
+  max_workers: 4                         # Max threads for parallel processing
+  batch_size: 50                         # Files per batch
+  
+  # Memory management
+  max_memory_usage_gb: 4.0               # Max memory usage
+  enable_garbage_collection: true        # Enable periodic GC
+  gc_frequency: 100                      # GC every N files
+  
+  # I/O optimization
+  optimize_io: true                      # Optimize I/O operations
+  use_memory_mapping: false              # Use memory mapping for large files
+  buffer_size: 8192                      # I/O buffer size
+  
+  # Error handling
+  skip_corrupted: true                   # Skip corrupted files
+  retry_count: 2                         # Retry count for I/O errors
+  continue_on_error: true                # Continue processing on errors
+
+# Progress tracking configuration
+progress:
+  enabled: true
+  granular_tracking: true                # Enable granular progress updates
+  
+  # Operation weights (for progress calculation)
+  operation_weights:
+    validation: 20                       # File validation
+    preprocessing: 60                    # Main preprocessing
+  
+  # Update frequency
+  update_frequency: 0.05                 # Update every 5%
+  log_frequency: 0.1                     # Log every 10%
+  show_eta: true                         # Show estimated time remaining
+
+# Performance configuration
 performance:
-  num_workers: 8  # dari worker_slider di form
-  batch_size: 32
-  use_gpu: true
-  compression_level: 90
-  max_memory_usage_gb: 4.0
-  use_mixed_precision: true
-
-# ========================================
-# CLEANUP CONFIGURATION
-# ========================================
-
-# Cleanup settings (tidak ada di form UI)
-cleanup:
-  augmentation_patterns:
-    - 'aug_.*'
-    - '.*_augmented.*'
-    - '.*_modified.*'
-    - '.*_processed.*'
-    - '.*_norm.*'
-  ignored_patterns:
-    - '.*\.gitkeep'
-    - '.*\.DS_Store'
-    - '.*\.gitignore'
-  backup_dir: 'data/backup/preprocessing'
-  backup_enabled: false
-  auto_cleanup_preprocessed: false
-
-# ========================================
-# FORM UI MAPPING REFERENCE
-# ========================================
-
-# UI Components yang ada di form:
-# - resolution_dropdown: ['320x320', '416x416', '512x512', '640x640']
-# - normalization_dropdown: ['minmax', 'standard', 'none']  
-# - worker_slider: 1-10 workers
-# - split_dropdown: ['all', 'train', 'valid', 'test']
-#
-# Mapping ke config:
-# resolution_dropdown -> preprocessing.normalization.target_size
-# normalization_dropdown -> preprocessing.normalization.method + enabled
-# worker_slider -> performance.num_workers
-# split_dropdown -> preprocessing.target_split
+  # Memory management
+  max_memory_usage_gb: 4.0            # Max memory usage
+  enable_garbage_collection: true     # Enable periodic GC
+  
+  # Processing optimization
+  use_threading: true                 # Enable threading
+  optimize_io: true                   # Optimize I/O operations
+  
+  # Cache settings
+  cache_metadata: true                # Cache file metadata
+  cache_size_mb: 100                  # Cache size limit

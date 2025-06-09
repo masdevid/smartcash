@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/utils/cleanup_manager.py
-Deskripsi: Manager untuk cleanup operations tanpa symlink handling
+Deskripsi: Manager cleanup tanpa .jpg di preprocessed
 """
 
 import shutil
@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 class CleanupManager:
-    """🧹 Manager untuk cleanup augmented data tanpa symlinks"""
+    """🧹 Manager cleanup augmented data"""
     
     def __init__(self, config, progress_bridge=None):
         self.config = config
@@ -16,27 +16,21 @@ class CleanupManager:
         self.data_dir = config.get('data', {}).get('dir', 'data')
     
     def cleanup_augmented_data(self, target_split: str = None) -> Dict[str, Any]:
-        """Cleanup augmented files dan preprocessed files"""
+        """Cleanup augmented dan preprocessed files"""
         try:
             total_removed = 0
-            
-            if target_split:
-                splits = [target_split]
-            else:
-                splits = ['train', 'valid', 'test']
+            splits = [target_split] if target_split else ['train', 'valid', 'test']
             
             for split in splits:
                 # Remove augmented files (.jpg dan .txt)
                 aug_dir = Path(self.data_dir) / 'augmented' / split
                 if aug_dir.exists():
-                    removed = self._remove_augmented_files(aug_dir)
-                    total_removed += removed
+                    total_removed += self._remove_augmented_files(aug_dir)
                 
-                # Remove preprocessed files (.npy, .jpg, .txt)
+                # Remove preprocessed files (.npy dan .txt)
                 prep_dir = Path(self.data_dir) / 'preprocessed' / split
                 if prep_dir.exists():
-                    removed = self._remove_preprocessed_files(prep_dir)
-                    total_removed += removed
+                    total_removed += self._remove_preprocessed_files(prep_dir)
             
             return {
                 'status': 'success',
@@ -48,10 +42,10 @@ class CleanupManager:
             return {'status': 'error', 'message': str(e), 'total_removed': 0}
     
     def _remove_augmented_files(self, aug_dir: Path) -> int:
-        """Remove augmented files dari directory"""
+        """Remove augmented files (.jpg dan .txt)"""
         count = 0
         
-        # Remove dari images directory
+        # Remove .jpg dari images
         images_dir = aug_dir / 'images'
         if images_dir.exists():
             for file_path in images_dir.glob('aug_*.jpg'):
@@ -61,7 +55,7 @@ class CleanupManager:
                 except Exception:
                     continue
         
-        # Remove dari labels directory 
+        # Remove .txt dari labels
         labels_dir = aug_dir / 'labels'
         if labels_dir.exists():
             for file_path in labels_dir.glob('aug_*.txt'):
@@ -74,29 +68,20 @@ class CleanupManager:
         return count
     
     def _remove_preprocessed_files(self, prep_dir: Path) -> int:
-        """Remove preprocessed files dari directory"""
+        """Remove preprocessed files (.npy dan .txt)"""
         count = 0
         
-        # Remove dari images directory (.npy dan .jpg files)
+        # Remove .npy dari images (TANPA .jpg)
         images_dir = prep_dir / 'images'
         if images_dir.exists():
-            # Remove .npy files (normalized untuk training)
             for file_path in images_dir.glob('aug_*.npy'):
                 try:
                     file_path.unlink()
                     count += 1
                 except Exception:
                     continue
-            
-            # Remove .jpg files (visualization)
-            for file_path in images_dir.glob('aug_*.jpg'):
-                try:
-                    file_path.unlink()
-                    count += 1
-                except Exception:
-                    continue
         
-        # Remove dari labels directory
+        # Remove .txt dari labels
         labels_dir = prep_dir / 'labels'
         if labels_dir.exists():
             for file_path in labels_dir.glob('aug_*.txt'):

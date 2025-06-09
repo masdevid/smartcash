@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/core/engine.py
-Deskripsi: Engine augmentasi dengan progress tracking yang bersih dan handling .npy files
+Deskripsi: Enhanced engine dengan directory auto-creation dan improved logging
 """
 
 import cv2
@@ -17,7 +17,7 @@ from smartcash.common.logger import get_logger
 from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
 
 class AugmentationEngine:
-    """🎨 Core engine untuk augmentasi dengan clean progress tracking"""
+    """🎨 Enhanced engine dengan auto directory creation dan improved summary"""
     
     def __init__(self, config: Dict[str, Any] = None, progress_bridge=None):
         self.logger = get_logger(__name__)
@@ -41,9 +41,12 @@ class AugmentationEngine:
         self.filename_manager = FilenameManager()
         
     def augment_split(self, target_split: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """🎯 Augment specific split dengan clean progress tracking"""
+        """🎯 Enhanced augmentation dengan auto directory setup dan improved summary"""
         try:
-            self._report_progress("overall", 0, 3, "Memulai analisis data", progress_callback)
+            self._report_progress("overall", 0, 4, "Memulai setup directory dan analisis", progress_callback)
+            
+            # Phase 0: Auto-create directories (NEW)
+            output_dir = self._ensure_all_directories(target_split)
             
             # Phase 1: Analysis
             source_files = self.file_processor.get_split_files(target_split)
@@ -54,14 +57,28 @@ class AugmentationEngine:
             needed_files = self.balance_calculator.select_files_for_augmentation(source_files, class_balance)
             
             if not needed_files:
-                return {'status': 'success', 'message': 'Dataset sudah seimbang', 'total_generated': 0}
+                return {
+                    'status': 'success', 
+                    'message': 'Dataset sudah seimbang - tidak perlu augmentasi', 
+                    'total_generated': 0,
+                    'summary': {
+                        'source_files': len(source_files),
+                        'balanced': True,
+                        'output_dir': str(output_dir)
+                    }
+                }
             
-            self._report_progress("overall", 1, 3, "Menjalankan augmentasi", progress_callback)
+            self._report_progress("overall", 1, 4, f"Memproses {len(needed_files)} file", progress_callback)
             
             # Phase 2: Augmentation
             aug_result = self._execute_augmentation(needed_files, target_split, progress_callback)
             
-            self._report_progress("overall", 3, 3, "Augmentasi selesai", progress_callback)
+            # Phase 3: Enhanced summary (NEW)
+            if aug_result.get('status') == 'success':
+                enhanced_summary = self._create_enhanced_summary(aug_result, source_files, target_split)
+                aug_result.update(enhanced_summary)
+            
+            self._report_progress("overall", 4, 4, "Augmentasi selesai", progress_callback)
             
             return aug_result
             
@@ -70,14 +87,92 @@ class AugmentationEngine:
             self.logger.error(error_msg)
             return {'status': 'error', 'message': error_msg, 'total_generated': 0}
     
+    def _ensure_all_directories(self, target_split: str) -> Path:
+        """🏗️ NEW: Auto-create semua directory yang diperlukan"""
+        base_dir = self.config.get('data', {}).get('dir', 'data')
+        
+        # Directories yang perlu dibuat
+        directories = [
+            # Augmented directories
+            f"{base_dir}/augmented/{target_split}/images",
+            f"{base_dir}/augmented/{target_split}/labels",
+            # Preprocessed directories (CRITICAL FIX)
+            f"{base_dir}/preprocessed/{target_split}/images", 
+            f"{base_dir}/preprocessed/{target_split}/labels"
+        ]
+        
+        created_dirs = []
+        for dir_path in directories:
+            path = Path(dir_path)
+            if not path.exists():
+                path.mkdir(parents=True, exist_ok=True)
+                created_dirs.append(str(path))
+        
+        if created_dirs:
+            self.logger.info(f"📁 Created {len(created_dirs)} directories: {', '.join(created_dirs)}")
+        
+        return Path(base_dir) / 'augmented' / target_split
+    
+    def _create_enhanced_summary(self, aug_result: Dict[str, Any], source_files: List[str], target_split: str) -> Dict[str, Any]:
+        """📊 NEW: Create detailed summary untuk UI logging"""
+        total_generated = aug_result.get('total_generated', 0)
+        processed_files = aug_result.get('processed_files', 0)
+        
+        # Calculate rates
+        success_rate = (total_generated / (processed_files * self.num_variations)) * 100 if processed_files > 0 else 0
+        processing_rate = (processed_files / len(source_files)) * 100 if source_files else 0
+        
+        # Enhanced summary
+        summary = {
+            'summary': {
+                'input': {
+                    'source_files': len(source_files),
+                    'processed_files': processed_files,
+                    'processing_rate': f"{processing_rate:.1f}%"
+                },
+                'output': {
+                    'total_generated': total_generated,
+                    'success_rate': f"{success_rate:.1f}%",
+                    'target_variations': self.num_variations,
+                    'intensity_applied': self.intensity
+                },
+                'configuration': {
+                    'types': ', '.join(self.types),
+                    'target_split': target_split,
+                    'target_count': self.target_count
+                },
+                'directories': {
+                    'augmented': f"data/augmented/{target_split}",
+                    'preprocessed': f"data/preprocessed/{target_split}"
+                }
+            }
+        }
+        
+        # Log enhanced summary
+        self._log_detailed_summary(summary['summary'])
+        
+        return summary
+    
+    def _log_detailed_summary(self, summary: Dict[str, Any]):
+        """📋 NEW: Log detailed summary untuk UI"""
+        input_info = summary['input']
+        output_info = summary['output']
+        config_info = summary['configuration']
+        
+        self.logger.success(f"✅ Augmentasi berhasil!")
+        self.logger.info(f"📊 Input: {input_info['processed_files']}/{input_info['source_files']} files ({input_info['processing_rate']})")
+        self.logger.info(f"🎯 Output: {output_info['total_generated']} generated ({output_info['success_rate']} success rate)")
+        self.logger.info(f"⚙️ Config: {config_info['types']} @ intensity {output_info['intensity_applied']}")
+        self.logger.info(f"📁 Saved to: {summary['directories']['augmented']} & {summary['directories']['preprocessed']}")
+    
     def _execute_augmentation(self, files: List[str], target_split: str, 
                             progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """Execute augmentation dengan clean progress"""
+        """Execute augmentation dengan enhanced progress tracking"""
         total_files = len(files)
         total_generated = 0
         processed_files = 0
         
-        # Setup output directory (hanya untuk augmented, bukan preprocessed)
+        # Setup output directory
         output_dir = self._setup_augmented_output_directory(target_split)
         
         # Create augmentation pipeline
@@ -100,14 +195,13 @@ class AugmentationEngine:
                 processed_files += 1
                 total_generated += result.get('generated', 0)
                 
-                # Update current progress
+                # Enhanced progress reporting
+                progress_pct = (processed_files / total_files) * 100
                 self._report_progress("current", processed_files, total_files, 
-                                    f"Diproses: {processed_files}/{total_files} file", progress_callback)
+                                    f"Generated {total_generated} files ({progress_pct:.1f}%)", progress_callback)
                 
                 if result['status'] == 'error':
-                    self.logger.warning(f"Error memproses {result['file']}: {result['error']}")
-        
-        self.logger.success(f"Augmentasi selesai: {total_generated} file dari {processed_files} sumber")
+                    self.logger.warning(f"⚠️ Error {result['file']}: {result['error']}")
         
         return {
             'status': 'success',
@@ -116,8 +210,19 @@ class AugmentationEngine:
             'output_dir': str(output_dir)
         }
     
+    def _setup_augmented_output_directory(self, target_split: str) -> Path:
+        """Setup directory untuk augmented output"""
+        base_dir = self.config.get('data', {}).get('dir', 'data')
+        output_dir = Path(base_dir) / 'augmented' / target_split
+        
+        # Create directories with auto-creation
+        (output_dir / 'images').mkdir(parents=True, exist_ok=True)
+        (output_dir / 'labels').mkdir(parents=True, exist_ok=True)
+        
+        return output_dir
+    
     def _augment_single_file(self, file_path: str, pipeline, output_dir: Path) -> Dict[str, Any]:
-        """Augment single file tanpa normalization"""
+        """Augment single file dengan detailed tracking"""
         try:
             # Load image dan labels
             image = cv2.imread(file_path)
@@ -135,7 +240,7 @@ class AugmentationEngine:
             
             generated_count = 0
             
-            # Generate variations (tanpa normalization)
+            # Generate variations
             for var_idx in range(1, self.num_variations + 1):
                 try:
                     # Apply augmentation
@@ -147,13 +252,13 @@ class AugmentationEngine:
                     # Generate output filename
                     aug_filename = self.filename_manager.create_augmented_filename(parsed, var_idx)
                     
-                    # Save augmented pair (TANPA normalization)
+                    # Save augmented pair
                     if self._save_augmented_pair(aug_image, aug_bboxes, aug_class_labels, 
                                                aug_filename, output_dir):
                         generated_count += 1
                         
                 except Exception as e:
-                    self.logger.warning(f"Error variasi {var_idx} untuk {file_path}: {str(e)}")
+                    self.logger.debug(f"⚠️ Error variasi {var_idx} untuk {file_path}: {str(e)}")
                     continue
             
             return {'status': 'success', 'file': file_path, 'generated': generated_count}
@@ -161,29 +266,18 @@ class AugmentationEngine:
         except Exception as e:
             return {'status': 'error', 'file': file_path, 'error': str(e), 'generated': 0}
     
-    def _setup_augmented_output_directory(self, target_split: str) -> Path:
-        """Setup directory HANYA untuk augmented (bukan preprocessed)"""
-        base_dir = self.config.get('data', {}).get('dir', 'data')
-        output_dir = Path(base_dir) / 'augmented' / target_split
-        
-        # Create directories
-        (output_dir / 'images').mkdir(parents=True, exist_ok=True)
-        (output_dir / 'labels').mkdir(parents=True, exist_ok=True)
-        
-        return output_dir
-    
     def _save_augmented_pair(self, image: np.ndarray, bboxes: List, class_labels: List, 
                            filename: str, output_dir: Path) -> bool:
-        """Save augmented pair TANPA normalization"""
+        """Save augmented pair dengan error handling"""
         try:
-            # Save image as regular JPEG (NO .npy files here)
+            # Save image as regular JPEG
             img_path = output_dir / 'images' / f"{filename}.jpg"
             save_params = [cv2.IMWRITE_JPEG_QUALITY, 95, cv2.IMWRITE_JPEG_OPTIMIZE, 1]
             
             if not cv2.imwrite(str(img_path), image, save_params):
                 return False
             
-            # Save labels as .txt (NO labels in images folder)
+            # Save labels as .txt
             label_path = output_dir / 'labels' / f"{filename}.txt"
             
             with open(label_path, 'w') as f:
@@ -196,7 +290,7 @@ class AugmentationEngine:
             return True
             
         except Exception as e:
-            self.logger.error(f"Error menyimpan {filename}: {str(e)}")
+            self.logger.error(f"❌ Error menyimpan {filename}: {str(e)}")
             return False
     
     def _create_pipeline(self):
@@ -227,12 +321,12 @@ class AugmentationEngine:
                         except (ValueError, IndexError):
                             continue
         except Exception as e:
-            self.logger.warning(f"Error loading labels {label_path}: {str(e)}")
+            self.logger.warning(f"⚠️ Error loading labels {label_path}: {str(e)}")
         
         return bboxes, class_labels
     
     def _report_progress(self, level: str, current: int, total: int, message: str, callback: Optional[Callable]):
-        """Report progress dengan clean format"""
+        """Report progress dengan enhanced messaging"""
         if self.progress:
             self.progress.update(level, current, total, message)
         

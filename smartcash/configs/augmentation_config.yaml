@@ -1,210 +1,60 @@
 # File: configs/augmentation_config.yaml
-# Deskripsi: Standalone augmentation config tanpa inheritance
+# Deskripsi: Config minimal untuk form fields dan backend essentials
 
-# Data configuration
+# Data paths
 data:
   dir: 'data'
-  splits:
-    train: 'data/train'
-    valid: 'data/valid'
-    test: 'data/test'
-  output:
-    augmented: 'data/augmented'
-    preprocessed: 'data/preprocessed'
 
-# Augmentation configuration
+# Form fields mapping
 augmentation:
-  # Basic settings
-  enabled: true
-  types: ['combined']                 # Default research type
-  num_variations: 2                   # Variations per file
-  target_count: 500                   # Target samples per class
-  intensity: 0.7                      # Augmentation intensity [0.0-1.0]
+  # Basic options (dari basic_opts_widget)
+  num_variations: 2          # IntSlider 1-10
+  target_count: 500          # IntSlider 100-2000
+  intensity: 0.7             # FloatSlider 0.1-1.0
+  output_prefix: 'aug'       # Text input
+  balance_classes: true      # Checkbox
+  target_split: 'train'      # Dropdown
+  types: ['combined']        # SelectMultiple
   
-  # Strategy settings
-  balance_classes: true               # Enable class balancing
-  target_split: 'train'               # Default target split
+  # Position parameters (dari advanced_opts_widget)
+  position:
+    horizontal_flip: 0.5     # fliplr slider
+    rotation_limit: 12       # degrees slider
+    translate_limit: 0.08    # translate slider
+    scale_limit: 0.04        # scale slider
   
-  # File naming
-  output_prefix: 'aug'                # Augmented file prefix
-  preserve_uuid: true                 # Preserve UUID in filenames
+  # Lighting parameters
+  lighting:
+    brightness_limit: 0.2    # brightness slider
+    contrast_limit: 0.15     # contrast slider
   
-  # Quality control
-  validate_outputs: true              # Validate augmented files
-  skip_existing: false                # Skip if augmented file exists
-  
-  # Available augmentation types
-  available_types:
-    - 'lighting'                      # Lighting variations
-    - 'position'                      # Position variations  
-    - 'combined'                      # Combined (default for research)
-    - 'geometric'                     # Geometric transformations
-    - 'color'                         # Color variations
-    - 'noise'                         # Noise and blur effects
-  
-  # Type-specific parameters
-  parameters:
-    # Position augmentation
-    position:
-      horizontal_flip: 0.5            # Flip probability
-      rotation_limit: 15              # Max rotation degrees
-      translate_limit: 0.1            # Max translation ratio
-      scale_limit: 0.05               # Max scale variation
-      perspective_scale: 0.08         # Perspective distortion
-    
-    # Lighting augmentation
-    lighting:
-      brightness_limit: 0.25          # Brightness variation
-      contrast_limit: 0.2             # Contrast variation
-      gamma_limit: [80, 120]          # Gamma range
-      shadow_probability: 0.3         # Shadow probability
-      clahe_probability: 0.4          # CLAHE probability
-    
-    # Combined augmentation (lighter versions)
-    combined:
-      horizontal_flip: 0.5
-      rotation_limit: 12
-      translate_limit: 0.08
-      scale_limit: 0.04
-      brightness_limit: 0.2
-      contrast_limit: 0.15
-      gamma_limit: [85, 115]
-      shadow_probability: 0.2
+  # Combined (sync dengan position + lighting)
+  combined:
+    horizontal_flip: 0.5
+    rotation_limit: 12
+    translate_limit: 0.08
+    scale_limit: 0.04
+    brightness_limit: 0.2
+    contrast_limit: 0.15
 
-# Preprocessing configuration
+# Normalization (dari normalization_opts_widget)
 preprocessing:
-  # Normalization settings
   normalization:
-    enabled: true
-    method: 'minmax'                  # minmax|standard|imagenet|none
-    denormalize: false                # Save as normalized (default)
-    target_size: [640, 640]           # Fixed size for YOLO
-    preserve_aspect_ratio: false      # Force exact size
-    
-    # Method-specific parameters
-    minmax:
-      output_range: [0.0, 1.0]        # Output range for minmax
-    
-    standard:
-      per_channel: true               # Per-channel standardization
-    
-    imagenet:
-      mean: [0.485, 0.456, 0.406]     # ImageNet mean
-      std: [0.229, 0.224, 0.225]      # ImageNet std
-  
-  # Quality settings
-  output_quality: 95                  # JPEG quality for images
-  save_float32: true                  # Save .npy for normalized data
-  save_visualization: true            # Save JPEG for visualization
+    method: 'minmax'         # norm_method dropdown
+    denormalize: false       # denormalize checkbox
+    target_size: [640, 640]
 
-# Class balancing configuration
+# Backend essentials
 balancing:
   enabled: true
-  strategy: 'weighted'                # weighted|uniform|adaptive
-  
-  # Target weights per layer
   layer_weights:
-    layer1: 1.0                       # Banknote detection (classes 0-6)
-    layer2: 0.8                       # Nominal detection (classes 7-13)
-    layer3: 0.5                       # Security features (classes 14-16)
-  
-  # Priority settings
-  priority_multiplier:
-    layer1: 1.5                       # Higher priority for banknotes
-    layer2: 1.2                       # Medium priority for nominals
-    layer3: 1.0                       # Normal priority for security
-  
-  # Selection limits
-  max_files_per_class: 500            # Max files to select per class
-  min_files_per_class: 10             # Min files required per class
+    layer1: 1.0              # Banknote detection
+    layer2: 0.8              # Nominal detection
+    layer3: 0.5              # Security features
 
-# File processing configuration
 file_processing:
-  # Threading settings
-  max_workers: 4                      # Max threads for parallel processing
-  batch_size: 100                     # Files per batch
-  
-  # File validation
-  validate_images: true               # Validate image files
-  validate_labels: true               # Validate label files
-  check_bbox_validity: true           # Check bbox coordinates
-  
-  # Supported formats
-  image_extensions: ['.jpg', '.jpeg', '.png', '.bmp']
-  label_extension: '.txt'
-  
-  # Error handling
-  skip_corrupted: true                # Skip corrupted files
-  log_errors: true                    # Log processing errors
+  max_workers: 4
+  batch_size: 100
 
-# Progress tracking configuration
-progress:
-  enabled: true
-  granular_tracking: true             # Enable granular progress updates
-  
-  # Operation weights (for progress calculation)
-  operation_weights:
-    validation: 10                    # Initial validation
-    balancing: 15                     # Class balancing
-    augmentation: 60                  # Main augmentation
-    normalization: 15                 # Normalization
-  
-  # Update frequency
-  update_frequency: 0.05              # Update every 5%
-  log_frequency: 0.1                  # Log every 10%
-
-# Output configuration
-output:
-  # Directory structure
-  create_split_dirs: true             # Create train/valid/test dirs
-  create_symlinks: true               # Create symlinks to preprocessed
-  
-  # File organization
-  organize_by_split: true             # Organize files by split
-  preserve_structure: true            # Preserve original directory structure
-  
-  # Cleanup settings
-  cleanup_on_error: true              # Cleanup partial results on error
-  backup_original: false              # Backup original files
-
-# Logging configuration
-logging:
-  level: 'INFO'                       # DEBUG|INFO|WARNING|ERROR
-  log_to_console: true                # Log to console
-  log_to_file: false                  # Log to file
-  
-  # Progress logging
-  log_progress: true                  # Log progress updates
-  log_statistics: true                # Log operation statistics
-  
-  # Performance logging
-  log_timing: true                    # Log execution times
-  log_memory_usage: false             # Log memory usage
-
-# Validation configuration
-validation:
-  # Input validation
-  check_data_integrity: true          # Check input data integrity
-  validate_config: true               # Validate configuration
-  
-  # Output validation
-  verify_augmented_files: true        # Verify augmented outputs
-  check_symlink_integrity: true       # Check symlink validity
-  
-  # Error thresholds
-  max_error_rate: 0.1                 # Max acceptable error rate (10%)
-  min_success_rate: 0.8               # Min required success rate (80%)
-
-# Performance configuration
 performance:
-  # Memory management
-  max_memory_usage_gb: 4.0            # Max memory usage
-  enable_garbage_collection: true     # Enable periodic GC
-  
-  # Processing optimization
-  use_threading: true                 # Enable threading
-  optimize_io: true                   # Optimize I/O operations
-  
-  # Cache settings
-  cache_metadata: true                # Cache file metadata
-  cache_size_mb: 100                  # Cache size limit
+  num_workers: 4

@@ -22,7 +22,6 @@ from smartcash.dataset.augmentor.utils.filename_manager import FilenameManager
 from smartcash.dataset.augmentor.utils.path_resolver import PathResolver
 from smartcash.dataset.augmentor.utils.balance_calculator import BalanceCalculator
 from smartcash.dataset.augmentor.utils.cleanup_manager import CleanupManager
-from smartcash.dataset.augmentor.utils.symlink_manager import SymlinkManager
 
 # One-liner utilities
 validate_config = lambda config: validate_augmentation_config(config)
@@ -65,5 +64,4 @@ __all__ = [
     'create_path_resolver',
     'create_balance_calculator',
     'create_cleanup_manager',
-    'create_symlink_manager'
 ]

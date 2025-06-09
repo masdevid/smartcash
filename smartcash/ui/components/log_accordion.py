@@ -16,7 +16,7 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
     output_widget = output_widget or widgets.Output(layout=widgets.Layout(
         max_height=height, 
         width='98%',
-        overflow='hidden', 
+        overflow='auto', 
         border='1px solid #ddd', 
         padding='8px',
         box_sizing='border-box',

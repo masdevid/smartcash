@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Config handler dengan proper inheritance dan UI logging yang diperbaiki
+Deskripsi: Config handler dengan backend integration dan proper inheritance
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.augmentation.handlers.config_updater import update_aug
 from smartcash.common.config.manager import get_config_manager
 
 class AugmentationConfigHandler(ConfigHandler):
-    """Config handler dengan proper UI logging dan inheritance support"""
+    """Config handler dengan backend integration dan proper logging"""
     
     def __init__(self, module_name: str = 'augmentation', parent_module: str = 'dataset'):
         super().__init__(module_name, parent_module)
@@ -19,20 +19,29 @@ class AugmentationConfigHandler(ConfigHandler):
         self._ui_components = {}
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract dengan DRY approach"""
-        return extract_augmentation_config(ui_components)
+        """Extract config dengan backend compatibility"""
+        extracted = extract_augmentation_config(ui_components)
+        
+        # Add backend-specific configs
+        extracted['backend'] = {
+            'service_enabled': True,
+            'progress_tracking': True,
+            'async_processing': False
+        }
+        
+        return extracted
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari config dengan inheritance handling"""
+        """Update UI dengan inheritance handling"""
         update_augmentation_ui(ui_components, config)
     
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default dari defaults.py"""
+        """Get default dari augmentation_config.yaml"""
         from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
         return get_default_augmentation_config()
     
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """CRITICAL: Load dengan inheritance handling"""
+        """Load dengan inheritance dari base_config.yaml"""
         try:
             filename = config_filename or self.config_filename
             config = self.config_manager.load_config(filename)
@@ -41,11 +50,11 @@ class AugmentationConfigHandler(ConfigHandler):
                 self._log_to_ui("⚠️ Config kosong, menggunakan default", "warning")
                 return self.get_default_config()
             
-            # CRITICAL: Handle inheritance dari _base_
+            # Handle inheritance dari _base_
             if '_base_' in config:
                 base_config = self.config_manager.load_config(config['_base_']) or {}
                 merged_config = self._merge_configs(base_config, config)
-                self._log_to_ui(f"📂 Config loaded dari {filename} dengan inheritance", "info")
+                self._log_to_ui(f"📂 Config loaded dengan inheritance dari {filename}", "info")
                 return merged_config
             
             self._log_to_ui(f"📂 Config loaded dari {filename}", "info")
@@ -56,19 +65,24 @@ class AugmentationConfigHandler(ConfigHandler):
             return self.get_default_config()
     
     def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """CRITICAL: Save dengan auto refresh"""
+        """Save dengan auto refresh dan backend update"""
         try:
             filename = config_filename or self.config_filename
             ui_config = self.extract_config(ui_components)
+            
+            # Validate backend compatibility
+            if not self._validate_backend_config(ui_config):
+                self._log_to_ui("⚠️ Config disesuaikan untuk kompatibilitas backend", "warning")
             
             success = self.config_manager.save_config(ui_config, filename)
             
             if success:
                 self._log_to_ui(f"✅ Config tersimpan ke {filename}", "success")
                 self._refresh_ui_after_save(ui_components, filename)
+                self._notify_backend_config_change(ui_components, ui_config)
                 return True
             else:
-                self._log_to_ui(f"❌ Gagal simpan config ke {filename}", "error")
+                self._log_to_ui(f"❌ Gagal simpan config", "error")
                 return False
                 
         except Exception as e:
@@ -76,7 +90,7 @@ class AugmentationConfigHandler(ConfigHandler):
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """CRITICAL: Reset dengan auto refresh"""
+        """Reset dengan backend notification"""
         try:
             filename = config_filename or self.config_filename
             default_config = self.get_default_config()
@@ -86,6 +100,7 @@ class AugmentationConfigHandler(ConfigHandler):
             if success:
                 self._log_to_ui("🔄 Config direset ke default", "success")
                 self.update_ui(ui_components, default_config)
+                self._notify_backend_config_change(ui_components, default_config)
                 return True
             else:
                 self._log_to_ui("❌ Gagal reset config", "error")
@@ -95,8 +110,32 @@ class AugmentationConfigHandler(ConfigHandler):
             self._log_to_ui(f"❌ Error reset config: {str(e)}", "error")
             return False
     
+    def _validate_backend_config(self, config: Dict[str, Any]) -> bool:
+        """Validate config untuk backend compatibility"""
+        aug_config = config.get('augmentation', {})
+        
+        # Ensure required fields
+        required_fields = ['num_variations', 'target_count', 'types']
+        for field in required_fields:
+            if field not in aug_config:
+                aug_config[field] = self.get_default_config()['augmentation'][field]
+        
+        # Validate ranges
+        aug_config['num_variations'] = max(1, min(10, aug_config.get('num_variations', 3)))
+        aug_config['target_count'] = max(100, min(2000, aug_config.get('target_count', 500)))
+        
+        return True
+    
+    def _notify_backend_config_change(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
+        """Notify backend tentang config changes"""
+        try:
+            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+            log_to_ui(ui_components, "🔄 Backend config updated", "info")
+        except Exception:
+            pass  # Silent fail
+    
     def _merge_configs(self, base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
-        """CRITICAL: Merge base config dengan override"""
+        """Merge configs dengan deep merge"""
         import copy
         merged = copy.deepcopy(base_config)
         
@@ -112,7 +151,7 @@ class AugmentationConfigHandler(ConfigHandler):
         return merged
     
     def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge dictionaries"""
+        """Deep merge helper"""
         import copy
         result = copy.deepcopy(base)
         
@@ -125,7 +164,7 @@ class AugmentationConfigHandler(ConfigHandler):
         return result
     
     def _refresh_ui_after_save(self, ui_components: Dict[str, Any], filename: str):
-        """CRITICAL: Auto refresh UI setelah save"""
+        """Auto refresh UI setelah save"""
         try:
             saved_config = self.load_config(filename)
             if saved_config:
@@ -135,31 +174,13 @@ class AugmentationConfigHandler(ConfigHandler):
             self._log_to_ui(f"⚠️ Error refresh UI: {str(e)}", "warning")
     
     def _log_to_ui(self, message: str, level: str = "info"):
-        """CRITICAL: Log ke UI components dengan fallback"""
+        """Log menggunakan UI utilities"""
         try:
-            ui_components = self._ui_components
-            logger = ui_components.get('logger')
-            
-            if logger and hasattr(logger, level):
-                log_method = getattr(logger, level)
-                log_method(message)
-                return
-            
-            # Fallback ke log widget
-            widget = ui_components.get('log_output') or ui_components.get('status')
-            if widget and hasattr(widget, 'clear_output'):
-                from IPython.display import display, HTML
-                color_map = {'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 'error': '#dc3545'}
-                color = color_map.get(level, '#007bff')
-                html = f'<div style="color: {color}; margin: 2px 0; padding: 4px;">{message}</div>'
-                
-                with widget:
-                    display(HTML(html))
-                return
-                
+            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+            log_to_ui(self._ui_components, message, level)
         except Exception:
             print(f"[{level.upper()}] {message}")
     
     def set_ui_components(self, ui_components: Dict[str, Any]):
-        """CRITICAL: Set UI components untuk logging"""
+        """Set UI components untuk logging"""
         self._ui_components = ui_components

@@ -1,27 +1,38 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/ui_utils.py
-Deskripsi: Enhanced UI utilities dengan unified logging dan parameter extraction yang DRY
+Deskripsi: Enhanced UI utilities dengan backend integration dan comprehensive form handling
 """
 
 from typing import Dict, Any, List
 from IPython.display import display, HTML
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Unified logging ke UI dengan fallback chain yang robust"""
+    """Enhanced logging dengan fallback chain"""
     try:
-        # Priority 1: UI Logger dengan level method
+        # Priority 1: UI Logger
         logger = ui_components.get('logger')
         if logger and hasattr(logger, level):
             getattr(logger, level)(message)
             return
         
-        # Priority 2: Log widget dengan HTML styling
+        # Priority 2: Log widget dengan enhanced styling
         widget = ui_components.get('log_output') or ui_components.get('status')
         if widget and hasattr(widget, 'clear_output'):
-            color_map = {'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 'error': '#dc3545', 'debug': '#6c757d'}
+            color_map = {
+                'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 
+                'error': '#dc3545', 'debug': '#6c757d'
+            }
             color = color_map.get(level, '#007bff')
+            emoji_map = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'debug': '🔍'}
+            emoji = emoji_map.get(level, 'ℹ️')
             
-            html = f'<div style="color: {color}; margin: 2px 0; padding: 4px; font-family: monospace;">{message}</div>'
+            html = f"""
+            <div style="color: {color}; margin: 2px 0; padding: 4px; 
+                        font-family: monospace; font-size: 13px;
+                        border-left: 3px solid {color}; padding-left: 8px;">
+                {emoji} {message}
+            </div>
+            """
             
             with widget:
                 display(HTML(html))
@@ -29,56 +40,103 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
             
     except Exception:
         pass
+        
+def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
+    """Log ke accordion output dengan styling"""
+    try:
+        accordion = ui_components.get('log_accordion')
+        log_output = ui_components.get('log_output')
+        
+        if accordion and log_output and hasattr(log_output, 'clear_output'):
+            # Expand accordion jika error atau warning
+            if level in ['error', 'warning']:
+                if hasattr(accordion, 'selected_index'):
+                    accordion.selected_index = 0  # Expand log accordion
+            
+            # Log ke output widget
+            color_map = {
+                'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 
+                'error': '#dc3545', 'debug': '#6c757d'
+            }
+            color = color_map.get(level, '#007bff')
+            emoji_map = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'debug': '🔍'}
+            emoji = emoji_map.get(level, 'ℹ️')
+            
+            html = f"""
+            <div style="color: {color}; margin: 2px 0; padding: 4px; 
+                        font-family: monospace; font-size: 13px;
+                        border-left: 3px solid {color}; padding-left: 8px;">
+                {emoji} {message}
+            </div>
+            """
+            
+            with log_output:
+                display(HTML(html))
+            return True
+    except Exception:
+        pass
+        
+    # Fallback ke log_to_ui
+    log_to_ui(ui_components, message, level)
+    return False
     
-    # Fallback print dengan emoji indicators
+    # Fallback print dengan emoji
     emoji_map = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'debug': '🔍'}
     emoji = emoji_map.get(level, 'ℹ️')
     print(f"{emoji} {message}")
 
-def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Backward compatibility untuk log_to_accordion pattern"""
-    log_to_ui(ui_components, message, level)
-
 def get_widget_value_safe(ui_components: Dict[str, Any], key: str, default: Any = None) -> Any:
-    """Safe widget value extraction dengan type preservation"""
+    """Enhanced safe widget value extraction dengan backend compatibility"""
     widget = ui_components.get(key)
     if widget and hasattr(widget, 'value'):
         try:
             value = getattr(widget, 'value')
-            # Type preservation untuk common types
+            
+            # Enhanced type preservation dan validation
             if isinstance(default, bool) and not isinstance(value, bool):
                 return bool(value)
-            elif isinstance(default, (int, float)) and isinstance(value, (int, float)):
-                return type(default)(value)
+            elif isinstance(default, int) and isinstance(value, (int, float)):
+                return int(value)
+            elif isinstance(default, float) and isinstance(value, (int, float)):
+                return float(value)
+            elif isinstance(default, list) and not isinstance(value, list):
+                return [value] if value else []
+            elif isinstance(default, str) and not isinstance(value, str):
+                return str(value) if value is not None else default
+            
             return value
         except Exception:
             pass
     return default
 
 def extract_augmentation_types(ui_components: Dict[str, Any]) -> List[str]:
-    """Extract augmentation types dengan validation dan fallback"""
+    """Enhanced augmentation types extraction dengan validation"""
     types_widget = ui_components.get('augmentation_types')
     if types_widget and hasattr(types_widget, 'value'):
         try:
             value = getattr(types_widget, 'value')
             if isinstance(value, (list, tuple)) and value:
-                return list(value)
+                # Validate tegen available types
+                valid_types = ['combined', 'position', 'lighting', 'geometric', 'color', 'noise']
+                filtered_types = [t for t in value if t in valid_types]
+                return filtered_types if filtered_types else ['combined']
         except Exception:
             pass
     
-    # Fallback ke combined jika tidak ada selection
+    # Fallback ke combined jika tidak ada selection valid
     return ['combined']
 
 def validate_form_inputs(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate form inputs dengan detailed feedback"""
-    validation_result = {'valid': True, 'errors': [], 'warnings': []}
+    """Enhanced form validation dengan backend compatibility check"""
+    validation_result = {'valid': True, 'errors': [], 'warnings': [], 'backend_compatible': True}
     
-    # Basic validation rules
+    # Basic validation rules dengan enhanced ranges
     validations = [
         ('num_variations', lambda x: 1 <= x <= 10, "Jumlah variasi harus antara 1-10"),
         ('target_count', lambda x: 100 <= x <= 2000, "Target count harus antara 100-2000"),
-        ('output_prefix', lambda x: x and len(x.strip()) > 0, "Output prefix tidak boleh kosong"),
-        ('augmentation_types', lambda x: x and len(x) > 0, "Pilih minimal 1 jenis augmentasi")
+        ('output_prefix', lambda x: x and len(x.strip()) > 0 and x.isalnum(), "Output prefix harus alphanumeric dan tidak kosong"),
+        ('augmentation_types', lambda x: x and len(x) > 0, "Pilih minimal 1 jenis augmentasi"),
+        ('target_split', lambda x: x in ['train', 'valid', 'test'], "Target split harus train, valid, atau test")
     ]
     
     for key, validator, error_msg in validations:
@@ -86,30 +144,82 @@ def validate_form_inputs(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         try:
             if not validator(value):
                 validation_result['valid'] = False
+                validation_result['backend_compatible'] = False
                 validation_result['errors'].append(f"❌ {error_msg}")
         except Exception:
             validation_result['valid'] = False
+            validation_result['backend_compatible'] = False
             validation_result['errors'].append(f"❌ Error validating {key}")
     
-    # Advanced validations dengan warnings
-    fliplr = get_widget_value_safe(ui_components, 'fliplr', 0.5)
-    if fliplr > 0.8:
-        validation_result['warnings'].append("⚠️ Flip probability tinggi (>80%) - mungkin terlalu agresif")
+    # Advanced parameter validation
+    _validate_position_parameters(ui_components, validation_result)
+    _validate_lighting_parameters(ui_components, validation_result)
+    _validate_normalization_parameters(ui_components, validation_result)
     
-    brightness = get_widget_value_safe(ui_components, 'brightness', 0.2)
-    contrast = get_widget_value_safe(ui_components, 'contrast', 0.2)
-    if brightness > 0.3 or contrast > 0.3:
-        validation_result['warnings'].append("⚠️ Brightness/Contrast tinggi - hasil mungkin tidak realistis")
+    # Backend compatibility check
+    if validation_result['valid']:
+        _check_backend_compatibility(ui_components, validation_result)
     
     return validation_result
 
+def _validate_position_parameters(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Validate position parameters dengan realistic ranges"""
+    fliplr = get_widget_value_safe(ui_components, 'fliplr', 0.5)
+    degrees = get_widget_value_safe(ui_components, 'degrees', 12)
+    translate = get_widget_value_safe(ui_components, 'translate', 0.08)
+    scale = get_widget_value_safe(ui_components, 'scale', 0.04)
+    
+    if fliplr > 0.8:
+        validation_result['warnings'].append("⚠️ Flip probability sangat tinggi (>80%) - hasil mungkin tidak natural")
+    
+    if degrees > 20:
+        validation_result['warnings'].append("⚠️ Rotasi >20° mungkin terlalu ekstrem untuk uang kertas")
+    
+    if translate > 0.15 or scale > 0.15:
+        validation_result['warnings'].append("⚠️ Translate/Scale >15% mungkin mengubah proporsi terlalu drastis")
+
+def _validate_lighting_parameters(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Validate lighting parameters dengan realistic ranges"""
+    brightness = get_widget_value_safe(ui_components, 'brightness', 0.2)
+    contrast = get_widget_value_safe(ui_components, 'contrast', 0.15)
+    
+    if brightness > 0.3 or contrast > 0.3:
+        validation_result['warnings'].append("⚠️ Brightness/Contrast >30% mungkin menghasilkan gambar tidak realistis")
+    
+    if brightness < 0.05 and contrast < 0.05:
+        validation_result['warnings'].append("⚠️ Variasi pencahayaan sangat rendah - augmentasi mungkin tidak efektif")
+
+def _validate_normalization_parameters(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Validate normalization parameters"""
+    norm_method = get_widget_value_safe(ui_components, 'norm_method', 'minmax')
+    denormalize = get_widget_value_safe(ui_components, 'denormalize', False)
+    
+    if norm_method == 'none':
+        validation_result['warnings'].append("⚠️ No normalization - pastikan kompatibilitas dengan model")
+    
+    if norm_method == 'imagenet' and denormalize:
+        validation_result['warnings'].append("⚠️ ImageNet normalization dengan denormalize mungkin tidak optimal")
+
+def _check_backend_compatibility(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Check backend service compatibility"""
+    try:
+        backend_ready = ui_components.get('backend_ready', False)
+        service_integration = ui_components.get('service_integration', False)
+        
+        if not (backend_ready and service_integration):
+            validation_result['warnings'].append("⚠️ Backend service tidak sepenuhnya terintegrasi")
+            validation_result['backend_compatible'] = False
+    except Exception:
+        validation_result['backend_compatible'] = False
+
 def update_button_states(ui_components: Dict[str, Any], state: str = 'ready'):
-    """Update button states dengan visual feedback yang konsisten"""
+    """Enhanced button state management dengan backend integration"""
     button_configs = {
         'ready': {'text_suffix': '', 'style': 'primary', 'disabled': False},
-        'processing': {'text_suffix': ' (Processing...)', 'style': 'warning', 'disabled': True},
-        'error': {'text_suffix': ' (Error)', 'style': 'danger', 'disabled': False},
-        'success': {'text_suffix': ' (✓)', 'style': 'success', 'disabled': False}
+        'processing': {'text_suffix': ' 🔄', 'style': 'warning', 'disabled': True},
+        'error': {'text_suffix': ' ❌', 'style': 'danger', 'disabled': False},
+        'success': {'text_suffix': ' ✅', 'style': 'success', 'disabled': False},
+        'validating': {'text_suffix': ' 🔍', 'style': 'info', 'disabled': True}
     }
     
     config = button_configs.get(state, button_configs['ready'])
@@ -118,44 +228,70 @@ def update_button_states(ui_components: Dict[str, Any], state: str = 'ready'):
     for key in button_keys:
         button = ui_components.get(key)
         if button and hasattr(button, 'disabled'):
-            # Preserve original text jika belum ada
+            # Preserve original properties
             if not hasattr(button, '_original_description'):
                 button._original_description = button.description
+                button._original_style = getattr(button, 'button_style', 'primary')
             
             # Update properties
             button.disabled = config['disabled']
-            if hasattr(button, 'button_style'):
-                button.button_style = config['style'] if state != 'ready' else getattr(button, '_original_style', 'primary')
-            if config['text_suffix']:
-                button.description = button._original_description + config['text_suffix']
-            else:
+            
+            if state == 'ready':
                 button.description = button._original_description
+                button.button_style = button._original_style
+            else:
+                button.description = button._original_description + config['text_suffix']
+                if hasattr(button, 'button_style'):
+                    button.button_style = config['style']
 
 def clear_ui_outputs(ui_components: Dict[str, Any]):
-    """Clear semua output widgets dengan safe error handling"""
+    """Enhanced output clearing dengan logging"""
     output_keys = ['log_output', 'status', 'confirmation_area']
+    cleared_count = 0
+    
     for key in output_keys:
         widget = ui_components.get(key)
         if widget and hasattr(widget, 'clear_output'):
             try:
                 widget.clear_output(wait=True)
+                cleared_count += 1
             except Exception:
                 pass
+    
+    # Log clearing action
+    if cleared_count > 0:
+        log_to_ui(ui_components, f"🧹 UI outputs cleared ({cleared_count} widgets)", "info")
 
 def show_validation_errors(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
-    """Show validation errors dengan styled formatting"""
+    """Enhanced validation error display dengan backend integration"""
     if not validation_result.get('errors') and not validation_result.get('warnings'):
         return
     
-    error_html = ""
+    # Build comprehensive error message
+    error_sections = []
     
-    # Errors dengan red styling
-    for error in validation_result.get('errors', []):
-        error_html += f'<div style="color: #dc3545; margin: 2px 0; padding: 4px;">{error}</div>'
+    if validation_result.get('errors'):
+        error_sections.append("<strong style='color: #dc3545;'>❌ Errors:</strong>")
+        for error in validation_result['errors']:
+            error_sections.append(f"<div style='margin-left: 15px; color: #dc3545;'>{error}</div>")
     
-    # Warnings dengan orange styling
-    for warning in validation_result.get('warnings', []):
-        error_html += f'<div style="color: #ffc107; margin: 2px 0; padding: 4px;">{warning}</div>'
+    if validation_result.get('warnings'):
+        error_sections.append("<strong style='color: #ffc107;'>⚠️ Warnings:</strong>")
+        for warning in validation_result['warnings']:
+            error_sections.append(f"<div style='margin-left: 15px; color: #ffc107;'>{warning}</div>")
+    
+    # Backend compatibility status
+    if not validation_result.get('backend_compatible', True):
+        error_sections.append("<strong style='color: #17a2b8;'>ℹ️ Backend Status:</strong>")
+        error_sections.append("<div style='margin-left: 15px; color: #17a2b8;'>Fallback mode - beberapa fitur mungkin terbatas</div>")
+    
+    error_html = f"""
+    <div style="padding: 12px; background-color: #f8f9fa; border-radius: 6px; 
+                margin: 8px 0; border-left: 4px solid #dc3545;">
+        <h6 style="margin: 0 0 8px 0; color: #333;">🔍 Form Validation Results</h6>
+        {"<br>".join(error_sections)}
+    </div>
+    """
     
     # Display dalam confirmation area atau fallback ke log
     confirmation_area = ui_components.get('confirmation_area')
@@ -167,11 +303,12 @@ def show_validation_errors(ui_components: Dict[str, Any], validation_result: Dic
         log_to_ui(ui_components, "Validation issues detected - check form inputs", 'warning')
 
 def handle_ui_error(ui_components: Dict[str, Any], error_message: str, show_in_confirmation: bool = True):
-    """Handle UI errors dengan consistent styling dan placement"""
+    """Enhanced error handling dengan logging"""
     error_html = f"""
-    <div style="padding: 10px; background-color: #f8d7da; color: #721c24; 
-                border-radius: 4px; margin: 5px 0; border-left: 4px solid #dc3545;">
+    <div style="padding: 12px; background-color: #f8d7da; color: #721c24; 
+                border-radius: 6px; margin: 8px 0; border-left: 4px solid #dc3545;">
         <strong>❌ Error:</strong> {error_message}
+        <br><small style="color: #856404;">💡 Coba refresh cell atau check console untuk detail</small>
     </div>
     """
     
@@ -187,26 +324,31 @@ def handle_ui_error(ui_components: Dict[str, Any], error_message: str, show_in_c
     log_to_ui(ui_components, error_message, 'error')
 
 def create_config_summary_html(config: Dict[str, Any]) -> str:
-    """Create HTML summary dari config untuk display"""
+    """Enhanced config summary dengan backend integration info"""
     aug_config = config.get('augmentation', {})
+    backend_config = config.get('backend', {})
     
     summary_items = [
         f"🎯 Variations: {aug_config.get('num_variations', 3)}",
         f"📊 Target Count: {aug_config.get('target_count', 500)}",
         f"🔄 Types: {', '.join(aug_config.get('types', ['combined']))}",
         f"📂 Split: {aug_config.get('target_split', 'train')}",
-        f"⚖️ Balance Classes: {'Yes' if aug_config.get('balance_classes', True) else 'No'}"
+        f"⚖️ Balance Classes: {'Yes' if aug_config.get('balance_classes', True) else 'No'}",
+        f"🔧 Backend: {'Enabled' if backend_config.get('service_enabled', True) else 'Disabled'}"
     ]
     
     return f"""
-    <div style="padding: 8px; background-color: #e3f2fd; border-radius: 4px; margin: 5px 0;">
-        <strong>📋 Config Summary:</strong><br>
-        {' | '.join(summary_items)}
+    <div style="padding: 10px; background-color: #e3f2fd; border-radius: 6px; 
+                margin: 8px 0; border-left: 4px solid #2196f3;">
+        <strong style="color: #1976d2;">📋 Configuration Summary:</strong><br>
+        <div style="margin-top: 6px; font-size: 13px;">
+            {' | '.join(summary_items)}
+        </div>
     </div>
     """
 
 def show_config_summary(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Show config summary dalam confirmation area"""
+    """Enhanced config summary display"""
     summary_html = create_config_summary_html(config)
     
     confirmation_area = ui_components.get('confirmation_area')
@@ -216,16 +358,45 @@ def show_config_summary(ui_components: Dict[str, Any], config: Dict[str, Any]):
     else:
         log_to_ui(ui_components, "Config summary ready - check form values", 'info')
 
-# One-liner utilities untuk common operations
+# Enhanced one-liner utilities
 safe_get_value = lambda ui_components, key, default=None: get_widget_value_safe(ui_components, key, default)
 safe_log = lambda ui_components, msg, level='info': log_to_ui(ui_components, msg, level)
 clear_outputs = lambda ui_components: clear_ui_outputs(ui_components)
 update_buttons = lambda ui_components, state: update_button_states(ui_components, state)
 show_error = lambda ui_components, msg: handle_ui_error(ui_components, msg)
 validate_form = lambda ui_components: validate_form_inputs(ui_components)
+extract_types = lambda ui_components: extract_augmentation_types(ui_components)
 
-# Progress utilities yang reusable
-show_progress_safe = lambda ui_components, operation: ui_components.get('progress_tracker', {}).get('show_container', lambda x: None)(operation)
-update_progress_safe = lambda ui_components, level, pct, msg: ui_components.get('progress_tracker', {}).get('update_progress', lambda *args: None)(level, pct, msg)
-complete_progress_safe = lambda ui_components, msg: ui_components.get('progress_tracker', {}).get('complete_operation', lambda x: None)(msg)
-error_progress_safe = lambda ui_components, msg: ui_components.get('progress_tracker', {}).get('error_operation', lambda x: None)(msg)
+# Enhanced progress utilities dengan backend integration
+show_progress_safe = lambda ui_components, operation: _safe_progress_operation(ui_components, 'show', operation)
+update_progress_safe = lambda ui_components, level, pct, msg: _safe_progress_operation(ui_components, 'update', level, pct, msg)
+complete_progress_safe = lambda ui_components, msg: _safe_progress_operation(ui_components, 'complete', msg)
+error_progress_safe = lambda ui_components, msg: _safe_progress_operation(ui_components, 'error', msg)
+
+def _safe_progress_operation(ui_components: Dict[str, Any], operation: str, *args):
+    """Safe progress operation dengan logging"""
+    try:
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, operation):
+            method = getattr(progress_tracker, operation)
+            if operation == 'show':
+                method()
+            elif operation == 'update':
+                if len(args) >= 3:  # level, pct, msg
+                    level, pct, msg = args[0], args[1], args[2]
+                    if level == 'overall':
+                        progress_tracker.update_overall(pct, msg)
+                    elif level == 'step':
+                        progress_tracker.update_step(pct, msg)
+                    elif level == 'current':
+                        progress_tracker.update_current(pct, msg)
+            elif operation in ['complete', 'error']:
+                method(args[0] if args else '')
+        
+        # Log operation
+        if operation in ['complete', 'error']:
+            level = 'success' if operation == 'complete' else 'error'
+            log_to_ui(ui_components, args[0] if args else f'Operation {operation}', level)
+                
+    except Exception:
+        pass  # Silent fail untuk compatibility

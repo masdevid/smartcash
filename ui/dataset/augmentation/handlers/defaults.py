@@ -1,127 +1,194 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/defaults.py
-Deskripsi: Default config untuk augmentation dengan mapping lengkap form UI
+Deskripsi: Default config sesuai augmentation_config.yaml dengan backend integration
 """
 
 from typing import Dict, Any
 from datetime import datetime
 
 def get_default_augmentation_config() -> Dict[str, Any]:
-    """Default config dengan mapping lengkap ke UI form components"""
+    """Default config sesuai augmentation_config.yaml dengan backend support"""
     return {
         '_base_': 'base_config.yaml',
         'config_version': '2.0',
         'updated_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         
+        # Data configuration
+        'data': {
+            'dir': 'data',
+            'splits': {
+                'train': 'data/train',
+                'valid': 'data/valid',
+                'test': 'data/test'
+            },
+            'output': {
+                'augmented': 'data/augmented',
+                'preprocessed': 'data/preprocessed'
+            }
+        },
+        
         # Augmentation config - mapping ke UI forms
         'augmentation': {
-            # Basic options mapping (basic_opts_widget)
+            # Basic options (dari basic_opts_widget)
             'enabled': True,
-            'num_variations': 3,          # IntSlider 1-10
+            'num_variations': 2,          # IntSlider 1-10
             'target_count': 500,          # IntSlider 100-2000
             'output_prefix': 'aug',       # Text input
             'balance_classes': True,      # Checkbox
             'target_split': 'train',      # Dropdown
             'move_to_preprocessed': True,
             
-            # Augmentation types mapping (augtypes_opts_widget)
+            # Types (dari augtypes_opts_widget)
             'types': ['combined'],        # SelectMultiple
+            'available_types': [
+                'lighting', 'position', 'combined',
+                'geometric', 'color', 'noise'
+            ],
             
-            # Position parameters mapping (advanced_opts_widget position tab)
+            # Position parameters (dari advanced_opts_widget)
             'position': {
-                'fliplr': 0.5,           # FloatSlider 0.0-1.0
-                'degrees': 10,           # IntSlider 0-30
-                'translate': 0.1,        # FloatSlider 0.0-0.25
-                'scale': 0.1             # FloatSlider 0.0-0.25
+                'horizontal_flip': 0.5,   # fliplr
+                'rotation_limit': 12,     # degrees  
+                'translate_limit': 0.08,  # translate
+                'scale_limit': 0.04       # scale
             },
             
-            # Lighting parameters mapping (advanced_opts_widget lighting tab)
+            # Lighting parameters
             'lighting': {
-                'hsv_h': 0.015,          # FloatSlider 0.0-0.05
-                'hsv_s': 0.7,            # FloatSlider 0.0-1.0
-                'brightness': 0.2,       # FloatSlider 0.0-0.4
-                'contrast': 0.2          # FloatSlider 0.0-0.4
+                'brightness_limit': 0.2,  # brightness
+                'contrast_limit': 0.15,   # contrast
+                'gamma_limit': [85, 115],
+                'shadow_probability': 0.2
+            },
+            
+            # Combined parameters (lighter versions)
+            'combined': {
+                'horizontal_flip': 0.5,
+                'rotation_limit': 12,
+                'translate_limit': 0.08,
+                'scale_limit': 0.04,
+                'brightness_limit': 0.2,
+                'contrast_limit': 0.15,
+                'gamma_limit': [85, 115],
+                'shadow_probability': 0.2
             },
             
             # Processing settings
-            'process_bboxes': True,
-            'validate_results': True,
+            'validate_outputs': True,
+            'skip_existing': False,
             'resume': False,
-            'output_dir': 'data/augmented',
-            
-            # Progress tracking untuk new progress tracker
-            'pipeline_steps': ["prepare", "augment", "normalize", "verify"],
-            'step_weights': {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10}
+            'output_dir': 'data/augmented'
         },
         
-        # Cleanup config
-        'cleanup': {
-            'backup_enabled': True,
-            'backup_dir': 'data/backup/augmentation',
-            'backup_count': 5,
-            'patterns': ['aug_*', '*_augmented*', '*_processed*'],
-            'cleanup_steps': ["locate", "analyze", "backup", "execute"]
-        },
-        
-        # Visualization config
-        'visualization': {
-            'enabled': True,
-            'sample_count': 5,
-            'save_visualizations': True,
-            'vis_dir': 'visualizations/augmentation',
-            'show_original': True,
-            'show_bboxes': True
-        },
-        
-        # Progress config untuk new progress tracker
-        'progress': {
-            'operations': {
-                'augmentation': {
-                    'steps': ["prepare", "augment", "normalize", "verify"],
-                    'weights': {"prepare": 10, "augment": 50, "normalize": 30, "verify": 10},
-                    'auto_hide': True
-                },
-                'check_dataset': {
-                    'steps': ["locate", "analyze_raw", "analyze_augmented", "analyze_preprocessed"],
-                    'weights': {"locate": 10, "analyze_raw": 30, "analyze_augmented": 30, "analyze_preprocessed": 30},
-                    'auto_hide': False
-                },
-                'cleanup': {
-                    'steps': ["locate", "analyze", "backup", "execute"],
-                    'weights': {"locate": 10, "analyze": 20, "backup": 30, "execute": 40},
-                    'auto_hide': True
-                }
-            },
-            'display': {
-                'level': 'triple',
-                'show_step_info': False,
-                'auto_hide_delay': 3600.0,
-                'animation_speed': 0.1
+        # Preprocessing configuration
+        'preprocessing': {
+            'normalization': {
+                'enabled': True,
+                'method': 'minmax',       # dari norm_method dropdown
+                'denormalize': False,     # dari denormalize checkbox
+                'target_size': [640, 640],
+                'preserve_aspect_ratio': False,
+                'output_quality': 95,
+                'save_float32': True,
+                'save_visualization': True
             }
         },
         
-        # Validation ranges untuk form validation
+        # Class balancing
+        'balancing': {
+            'enabled': True,
+            'strategy': 'weighted',
+            'layer_weights': {
+                'layer1': 1.0,    # Banknote detection
+                'layer2': 0.8,    # Nominal detection  
+                'layer3': 0.5     # Security features
+            },
+            'max_files_per_class': 500,
+            'min_files_per_class': 10
+        },
+        
+        # File processing
+        'file_processing': {
+            'max_workers': 4,
+            'batch_size': 100,
+            'validate_images': True,
+            'validate_labels': True,
+            'check_bbox_validity': True,
+            'skip_corrupted': True,
+            'image_extensions': ['.jpg', '.jpeg', '.png', '.bmp'],
+            'label_extension': '.txt'
+        },
+        
+        # Progress tracking untuk dual progress tracker
+        'progress': {
+            'enabled': True,
+            'granular_tracking': True,
+            'operation_weights': {
+                'validation': 10,
+                'balancing': 15,
+                'augmentation': 60,
+                'normalization': 15
+            },
+            'update_frequency': 0.05,
+            'log_frequency': 0.1
+        },
+        
+        # Output configuration
+        'output': {
+            'create_split_dirs': True,
+            'create_symlinks': True,
+            'organize_by_split': True,
+            'preserve_structure': True,
+            'cleanup_on_error': True,
+            'backup_original': False
+        },
+        
+        # Logging
+        'logging': {
+            'level': 'INFO',
+            'log_to_console': True,
+            'log_progress': True,
+            'log_statistics': True,
+            'log_timing': True
+        },
+        
+        # Validation
         'validation': {
+            'check_data_integrity': True,
+            'validate_config': True,
+            'verify_augmented_files': True,
+            'check_symlink_integrity': True,
+            'max_error_rate': 0.1,
+            'min_success_rate': 0.8,
+            
+            # Form validation ranges
             'ranges': {
                 'num_variations': [1, 10],
                 'target_count': [100, 2000],
-                'fliplr': [0.0, 1.0],
-                'degrees': [0, 30],
-                'translate': [0.0, 0.25],
-                'scale': [0.0, 0.25],
-                'hsv_h': [0.0, 0.05],
-                'hsv_s': [0.0, 1.0],
-                'brightness': [0.0, 0.4],
-                'contrast': [0.0, 0.4]
-            },
-            'required': ['num_variations', 'target_count', 'types', 'target_split'],
-            'defaults': {
-                'num_variations': 3,
-                'target_count': 500,
-                'output_prefix': 'aug',
-                'balance_classes': True,
-                'target_split': 'train',
-                'types': ['combined']
+                'horizontal_flip': [0.0, 1.0],
+                'rotation_limit': [0, 30],
+                'translate_limit': [0.0, 0.25],
+                'scale_limit': [0.0, 0.25],
+                'brightness_limit': [0.0, 0.4],
+                'contrast_limit': [0.0, 0.4]
             }
+        },
+        
+        # Performance
+        'performance': {
+            'max_memory_usage_gb': 4.0,
+            'enable_garbage_collection': True,
+            'use_threading': True,
+            'optimize_io': True,
+            'cache_metadata': True,
+            'cache_size_mb': 100
+        },
+        
+        # Backend integration
+        'backend': {
+            'service_enabled': True,
+            'progress_tracking': True,
+            'async_processing': False,
+            'communicator_enabled': True
         }
     }

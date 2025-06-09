@@ -1,133 +1,210 @@
 # File: configs/augmentation_config.yaml
-# Enhanced augmentation config dengan progress tracking dan dataset comparison
-_base_: 'base_config.yaml'
+# Deskripsi: Standalone augmentation config tanpa inheritance
 
-# Augmentation specific config
+# Data configuration
+data:
+  dir: 'data'
+  splits:
+    train: 'data/train'
+    valid: 'data/valid'
+    test: 'data/test'
+  output:
+    augmented: 'data/augmented'
+    preprocessed: 'data/preprocessed'
+
+# Augmentation configuration
 augmentation:
-  # Basic options (UI: basic_opts_widget)
+  # Basic settings
   enabled: true
-  num_variations: 3                    # IntSlider 1-10
-  target_count: 500                   # IntSlider 100-2000
-  output_prefix: 'aug'                # Text input
-  balance_classes: true               # Checkbox
-  target_split: 'train'               # Dropdown: train/valid/test
+  types: ['combined']                 # Default research type
+  num_variations: 2                   # Variations per file
+  target_count: 500                   # Target samples per class
+  intensity: 0.7                      # Augmentation intensity [0.0-1.0]
   
-  # Augmentation types (UI: augtypes_opts_widget)
-  types: ['combined']                 # SelectMultiple: position/lighting/combined
+  # Strategy settings
+  balance_classes: true               # Enable class balancing
+  target_split: 'train'               # Default target split
   
-  # Position parameters (UI: advanced_opts_widget position tab)
-  position:
-    fliplr: 0.5                      # FloatSlider 0.0-1.0
-    degrees: 10                      # IntSlider 0-30
-    translate: 0.1                   # FloatSlider 0.0-0.25
-    scale: 0.1                       # FloatSlider 0.0-0.25
+  # File naming
+  output_prefix: 'aug'                # Augmented file prefix
+  preserve_uuid: true                 # Preserve UUID in filenames
   
-  # Lighting parameters (UI: advanced_opts_widget lighting tab)
-  lighting:
-    hsv_h: 0.015                     # FloatSlider 0.0-0.05
-    hsv_s: 0.7                       # FloatSlider 0.0-1.0
-    brightness: 0.2                  # FloatSlider 0.0-0.4
-    contrast: 0.2                    # FloatSlider 0.0-0.4
+  # Quality control
+  validate_outputs: true              # Validate augmented files
+  skip_existing: false                # Skip if augmented file exists
   
-  # Processing settings
-  process_bboxes: true
-  validate_results: true
-  move_to_preprocessed: true
-  output_dir: 'data/augmented'
+  # Available augmentation types
+  available_types:
+    - 'lighting'                      # Lighting variations
+    - 'position'                      # Position variations  
+    - 'combined'                      # Combined (default for research)
+    - 'geometric'                     # Geometric transformations
+    - 'color'                         # Color variations
+    - 'noise'                         # Noise and blur effects
+  
+  # Type-specific parameters
+  parameters:
+    # Position augmentation
+    position:
+      horizontal_flip: 0.5            # Flip probability
+      rotation_limit: 15              # Max rotation degrees
+      translate_limit: 0.1            # Max translation ratio
+      scale_limit: 0.05               # Max scale variation
+      perspective_scale: 0.08         # Perspective distortion
+    
+    # Lighting augmentation
+    lighting:
+      brightness_limit: 0.25          # Brightness variation
+      contrast_limit: 0.2             # Contrast variation
+      gamma_limit: [80, 120]          # Gamma range
+      shadow_probability: 0.3         # Shadow probability
+      clahe_probability: 0.4          # CLAHE probability
+    
+    # Combined augmentation (lighter versions)
+    combined:
+      horizontal_flip: 0.5
+      rotation_limit: 12
+      translate_limit: 0.08
+      scale_limit: 0.04
+      brightness_limit: 0.2
+      contrast_limit: 0.15
+      gamma_limit: [85, 115]
+      shadow_probability: 0.2
 
-# Enhanced progress tracking configuration
+# Preprocessing configuration
+preprocessing:
+  # Normalization settings
+  normalization:
+    enabled: true
+    method: 'minmax'                  # minmax|standard|imagenet|none
+    denormalize: false                # Save as normalized (default)
+    target_size: [640, 640]           # Fixed size for YOLO
+    preserve_aspect_ratio: false      # Force exact size
+    
+    # Method-specific parameters
+    minmax:
+      output_range: [0.0, 1.0]        # Output range for minmax
+    
+    standard:
+      per_channel: true               # Per-channel standardization
+    
+    imagenet:
+      mean: [0.485, 0.456, 0.406]     # ImageNet mean
+      std: [0.229, 0.224, 0.225]      # ImageNet std
+  
+  # Quality settings
+  output_quality: 95                  # JPEG quality for images
+  save_float32: true                  # Save .npy for normalized data
+  save_visualization: true            # Save JPEG for visualization
+
+# Class balancing configuration
+balancing:
+  enabled: true
+  strategy: 'weighted'                # weighted|uniform|adaptive
+  
+  # Target weights per layer
+  layer_weights:
+    layer1: 1.0                       # Banknote detection (classes 0-6)
+    layer2: 0.8                       # Nominal detection (classes 7-13)
+    layer3: 0.5                       # Security features (classes 14-16)
+  
+  # Priority settings
+  priority_multiplier:
+    layer1: 1.5                       # Higher priority for banknotes
+    layer2: 1.2                       # Medium priority for nominals
+    layer3: 1.0                       # Normal priority for security
+  
+  # Selection limits
+  max_files_per_class: 500            # Max files to select per class
+  min_files_per_class: 10             # Min files required per class
+
+# File processing configuration
+file_processing:
+  # Threading settings
+  max_workers: 4                      # Max threads for parallel processing
+  batch_size: 100                     # Files per batch
+  
+  # File validation
+  validate_images: true               # Validate image files
+  validate_labels: true               # Validate label files
+  check_bbox_validity: true           # Check bbox coordinates
+  
+  # Supported formats
+  image_extensions: ['.jpg', '.jpeg', '.png', '.bmp']
+  label_extension: '.txt'
+  
+  # Error handling
+  skip_corrupted: true                # Skip corrupted files
+  log_errors: true                    # Log processing errors
+
+# Progress tracking configuration
 progress:
-  operations:
-    augmentation:
-      steps: ["validate", "balance", "augment", "normalize", "complete"]
-      weights: 
-        validate: 15
-        balance: 10
-        augment: 45
-        normalize: 25
-        complete: 5
-      granular_tracking: true
-      milestone_logging: true
-    
-    check_dataset:
-      steps: ["locate", "analyze_raw", "analyze_preprocessed", "compare", "report"]
-      weights:
-        locate: 10
-        analyze_raw: 30
-        analyze_preprocessed: 20
-        compare: 20
-        report: 20
-      comparison_enabled: true
-    
-    cleanup:
-      steps: ["scan", "analyze", "confirm", "execute", "verify"]
-      weights:
-        scan: 15
-        analyze: 10
-        confirm: 5
-        execute: 60
-        verify: 10
-      confirmation_required: true
-
-# Dataset comparison settings
-dataset_comparison:
   enabled: true
-  check_preprocessing: true
-  validate_consistency: true
-  readiness_threshold: 0.8
-  splits_to_check: ['train', 'valid', 'test']
+  granular_tracking: true             # Enable granular progress updates
   
-  # Recommendations
-  recommendations:
-    missing_preprocessed: "🔄 Dataset perlu preprocessing sebelum augmentasi"
-    partial_preprocessed: "⚠️ Beberapa split perlu preprocessing tambahan" 
-    ready_for_augmentation: "✅ Dataset siap untuk augmentasi"
-    no_raw_data: "❌ Dataset raw tidak ditemukan"
+  # Operation weights (for progress calculation)
+  operation_weights:
+    validation: 10                    # Initial validation
+    balancing: 15                     # Class balancing
+    augmentation: 60                  # Main augmentation
+    normalization: 15                 # Normalization
+  
+  # Update frequency
+  update_frequency: 0.05              # Update every 5%
+  log_frequency: 0.1                  # Log every 10%
 
-# Enhanced validation
+# Output configuration
+output:
+  # Directory structure
+  create_split_dirs: true             # Create train/valid/test dirs
+  create_symlinks: true               # Create symlinks to preprocessed
+  
+  # File organization
+  organize_by_split: true             # Organize files by split
+  preserve_structure: true            # Preserve original directory structure
+  
+  # Cleanup settings
+  cleanup_on_error: true              # Cleanup partial results on error
+  backup_original: false              # Backup original files
+
+# Logging configuration
+logging:
+  level: 'INFO'                       # DEBUG|INFO|WARNING|ERROR
+  log_to_console: true                # Log to console
+  log_to_file: false                  # Log to file
+  
+  # Progress logging
+  log_progress: true                  # Log progress updates
+  log_statistics: true                # Log operation statistics
+  
+  # Performance logging
+  log_timing: true                    # Log execution times
+  log_memory_usage: false             # Log memory usage
+
+# Validation configuration
 validation:
-  enabled: true
-  check_raw_dataset: true
-  check_preprocessed_dataset: true
-  compare_datasets: true
-  validate_splits: true
+  # Input validation
+  check_data_integrity: true          # Check input data integrity
+  validate_config: true               # Validate configuration
   
-  # Validation rules
-  rules:
-    min_images_per_split: 10
-    max_size_mb: 1000
-    required_splits: ['train']
-    optional_splits: ['valid', 'test']
-    
-# UI Integration settings
-ui_integration:
-  shared_progress_tracker: true
-  shared_dialog_components: true
-  granular_feedback: true
-  real_time_updates: true
+  # Output validation
+  verify_augmented_files: true        # Verify augmented outputs
+  check_symlink_integrity: true       # Check symlink validity
   
-  # Button behavior
-  buttons:
-    disable_during_operation: true
-    restore_after_completion: true
-    show_processing_indicator: true
-  
-  # Confirmation dialogs
-  confirmations:
-    cleanup_required: true
-    reset_required: true
-    destructive_operations: true
+  # Error thresholds
+  max_error_rate: 0.1                 # Max acceptable error rate (10%)
+  min_success_rate: 0.8               # Min required success rate (80%)
 
-# Backend service configuration
-service:
-  communicator_enabled: true
-  progress_callback_enabled: true
-  error_handling: 'comprehensive'
-  logging_level: 'info'
+# Performance configuration
+performance:
+  # Memory management
+  max_memory_usage_gb: 4.0            # Max memory usage
+  enable_garbage_collection: true     # Enable periodic GC
   
-  # Service methods
-  methods:
-    check_dataset_readiness: true
-    run_full_pipeline: true
-    cleanup_augmented_data: true
-    get_status: true
+  # Processing optimization
+  use_threading: true                 # Enable threading
+  optimize_io: true                   # Optimize I/O operations
+  
+  # Cache settings
+  cache_metadata: true                # Cache file metadata
+  cache_size_mb: 100                  # Cache size limit

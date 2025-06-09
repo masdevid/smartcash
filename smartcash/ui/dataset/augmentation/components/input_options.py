@@ -27,18 +27,20 @@ def _create_normalization_options(preprocessing_config: Dict[str, Any]) -> Dict[
         indent=False,
         layout=widgets.Layout(width='auto', margin='6px 0')
     )
-    
+    info_color = "#f57c00"  # Purple matching header
+    info_bg = "#ff980315"   # Purple background
+    info_border = "#ff980340" # Purple border
     # FIXED: Compact info dengan orange colors
     norm_info = widgets.HTML(
         f"""
-        <div style="padding: 6px 8px; background-color: #ff980315; 
+        <div style="padding: 6px 8px; background-color: {info_bg}; 
                     border-radius: 4px; margin: 6px 0; font-size: 10px;
-                    border: 1px solid #ff980340; line-height: 1.3;">
-            <strong style="color: #f57c00;">🔧 Normalization Backend:</strong><br>
-            • <strong style="color: #f57c00;">MinMax:</strong> OpenCV + NumPy [0.0, 1.0]<br>
-            • <strong style="color: #f57c00;">Standard:</strong> Scikit-learn compatible<br>
-            • <strong style="color: #f57c00;">ImageNet:</strong> Torchvision preset<br>
-            • <strong style="color: #f57c00;">Target:</strong> 640x640 fixed untuk YOLO
+                    border: 1px solid {info_border}; line-height: 1.3;">
+            <strong style="color: {info_color};">🔧 Normalization Backend:</strong><br>
+            • <strong style="color: {info_color};">MinMax:</strong> OpenCV + NumPy [0.0, 1.0]<br>
+            • <strong style="color: {info_color};">Standard:</strong> Scikit-learn compatible<br>
+            • <strong style="color: {info_color};">ImageNet:</strong> Torchvision preset<br>
+            • <strong style="color: {info_color};">Target:</strong> 640x640 fixed untuk YOLO
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='3px 0')

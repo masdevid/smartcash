@@ -67,18 +67,20 @@ def create_basic_options_widget() -> Dict[str, Any]:
         indent=False,
         layout=widgets.Layout(width='auto', margin='6px 0')
     )
-    
+    info_color = "#2e7d32"  # Orange matching header
+    info_bg = "#4caf5015"   # Orange background
+    info_border = "#4caf5040" # Orange border
     # FIXED: Compact info panel dengan purple colors
     info_panel = widgets.HTML(
         f"""
-        <div style="padding: 6px 8px; background-color: #4caf5015; 
+        <div style="padding: 6px 8px; background-color: {info_bg}; 
                     border-radius: 4px; margin: 6px 0; font-size: 10px;
-                    border: 1px solid #4caf5040; line-height: 1.3;">
-            <strong style="color: #2e7d32;">{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
-            • <strong style="color: #2e7d32;">Variasi:</strong> 2-5 optimal untuk research<br>
-            • <strong style="color: #2e7d32;">Target Count:</strong> 500-1000 efektif<br>
-            • <strong style="color: #2e7d32;">Intensitas:</strong> 0.7 optimal, 0.3-0.5 conservative<br>
-            • <strong style="color: #2e7d32;">Target Split:</strong> Train primary untuk augmentasi
+                    border: 1px solid {info_border}; line-height: 1.3;">
+            <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
+            • <strong style="color: {info_color};">Variasi:</strong> 2-5 optimal untuk research<br>
+            • <strong style="color: {info_color};">Target Count:</strong> 500-1000 efektif<br>
+            • <strong style="color: {info_color};">Intensitas:</strong> 0.7 optimal, 0.3-0.5 conservative<br>
+            • <strong style="color: {info_color};">Target Split:</strong> Train primary untuk augmentasi
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='3px 0')

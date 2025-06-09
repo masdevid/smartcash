@@ -1,165 +1,107 @@
 """
 File: smartcash/ui/dataset/augmentation/components/advanced_opts_widget.py
-Deskripsi: Advanced options dengan warna info konsisten antara posisi dan pencahayaan
+Deskripsi: Advanced options widget yang dioptimasi dengan tabbed layout dan styling terkonsolidasi
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_advanced_options_widget() -> Dict[str, Any]:
-    """Create advanced options dengan consistent info colors"""
+    """Create advanced options dengan tabbed layout dan styling terkonsolidasi"""
     
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    
-    # Position Parameters
-    fliplr = widgets.FloatSlider(
-        value=0.5, min=0.0, max=1.0, step=0.05,
-        description='Flip Horizontal:',
-        continuous_update=False,
-        readout=True, readout_format='.2f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
+    from smartcash.ui.dataset.augmentation.utils.style_utils import (
+        style_widget, tabbed_container, create_info_content, info_panel
     )
     
-    degrees = widgets.IntSlider(
-        value=10, min=0, max=30, step=1,
-        description='Rotasi (°):',
-        continuous_update=False,
-        readout=True,
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Position parameters dengan consistent styling
+    position_widgets = {
+        'fliplr': style_widget(widgets.FloatSlider(
+            value=0.5, min=0.0, max=1.0, step=0.05, description='Flip Horizontal:',
+            continuous_update=False, readout=True, readout_format='.2f'
+        )),
+        'degrees': style_widget(widgets.IntSlider(
+            value=10, min=0, max=30, step=1, description='Rotasi (°):',
+            continuous_update=False, readout=True
+        )),
+        'translate': style_widget(widgets.FloatSlider(
+            value=0.1, min=0.0, max=0.25, step=0.01, description='Translasi:',
+            continuous_update=False, readout=True, readout_format='.2f'
+        )),
+        'scale': style_widget(widgets.FloatSlider(
+            value=0.1, min=0.0, max=0.25, step=0.01, description='Skala:',
+            continuous_update=False, readout=True, readout_format='.2f'
+        ))
+    }
     
-    translate = widgets.FloatSlider(
-        value=0.1, min=0.0, max=0.25, step=0.01,
-        description='Translasi:',
-        continuous_update=False,
-        readout=True, readout_format='.2f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Lighting parameters
+    lighting_widgets = {
+        'hsv_h': style_widget(widgets.FloatSlider(
+            value=0.015, min=0.0, max=0.05, step=0.001, description='HSV Hue:',
+            continuous_update=False, readout=True, readout_format='.3f'
+        )),
+        'hsv_s': style_widget(widgets.FloatSlider(
+            value=0.7, min=0.0, max=1.0, step=0.02, description='HSV Saturation:',
+            continuous_update=False, readout=True, readout_format='.2f'
+        )),
+        'brightness': style_widget(widgets.FloatSlider(
+            value=0.2, min=0.0, max=0.4, step=0.02, description='Brightness:',
+            continuous_update=False, readout=True, readout_format='.2f'
+        )),
+        'contrast': style_widget(widgets.FloatSlider(
+            value=0.2, min=0.0, max=0.4, step=0.02, description='Contrast:',
+            continuous_update=False, readout=True, readout_format='.2f'
+        ))
+    }
     
-    scale = widgets.FloatSlider(
-        value=0.1, min=0.0, max=0.25, step=0.01,
-        description='Skala:',
-        continuous_update=False,
-        readout=True, readout_format='.2f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Create info content untuk setiap tab
+    position_info = create_info_content([
+        ('Parameter Posisi', ''),
+        ('Rotasi', '0-30° (optimal: 8-15°)'),
+        ('Translasi & Skala', '0.0-0.25'),
+        ('Flip', '0.0-1.0 (50% probabilitas)'),
+        ('Backend', 'Albumentations compatible')
+    ], theme='advanced')
     
-    # Lighting Parameters
-    hsv_h = widgets.FloatSlider(
-        value=0.015, min=0.0, max=0.05, step=0.001,
-        description='HSV Hue:',
-        continuous_update=False,
-        readout=True, readout_format='.3f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    lighting_info = create_info_content([
+        ('Parameter Pencahayaan', ''),
+        ('HSV Hue', '0.0-0.05 (precision: 0.001)'),
+        ('HSV Saturation', '0.0-1.0'),
+        ('Brightness/Contrast', '0.0-0.4'),
+        ('Backend', 'OpenCV HSV compatible')
+    ], theme='advanced')
     
-    hsv_s = widgets.FloatSlider(
-        value=0.7, min=0.0, max=1.0, step=0.02,
-        description='HSV Saturation:',
-        continuous_update=False,
-        readout=True, readout_format='.2f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Create tab content
+    position_content = widgets.VBox([
+        widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Transformasi geometri dengan Albumentations</p>"),
+        *position_widgets.values(),
+        info_panel(position_info, theme='advanced')
+    ])
     
-    brightness = widgets.FloatSlider(
-        value=0.2, min=0.0, max=0.4, step=0.02,
-        description='Brightness:',
-        continuous_update=False,
-        readout=True, readout_format='.2f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    lighting_content = widgets.VBox([
+        widgets.HTML("<p style='font-size: 10px; color: #666; margin: 2px 0;'>Variasi pencahayaan dengan OpenCV HSV</p>"),
+        *lighting_widgets.values(),
+        info_panel(lighting_info, theme='advanced')
+    ])
     
-    contrast = widgets.FloatSlider(
-        value=0.2, min=0.0, max=0.4, step=0.02,
-        description='Contrast:',
-        continuous_update=False,
-        readout=True, readout_format='.2f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Create tabbed container
+    tabs_config = [
+        ('📍 Posisi', position_content),
+        ('💡 Pencahayaan', lighting_content)
+    ]
     
-    # FIXED: Purple colors matching header box
-    info_color = "#9c27b0"  # Purple matching header
-    info_bg = "#9c27b015"   # Purple background
-    info_border = "#9c27b0" # Purple border
+    container = tabbed_container(tabs_config, theme='advanced')
     
-    position_info = widgets.HTML(
-        f"""
-        <div style="padding: 6px; background-color: {info_bg}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 10px;
-                    border: 1px solid {info_border}40; line-height: 1.2;">
-            <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Posisi:</strong><br>
-            • <strong style="color: {info_color};">Rotasi:</strong> 0-30° (optimal: 8-15°)<br>
-            • <strong style="color: {info_color};">Translasi & Skala:</strong> 0.0-0.25<br>
-            • <strong style="color: {info_color};">Flip:</strong> 0.0-1.0 (50% probabilitas)<br>
-            • <strong style="color: {info_color};">Backend:</strong> Albumentations compatible
-        </div>
-        """,
-        layout=widgets.Layout(width='100%', margin='3px 0')
-    )
-    
-    lighting_info = widgets.HTML(
-        f"""
-        <div style="padding: 6px; background-color: {info_bg}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 10px;
-                    border: 1px solid {info_border}40; line-height: 1.2;">
-            <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Pencahayaan:</strong><br>
-            • <strong style="color: {info_color};">HSV Hue:</strong> 0.0-0.05 (precision: 0.001)<br>
-            • <strong style="color: {info_color};">HSV Saturation:</strong> 0.0-1.0<br>
-            • <strong style="color: {info_color};">Brightness/Contrast:</strong> 0.0-0.4<br>
-            • <strong style="color: {info_color};">Backend:</strong> OpenCV HSV compatible
-        </div>
-        """,
-        layout=widgets.Layout(width='100%', margin='3px 0')
-    )
-    
-    # Tabs dengan consistent styling
-    position_tab = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {info_color}; margin: 5px 0;'>📍 Parameter Posisi</h6>"),
-        widgets.HTML(f"<p style='font-size: 10px; color: #666; margin: 2px 0;'>Transformasi geometri dengan Albumentations</p>"),
-        fliplr, degrees, translate, scale,
-        position_info
-    ], layout=widgets.Layout(padding='5px'))
-    
-    lighting_tab = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {info_color}; margin: 5px 0;'>💡 Parameter Pencahayaan</h6>"),
-        widgets.HTML(f"<p style='font-size: 10px; color: #666; margin: 2px 0;'>Variasi pencahayaan dengan OpenCV HSV</p>"),
-        hsv_h, hsv_s, brightness, contrast,
-        lighting_info
-    ], layout=widgets.Layout(padding='5px'))
-    
-    # Tabs
-    tabs = widgets.Tab(children=[position_tab, lighting_tab])
-    tabs.set_title(0, "📍 Posisi")
-    tabs.set_title(1, "💡 Pencahayaan")
-    
-    # Main container
-    container = widgets.VBox([tabs], layout=widgets.Layout(margin='10px 0', width='100%'))
+    # Combine all widgets
+    all_widgets = {**position_widgets, **lighting_widgets}
     
     return {
         'container': container,
-        'widgets': {
-            'fliplr': fliplr,
-            'degrees': degrees, 
-            'translate': translate,
-            'scale': scale,
-            'hsv_h': hsv_h,
-            'hsv_s': hsv_s,
-            'brightness': brightness,
-            'contrast': contrast
-        },
+        'widgets': all_widgets,
         'backend_mapping': {
             'position': {
                 'horizontal_flip': 'fliplr',
                 'rotation_limit': 'degrees',
-                'translate_limit': 'translate', 
+                'translate_limit': 'translate',
                 'scale_limit': 'scale'
             },
             'lighting': {

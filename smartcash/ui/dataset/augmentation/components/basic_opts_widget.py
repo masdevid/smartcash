@@ -1,120 +1,72 @@
 """
 File: smartcash/ui/dataset/augmentation/components/basic_opts_widget.py
-Deskripsi: Compact info panel dengan purple colors dan reduced spacing
+Deskripsi: Basic options widget yang dioptimasi dengan fungsi styling terkonsolidasi
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_basic_options_widget() -> Dict[str, Any]:
-    """Create basic options widget dengan compact styling"""
+    """Create basic options dengan styling terkonsolidasi"""
     
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    
-    # Widgets dengan flex layout
-    num_variations = widgets.IntSlider(
-        value=2, min=1, max=10, step=1,
-        description='Jumlah Variasi:',
-        continuous_update=False,
-        readout=True, readout_format='d',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
+    from smartcash.ui.dataset.augmentation.utils.style_utils import (
+        style_widget, flex_layout, info_panel, create_info_content
     )
     
-    target_count = widgets.IntSlider(
-        value=500, min=100, max=2000, step=50,
-        description='Target Count:',
-        continuous_update=False,
-        readout=True, readout_format='d',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Create widgets dengan consistent styling
+    widgets_dict = {
+        'num_variations': style_widget(widgets.IntSlider(
+            value=2, min=1, max=10, step=1, description='Jumlah Variasi:',
+            continuous_update=False, readout=True, readout_format='d'
+        )),
+        'target_count': style_widget(widgets.IntSlider(
+            value=500, min=100, max=2000, step=50, description='Target Count:',
+            continuous_update=False, readout=True, readout_format='d'
+        )),
+        'intensity': style_widget(widgets.FloatSlider(
+            value=0.7, min=0.1, max=1.0, step=0.1, description='Intensitas:',
+            continuous_update=False, readout=True, readout_format='.1f'
+        )),
+        'target_split': style_widget(widgets.Dropdown(
+            options=[
+                ('🎯 Train - Dataset training (Recommended)', 'train'),
+                ('📊 Valid - Dataset validasi', 'valid'),
+                ('🧪 Test - Dataset testing (Not Recommended)', 'test')
+            ],
+            value='train', description='Target Split:', disabled=False
+        )),
+        'output_prefix': style_widget(widgets.Text(
+            value='aug', placeholder='Prefix untuk file hasil augmentasi',
+            description='Output Prefix:', disabled=False
+        )),
+        'balance_classes': widgets.Checkbox(
+            value=True, description='Balance Classes (Layer 1 & 2 optimal)',
+            indent=False, layout=widgets.Layout(width='auto', margin='6px 0')
+        )
+    }
     
-    intensity = widgets.FloatSlider(
-        value=0.7, min=0.1, max=1.0, step=0.1,
-        description='Intensitas:',
-        continuous_update=False,
-        readout=True, readout_format='.1f',
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
+    # Create info content menggunakan fungsi terkonsolidasi
+    info_content = create_info_content([
+        ('Parameter Guidance', ''),
+        ('Variasi', '2-5 optimal untuk research'),
+        ('Target Count', '500-1000 efektif'),
+        ('Intensitas', '0.7 optimal, 0.3-0.5 conservative'),
+        ('Target Split', 'Train primary untuk augmentasi')
+    ], theme='basic')
     
-    target_split = widgets.Dropdown(
-        options=[
-            ('🎯 Train - Dataset training (Recommended)', 'train'),
-            ('📊 Valid - Dataset validasi', 'valid'),
-            ('🧪 Test - Dataset testing (Not Recommended)', 'test')
-        ],
-        value='train',
-        description='Target Split:',
-        disabled=False,
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
-    
-    output_prefix = widgets.Text(
-        value='aug',
-        placeholder='Prefix untuk file hasil augmentasi',
-        description='Output Prefix:',
-        disabled=False,
-        layout=widgets.Layout(width='95%'),
-        style={'description_width': '120px'}
-    )
-    
-    balance_classes = widgets.Checkbox(
-        value=True,
-        description='Balance Classes (Layer 1 & 2 optimal)',
-        indent=False,
-        layout=widgets.Layout(width='auto', margin='6px 0')
-    )
-    info_color = "#2e7d32"  # Orange matching header
-    info_bg = "#4caf5015"   # Orange background
-    info_border = "#4caf5040" # Orange border
-    # FIXED: Compact info panel dengan purple colors
-    info_panel = widgets.HTML(
-        f"""
-        <div style="padding: 6px 8px; background-color: {info_bg}; 
-                    border-radius: 4px; margin: 6px 0; font-size: 10px;
-                    border: 1px solid {info_border}; line-height: 1.3;">
-            <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
-            • <strong style="color: {info_color};">Variasi:</strong> 2-5 optimal untuk research<br>
-            • <strong style="color: {info_color};">Target Count:</strong> 500-1000 efektif<br>
-            • <strong style="color: {info_color};">Intensitas:</strong> 0.7 optimal, 0.3-0.5 conservative<br>
-            • <strong style="color: {info_color};">Target Split:</strong> Train primary untuk augmentasi
-        </div>
-        """,
-        layout=widgets.Layout(width='100%', margin='3px 0')
-    )
-    
-    # Container dengan flexbox
+    # Create container dengan flex layout
     container = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 6px 0;'>{ICONS.get('settings', '⚙️')} Opsi Dasar</h6>"),
-        num_variations,
-        target_count,
-        intensity,
-        target_split,
-        output_prefix,
-        balance_classes,
-        info_panel
-    ], layout=widgets.Layout(
-        padding='10px', 
-        width='100%',
-        display='flex',
-        flex_flow='column',
-        align_items='stretch',
-        gap='4px'
-    ))
+        widgets.HTML("<h6 style='color: #4caf50; margin: 6px 0;'>⚙️ Opsi Dasar</h6>"),
+        *widgets_dict.values(),
+        info_panel(info_content, theme='basic')
+    ])
+    
+    # Apply flex layout
+    flex_layout(container)
     
     return {
         'container': container,
-        'widgets': {
-            'num_variations': num_variations,
-            'target_count': target_count,
-            'intensity': intensity,
-            'target_split': target_split,
-            'output_prefix': output_prefix,
-            'balance_classes': balance_classes
-        },
+        'widgets': widgets_dict,
         'validation': {
             'ranges': {
                 'num_variations': (1, 10),

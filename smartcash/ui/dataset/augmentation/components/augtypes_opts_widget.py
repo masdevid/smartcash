@@ -1,17 +1,19 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augtypes_opts_widget.py
-Deskripsi: Compact augmentation types widget dengan blue colors
+Deskripsi: Augmentation types widget yang dioptimasi dengan styling terkonsolidasi
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_augmentation_types_widget() -> Dict[str, Any]:
-    """Create compact augmentation types widget"""
+    """Create compact augmentation types widget dengan styling terkonsolidasi"""
     
-    from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.dataset.augmentation.utils.style_utils import (
+        flex_layout, info_panel, create_info_content, section_header
+    )
     
-    # Jenis augmentasi
+    # Augmentation types widget
     augmentation_types = widgets.SelectMultiple(
         options=[
             ('🎯 Combined: Posisi + Pencahayaan (Research Pipeline)', 'combined'),
@@ -27,36 +29,24 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         style={'description_width': '0'}
     )
     
-    # FIXED: Compact types info dengan blue colors
-    types_info = widgets.HTML(
-        f"""
-        <div style="padding: 6px 8px; background-color:#2196f315; 
-                    border-radius: 4px; margin: 6px 0; font-size: 10px;
-                    border: 1px solid #2196f340; line-height: 1.3;">
-            <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
-            • <strong style="color:#2196f3">Combined</strong>: Research pipeline optimal<br>
-            • <strong style="color:#2196f3">Position</strong>: Geometric transforms + bbox preservation<br>
-            • <strong style="color:#2196f3">Lighting</strong>: Photometric transforms pencahayaan<br>
-            • <strong style="color:#2196f3">Advanced</strong>: Geometric, color, noise transforms
-        </div>
-        """,
-        layout=widgets.Layout(width='100%', margin='3px 0')
-    )
+    # Create info content menggunakan fungsi terkonsolidasi
+    info_content = create_info_content([
+        ('Jenis Augmentasi', ''),
+        ('Combined', 'Research pipeline optimal'),
+        ('Position', 'Geometric transforms + bbox preservation'),
+        ('Lighting', 'Photometric transforms pencahayaan'),
+        ('Advanced', 'Geometric, color, noise transforms')
+    ], theme='types')
     
-    # Container dengan flexbox
+    # Create container dengan flex layout
     container = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 6px 0;'>{ICONS.get('augmentation', '🔄')} Jenis Augmentasi</h6>"),
+        section_header('🔄 Jenis Augmentasi', theme='types'),
         augmentation_types,
-        types_info
-    ], layout=widgets.Layout(
-        width='100%',
-        padding='10px',
-        margin='6px 0',
-        display='flex',
-        flex_flow='column',
-        align_items='stretch',
-        gap='4px'
-    ))
+        info_panel(info_content, theme='types')
+    ])
+    
+    # Apply flex layout
+    flex_layout(container)
     
     return {
         'container': container,

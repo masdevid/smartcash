@@ -52,8 +52,7 @@ smartcash/dataset/preprocessor/
 ### ⚙️ **Configuration Structure**
 ```
 configs/
-├── preprocessing_config.yaml  # Standalone preprocessing config
-└── base_config.yaml          # Base config (inheritance support)
+└── preprocessing_config.yaml  # Standalone preprocessing config
 ```
 
 ## 🚀 **Main API Functions**
@@ -228,15 +227,8 @@ preprocessing:
     preserve_aspect_ratio: false
     denormalize: false        # Save as normalized (default)
     
-  visualization:
-    enabled: true             # Create visualizations
-    comparison_mode: true     # Side-by-side comparison
-    add_metadata: true        # Add processing info
-    quality: 90               # JPEG quality
-
   output:
     create_npy: true          # Save .npy files
-    create_visualizations: true # Save visualization images
     organize_by_split: true   # Organize by train/valid/test
 ```
 
@@ -244,7 +236,6 @@ preprocessing:
 ```yaml
 file_naming:
   preprocessed_pattern: 'pre_{nominal}_{uuid}_{increment}'
-  visualization_pattern: 'vis_{nominal}_{uuid}_{increment}'
   preserve_uuid: true        # Maintain UUID consistency
 ```
 

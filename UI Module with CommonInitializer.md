@@ -1,54 +1,159 @@
-# 🏗️ Guide Pola UI Module SmartCash
+# 🏗️ Panduan Pola UI Module SmartCash
 
-## Struktur Wajib UI Module with CommonInitializer
+## Struktur Wajib UI Module dengan CommonInitializer
 
-### 📁 Directory Structure
+### 📁 Struktur Direktori
 ```
 smartcash/ui/[domain]/[module]/
-├── __init__.py                    # Export initializer
-├── [module]_initializer.py        # Main initializer class
+├── __init__.py                    # Ekspor initializer
+├── [module]_initializer.py        # Kelas initializer utama
 ├── handlers/
 │   ├── __init__.py
-│   ├── config_handler.py         # Config management
-│   ├── config_extractor.py       # UI → Config
-│   ├── config_updater.py         # Config → UI
-│   ├── defaults.py               # Hardcoded defaults
-│   └── [module]_handlers.py      # Business logic handlers
+│   ├── config_handler.py         # Manajemen konfigurasi
+│   ├── config_extractor.py       # UI → Konfigurasi
+│   ├── config_updater.py         # Konfigurasi → UI
+│   ├── defaults.py               # Nilai default hardcoded
+│   └── [module]_handlers.py      # Handler logika bisnis
 ├── components/
 │   ├── __init__.py
-│   ├── ui_components.py          # Main UI assembly
-│   └── input_options.py          # Form components
+│   ├── ui_components.py          # Penyusun antarmuka utama
+│   └── input_options.py          # Komponen form
 └── utils/
     ├── __init__.py
-    ├── ui_utils.py               # UI display utilities
-    ├── button_manager.py         # State management
-    ├── dialog_utils.py           # Confirmation dialogs
-    ├── progress_utils.py         # Progress tracking
-    └── backend_utils.py          # Backend integration
+    ├── ui_utils.py               # Utilitas tampilan UI
+    ├── button_manager.py         # Manajemen status tombol
+    ├── dialog_utils.py           # Dialog konfirmasi
+    ├── progress_utils.py         # Pelacakan kemajuan
+    └── backend_utils.py          # Integrasi backend
 ```
 
-## 📋 Konsistensi Penamaan File
+## 🎯 Pola UI Terkini (Modul Augmentasi)
 
-### File Naming Pattern
-- **Initializer**: `[module]_initializer.py`
-- **Config Handler**: `config_handler.py` (standardized)
-- **Main Handlers**: `[module]_handlers.py`
-- **Main UI**: `ui_components.py` (standardized)
-- **Utils**: `[function]_utils.py`
+### 1. Pola Area Konfirmasi
 
-### Class Naming Pattern
-- **Initializer**: `[Module]Initializer`
-- **Config Handler**: `[Module]ConfigHandler`
-- **UI Components**: Functional exports
+#### 1.1. Penggunaan Dasar
+```python
+from smartcash.ui.dataset.augmentation.utils.dialog_utils import (
+    show_confirmation_in_area,
+    show_info_in_area,
+    show_warning_in_area,
+    clear_confirmation_area
+)
+
+# Menampilkan dialog konfirmasi
+show_confirmation_in_area(
+    ui_components,
+    title="Konfirmasi",
+    message="Apakah Anda yakin ingin melanjutkan?",
+    on_confirm=lambda b: print("Dikonfirmasi"),
+    on_cancel=lambda b: print("Dibatalkan"),
+    confirm_text="Ya",
+    cancel_text="Tidak",
+    danger_mode=True
+)
+
+# Menampilkan pesan info
+show_info_in_area(
+    ui_components,
+    title="Informasi",
+    message="Proses telah selesai",
+    on_close=lambda b: print("Tutup")
+)
+
+# Membersihkan area konfirmasi
+clear_confirmation_area(ui_components)
+```
+
+#### 1.2. Praktik Terbaik
+- Selalu gunakan `clear_confirmation_area` sebelum menampilkan dialog baru
+- Gunakan `danger_mode=True` untuk aksi yang berisiko
+- Sediakan fungsi callback untuk `on_confirm` dan `on_cancel`
+- Gunakan `on_close` untuk membersihkan sumber daya setelah dialog ditutup
+
+### 2. Pola Pencatatan Log
+
+#### 2.1. Penggunaan Dasar
+```python
+from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui, log_to_accordion
+
+# Mencatat log dengan level berbeda
+log_to_ui(ui_components, "Pesan informasi", level='info')
+log_to_ui(ui_components, "Pesan sukses", level='success')
+log_to_ui(ui_components, "Pesan peringatan", level='warning')
+log_to_ui(ui_components, "Pesan kesalahan", level='error')
+log_to_ui(ui_components, "Pesan debug", level='debug')
+
+# Mencatat ke accordion yang otomatis terbuka untuk error/peringatan
+log_to_accordion(ui_components, "Penting: Proses gagal", level='error')
+```
+
+#### 2.2. Praktik Terbaik
+- Gunakan level yang sesuai untuk setiap jenis pesan
+- Sertakan konteks yang cukup dalam pesan log
+- Gunakan `log_to_accordion` untuk pesan penting yang membutuhkan perhatian khusus
+- Hindari pencatatan log berlebihan yang dapat membanjiri antarmuka pengguna
+
+### 3. Pelacakan Kemajuan
+
+#### 3.1. Manajemen Status Tombol
+```python
+from smartcash.ui.dataset.augmentation.utils.button_manager import (
+    disable_all_buttons,
+    enable_all_buttons,
+    set_button_processing_state
+)
+
+# Menonaktifkan semua tombol saat operasi berjalan
+disable_all_buttons(ui_components)
+
+# Mengatur tombol ke status 'sedang diproses'
+set_button_processing_state(ui_components, 'augment_button', processing=True)
+
+# Mengaktifkan kembali tombol setelah selesai
+enable_all_buttons(ui_components)
+```
+
+#### 3.2. Bilah Kemajuan
+```python
+def update_progress(ui_components, current, total, message=None):
+    progress = ui_components.get('progress_bar')
+    progress_label = ui_components.get('progress_label')
+    
+    if progress and hasattr(progress, 'value'):
+        progress.value = current
+        progress.max = total
+    
+    if progress_label and hasattr(progress_label, 'value'):
+        persen = (current / total) * 100 if total > 0 else 0
+        status = f"{message}: " if message else ""
+        progress_label.value = f"{status}{current}/{total} ({persen:.1f}%)"
+
+# Contoh penggunaan
+update_progress(ui_components, 5, 10, "Memproses")
+```
+
+## 📋 Konsistensi Penamaan Berkas
+
+### Pola Penamaan Berkas
+- **Inisialisasi**: `[module]_initializer.py`
+- **Pengelola Konfigurasi**: `config_handler.py` (standar)
+- **Utama Handler**: `[module]_handlers.py`
+- **Antarmuka Utama**: `ui_components.py` (standar)
+- **Utilitas**: `[fungsi]_utils.py`
+
+### Pola Penamaan Kelas
+- **Inisialisasi**: `[Module]Initializer`
+- **Pengelola Konfigurasi**: `[Module]ConfigHandler`
+- **Komponen Antarmuka**: Ekspor fungsional
 
 ## 🔧 Template Standar
 
-### 1. Initializer Template
+### 1. Template Inisialisasi
 
 ```python
 """
 File: smartcash/ui/[domain]/[module]/[module]_initializer.py
-Deskripsi: [Module] initializer yang mewarisi CommonInitializer
+Deskripsi: Inisialisasi [Module] yang mewarisi CommonInitializer
 """
 
 from typing import Dict, Any, List
@@ -58,7 +163,7 @@ from smartcash.ui.[domain].[module].components.ui_components import create_[modu
 from smartcash.ui.[domain].[module].handlers.[module]_handlers import setup_[module]_handlers
 
 class [Module]Initializer(CommonInitializer):
-    """[Module] initializer dengan complete UI dan backend integration"""
+    """Inisialisasi [Module] dengan antarmuka dan integrasi backend yang lengkap"""
     
     def __init__(self):
         super().__init__(
@@ -68,7 +173,7 @@ class [Module]Initializer(CommonInitializer):
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create [module] UI components"""
+        """Membuat komponen antarmuka pengguna untuk modul"""
         ui_components = create_[module]_main_ui(config)
         ui_components.update({
             '[module]_initialized': True,
@@ -77,41 +182,42 @@ class [Module]Initializer(CommonInitializer):
         })
         return ui_components
     
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan auto config load dan UI update"""
-        # Setup handlers terlebih dahulu
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
+                             env=None, **kwargs) -> Dict[str, Any]:
+        """Menyiapkan handler dengan pemuatan konfigurasi dan pembaruan UI otomatis"""
+        # Siapkan handler terlebih dahulu
         result = setup_[module]_handlers(ui_components, config, env)
         
-        # CRITICAL: Load config dari file dan update UI
+        # PENTING: Muat konfigurasi dari berkas dan perbarui UI
         self._load_and_update_ui(ui_components)
         
         return result
     
     def _load_and_update_ui(self, ui_components: Dict[str, Any]):
-        """CRITICAL: Load config dari file dan update UI saat initialization"""
+        """PENTING: Memuat konfigurasi dari berkas dan memperbarui UI saat inisialisasi"""
         try:
             config_handler = ui_components.get('config_handler')
             if config_handler:
-                # Set UI components untuk logging
+                # Atur komponen UI untuk pencatatan log
                 if hasattr(config_handler, 'set_ui_components'):
                     config_handler.set_ui_components(ui_components)
                 
-                # Load config dari file dengan inheritance
+                # Muat konfigurasi dari berkas dengan pewarisan
                 loaded_config = config_handler.load_config()
                 
-                # Update UI dengan loaded config
+                # Perbarui UI dengan konfigurasi yang dimuat
                 config_handler.update_ui(ui_components, loaded_config)
                 
-                # Update config reference
+                # Perbarui referensi konfigurasi
                 ui_components['config'] = loaded_config
                 
         except Exception as e:
             logger = ui_components.get('logger')
             if logger:
-                logger.warning(f"⚠️ Error loading config: {str(e)}")
+                logger.warning(f"⚠️ Gagal memuat konfigurasi: {str(e)}")
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Get default config"""
+        """Mendapatkan konfigurasi bawaan"""
         from smartcash.ui.[domain].[module].handlers.defaults import get_default_[module]_config
         return get_default_[module]_config()
     
@@ -121,20 +227,20 @@ class [Module]Initializer(CommonInitializer):
             'save_button', 'reset_button', 'log_output', 'status_panel'
         ]
 
-# Global instance
+# Instance global
 _[module]_initializer = [Module]Initializer()
 
 def initialize_[module]_ui(env=None, config=None, **kwargs):
-    """Factory function untuk [module] UI dengan auto config load"""
+    """Fungsi factory untuk UI [module] dengan pemuatan konfigurasi otomatis"""
     return _[module]_initializer.initialize(env=env, config=config, **kwargs)
 ```
 
-### 2. Config Handler Template (CRITICAL PATTERNS)
+### 2. Template Penangan Konfigurasi (POLA PENTING)
 
 ```python
 """
 File: smartcash/ui/[domain]/[module]/handlers/config_handler.py
-Deskripsi: Config handler dengan proper logging dan auto UI refresh
+Deskripsi: Penangan konfigurasi dengan pencatatan log yang baik dan penyegaran UI otomatis
 """
 
 from typing import Dict, Any
@@ -144,7 +250,7 @@ from smartcash.ui.[domain].[module].handlers.config_updater import update_[modul
 from smartcash.common.config.manager import get_config_manager
 
 class [Module]ConfigHandler(ConfigHandler):
-    """Config handler dengan proper UI logging dan inheritance"""
+    """Penangan konfigurasi dengan pencatatan log UI dan pewarisan yang tepat"""
     
     def __init__(self, module_name: str = '[module]', parent_module: str = '[domain]'):
         super().__init__(module_name, parent_module)
@@ -152,44 +258,44 @@ class [Module]ConfigHandler(ConfigHandler):
         self.config_filename = '[module]_config.yaml'
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract dengan DRY approach"""
+        """Ekstrak konfigurasi dengan pendekatan DRY"""
         return extract_[module]_config(ui_components)
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari config"""
+        """Memperbarui UI berdasarkan konfigurasi"""
         update_[module]_ui(ui_components, config)
     
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default dari defaults.py"""
+        """Mendapatkan konfigurasi bawaan dari defaults.py"""
         from smartcash.ui.[domain].[module].handlers.defaults import get_default_[module]_config
         return get_default_[module]_config()
     
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """CRITICAL: Load dengan inheritance handling"""
+        """PENTING: Memuat konfigurasi dengan penanganan pewarisan"""
         try:
             filename = config_filename or self.config_filename
             config = self.config_manager.load_config(filename)
             
             if not config:
-                self._log_to_ui("⚠️ Config kosong, menggunakan default", "warning")
+                self._log_to_ui("⚠️ Konfigurasi kosong, menggunakan setelan bawaan", "warning")
                 return self.get_default_config()
             
-            # CRITICAL: Handle inheritance dari _base_
+            # PENTING: Menangani pewarisan dari _base_
             if '_base_' in config:
                 base_config = self.config_manager.load_config(config['_base_']) or {}
                 merged_config = self._merge_configs(base_config, config)
-                self._log_to_ui(f"📂 Config loaded dari {filename} dengan inheritance", "info")
+                self._log_to_ui(f"📂 Konfigurasi dimuat dari {filename} dengan pewarisan", "info")
                 return merged_config
             
-            self._log_to_ui(f"📂 Config loaded dari {filename}", "info")
+            self._log_to_ui(f"📂 Konfigurasi dimuat dari {filename}", "info")
             return config
             
         except Exception as e:
-            self._log_to_ui(f"❌ Error loading config: {str(e)}", "error")
+            self._log_to_ui(f"❌ Gagal memuat konfigurasi: {str(e)}", "error")
             return self.get_default_config()
     
     def _merge_configs(self, base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
-        """CRITICAL: Merge base config dengan override"""
+        """PENTING: Menggabungkan konfigurasi dasar dengan penggantian"""
         import copy
         merged = copy.deepcopy(base_config)
         
@@ -205,7 +311,7 @@ class [Module]ConfigHandler(ConfigHandler):
         return merged
     
     def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge dictionaries"""
+        """Menggabungkan kamus secara rekursif"""
         import copy
         result = copy.deepcopy(base)
         
@@ -218,7 +324,7 @@ class [Module]ConfigHandler(ConfigHandler):
         return result
     
     def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """CRITICAL: Save dengan auto refresh"""
+        """PENTING: Menyimpan konfigurasi dengan penyegaran otomatis"""
         try:
             filename = config_filename or self.config_filename
             ui_config = self.extract_config(ui_components)
@@ -226,19 +332,19 @@ class [Module]ConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(ui_config, filename)
             
             if success:
-                self._log_to_ui(f"✅ Config tersimpan ke {filename}", "success")
+                self._log_to_ui(f"✅ Konfigurasi tersimpan ke {filename}", "success")
                 self._refresh_ui_after_save(ui_components, filename)
                 return True
             else:
-                self._log_to_ui(f"❌ Gagal simpan config ke {filename}", "error")
+                self._log_to_ui(f"❌ Gagal menyimpan konfigurasi ke {filename}", "error")
                 return False
                 
         except Exception as e:
-            self._log_to_ui(f"❌ Error save config: {str(e)}", "error")
+            self._log_to_ui(f"❌ Kesalahan saat menyimpan konfigurasi: {str(e)}", "error")
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """CRITICAL: Reset dengan auto refresh"""
+        """PENTING: Mengatur ulang konfigurasi ke nilai bawaan"""
         try:
             filename = config_filename or self.config_filename
             default_config = self.get_default_config()
@@ -246,29 +352,29 @@ class [Module]ConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(default_config, filename)
             
             if success:
-                self._log_to_ui(f"🔄 Config direset ke default", "success")
+                self._log_to_ui(f"🔄 Konfigurasi diatur ulang ke setelan bawaan", "success")
                 self.update_ui(ui_components, default_config)
                 return True
             else:
-                self._log_to_ui(f"❌ Gagal reset config", "error")
+                self._log_to_ui(f"❌ Gagal mengatur ulang konfigurasi", "error")
                 return False
                 
         except Exception as e:
-            self._log_to_ui(f"❌ Error reset config: {str(e)}", "error")
+            self._log_to_ui(f"❌ Kesalahan saat mengatur ulang konfigurasi: {str(e)}", "error")
             return False
     
     def _refresh_ui_after_save(self, ui_components: Dict[str, Any], filename: str):
-        """CRITICAL: Auto refresh UI setelah save"""
+        """PENTING: Menyegarkan UI secara otomatis setelah penyimpanan"""
         try:
             saved_config = self.load_config(filename)
             if saved_config:
                 self.update_ui(ui_components, saved_config)
-                self._log_to_ui("🔄 UI direfresh dengan config tersimpan", "info")
+                self._log_to_ui("🔄 Antarmuka disegarkan dengan konfigurasi terbaru", "info")
         except Exception as e:
-            self._log_to_ui(f"⚠️ Error refresh UI: {str(e)}", "warning")
+            self._log_to_ui(f"⚠️ Gagal menyegarkan antarmuka: {str(e)}", "warning")
     
     def _log_to_ui(self, message: str, level: str = "info"):
-        """CRITICAL: Log ke UI components dengan fallback"""
+        """PENTING: Mencatat log ke komponen UI dengan fallback"""
         try:
             ui_components = getattr(self, '_ui_components', {})
             logger = ui_components.get('logger')
@@ -286,31 +392,31 @@ class [Module]ConfigHandler(ConfigHandler):
             print(f"[{level.upper()}] {message}")
     
     def set_ui_components(self, ui_components: Dict[str, Any]):
-        """CRITICAL: Set UI components untuk logging"""
+        """PENTING: Mengatur komponen UI untuk pencatatan log"""
         self._ui_components = ui_components
 ```
 
-### 3. Config Extractor Template (DRY APPROACH)
+### 3. Template Ekstraktor Konfigurasi (PENDEKATAN DRY)
 
 ```python
 """
 File: smartcash/ui/[domain]/[module]/handlers/config_extractor.py
-Deskripsi: DRY config extraction dengan defaults sebagai base
+Deskripsi: Ekstraksi konfigurasi DRY dengan nilai bawaan sebagai dasar
 """
 
 from typing import Dict, Any
 
 def extract_[module]_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """CRITICAL: DRY approach - base dari defaults + form values"""
+    """PENTING: Pendekatan DRY - dasar dari nilai bawaan + nilai form"""
     from smartcash.ui.[domain].[module].handlers.defaults import get_default_[module]_config
     
-    # Base structure dari defaults (DRY)
+    # Struktur dasar dari nilai bawaan (DRY)
     config = get_default_[module]_config()
     
-    # Helper untuk get form values
+    # Helper untuk mendapatkan nilai form
     get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
     
-    # Update HANYA nilai dari form - examples:
+    # Hanya memperbarui nilai dari form - contoh:
     config['[module]']['option1'] = get_value('option1_input', 'default')
     config['[module]']['option2'] = get_value('option2_checkbox', False)
     config['performance']['num_workers'] = get_value('worker_slider', 8)
@@ -318,31 +424,31 @@ def extract_[module]_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     return config
 ```
 
-### 4. Config Updater Template (INHERITANCE AWARE)
+### 4. Template Pembaruan Konfigurasi (DENGAN PEWARISAN)
 
 ```python
 """
 File: smartcash/ui/[domain]/[module]/handlers/config_updater.py
-Deskripsi: Config updater dengan inheritance handling
+Deskripsi: Pembaruan konfigurasi dengan penanganan pewarisan
 """
 
 from typing import Dict, Any
 
 def update_[module]_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """CRITICAL: Update UI dengan inheritance handling"""
-    # Extract sections dengan safe defaults (handle inheritance)
+    """PENTING: Perbarui UI dengan penanganan pewarisan"""
+    # Ekstrak bagian dengan nilai bawaan yang aman (menangani pewarisan)
     [module]_config = config.get('[module]', {})
     performance_config = config.get('performance', {})
     
     safe_update = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
     
-    # Field mappings dengan validation
+    # Pemetaan field dengan validasi
     safe_update('option1_input', [module]_config.get('option1', 'default'))
     safe_update('option2_checkbox', [module]_config.get('option2', False))
     safe_update('worker_slider', min(max(performance_config.get('num_workers', 8), 1), 10))
 
 def reset_[module]_ui(ui_components: Dict[str, Any]) -> None:
-    """Reset UI ke defaults"""
+    """Atur ulang UI ke nilai bawaan"""
     try:
         from smartcash.ui.[domain].[module].handlers.defaults import get_default_[module]_config
         default_config = get_default_[module]_config()
@@ -351,7 +457,7 @@ def reset_[module]_ui(ui_components: Dict[str, Any]) -> None:
         _apply_hardcoded_defaults(ui_components)
 
 def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
-    """Hardcoded defaults fallback"""
+    """Fallback ke nilai bawaan hardcoded"""
     defaults = {'option1_input': 'default', 'worker_slider': 8}
     for key, value in defaults.items():
         if key in ui_components and hasattr(ui_components[key], 'value'):
@@ -361,24 +467,24 @@ def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
                 pass
 ```
 
-### 5. Handlers Template (CONFIG HANDLER INTEGRATION)
+### 5. Template Handler (INTEGRASI PENANGAN KONFIGURASI)
 
 ```python
 def setup_[module]_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handlers dengan config handler UI integration"""
+    """Menyiapkan handler dengan integrasi penangan konfigurasi UI"""
     
-    # CRITICAL: Setup config handler dengan UI logger
+    # PENTING: Siapkan penangan konfigurasi dengan logger UI
     config_handler = ui_components.get('config_handler')
     if config_handler and hasattr(config_handler, 'set_ui_components'):
         config_handler.set_ui_components(ui_components)
     
-    # Setup other handlers...
+    # Siapkan handler lainnya...
     setup_config_handlers_fixed(ui_components, config)
     
     return ui_components
 
 def setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """CRITICAL: Config handlers dengan proper UI logging"""
+    """PENTING: Penangan konfigurasi dengan pencatatan log UI yang tepat"""
     
     def save_config(button=None):
         clear_outputs(ui_components)
@@ -386,18 +492,18 @@ def setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str,
         try:
             config_handler = ui_components.get('config_handler')
             if not config_handler:
-                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                handle_ui_error(ui_components, "❌ Penangan konfigurasi tidak tersedia")
                 return
             
-            # CRITICAL: Set UI components untuk logging
+            # PENTING: Atur komponen UI untuk pencatatan log
             if hasattr(config_handler, 'set_ui_components'):
                 config_handler.set_ui_components(ui_components)
             
             success = config_handler.save_config(ui_components)
-            # Logger sudah handle di config_handler
+            # Pencatat log sudah ditangani di config_handler
             
         except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error save: {str(e)}")
+            handle_ui_error(ui_components, f"❌ Gagal menyimpan: {str(e)}")
     
     def reset_config(button=None):
         clear_outputs(ui_components)
@@ -405,20 +511,20 @@ def setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str,
         try:
             config_handler = ui_components.get('config_handler')
             if not config_handler:
-                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                handle_ui_error(ui_components, "❌ Penangan konfigurasi tidak tersedia")
                 return
             
-            # CRITICAL: Set UI components untuk logging
+            # PENTING: Atur komponen UI untuk pencatatan log
             if hasattr(config_handler, 'set_ui_components'):
                 config_handler.set_ui_components(ui_components)
             
             success = config_handler.reset_config(ui_components)
-            # Logger sudah handle di config_handler
+            # Pencatat log sudah ditangani di config_handler
             
         except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error reset: {str(e)}")
+            handle_ui_error(ui_components, f"❌ Gagal mengatur ulang: {str(e)}")
     
-    # Bind handlers
+    # Hubungkan handler
     save_button = ui_components.get('save_button')
     reset_button = ui_components.get('reset_button')
     if save_button:
@@ -427,55 +533,55 @@ def setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str,
         reset_button.on_click(reset_config)
 ```
 
-## 🔄 Implementasi Checklist
+## 🐄 Daftar Periksa Implementasi
 
-### Setup Phase
-- [ ] Create directory structure
-- [ ] Implement initializer dengan CommonInitializer inheritance
-- [ ] **CRITICAL**: Add `_load_and_update_ui()` di initializer
-- [ ] Setup config handler dengan proper inheritance
+### Fase Persiapan
+- [ ] Buat struktur direktori
+- [ ] Implementasikan inisialisasi dengan pewarisan CommonInitializer
+- [ ] **PENTING**: Tambahkan `_load_and_update_ui()` di inisialisator
+- [ ] Siapkan penangan konfigurasi dengan pewarisan yang tepat
 
-### Config Management (CRITICAL FIXES)
-- [ ] **CRITICAL**: Implement `_log_to_ui()` dengan fallback ke `log_to_accordion`
-- [ ] **CRITICAL**: Add `set_ui_components()` method di config handler
-- [ ] **CRITICAL**: Implement `load_config()` dengan `_merge_configs()` untuk inheritance
-- [ ] **CRITICAL**: Add `_refresh_ui_after_save()` untuk auto UI update
-- [ ] Implement DRY config extractor dengan defaults sebagai base
-- [ ] Implement config updater dengan safe extraction dari inheritance
+### Manajemen Konfigurasi (PERBAIKAN PENTING)
+- [ ] **PENTING**: Implementasikan `_log_to_ui()` dengan fallback ke `log_to_accordion`
+- [ ] **PENTING**: Tambahkan method `set_ui_components()` di penangan konfigurasi
+- [ ] **PENTING**: Implementasikan `load_config()` dengan `_merge_configs()` untuk pewarisan
+- [ ] **PENTING**: Tambahkan `_refresh_ui_after_save()` untuk pembaruan UI otomatis
+- [ ] Implementasikan ekstraktor konfigurasi DRY dengan nilai bawaan sebagai dasar
+- [ ] Implementasikan pembarui konfigurasi dengan ekstraksi aman dari pewarisan
 
-### Handler Integration (CRITICAL)
-- [ ] **CRITICAL**: Call `config_handler.set_ui_components()` di setup handlers
-- [ ] **CRITICAL**: Use `setup_config_handlers_fixed()` pattern
-- [ ] Setup proper error handling dengan UI logging
+### Integrasi Handler (PENTING)
+- [ ] **PENTING**: Panggil `config_handler.set_ui_components()` di penyiapan handler
+- [ ] **PENTING**: Gunakan pola `setup_config_handlers_fixed()`
+- [ ] Siapkan penanganan error dengan pencatatan log UI
 
-### UI Components
-- [ ] Create main UI components file
-- [ ] Implement input options dengan responsive layout
-- [ ] Setup progress tracking dengan dual level
-- [ ] Add proper button management
+### Komponen UI
+- [ ] Buat file komponen UI utama
+- [ ] Implementasikan opsi input dengan tata letak responsif
+- [ ] Siapkan pelacakan progress dengan dua level
+- [ ] Tambahkan manajemen tombol yang tepat
 
-## 💡 Critical Lessons Learned
+## 💡 Pelajaran Penting
 
-### 1. **Config Loading & UI Update**
-- **MUST** implement `_load_and_update_ui()` di initializer
-- **MUST** handle inheritance dengan `_merge_configs()`
-- **MUST** call `config_handler.set_ui_components()` untuk logging
+### 1. **Pemuatan Konfigurasi & Pembaruan UI**
+- **HARUS** mengimplementasikan `_load_and_update_ui()` di inisialisator
+- **HARUS** menangani pewarisan dengan `_merge_configs()`
+- **HARUS** memanggil `config_handler.set_ui_components()` untuk pencatatan log
 
-### 2. **Logging to UI**
-- **MUST** implement `_log_to_ui()` dengan fallback ke `log_to_accordion`
-- **NEVER** rely only pada `print()` - logs won't show di UI
+### 2. **Pencatatan Log ke UI**
+- **HARUS** mengimplementasikan `_log_to_ui()` dengan fallback ke `log_to_accordion`
+- **JANGAN PERNAH** hanya mengandalkan `print()` - log tidak akan muncul di UI
 
-### 3. **DRY Principle**
-- **ALWAYS** use defaults.py sebagai base structure
-- **ONLY** update form values di extractor
-- **AVOID** rewriting entire config structure
+### 3. **Prinsip DRY**
+- **SELALU** gunakan defaults.py sebagai struktur dasar
+- **HANYA** perbarui nilai form di ekstraktor
+- **HINDARI** menulis ulang seluruh struktur konfigurasi
 
-### 4. **Auto Refresh**
-- **MUST** implement `_refresh_ui_after_save()` 
-- **MUST** reload config dari file setelah save
-- **MUST** call `update_ui()` dengan reloaded config
+### 4. **Pembaruan Otomatis**
+- **HARUS** mengimplementasikan `_refresh_ui_after_save()`
+- **HARUS** memuat ulang konfigurasi dari file setelah penyimpanan
+- **HARUS** memanggil `update_ui()` dengan konfigurasi yang dimuat ulang
 
-### 5. **Error Prevention**
-- **ALWAYS** use safe_update dengan try/catch
-- **ALWAYS** validate dropdown values before assignment
-- **ALWAYS** handle missing keys dengan `.get()` dan defaults
+### 5. **Pencegahan Error**
+- **SELALU** gunakan safe_update dengan try/catch
+- **SELALU** validasi nilai dropdown sebelum penugasan
+- **SELALU** tangani kunci yang hilang dengan `.get()` dan nilai default

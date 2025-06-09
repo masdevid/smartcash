@@ -17,3 +17,12 @@ class FileScanner:
             return []
         
         return list(glob.glob(str(aug_dir / 'aug_*.jpg')))
+
+    def scan_preprocessed_files(self, prep_path: str) -> List[str]:
+        """Scan preprocessed files dengan pattern pre_*"""
+        prep_dir = Path(prep_path) / 'images'
+        
+        if not prep_dir.exists():
+            return []
+        
+        return list(glob.glob(str(prep_path / 'pre_*.jpg')))

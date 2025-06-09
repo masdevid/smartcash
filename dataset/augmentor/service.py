@@ -152,8 +152,16 @@ class AugmentationService:
             self.logger.info(f"    {aug_icon} Augmented: {aug_imgs} images ({aug_status})")
             self.logger.info(f"    {prep_icon} Preprocessed: {prep_imgs} .npy files ({prep_status})")
     
-    def cleanup_augmented_data(self, target_split: str = None) -> Dict[str, Any]:
-        """🧹 Enhanced cleanup dengan comprehensive reporting"""
+    def cleanup_data(self, target: str = 'both', target_split: str = None) -> Dict[str, Any]:
+        """🧹 Enhanced cleanup dengan comprehensive reporting
+        
+        Args:
+            target: Jenis file yang akan dibersihkan ('augmented', 'preprocessed', atau 'both')
+            target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test')
+            
+        Returns:
+            Dict berisi status, total file yang dihapus, dan pesan
+        """
         try:
             from smartcash.dataset.augmentor.utils.cleanup_manager import CleanupManager
             cleanup_manager = CleanupManager(self.config, self.progress)
@@ -162,17 +170,40 @@ class AugmentationService:
             pre_cleanup_status = self.get_augmentation_status()
             
             # Execute cleanup
-            result = cleanup_manager.cleanup_augmented_data(target_split)
+            result = cleanup_manager.cleanup_data(target=target, target_split=target_split)
             
             # Enhanced result with before/after comparison
             if result.get('status') == 'success':
                 post_cleanup_status = self.get_augmentation_status()
-                result['cleanup_summary'] = self._create_cleanup_summary(pre_cleanup_status, post_cleanup_status, target_split)
+                result['cleanup_summary'] = self._create_cleanup_summary(
+                    pre_cleanup_status, post_cleanup_status, target_split)
                 self._log_cleanup_summary(result['cleanup_summary'])
             
             return result
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
+            
+    def cleanup_augmented_data(self, target_split: str = None) -> Dict[str, Any]:
+        """Alias untuk membersihkan data augmented.
+        
+        Args:
+            target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test')
+            
+        Returns:
+            Dict berisi status, total file yang dihapus, dan pesan
+        """
+        return self.cleanup_data(target='augmented', target_split=target_split)
+        
+    def cleanup_preprocessed_data(self, target_split: str = None) -> Dict[str, Any]:
+        """Alias untuk membersihkan data preprocessed.
+        
+        Args:
+            target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test')
+            
+        Returns:
+            Dict berisi status, total file yang dihapus, dan pesan
+        """
+        return self.cleanup_data(target='preprocessed', target_split=target_split)
     
     def _create_cleanup_summary(self, pre_status: Dict[str, Any], post_status: Dict[str, Any], target_split: str) -> Dict[str, Any]:
         """📊 NEW: Create cleanup summary"""

@@ -1,7 +1,5 @@
 # File: configs/preprocessing_config.yaml
-# Deskripsi: Standalone preprocessing config untuk normalisasi dan validasi dataset
-
-# Data configuration
+# Deskripsi: Konfigurasi untuk preprocessing dataset SmartCash
 data:
   dir: 'data'
   splits:
@@ -11,73 +9,33 @@ data:
   output:
     preprocessed: 'data/preprocessed'
 
-# Preprocessing configuration
+# Konfigurasi preprocessing
 preprocessing:
-  # Basic settings
-  enabled: true
-  process_splits: ['train', 'valid']     # Splits to process
-  skip_existing: false                   # Skip if preprocessed file exists
+  enabled: true  # Aktifkan preprocessing
   
-  # Validation settings
+  # Pengaturan validasi
   validation:
-    enabled: true                        # Enable comprehensive validation
-    move_invalid: true                   # Move invalid files to invalid folder
-    fix_issues: false                    # Try to fix minor issues automatically
-    check_image_integrity: true          # Check image file integrity
-    check_label_format: true             # Check YOLO label format
-    check_pair_consistency: true         # Check image-label pairs
-    validate_bbox_coords: true           # Validate bbox coordinates [0,1]
-    validate_class_ids: true             # Validate class ID ranges
-    
-    # Error thresholds
-    max_error_rate: 0.1                  # Max acceptable error rate (10%)
-    min_success_rate: 0.8                # Min required success rate (80%)
+    enabled: true    # Aktifkan validasi
+    move_invalid: true  # Pindahkan file yang tidak valid
+    fix_issues: false   # Coba perbaiki masalah otomatis
   
-  # Normalization settings
+  # Pengaturan normalisasi
   normalization:
-    enabled: true
-    method: 'minmax'                     # minmax|standard|imagenet|none
-    target_size: [640, 640]              # Fixed size untuk YOLO
-    preserve_aspect_ratio: false         # Force exact size
-    denormalize: false                   # Save as normalized (default)
-    
-    # Method-specific parameters
-    minmax:
-      input_range: [0, 255]              # Input range (uint8)
-      output_range: [0.0, 1.0]           # Output range for training
-    
-    standard:
-      per_channel: true                  # Per-channel standardization
-      clip_values: true                  # Clip extreme values
-      clip_range: [-3.0, 3.0]            # Clipping range (std deviations)
-    
-    imagenet:
-      mean: [0.485, 0.456, 0.406]        # ImageNet mean (RGB)
-      std: [0.229, 0.224, 0.225]         # ImageNet std (RGB)
-      input_normalized: false            # Input already normalized [0,1]
-# File naming configuration
+    method: 'minmax'  # minmax|standard|imagenet|none
+    target_size: [640, 640]  # Ukuran target untuk YOLO
+    preserve_aspect_ratio: true
+    denormalize: false  # Simpan dalam format ternormalisasi
+  
+  # Pengaturan output
+  output:
+    create_npy: true  # Buat file .npy
+    organize_by_split: true  # Kelompokkan berdasarkan train/valid/test
+
+# Pola penamaan file
 file_naming:
   preprocessed_pattern: 'pre_{nominal}_{uuid}_{increment}'
-  preserve_uuid: true                    # Maintain UUID consistency
+  preserve_uuid: true  # Pertahankan UUID konsisten
   sequence_padding: 3                    # Padding untuk increment (001, 002, dst)
-
-# Quality control configuration
-quality_control:
-  # Image quality checks
-  min_image_size: [32, 32]               # Minimum image dimensions
-  max_image_size: [4096, 4096]           # Maximum image dimensions
-  supported_formats: ['.jpg', '.jpeg', '.png', '.bmp']
-  max_file_size_mb: 50                   # Maximum file size in MB
-  
-  # Label quality checks
-  min_bbox_size: 0.001                   # Minimum bbox width/height
-  max_bbox_size: 1.0                     # Maximum bbox width/height
-  valid_class_ids: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-  
-  # Consistency checks
-  check_filename_format: true            # Check filename format
-  check_uuid_consistency: true           # Check UUID consistency
-  require_labels: true                   # Require label files for all images
 
 # File processing configuration
 file_processing:
@@ -85,46 +43,3 @@ file_processing:
   max_workers: 4                         # Max threads for parallel processing
   batch_size: 50                         # Files per batch
   
-  # Memory management
-  max_memory_usage_gb: 4.0               # Max memory usage
-  enable_garbage_collection: true        # Enable periodic GC
-  gc_frequency: 100                      # GC every N files
-  
-  # I/O optimization
-  optimize_io: true                      # Optimize I/O operations
-  use_memory_mapping: false              # Use memory mapping for large files
-  buffer_size: 8192                      # I/O buffer size
-  
-  # Error handling
-  skip_corrupted: true                   # Skip corrupted files
-  retry_count: 2                         # Retry count for I/O errors
-  continue_on_error: true                # Continue processing on errors
-
-# Progress tracking configuration
-progress:
-  enabled: true
-  granular_tracking: true                # Enable granular progress updates
-  
-  # Operation weights (for progress calculation)
-  operation_weights:
-    validation: 20                       # File validation
-    preprocessing: 60                    # Main preprocessing
-  
-  # Update frequency
-  update_frequency: 0.05                 # Update every 5%
-  log_frequency: 0.1                     # Log every 10%
-  show_eta: true                         # Show estimated time remaining
-
-# Performance configuration
-performance:
-  # Memory management
-  max_memory_usage_gb: 4.0            # Max memory usage
-  enable_garbage_collection: true     # Enable periodic GC
-  
-  # Processing optimization
-  use_threading: true                 # Enable threading
-  optimize_io: true                   # Optimize I/O operations
-  
-  # Cache settings
-  cache_metadata: true                # Cache file metadata
-  cache_size_mb: 100                  # Cache size limit

@@ -1,17 +1,17 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augtypes_opts_widget.py
-Deskripsi: Augmentation types widget tanpa target split (dipindah ke basic options)
+Deskripsi: Compact augmentation types widget dengan blue colors
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_augmentation_types_widget() -> Dict[str, Any]:
-    """Create augmentation types widget tanpa target split"""
+    """Create compact augmentation types widget"""
     
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Jenis augmentasi saja
+    # Jenis augmentasi
     augmentation_types = widgets.SelectMultiple(
         options=[
             ('🎯 Combined: Posisi + Pencahayaan (Research Pipeline)', 'combined'),
@@ -24,35 +24,39 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         value=['combined'],
         description='Jenis Augmentasi:',
         disabled=False,
-        layout=widgets.Layout(width='100%', height='160px'),
+        layout=widgets.Layout(width='100%', height='140px'),
         style={'description_width': '140px'}
     )
     
-    # Types information
+    # FIXED: Compact types info dengan blue colors
     types_info = widgets.HTML(
         f"""
-        <div style="padding: 12px; background-color:#2196f315; 
-                    border-radius: 6px; margin: 10px 0; font-size: 11px;  line-height: 4px;
-                    border: 1px solid #2196f3;">
+        <div style="padding: 6px 8px; background-color:#2196f315; 
+                    border-radius: 4px; margin: 6px 0; font-size: 10px;
+                    border: 1px solid #2196f340; line-height: 1.3;">
             <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
             • <strong style="color:#2196f3">Combined</strong>: Research pipeline optimal<br>
-            • <strong style="color:#2196f3">Position</strong>: Geometric transforms dengan bbox preservation<br>
-            • <strong style="color:#2196f3">Lighting</strong>: Photometric transforms kondisi pencahayaan<br>
+            • <strong style="color:#2196f3">Position</strong>: Geometric transforms + bbox preservation<br>
+            • <strong style="color:#2196f3">Lighting</strong>: Photometric transforms pencahayaan<br>
             • <strong style="color:#2196f3">Advanced</strong>: Geometric, color, noise transforms
         </div>
         """,
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='3px 0')
     )
     
-    # Container - hanya jenis augmentasi
+    # Container dengan flexbox
     container = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 10px 0;'>{ICONS.get('augmentation', '🔄')} Jenis Augmentasi</h6>"),
+        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 6px 0;'>{ICONS.get('augmentation', '🔄')} Jenis Augmentasi</h6>"),
         augmentation_types,
         types_info
     ], layout=widgets.Layout(
         width='100%',
-        padding='12px',
-        margin='8px 0'
+        padding='10px',
+        margin='6px 0',
+        display='flex',
+        flex_flow='column',
+        align_items='stretch',
+        gap='4px'
     ))
     
     return {

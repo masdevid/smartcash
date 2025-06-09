@@ -85,40 +85,39 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
-    # FIXED: Consistent colors untuk info panels
-    info_color = "#2196f3"  # Same blue color for both
-    info_bg = "#2196f315"   # Same background
-    info_border = "#2196f3" # Same border
+    # FIXED: Purple colors matching header box
+    info_color = "#9c27b0"  # Purple matching header
+    info_bg = "#9c27b015"   # Purple background
+    info_border = "#9c27b0" # Purple border
     
     position_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: {info_bg}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;
-                    border: 1px solid {info_border}40;">
+        <div style="padding: 6px; background-color: {info_bg}; 
+                    border-radius: 4px; margin: 5px 0; font-size: 10px;
+                    border: 1px solid {info_border}40; line-height: 1.2;">
             <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Posisi:</strong><br>
-            • <strong style="color: {info_color};">Rotasi:</strong> 0-30° (optimal: 8-15° untuk mata uang)<br>
-            • <strong style="color: {info_color};">Translasi & Skala:</strong> 0.0-0.25 (step: 0.01)<br>
-            • <strong style="color: {info_color};">Flip:</strong> 0.0-1.0 (0.5 = 50% probabilitas)<br>
+            • <strong style="color: {info_color};">Rotasi:</strong> 0-30° (optimal: 8-15°)<br>
+            • <strong style="color: {info_color};">Translasi & Skala:</strong> 0.0-0.25<br>
+            • <strong style="color: {info_color};">Flip:</strong> 0.0-1.0 (50% probabilitas)<br>
             • <strong style="color: {info_color};">Backend:</strong> Albumentations compatible
         </div>
         """,
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='3px 0')
     )
     
     lighting_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: {info_bg}; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;
-                    line-height: 4px;
-                    border: 1px solid {info_border}40;">
+        <div style="padding: 6px; background-color: {info_bg}; 
+                    border-radius: 4px; margin: 5px 0; font-size: 10px;
+                    border: 1px solid {info_border}40; line-height: 1.2;">
             <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Pencahayaan:</strong><br>
-            • <strong style="color: {info_color};">HSV Hue:</strong> 0.0-0.05 (step: 0.001 precision)<br>
-            • <strong style="color: {info_color};">HSV Saturation:</strong> 0.0-1.0 (step: 0.02)<br>
-            • <strong style="color: {info_color};">Brightness/Contrast:</strong> 0.0-0.4 (step: 0.02)<br>
-            • <strong style="color: {info_color};">Backend:</strong> OpenCV HSV space compatible
+            • <strong style="color: {info_color};">HSV Hue:</strong> 0.0-0.05 (precision: 0.001)<br>
+            • <strong style="color: {info_color};">HSV Saturation:</strong> 0.0-1.0<br>
+            • <strong style="color: {info_color};">Brightness/Contrast:</strong> 0.0-0.4<br>
+            • <strong style="color: {info_color};">Backend:</strong> OpenCV HSV compatible
         </div>
         """,
-        layout=widgets.Layout(width='100%', margin='5px 0')
+        layout=widgets.Layout(width='100%', margin='3px 0')
     )
     
     # Tabs dengan consistent styling

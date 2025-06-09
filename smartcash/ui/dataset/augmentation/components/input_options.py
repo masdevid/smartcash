@@ -1,13 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/components/input_options.py
-Deskripsi: Fixed normalization options dengan title yang benar
+Deskripsi: Compact normalization options dengan orange colors
 """
 
 def _create_normalization_options(preprocessing_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create normalization options dengan title yang diperbaiki"""
+    """Create compact normalization options"""
     norm_config = preprocessing_config.get('normalization', {})
     
-    # Normalization method
     norm_method = widgets.Dropdown(
         options=[
             ('MinMax (0-1): YOLOv5 compatible', 'minmax'),
@@ -18,54 +17,47 @@ def _create_normalization_options(preprocessing_config: Dict[str, Any]) -> Dict[
         value=norm_config.get('method', 'minmax'),
         description='Norm Method:',
         disabled=False,
-        layout=widgets.Layout(width='auto'),
+        layout=widgets.Layout(width='95%'),
         style={'description_width': '100px'}
     )
     
-    # Denormalization option
     denormalize = widgets.Checkbox(
         value=norm_config.get('denormalize', False),
         description='Denormalize setelah preprocessing (save as uint8)',
         indent=False,
-        layout=widgets.Layout(width='auto', margin='5px 0')
+        layout=widgets.Layout(width='auto', margin='6px 0')
     )
     
-    # Target size display
-    target_size_display = widgets.HTML(
-        f"""
-        <div style="padding: 6px 8px; background-color: #f5f5f5; 
-                    border-radius: 3px; margin: 5px 0; font-size: 11px;
-                    border: 1px solid #ddd;">
-            <strong>🎯 Target Size:</strong> 640x640 (Fixed untuk YOLOv5 compatibility)
-        </div>
-        """,
-        layout=widgets.Layout(width='100%')
-    )
-    
-    # Normalization info panel
+    # FIXED: Compact info dengan orange colors
     norm_info = widgets.HTML(
         f"""
-        <div style="padding: 8px; background-color: #fff3e0; 
-                    border-radius: 4px; margin: 5px 0; font-size: 11px;
-                    border: 1px solid #ff980040;">
+        <div style="padding: 6px 8px; background-color: #ff980315; 
+                    border-radius: 4px; margin: 6px 0; font-size: 10px;
+                    border: 1px solid #ff980340; line-height: 1.3;">
             <strong style="color: #f57c00;">🔧 Normalization Backend:</strong><br>
-            • <strong style="color: #f57c00;">MinMax:</strong> OpenCV + NumPy array [0.0, 1.0]<br>
-            • <strong style="color: #f57c00;">Standard:</strong> Scikit-learn StandardScaler compatible<br>
-            • <strong style="color: #f57c00;">ImageNet:</strong> Torchvision transforms preset<br>
-            • <strong style="color: #f57c00;">Denormalize:</strong> Convert float32 → uint8
+            • <strong style="color: #f57c00;">MinMax:</strong> OpenCV + NumPy [0.0, 1.0]<br>
+            • <strong style="color: #f57c00;">Standard:</strong> Scikit-learn compatible<br>
+            • <strong style="color: #f57c00;">ImageNet:</strong> Torchvision preset<br>
+            • <strong style="color: #f57c00;">Target:</strong> 640x640 fixed untuk YOLO
         </div>
         """,
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='100%', margin='3px 0')
     )
     
-    # FIXED: Changed title from "Preprocessing Options" to "Augmentation Normalization"
+    # Container dengan flexbox
     container = widgets.VBox([
-        widgets.HTML("<h6 style='color: #f57c00; margin: 8px 0;'>🔧 Augmentation Normalization</h6>"),
+        widgets.HTML("<h6 style='color: #f57c00; margin: 6px 0;'>📊 Normalisasi Augmentasi</h6>"),
         norm_method,
         denormalize,
-        target_size_display,
         norm_info
-    ], layout=widgets.Layout(padding='8px', width='100%'))
+    ], layout=widgets.Layout(
+        padding='10px', 
+        width='100%',
+        display='flex',
+        flex_flow='column',
+        align_items='stretch',
+        gap='4px'
+    ))
     
     return {
         'container': container,

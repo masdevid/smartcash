@@ -13,32 +13,37 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style_widget, flex_layout, info_panel, create_info_content
     )
     
-    # Create widgets dengan consistent styling
+    # Create widgets dengan overflow-safe styling
     widgets_dict = {
-        'num_variations': style_widget(widgets.IntSlider(
+        'num_variations': widgets.IntSlider(
             value=2, min=1, max=10, step=1, description='Jumlah Variasi:',
-            continuous_update=False, readout=True, readout_format='d'
-        )),
-        'target_count': style_widget(widgets.IntSlider(
+            continuous_update=False, readout=True, readout_format='d',
+            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'target_count': widgets.IntSlider(
             value=500, min=100, max=2000, step=50, description='Target Count:',
-            continuous_update=False, readout=True, readout_format='d'
-        )),
-        'intensity': style_widget(widgets.FloatSlider(
+            continuous_update=False, readout=True, readout_format='d',
+            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'intensity': widgets.FloatSlider(
             value=0.7, min=0.1, max=1.0, step=0.1, description='Intensitas:',
-            continuous_update=False, readout=True, readout_format='.1f'
-        )),
-        'target_split': style_widget(widgets.Dropdown(
+            continuous_update=False, readout=True, readout_format='.1f',
+            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'target_split': widgets.Dropdown(
             options=[
                 ('🎯 Train - Dataset training (Recommended)', 'train'),
                 ('📊 Valid - Dataset validasi', 'valid'),
                 ('🧪 Test - Dataset testing (Not Recommended)', 'test')
             ],
-            value='train', description='Target Split:', disabled=False
-        )),
-        'output_prefix': style_widget(widgets.Text(
+            value='train', description='Target Split:', disabled=False,
+            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'output_prefix': widgets.Text(
             value='aug', placeholder='Prefix untuk file hasil augmentasi',
-            description='Output Prefix:', disabled=False
-        )),
+            description='Output Prefix:', disabled=False,
+            style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
         'balance_classes': widgets.Checkbox(
             value=True, description='Balance Classes (Layer 1 & 2 optimal)',
             indent=False, layout=widgets.Layout(width='auto', margin='6px 0')

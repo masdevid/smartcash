@@ -13,44 +13,52 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         style_widget, tabbed_container, create_info_content, info_panel
     )
     
-    # Position parameters dengan consistent styling
+    # Position parameters dengan overflow-safe styling
     position_widgets = {
-        'fliplr': style_widget(widgets.FloatSlider(
+        'fliplr': widgets.FloatSlider(
             value=0.5, min=0.0, max=1.0, step=0.05, description='Flip Horizontal:',
-            continuous_update=False, readout=True, readout_format='.2f'
-        )),
-        'degrees': style_widget(widgets.IntSlider(
+            continuous_update=False, readout=True, readout_format='.2f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'degrees': widgets.IntSlider(
             value=10, min=0, max=30, step=1, description='Rotasi (°):',
-            continuous_update=False, readout=True
-        )),
-        'translate': style_widget(widgets.FloatSlider(
+            continuous_update=False, readout=True,
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'translate': widgets.FloatSlider(
             value=0.1, min=0.0, max=0.25, step=0.01, description='Translasi:',
-            continuous_update=False, readout=True, readout_format='.2f'
-        )),
-        'scale': style_widget(widgets.FloatSlider(
+            continuous_update=False, readout=True, readout_format='.2f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'scale': widgets.FloatSlider(
             value=0.1, min=0.0, max=0.25, step=0.01, description='Skala:',
-            continuous_update=False, readout=True, readout_format='.2f'
-        ))
+            continuous_update=False, readout=True, readout_format='.2f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        )
     }
     
     # Lighting parameters
     lighting_widgets = {
-        'hsv_h': style_widget(widgets.FloatSlider(
+        'hsv_h': widgets.FloatSlider(
             value=0.015, min=0.0, max=0.05, step=0.001, description='HSV Hue:',
-            continuous_update=False, readout=True, readout_format='.3f'
-        )),
-        'hsv_s': style_widget(widgets.FloatSlider(
+            continuous_update=False, readout=True, readout_format='.3f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'hsv_s': widgets.FloatSlider(
             value=0.7, min=0.0, max=1.0, step=0.02, description='HSV Saturation:',
-            continuous_update=False, readout=True, readout_format='.2f'
-        )),
-        'brightness': style_widget(widgets.FloatSlider(
+            continuous_update=False, readout=True, readout_format='.2f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'brightness': widgets.FloatSlider(
             value=0.2, min=0.0, max=0.4, step=0.02, description='Brightness:',
-            continuous_update=False, readout=True, readout_format='.2f'
-        )),
-        'contrast': style_widget(widgets.FloatSlider(
+            continuous_update=False, readout=True, readout_format='.2f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        ),
+        'contrast': widgets.FloatSlider(
             value=0.2, min=0.0, max=0.4, step=0.02, description='Contrast:',
-            continuous_update=False, readout=True, readout_format='.2f'
-        ))
+            continuous_update=False, readout=True, readout_format='.2f',
+            style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%')
+        )
     }
     
     # Create info content untuk setiap tab

@@ -51,16 +51,26 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         ))
         log_components = create_log_accordion('augmentation', '250px')
         
-        # 2x2 Grid menggunakan fungsi terkonsolidasi
-        row1 = widget_grid([
-            styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic'),
-            styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced')
-        ])
+        # 2x2 Grid dengan overflow fix
+        row1 = widgets.HBox([
+            styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic', '47%'),
+            styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced', '47%')
+        ], layout=widgets.Layout(
+            width='100%', max_width='100%', display='flex',
+            flex_flow='row wrap', justify_content='space-between',
+            align_items='stretch', gap='6px', margin='8px 0',
+            overflow='hidden', box_sizing='border-box'
+        ))
         
-        row2 = widget_grid([
-            styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types'),
-            styled_container(normalization_options['container'], "📊 Normalisasi", 'normalization')
-        ])
+        row2 = widgets.HBox([
+            styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types', '47%'),
+            styled_container(normalization_options['container'], "📊 Normalisasi", 'normalization', '47%')
+        ], layout=widgets.Layout(
+            width='100%', max_width='100%', display='flex',
+            flex_flow='row wrap', justify_content='space-between',
+            align_items='stretch', gap='6px', margin='8px 0',
+            overflow='hidden', box_sizing='border-box'
+        ))
         
         # Action dan config sections
         action_section = widgets.VBox([

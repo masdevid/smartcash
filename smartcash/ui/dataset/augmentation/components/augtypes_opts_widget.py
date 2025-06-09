@@ -32,7 +32,7 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
     types_info = widgets.HTML(
         f"""
         <div style="padding: 12px; background-color:#2196f315; 
-                    border-radius: 6px; margin: 10px 0; font-size: 12px;
+                    border-radius: 6px; margin: 10px 0; font-size: 11px;  line-height: 4px;
                     border: 1px solid #2196f3;">
             <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
             • <strong style="color:#2196f3">Combined</strong>: Research pipeline optimal<br>

@@ -77,7 +77,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
     info_panel = widgets.HTML(
         f"""
         <div style="padding: 10px; background-color: #4caf5015; 
-                    border-radius: 6px; margin: 8px 0; font-size: 12px;
+                    border-radius: 6px; margin: 8px 0; font-size: 11px; line-height: 4px;
                     border: 1px solid #4caf5040;" >
             <strong style="color: #2e7d32;">{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
             • <strong style="color: #2e7d32;">Variasi:</strong> 2-5 optimal untuk research pipeline<br>

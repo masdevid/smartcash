@@ -109,6 +109,7 @@ def create_advanced_options_widget() -> Dict[str, Any]:
         f"""
         <div style="padding: 8px; background-color: {info_bg}; 
                     border-radius: 4px; margin: 5px 0; font-size: 11px;
+                    line-height: 4px;
                     border: 1px solid {info_border}40;">
             <strong style="color: {info_color};">{ICONS.get('info', 'ℹ️')} Parameter Pencahayaan:</strong><br>
             • <strong style="color: {info_color};">HSV Hue:</strong> 0.0-0.05 (step: 0.001 precision)<br>

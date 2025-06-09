@@ -15,13 +15,13 @@ class CleanupManager:
         self.progress = progress_bridge
         self.data_dir = config.get('data', {}).get('dir', 'data')
     
-    def cleanup_data(self, target: str = 'both', target_split: str = None) -> Dict[str, Any]:
-        """Cleanup data berdasarkan target yang ditentukan.
+    def cleanup_augmented_data(self, target: str = 'both', target_split: str = None) -> Dict[str, Any]:
+        """Cleanup augmented dan/atau preprocessed files
         
         Args:
             target: Jenis file yang akan dibersihkan. Pilihan: 'augmented', 'preprocessed', atau 'both'
             target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test'). 
-                       Jika None, semua split akan dibersihkan.
+                        Jika None, semua split akan dibersihkan.
                         
         Returns:
             Dict berisi status, total file yang dihapus, dan pesan
@@ -38,19 +38,22 @@ class CleanupManager:
             splits = [target_split] if target_split else ['train', 'valid', 'test']
             cleaned_targets = []
             
-            cleanup_actions = {
-                'augmented': self._remove_augmented_files,
-                'preprocessed': self._remove_preprocessed_files
-            }
-            
             for split in splits:
-                for t in (['augmented', 'preprocessed'] if target == 'both' else [target]):
-                    target_dir = Path(self.data_dir) / t / split
-                    if target_dir.exists():
-                        removed = cleanup_actions[t](target_dir)
+                if target in ['augmented', 'both']:
+                    aug_dir = Path(self.data_dir) / 'augmented' / split
+                    if aug_dir.exists():
+                        removed = self._remove_augmented_files(aug_dir)
+                        total_removed += removed
                         if removed > 0:
-                            total_removed += removed
-                            cleaned_targets.append(f'{t}/{split}')
+                            cleaned_targets.append(f'augmented/{split}')
+                
+                if target in ['preprocessed', 'both']:
+                    prep_dir = Path(self.data_dir) / 'preprocessed' / split
+                    if prep_dir.exists():
+                        removed = self._remove_preprocessed_files(prep_dir)
+                        total_removed += removed
+                        if removed > 0:
+                            cleaned_targets.append(f'preprocessed/{split}')
             
             if not cleaned_targets:
                 message = "Tidak ada file yang perlu dibersihkan"
@@ -72,30 +75,6 @@ class CleanupManager:
                 'total_removed': 0,
                 'cleaned_targets': []
             }
-    
-    def cleanup_augmented_data(self, target_split: str = None) -> Dict[str, Any]:
-        """Alias untuk membersihkan data augmented.
-        
-        Args:
-            target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test').
-                       Jika None, semua split akan dibersihkan.
-                       
-        Returns:
-            Dict berisi status, total file yang dihapus, dan pesan
-        """
-        return self.cleanup_data(target='augmented', target_split=target_split)
-    
-    def cleanup_preprocessed_data(self, target_split: str = None) -> Dict[str, Any]:
-        """Alias untuk membersihkan data preprocessed.
-        
-        Args:
-            target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test').
-                       Jika None, semua split akan dibersihkan.
-                       
-        Returns:
-            Dict berisi status, total file yang dihapus, dan pesan
-        """
-        return self.cleanup_data(target='preprocessed', target_split=target_split)
     
     def _remove_augmented_files(self, aug_dir: Path) -> int:
         """Remove augmented files (.jpg dan .txt)"""

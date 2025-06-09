@@ -11,7 +11,6 @@ from smartcash.dataset.augmentor.core.engine import AugmentationEngine
 from smartcash.dataset.augmentor.core.normalizer import NormalizationEngine
 from smartcash.dataset.augmentor.utils.progress_bridge import ProgressBridge
 from smartcash.dataset.augmentor.utils.path_resolver import PathResolver
-from smartcash.dataset.augmentor.utils.cleanup_manager import CleanupManager
 from smartcash.common.logger import get_logger
 from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
 
@@ -31,7 +30,6 @@ class AugmentationService:
         self.engine = AugmentationEngine(self.config, self.progress)
         self.normalizer = NormalizationEngine(self.config, self.progress)
         self.path_resolver = PathResolver(self.config)
-        self.cleanup_manager = CleanupManager(self.config, self.progress)
         
     def run_augmentation_pipeline(self, target_split: str = "train", 
                                 progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
@@ -85,33 +83,6 @@ class AugmentationService:
             return status
         except Exception as e:
             return {'service_ready': False, 'error': str(e)}
-            
-    def cleanup_processed_data(self, target: str = 'augmented', target_split: str = None) -> Dict[str, Any]:
-        """🧹 Membersihkan file hasil augmentasi
-        
-        Args:
-            target: Jenis file yang akan dibersihkan. Default: 'augmented'
-            target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test'). 
-                       Jika None, semua split akan dibersihkan.
-                        
-        Returns:
-            Dict berisi status, total file yang dihapus, dan pesan
-        """
-        try:
-            self.logger.info(f"Memulai cleanup data dengan target={target}, split={target_split}")
-            result = self.cleanup_manager.cleanup_data(target=target, target_split=target_split)
-            
-            if result.get('status') == 'success':
-                self.logger.info(f"Cleanup berhasil: {result.get('total_removed', 0)} file dihapus")
-            else:
-                self.logger.error(f"Cleanup gagal: {result.get('message', 'Unknown error')}")
-                
-            return result
-            
-        except Exception as e:
-            error_msg = f"Error saat membersihkan data: {str(e)}"
-            self.logger.error(error_msg)
-            return {'status': 'error', 'message': error_msg, 'total_removed': 0}
     
     def _analyze_split_comprehensive(self, split: str) -> Dict[str, Any]:
         """🔍 NEW: Comprehensive analysis per split"""
@@ -199,7 +170,7 @@ class AugmentationService:
             pre_cleanup_status = self.get_augmentation_status()
             
             # Execute cleanup
-            result = cleanup_manager.cleanup_data(target=target, target_split=target_split)
+            result = cleanup_manager.cleanup_augmented_data(target_split=target_split)
             
             # Enhanced result with before/after comparison
             if result.get('status') == 'success':

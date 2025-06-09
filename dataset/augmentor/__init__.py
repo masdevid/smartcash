@@ -63,32 +63,9 @@ def get_supported_types():
     return get_default_augmentation_types()
 
 def cleanup_augmented_data(config, target_split=None, progress_tracker=None):
-    """Hapus file-file hasil augmentasi.
-    
-    Args:
-        config: Konfigurasi augmentasi
-        target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test')
-        progress_tracker: Objek untuk melacak progress (opsional)
-        
-    Returns:
-        Dict berisi status, total file yang dihapus, dan pesan
-    """
-    service = AugmentationService(config, progress_tracker)
-    return service.cleanup_data(target='augmented', target_split=target_split)
-
-def cleanup_preprocessed_data(config, target_split=None, progress_tracker=None):
-    """Hapus file-file hasil preprocessing.
-    
-    Args:
-        config: Konfigurasi preprocessing
-        target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test')
-        progress_tracker: Objek untuk melacak progress (opsional)
-        
-    Returns:
-        Dict berisi status, total file yang dihapus, dan pesan
-    """
+    """🧹 One-liner untuk cleanup augmented data"""
     service = create_augmentor(config, progress_tracker)
-    return service.cleanup_data(target='preprocessed', target_split=target_split)
+    return service.cleanup_augmented_data(target_split)
 
 def get_augmentation_status(config, progress_tracker=None):
     """📊 One-liner untuk get augmentation status"""

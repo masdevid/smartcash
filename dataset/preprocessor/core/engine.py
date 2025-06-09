@@ -69,6 +69,9 @@ class PreprocessingEngine:
         self.target_size = norm_config.get('target_size', [640, 640])
         self.preserve_aspect_ratio = norm_config.get('preserve_aspect_ratio', True)
         self.denormalize = norm_config.get('denormalize', False)
+        self.convert_rgb = norm_config.get('convert_rgb', True)
+        self.img_size = self.target_size[0]  # Gunakan ukuran pertama dari target_size
+        self.normalize = norm_config.get('normalize', True)
         
         # Konfigurasi output
         output_config = self.config.get('output', {})
@@ -175,8 +178,8 @@ class PreprocessingEngine:
             Dictionary berisi status dan hasil pemrosesan
         """
         try:
-            # Baca gambar
-            img = cv2.imread(str(img_file))
+            # Baca gambar menggunakan file_processor
+            img = self.file_processor.read_image(str(img_file))
             if img is None:
                 return {'status': 'error', 'error': 'Gagal membaca gambar'}
             
@@ -191,9 +194,9 @@ class PreprocessingEngine:
             if self.normalize:
                 img = img.astype(np.float32) / 255.0
             
-            # Simpan gambar yang sudah diproses
+            # Simpan gambar yang sudah diproses menggunakan file_processor
             dst_img_path = dst_img_dir / img_file.name
-            cv2.imwrite(str(dst_img_path), img)
+            self.file_processor.write_image(str(dst_img_path), img)
             
             # Salin file label (jika ada)
             label_file = self._get_corresponding_label_file(img_file)
@@ -204,8 +207,11 @@ class PreprocessingEngine:
             return {'status': 'success'}
             
         except Exception as e:
-            self.logger.error(f"Gagal memproses {img_file}: {str(e)}", exc_info=True)
-            return {'status': 'error', 'error': str(e)}
+            error_msg = f"Gagal memproses {img_file}: {str(e)}"
+            self.logger.error(error_msg)
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            return {'status': 'error', 'error': error_msg}
     
     def _get_corresponding_label_file(self, img_file: Path) -> Optional[Path]:
         """Dapatkan path ke file label yang sesuai dengan file gambar."""

@@ -1116,7 +1116,8 @@ class TestPreprocessorIntegration:
                     'root': 'tests/output',
                     'images': 'images',
                     'labels': 'labels',
-                    'create_npy': False
+                    'create_npy': False,
+                    'organize_by_split': True
                 },
                 'validation': {
                     'enabled': True,
@@ -1125,7 +1126,10 @@ class TestPreprocessorIntegration:
                 'normalization': {
                     'enabled': True,
                     'target_size': [640, 640],
-                    'convert_rgb': True
+                    'preserve_aspect_ratio': True,
+                    'denormalize': False,
+                    'convert_rgb': True,
+                    'normalize': True
                 }
             }
         }
@@ -1227,7 +1231,21 @@ class TestPreprocessorIntegration:
                 f"Semua file seharusnya diproses, tapi hanya {result['stats'].get('processed')} dari {len(test_images)}"
             
             # Verifikasi file_scanner dipanggil dengan parameter yang benar
-            mock_file_scanner.scan_directory.assert_called_once_with(mock_src_img_dir, {'.jpg', '.jpeg', '.png'})
+            # Perhatikan bahwa parameter extensions bisa berupa list atau set
+            mock_file_scanner.scan_directory.assert_called_once()
+            args, kwargs = mock_file_scanner.scan_directory.call_args
+            assert len(args) >= 1, "scan_directory harus dipanggil dengan minimal 1 argumen"
+            assert str(args[0]) == str(mock_src_img_dir), f"Direktori sumber tidak sesuai: {args[0]}"
+            
+            # Periksa ekstensi yang diharapkan (bisa dalam urutan apa pun)
+            if len(args) > 1:
+                extensions = args[1]
+            else:
+                extensions = kwargs.get('extensions', [])
+                
+            expected_extensions = {'.jpg', '.jpeg', '.png'}
+            assert set(extensions) == expected_extensions, \
+                f"Ekstensi yang diharapkan {expected_extensions}, tapi dapat {set(extensions)}"
             
             # Verifikasi path resolver dipanggil
             mock_path_resolver.get_source_image_dir.assert_called_once_with('train')
@@ -1247,14 +1265,20 @@ class TestPreprocessorIntegration:
             # Verifikasi progress callback dipanggil
             assert len(progress_updates) > 0, "Progress callback tidak pernah dipanggil"
             
-            # Verifikasi progress meningkat secara monoton
+            # Verifikasi progress callback dipanggil dengan benar
+            assert len(progress_updates) > 0, "Progress callback tidak pernah dipanggil"
+            
+            # Verifikasi progress meningkat secara monoton (boleh sama untuk update status)
             prev_progress = -1
             for progress, status, _ in progress_updates:
-                assert progress > prev_progress, f"Progress harus meningkat, tapi {progress} <= {prev_progress}"
+                assert progress >= prev_progress, f"Progress tidak boleh menurun: {progress} < {prev_progress}"
                 prev_progress = progress
                 
-            # Verifikasi progress terakhir mendekati 100%
-            assert progress_updates[-1][0] >= 90, f"Progress terakhir harus >= 90%, tapi dapat {progress_updates[-1][0]}%"
+            # Pastikan progress mencapai 1.0 (100%) di akhir
+            assert progress_updates[-1][0] == 1.0, f"Progress akhir harus 1.0, tapi dapat {progress_updates[-1][0]}"
+                
+            # Verifikasi progress terakhir adalah 1.0 (100%)
+            assert progress_updates[-1][0] == 1.0, f"Progress terakhir harus 1.0 (100%), tapi dapat {progress_updates[-1][0]}"
             
             # Verifikasi status terakhir menunjukkan selesai
             if progress_updates:  # Pastikan ada progress update

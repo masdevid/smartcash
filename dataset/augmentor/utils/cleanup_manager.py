@@ -5,6 +5,7 @@ Deskripsi: Manager untuk cleanup operations
 
 import shutil
 from pathlib import Path
+from typing import Dict, Any
 
 class CleanupManager:
     """🧹 Manager untuk cleanup augmented data"""

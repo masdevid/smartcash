@@ -2,17 +2,16 @@
 File: smartcash/dataset/augmentor/utils/balance_calculator.py
 Deskripsi: Calculator menggunakan refactored balancer module
 """
-
+from typing import Dict, Any, List
 from smartcash.dataset.augmentor.balancer import ClassBalancingStrategy, FileSelectionStrategy
 
 class BalanceCalculator:
     """⚖️ Calculator dengan updated balancer import"""
     
     def __init__(self, config: Dict[str, Any] = None):
-        from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config
+        from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
         
         if config is None:
-            from smartcash.dataset.augmentor.utils.config_validator import get_default_augmentation_config
             self.config = get_default_augmentation_config()
         else:
             self.config = validate_augmentation_config(config)
@@ -41,9 +40,3 @@ class BalanceCalculator:
 
 def create_balance_calculator(config: Dict[str, Any]) -> BalanceCalculator:
     return BalanceCalculator(config)
-
-def validate_augmentation_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    return ConfigValidator.validate_and_normalize(config)
-
-def get_default_augmentation_config() -> Dict[str, Any]:
-    return ConfigValidator.get_default_config()

@@ -58,12 +58,12 @@ def get_supported_types():
 
 def cleanup_augmented_data(config, target_split=None, progress_tracker=None):
     """🧹 One-liner untuk cleanup augmented data"""
-    service = create_augmentation_service(config, progress_tracker)
+    service = create_augmentor(config, progress_tracker)
     return service.cleanup_augmented_data(target_split)
 
 def get_augmentation_status(config, progress_tracker=None):
     """📊 One-liner untuk get augmentation status"""
-    service = create_augmentation_service(config, progress_tracker)
+    service = create_augmentor(config, progress_tracker)
     return service.get_augmentation_status()
 
 # Export semua untuk backward compatibility

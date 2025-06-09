@@ -82,10 +82,7 @@ def _bind_handlers_safe(ui_components: Dict[str, Any], handlers: Dict[str, Calla
         button = ui_components.get(button_key)
         if button and hasattr(button, 'on_click'):
             try:
-                # Clear existing handlers
-                if hasattr(button, '_click_handlers'):
-                    button._click_handlers.clear()
-                
+                # Langsung pasang handler baru, on_click akan menangani penggantian handler lama
                 button.on_click(handler)
                 
                 # Log successful binding

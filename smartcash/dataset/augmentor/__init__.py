@@ -1,12 +1,13 @@
 """
 File: smartcash/dataset/augmentor/__init__.py
-Deskripsi: Main augmentation module dengan clean interface dan compatibility
+Deskripsi: Main augmentation module dengan sampling service
 """
 
 from smartcash.dataset.augmentor.service import (
     AugmentationService,
     create_augmentation_service,
-    run_augmentation_pipeline
+    run_augmentation_pipeline,
+    get_augmentation_samples
 )
 
 from smartcash.dataset.augmentor.core.engine import (
@@ -37,7 +38,7 @@ from smartcash.dataset.augmentor.utils.progress_bridge import (
 # Main API functions
 
 def create_augmentor(config=None, progress_tracker=None):
-    """🚀 Enhanced factory dengan config validation"""
+    """🚀 Factory dengan config validation"""
     from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
     
     if config is None:
@@ -48,9 +49,14 @@ def create_augmentor(config=None, progress_tracker=None):
     return AugmentationService(validated_config, progress_tracker)
 
 def augment_and_normalize(config=None, target_split='train', progress_tracker=None, progress_callback=None):
-    """🎯 Enhanced one-liner dengan config validation"""
+    """🎯 One-liner dengan config validation"""
     service = create_augmentor(config, progress_tracker)
     return service.run_augmentation_pipeline(target_split, progress_callback)
+
+def get_sampling_data(config=None, target_split='train', max_samples=5, progress_tracker=None):
+    """📊 NEW: Get sampling data untuk evaluasi"""
+    service = create_augmentor(config, progress_tracker)
+    return service.get_sampling(target_split, max_samples)
 
 def get_supported_types():
     """📋 Get supported augmentation types"""
@@ -85,12 +91,14 @@ __all__ = [
     # Main API
     'create_augmentor',
     'augment_and_normalize',
+    'get_sampling_data',
     'get_supported_types',
     'cleanup_augmented_data',
     'get_augmentation_status',
     
     # Utility functions
     'run_augmentation_pipeline',
+    'get_augmentation_samples',
     'augment_dataset_split',
     'normalize_augmented_dataset',
     'get_default_augmentation_types',

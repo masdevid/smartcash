@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/service.py
-Deskripsi: Enhanced augmentation service dengan progress tracking dan normalization otomatis
+Deskripsi: Service augmentasi tanpa symlink dan dengan sampling service
 """
 
 import time
@@ -15,121 +15,165 @@ from smartcash.common.logger import get_logger
 from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
 
 class AugmentationService:
-    """🎯 Enhanced service dengan progress tracking dan auto-normalization"""
+    """🎯 Service augmentasi dengan sampling capability"""
     
     def __init__(self, config: Dict[str, Any] = None, progress_tracker=None):
         self.logger = get_logger(__name__)
-        # Use defaults jika config tidak disediakan
         if config is None:
             self.config = get_default_augmentation_config()
-            self.logger.info("📋 Menggunakan default config dari augmentation_config.yaml")
+            self.logger.info("Menggunakan default config")
         else:
-            # Validate dan merge dengan defaults
             self.config = validate_augmentation_config(config)
-            self.logger.info("📋 Config validated dan merged dengan defaults")  
+            self.logger.info("Config validated dan merged")  
         
-        # Setup progress bridge untuk UI integration
         self.progress = ProgressBridge(progress_tracker) if progress_tracker else None
-        
-        # Initialize core engines
         self.engine = AugmentationEngine(self.config, self.progress)
         self.normalizer = NormalizationEngine(self.config, self.progress)
-        
-        # Path resolver untuk smart path handling
         self.path_resolver = PathResolver(self.config)
         
     def run_augmentation_pipeline(self, target_split: str = "train", 
                                 progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """🚀 Execute full pipeline: augmentation + normalization + symlink"""
+        """🚀 Execute pipeline: augmentation + normalization (TANPA symlink)"""
         start_time = time.time()
         
         try:
             self._report_start(target_split)
             
-            # Phase 1: Augmentation (0-70%)
+            # Phase 1: Augmentation (0-50%)
             aug_result = self._execute_augmentation(target_split, progress_callback)
             if aug_result['status'] != 'success':
                 return aug_result
                 
-            # Phase 2: Normalization (70-90%) 
+            # Phase 2: Normalization (50-100%) 
             norm_result = self._execute_normalization(target_split, progress_callback)
             if norm_result['status'] != 'success':
                 return norm_result
-                
-            # Phase 3: Symlink creation (90-100%)
-            symlink_result = self._create_symlinks(target_split, progress_callback)
             
-            return self._create_final_result(aug_result, norm_result, symlink_result, start_time)
+            return self._create_final_result(aug_result, norm_result, start_time)
             
         except Exception as e:
-            error_msg = f"🚨 Pipeline error: {str(e)}"
+            error_msg = f"Pipeline error: {str(e)}"
             self.logger.error(error_msg)
             return {'status': 'error', 'message': error_msg, 'total_generated': 0}
     
+    def get_sampling(self, target_split: str = "train", max_samples: int = 5) -> Dict[str, Any]:
+        """📊 Get random samples untuk evaluasi (uuid, raw_image, aug_without_norm, aug_norm)"""
+        try:
+            import random
+            import cv2
+            import numpy as np
+            
+            # Get paths
+            raw_path = Path(self.path_resolver.get_raw_path(target_split))
+            aug_path = Path(self.path_resolver.get_augmented_path(target_split))
+            norm_path = Path(self.path_resolver.get_preprocessed_path(target_split))
+            
+            # Find files dengan UUID yang sama di semua direktori
+            samples = []
+            raw_images = list((raw_path / 'images').glob('*.jpg')) if raw_path.exists() else []
+            
+            if not raw_images:
+                return {'status': 'error', 'message': 'Tidak ada raw images ditemukan', 'samples': []}
+            
+            # Sample random files
+            sampled_files = random.sample(raw_images, min(max_samples, len(raw_images)))
+            
+            for raw_file in sampled_files:
+                try:
+                    # Extract UUID dari filename (format: rp_001000_uuid_increment.jpg)
+                    filename = raw_file.stem
+                    parts = filename.split('_')
+                    if len(parts) >= 3:
+                        uuid_part = parts[2]
+                        
+                        # Load raw image
+                        raw_image = cv2.imread(str(raw_file))
+                        
+                        # Find corresponding augmented file
+                        aug_pattern = f"aug_rp_*_{uuid_part}_*_*.jpg"
+                        aug_files = list((aug_path / 'images').glob(aug_pattern)) if aug_path.exists() else []
+                        aug_image = cv2.imread(str(aug_files[0])) if aug_files else None
+                        
+                        # Find corresponding normalized file (.npy)
+                        norm_pattern = f"aug_rp_*_{uuid_part}_*_*.npy"
+                        norm_files = list((norm_path / 'images').glob(norm_pattern)) if norm_path.exists() else []
+                        norm_image = np.load(str(norm_files[0])) if norm_files else None
+                        
+                        sample_data = {
+                            'uuid': uuid_part,
+                            'filename': filename,
+                            'raw_image': raw_image.tolist() if raw_image is not None else None,
+                            'aug_without_norm': aug_image.tolist() if aug_image is not None else None,
+                            'aug_norm': norm_image.tolist() if norm_image is not None else None,
+                            'raw_path': str(raw_file) if raw_image is not None else None,
+                            'aug_path': str(aug_files[0]) if aug_files else None,
+                            'norm_path': str(norm_files[0]) if norm_files else None
+                        }
+                        
+                        samples.append(sample_data)
+                        
+                except Exception as e:
+                    self.logger.warning(f"Error processing sample {raw_file}: {str(e)}")
+                    continue
+            
+            self.logger.info(f"Generated {len(samples)} samples dari {target_split}")
+            
+            return {
+                'status': 'success',
+                'samples': samples,
+                'total_samples': len(samples),
+                'target_split': target_split
+            }
+            
+        except Exception as e:
+            error_msg = f"Error generating samples: {str(e)}"
+            self.logger.error(error_msg)
+            return {'status': 'error', 'message': error_msg, 'samples': []}
+    
     def _execute_augmentation(self, target_split: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """Execute augmentation dengan progress 0-70%"""
-        self._update_progress("overall", 5, 100, f"🎨 Memulai augmentasi {target_split}", progress_callback)
+        """Execute augmentation dengan progress 0-50%"""
+        self._update_progress("overall", 1, 4, "Memulai augmentasi", progress_callback)
         
-        # Callback untuk map engine progress ke overall 0-70%
+        # Callback untuk map engine progress ke overall 0-50%
         def aug_progress_bridge(level: str, current: int, total: int, message: str):
             if level == "overall":
-                mapped_progress = int((current / total) * 70)  # Map ke 0-70%
-                self._update_progress("overall", mapped_progress, 100, f"🎨 {message}", progress_callback)
+                mapped_progress = 1 + int((current / total) * 2)  # Map ke 1-3
+                self._update_progress("overall", mapped_progress, 4, f"Augmentasi: {message}", progress_callback)
             else:
                 self._update_progress(level, current, total, message, progress_callback)
         
         result = self.engine.augment_split(target_split, aug_progress_bridge)
         
         if result['status'] == 'success':
-            self._update_progress("overall", 70, 100, f"✅ Augmentasi selesai: {result['total_generated']} file", progress_callback)
+            self._update_progress("overall", 3, 4, f"Augmentasi selesai: {result['total_generated']} file", progress_callback)
             
         return result
     
     def _execute_normalization(self, target_split: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """Execute normalization dengan progress 70-90%"""
-        self._update_progress("overall", 72, 100, f"🔧 Memulai normalisasi", progress_callback)
+        """Execute normalization dengan progress 50-100%"""
+        self._update_progress("overall", 3, 4, "Memulai normalisasi", progress_callback)
         
-        # Callback untuk map normalization progress ke 70-90%
+        # Callback untuk map normalization progress ke 75-100%
         def norm_progress_bridge(level: str, current: int, total: int, message: str):
             if level == "overall":
-                mapped_progress = 70 + int((current / total) * 20)  # Map ke 70-90%
-                self._update_progress("overall", mapped_progress, 100, f"🔧 {message}", progress_callback)
+                mapped_progress = 3 + int((current / total) * 1)  # Map ke 3-4
+                self._update_progress("overall", mapped_progress, 4, f"Normalisasi: {message}", progress_callback)
             else:
                 self._update_progress(level, current, total, message, progress_callback)
         
-        # Get augmented files path
+        # Get paths
         aug_path = self.path_resolver.get_augmented_path(target_split)
         prep_path = self.path_resolver.get_preprocessed_path(target_split)
         
         result = self.normalizer.normalize_augmented_files(aug_path, prep_path, norm_progress_bridge)
         
         if result['status'] == 'success':
-            self._update_progress("overall", 90, 100, f"✅ Normalisasi selesai: {result['total_normalized']} file", progress_callback)
+            self._update_progress("overall", 4, 4, f"Pipeline selesai: {result['total_normalized']} file dinormalisasi", progress_callback)
             
         return result
     
-    def _create_symlinks(self, target_split: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """Create symlinks dengan progress 90-100%"""
-        self._update_progress("overall", 92, 100, f"🔗 Membuat symlink", progress_callback)
-        
-        try:
-            from smartcash.dataset.augmentor.utils.symlink_manager import SymlinkManager
-            
-            symlink_manager = SymlinkManager(self.config)
-            aug_path = self.path_resolver.get_augmented_path(target_split)
-            prep_path = self.path_resolver.get_preprocessed_path(target_split)
-            
-            result = symlink_manager.create_augmented_symlinks(aug_path, prep_path)
-            
-            self._update_progress("overall", 100, 100, f"✅ Pipeline selesai", progress_callback)
-            return result
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Symlink creation failed: {str(e)}")
-            return {'status': 'partial', 'message': 'Symlink creation failed but augmentation successful'}
-    
     def cleanup_augmented_data(self, target_split: str = None) -> Dict[str, Any]:
-        """🧹 Cleanup augmented files dan symlinks"""
+        """🧹 Cleanup augmented files (TANPA symlinks)"""
         try:
             from smartcash.dataset.augmentor.utils.cleanup_manager import CleanupManager
             
@@ -137,7 +181,7 @@ class AugmentationService:
             return cleanup_manager.cleanup_augmented_data(target_split)
             
         except Exception as e:
-            error_msg = f"🚨 Cleanup error: {str(e)}"
+            error_msg = f"Cleanup error: {str(e)}"
             self.logger.error(error_msg)
             return {'status': 'error', 'message': error_msg}
     
@@ -162,8 +206,11 @@ class AugmentationService:
                 aug_path = self.path_resolver.get_augmented_path(split)
                 prep_path = self.path_resolver.get_preprocessed_path(split)
                 
+                # Count .jpg files in augmented
                 status[f'{split}_augmented'] = len(list(Path(aug_path).glob('aug_*.jpg'))) if Path(aug_path).exists() else 0
-                status[f'{split}_preprocessed'] = len(list(Path(prep_path).glob('*.jpg'))) if Path(prep_path).exists() else 0
+                
+                # Count .npy files in preprocessed
+                status[f'{split}_preprocessed'] = len(list(Path(prep_path).glob('*.npy'))) if Path(prep_path).exists() else 0
             
             return status
             
@@ -172,55 +219,56 @@ class AugmentationService:
     
     def _report_start(self, target_split: str):
         """Report pipeline start"""
-        self.logger.info(f"🚀 Memulai pipeline augmentasi untuk split: {target_split}")
-        self.logger.info(f"📁 Raw data: {self.path_resolver.get_raw_path(target_split)}")
-        self.logger.info(f"📁 Augmented: {self.path_resolver.get_augmented_path(target_split)}")
-        self.logger.info(f"📁 Preprocessed: {self.path_resolver.get_preprocessed_path(target_split)}")
+        self.logger.info(f"Memulai pipeline augmentasi untuk split: {target_split}")
+        self.logger.info(f"Raw data: {self.path_resolver.get_raw_path(target_split)}")
+        self.logger.info(f"Augmented: {self.path_resolver.get_augmented_path(target_split)}")
+        self.logger.info(f"Preprocessed: {self.path_resolver.get_preprocessed_path(target_split)}")
     
     def _update_progress(self, level: str, current: int, total: int, message: str, callback: Optional[Callable]):
         """Update progress dengan dual reporting"""
-        # Report ke progress tracker
         if self.progress:
             self.progress.update(level, current, total, message)
         
-        # Report ke callback jika disediakan
         if callback and callable(callback):
             try:
                 callback(level, current, total, message)
             except Exception:
-                pass  # Silent fail untuk callback errors
+                pass
     
-    def _create_final_result(self, aug_result: Dict, norm_result: Dict, 
-                           symlink_result: Dict, start_time: float) -> Dict[str, Any]:
-        """Create comprehensive final result"""
+    def _create_final_result(self, aug_result: Dict, norm_result: Dict, start_time: float) -> Dict[str, Any]:
+        """Create comprehensive final result TANPA symlinks"""
         processing_time = time.time() - start_time
         
         result = {
             'status': 'success',
             'total_generated': aug_result.get('total_generated', 0),
             'total_normalized': norm_result.get('total_normalized', 0),
-            'symlinks_created': symlink_result.get('total_created', 0),
             'processing_time': processing_time,
             'phases': {
                 'augmentation': aug_result,
-                'normalization': norm_result,
-                'symlinks': symlink_result
+                'normalization': norm_result
             }
         }
         
-        self.logger.success(f"🎉 Pipeline selesai dalam {processing_time:.1f}s")
-        self.logger.info(f"📊 Generated: {result['total_generated']}, Normalized: {result['total_normalized']}")
+        self.logger.success(f"Pipeline selesai dalam {processing_time:.1f}s")
+        self.logger.info(f"Generated: {result['total_generated']}, Normalized: {result['total_normalized']}")
         
         return result
 
 
 # Factory functions
 def create_augmentation_service(config: Dict[str, Any], progress_tracker=None) -> AugmentationService:
-    """🏭 Factory untuk create augmentation service"""
+    """Factory untuk create augmentation service"""
     return AugmentationService(config, progress_tracker)
 
 def run_augmentation_pipeline(config: Dict[str, Any], target_split: str = "train", 
                             progress_tracker=None, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-    """🚀 One-liner untuk run complete pipeline"""
+    """One-liner untuk run complete pipeline"""
     service = create_augmentation_service(config, progress_tracker)
     return service.run_augmentation_pipeline(target_split, progress_callback)
+
+def get_augmentation_samples(config: Dict[str, Any], target_split: str = "train", 
+                           max_samples: int = 5, progress_tracker=None) -> Dict[str, Any]:
+    """One-liner untuk get sampling data"""
+    service = create_augmentation_service(config, progress_tracker)
+    return service.get_sampling(target_split, max_samples)

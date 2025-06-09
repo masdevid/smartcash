@@ -44,9 +44,12 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             with_sync_info=True, sync_message="Konfigurasi disinkronkan dengan backend"
         )
         action_buttons = create_action_buttons(
-            primary_label="🚀 Run Augmentation Pipeline", primary_icon="play",
-            secondary_buttons=[("🔍 Comprehensive Check", "search", "info")],
-            cleanup_enabled=True, button_width="220px"
+            primary_label="🚀 Jalankan Augmentasi", primary_icon="play",
+            secondary_buttons=[("🔍 Cek Data", "search", "info")],
+            cleanup_enabled=True, 
+            cleanup_label="🧹 Bersihkan Data",
+            cleanup_tooltip='Hapus file hasil augmentasi',
+            button_width="220px"
         )
         
         # CRITICAL FIX: Confirmation area yang benar

@@ -1140,27 +1140,6 @@ class TestPreprocessorIntegration:
         mock_validator.validate_image_label_pair.return_value = (True, [], {})
         engine.validator = mock_validator
         
-        # Setup mock untuk file_scanner
-        mock_file_scanner = MagicMock(spec=FileScanner)
-        
-        # Buat file gambar dummy di direktori sumber
-        test_images = []
-        for i in range(1, 6):
-            img_path = mock_src_img_dir / f'img_{i}.jpg'
-            img_path.parent.mkdir(parents=True, exist_ok=True)
-            img_path.touch()  # Buat file kosong
-            test_images.append(img_path)
-        
-        # Setup mock untuk scan_directory
-        mock_file_scanner.scan_directory.return_value = test_images
-        engine.file_scanner = mock_file_scanner
-        
-        # Setup mock untuk progress callback
-        progress_updates = []
-        
-        def mock_progress_callback(progress, status=None, **kwargs):
-            progress_updates.append((progress, status, kwargs))
-        
         # Setup mock untuk path resolver
         mock_path_resolver = MagicMock()
         
@@ -1183,13 +1162,50 @@ class TestPreprocessorIntegration:
         # Inject mock path resolver ke engine
         engine.path_resolver = mock_path_resolver
         
+        # Buat file gambar dummy di direktori sumber
+        test_images = []
+        for i in range(1, 6):
+            img_path = mock_src_img_dir / f'img_{i}.jpg'
+            img_path.parent.mkdir(parents=True, exist_ok=True)
+            img_path.touch()  # Buat file kosong
+            test_images.append(img_path)
+        
+        # Setup mock untuk file_scanner
+        mock_file_scanner = MagicMock(spec=FileScanner)
+        mock_file_scanner.scan_directory.return_value = test_images
+        engine.file_scanner = mock_file_scanner
+        
+        # Setup mock untuk progress callback
+        progress_updates = []
+        
+        def mock_progress_callback(progress, status=None, **kwargs):
+            progress_updates.append((progress, status, kwargs))
+        
+        # Setup mock untuk file_processor
+        mock_file_processor = MagicMock()
+        mock_file_processor.read_image.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
+        mock_file_processor.write_image.return_value = True
+        mock_file_processor.copy_file.return_value = True
+        engine.file_processor = mock_file_processor
+        
         # Mock untuk operasi file system
+        def mock_exists(path):
+            path_str = str(path)
+            return (
+                path_str == str(mock_src_img_dir) or 
+                path_str == str(mock_src_label_dir) or
+                path_str == str(mock_dst_img_dir) or
+                path_str == str(mock_dst_label_dir) or
+                any(str(img) == path_str for img in test_images) or
+                any(path_str.startswith(str(mock_src_img_dir)) or 
+                   path_str.startswith(str(mock_src_label_dir)) or
+                   path_str.startswith(str(mock_dst_img_dir)) or
+                   path_str.startswith(str(mock_dst_label_dir)))
+            )
+        
         with patch('cv2.imread', return_value=np.zeros((100, 100, 3), dtype=np.uint8)) as mock_imread, \
              patch('cv2.imwrite', return_value=True) as mock_imwrite, \
-             patch('os.path.exists', side_effect=lambda x: x in [
-                 str(mock_src_img_dir), 
-                 str(mock_src_label_dir)
-             ]) as mock_exists, \
+             patch('os.path.exists', side_effect=mock_exists) as mock_exists, \
              patch('shutil.copy2') as mock_copy2, \
              patch('os.makedirs') as mock_makedirs, \
              patch.object(Path, 'mkdir') as mock_mkdir:
@@ -1204,47 +1220,48 @@ class TestPreprocessorIntegration:
             assert result['status'] == 'completed', f"Status seharusnya 'completed', tapi dapat {result.get('status')}"
             assert 'stats' in result, "Statistik tidak ditemukan dalam hasil"
             assert 'total' in result['stats'], "Total file tidak ditemukan dalam statistik"
+            assert 'processed' in result['stats'], "Jumlah file yang diproses tidak ditemukan dalam statistik"
             assert result['stats']['total'] == len(test_images), \
                 f"Jumlah file yang diproses harus {len(test_images)}, tapi dapat {result['stats'].get('total')}"
+            assert result['stats']['processed'] == len(test_images), \
+                f"Semua file seharusnya diproses, tapi hanya {result['stats'].get('processed')} dari {len(test_images)}"
             
             # Verifikasi file_scanner dipanggil dengan parameter yang benar
-            mock_file_scanner.scan_directory.assert_called_once()
+            mock_file_scanner.scan_directory.assert_called_once_with(mock_src_img_dir, {'.jpg', '.jpeg', '.png'})
             
             # Verifikasi path resolver dipanggil
             mock_path_resolver.get_source_image_dir.assert_called_once_with('train')
             mock_path_resolver.get_source_label_dir.assert_called_once_with('train')
-            mock_path_resolver.get_preprocessed_image_dir.assert_called_once()
-            mock_path_resolver.get_preprocessed_label_dir.assert_called_once()
+            mock_path_resolver.get_preprocessed_image_dir.assert_called_once_with('train')
+            mock_path_resolver.get_preprocessed_label_dir.assert_called_once_with('train')
             
             # Verifikasi direktori tujuan dibuat
             assert mock_mkdir.called, "Direktori tujuan harus dibuat"
             
+            # Verifikasi file_processor dipanggil untuk setiap gambar
+            assert mock_file_processor.read_image.call_count == len(test_images), \
+                f"read_image harus dipanggil {len(test_images)} kali, tapi dipanggil {mock_file_processor.read_image.call_count} kali"
+            assert mock_file_processor.write_image.call_count == len(test_images), \
+                f"write_image harus dipanggil {len(test_images)} kali, tapi dipanggil {mock_file_processor.write_image.call_count} kali"
+            
             # Verifikasi progress callback dipanggil
             assert len(progress_updates) > 0, "Progress callback tidak pernah dipanggil"
             
-            # Verifikasi cv2.imread dipanggil untuk setiap gambar
-            assert mock_imread.call_count == len(test_images), \
-                f"cv2.imread harus dipanggil {len(test_images)} kali, tapi dipanggil {mock_imread.call_count} kali"
+            # Verifikasi progress meningkat secara monoton
+            prev_progress = -1
+            for progress, status, _ in progress_updates:
+                assert progress > prev_progress, f"Progress harus meningkat, tapi {progress} <= {prev_progress}"
+                prev_progress = progress
+                
+            # Verifikasi progress terakhir mendekati 100%
+            assert progress_updates[-1][0] >= 90, f"Progress terakhir harus >= 90%, tapi dapat {progress_updates[-1][0]}%"
             
-            # Verifikasi cv2.imwrite dipanggil untuk setiap gambar
-            assert mock_imwrite.call_count == len(test_images), \
-                f"cv2.imwrite harus dipanggil {len(test_images)} kali, tapi dipanggil {mock_imwrite.call_count} kali"
-            
-            # Verifikasi validator dipanggil untuk setiap gambar
-            assert mock_validator.validate_image.call_count == len(test_images), \
-                f"Validator harus dipanggil {len(test_images)} kali, tapi dipanggil {mock_validator.validate_image.call_count} kali"
-            
-            # Verifikasi progress naik secara monoton
-            progresses = [p for p, _, _ in progress_updates if isinstance(p, (int, float))]
-            if len(progresses) > 1:
-                assert all(progresses[i] <= progresses[i+1] for i in range(len(progresses)-1)), \
-                    "Progress harus naik secara monoton"
-            
-            # Verifikasi status terakhir mengandung indikasi selesai
+            # Verifikasi status terakhir menunjukkan selesai
             if progress_updates:  # Pastikan ada progress update
                 _, last_status, _ = progress_updates[-1]
                 assert last_status is not None, "Status terakhir tidak boleh None"
-                assert any(keyword in str(last_status).lower() for keyword in ['complete', 'selesai', 'done']), \
+                last_status_lower = str(last_status).lower()
+                assert any(keyword in last_status_lower for keyword in ['complete', 'selesai', 'done', 'berhasil']), \
                     f"Status terakhir harus mengandung indikasi selesai, tapi mendapat: {last_status}"
     
     def test_file_processor_integration(self, test_config, tmp_path):

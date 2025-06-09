@@ -8,6 +8,7 @@ import ipywidgets as widgets
 
 def create_action_buttons(primary_label: str = "Download Dataset", primary_icon: str = "download", 
                          secondary_buttons: list = None, cleanup_enabled: bool = True,
+                         cleanup_label: str = "Cleanup Dataset", cleanup_tooltip: str = "Hapus dataset yang sudah ada",
                          button_width: str = '140px', container_width: str = '100%',
                          primary_style: str = '') -> dict:
     """Create action buttons dengan flex layout"""
@@ -44,14 +45,14 @@ def create_action_buttons(primary_label: str = "Download Dataset", primary_icon:
     cleanup_button = None
     if cleanup_enabled:
         cleanup_button = widgets.Button(
-            description="Cleanup Dataset",
+            description=cleanup_label,
             button_style='warning',
-            tooltip='Hapus dataset yang sudah ada',
+            tooltip=cleanup_tooltip,
             icon='trash',
             layout=widgets.Layout(width=button_width, height='32px', margin='0')
         )
         setattr(cleanup_button, '_original_style', 'warning')
-        setattr(cleanup_button, '_original_description', "Cleanup Dataset")
+        setattr(cleanup_button, '_original_description', cleanup_label)
     
     # Button list
     button_list = [download_button, check_button]

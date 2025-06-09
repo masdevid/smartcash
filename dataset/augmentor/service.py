@@ -152,11 +152,10 @@ class AugmentationService:
             self.logger.info(f"    {aug_icon} Augmented: {aug_imgs} images ({aug_status})")
             self.logger.info(f"    {prep_icon} Preprocessed: {prep_imgs} .npy files ({prep_status})")
     
-    def cleanup_data(self, target: str = 'both', target_split: str = None) -> Dict[str, Any]:
+    def cleanup_data(self,target_split: str = None) -> Dict[str, Any]:
         """🧹 Enhanced cleanup dengan comprehensive reporting
         
         Args:
-            target: Jenis file yang akan dibersihkan ('augmented', 'preprocessed', atau 'both')
             target_split: Nama split yang akan dibersihkan (contoh: 'train', 'valid', 'test')
             
         Returns:
@@ -192,7 +191,7 @@ class AugmentationService:
         Returns:
             Dict berisi status, total file yang dihapus, dan pesan
         """
-        return self.cleanup_data(target='augmented', target_split=target_split)
+        return self.cleanup_data(target_split=target_split)
         
     def cleanup_preprocessed_data(self, target_split: str = None) -> Dict[str, Any]:
         """Alias untuk membersihkan data preprocessed.

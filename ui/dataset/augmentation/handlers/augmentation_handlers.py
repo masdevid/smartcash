@@ -37,7 +37,7 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         from smartcash.ui.dataset.augmentation.utils.operation_handlers import handle_cleanup_with_confirmation
         handle_cleanup_with_confirmation(ui_components, skip_confirmation=False)
     
-    # CRITICAL FIX: Bind operation handlers dengan proper error handling
+    # FIXED: Bind operation handlers dengan proper CallbackDispatcher handling
     operation_handlers = {
         'augment_button': execute_augmentation_pipeline,
         'check_button': execute_dataset_check,
@@ -48,11 +48,7 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         button = ui_components.get(button_key)
         if button and hasattr(button, 'on_click'):
             try:
-                # Clear existing handlers first
-                button._click_handlers = getattr(button, '_click_handlers', [])
-                button._click_handlers.clear()
-                
-                # Bind new handler
+                # Simply bind handler - ipywidgets handles duplicates automatically
                 button.on_click(handler)
                 
                 # Log successful binding

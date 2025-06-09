@@ -22,10 +22,9 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
             ('📡 Noise: Gaussian noise dan motion blur', 'noise')
         ],
         value=['combined'],
-        description='Jenis Augmentasi:',
         disabled=False,
-        layout=widgets.Layout(width='100%', height='140px'),
-        style={'description_width': '140px'}
+        layout=widgets.Layout(width='100%', height='120px'),
+        style={'description_width': '0'}
     )
     
     # FIXED: Compact types info dengan blue colors

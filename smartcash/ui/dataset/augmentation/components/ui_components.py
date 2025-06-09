@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/ui_components.py
-Deskripsi: Enhanced UI components dengan dual progress tracker dan backend integration
+Deskripsi: Fixed UI components layout dengan single column untuk types dan normalization
 """
 
 from IPython.display import display
@@ -8,7 +8,7 @@ import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Main UI dengan dual progress tracker dan backend integration"""
+    """Main UI dengan dual progress tracker dan fixed layout"""
     
     try:
         from smartcash.ui.utils.header_utils import create_header
@@ -19,7 +19,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
         from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
         
-        # Header dengan backend integration indicator
+        # Header
         header = create_header(
             f"{ICONS.get('augmentation', '🔄')} Dataset Augmentation", 
             "Augmentasi dataset dengan backend service integration dan comprehensive progress tracking"
@@ -34,18 +34,18 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         augmentation_types = _create_augmentation_types_group()
         normalization_options = _create_normalization_options_group()
         
-        # Dual progress tracker dengan auto-hide
+        # Dual progress tracker
         progress_tracker = create_dual_progress_tracker("Augmentation Pipeline", auto_hide=True)
         
-        # Config buttons
+        # Config buttons - FIXED: Removed icons
         config_buttons = create_save_reset_buttons(
-            save_label="💾 Simpan Config", 
-            reset_label="🔄 Reset",
+            save_label="Simpan", 
+            reset_label="Reset",
             with_sync_info=True,
             sync_message="Konfigurasi akan disinkronkan dengan backend service"
         )
         
-        # Action buttons dengan enhanced labels
+        # Action buttons
         action_buttons = create_action_buttons(
             primary_label="🚀 Run Augmentation Pipeline", 
             primary_icon="play",
@@ -61,8 +61,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         log_components = create_log_accordion('augmentation', '250px')
         
-        # Enhanced layout dengan responsive design
-        # Row 1: Basic dan Advanced options
+        # FIXED: Enhanced layout dengan proper responsive design
+        # Row 1: Basic dan Advanced options (48% each)
         options_row = widgets.HBox([
             basic_options['container'], 
             advanced_options['container']
@@ -73,15 +73,13 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             gap='15px'
         ))
         
-        # Row 2: Augmentation types dan Normalization
-        types_and_norm_row = widgets.HBox([
+        # FIXED: Single column layout untuk types dan normalization
+        types_and_norm_section = widgets.VBox([
             augmentation_types['container'],
             normalization_options['container']
         ], layout=widgets.Layout(
             width='100%',
-            display="flex", 
-            justify_content='space-between', 
-            gap='15px'
+            margin='8px 0'
         ))
         
         # Action section
@@ -101,22 +99,22 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         ui = widgets.VBox([
             header,
             status_panel,
-            options_row,           # Basic + Advanced
-            types_and_norm_row,    # Types + Normalization
+            options_row,           # Basic + Advanced (horizontal)
+            types_and_norm_section, # FIXED: Types + Normalization (vertical)
             config_section,
             action_section,
             progress_tracker.container,
             log_components['log_accordion']
         ], layout=widgets.Layout(width='100%', max_width='100%'))
         
-        # Component mapping dengan backend integration
+        # Component mapping
         return {
             'ui': ui,
             'header': header,
             'status_panel': status_panel,
             'confirmation_area': confirmation_area,
             
-            # Form widgets
+            # Form widgets - FIXED: Added intensity widget
             **basic_options['widgets'],
             **advanced_options['widgets'], 
             **augmentation_types['widgets'],
@@ -150,6 +148,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             # Metadata
             'module_name': 'augmentation',
             'logger_namespace': 'smartcash.ui.dataset.augmentation',
+            'augmentation_initialized': True,  # FIXED: Added flag for namespace detection
             'config': config or {}
         }
         
@@ -166,7 +165,7 @@ def _create_section_header(title: str, color: str) -> widgets.HTML:
     """)
 
 def _create_basic_options_group() -> Dict[str, Any]:
-    """Basic options dengan enhanced styling - 48% width"""
+    """Basic options - 48% width"""
     try:
         from smartcash.ui.dataset.augmentation.components.basic_opts_widget import create_basic_options_widget
         result = create_basic_options_widget()
@@ -176,7 +175,7 @@ def _create_basic_options_group() -> Dict[str, Any]:
         return _create_fallback_basic_options()
 
 def _create_advanced_options_group() -> Dict[str, Any]:
-    """Advanced options dengan enhanced styling - 48% width"""
+    """Advanced options - 48% width"""
     try:
         from smartcash.ui.dataset.augmentation.components.advanced_opts_widget import create_advanced_options_widget
         result = create_advanced_options_widget()
@@ -186,17 +185,17 @@ def _create_advanced_options_group() -> Dict[str, Any]:
         return _create_fallback_advanced_options()
 
 def _create_augmentation_types_group() -> Dict[str, Any]:
-    """Augmentation types dengan enhanced styling - 65% width"""
+    """Augmentation types - FIXED: 100% width vertical layout"""
     try:
         from smartcash.ui.dataset.augmentation.components.augtypes_opts_widget import create_augmentation_types_widget
         result = create_augmentation_types_widget()
-        result['container'] = _add_border_styling(result['container'], "🔄 Jenis Augmentasi & Target Split", "#2196f3", "65%")
+        result['container'] = _add_border_styling(result['container'], "🔄 Jenis Augmentasi & Target Split", "#2196f3", "100%")
         return result
     except ImportError:
         return _create_fallback_types_options()
 
 def _create_normalization_options_group() -> Dict[str, Any]:
-    """Normalization options dengan enhanced styling - 32% width"""
+    """Normalization options - FIXED: 100% width dan title fixed"""
     norm_method = widgets.Dropdown(
         options=[
             ('MinMax [0,1] - YOLO Recommended', 'minmax'),
@@ -218,7 +217,7 @@ def _create_normalization_options_group() -> Dict[str, Any]:
     )
     
     norm_info = widgets.HTML(f"""
-    <div style="padding: 8px; background-color: #ff9800 15; 
+    <div style="padding: 8px; background-color: #ff980015; 
                 border-radius: 4px; margin: 5px 0; font-size: 11px;
                 border: 1px solid #ff980040;">
         <strong style="color: #f57c00;">ℹ️ Normalization Info:</strong><br>
@@ -228,14 +227,14 @@ def _create_normalization_options_group() -> Dict[str, Any]:
     """)
     
     container = widgets.VBox([
-        widgets.HTML("<h6 style='color: #f57c00; margin: 5px 0;'>📊 Normalization</h6>"),
+        widgets.HTML("<h6 style='color: #f57c00; margin: 5px 0;'>📊 Augmentation Normalization</h6>"),  # FIXED: Title
         norm_method,
         denormalize,
         norm_info
     ], layout=widgets.Layout(padding='10px', width='100%'))
     
     result = {
-        'container': _add_border_styling(container, "📊 Preprocessing", "#ff9800", "32%"),
+        'container': _add_border_styling(container, "📊 Augmentation Normalization", "#ff9800", "100%"),  # FIXED: 100% width
         'widgets': {
             'norm_method': norm_method,
             'denormalize': denormalize
@@ -245,8 +244,8 @@ def _create_normalization_options_group() -> Dict[str, Any]:
     return result
 
 def _add_border_styling(content_widget, title: str, border_color: str, width: str = "48%") -> widgets.VBox:
-    """Add enhanced border styling dengan gradient background"""
-    bg_color = f"{border_color}15"  # 15% opacity
+    """Add enhanced border styling"""
+    bg_color = f"{border_color}15"
     
     header_html = f"""
     <div style="padding: 8px 12px; margin-bottom: 8px;
@@ -271,14 +270,16 @@ def _add_border_styling(content_widget, title: str, border_color: str, width: st
         background_color='rgba(255,255,255,0.8)'
     ))
 
-# Fallback implementations
+# Fallback implementations with intensity support
 def _create_fallback_basic_options() -> Dict[str, Any]:
-    """Fallback basic options"""
+    """Fallback basic options dengan intensity"""
     widgets_dict = {
         'num_variations': widgets.IntSlider(value=2, min=1, max=10, description='Variasi:', 
                                           style={'description_width': '80px'}, layout=widgets.Layout(width='95%')),
         'target_count': widgets.IntSlider(value=500, min=100, max=2000, step=100, description='Target:',
                                         style={'description_width': '80px'}, layout=widgets.Layout(width='95%')),
+        'intensity': widgets.FloatSlider(value=0.7, min=0.1, max=1.0, step=0.1, description='Intensitas:',
+                                       style={'description_width': '80px'}, layout=widgets.Layout(width='95%')),  # FIXED: Added intensity
         'output_prefix': widgets.Text(value='aug', description='Prefix:', style={'description_width': '80px'}, 
                                     layout=widgets.Layout(width='95%')),
         'balance_classes': widgets.Checkbox(value=True, description='Balance Classes', layout=widgets.Layout(margin='5px 0'))
@@ -320,9 +321,9 @@ def _create_fallback_types_options() -> Dict[str, Any]:
         ),
         'target_split': widgets.Dropdown(
             options=[('Train', 'train'), ('Valid', 'valid'), ('Test', 'test')],
-            value='train', description='Split:',
+            value='train', description='Target Split Augmentasi:',  # FIXED: Updated description
             layout=widgets.Layout(width='100%'),
-            style={'description_width': '100px'}
+            style={'description_width': '160px'}
         )
     }
     
@@ -348,12 +349,14 @@ def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
     log_output = widgets.Output()
     ui = widgets.VBox([error_widget, fallback_button, log_output])
     
-    # Return minimal required components
+    # Return minimal required components dengan intensity support
     return {
         'ui': ui, 'augment_button': fallback_button, 'check_button': fallback_button,
         'cleanup_button': fallback_button, 'save_button': fallback_button, 'reset_button': fallback_button,
         'log_output': log_output, 'status': log_output, 'confirmation_area': log_output,
         'progress_tracker': None, 'error': error_message,
         'norm_method': widgets.Dropdown(options=[('minmax', 'minmax')], value='minmax'),
-        'denormalize': widgets.Checkbox(value=False)
+        'denormalize': widgets.Checkbox(value=False),
+        'intensity': widgets.FloatSlider(value=0.7, min=0.1, max=1.0),  # FIXED: Added intensity fallback
+        'augmentation_initialized': True  # FIXED: Added namespace flag
     }

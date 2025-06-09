@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/save_reset_buttons.py
-Deskripsi: Fixed save reset buttons dengan one-liner style dan responsive layout tanpa icon
+Deskripsi: Save reset buttons tanpa icon, style bersih
 """
 
 import ipywidgets as widgets
@@ -9,10 +9,10 @@ from typing import Dict, Any
 def create_save_reset_buttons(save_label: str = "Simpan", reset_label: str = "Reset", button_width: str = '100px',
                              container_width: str = '100%', save_tooltip: str = "Simpan konfigurasi saat ini",
                              reset_tooltip: str = "Reset ke nilai default", with_sync_info: bool = False,
-                             sync_message: str = "Konfigurasi akan otomatis disinkronkan dengan Google Drive.") -> Dict[str, Any]:
-    """Create save dan reset buttons dengan one-liner responsive layout tanpa icon."""
+                             sync_message: str = "Konfigurasi akan otomatis disinkronkan.") -> Dict[str, Any]:
+    """Create save dan reset buttons tanpa icon dengan style bersih."""
     
-    # Save button - secondary style, no icon
+    # Save button - primary style, no icon
     save_button = widgets.Button(
         description=save_label, 
         button_style='primary', 

@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_extractor.py
-Deskripsi: Config extractor dengan backend integration dan DRY approach
+Deskripsi: Config extractor dengan intensity support dan backend integration
 """
 
 from typing import Dict, Any
 
 def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extract config dengan backend integration dan DRY approach
+    Extract config dengan intensity support dan backend integration
     Base dari defaults + form values untuk backend compatibility
     """
     from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
@@ -22,6 +22,7 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     aug_config = config['augmentation']
     aug_config['num_variations'] = get_value('num_variations', 2)
     aug_config['target_count'] = get_value('target_count', 500)
+    aug_config['intensity'] = get_value('intensity', 0.7)  # NEW: Added intensity extraction
     aug_config['output_prefix'] = get_value('output_prefix', 'aug')
     aug_config['balance_classes'] = get_value('balance_classes', True)
     aug_config['target_split'] = get_value('target_split', 'train')
@@ -50,6 +51,11 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     combined['brightness_limit'] = aug_config['lighting']['brightness_limit']
     combined['contrast_limit'] = aug_config['lighting']['contrast_limit']
     
+    # NEW: Apply intensity scaling to all parameters
+    intensity = aug_config['intensity']
+    if intensity != 1.0:  # Only scale if not default
+        _apply_intensity_scaling(aug_config, intensity)
+    
     # Preprocessing/Normalization
     preprocessing = config['preprocessing']['normalization']
     preprocessing['method'] = get_value('norm_method', 'minmax')
@@ -58,18 +64,48 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     # Backend integration metadata
     config['backend'].update({
         'extracted_at': _get_timestamp(),
-        'ui_version': '2.0',
-        'form_validated': _validate_extracted_config(config)
+        'ui_version': '2.1',  # Updated version dengan intensity
+        'form_validated': _validate_extracted_config(config),
+        'intensity_applied': intensity != 1.0
     })
     
     return config
+
+def _apply_intensity_scaling(aug_config: Dict[str, Any], intensity: float) -> None:
+    """
+    NEW: Apply intensity scaling to augmentation parameters
+    
+    Args:
+        aug_config: Augmentation configuration
+        intensity: Intensity factor (0.1-1.0)
+    """
+    # Scale position parameters
+    position = aug_config['position']
+    position['horizontal_flip'] = min(1.0, position['horizontal_flip'] * intensity)
+    position['rotation_limit'] = int(position['rotation_limit'] * intensity)
+    position['translate_limit'] = position['translate_limit'] * intensity
+    position['scale_limit'] = position['scale_limit'] * intensity
+    
+    # Scale lighting parameters
+    lighting = aug_config['lighting']
+    lighting['brightness_limit'] = lighting['brightness_limit'] * intensity
+    lighting['contrast_limit'] = lighting['contrast_limit'] * intensity
+    
+    # Scale combined parameters
+    combined = aug_config['combined']
+    combined['horizontal_flip'] = min(1.0, combined['horizontal_flip'] * intensity)
+    combined['rotation_limit'] = int(combined['rotation_limit'] * intensity)
+    combined['translate_limit'] = combined['translate_limit'] * intensity
+    combined['scale_limit'] = combined['scale_limit'] * intensity
+    combined['brightness_limit'] = combined['brightness_limit'] * intensity
+    combined['contrast_limit'] = combined['contrast_limit'] * intensity
 
 def _validate_extracted_config(config: Dict[str, Any]) -> bool:
     """Validate extracted config untuk backend compatibility"""
     aug_config = config.get('augmentation', {})
     
     # Required fields check
-    required = ['num_variations', 'target_count', 'types', 'target_split']
+    required = ['num_variations', 'target_count', 'intensity', 'types', 'target_split']
     if not all(field in aug_config for field in required):
         return False
     
@@ -77,6 +113,8 @@ def _validate_extracted_config(config: Dict[str, Any]) -> bool:
     if not (1 <= aug_config.get('num_variations', 0) <= 10):
         return False
     if not (100 <= aug_config.get('target_count', 0) <= 2000):
+        return False
+    if not (0.1 <= aug_config.get('intensity', 0) <= 1.0):  # NEW: Intensity validation
         return False
     
     return True

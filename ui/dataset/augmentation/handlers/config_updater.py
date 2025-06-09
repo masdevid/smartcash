@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_updater.py
-Deskripsi: Config updater dengan backend integration dan safe form handling
+Deskripsi: Config updater dengan intensity support dan backend integration
 """
 
 from typing import Dict, Any
 
 def update_augmentation_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update UI dengan backend config mapping dan inheritance handling"""
+    """Update UI dengan intensity support dan backend config mapping"""
     # Extract sections dengan safe defaults
     aug_config = config.get('augmentation', {})
     position_config = aug_config.get('position', {})
@@ -19,6 +19,7 @@ def update_augmentation_ui(ui_components: Dict[str, Any], config: Dict[str, Any]
     # Basic options mapping
     safe_update('num_variations', aug_config.get('num_variations', 2))
     safe_update('target_count', aug_config.get('target_count', 500))
+    safe_update('intensity', aug_config.get('intensity', 0.7))  # NEW: Added intensity update
     safe_update('output_prefix', aug_config.get('output_prefix', 'aug'))
     safe_update('balance_classes', aug_config.get('balance_classes', True))
     safe_update('target_split', aug_config.get('target_split', 'train'))
@@ -46,7 +47,7 @@ def update_augmentation_ui(ui_components: Dict[str, Any], config: Dict[str, Any]
     _notify_backend_ui_update(ui_components, config)
 
 def reset_augmentation_ui(ui_components: Dict[str, Any]) -> None:
-    """Reset UI dengan backend notification"""
+    """Reset UI dengan intensity support dan backend notification"""
     try:
         from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
         default_config = get_default_augmentation_config()
@@ -102,10 +103,11 @@ def _notify_backend_ui_update(ui_components: Dict[str, Any], config: Dict[str, A
         pass  # Silent fail
 
 def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
-    """Hardcoded defaults fallback untuk emergency recovery"""
+    """Hardcoded defaults fallback dengan intensity support"""
     defaults = {
         'num_variations': 2,
         'target_count': 500,
+        'intensity': 0.7,  # NEW: Added intensity default
         'output_prefix': 'aug',
         'balance_classes': True,
         'target_split': 'train',

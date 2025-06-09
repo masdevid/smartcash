@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augtypes_opts_widget.py
-Deskripsi: Enhanced augmentation types widget dengan backend service integration
+Deskripsi: Vertical layout untuk jenis augmentasi dan target split
 """
 
 import ipywidgets as widgets
@@ -8,14 +8,14 @@ from typing import Dict, Any
 
 def create_augmentation_types_widget() -> Dict[str, Any]:
     """
-    Create enhanced augmentation types dengan backend compatibility
+    Create vertical layout untuk augmentation types dan target split
     
     Returns:
         Dictionary berisi container dan widget mapping
     """
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Enhanced jenis augmentasi dengan backend support - 65% width
+    # Jenis augmentasi dengan backend support
     augmentation_types = widgets.SelectMultiple(
         options=[
             ('🎯 Combined: Posisi + Pencahayaan (Research Pipeline)', 'combined'),
@@ -32,87 +32,62 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
         style={'description_width': '140px'}
     )
     
-    # Enhanced target split dengan backend guidance
+    # Target split dengan title yang diperbaiki
     target_split = widgets.Dropdown(
         options=[
-            ('🎯 Train - Dataset training (Backend Recommended)', 'train'),
-            ('📊 Valid - Dataset validasi (Backend Support)', 'valid'),
+            ('🎯 Train - Dataset training (Recommended)', 'train'),
+            ('📊 Valid - Dataset validasi', 'valid'),
             ('🧪 Test - Dataset testing (Not Recommended)', 'test')
         ],
         value='train',
-        description='Target Split:',
+        description='Target Split Augmentasi:',  # FIXED: Changed title
         disabled=False,
         layout=widgets.Layout(width='100%'),
-        style={'description_width': '140px'}
+        style={'description_width': '160px'}
     )
     
-    # Enhanced types information dengan backend details
+    # Types information
     types_info = widgets.HTML(
         f"""
         <div style="padding: 12px; background-color:#2196f315; 
                     border-radius: 6px; margin: 10px 0; font-size: 12px;
                     border: 1px solid #2196f3;">
-            <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Backend Augmentation Types:</strong><br>
-            • <strong style="color:#2196f3">Combined</strong>: Research pipeline dengan optimized backend processing<br>
+            <strong style="color:#2196f3">{ICONS.get('augmentation', '🔄')} Jenis Augmentasi:</strong><br>
+            • <strong style="color:#2196f3">Combined</strong>: Research pipeline optimal<br>
             • <strong style="color:#2196f3">Position</strong>: Geometric transforms dengan bbox preservation<br>
-            • <strong style="color:#2196f3">Lighting</strong>: Photometric transforms untuk kondisi pencahayaan<br>
-            • <strong style="color:#2196f3">Advanced Types</strong>: Backend support untuk geometric, color, noise transforms
+            • <strong style="color:#2196f3">Lighting</strong>: Photometric transforms kondisi pencahayaan<br>
+            • <strong style="color:#2196f3">Advanced</strong>: Geometric, color, noise transforms
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Enhanced split information dengan backend integration
+    # Split information
     split_info = widgets.HTML(
         f"""
-        <div style="padding: 12px; background-color:#2196f315; 
+        <div style="padding: 12px; background-color:#ff980315; 
                     border-radius: 6px; margin: 10px 0; font-size: 12px;
-                    border: 1px solid #2196f3;">
-            <strong style="color:#2196f3">{ICONS.get('info', 'ℹ️')} Backend Split Management:</strong><br>
-            • <strong style="color:#2196f3">train</strong>: Primary target dengan backend service integration<br>
-            • <strong style="color:#2196f3">valid</strong>: Backend support untuk validation augmentation<br>
-            • <strong style="color:#2196f3">test</strong>: Backend warning - tidak recommended untuk evaluation
+                    border: 1px solid #ff9803;">
+            <strong style="color:#f57c00">{ICONS.get('info', 'ℹ️')} Target Split:</strong><br>
+            • <strong style="color:#f57c00">train</strong>: Primary target untuk augmentasi<br>
+            • <strong style="color:#f57c00">valid</strong>: Opsional untuk validation augmentation<br>
+            • <strong style="color:#f57c00">test</strong>: Tidak recommended untuk evaluation
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Types section (65% width)
-    aug_types_section = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 10px 0;'>{ICONS.get('augmentation', '🔄')} Pilih Jenis Augmentasi (Backend Enhanced):</h6>"),
+    # FIXED: Single column vertical layout
+    container = widgets.VBox([
+        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 10px 0;'>{ICONS.get('augmentation', '🔄')} Jenis Augmentasi & Target Split</h6>"),
         augmentation_types,
-        types_info
-    ], layout=widgets.Layout(
-        width='65%', 
-        overflow='hidden', 
-        display='flex', 
-        flex_flow='column'
-    ))
-    
-    # Split section (32% width)
-    split_section = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 18px 0 10px 0;'>{ICONS.get('split', '📂')} Target Split Dataset:</h6>"),
+        types_info,
         target_split,
         split_info
     ], layout=widgets.Layout(
-        width='32%', 
-        overflow='hidden', 
-        display='flex', 
-        flex_flow='column'
-    ))
-    
-    # Main container dengan enhanced spacing
-    container = widgets.HBox([
-        aug_types_section,
-        split_section
-    ], layout=widgets.Layout(
         width='100%',
         padding='12px',
-        margin='8px 0',
-        display='flex',
-        justify_content="space-between",
-        align_items="stretch",
-        gap='15px'
+        margin='8px 0'
     ))
     
     return {
@@ -121,7 +96,6 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
             'augmentation_types': augmentation_types,
             'target_split': target_split
         },
-        # Enhanced validation dengan backend compatibility
         'validation': {
             'required': ['augmentation_types', 'target_split'],
             'defaults': {
@@ -130,7 +104,6 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
             },
             'backend_compatible': True
         },
-        # Extended options dengan backend support
         'options': {
             'augmentation_types': ['combined', 'position', 'lighting', 'geometric', 'color', 'noise'],
             'target_split': ['train', 'valid', 'test'],
@@ -139,7 +112,6 @@ def create_augmentation_types_widget() -> Dict[str, Any]:
                 'split': 'train'
             }
         },
-        # Backend integration metadata
         'backend_mapping': {
             'augmentation_types': 'augmentation.types',
             'target_split': 'augmentation.target_split'

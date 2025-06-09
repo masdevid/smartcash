@@ -1,16 +1,16 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/defaults.py
-Deskripsi: Default config sesuai augmentation_config.yaml dengan backend integration
+Deskripsi: Default config dengan intensity support sesuai augmentation_config.yaml
 """
 
 from typing import Dict, Any
 from datetime import datetime
 
 def get_default_augmentation_config() -> Dict[str, Any]:
-    """Default config sesuai augmentation_config.yaml dengan backend support"""
+    """Default config dengan intensity support dan backend compatibility"""
     return {
         '_base_': 'base_config.yaml',
-        'config_version': '2.0',
+        'config_version': '2.1',  # Updated version dengan intensity
         'updated_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         
         # Data configuration
@@ -27,12 +27,13 @@ def get_default_augmentation_config() -> Dict[str, Any]:
             }
         },
         
-        # Augmentation config - mapping ke UI forms
+        # Augmentation config dengan intensity support
         'augmentation': {
             # Basic options (dari basic_opts_widget)
             'enabled': True,
             'num_variations': 2,          # IntSlider 1-10
             'target_count': 500,          # IntSlider 100-2000
+            'intensity': 0.7,             # NEW: FloatSlider 0.1-1.0
             'output_prefix': 'aug',       # Text input
             'balance_classes': True,      # Checkbox
             'target_split': 'train',      # Dropdown
@@ -152,7 +153,7 @@ def get_default_augmentation_config() -> Dict[str, Any]:
             'log_timing': True
         },
         
-        # Validation
+        # Validation dengan intensity range
         'validation': {
             'check_data_integrity': True,
             'validate_config': True,
@@ -161,10 +162,11 @@ def get_default_augmentation_config() -> Dict[str, Any]:
             'max_error_rate': 0.1,
             'min_success_rate': 0.8,
             
-            # Form validation ranges
+            # Form validation ranges dengan intensity
             'ranges': {
                 'num_variations': [1, 10],
                 'target_count': [100, 2000],
+                'intensity': [0.1, 1.0],        # NEW: Intensity range
                 'horizontal_flip': [0.0, 1.0],
                 'rotation_limit': [0, 30],
                 'translate_limit': [0.0, 0.25],
@@ -184,11 +186,12 @@ def get_default_augmentation_config() -> Dict[str, Any]:
             'cache_size_mb': 100
         },
         
-        # Backend integration
+        # Backend integration dengan intensity support
         'backend': {
             'service_enabled': True,
             'progress_tracking': True,
             'async_processing': False,
-            'communicator_enabled': True
+            'communicator_enabled': True,
+            'intensity_scaling': True      # NEW: Intensity scaling support
         }
     }

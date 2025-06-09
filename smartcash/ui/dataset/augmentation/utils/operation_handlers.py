@@ -1,9 +1,10 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/operation_handlers.py
-Deskripsi: Operation handlers dengan backend service integration dan progress tracking
+Deskripsi: Fixed operation handlers dengan proper imports dan Dict type annotation
 """
 
-from typing import Dict, Any
+from typing import Dict, Any  # FIXED: Added explicit import
+from smartcash.common.logger import get_logger  # FIXED: Use default logger
 
 def handle_augmentation_execution(ui_components: Dict[str, Any]):
     """Handle augmentation execution dengan comprehensive pipeline"""
@@ -13,6 +14,9 @@ def handle_augmentation_execution(ui_components: Dict[str, Any]):
     @with_button_management
     def _execute_pipeline(ui_components):
         clear_ui_outputs(ui_components)
+        
+        # FIXED: Use default logger tanpa fallbacks
+        logger = get_logger('smartcash.ui.dataset.augmentation')
         
         # Form validation
         validation = validate_form_inputs(ui_components)
@@ -30,7 +34,7 @@ def handle_augmentation_execution(ui_components: Dict[str, Any]):
             from smartcash.dataset.augmentor import augment_and_normalize
             from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
             
-            # Extract config dan create service config
+            # Extract config
             ui_config = extract_augmentation_config(ui_components)
             
             # Create progress callback
@@ -55,6 +59,7 @@ def handle_augmentation_execution(ui_components: Dict[str, Any]):
             _handle_pipeline_result(ui_components, result, 'augmentation')
             
         except Exception as e:
+            logger.error(f"❌ Augmentation pipeline error: {str(e)}")
             _handle_operation_error(ui_components, e, 'augmentation pipeline')
     
     _execute_pipeline(ui_components)
@@ -67,6 +72,9 @@ def handle_dataset_check(ui_components: Dict[str, Any]):
     @with_button_management
     def _execute_check(ui_components):
         clear_ui_outputs(ui_components)
+        
+        # FIXED: Use default logger
+        logger = get_logger('smartcash.ui.dataset.augmentation')
         
         # Start progress tracking
         progress_tracker = ui_components.get('progress_tracker')
@@ -95,6 +103,7 @@ def handle_dataset_check(ui_components: Dict[str, Any]):
             _handle_check_result(ui_components, result)
             
         except Exception as e:
+            logger.error(f"❌ Dataset check error: {str(e)}")
             _handle_operation_error(ui_components, e, 'dataset check')
     
     _execute_check(ui_components)
@@ -127,6 +136,9 @@ def _execute_cleanup(ui_components: Dict[str, Any]):
     
     @with_button_management
     def _cleanup_operation(ui_components):
+        # FIXED: Use default logger
+        logger = get_logger('smartcash.ui.dataset.augmentation')
+        
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker:
             progress_tracker.show()
@@ -151,6 +163,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]):
             _handle_cleanup_result(ui_components, result)
             
         except Exception as e:
+            logger.error(f"❌ Cleanup error: {str(e)}")
             _handle_operation_error(ui_components, e, 'cleanup')
     
     _cleanup_operation(ui_components)

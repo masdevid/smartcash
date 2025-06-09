@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/basic_opts_widget.py
-Deskripsi: Enhanced basic options widget dengan backend compatibility dan validation
+Deskripsi: Fixed basic options dengan augmentation intensity slider
 """
 
 import ipywidgets as widgets
@@ -8,14 +8,14 @@ from typing import Dict, Any
 
 def create_basic_options_widget() -> Dict[str, Any]:
     """
-    Create enhanced basic options widget dengan backend integration
+    Create enhanced basic options widget dengan intensity slider
     
     Returns:
         Dictionary berisi container dan widget mapping
     """
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Jumlah variasi per gambar (1-10) - sesuai backend
+    # Jumlah variasi per gambar (1-10)
     num_variations = widgets.IntSlider(
         value=2, min=1, max=10, step=1,
         description='Jumlah Variasi:',
@@ -25,7 +25,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
-    # Target count dengan range optimal untuk backend (100-2000)
+    # Target count dengan range optimal (100-2000)
     target_count = widgets.IntSlider(
         value=500, min=100, max=2000, step=50,
         description='Target Count:',
@@ -35,7 +35,17 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
-    # Output prefix untuk backend compatibility
+    # NEW: Augmentation Intensity slider
+    intensity = widgets.FloatSlider(
+        value=0.7, min=0.1, max=1.0, step=0.1,
+        description='Intensitas:',
+        continuous_update=False,
+        readout=True, readout_format='.1f',
+        layout=widgets.Layout(width='95%'),
+        style={'description_width': '120px'}
+    )
+    
+    # Output prefix
     output_prefix = widgets.Text(
         value='aug',
         placeholder='Prefix untuk file hasil augmentasi (alphanumeric)',
@@ -45,7 +55,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
         style={'description_width': '120px'}
     )
     
-    # Balance classes dengan enhanced description
+    # Balance classes
     balance_classes = widgets.Checkbox(
         value=True,
         description='Balance Classes (Layer 1 & 2 optimal)',
@@ -53,27 +63,28 @@ def create_basic_options_widget() -> Dict[str, Any]:
         layout=widgets.Layout(width='auto', margin='8px 0')
     )
     
-    # Enhanced info panel dengan backend integration info
+    # Enhanced info panel dengan intensity info
     info_panel = widgets.HTML(
         f"""
         <div style="padding: 10px; background-color: #4caf5015; 
                     border-radius: 6px; margin: 8px 0; font-size: 12px;
                     border: 1px solid #4caf5040;" >
-            <strong style="color: #2e7d32;">{ICONS.get('info', 'ℹ️')} Parameter Guidance (Backend Optimized):</strong><br>
-            • <strong style="color: #2e7d32;">Variasi:</strong> 2-5 optimal untuk pipeline research dengan backend service<br>
-            • <strong style="color: #2e7d32;">Target Count:</strong> 500-1000 untuk training efektif, backend support sampai 2000<br>
-            • <strong style="color: #2e7d32;">Balance Classes:</strong> Layer 1 & 2 (denominasi) dengan algoritma backend<br>
-            • <strong style="color: #2e7d32;">Backend:</strong> Service integration untuk progress tracking dan validation
+            <strong style="color: #2e7d32;">{ICONS.get('info', 'ℹ️')} Parameter Guidance:</strong><br>
+            • <strong style="color: #2e7d32;">Variasi:</strong> 2-5 optimal untuk research pipeline<br>
+            • <strong style="color: #2e7d32;">Target Count:</strong> 500-1000 untuk training efektif<br>
+            • <strong style="color: #2e7d32;">Intensitas:</strong> 0.7 optimal, 0.3-0.5 conservative, 0.8-1.0 aggressive<br>
+            • <strong style="color: #2e7d32;">Balance Classes:</strong> Layer 1 & 2 (denominasi) optimal
         </div>
         """,
         layout=widgets.Layout(width='100%', margin='5px 0')
     )
     
-    # Container dengan enhanced layout
+    # Container
     container = widgets.VBox([
-        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 8px 0;'>{ICONS.get('settings', '⚙️')} Opsi Dasar - Backend Integration</h6>"),
+        widgets.HTML(f"<h6 style='color: {COLORS.get('dark', '#333')}; margin: 8px 0;'>{ICONS.get('settings', '⚙️')} Opsi Dasar</h6>"),
         num_variations,
         target_count,
+        intensity,  # NEW: Added intensity slider
         output_prefix,
         balance_classes,
         info_panel
@@ -84,22 +95,23 @@ def create_basic_options_widget() -> Dict[str, Any]:
         'widgets': {
             'num_variations': num_variations,
             'target_count': target_count,
+            'intensity': intensity,  # NEW: Added to widgets dict
             'output_prefix': output_prefix,
             'balance_classes': balance_classes
         },
-        # Enhanced validation info untuk backend compatibility
         'validation': {
             'ranges': {
                 'num_variations': (1, 10),
-                'target_count': (100, 2000)
+                'target_count': (100, 2000),
+                'intensity': (0.1, 1.0)  # NEW: Added intensity range
             },
-            'required': ['num_variations', 'target_count', 'output_prefix'],
+            'required': ['num_variations', 'target_count', 'intensity', 'output_prefix'],
             'backend_compatible': True
         },
-        # Backend integration metadata
         'backend_mapping': {
             'num_variations': 'augmentation.num_variations',
             'target_count': 'augmentation.target_count',
+            'intensity': 'augmentation.intensity',  # NEW: Added intensity mapping
             'output_prefix': 'augmentation.output_prefix',
             'balance_classes': 'augmentation.balance_classes'
         }

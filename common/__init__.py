@@ -9,11 +9,6 @@ from smartcash.common.config import (
     SimpleConfigManager
 )
 
-from smartcash.common.default_config import (
-    generate_default_config, 
-    ensure_base_config_exists, 
-    ensure_colab_config_exists
-)
 
 # ===== Lingkungan =====
 from smartcash.common.environment import (

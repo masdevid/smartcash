@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/balancer/__init__.py
-Deskripsi: Balancer module exports untuk preserved compatibility
+Deskripsi: Balancer module exports dengan preserved compatibility
 """
 
 from smartcash.dataset.augmentor.balancer.balancer import (
@@ -13,9 +13,7 @@ from smartcash.dataset.augmentor.balancer.balancer import (
     calc_priority_multiplier
 )
 
-from smartcash.dataset.augmentor.balancer.selector import (
-    FileSelectionStrategy
-)
+from smartcash.dataset.augmentor.balancer.selector import FileSelectionStrategy
 
 # Backward compatibility aliases
 from smartcash.dataset.augmentor.balancer.balancer import ClassBalancingStrategy as BalancingStrategy

@@ -1,11 +1,13 @@
-
 """
 File: smartcash/dataset/augmentor/balancer/selector.py
-Deskripsi: File selector dengan preserved logic
+Deskripsi: File selector dengan preserved logic dan missing imports
 """
 
-from pathlib import Path
+from typing import Dict, List, Set, Any, Optional
+from collections import defaultdict, Counter
 import random
+from pathlib import Path
+from smartcash.common.logger import get_logger
 
 class FileSelectionStrategy:
     """📁 File selector dengan preserved business logic"""

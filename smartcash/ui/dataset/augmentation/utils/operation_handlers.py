@@ -1,10 +1,10 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/operation_handlers.py
-Deskripsi: Fixed operation handlers dengan proper imports dan Dict type annotation
+Deskripsi: Fixed operation handlers dengan proper imports dan error handling
 """
 
-from typing import Dict, Any  # FIXED: Added explicit import
-from smartcash.common.logger import get_logger  # FIXED: Use default logger
+from typing import Dict, Any
+from smartcash.common.logger import get_logger
 
 def handle_augmentation_execution(ui_components: Dict[str, Any]):
     """Handle augmentation execution dengan comprehensive pipeline"""
@@ -14,8 +14,6 @@ def handle_augmentation_execution(ui_components: Dict[str, Any]):
     @with_button_management
     def _execute_pipeline(ui_components):
         clear_ui_outputs(ui_components)
-        
-        # FIXED: Use default logger tanpa fallbacks
         logger = get_logger('smartcash.ui.dataset.augmentation')
         
         # Form validation
@@ -29,7 +27,6 @@ def handle_augmentation_execution(ui_components: Dict[str, Any]):
         if progress_tracker:
             progress_tracker.show()
         
-        # Execute dengan backend service
         try:
             from smartcash.dataset.augmentor import augment_and_normalize
             from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
@@ -72,8 +69,6 @@ def handle_dataset_check(ui_components: Dict[str, Any]):
     @with_button_management
     def _execute_check(ui_components):
         clear_ui_outputs(ui_components)
-        
-        # FIXED: Use default logger
         logger = get_logger('smartcash.ui.dataset.augmentation')
         
         # Start progress tracking
@@ -83,18 +78,16 @@ def handle_dataset_check(ui_components: Dict[str, Any]):
             progress_tracker.update_overall(0, "Memulai pengecekan dataset...")
         
         try:
-            from smartcash.dataset.augmentor import create_augmentor
+            from smartcash.dataset.augmentor import get_augmentation_status
             from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
             
-            # Create service
             ui_config = extract_augmentation_config(ui_components)
-            service = create_augmentor(ui_config, progress_tracker)
             
             if progress_tracker:
                 progress_tracker.update_overall(25, "Menganalisis dataset mentah...")
             
-            # Execute check
-            result = service.check_dataset_readiness(ui_config['augmentation']['target_split'])
+            # Execute check using status function
+            result = get_augmentation_status(ui_config, progress_tracker)
             
             if progress_tracker:
                 progress_tracker.update_overall(100, "Pengecekan selesai")
@@ -136,7 +129,6 @@ def _execute_cleanup(ui_components: Dict[str, Any]):
     
     @with_button_management
     def _cleanup_operation(ui_components):
-        # FIXED: Use default logger
         logger = get_logger('smartcash.ui.dataset.augmentation')
         
         progress_tracker = ui_components.get('progress_tracker')
@@ -222,38 +214,26 @@ def _handle_check_result(ui_components: Dict[str, Any], result: Dict[str, Any]):
     
     progress_tracker = ui_components.get('progress_tracker')
     
-    if result.get('status') == 'success':
-        # Log basic info
-        data_location = result.get('data_location', 'Unknown')
-        log_to_ui(ui_components, f"📁 Data location: {data_location}", "info")
+    if result.get('service_ready'):
+        # Log service info
+        paths = result.get('paths', {})
+        log_to_ui(ui_components, f"📁 Data directory: {paths.get('data_dir', 'Unknown')}", "info")
         
-        # Raw dataset info
-        raw_info = result.get('raw_dataset', {})
-        if raw_info.get('status') == 'success':
-            total_raw = raw_info.get('total_images', 0)
-            splits = raw_info.get('available_splits', [])
-            log_to_ui(ui_components, f"✅ Raw Dataset: {total_raw} gambar di {len(splits)} splits", "success")
-        else:
-            log_to_ui(ui_components, f"❌ Raw dataset: {raw_info.get('message', 'Not found')}", "error")
+        # Check augmented files
+        train_aug = result.get('train_augmented', 0)
+        train_prep = result.get('train_preprocessed', 0)
         
-        # Readiness status
-        if result.get('ready_for_augmentation'):
-            success_msg = "✅ Dataset siap untuk augmentasi"
-            log_to_ui(ui_components, success_msg, "success")
-            if progress_tracker:
-                progress_tracker.complete(success_msg)
+        if train_aug > 0:
+            log_to_ui(ui_components, f"✅ Found {train_aug} augmented files, {train_prep} preprocessed", "success")
         else:
-            warning_msg = "⚠️ Dataset perlu preprocessing sebelum augmentasi"
-            log_to_ui(ui_components, warning_msg, "warning")
-            if progress_tracker:
-                progress_tracker.complete(warning_msg)
-                
-        # Recommendations
-        recommendations = result.get('recommendations', [])
-        for rec in recommendations[:3]:  # Top 3 recommendations
-            log_to_ui(ui_components, f"💡 {rec}", "info")
+            log_to_ui(ui_components, "💡 No augmented files found - ready for augmentation", "info")
+        
+        success_msg = "✅ Dataset check completed"
+        log_to_ui(ui_components, success_msg, "success")
+        if progress_tracker:
+            progress_tracker.complete(success_msg)
     else:
-        error_msg = f"❌ Check gagal: {result.get('message', 'Unknown error')}"
+        error_msg = f"❌ Check gagal: {result.get('error', 'Service not ready')}"
         log_to_ui(ui_components, error_msg, "error")
         if progress_tracker:
             progress_tracker.error(error_msg)
@@ -265,9 +245,9 @@ def _handle_cleanup_result(ui_components: Dict[str, Any], result: Dict[str, Any]
     progress_tracker = ui_components.get('progress_tracker')
     
     if result.get('status') == 'success':
-        total_deleted = result.get('total_deleted', 0)
-        if total_deleted > 0:
-            success_msg = f"✅ Cleanup berhasil: {total_deleted} file dihapus"
+        total_removed = result.get('total_removed', 0)
+        if total_removed > 0:
+            success_msg = f"✅ Cleanup berhasil: {total_removed} file dihapus"
             log_to_ui(ui_components, success_msg, "success")
             if progress_tracker:
                 progress_tracker.complete(success_msg)

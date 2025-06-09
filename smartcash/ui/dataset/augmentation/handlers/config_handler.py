@@ -1,186 +1,200 @@
 """
-File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Config handler dengan backend integration dan proper inheritance
+File: smartcash/ui/dataset/augmentation/utils/config_handlers.py
+Deskripsi: Optimized config handlers dengan simplified logic dan consolidated operations
 """
 
 from typing import Dict, Any
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-from smartcash.ui.dataset.augmentation.handlers.config_updater import update_augmentation_ui
-from smartcash.common.config.manager import get_config_manager
 
-class AugmentationConfigHandler(ConfigHandler):
-    """Config handler dengan backend integration dan proper logging"""
+def handle_save_config(ui_components: Dict[str, Any]):
+    """Handle save config dengan optimized validation dan confirmation"""
+    from smartcash.ui.dataset.augmentation.utils.ui_utils import validate_form_inputs, clear_ui_outputs
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
     
-    def __init__(self, module_name: str = 'augmentation', parent_module: str = 'dataset'):
-        super().__init__(module_name, parent_module)
-        self.config_manager = get_config_manager()
-        self.config_filename = 'augmentation_config.yaml'
-        self._ui_components = {}
+    clear_ui_outputs(ui_components)
+    clear_confirmation_area(ui_components)
     
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dengan backend compatibility"""
-        extracted = extract_augmentation_config(ui_components)
+    # Form validation
+    validation = validate_form_inputs(ui_components)
+    if not validation['valid']:
+        _show_validation_errors_in_area(ui_components, validation)
+        return
+    
+    # Show config summary confirmation
+    _show_config_summary_confirmation(ui_components)
+
+def handle_reset_config(ui_components: Dict[str, Any]):
+    """Handle reset config langsung tanpa confirmation"""
+    from smartcash.ui.dataset.augmentation.utils.ui_utils import clear_ui_outputs
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
+    
+    clear_ui_outputs(ui_components)
+    clear_confirmation_area(ui_components)
+    
+    # Execute reset langsung
+    _execute_config_operation(ui_components, 'reset')
+
+def _execute_config_operation(ui_components: Dict[str, Any], operation_type: str):
+    """Consolidated config operation execution"""
+    try:
+        config_handler = ui_components.get('config_handler')
+        if not config_handler:
+            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+            log_to_ui(ui_components, "❌ Config handler tidak tersedia", "error")
+            return
         
-        # Add backend-specific configs
-        extracted['backend'] = {
-            'service_enabled': True,
-            'progress_tracking': True,
-            'async_processing': False
-        }
+        # Set UI components untuk logging
+        if hasattr(config_handler, 'set_ui_components'):
+            config_handler.set_ui_components(ui_components)
         
-        return extracted
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan inheritance handling"""
-        update_augmentation_ui(ui_components, config)
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default dari augmentation_config.yaml"""
-        from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
-        return get_default_augmentation_config()
-    
-    def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """Load dengan inheritance dari base_config.yaml"""
-        try:
-            filename = config_filename or self.config_filename
-            config = self.config_manager.load_config(filename)
-            
-            if not config:
-                self._log_to_ui("⚠️ Config kosong, menggunakan default", "warning")
-                return self.get_default_config()
-            
-            # Handle inheritance dari _base_
-            if '_base_' in config:
-                base_config = self.config_manager.load_config(config['_base_']) or {}
-                merged_config = self._merge_configs(base_config, config)
-                self._log_to_ui(f"📂 Config loaded dengan inheritance dari {filename}", "info")
-                return merged_config
-            
-            self._log_to_ui(f"📂 Config loaded dari {filename}", "info")
-            return config
-            
-        except Exception as e:
-            self._log_to_ui(f"❌ Error loading config: {str(e)}", "error")
-            return self.get_default_config()
-    
-    def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Save dengan auto refresh dan backend update"""
-        try:
-            filename = config_filename or self.config_filename
-            ui_config = self.extract_config(ui_components)
-            
-            # Validate backend compatibility
-            if not self._validate_backend_config(ui_config):
-                self._log_to_ui("⚠️ Config disesuaikan untuk kompatibilitas backend", "warning")
-            
-            success = self.config_manager.save_config(ui_config, filename)
-            
+        # Execute operation
+        if operation_type == 'save':
+            success = config_handler.save_config(ui_components)
             if success:
-                self._log_to_ui(f"✅ Config tersimpan ke {filename}", "success")
-                self._refresh_ui_after_save(ui_components, filename)
-                self._notify_backend_config_change(ui_components, ui_config)
-                return True
-            else:
-                self._log_to_ui(f"❌ Gagal simpan config", "error")
-                return False
-                
-        except Exception as e:
-            self._log_to_ui(f"❌ Error save config: {str(e)}", "error")
-            return False
-    
-    def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Reset dengan backend notification"""
-        try:
-            filename = config_filename or self.config_filename
-            default_config = self.get_default_config()
-            
-            success = self.config_manager.save_config(default_config, filename)
-            
+                _show_config_success(ui_components, 'save')
+        
+        elif operation_type == 'reset':
+            success = config_handler.reset_config(ui_components)
             if success:
-                self._log_to_ui("🔄 Config direset ke default", "success")
-                self.update_ui(ui_components, default_config)
-                self._notify_backend_config_change(ui_components, default_config)
-                return True
-            else:
-                self._log_to_ui("❌ Gagal reset config", "error")
-                return False
-                
-        except Exception as e:
-            self._log_to_ui(f"❌ Error reset config: {str(e)}", "error")
-            return False
+                _show_config_success(ui_components, 'reset')
+            
+    except Exception as e:
+        from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+        log_to_ui(ui_components, f"❌ Error {operation_type} config: {str(e)}", "error")
+
+def _show_config_summary_confirmation(ui_components: Dict[str, Any]):
+    """Show config summary dengan save confirmation"""
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_confirmation_in_area
+    from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
     
-    def _validate_backend_config(self, config: Dict[str, Any]) -> bool:
-        """Validate config untuk backend compatibility"""
+    # Extract current config
+    current_config = extract_augmentation_config(ui_components)
+    aug_config = current_config.get('augmentation', {})
+    
+    # Create summary
+    summary_items = [
+        f"🎯 Variations: {aug_config.get('num_variations', 3)}",
+        f"📊 Target Count: {aug_config.get('target_count', 500)}",
+        f"🔄 Types: {', '.join(aug_config.get('types', ['combined']))}",
+        f"📂 Split: {aug_config.get('target_split', 'train')}",
+        f"⚖️ Balance Classes: {'Yes' if aug_config.get('balance_classes', True) else 'No'}",
+        f"🎚️ Intensity: {aug_config.get('intensity', 0.7)}"
+    ]
+    
+    message = "Simpan konfigurasi dengan pengaturan berikut?\n\n" + "\n".join(summary_items)
+    
+    def on_confirm_save(btn):
+        from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
+        clear_confirmation_area(ui_components)
+        _execute_config_operation(ui_components, 'save')
+    
+    def on_cancel_save(btn):
+        from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
+        from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+        clear_confirmation_area(ui_components)
+        log_to_ui(ui_components, "❌ Save config dibatalkan", "info")
+    
+    show_confirmation_in_area(
+        ui_components,
+        title="Konfirmasi Save Konfigurasi",
+        message=message,
+        on_confirm=on_confirm_save,
+        on_cancel=on_cancel_save,
+        confirm_text="Ya, Simpan",
+        cancel_text="Batal"
+    )
+
+def _show_validation_errors_in_area(ui_components: Dict[str, Any], validation: Dict[str, Any]):
+    """Show validation errors di confirmation area"""
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_warning_in_area
+    
+    error_messages = validation.get('errors', []) + validation.get('warnings', [])
+    message = "Form validation menemukan masalah:\n\n" + "\n".join(error_messages)
+    message += "\n\nSilakan perbaiki input form sebelum menyimpan."
+    
+    show_warning_in_area(
+        ui_components,
+        title="Validation Error - Save Config",
+        message=message,
+        on_close=lambda btn: None
+    )
+
+def _show_config_success(ui_components: Dict[str, Any], operation_type: str):
+    """Show config operation success di confirmation area"""
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_info_in_area
+    
+    if operation_type == 'save':
+        title = "Save Config Berhasil"
+        message = "✅ Konfigurasi berhasil disimpan!\n\nKonfigurasi telah disimpan ke file dan UI telah direfresh dengan nilai terbaru."
+    elif operation_type == 'reset':
+        title = "Reset Config Berhasil"  
+        message = "✅ Konfigurasi berhasil direset!\n\nSemua pengaturan telah dikembalikan ke nilai default dan UI telah diperbarui."
+    else:
+        title = "Config Operation Berhasil"
+        message = f"✅ {operation_type.title()} config berhasil!"
+    
+    show_info_in_area(
+        ui_components,
+        title=title,
+        message=message,
+        on_close=lambda btn: None
+    )
+
+# Utility functions untuk compatibility
+def validate_and_save_config(ui_components: Dict[str, Any]) -> bool:
+    """Validate dan save config - return success status"""
+    from smartcash.ui.dataset.augmentation.utils.ui_utils import validate_form_inputs
+    
+    validation = validate_form_inputs(ui_components)
+    if not validation['valid']:
+        return False
+    
+    try:
+        config_handler = ui_components.get('config_handler')
+        if not config_handler:
+            return False
+        
+        if hasattr(config_handler, 'set_ui_components'):
+            config_handler.set_ui_components(ui_components)
+        
+        return config_handler.save_config(ui_components)
+    except Exception:
+        return False
+
+def reset_config_silent(ui_components: Dict[str, Any]) -> bool:
+    """Reset config tanpa UI feedback - return success status"""
+    try:
+        config_handler = ui_components.get('config_handler')
+        if not config_handler:
+            return False
+        
+        if hasattr(config_handler, 'set_ui_components'):
+            config_handler.set_ui_components(ui_components)
+        
+        return config_handler.reset_config(ui_components)
+    except Exception:
+        return False
+
+def get_current_config_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Get current config summary untuk display"""
+    try:
+        from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
+        
+        config = extract_augmentation_config(ui_components)
         aug_config = config.get('augmentation', {})
         
-        # Ensure required fields
-        required_fields = ['num_variations', 'target_count', 'types']
-        for field in required_fields:
-            if field not in aug_config:
-                aug_config[field] = self.get_default_config()['augmentation'][field]
-        
-        # Validate ranges
-        aug_config['num_variations'] = max(1, min(10, aug_config.get('num_variations', 3)))
-        aug_config['target_count'] = max(100, min(2000, aug_config.get('target_count', 500)))
-        
-        return True
-    
-    def _notify_backend_config_change(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        """Notify backend tentang config changes"""
-        try:
-            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
-            log_to_ui(ui_components, "🔄 Backend config updated", "info")
-        except Exception:
-            pass  # Silent fail
-    
-    def _merge_configs(self, base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge configs dengan deep merge"""
-        import copy
-        merged = copy.deepcopy(base_config)
-        
-        for key, value in override_config.items():
-            if key == '_base_':
-                continue
-                
-            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-                merged[key] = self._deep_merge(merged[key], value)
-            else:
-                merged[key] = value
-        
-        return merged
-    
-    def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge helper"""
-        import copy
-        result = copy.deepcopy(base)
-        
-        for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._deep_merge(result[key], value)
-            else:
-                result[key] = value
-        
-        return result
-    
-    def _refresh_ui_after_save(self, ui_components: Dict[str, Any], filename: str):
-        """Auto refresh UI setelah save"""
-        try:
-            saved_config = self.load_config(filename)
-            if saved_config:
-                self.update_ui(ui_components, saved_config)
-                self._log_to_ui("🔄 UI direfresh dengan config tersimpan", "info")
-        except Exception as e:
-            self._log_to_ui(f"⚠️ Error refresh UI: {str(e)}", "warning")
-    
-    def _log_to_ui(self, message: str, level: str = "info"):
-        """Log menggunakan UI utilities"""
-        try:
-            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
-            log_to_ui(self._ui_components, message, level)
-        except Exception:
-            print(f"[{level.upper()}] {message}")
-    
-    def set_ui_components(self, ui_components: Dict[str, Any]):
-        """Set UI components untuk logging"""
-        self._ui_components = ui_components
+        return {
+            'num_variations': aug_config.get('num_variations', 2),
+            'target_count': aug_config.get('target_count', 500),
+            'intensity': aug_config.get('intensity', 0.7),
+            'types': aug_config.get('types', ['combined']),
+            'target_split': aug_config.get('target_split', 'train'),
+            'balance_classes': aug_config.get('balance_classes', True),
+            'normalization_method': config.get('preprocessing', {}).get('normalization', {}).get('method', 'minmax')
+        }
+    except Exception:
+        return {}
+
+# One-liner utilities
+safe_save = lambda ui_components: validate_and_save_config(ui_components)
+safe_reset = lambda ui_components: reset_config_silent(ui_components)
+get_summary = lambda ui_components: get_current_config_summary(ui_components)

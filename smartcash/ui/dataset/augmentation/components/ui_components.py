@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/ui_components.py
-Deskripsi: UI components assembly yang dioptimasi dengan styling terkonsolidasi dan 2x2 grid
+Deskripsi: Fixed UI components dengan confirmation area yang benar dan layout yang diperbaiki
 """
 
 from IPython.display import display, HTML
@@ -13,7 +13,7 @@ from smartcash.ui.dataset.augmentation.utils.style_utils import (
 )
 
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Main UI dengan styling terkonsolidasi dan 2x2 grid responsif"""
+    """Main UI dengan confirmation area yang benar dan layout yang diperbaiki"""
     
     try:
         from smartcash.ui.utils.header_utils import create_header
@@ -49,10 +49,20 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             cleanup_enabled=True, button_width="220px"
         )
         
-        # Output widgets
+        # CRITICAL FIX: Confirmation area yang benar
         confirmation_area = widgets.Output(layout=widgets.Layout(
-            width='100%', margin='8px 0', max_height='300px', overflow='auto'
+            width='100%', 
+            min_height='50px',
+            max_height='200px', 
+            margin='10px 0',
+            padding='5px',
+            border='1px solid #e0e0e0',
+            border_radius='4px',
+            overflow='auto',
+            background_color='#fafafa'
         ))
+        
+        # Log accordion
         log_components = create_log_accordion('augmentation', '250px')
         
         # 2x2 Grid dengan overflow fix
@@ -76,22 +86,38 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             overflow='hidden', box_sizing='border-box'
         ))
         
-        # Action dan config sections
+        # CRITICAL FIX: Action section dengan confirmation area yang benar
         action_section = widgets.VBox([
             _create_section_header("🚀 Pipeline Operations", "#667eea"),
             action_buttons['container'],
+            # CONFIRMATION AREA DI SINI - antara action buttons dan progress
+            widgets.HTML("<div style='margin: 5px 0;'><strong>📋 Status & Konfirmasi:</strong></div>"),
             confirmation_area
-        ])
+        ], layout=widgets.Layout(
+            width='100%',
+            margin='10px 0',
+            padding='10px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9'
+        ))
         
+        # Config section
         config_section = widgets.VBox([
             widgets.Box([config_buttons['container']], 
                 layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
         ])
         
-        # Main UI assembly
+        # CRITICAL FIX: Main UI assembly dengan urutan yang benar
         ui = widgets.VBox([
-            header, status_panel, row1, row2, config_section,
-            action_section, progress_tracker.container, log_components['log_accordion']
+            header, 
+            status_panel, 
+            row1, 
+            row2, 
+            config_section,
+            action_section,  # Action section dengan confirmation area
+            progress_tracker.container,  # Progress tracker setelah confirmation
+            log_components['log_accordion']  # Log accordion terakhir
         ], layout=widgets.Layout(
             width='100%', max_width='100%', display='flex',
             flex_flow='column', align_items='stretch'
@@ -99,10 +125,14 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         # Component mapping
         return {
-            'ui': ui, 'header': header, 'status_panel': status_panel,
-            'confirmation_area': confirmation_area,
-            **basic_options['widgets'], **advanced_options['widgets'],
-            **augmentation_types['widgets'], **normalization_options['widgets'],
+            'ui': ui, 
+            'header': header, 
+            'status_panel': status_panel,
+            'confirmation_area': confirmation_area,  # CRITICAL: Properly mapped
+            **basic_options['widgets'], 
+            **advanced_options['widgets'],
+            **augmentation_types['widgets'], 
+            **normalization_options['widgets'],
             'augment_button': action_buttons['download_button'],
             'check_button': action_buttons['check_button'],
             'cleanup_button': action_buttons.get('cleanup_button'),
@@ -111,7 +141,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             'progress_tracker': progress_tracker,
             'log_output': log_components['log_output'],
             'status': log_components['log_output'],
-            'backend_ready': True, 'service_integration': True,
+            'backend_ready': True, 
+            'service_integration': True,
             'module_name': 'augmentation',
             'logger_namespace': 'smartcash.ui.dataset.augmentation',
             'augmentation_initialized': True,
@@ -124,8 +155,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
 def _create_section_header(title: str, color: str) -> widgets.HTML:
     """Create styled section header"""
     return widgets.HTML(f"""
-    <h4 style="color: #333; margin: 15px 0 10px 0; border-bottom: 2px solid {color}; 
-               font-size: 16px; padding-bottom: 6px;">
+    <h4 style="color: #333; margin: 10px 0 8px 0; border-bottom: 2px solid {color}; 
+               font-size: 14px; padding-bottom: 4px;">
         {title}
     </h4>
     """)
@@ -285,7 +316,7 @@ def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
     """Minimal fallback UI dengan consistent styling"""
     error_widget = widgets.HTML(f"""
     <div style="padding: 20px; background: #f8d7da; border: 1px solid #dc3545; 
-                border-radius: 8px; color: #721c24; margin: 10px 0;">
+                border_radius: 8px; color: #721c24; margin: 10px 0;">
         <h4>⚠️ Augmentation UI Error</h4>
         <p><strong>Error:</strong> {error_message}</p>
         <p>💡 Restart cell atau check imports</p>
@@ -294,16 +325,26 @@ def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
     
     fallback_button = widgets.Button(description="🔄 Retry", button_style='primary')
     log_output = widgets.Output()
+    confirmation_area = widgets.Output(layout=widgets.Layout(
+        width='100%', min_height='50px', border='1px solid #ddd'
+    ))
     
-    ui = widgets.VBox([error_widget, fallback_button, log_output], 
+    ui = widgets.VBox([error_widget, fallback_button, confirmation_area, log_output], 
                      layout=widgets.Layout(display='flex', flex_flow='column', align_items='stretch'))
     
     # Return minimal required components
     return {
-        'ui': ui, 'augment_button': fallback_button, 'check_button': fallback_button,
-        'cleanup_button': fallback_button, 'save_button': fallback_button, 
-        'reset_button': fallback_button, 'log_output': log_output, 'status': log_output,
-        'confirmation_area': log_output, 'progress_tracker': None, 'error': error_message,
+        'ui': ui, 
+        'augment_button': fallback_button, 
+        'check_button': fallback_button,
+        'cleanup_button': fallback_button, 
+        'save_button': fallback_button, 
+        'reset_button': fallback_button, 
+        'log_output': log_output, 
+        'status': log_output,
+        'confirmation_area': confirmation_area,  # CRITICAL: Always present
+        'progress_tracker': None, 
+        'error': error_message,
         'norm_method': widgets.Dropdown(options=[('minmax', 'minmax')], value='minmax'),
         'denormalize': widgets.Checkbox(value=False),
         'intensity': widgets.FloatSlider(value=0.7, min=0.1, max=1.0),

@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_handlers.py
-Deskripsi: Handlers dengan backend integration dan dialog confirmation
+Deskripsi: Fixed handlers dengan proper cleanup binding dan backend integration
 """
 
 from typing import Dict, Any
 
 def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handlers dengan backend integration dan dialog system"""
+    """Setup handlers dengan proper cleanup binding dan backend integration"""
     
     # Setup config handler dengan UI integration
     config_handler = ui_components.get('config_handler')
@@ -20,7 +20,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str,
     return ui_components
 
 def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup operation handlers dengan backend service integration"""
+    """FIXED: Setup operation handlers dengan proper cleanup binding"""
     
     def execute_augmentation_pipeline(button=None):
         """Execute augmentation dengan progress tracking dan validation"""
@@ -33,11 +33,11 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         handle_dataset_check(ui_components)
     
     def execute_cleanup_with_confirmation(button=None):
-        """Execute cleanup dengan confirmation dialog"""
+        """FIXED: Execute cleanup dengan proper confirmation dialog"""
         from smartcash.ui.dataset.augmentation.utils.operation_handlers import handle_cleanup_with_confirmation
-        handle_cleanup_with_confirmation(ui_components)
+        handle_cleanup_with_confirmation(ui_components, skip_confirmation=False)
     
-    # Bind operation handlers
+    # CRITICAL FIX: Bind operation handlers dengan proper error handling
     operation_handlers = {
         'augment_button': execute_augmentation_pipeline,
         'check_button': execute_dataset_check,
@@ -47,7 +47,21 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     for button_key, handler in operation_handlers.items():
         button = ui_components.get(button_key)
         if button and hasattr(button, 'on_click'):
-            button.on_click(handler)
+            try:
+                # Clear existing handlers first
+                button._click_handlers = getattr(button, '_click_handlers', [])
+                button._click_handlers.clear()
+                
+                # Bind new handler
+                button.on_click(handler)
+                
+                # Log successful binding
+                from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+                log_to_ui(ui_components, f"🔗 {button_key} handler terikat", "debug")
+                
+            except Exception as e:
+                from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+                log_to_ui(ui_components, f"⚠️ Error binding {button_key}: {str(e)}", "warning")
 
 def _setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
     """Setup config handlers dengan confirmation dialogs"""

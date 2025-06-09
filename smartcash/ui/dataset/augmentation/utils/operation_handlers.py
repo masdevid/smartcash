@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/operation_handlers.py
-Deskripsi: Enhanced operation handlers menggunakan Dialog API dan simplified cleanup flow
+Deskripsi: Fixed operation handlers dengan proper cleanup binding dan backend integration
 """
 
 from typing import Dict, Any
@@ -31,219 +31,8 @@ def handle_augmentation_execution(ui_components: Dict[str, Any]):
     
     _execute_pipeline(ui_components)
 
-def _should_offer_cleanup_before_augmentation(ui_components: Dict[str, Any]) -> bool:
-    """Check if cleanup should be offered before augmentation"""
-    try:
-        from smartcash.dataset.augmentor import get_augmentation_status
-        from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-        
-        ui_config = extract_augmentation_config(ui_components)
-        target_split = ui_config['augmentation']['target_split']
-        status = get_augmentation_status(ui_config)
-        
-        aug_files = status.get(f'{target_split}_augmented', 0)
-        prep_files = status.get(f'{target_split}_preprocessed', 0)
-        
-        return (aug_files > 0 or prep_files > 0)
-    except Exception:
-        return False
-
-def _show_cleanup_before_augmentation_dialog(ui_components: Dict[str, Any]):
-    """Show cleanup dialog menggunakan Dialog API"""
-    from smartcash.ui.components.dialogs import DialogFactory
-    from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-    
-    ui_config = extract_augmentation_config(ui_components)
-    target_split = ui_config['augmentation']['target_split']
-    
-    def on_delete_and_continue():
-        """Delete dan continue dengan augmentation"""
-        _execute_cleanup_then_augmentation(ui_components)
-    
-    def on_just_delete():
-        """Hanya delete tanpa continue"""
-        handle_cleanup_with_confirmation(ui_components, skip_confirmation=True)
-    
-    def on_cancel():
-        """Cancel operation"""
-        from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
-        log_to_ui(ui_components, "❌ Augmentasi dibatalkan", "info")
-    
-    # Create custom dialog dengan 3 options
-    factory = DialogFactory()
-    
-    message = f"""File augmented ditemukan untuk split '{target_split}'.
-
-🔍 Pilihan tindakan:
-• Delete & Continue: Hapus file existing, lanjut augmentasi
-• Just Delete: Hapus file existing saja
-• Cancel: Batalkan operasi
-
-⚠️ File yang akan dihapus:
-- Augmented images (.jpg) dan labels (.txt)
-- Preprocessed images (.npy) dan labels (.txt)"""
-    
-    # Create custom dialog dengan buttons mapping
-    buttons = {
-        "delete_continue": {"text": "🚀 Delete & Continue", "style": "primary"},
-        "just_delete": {"text": "🧹 Just Delete", "style": "warning"},
-        "cancel": {"text": "❌ Cancel", "style": "secondary"}
-    }
-    
-    callbacks = {
-        "on_delete_continue": on_delete_and_continue,
-        "on_just_delete": on_just_delete,
-        "on_cancel": on_cancel
-    }
-    
-    dialog_id = factory.create_custom_dialog(
-        title="File Augmented Ditemukan",
-        message=message,
-        buttons=buttons,
-        callbacks=callbacks,
-        width="500px"
-    )
-    
-    # Get dan display dialog widget
-    dialog_widget = factory.get_dialog_widget(dialog_id)
-    if dialog_widget:
-        confirmation_area = ui_components.get('confirmation_area')
-        if confirmation_area:
-            confirmation_area.clear_output()
-            with confirmation_area:
-                from IPython.display import display
-                display(dialog_widget)
-
-def _execute_cleanup_then_augmentation(ui_components: Dict[str, Any]):
-    """Execute cleanup then continue dengan augmentation"""
-    from smartcash.ui.dataset.augmentation.utils.button_manager import with_button_management
-    
-    @with_button_management
-    def _cleanup_then_augment(ui_components):
-        logger = get_logger('smartcash.ui.dataset.augmentation')
-        
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            progress_tracker.show()
-            progress_tracker.update_overall(0, "Memulai cleanup...")
-        
-        try:
-            from smartcash.dataset.augmentor import cleanup_augmented_data
-            from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
-            
-            ui_config = extract_augmentation_config(ui_components)
-            target_split = ui_config['augmentation']['target_split']
-            
-            # Phase 1: Cleanup
-            if progress_tracker:
-                progress_tracker.update_overall(25, "Menghapus file existing...")
-            
-            log_to_ui(ui_components, f"🧹 Menghapus file augmented untuk {target_split}...", "info")
-            cleanup_result = cleanup_augmented_data(ui_config, target_split, progress_tracker)
-            
-            if cleanup_result.get('status') != 'success':
-                error_msg = f"❌ Cleanup gagal: {cleanup_result.get('message', 'Unknown error')}"
-                logger.error(error_msg)
-                if progress_tracker:
-                    progress_tracker.error(error_msg)
-                return
-            
-            # Log cleanup success
-            total_removed = cleanup_result.get('total_removed', 0)
-            log_to_ui(ui_components, f"✅ Cleanup berhasil: {total_removed} file dihapus", "success")
-            
-            # Phase 2: Continue dengan augmentation
-            if progress_tracker:
-                progress_tracker.update_overall(50, "Memulai augmentasi...")
-            
-            log_to_ui(ui_components, "🚀 Melanjutkan dengan augmentasi pipeline...", "info")
-            _execute_augmentation_pipeline(ui_components)
-            
-        except Exception as e:
-            error_msg = f"❌ Error cleanup & augmentation: {str(e)}"
-            logger.error(error_msg)
-            if progress_tracker:
-                progress_tracker.error(error_msg)
-    
-    _cleanup_then_augment(ui_components)
-
-def _execute_augmentation_pipeline(ui_components: Dict[str, Any]):
-    """Execute core augmentation pipeline"""
-    logger = get_logger('smartcash.ui.dataset.augmentation')
-    
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        progress_tracker.show()
-    
-    try:
-        from smartcash.dataset.augmentor import augment_and_normalize
-        from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-        
-        ui_config = extract_augmentation_config(ui_components)
-        
-        def progress_callback(level, current, total, message):
-            if progress_tracker:
-                progress_pct = int((current/total)*100)
-                if level == 'overall':
-                    progress_tracker.update_overall(progress_pct, message)
-                elif level == 'step':
-                    progress_tracker.update_step(progress_pct, message)
-                elif level == 'current':
-                    progress_tracker.update_current(progress_pct, message)
-        
-        result = augment_and_normalize(
-            config=ui_config,
-            target_split=ui_config['augmentation']['target_split'],
-            progress_tracker=progress_tracker,
-            progress_callback=progress_callback
-        )
-        
-        _handle_pipeline_result(ui_components, result, 'augmentation')
-        
-    except Exception as e:
-        logger.error(f"❌ Augmentation pipeline error: {str(e)}")
-        _handle_operation_error(ui_components, e, 'augmentation pipeline')
-
-def handle_dataset_check(ui_components: Dict[str, Any]):
-    """Handle enhanced dataset check dengan comprehensive analysis"""
-    from smartcash.ui.dataset.augmentation.utils.ui_utils import clear_ui_outputs
-    from smartcash.ui.dataset.augmentation.utils.button_manager import with_button_management
-    
-    @with_button_management
-    def _execute_check(ui_components):
-        clear_ui_outputs(ui_components)
-        
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            progress_tracker.show()
-            progress_tracker.update_overall(0, "Memulai comprehensive dataset check...")
-        
-        try:
-            from smartcash.dataset.augmentor import get_augmentation_status
-            from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-            
-            ui_config = extract_augmentation_config(ui_components)
-            
-            if progress_tracker:
-                progress_tracker.update_overall(25, "Menganalisis raw data...")
-            
-            result = get_augmentation_status(ui_config, progress_tracker)
-            
-            if progress_tracker:
-                progress_tracker.update_overall(100, "Dataset analysis completed")
-            
-            _handle_enhanced_check_result(ui_components, result)
-            
-        except Exception as e:
-            logger = get_logger('smartcash.ui.dataset.augmentation')
-            logger.error(f"❌ Dataset check error: {str(e)}")
-            _handle_operation_error(ui_components, e, 'dataset check')
-    
-    _execute_check(ui_components)
-
 def handle_cleanup_with_confirmation(ui_components: Dict[str, Any], skip_confirmation: bool = False):
-    """Handle cleanup dengan optional confirmation skip menggunakan Dialog API"""
+    """FIXED: Handle cleanup dengan proper confirmation dan execution"""
     from smartcash.ui.dataset.augmentation.utils.ui_utils import clear_ui_outputs
     
     if skip_confirmation:
@@ -271,7 +60,7 @@ def handle_cleanup_with_confirmation(ui_components: Dict[str, Any], skip_confirm
     )
 
 def _execute_cleanup(ui_components: Dict[str, Any]):
-    """Execute cleanup operation dengan enhanced progress tracking"""
+    """FIXED: Execute cleanup operation dengan proper backend integration"""
     from smartcash.ui.dataset.augmentation.utils.button_manager import with_button_management
     
     @with_button_management
@@ -284,15 +73,20 @@ def _execute_cleanup(ui_components: Dict[str, Any]):
             progress_tracker.update_overall(0, "Memulai cleanup...")
         
         try:
-            from smartcash.dataset.augmentor import cleanup_augmented_data
+            # CRITICAL FIX: Use proper service import
+            from smartcash.dataset.augmentor.service import create_augmentation_service
             from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
             
             ui_config = extract_augmentation_config(ui_components)
             
+            # Create service dengan proper config
+            service = create_augmentation_service(ui_config, progress_tracker)
+            
             if progress_tracker:
                 progress_tracker.update_overall(25, "Mencari file yang akan dihapus...")
             
-            result = cleanup_augmented_data(ui_config, progress_tracker=progress_tracker)
+            # Execute cleanup via service
+            result = service.cleanup_augmented_data()
             
             if progress_tracker:
                 progress_tracker.update_overall(100, "Cleanup selesai")
@@ -304,6 +98,194 @@ def _execute_cleanup(ui_components: Dict[str, Any]):
             _handle_operation_error(ui_components, e, 'cleanup')
     
     _cleanup_operation(ui_components)
+
+def _execute_augmentation_pipeline(ui_components: Dict[str, Any]):
+    """FIXED: Execute augmentation pipeline dengan proper backend integration"""
+    logger = get_logger('smartcash.ui.dataset.augmentation')
+    
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        progress_tracker.show()
+    
+    try:
+        # CRITICAL FIX: Use proper service import
+        from smartcash.dataset.augmentor.service import create_augmentation_service
+        from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
+        
+        ui_config = extract_augmentation_config(ui_components)
+        
+        # Create service dengan proper config
+        service = create_augmentation_service(ui_config, progress_tracker)
+        
+        def progress_callback(level, current, total, message):
+            if progress_tracker:
+                progress_pct = int((current/total)*100) if total > 0 else current
+                if level == 'overall':
+                    progress_tracker.update_overall(progress_pct, message)
+                elif level == 'step':
+                    progress_tracker.update_step(progress_pct, message)
+                elif level == 'current':
+                    progress_tracker.update_current(progress_pct, message)
+        
+        result = service.run_augmentation_pipeline(
+            target_split=ui_config['augmentation']['target_split'],
+            progress_callback=progress_callback
+        )
+        
+        _handle_pipeline_result(ui_components, result, 'augmentation')
+        
+    except Exception as e:
+        logger.error(f"❌ Augmentation pipeline error: {str(e)}")
+        _handle_operation_error(ui_components, e, 'augmentation pipeline')
+
+def handle_dataset_check(ui_components: Dict[str, Any]):
+    """FIXED: Handle dataset check dengan proper backend integration"""
+    from smartcash.ui.dataset.augmentation.utils.ui_utils import clear_ui_outputs
+    from smartcash.ui.dataset.augmentation.utils.button_manager import with_button_management
+    
+    @with_button_management
+    def _execute_check(ui_components):
+        clear_ui_outputs(ui_components)
+        
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            progress_tracker.show()
+            progress_tracker.update_overall(0, "Memulai comprehensive dataset check...")
+        
+        try:
+            # CRITICAL FIX: Use proper service import
+            from smartcash.dataset.augmentor.service import create_augmentation_service
+            from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
+            
+            ui_config = extract_augmentation_config(ui_components)
+            
+            if progress_tracker:
+                progress_tracker.update_overall(25, "Menganalisis raw data...")
+            
+            # Create service dan get status
+            service = create_augmentation_service(ui_config, progress_tracker)
+            result = service.get_augmentation_status()
+            
+            if progress_tracker:
+                progress_tracker.update_overall(100, "Dataset analysis completed")
+            
+            _handle_enhanced_check_result(ui_components, result)
+            
+        except Exception as e:
+            logger = get_logger('smartcash.ui.dataset.augmentation')
+            logger.error(f"❌ Dataset check error: {str(e)}")
+            _handle_operation_error(ui_components, e, 'dataset check')
+    
+    _execute_check(ui_components)
+
+def _should_offer_cleanup_before_augmentation(ui_components: Dict[str, Any]) -> bool:
+    """Check if cleanup should be offered before augmentation"""
+    try:
+        from smartcash.dataset.augmentor.service import create_augmentation_service
+        from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
+        
+        ui_config = extract_augmentation_config(ui_components)
+        target_split = ui_config['augmentation']['target_split']
+        
+        # Create service dan check status
+        service = create_augmentation_service(ui_config)
+        status = service.get_augmentation_status()
+        
+        aug_files = status.get(f'{target_split}_augmented', 0)
+        prep_files = status.get(f'{target_split}_preprocessed', 0)
+        
+        return (aug_files > 0 or prep_files > 0)
+    except Exception:
+        return False
+
+def _show_cleanup_before_augmentation_dialog(ui_components: Dict[str, Any]):
+    """Show cleanup dialog menggunakan Dialog API"""
+    from smartcash.ui.components.dialogs import show_confirmation
+    from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
+    
+    ui_config = extract_augmentation_config(ui_components)
+    target_split = ui_config['augmentation']['target_split']
+    
+    def on_cleanup_and_continue():
+        """Cleanup dan continue dengan augmentation"""
+        _execute_cleanup_then_augmentation(ui_components)
+    
+    def on_cancel():
+        """Cancel operation"""
+        from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+        log_to_ui(ui_components, "❌ Augmentasi dibatalkan", "info")
+    
+    message = f"""File augmented ditemukan untuk split '{target_split}'.
+
+Apakah Anda ingin menghapus file existing dan melanjutkan augmentasi?
+
+⚠️ File yang akan dihapus:
+- Augmented images (.jpg) dan labels (.txt)
+- Preprocessed images (.npy) dan labels (.txt)"""
+    
+    show_confirmation(
+        title="File Augmented Ditemukan",
+        message=message,
+        on_confirm=on_cleanup_and_continue,
+        on_cancel=on_cancel
+    )
+
+def _execute_cleanup_then_augmentation(ui_components: Dict[str, Any]):
+    """Execute cleanup then continue dengan augmentation"""
+    from smartcash.ui.dataset.augmentation.utils.button_manager import with_button_management
+    
+    @with_button_management
+    def _cleanup_then_augment(ui_components):
+        logger = get_logger('smartcash.ui.dataset.augmentation')
+        
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker:
+            progress_tracker.show()
+            progress_tracker.update_overall(0, "Memulai cleanup...")
+        
+        try:
+            from smartcash.dataset.augmentor.service import create_augmentation_service
+            from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
+            from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+            
+            ui_config = extract_augmentation_config(ui_components)
+            target_split = ui_config['augmentation']['target_split']
+            
+            # Create service
+            service = create_augmentation_service(ui_config, progress_tracker)
+            
+            # Phase 1: Cleanup
+            if progress_tracker:
+                progress_tracker.update_overall(25, "Menghapus file existing...")
+            
+            log_to_ui(ui_components, f"🧹 Menghapus file augmented untuk {target_split}...", "info")
+            cleanup_result = service.cleanup_augmented_data(target_split)
+            
+            if cleanup_result.get('status') != 'success':
+                error_msg = f"❌ Cleanup gagal: {cleanup_result.get('message', 'Unknown error')}"
+                logger.error(error_msg)
+                if progress_tracker:
+                    progress_tracker.error(error_msg)
+                return
+            
+            # Log cleanup success
+            total_removed = cleanup_result.get('total_removed', 0)
+            log_to_ui(ui_components, f"✅ Cleanup berhasil: {total_removed} file dihapus", "success")
+            
+            # Phase 2: Continue dengan augmentation
+            if progress_tracker:
+                progress_tracker.update_overall(50, "Memulai augmentasi...")
+            
+            log_to_ui(ui_components, "🚀 Melanjutkan dengan augmentasi pipeline...", "info")
+            _execute_augmentation_pipeline(ui_components)
+            
+        except Exception as e:
+            error_msg = f"❌ Error cleanup & augmentation: {str(e)}"
+            logger.error(error_msg)
+            if progress_tracker:
+                progress_tracker.error(error_msg)
+    
+    _cleanup_then_augment(ui_components)
 
 def _show_validation_errors(ui_components: Dict[str, Any], validation: Dict[str, Any]):
     """Show validation errors menggunakan Dialog API"""
@@ -336,7 +318,7 @@ def _handle_pipeline_result(ui_components: Dict[str, Any], result: Dict[str, Any
         if progress_tracker:
             progress_tracker.complete(success_msg)
         
-        # Log enhanced summary dari result
+        # Log enhanced summary
         pipeline_summary = result.get('pipeline_summary', {})
         if pipeline_summary:
             overall = pipeline_summary.get('overall', {})

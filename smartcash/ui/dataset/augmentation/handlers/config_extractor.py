@@ -1,14 +1,14 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_extractor.py
-Deskripsi: Config extractor dengan intensity support dan backend integration
+Deskripsi: Fixed config extractor dengan backend structure dan proper validation
 """
 
 from typing import Dict, Any
 
 def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extract config dengan intensity support dan backend integration
-    Base dari defaults + form values untuk backend compatibility
+    Extract config dengan backend structure dan comprehensive validation
+    Base dari defaults + form values untuk service compatibility
     """
     from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
     
@@ -22,7 +22,7 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     aug_config = config['augmentation']
     aug_config['num_variations'] = get_value('num_variations', 2)
     aug_config['target_count'] = get_value('target_count', 500)
-    aug_config['intensity'] = get_value('intensity', 0.7)  # NEW: Added intensity extraction
+    aug_config['intensity'] = get_value('intensity', 0.7)
     aug_config['output_prefix'] = get_value('output_prefix', 'aug')
     aug_config['balance_classes'] = get_value('balance_classes', True)
     aug_config['target_split'] = get_value('target_split', 'train')
@@ -51,9 +51,9 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     combined['brightness_limit'] = aug_config['lighting']['brightness_limit']
     combined['contrast_limit'] = aug_config['lighting']['contrast_limit']
     
-    # NEW: Apply intensity scaling to all parameters
+    # Apply intensity scaling to all parameters
     intensity = aug_config['intensity']
-    if intensity != 1.0:  # Only scale if not default
+    if intensity != 1.0:
         _apply_intensity_scaling(aug_config, intensity)
     
     # Preprocessing/Normalization
@@ -61,24 +61,21 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     preprocessing['method'] = get_value('norm_method', 'minmax')
     preprocessing['denormalize'] = get_value('denormalize', False)
     
-    # Backend integration metadata
-    config['backend'].update({
+    # CRITICAL FIX: Ensure backend structure exists
+    config['backend'] = {
+        'service_enabled': True,
+        'progress_tracking': True,
+        'async_processing': False,
         'extracted_at': _get_timestamp(),
-        'ui_version': '2.1',  # Updated version dengan intensity
+        'ui_version': '2.1',
         'form_validated': _validate_extracted_config(config),
         'intensity_applied': intensity != 1.0
-    })
+    }
     
     return config
 
 def _apply_intensity_scaling(aug_config: Dict[str, Any], intensity: float) -> None:
-    """
-    NEW: Apply intensity scaling to augmentation parameters
-    
-    Args:
-        aug_config: Augmentation configuration
-        intensity: Intensity factor (0.1-1.0)
-    """
+    """Apply intensity scaling to augmentation parameters"""
     # Scale position parameters
     position = aug_config['position']
     position['horizontal_flip'] = min(1.0, position['horizontal_flip'] * intensity)
@@ -114,7 +111,7 @@ def _validate_extracted_config(config: Dict[str, Any]) -> bool:
         return False
     if not (100 <= aug_config.get('target_count', 0) <= 2000):
         return False
-    if not (0.1 <= aug_config.get('intensity', 0) <= 1.0):  # NEW: Intensity validation
+    if not (0.1 <= aug_config.get('intensity', 0) <= 1.0):
         return False
     
     return True

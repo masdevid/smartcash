@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/defaults.py
-Deskripsi: Default config minimal sesuai form fields yang ada
+Deskripsi: Fixed default config dengan backend structure yang lengkap
 """
 
 from typing import Dict, Any
 
 def get_default_augmentation_config() -> Dict[str, Any]:
-    """Default config minimal fokus pada form fields dan backend essentials"""
+    """Default config dengan backend structure yang lengkap untuk service compatibility"""
     return {
         # Data paths - backend essentials
         'data': {
@@ -56,6 +56,17 @@ def get_default_augmentation_config() -> Dict[str, Any]:
                 'denormalize': False,     # denormalize checkbox
                 'target_size': [640, 640]
             }
+        },
+        
+        # CRITICAL FIX: Backend structure yang diharapkan service
+        'backend': {
+            'service_enabled': True,
+            'progress_tracking': True,
+            'async_processing': False,
+            'max_workers': 4,
+            'timeout_seconds': 300,
+            'retry_count': 3,
+            'validation_enabled': True
         },
         
         # Backend essentials only

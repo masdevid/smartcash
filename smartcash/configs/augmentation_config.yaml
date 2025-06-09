@@ -1,34 +1,34 @@
 # File: configs/augmentation_config.yaml
-# Deskripsi: Config minimal untuk form fields dan backend essentials
+# Deskripsi: Config sesuai struktur defaults.py dengan backend structure lengkap
 
-# Data paths
+# Data paths - backend essentials
 data:
   dir: 'data'
 
 # Form fields mapping
 augmentation:
-  # Basic options (dari basic_opts_widget)
-  num_variations: 2          # IntSlider 1-10
-  target_count: 500          # IntSlider 100-2000
-  intensity: 0.7             # FloatSlider 0.1-1.0
-  output_prefix: 'aug'       # Text input
+  # Basic form fields
+  num_variations: 2          # IntSlider
+  target_count: 500          # IntSlider  
+  intensity: 0.7             # FloatSlider
+  output_prefix: 'aug'       # Text
   balance_classes: true      # Checkbox
   target_split: 'train'      # Dropdown
   types: ['combined']        # SelectMultiple
   
-  # Position parameters (dari advanced_opts_widget)
+  # Advanced form fields (position)
   position:
     horizontal_flip: 0.5     # fliplr slider
     rotation_limit: 12       # degrees slider
     translate_limit: 0.08    # translate slider
     scale_limit: 0.04        # scale slider
   
-  # Lighting parameters
+  # Advanced form fields (lighting)
   lighting:
     brightness_limit: 0.2    # brightness slider
     contrast_limit: 0.15     # contrast slider
   
-  # Combined (sync dengan position + lighting)
+  # Combined params (sync dengan position + lighting)
   combined:
     horizontal_flip: 0.5
     rotation_limit: 12
@@ -37,20 +37,30 @@ augmentation:
     brightness_limit: 0.2
     contrast_limit: 0.15
 
-# Normalization (dari normalization_opts_widget)
+# Normalization form fields
 preprocessing:
   normalization:
     method: 'minmax'         # norm_method dropdown
     denormalize: false       # denormalize checkbox
     target_size: [640, 640]
 
-# Backend essentials
+# Backend structure yang diharapkan service
+backend:
+  service_enabled: true
+  progress_tracking: true
+  async_processing: false
+  max_workers: 4
+  timeout_seconds: 300
+  retry_count: 3
+  validation_enabled: true
+
+# Backend essentials only
 balancing:
   enabled: true
   layer_weights:
-    layer1: 1.0              # Banknote detection
-    layer2: 0.8              # Nominal detection
-    layer3: 0.5              # Security features
+    layer1: 1.0
+    layer2: 0.8
+    layer3: 0.5
 
 file_processing:
   max_workers: 4

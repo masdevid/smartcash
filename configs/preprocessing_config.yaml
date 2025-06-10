@@ -1,45 +1,85 @@
 # File: configs/preprocessing_config.yaml
-# Deskripsi: Konfigurasi untuk preprocessing dataset SmartCash
-data:
-  dir: 'data'
-  splits:
-    train: 'data/train'
-    valid: 'data/valid'
-    test: 'data/test'
-  output:
-    preprocessed: 'data/preprocessed'
+# Deskripsi: Enhanced konfigurasi preprocessing dengan validasi dan multi-split support
 
-# Konfigurasi preprocessing
+_base_: 'base_config.yaml'
+
+# Enhanced preprocessing configuration
 preprocessing:
-  enabled: true  # Aktifkan preprocessing
+  enabled: true
+  output_dir: 'data/preprocessed'
+  save_visualizations: false
+  vis_dir: 'visualizations/preprocessing'
+  sample_size: 0
+  target_splits: ['train', 'valid']  # Multi-select splits
+  force_reprocess: false
   
-  # Pengaturan validasi
+  # Enhanced validation settings
   validation:
-    enabled: true    # Aktifkan validasi
-    move_invalid: true  # Pindahkan file yang tidak valid
-    fix_issues: false   # Coba perbaiki masalah otomatis
-  
-  # Pengaturan normalisasi
+    enabled: true
+    fix_issues: true
+    move_invalid: true
+    invalid_dir: 'data/invalid'
+    visualize: false
+    check_image_quality: true
+    check_labels: true
+    check_coordinates: true
+    check_uuid_consistency: true
+    
+  # Enhanced normalization dengan aspect ratio
   normalization:
-    method: 'minmax'  # minmax|standard|imagenet|none
-    target_size: [640, 640]  # Ukuran target untuk YOLO
-    preserve_aspect_ratio: true
-    denormalize: false  # Simpan dalam format ternormalisasi
-  
-  # Pengaturan output
-  output:
-    create_npy: true  # Buat file .npy
-    organize_by_split: true  # Kelompokkan berdasarkan train/valid/test
+    enabled: true
+    method: 'minmax'
+    target_size: [640, 640]
+    preserve_aspect_ratio: true  # Preserve aspect ratio option
+    normalize_pixel_values: true
+    pixel_range: [0, 1]
+    
+  # Analysis settings
+  analysis:
+    enabled: false
+    class_balance: true
+    image_size_distribution: true
+    bbox_statistics: true
+    layer_balance: true
+    
+  # Balance settings
+  balance:
+    enabled: false
+    target_distribution: 'auto'
+    methods:
+      undersampling: false
+      oversampling: true
+      augmentation: true
+    min_samples_per_class: 100
+    max_samples_per_class: 1000
 
-# Pola penamaan file
-file_naming:
-  preprocessed_pattern: 'pre_{nominal}_{uuid}_{increment}'
-  preserve_uuid: true  # Pertahankan UUID konsisten
-  sequence_padding: 3                    # Padding untuk increment (001, 002, dst)
-
-# File processing configuration
-file_processing:
-  # Threading settings
-  max_workers: 4                         # Max threads for parallel processing
-  batch_size: 50                         # Files per batch
+# Enhanced performance settings
+performance:
+  batch_size: 32  # Batch size untuk processing
+  use_gpu: true
+  compression_level: 90
+  max_memory_usage_gb: 4.0
+  use_mixed_precision: true
   
+  # Threading configuration (removed worker slider)
+  threading:
+    io_workers: 8
+    cpu_workers: null  # Auto-detect
+    parallel_threshold: 100
+    batch_processing: true
+
+# Enhanced cleanup configuration
+cleanup:
+  augmentation_patterns:
+    - 'aug_.*'
+    - '.*_augmented.*'
+    - '.*_modified.*'
+    - '.*_processed.*'
+    - '.*_norm.*'
+  ignored_patterns:
+    - '.*\.gitkeep'
+    - '.*\.DS_Store'
+    - '.*\.gitignore'
+  backup_dir: 'data/backup/preprocessing'
+  backup_enabled: false
+  auto_cleanup_preprocessed: false

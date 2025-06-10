@@ -3,7 +3,7 @@ File: smartcash/dataset/augmentor/utils/progress_bridge.py
 Deskripsi: Bridge untuk kompatibilitas dengan dual/triple progress tracker API
 """
 
-from typing import Optional, Callable, Any
+from typing import Callable, Any
 
 class ProgressBridge:
     """🌉 Bridge untuk kompatibilitas dengan progress tracker API yang berbeda"""

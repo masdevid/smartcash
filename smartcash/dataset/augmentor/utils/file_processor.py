@@ -4,7 +4,7 @@ Deskripsi: File processor untuk handling input files dengan format naming yang b
 """
 
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 import glob
 
 class FileProcessor:

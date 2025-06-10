@@ -105,21 +105,12 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         # Create confirmation area
         confirmation_area = _create_confirmation_area()
         
-        # Progress tracker with fallback
-        try:
-            progress_tracker_components = create_dual_progress_tracker(
-                operation="Dataset Preprocessing",
-                auto_hide=False
-            )
-            if isinstance(progress_tracker_components, dict):
-                progress_tracker = progress_tracker_components.get('tracker')
-                progress_container = progress_tracker_components.get('container', widgets.VBox([]))
-            else:
-                progress_tracker = progress_tracker_components
-                progress_container = widgets.VBox([progress_tracker])
-        except Exception as e:
-            progress_tracker = None
-            progress_container = _create_error_component('Progress Tracker', str(e))
+        # Progress tracker dengan container
+        progress_tracker = create_dual_progress_tracker(
+            primary_label="📊 Progres Preprocessing",
+            secondary_label="🔄 Proses File"
+        )
+        progress_container = progress_tracker.container  # Akses container widget
         
         # Log accordion with fallback
         try:
@@ -181,7 +172,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
                 'save_reset_buttons': save_reset_buttons,
                 'action_buttons': action_buttons,
                 'confirmation_area': confirmation_area,
-                'progress_tracker': progress_tracker,
+                'progress_tracker': progress_tracker,  # Simpan objek asli
                 'progress_container': progress_container,
                 'log_output': log_output,
                 'log_accordion': log_accordion,

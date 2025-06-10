@@ -23,9 +23,9 @@ class PreprocessingInitializer(CommonInitializer):
         """Create UI components dengan minimal structure"""
         ui_components = create_preprocessing_main_ui(config)
         
-        # Pastikan progress_tracker adalah widget jika ada
-        if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'widget'):
-            ui_components['progress_tracker'] = ui_components['progress_tracker'].widget
+        # Pastikan progress_tracker diakses melalui container
+        if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'container'):
+            ui_components['progress_tracker'] = ui_components['progress_tracker'].container
             
         ui_components.update({
             'preprocessing_initialized': True,
@@ -66,9 +66,11 @@ class PreprocessingInitializer(CommonInitializer):
         """Minimal critical components yang harus ada"""
         return [
             'ui',
-           
+            'progress_tracker',
+            'log_accordion',
+            'action_buttons'
         ]
-
+    
 # Global instance
 _preprocessing_initializer = PreprocessingInitializer()
 

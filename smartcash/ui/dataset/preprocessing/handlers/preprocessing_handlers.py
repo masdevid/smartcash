@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py
-Deskripsi: Fixed handlers dengan proper progress integration mengikuti pola augmentation
+Deskripsi: Fixed handlers dengan working progress integration dan proper UI state management
 """
 
 from typing import Dict, Any
@@ -8,16 +8,13 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.preprocessing.utils.ui_utils import (
     clear_outputs, handle_ui_error, show_ui_success, log_to_accordion
 )
-from smartcash.ui.dataset.preprocessing.utils.progress_utils import (
-    setup_progress_tracking, complete_progress_tracking, error_progress_tracking
-)
 from smartcash.ui.dataset.preprocessing.utils.button_manager import (
     disable_operation_buttons, enable_operation_buttons
 )
 from smartcash.ui.dataset.preprocessing.utils.backend_utils import (
     validate_dataset_ready, check_preprocessed_exists,
     create_backend_preprocessor_with_progress, create_backend_checker, 
-    create_backend_cleanup_service_with_progress, _convert_ui_to_backend_config
+    create_backend_cleanup_service_with_progress, _extract_and_enhance_config
 )
 from smartcash.ui.dataset.preprocessing.utils.confirmation_utils import (
     show_preprocessing_confirmation, show_cleanup_confirmation, 
@@ -25,7 +22,7 @@ from smartcash.ui.dataset.preprocessing.utils.confirmation_utils import (
 )
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """🔧 Setup handlers dengan fixed progress integration"""
+    """🔧 Setup handlers dengan working progress integration"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -35,7 +32,7 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
         # Setup operation handlers (dengan working progress integration)
         _setup_operation_handlers_fixed(ui_components, config)
         
-        logger.info("✅ Preprocessing handlers setup dengan fixed progress integration")
+        logger.info("✅ Preprocessing handlers setup dengan working progress integration")
         return ui_components
         
     except Exception as e:
@@ -90,16 +87,16 @@ def _setup_config_handlers_fixed(ui_components: Dict[str, Any]):
         reset_button.on_click(simple_reset_config)
 
 def _setup_operation_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """🔧 Setup operation handlers dengan fixed progress integration pattern"""
+    """🔧 Setup operation handlers dengan working progress integration"""
     
     def preprocessing_handler(button=None):
-        return _handle_preprocessing_request_fixed(ui_components, config)
+        return _handle_preprocessing_request_working(ui_components, config)
     
     def check_handler(button=None):
-        return _execute_check_operation_fixed(ui_components, config)
+        return _execute_check_operation_working(ui_components, config)
     
     def cleanup_handler(button=None):
-        return _handle_cleanup_request_fixed(ui_components, config)
+        return _handle_cleanup_request_working(ui_components, config)
     
     # Bind handlers
     if preprocess_button := ui_components.get('preprocess_button'):
@@ -109,8 +106,8 @@ def _setup_operation_handlers_fixed(ui_components: Dict[str, Any], config: Dict[
     if cleanup_button := ui_components.get('cleanup_button'):
         cleanup_button.on_click(cleanup_handler)
 
-def _handle_preprocessing_request_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """🚀 Handle preprocessing request dengan fixed confirmation dan progress"""
+def _handle_preprocessing_request_working(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """🚀 Handle preprocessing request dengan working confirmation dan progress"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -118,7 +115,7 @@ def _handle_preprocessing_request_fixed(ui_components: Dict[str, Any], config: D
         
         # Check confirmation state
         if should_execute_operation(ui_components, 'preprocessing'):
-            return _execute_preprocessing_with_progress(ui_components, config)
+            return _execute_preprocessing_with_working_progress(ui_components, config)
         
         if is_confirmation_pending(ui_components):
             log_to_accordion(ui_components, "⏳ Menunggu konfirmasi user...", "info")
@@ -128,7 +125,7 @@ def _handle_preprocessing_request_fixed(ui_components: Dict[str, Any], config: D
         disable_operation_buttons(ui_components)
         
         log_to_accordion(ui_components, "🔍 Validating dataset before confirmation...", "info")
-        backend_config = _convert_ui_to_backend_config(ui_components)
+        backend_config = _extract_and_enhance_config(ui_components)
         
         is_valid, validation_msg = validate_dataset_ready(backend_config)
         if not is_valid:
@@ -151,31 +148,44 @@ def _handle_preprocessing_request_fixed(ui_components: Dict[str, Any], config: D
         handle_ui_error(ui_components, error_msg)
         return False
 
-def _execute_preprocessing_with_progress(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """🔧 Execute preprocessing dengan fixed progress integration"""
+def _execute_preprocessing_with_working_progress(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """🔧 Execute preprocessing dengan WORKING progress integration"""
     logger = get_logger('preprocessing_handlers')
     
     try:
-        # 🎯 CRITICAL: Setup progress tracking SEBELUM create service
-        setup_progress_tracking(ui_components, "Dataset Preprocessing")
-        
-        # Show progress tracker
+        # 🎯 CRITICAL: Force show progress tracker dengan visibility fix
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'show'):
-            progress_tracker.show()
+        if progress_tracker:
+            # Ensure container is visible
+            if hasattr(progress_tracker, 'container'):
+                container = progress_tracker.container
+                if hasattr(container, 'layout'):
+                    container.layout.visibility = 'visible'
+                    container.layout.display = 'flex'
+                    container.layout.height = 'auto'
+            
+            # Call show method if available
+            if hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
+            
+            # Initialize progress
+            if hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(0, "🚀 Memulai preprocessing...")
         
         log_to_accordion(ui_components, "🏗️ Creating preprocessing service dengan progress integration...", "info")
         
         # 🔑 KEY: Create service dengan UI components untuk progress integration
         service = create_backend_preprocessor_with_progress(ui_components)
         if not service:
-            error_progress_tracking(ui_components, "Service creation failed")
-            handle_ui_error(ui_components, "Failed to create preprocessing service")
-            enable_operation_buttons(ui_components)
+            _error_cleanup(ui_components, "Failed to create preprocessing service")
             return False
         
         # 🚀 Execute preprocessing dengan integrated progress
         log_to_accordion(ui_components, "🚀 Starting preprocessing pipeline...", "info")
+        
+        # Update progress manually untuk start
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(5, "Pipeline starting...")
         
         # ✅ Service sudah memiliki progress callback terintegrasi
         result = service.preprocess_dataset()
@@ -189,10 +199,15 @@ def _execute_preprocessing_with_progress(ui_components: Dict[str, Any], config: 
             success_message = f"Preprocessing berhasil: {processed_count:,} gambar diproses dalam {processing_time:.1f} detik (Success rate: {success_rate})"
             
             # Complete progress
-            complete_progress_tracking(ui_components, success_message)
+            if progress_tracker:
+                if hasattr(progress_tracker, 'complete'):
+                    progress_tracker.complete(success_message)
+                elif hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(100, "✅ Selesai")
+            
             show_ui_success(ui_components, success_message)
             
-            # Log detailed stats (TANPA backend log untuk avoid double)
+            # Log detailed stats
             if normalized_count := stats.get('output', {}).get('total_normalized', 0):
                 log_to_accordion(ui_components, f"🎨 Normalisasi: {normalized_count:,} gambar", "info")
             
@@ -200,21 +215,17 @@ def _execute_preprocessing_with_progress(ui_components: Dict[str, Any], config: 
             return True
         else:
             error_msg = result.get('message', 'Preprocessing failed')
-            error_progress_tracking(ui_components, error_msg)
-            handle_ui_error(ui_components, error_msg)
-            enable_operation_buttons(ui_components)
+            _error_cleanup(ui_components, error_msg)
             return False
             
     except Exception as e:
         error_msg = f"Preprocessing execution error: {str(e)}"
         logger.error(error_msg)
-        error_progress_tracking(ui_components, error_msg)
-        handle_ui_error(ui_components, error_msg)
-        enable_operation_buttons(ui_components)
+        _error_cleanup(ui_components, error_msg)
         return False
 
-def _handle_cleanup_request_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """🧹 Handle cleanup request dengan fixed progress integration"""
+def _handle_cleanup_request_working(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """🧹 Handle cleanup request dengan working progress integration"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -222,7 +233,7 @@ def _handle_cleanup_request_fixed(ui_components: Dict[str, Any], config: Dict[st
         
         # Check confirmation state
         if should_execute_operation(ui_components, 'cleanup'):
-            return _execute_cleanup_with_progress(ui_components, config)
+            return _execute_cleanup_with_working_progress(ui_components, config)
         
         if is_confirmation_pending(ui_components):
             log_to_accordion(ui_components, "⏳ Menunggu konfirmasi user...", "info")
@@ -232,7 +243,7 @@ def _handle_cleanup_request_fixed(ui_components: Dict[str, Any], config: Dict[st
         disable_operation_buttons(ui_components)
         
         log_to_accordion(ui_components, "🔍 Checking preprocessed data...", "info")
-        backend_config = _convert_ui_to_backend_config(ui_components)
+        backend_config = _extract_and_enhance_config(ui_components)
         
         exists, detailed_msg = check_preprocessed_exists(backend_config)
         if not exists:
@@ -254,31 +265,44 @@ def _handle_cleanup_request_fixed(ui_components: Dict[str, Any], config: Dict[st
         handle_ui_error(ui_components, error_msg)
         return False
 
-def _execute_cleanup_with_progress(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """🔧 Execute cleanup dengan fixed progress integration"""
+def _execute_cleanup_with_working_progress(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """🔧 Execute cleanup dengan WORKING progress integration"""
     logger = get_logger('preprocessing_handlers')
     
     try:
-        # Setup progress tracking
-        setup_progress_tracking(ui_components, "Dataset Cleanup")
-        
-        # Show progress tracker
+        # 🎯 CRITICAL: Force show progress tracker
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'show'):
-            progress_tracker.show()
+        if progress_tracker:
+            # Ensure container is visible
+            if hasattr(progress_tracker, 'container'):
+                container = progress_tracker.container
+                if hasattr(container, 'layout'):
+                    container.layout.visibility = 'visible'
+                    container.layout.display = 'flex'
+                    container.layout.height = 'auto'
+            
+            # Call show method if available
+            if hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
+            
+            # Initialize progress
+            if hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(0, "🗑️ Memulai cleanup...")
         
         log_to_accordion(ui_components, "🏗️ Creating cleanup service dengan progress integration...", "info")
         
         # 🔑 KEY: Create cleanup service dengan UI components untuk progress
         cleanup_service = create_backend_cleanup_service_with_progress(ui_components)
         if not cleanup_service:
-            error_progress_tracking(ui_components, "Service creation failed")
-            handle_ui_error(ui_components, "Failed to create cleanup service")
-            enable_operation_buttons(ui_components)
+            _error_cleanup(ui_components, "Failed to create cleanup service")
             return False
         
         # Execute cleanup dengan integrated progress
         log_to_accordion(ui_components, "🗑️ Starting cleanup process...", "info")
+        
+        # Update progress manually untuk start
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(5, "Cleanup starting...")
         
         result = cleanup_service.cleanup_preprocessed_data()
         
@@ -289,7 +313,12 @@ def _execute_cleanup_with_progress(ui_components: Dict[str, Any], config: Dict[s
             success_message = f"Cleanup berhasil: {files_removed:,} file dihapus"
             
             # Complete progress
-            complete_progress_tracking(ui_components, success_message)
+            if progress_tracker:
+                if hasattr(progress_tracker, 'complete'):
+                    progress_tracker.complete(success_message)
+                elif hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(100, "✅ Cleanup selesai")
+            
             show_ui_success(ui_components, success_message)
             
             # Log cleanup details
@@ -299,35 +328,44 @@ def _execute_cleanup_with_progress(ui_components: Dict[str, Any], config: Dict[s
             return True
         else:
             error_msg = result.get('message', 'Cleanup failed')
-            error_progress_tracking(ui_components, error_msg)
-            handle_ui_error(ui_components, error_msg)
-            enable_operation_buttons(ui_components)
+            _error_cleanup(ui_components, error_msg)
             return False
             
     except Exception as e:
         error_msg = f"Cleanup execution error: {str(e)}"
         logger.error(error_msg)
-        error_progress_tracking(ui_components, error_msg)
-        handle_ui_error(ui_components, error_msg)
-        enable_operation_buttons(ui_components)
+        _error_cleanup(ui_components, error_msg)
         return False
 
-def _execute_check_operation_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """🔍 Execute dataset check dengan fixed progress integration"""
+def _execute_check_operation_working(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """🔍 Execute dataset check dengan working progress integration"""
     logger = get_logger('preprocessing_handlers')
     
     try:
         clear_outputs(ui_components)
         disable_operation_buttons(ui_components)
-        setup_progress_tracking(ui_components, "Dataset Validation")
         
-        # Show progress tracker
+        # 🎯 CRITICAL: Force show progress tracker
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, 'show'):
-            progress_tracker.show()
+        if progress_tracker:
+            # Ensure container is visible
+            if hasattr(progress_tracker, 'container'):
+                container = progress_tracker.container
+                if hasattr(container, 'layout'):
+                    container.layout.visibility = 'visible'
+                    container.layout.display = 'flex'
+                    container.layout.height = 'auto'
+            
+            # Call show method if available
+            if hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
+            
+            # Initialize progress
+            if hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(0, "🔍 Memulai validasi...")
         
         # Get backend config
-        backend_config = _convert_ui_to_backend_config(ui_components)
+        backend_config = _extract_and_enhance_config(ui_components)
         
         # Check source dataset
         log_to_accordion(ui_components, "🔍 Checking source dataset...", "info")
@@ -359,7 +397,13 @@ def _execute_check_operation_fixed(ui_components: Dict[str, Any], config: Dict[s
         final_message = " | ".join(results)
         
         if is_valid:
-            complete_progress_tracking(ui_components, "Dataset check completed")
+            # Complete progress
+            if progress_tracker:
+                if hasattr(progress_tracker, 'complete'):
+                    progress_tracker.complete("Dataset check completed")
+                elif hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(100, "✅ Check selesai")
+            
             show_ui_success(ui_components, final_message)
             
             # Log detailed info
@@ -369,15 +413,23 @@ def _execute_check_operation_fixed(ui_components: Dict[str, Any], config: Dict[s
             enable_operation_buttons(ui_components)
             return True
         else:
-            error_progress_tracking(ui_components, source_msg)
-            handle_ui_error(ui_components, final_message)
-            enable_operation_buttons(ui_components)
+            _error_cleanup(ui_components, source_msg)
             return False
             
     except Exception as e:
         error_msg = f"Validation error: {str(e)}"
         logger.error(error_msg)
-        error_progress_tracking(ui_components, error_msg)
-        handle_ui_error(ui_components, error_msg)
-        enable_operation_buttons(ui_components)
+        _error_cleanup(ui_components, error_msg)
         return False
+
+def _error_cleanup(ui_components: Dict[str, Any], error_msg: str):
+    """Cleanup UI state setelah error"""
+    progress_tracker = ui_components.get('progress_tracker')
+    if progress_tracker:
+        if hasattr(progress_tracker, 'error'):
+            progress_tracker.error(error_msg)
+        elif hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(0, f"❌ Error")
+    
+    handle_ui_error(ui_components, error_msg)
+    enable_operation_buttons(ui_components)

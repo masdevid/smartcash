@@ -1,148 +1,151 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/confirmation_utils.py
-Deskripsi: Fixed confirmation utilities dengan immediate response tanpa threading
+Deskripsi: Working confirmation system dengan dialog yang benar-benar muncul dan state management
 """
 
 from typing import Dict, Any, Callable, Optional
 from ipywidgets import VBox, HBox, Button, HTML, Output
 from IPython.display import display, clear_output
 
-def show_cleanup_confirmation(ui_components: Dict[str, Any], detailed_stats: str) -> Optional[bool]:
-    """Fixed cleanup confirmation dengan immediate response"""
+def show_cleanup_confirmation(ui_components: Dict[str, Any], detailed_stats: str):
+    """Show cleanup confirmation dialog yang benar-benar muncul"""
     if 'confirmation_area' not in ui_components:
-        return True  # Default proceed jika no confirmation area
+        return
     
-    # Clear area first
     _clear_confirmation_area(ui_components)
     
-    # Show confirmation dialog
-    return _show_immediate_confirmation(
+    # Create confirmation dialog
+    _create_confirmation_dialog(
         ui_components=ui_components,
         title="⚠️ Konfirmasi Cleanup Dataset",
         message=f"Anda akan menghapus data preprocessed:<br><strong>{detailed_stats}</strong><br><span style='color: #dc3545;'>⚠️ Tindakan ini tidak dapat dibatalkan!</span>",
         confirm_text="Ya, Hapus",
         cancel_text="Batal",
-        danger_mode=True
+        danger_mode=True,
+        operation_type='cleanup'
     )
 
-def show_preprocessing_confirmation(ui_components: Dict[str, Any], message: str = None) -> Optional[bool]:
-    """Fixed preprocessing confirmation dengan immediate response"""
+def show_preprocessing_confirmation(ui_components: Dict[str, Any], message: str = None):
+    """Show preprocessing confirmation dialog yang benar-benar muncul"""
     if 'confirmation_area' not in ui_components:
-        return True
+        return
     
     _clear_confirmation_area(ui_components)
     
-    default_message = "Apakah Anda yakin ingin memulai preprocessing dataset?"
-    return _show_immediate_confirmation(
+    default_message = message or "Apakah Anda yakin ingin memulai preprocessing dataset?"
+    _create_confirmation_dialog(
         ui_components=ui_components,
         title="🔄 Konfirmasi Preprocessing",
-        message=message or default_message,
+        message=default_message,
         confirm_text="Ya, Mulai",
         cancel_text="Batal",
-        danger_mode=False
+        danger_mode=False,
+        operation_type='preprocessing'
     )
 
-def _show_immediate_confirmation(ui_components: Dict[str, Any], title: str, message: str, 
-                               confirm_text: str, cancel_text: str, danger_mode: bool = False) -> Optional[bool]:
-    """Fixed immediate confirmation dengan state tracking yang proper"""
+def _create_confirmation_dialog(ui_components: Dict[str, Any], title: str, message: str, 
+                              confirm_text: str, cancel_text: str, danger_mode: bool = False,
+                              operation_type: str = 'operation'):
+    """Create confirmation dialog yang benar-benar muncul dengan proper handlers"""
     confirmation_area = ui_components['confirmation_area']
     
-    # Result container yang akan dimodifikasi oleh handlers
-    confirmation_result = {'value': None, 'completed': False}
+    # Initialize confirmation state
+    ui_components['_confirmation_state'] = {
+        'waiting': True,
+        'result': None,
+        'operation_type': operation_type
+    }
     
-    # Buttons dengan proper styling
+    # Create buttons
     confirm_style = 'danger' if danger_mode else 'primary'
     confirm_btn = Button(
         description=confirm_text,
         button_style=confirm_style,
         icon='trash' if danger_mode else 'check',
-        layout={'width': '130px', 'margin': '5px'}
+        layout={'width': '140px', 'height': '35px', 'margin': '5px'}
     )
     
     cancel_btn = Button(
         description=cancel_text,
         button_style='',
         icon='times',
-        layout={'width': '100px', 'margin': '5px'}
+        layout={'width': '100px', 'height': '35px', 'margin': '5px'}
     )
     
-    # Event handlers yang langsung mengupdate result
-    def handle_confirm(btn):
-        """Handler konfirmasi yang immediate"""
-        confirmation_result['value'] = True
-        confirmation_result['completed'] = True
+    # Event handlers
+    def on_confirm(btn):
+        """Handle confirmation"""
+        ui_components['_confirmation_state'] = {
+            'waiting': False,
+            'result': True,
+            'operation_type': operation_type
+        }
         
-        # Show immediate feedback
-        _show_immediate_feedback(
-            ui_components, 
-            f"✅ {confirm_text} dikonfirmasi - Melanjutkan operasi...", 
-            "success"
-        )
+        # Show feedback dan execute operation
+        _show_confirmation_feedback(ui_components, f"✅ {confirm_text} - Memulai operasi...", "success")
+        _execute_confirmed_operation(ui_components, operation_type)
     
-    def handle_cancel(btn):
-        """Handler pembatalan yang immediate"""
-        confirmation_result['value'] = False
-        confirmation_result['completed'] = True
+    def on_cancel(btn):
+        """Handle cancellation"""
+        ui_components['_confirmation_state'] = {
+            'waiting': False,
+            'result': False,
+            'operation_type': operation_type
+        }
         
-        # Show immediate feedback  
-        _show_immediate_feedback(
-            ui_components,
-            f"🚫 Operasi dibatalkan",
-            "info"
-        )
+        # Show feedback dan cleanup
+        _show_confirmation_feedback(ui_components, f"🚫 Operasi dibatalkan", "info")
+        _handle_operation_cancelled(ui_components, operation_type)
     
     # Bind handlers
-    confirm_btn.on_click(handle_confirm)
-    cancel_btn.on_click(handle_cancel)
+    confirm_btn.on_click(on_confirm)
+    cancel_btn.on_click(on_cancel)
     
     # Dialog styling
     border_color = '#dc3545' if danger_mode else '#007bff'
     bg_color = '#fff5f5' if danger_mode else '#f8f9fa'
     
     dialog = VBox([
-        HTML(f"<h4 style='color: {border_color}; margin: 0 0 15px 0; text-align: center;'>{title}</h4>"),
-        HTML(f'<div style="margin: 0 0 20px 0; text-align: center; line-height: 1.4;">{message}</div>'),
+        HTML(f"""
+        <div style='text-align: center; margin-bottom: 15px;'>
+            <h3 style='color: {border_color}; margin: 0; font-size: 18px;'>{title}</h3>
+        </div>
+        """),
+        HTML(f"""
+        <div style='margin-bottom: 20px; text-align: center; line-height: 1.5; font-size: 14px;'>
+            {message}
+        </div>
+        """),
         HBox([confirm_btn, cancel_btn], layout={
             'justify_content': 'center',
             'align_items': 'center',
             'margin': '10px 0 0 0'
         })
     ], layout={
-        'padding': '20px',
-        'border': f'2px solid {border_color}',
-        'border_radius': '8px',
+        'padding': '25px',
+        'border': f'3px solid {border_color}',
+        'border_radius': '10px',
         'background_color': bg_color,
         'width': '100%',
-        'max_width': '500px',
-        'margin': '10px auto'
+        'max_width': '550px',
+        'margin': '15px auto',
+        'box_shadow': '0 4px 8px rgba(0,0,0,0.1)'
     })
     
     # Display dialog
     with confirmation_area:
         clear_output(wait=True)
         display(dialog)
-    
-    # Store confirmation components untuk akses dari handler
-    ui_components['_current_confirmation'] = {
-        'result': confirmation_result,
-        'dialog': dialog,
-        'confirm_btn': confirm_btn,
-        'cancel_btn': cancel_btn
-    }
-    
-    # Return None untuk indicate bahwa ini async confirmation
-    # Actual result akan di-check di calling function
-    return None
 
-def _show_immediate_feedback(ui_components: Dict[str, Any], message: str, level: str):
-    """Show immediate feedback tanpa delay"""
+def _show_confirmation_feedback(ui_components: Dict[str, Any], message: str, level: str):
+    """Show confirmation feedback message"""
     confirmation_area = ui_components.get('confirmation_area')
     if not confirmation_area:
         return
     
     colors = {
         'success': '#28a745',
-        'info': '#17a2b8', 
+        'info': '#17a2b8',
         'warning': '#ffc107',
         'error': '#dc3545'
     }
@@ -150,10 +153,11 @@ def _show_immediate_feedback(ui_components: Dict[str, Any], message: str, level:
     color = colors.get(level, '#17a2b8')
     
     feedback_html = HTML(f"""
-    <div style='padding: 15px; background-color: rgba(248,249,250,0.95); 
-               margin: 10px auto; border: 2px solid {color}; 
-               border_radius: 8px; text-align: center; max-width: 500px;'>
-        <span style='color: {color}; font-weight: 600; font-size: 14px;'>{message}</span>
+    <div style='padding: 20px; background-color: rgba(248,249,250,0.95); 
+               margin: 15px auto; border: 2px solid {color}; 
+               border_radius: 8px; text-align: center; max-width: 500px;
+               box_shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+        <span style='color: {color}; font-weight: 600; font-size: 15px;'>{message}</span>
     </div>
     """)
     
@@ -161,41 +165,51 @@ def _show_immediate_feedback(ui_components: Dict[str, Any], message: str, level:
         clear_output(wait=True)
         display(feedback_html)
 
-def check_confirmation_result(ui_components: Dict[str, Any]) -> Optional[bool]:
-    """Check apakah user sudah memberikan konfirmasi"""
-    current_confirmation = ui_components.get('_current_confirmation')
+def _execute_confirmed_operation(ui_components: Dict[str, Any], operation_type: str):
+    """Execute operation setelah konfirmasi diterima"""
+    from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
     
-    if not current_confirmation:
-        return None
-    
-    result = current_confirmation['result']
-    
-    if result['completed']:
-        # Cleanup confirmation state
-        ui_components.pop('_current_confirmation', None)
-        return result['value']
-    
-    return None  # Still waiting for user input
+    if operation_type == 'preprocessing':
+        log_to_accordion(ui_components, "🚀 Konfirmasi diterima - Memulai preprocessing...", "success")
+        _trigger_preprocessing_execution(ui_components)
+    elif operation_type == 'cleanup':
+        log_to_accordion(ui_components, "🗑️ Konfirmasi diterima - Memulai cleanup...", "success")
+        _trigger_cleanup_execution(ui_components)
 
-def wait_for_confirmation(ui_components: Dict[str, Any], timeout_seconds: int = 30) -> Optional[bool]:
-    """Wait for user confirmation dengan polling tanpa threading"""
-    import time
+def _handle_operation_cancelled(ui_components: Dict[str, Any], operation_type: str):
+    """Handle operation cancellation"""
+    from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
+    from smartcash.ui.dataset.preprocessing.utils.button_manager import enable_all_buttons
     
-    start_time = time.time()
+    log_to_accordion(ui_components, f"🚫 {operation_type.capitalize()} dibatalkan oleh user", "info")
     
-    while (time.time() - start_time) < timeout_seconds:
-        result = check_confirmation_result(ui_components)
-        
-        if result is not None:
-            return result
-        
-        # Short sleep untuk avoid busy waiting
-        time.sleep(0.2)
+    # Re-enable buttons
+    enable_all_buttons(ui_components)
     
-    # Timeout - cleanup dan return None
-    ui_components.pop('_current_confirmation', None)
-    _show_immediate_feedback(ui_components, "⏰ Timeout - Operasi dibatalkan", "warning")
-    return None
+    # Clear confirmation area setelah delay
+    import threading
+    def delayed_clear():
+        import time
+        time.sleep(2)
+        _clear_confirmation_area(ui_components)
+    
+    threading.Thread(target=delayed_clear, daemon=True).start()
+
+def _trigger_preprocessing_execution(ui_components: Dict[str, Any]):
+    """Trigger actual preprocessing execution"""
+    # Set flag untuk indicate processing should continue
+    ui_components['_should_execute_preprocessing'] = True
+    
+    # Clear confirmation area
+    _clear_confirmation_area(ui_components)
+
+def _trigger_cleanup_execution(ui_components: Dict[str, Any]):
+    """Trigger actual cleanup execution"""
+    # Set flag untuk indicate cleanup should continue
+    ui_components['_should_execute_cleanup'] = True
+    
+    # Clear confirmation area
+    _clear_confirmation_area(ui_components)
 
 def _clear_confirmation_area(ui_components: Dict[str, Any]):
     """Clear confirmation area"""
@@ -204,76 +218,36 @@ def _clear_confirmation_area(ui_components: Dict[str, Any]):
         with confirmation_area:
             clear_output(wait=True)
     
-    # Also cleanup state
-    ui_components.pop('_current_confirmation', None)
+    # Clear confirmation state
+    ui_components.pop('_confirmation_state', None)
 
-# Enhanced public utilities
+def is_confirmation_pending(ui_components: Dict[str, Any]) -> bool:
+    """Check jika sedang menunggu konfirmasi"""
+    state = ui_components.get('_confirmation_state', {})
+    return state.get('waiting', False)
+
+def should_execute_operation(ui_components: Dict[str, Any], operation_type: str) -> bool:
+    """Check jika operation sudah dikonfirmasi dan should execute"""
+    if operation_type == 'preprocessing':
+        return ui_components.pop('_should_execute_preprocessing', False)
+    elif operation_type == 'cleanup':
+        return ui_components.pop('_should_execute_cleanup', False)
+    return False
+
 def clear_confirmation_area(ui_components: Dict[str, Any]):
     """Public function to clear confirmation area"""
     _clear_confirmation_area(ui_components)
 
-def show_info_message(ui_components: Dict[str, Any], message: str, auto_clear_seconds: int = 0):
+def show_info_message(ui_components: Dict[str, Any], message: str):
     """Show info message dalam confirmation area"""
     if 'confirmation_area' not in ui_components:
         return
     
-    _show_immediate_feedback(ui_components, message, "info")
-    
-    if auto_clear_seconds > 0:
-        # Simple auto clear dengan immediate scheduling
-        import time
-        def delayed_clear():
-            time.sleep(auto_clear_seconds)
-            _clear_confirmation_area(ui_components)
-        
-        # Schedule tanpa threading - caller harus handle
-        ui_components['_clear_scheduled'] = {
-            'time': time.time() + auto_clear_seconds,
-            'action': delayed_clear
-        }
+    _show_confirmation_feedback(ui_components, message, "info")
 
-def show_success_message(ui_components: Dict[str, Any], message: str, auto_clear_seconds: int = 0):
+def show_success_message(ui_components: Dict[str, Any], message: str):
     """Show success message dalam confirmation area"""
     if 'confirmation_area' not in ui_components:
         return
     
-    _show_immediate_feedback(ui_components, message, "success")
-    
-    if auto_clear_seconds > 0:
-        import time
-        ui_components['_clear_scheduled'] = {
-            'time': time.time() + auto_clear_seconds,
-            'action': lambda: _clear_confirmation_area(ui_components)
-        }
-
-def process_scheduled_clear(ui_components: Dict[str, Any]):
-    """Process scheduled clear jika ada"""
-    import time
-    
-    scheduled = ui_components.get('_clear_scheduled')
-    if scheduled and time.time() >= scheduled['time']:
-        try:
-            scheduled['action']()
-        except Exception:
-            pass
-        finally:
-            ui_components.pop('_clear_scheduled', None)
-
-# Synchronous confirmation functions untuk immediate use
-def get_preprocessing_confirmation(ui_components: Dict[str, Any], message: str = None) -> bool:
-    """Synchronous preprocessing confirmation yang langsung return True"""
-    # Untuk sementara return True untuk avoid blocking
-    # Nanti bisa di-enhance dengan proper modal dialog
-    from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
-    
-    default_message = message or "Memulai preprocessing dataset"
-    log_to_accordion(ui_components, f"🚀 {default_message}", "info")
-    return True
-
-def get_cleanup_confirmation(ui_components: Dict[str, Any], detailed_stats: str) -> bool:
-    """Synchronous cleanup confirmation yang langsung return True setelah warning"""
-    from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
-    
-    log_to_accordion(ui_components, f"⚠️ Akan menghapus: {detailed_stats}", "warning")
-    log_to_accordion(ui_components, "🧹 Melanjutkan cleanup (konfirmasi otomatis aktif)", "info")
-    return True
+    _show_confirmation_feedback(ui_components, message, "success")

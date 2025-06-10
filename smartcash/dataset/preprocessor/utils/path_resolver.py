@@ -18,7 +18,7 @@ class PathResolver:
         """
         self.config = config
         self.data_dir = Path(config.get('data', {}).get('dir', 'data'))
-        self.raw_data_dir = self.data_dir / 'raw'
+        self.raw_data_dir = self.data_dir
         self.preprocessed_dir = Path(config.get('data', {}).get('output', {}).get('preprocessed', 'data/preprocessed'))
         
         # Pastikan direktori dasar ada

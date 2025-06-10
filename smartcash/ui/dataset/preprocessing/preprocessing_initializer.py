@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
-Deskripsi: Fixed preprocessing initializer dengan auto load config dan UI update
+Deskripsi: Updated preprocessing initializer dengan critical components yang tepat
 """
 
 from typing import Dict, Any, List
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.preprocessing.components.ui_components import create_p
 from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import setup_preprocessing_handlers
 
 class PreprocessingInitializer(CommonInitializer):
-    """Fixed preprocessing initializer dengan proper config loading"""
+    """Optimized preprocessing initializer dengan updated critical components"""
     
     def __init__(self):
         super().__init__(
@@ -20,7 +20,7 @@ class PreprocessingInitializer(CommonInitializer):
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan config loading"""
+        """Create UI components dengan proper config"""
         ui_components = create_preprocessing_main_ui(config)
         ui_components.update({
             'preprocessing_initialized': True,
@@ -31,31 +31,21 @@ class PreprocessingInitializer(CommonInitializer):
         return ui_components
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan auto config load dan UI update"""
-        # Setup handlers terlebih dahulu
+        """Setup handlers dengan auto config load"""
         result = setup_preprocessing_handlers(ui_components, config, env)
-        
-        # Load config dari file dan update UI
         self._load_and_update_ui(ui_components)
-        
         return result
     
     def _load_and_update_ui(self, ui_components: Dict[str, Any]):
-        """Load config dari file dan update UI"""
+        """Load config dan update UI"""
         try:
             config_handler = ui_components.get('config_handler')
             if config_handler:
-                # Set UI components untuk logging
                 if hasattr(config_handler, 'set_ui_components'):
                     config_handler.set_ui_components(ui_components)
                 
-                # Load config dari file
                 loaded_config = config_handler.load_config()
-                
-                # Update UI dengan loaded config
                 config_handler.update_ui(ui_components, loaded_config)
-                
-                # Update config reference
                 ui_components['config'] = loaded_config
                 
         except Exception as e:
@@ -64,21 +54,27 @@ class PreprocessingInitializer(CommonInitializer):
                 logger.warning(f"⚠️ Error loading config: {str(e)}")
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Get default config untuk preprocessing"""
+        """Get default config"""
         from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
         return get_default_preprocessing_config()
     
     def _get_critical_components(self) -> List[str]:
+        """Updated critical components sesuai dengan UI struktur baru"""
         return [
-            'ui', 'preprocess_button', 'check_button', 'cleanup_button',
-            'save_button', 'reset_button', 'log_output', 'status_panel',
-            'progress_tracker', 'progress_container', 'show_for_operation', 
-            'update_progress', 'complete_operation', 'error_operation', 'reset_all'
+            'ui', 'header', 'status_panel',
+            'preprocess_button', 'check_button', 'cleanup_button',
+            'save_button', 'reset_button',
+            'confirmation_area',
+            'progress_tracker', 'progress_container',
+            'log_output', 'log_accordion',
+            'resolution_dropdown', 'normalization_dropdown', 
+            'target_splits_select', 'batch_size_input',
+            'validation_checkbox', 'preserve_aspect_checkbox'
         ]
 
 # Global instance
 _preprocessing_initializer = PreprocessingInitializer()
 
 def initialize_preprocessing_ui(env=None, config=None, **kwargs):
-    """Factory function untuk preprocessing UI dengan auto config load"""
+    """Factory function untuk preprocessing UI"""
     return _preprocessing_initializer.initialize(env=env, config=config, **kwargs)

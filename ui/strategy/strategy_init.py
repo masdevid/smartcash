@@ -92,7 +92,6 @@ class StrategyInitializer(ConfigCellInitializer):
             return super().initialize(env=env, config=self.config_handler.get_default_config(), **kwargs)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Buat UI components dengan cascading config loading"""
         try:
             # Load cascading config untuk memastikan defaults yang benar
             if not config or len(config) < 5:
@@ -111,9 +110,8 @@ class StrategyInitializer(ConfigCellInitializer):
             self._setup_summary_update_callback(ui_components)
             
             return ui_components
-            
         except Exception as e:
-            self.logger.error(f"❌ Error creating strategy UI: {str(e)}")
+            self.logger.error(f"❌ Error creating training strategy UI: {str(e)}")
             # Fallback ke default config
             default_config = self.config_handler.get_default_config()
             form_components = create_strategy_form(default_config)

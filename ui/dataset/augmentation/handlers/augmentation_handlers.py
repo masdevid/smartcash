@@ -147,7 +147,7 @@ def _execute_backend_operation(ui_components: Dict[str, Any], operation_type: st
                 
                 log_to_ui(ui_components, "🧹 Memulai cleanup augmented files...", "info")
                 # Membersihkan file augmented saja untuk kompatibilitas dengan kode yang ada
-                result = service.cleanup_augmented_data(target='augmented')
+                result = service.cleanup_augmented_data(target_split=ui_config['augmentation']['target_split'])
                 
                 if progress_tracker:
                     progress_tracker.update_overall(100, "Cleanup selesai")

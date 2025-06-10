@@ -68,7 +68,8 @@ class PreprocessingInitializer(CommonInitializer):
             'ui',
             'progress_tracker',
             'log_accordion',
-            'action_buttons'
+            'action_buttons',
+            'new_component'
         ]
     
 # Global instance

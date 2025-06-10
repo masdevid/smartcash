@@ -156,19 +156,9 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         # Return components dictionary
         return {
             'ui': ui,
-            'components': {
-                'header': header,
-                'status_panel': status_panel,
-                'input_container': input_options.get('container', widgets.VBox()),
-                'progress_container': progress_container,
-                'log_output': log_output,
-                'log_accordion': log_accordion,
-                'action_buttons': action_buttons,
-                'confirmation_area': confirmation_area,
-                'save_reset_buttons': save_reset_buttons,
-                'config_section': config_section,
-                'progress_tracker': progress_tracker
-            }
+            'progress_tracker': progress_tracker,
+            'log_accordion': log_accordion,
+            'action_buttons': action_buttons
         }
         
     except Exception as e:

@@ -1,13 +1,11 @@
-"""
-File: smartcash/model/service/training_service.py
-Deskripsi: Simplified training service dengan UI integration dan progress tracking
-"""
+"""TrainingService untuk modul training SmartCash"""
 
 import torch
 import time
 import numpy as np
 from typing import Dict, Optional, Any, Callable
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import ModelTrainingError
@@ -15,6 +13,8 @@ from smartcash.model.service.progress_tracker import ProgressTracker
 from smartcash.model.service.metrics_tracker import MetricsTracker
 from smartcash.model.service.checkpoint_service import CheckpointService
 from smartcash.model.service.callback_interfaces import CallbackType
+from smartcash.common.environment import EnvironmentManager
+from smartcash.model.manager import ModelManager
 
 class TrainingService:
     """Simplified training service dengan UI integration dan one-liner style"""
@@ -121,6 +121,10 @@ class TrainingService:
                 
                 # Checkpoint saving
                 self._save_checkpoints(model, optimizer, scheduler, epoch, epoch_metrics, is_best, save_best, save_interval)
+                
+                # Evaluasi periodik
+                if epoch % 5 == 0:
+                    self._evaluate_model(model, val_loader)
                 
                 # Early stopping check
                 if early_stopping and no_improve_count >= patience:
@@ -361,3 +365,165 @@ class TrainingService:
     get_best_metric = lambda self: self.best_metric
     get_elapsed_time = lambda self: time.time() - self.start_time if self.is_training else 0
     get_checkpoint_service = lambda self: self.checkpoint_service
+    
+    def _evaluate_model(self, model, val_loader):
+        """Lakukan evaluasi model dan hasilkan confusion matrix"""
+        try:
+            # Inisialisasi placeholder (akan diganti dengan implementasi aktual)
+            y_true = []
+            y_pred = []
+            
+            # Lakukan evaluasi
+            with torch.no_grad():
+                for batch_idx, (data, targets) in enumerate(val_loader):
+                    device = next(model.parameters()).device
+                    data, targets = data.to(device), self._transfer_targets_to_device(targets, device)
+                    
+                    outputs = model(data)
+                    _, predicted = torch.max(outputs, 1)
+                    y_true.extend(targets.cpu().numpy())
+                    y_pred.extend(predicted.cpu().numpy())
+            
+            # Hitung confusion matrix
+            cm = confusion_matrix(y_true, y_pred)
+            
+            # Panggil callback untuk update UI
+            if hasattr(self._callback, 'on_confusion_matrix'):
+                self._callback.on_confusion_matrix(cm)
+                
+            return cm
+        except Exception as e:
+            self.logger.error(f"❌ Evaluasi gagal: {str(e)}")
+            if hasattr(self._callback, 'on_training_error'):
+                self._callback.on_training_error(str(e), "evaluation")
+
+
+class TrainingService:
+    """Service untuk menangani proses training"""
+    
+    def __init__(self, config: dict, env_manager: EnvironmentManager):
+        self.config = config
+        self.env_manager = env_manager
+        self.is_paused = False
+        self.is_stopped = False
+        
+        # Inisialisasi model manager
+        self.model_manager = ModelManager(
+            config=config,
+            pretrained_models_path=env_manager.get_model_dir()
+        )
+        self.model = self.model_manager.build_model()
+        
+        self.progress_callback = None
+        self.metrics_callback = None
+        self.evaluation_callback = None
+        
+    def set_progress_callback(self, callback: Callable[[dict], None]):
+        """Set callback untuk update progress"""
+        self.progress_callback = callback
+        
+    def set_metrics_callback(self, callback: Callable[[dict], None]):
+        """Set callback untuk update metrics"""
+        self.metrics_callback = callback
+        
+    def set_evaluation_callback(self, callback: Callable[[np.ndarray, list], None]):
+        """Set callback untuk hasil evaluasi"""
+        self.evaluation_callback = callback
+        
+    def start(self):
+        """Main training loop tanpa threading"""
+        try:
+            # Setup training configuration
+            full_config = {'epochs': self.config['epochs'], 'learning_rate': self.config['learning_rate'], 
+                          'weight_decay': self.config['weight_decay'], 'early_stopping': self.config['early_stopping'], 
+                          'patience': self.config['patience'], 'save_best': self.config['save_best'],
+                          'save_interval': self.config['save_interval'], 'checkpoint_dir': self.config['checkpoint_dir']}
+            
+            # Training notification
+            self._notify_training_start(full_config['epochs'], len(self.config['train_loader']), full_config)
+            
+            # Main training loop
+            no_improve_count = 0
+            for epoch in range(self.config['epochs']):
+                if self.is_stopped:
+                    break
+                
+                # Pause handling
+                while self.is_paused:
+                    time.sleep(0.1)
+                
+                # Update progress
+                self._update_progress(epoch)
+                
+                # Training step (simulasi)
+                time.sleep(1)
+                
+                # Update metrics (simulasi)
+                metrics = self._generate_metrics(epoch)
+                if self.metrics_callback:
+                    self.metrics_callback(metrics)
+                
+                # Evaluasi periodik
+                if epoch % self.config['eval_interval'] == 0:
+                    self._run_evaluation()
+            
+            # Evaluasi final
+            self._run_evaluation()
+            
+        except Exception as e:
+            print(f"❌ Training error: {str(e)}")
+            
+    def _update_progress(self, epoch: int):
+        """Update progress training"""
+        if self.progress_callback:
+            progress_data = {
+                'epoch_progress': (epoch + 1) / self.config['epochs'],
+                'batch_progress': 0.75,  # Contoh
+                'overall_progress': (epoch + 0.75) / self.config['epochs'],
+                'epoch_label': f"Epoch {epoch+1}/{self.config['epochs']}",
+                'batch_label': f"Batch 120/160",
+                'overall_label': f"{int((epoch + 0.75) / self.config['epochs'] * 100)}%"
+            }
+            self.progress_callback(progress_data)
+            
+    def _generate_metrics(self, epoch: int) -> dict:
+        """Generate metrics simulasi"""
+        return {
+            'mAP': 0.85 - 0.01 * epoch,
+            'Loss': 0.2 + 0.01 * epoch,
+            'Akurasi': 0.92 - 0.005 * epoch,
+            'Presisi': 0.89 - 0.003 * epoch,
+            'F1': 0.87 - 0.002 * epoch,
+            'Waktu Inferensi': 45 + epoch
+        }
+        
+    def _run_evaluation(self):
+        """Jalankan evaluasi menggunakan ModelManager"""
+        if not self.model_manager:
+            return
+        
+        # Dapatkan validation loader
+        val_loader = self.env_manager.get_dataloader('validation')
+        
+        # Jalankan evaluasi
+        cm = self.model_manager.evaluate_model(val_loader)
+        
+        # Dapatkan class labels
+        classes = self.config.get('class_labels', 
+            ['Rp1000', 'Rp2000', 'Rp5000', 'Rp10000', 'Rp20000', 'Rp50000', 'Rp100000'])
+        
+        if self.evaluation_callback:
+            self.evaluation_callback(cm, classes)
+            
+    def pause(self):
+        """Jeda training"""
+        self.is_paused = True
+        
+    def resume(self):
+        """Lanjutkan training"""
+        self.is_paused = False
+        
+    def stop(self):
+        """Hentikan training"""
+        self.is_stopped = True
+        self.is_paused = False  # Pastikan thread tidak stuck

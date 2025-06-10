@@ -4,13 +4,10 @@ Deskripsi: Enhanced form components dengan multi-split, validasi, aspect ratio, 
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
-def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
+def create_preprocessing_input_options(config: Dict[str, Any]) -> Dict[str, Any]:
     """Enhanced form dengan multi-split, validasi, aspect ratio, dan styling optimal"""
-    if not config:
-        config = {}
-    
     preprocessing_config = config.get('preprocessing', {})
     normalization_config = preprocessing_config.get('normalization', {})
     validation_config = preprocessing_config.get('validation', {})
@@ -137,7 +134,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     ))
     
     # Main container dengan optimized styling
-    options_container = widgets.VBox([
+    container = widgets.VBox([
         widgets.HTML("<h5 style='margin:8px 0;color:#495057;border-bottom:2px solid #28a745;padding-bottom:4px;'>⚙️ Konfigurasi Preprocessing</h5>"),
         top_row,
         validation_section
@@ -152,13 +149,25 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     ))
     
     # Attach references untuk akses mudah
-    options_container.resolution_dropdown = resolution_dropdown
-    options_container.normalization_dropdown = normalization_dropdown
-    options_container.preserve_aspect_checkbox = preserve_aspect_checkbox
-    options_container.target_splits_select = target_splits_select
-    options_container.batch_size_input = batch_size_input
-    options_container.validation_checkbox = validation_checkbox
-    options_container.move_invalid_checkbox = move_invalid_checkbox
-    options_container.invalid_dir_input = invalid_dir_input
+    container.resolution_dropdown = resolution_dropdown
+    container.normalization_dropdown = normalization_dropdown
+    container.preserve_aspect_checkbox = preserve_aspect_checkbox
+    container.target_splits_select = target_splits_select
+    container.batch_size_input = batch_size_input
+    container.validation_checkbox = validation_checkbox
+    container.move_invalid_checkbox = move_invalid_checkbox
+    container.invalid_dir_input = invalid_dir_input
     
-    return options_container
+    return {
+        'container': container,
+        'components': {
+            'resolution_dropdown': resolution_dropdown,
+            'normalization_dropdown': normalization_dropdown,
+            'preserve_aspect_checkbox': preserve_aspect_checkbox,
+            'target_splits_select': target_splits_select,
+            'batch_size_input': batch_size_input,
+            'validation_checkbox': validation_checkbox,
+            'move_invalid_checkbox': move_invalid_checkbox,
+            'invalid_dir_input': invalid_dir_input
+        }
+    }

@@ -22,6 +22,11 @@ class PreprocessingInitializer(CommonInitializer):
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components dengan minimal structure"""
         ui_components = create_preprocessing_main_ui(config)
+        
+        # Pastikan progress_tracker adalah widget jika ada
+        if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'widget'):
+            ui_components['progress_tracker'] = ui_components['progress_tracker'].widget
+            
         ui_components.update({
             'preprocessing_initialized': True,
             'module_name': 'preprocessing',

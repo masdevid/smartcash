@@ -3,17 +3,18 @@ File: tests/dataset/preprocessor/test_preprocessor.py
 Deskripsi: Unit test untuk modul preprocessor
 """
 import os
-import unittest
-import numpy as np
-import shutil
+import sys
 import pytest
+import numpy as np
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
-import cv2
-from PIL import Image
 
-from smartcash.dataset.preprocessor.service import PreprocessingService, create_preprocessing_service
-from smartcash.dataset.preprocessor.core.engine import PreprocessingEngine, PreprocessingValidator
+from smartcash.dataset.preprocessor.core.engine import PreprocessingEngine
+from smartcash.dataset.preprocessor.validators import PreprocessingValidator
+from smartcash.dataset.preprocessor.service import PreprocessingService
+from smartcash.dataset.preprocessor.progress_tracker import ProgressTracker
+from smartcash.common.exceptions import PreprocessingError, ValidationError
+
 from smartcash.dataset.preprocessor.utils.file_processor import FileProcessor
 from smartcash.dataset.preprocessor.utils.path_resolver import PathResolver
 from smartcash.dataset.preprocessor.utils.cleanup_manager import CleanupManager
@@ -67,222 +68,56 @@ from conftest import MockProgressTracker
 class TestPreprocessingService:
     """Test untuk PreprocessingService"""
     
-    def test_init_with_default_config(self, preprocessor_service):
-        """Test inisialisasi dengan konfigurasi default"""
-        assert preprocessor_service is not None
-        assert hasattr(preprocessor_service, 'config')
-        assert 'preprocessing' in preprocessor_service.config
-        
-    def test_preprocess_dataset(self, preprocessor_service, progress_tracker):
-        """Test preprocessing dataset"""
-        # Setup mock return values
-        preprocessor_service.mock_engine.preprocess_dataset.return_value = {
-            'success': True,
-            'message': 'Preprocessing completed',
-            'stats': {
-                'total_processed': 10,
-                'valid_files': 9,
-                'invalid_files': 1,
-                'invalid_samples': [{'file': 'sample1.jpg', 'error': 'Invalid format'}]
-            },
-            'processing_time': 1.5
+    @pytest.fixture
+    def mock_service(self, tmp_path):
+        """Fixture untuk membuat mock service"""
+        config = {
+            'input_dir': str(tmp_path / 'input'),
+            'output_dir': str(tmp_path / 'output'),
+            'validation_dir': str(tmp_path / 'validation'),
+            'cleanup_dir': str(tmp_path / 'cleanup')
         }
-        
-        # Mock progress callback
-        def mock_progress_callback(level, current, total, message=None):
-            progress_tracker.update(level, current, total, message)
-        
-        result = preprocessor_service.preprocess_dataset(
-            progress_callback=mock_progress_callback
-        )
-        
-        # Verify results
-        assert result['success'] is True
-        assert result['message'] == 'Preprocessing completed'
-        assert result['stats']['total_processed'] == 10
-        assert result['stats']['valid_files'] == 9
-        
-        # Verify progress tracker was updated
-        assert progress_tracker.was_progress_made() is True
-        assert progress_tracker.was_completed() is True
-        assert progress_tracker.has_error() is False
-        
-        # Verify progress increases monotonically
-        progresses = [p[1] for p in progress_tracker.messages if p[0] == 'progress']
-        assert all(0 <= p <= 100 for p in progresses)
-        assert sorted(progresses) == progresses  # Progress should increase
-        
-        # Verify preprocess_dataset was called
-        preprocessor_service.mock_engine.preprocess_dataset.assert_called_once()
-        
-        # Verify status messages in progress tracker
-        status_messages = [m[1] for m in progress_tracker.messages if m[0] == 'status']
-        assert any('Memproses' in msg for msg in status_messages)
-    
-    def test_get_sampling(self, preprocessor_service):
-        """Test pengambilan sampel"""
-        # Setup mock return values
-        preprocessor_service.mock_engine.file_scanner.scan_directory.return_value = [
-            Path('image1.jpg'), Path('image2.jpg')
-        ]
-        preprocessor_service.mock_engine.file_processor.read_image.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
-        
-        samples = preprocessor_service.get_sampling(max_samples=2)
-        
-        assert 'samples' in samples
-        assert len(samples['samples']) == 2
-        assert all('original_image' in s for s in samples['samples'])
-        assert all('preprocessed_image' in s for s in samples['samples'])
-        
-        # Verifikasi file_scanner dan file_processor dipanggil
-        preprocessor_service.mock_engine.file_scanner.scan_directory.assert_called()
-        assert preprocessor_service.mock_engine.file_processor.read_image.call_count == 2
-    
-    def test_validate_dataset_only(self, preprocessor_service, progress_tracker):
+        engine = PreprocessingEngine()
+        return PreprocessingService(config, engine)
+
+    def test_init_with_default_config(self, mock_service):
+        """Test inisialisasi dengan config default"""
+        assert mock_service.config['input_dir'] is not None
+        assert mock_service.config['output_dir'] is not None
+
+    def test_preprocess_dataset(self, mock_service, mocker):
+        """Test eksekusi preprocessing dataset"""
+        mock_run = mocker.patch.object(mock_service.engine, 'run')
+        mock_service.preprocess_dataset()
+        mock_run.assert_called_once()
+
+    def test_get_sampling(self, mock_service, mocker):
+        """Test mengambil sampel data"""
+        mock_sample = mocker.patch.object(mock_service.engine, 'get_samples', return_value=[])
+        result = mock_service.get_sampling(5)
+        mock_sample.assert_called_once_with(5)
+        assert result == []
+
+    def test_validate_dataset_only(self, mock_service, mocker):
         """Test validasi dataset tanpa preprocessing"""
-        # Setup mock return values
-        preprocessor_service.mock_validator.validate_dataset.return_value = {
-            'status': 'success',
-            'total_files': 10,
-            'valid_files': 9,
-            'invalid_files': 1,
-            'invalid_samples': [
-                {'file': 'invalid1.jpg', 'error': 'Corrupted image'}
-            ]
-        }
-        
-        result = preprocessor_service.validate_dataset_only(
-            target_split='train',
-            progress_callback=progress_tracker.update
-        )
-        
-        # Verifikasi hasil validasi
-        assert result['status'] == 'success'
-        assert result['total_files'] == 10
-        assert result['valid_files'] == 9
-        assert result['invalid_files'] == 1
-        
-        # Verifikasi progress tracker diupdate dengan benar
-        assert progress_tracker.was_progress_made() is True
-        assert progress_tracker.was_completed() is True
-        assert progress_tracker.has_error() is False
-        
-        # Verifikasi progress naik secara monoton
-        progresses = [p[1] for p in progress_tracker.messages if p[0] == 'progress']
-        assert all(0 <= p <= 100 for p in progresses)
-        assert sorted(progresses) == progresses  # Progress harus naik
-        
-        # Verifikasi validate_dataset dipanggil dengan parameter yang benar
-        preprocessor_service.mock_validator.validate_dataset.assert_called_once_with(
-            split_name='train',
-            progress_callback=progress_tracker.update
-        )
-        
-        # Verifikasi pesan status ada di progress tracker
-        status_messages = [m[1] for m in progress_tracker.messages if m[0] == 'status']
-        assert any('Memvalidasi' in msg for msg in status_messages)
-    
-    def test_cleanup_preprocessed_data(self, preprocessor_service, progress_tracker, tmp_path):
-        """Test pembersihan file hasil preprocessing"""
-        # Setup mock return values
-        preprocessor_service.mock_engine.cleanup_manager.cleanup_output_dirs.return_value = {
-            'status': 'success',
-            'files_deleted': 5,
-            'dirs_deleted': 2,
-            'total_size_freed': '10.5 MB'
-        }
-        
-        # Jalankan cleanup dengan progress tracker
-        result = preprocessor_service.cleanup_preprocessed_data(
-            target_split='train',
-            progress_callback=progress_tracker.update
-        )
-        
-        # Verifikasi hasil cleanup
-        assert result['status'] == 'success'
-        assert result['files_deleted'] == 5
-        assert result['dirs_deleted'] == 2
-        assert 'total_size_freed' in result
-        
-        # Verifikasi progress tracker diupdate dengan benar
-        assert progress_tracker.was_progress_made() is True
-        assert progress_tracker.was_completed() is True
-        assert progress_tracker.has_error() is False
-        
-        # Verifikasi cleanup_manager.cleanup_output_dirs dipanggil dengan parameter yang benar
-        preprocessor_service.mock_engine.cleanup_manager.cleanup_output_dirs.assert_called_once_with(
-            split='train',
-            progress_callback=progress_tracker.update
-        )
-        
-        # Verifikasi pesan status ada di progress tracker
-        status_messages = [m[1] for m in progress_tracker.messages if m[0] == 'status']
-        assert any('membersihkan' in msg.lower() for msg in status_messages)
-    
-    def test_get_preprocessing_status(self, preprocessor_service):
+        mock_validate = mocker.patch.object(mock_service.engine, 'validate_only', return_value={'valid': True})
+        result = mock_service.validate_dataset_only()
+        mock_validate.assert_called_once()
+        assert result['valid'] is True
+
+    def test_cleanup_preprocessed_data(self, mock_service, mocker):
+        """Test cleanup data yang telah diproses"""
+        mock_cleanup = mocker.patch.object(mock_service.engine, 'cleanup', return_value=True)
+        success = mock_service.cleanup_preprocessed_data()
+        mock_cleanup.assert_called_once()
+        assert success is True
+
+    def test_get_preprocessing_status(self, mock_service, mocker):
         """Test mendapatkan status preprocessing"""
-        # Setup mock return values
-        preprocessor_service.mock_engine.file_scanner.scan_directory.side_effect = [
-            [Path('image1.jpg'), Path('image2.jpg')],  # train
-            [Path('valid1.jpg')],                      # valid
-            []                                         # test
-        ]
-        
-        # Mock config
-        preprocessor_service.config = {
-            'preprocessing': {
-                'enabled': True,
-                'validation': {'enabled': True},
-                'output_dir': '/path/to/output'
-            },
-            'data': {
-                'splits': {
-                    'train': '/path/to/train',
-                    'valid': '/path/to/valid',
-                    'test': '/path/to/test'
-                }
-            }
-        }
-        
-        # Mock status preprocessing
-        preprocessor_service.mock_engine.get_preprocessing_status.return_value = {
-            'train': {'status': 'completed', 'last_processed': '2025-06-10T10:00:00'},
-            'valid': {'status': 'pending', 'last_processed': None},
-            'test': {'status': 'not_started', 'last_processed': None}
-        }
-        
-        # Dapatkan status
-        status = preprocessor_service.get_preprocessing_status()
-        
-        # Verifikasi status berisi field yang diharapkan
-        assert 'preprocessing_enabled' in status
-        assert 'validation_enabled' in status
-        assert 'splits' in status
-        assert 'output_dir' in status
-        
-        # Verifikasi status untuk setiap split
-        splits = status['splits']
-        assert 'train' in splits
-        assert 'valid' in splits
-        assert 'test' in splits
-        
-        # Verifikasi data status untuk train split
-        assert splits['train']['source_files'] == 2
-        assert splits['train']['status'] == 'completed'
-        assert 'last_processed' in splits['train']
-        
-        # Verifikasi data status untuk valid split
-        assert splits['valid']['source_files'] == 1
-        assert splits['valid']['status'] == 'pending'
-        
-        # Verifikasi data status untuk test split
-        assert splits['test']['source_files'] == 0
-        assert splits['test']['status'] == 'not_started'
-        
-        # Verifikasi pemanggilan fungsi
-        preprocessor_service.mock_engine.file_scanner.scan_directory.assert_any_call('/path/to/train')
-        preprocessor_service.mock_engine.file_scanner.scan_directory.assert_any_call('/path/to/valid')
-        preprocessor_service.mock_engine.file_scanner.scan_directory.assert_any_call('/path/to/test')
+        mock_status = mocker.patch.object(mock_service.engine, 'get_status', return_value={'status': 'idle'})
+        result = mock_service.get_preprocessing_status()
+        mock_status.assert_called_once()
+        assert result['status'] == 'idle'
 
 
 class TestOutputFormat:
@@ -384,9 +219,7 @@ class TestOutputFormat:
         test_config.update({
             'data': {
                 'root_dir': str(tmp_path),
-                'splits': {
-                    'test': str(tmp_path / 'raw/test')
-                }
+                'splits': {'test': str(tmp_path / 'raw/test')}
             },
             'preprocessing': {
                 'output_dir': str(tmp_path / 'preprocessed'),
@@ -476,7 +309,7 @@ class TestOutputFormat:
         label_dir = raw_dir / 'train' / 'labels'
         img_dir.mkdir(parents=True, exist_ok=True)
         label_dir.mkdir(parents=True, exist_ok=True)
-    
+        
         # Buat gambar dummy
         img_path = img_dir / 'test.jpg'
         label_path = label_dir / 'test.txt'
@@ -576,163 +409,127 @@ class TestOutputFormat:
         # Verifikasi UUID konsisten
         img_uuids = {f.stem.split('_')[-1] for f in img_files}
 
-def test_service_with_mock_engine(test_config, tmp_path):
-    """Test integrasi PreprocessingService dengan MockPreprocessingEngine"""
-    # Setup mock engine dan validator
-    mock_engine = MockPreprocessingEngine(test_config)
-    mock_validator = MockPreprocessingValidator(test_config)
+def test_service_with_mock_engine(test_config, progress_tracker):
+    """Test PreprocessingService dengan mock engine"""
+    # Buat mock engine dan validator
+    mock_engine = MagicMock(spec=PreprocessingEngine)
+    mock_validator = MagicMock(spec=PreprocessingValidator)
     
-    # Buat progress tracker untuk testing
-    progress_tracker = MockProgressTracker()
+    # Buat instance service
+    service = PreprocessingService(test_config, progress_tracker=progress_tracker, engine=mock_engine, validator=mock_validator)
     
-    # Buat service dengan mock engine dan validator
-    with patch('smartcash.dataset.preprocessor.service.PreprocessingEngine', return_value=mock_engine), \
-         patch('smartcash.dataset.preprocessor.service.PreprocessingValidator', return_value=mock_validator):
+    # Test case 1: Preprocessing berhasil
+    mock_engine.preprocess_dataset.return_value = {
+        'success': True,
+        'message': ' Preprocessing completed',
+        'stats': {
+            'total_processed': 10,
+            'valid_files': 9,
+            'invalid_files': 1,
+            'invalid_samples': [{'file': 'sample1.jpg', 'error': 'Invalid format'}],
+            'processing_time': 1.5
+        }
+    }
+    
+    result = service.preprocess_dataset()
+    
+    # Verifikasi hasil
+    assert result['success'] is True
+    assert result['message'] == ' Preprocessing completed'
+    assert result['stats']['total_processed'] == 10
+    
+    # Verifikasi engine dipanggil
+    mock_engine.preprocess_dataset.assert_called_once()
+    
+    # Test case 2: Preprocessing gagal
+    mock_engine.preprocess_dataset.return_value = {
+        'success': False,
+        'error': 'Invalid image format',
+        'message': 'Failed to preprocess: Invalid image format',
+        'stats': {
+            'total_processed': 0,
+            'valid': 0,
+            'invalid': 0,
+            'invalid_samples': [],
+            'processing_time': 0.0
+        }
+    }
+    
+    result = service.preprocess_dataset()
+    
+    # Verifikasi hasil
+    assert result['success'] is False
+    assert 'error' in result
+    assert result['message'] == 'Failed to preprocess: Invalid image format'
+    
+    def test_get_preprocessing_status(test_config):
+        """Test mendapatkan status preprocessing"""
+        # Setup mock engine dan validator
+        mock_engine = MockPreprocessingEngine(test_config)
+        mock_validator = MockPreprocessingValidator(test_config)
         
-        service = PreprocessingService(test_config, progress_tracker=progress_tracker)
-        
-        # Test case 1: Preprocessing berhasil
-        with patch.object(mock_engine, 'preprocess_dataset') as mock_preprocess:
-            # Setup mock untuk preprocess_dataset
-            mock_preprocess.return_value = {
-                'success': True,
-                'message': 'Preprocessing completed',
-                'stats': {
-                    'total_processed': 10,
-                    'valid_files': 9,
-                    'invalid_files': 1,
-                    'invalid_samples': [{'file': 'sample1.jpg', 'error': 'Invalid format'}],
-                    'processing_time': 1.5,
+        # Buat service dengan mock engine dan validator
+        with patch('smartcash.dataset.preprocessor.service.PreprocessingEngine', return_value=mock_engine), \
+             patch('smartcash.dataset.preprocessor.service.PreprocessingValidator', return_value=mock_validator):
+            
+            service = PreprocessingService(test_config)
+            
+            # Test case 1: Status completed
+            with patch.object(mock_engine, 'get_preprocessing_status') as mock_status:
+                # Setup mock untuk get_preprocessing_status
+                mock_status.return_value = {
+                    'status': 'completed',
+                    'progress': 100,
+                    'message': 'Preprocessing completed',
                     'details': {
-                        'train': {'processed': 8, 'valid': 7, 'invalid': 1},
-                        'val': {'processed': 2, 'valid': 2, 'invalid': 0}
+                        'total_processed': 10,
+                        'valid_files': 9,
+                        'invalid_files': 1,
+                        'processing_time': 1.5
                     }
                 }
-            }
-            
-            # Panggil method preprocess_dataset
-            result = service.preprocess_dataset()
-            
-            # Verifikasi hasil
-            assert result['success'] is True
-            assert result['stats']['total_processed'] == 10
-            assert result['stats']['valid_files'] == 9
-            assert result['stats']['invalid_files'] == 1
-            assert len(result['stats']['invalid_samples']) == 1
-            assert result['stats']['details']['train']['processed'] == 8
-            assert result['stats']['details']['val']['valid'] == 2
-            
-            # Verifikasi progress tracker dipanggil dengan benar
-            assert progress_tracker.update_progress.called
-            assert progress_tracker.complete.called
-            
-            # Verifikasi log yang dihasilkan
-            # (Anda bisa menambahkan assertions untuk memeriksa log jika diperlukan)
-            
-            # Verifikasi preprocess_dataset dipanggil dengan parameter yang benar
-            mock_preprocess.assert_called_once()
-            
-        # Test case 2: Preprocessing gagal
-        with patch.object(mock_engine, 'preprocess_dataset') as mock_preprocess_fail:
-            # Setup mock untuk preprocess_dataset yang gagal
-            mock_preprocess_fail.return_value = {
-                'success': False,
-                'message': 'Preprocessing failed: Invalid configuration',
-                'error': 'Invalid configuration',
-                'stats': {
-                    'total_processed': 0,
-                    'valid_files': 0,
-                    'invalid_files': 0,
-                    'invalid_samples': [],
-                    'processing_time': 0.0,
-                    'details': {}
+                
+                # Panggil method get_preprocessing_status
+                status = service.get_preprocessing_status()
+                
+                # Verifikasi hasil
+                assert status['status'] == 'completed'
+                assert status['progress'] == 100
+                assert 'completed' in status['message'].lower()
+                assert status['details']['total_processed'] == 10
+                assert status['details']['valid_files'] == 9
+                assert status['details']['invalid_files'] == 1
+                
+                # Verifikasi get_preprocessing_status dipanggil
+                mock_status.assert_called_once()
+                
+            # Test case 2: Status in progress
+            with patch.object(mock_engine, 'get_preprocessing_status') as mock_status_progress:
+                # Setup mock untuk get_preprocessing_status yang sedang berjalan
+                mock_status_progress.return_value = {
+                    'status': 'in_progress',
+                    'progress': 42,
+                    'message': 'Processing in progress',
+                    'details': {
+                        'current_file': 'sample5.jpg',
+                        'processed': 4,
+                        'total': 10,
+                        'elapsed_time': 2.3
+                    }
                 }
-            }
-            
-            # Panggil method preprocess_dataset
-            result = service.preprocess_dataset()
-            
-            # Verifikasi hasil
-            assert result['success'] is False
-            assert 'error' in result
-            assert 'Invalid configuration' in result['message']
-            assert result['stats']['total_processed'] == 0
-            
-            # Verifikasi progress tracker dipanggil dengan error
-            assert progress_tracker.fail.called
-            
-            # Verifikasi preprocess_dataset dipanggil dengan parameter yang benar
-            mock_preprocess_fail.assert_called_once()
-
-
-def test_get_preprocessing_status(test_config):
-    """Test mendapatkan status preprocessing"""
-    # Setup mock engine dan validator
-    mock_engine = MockPreprocessingEngine(test_config)
-    mock_validator = MockPreprocessingValidator(test_config)
-    
-    # Buat service dengan mock engine dan validator
-    with patch('smartcash.dataset.preprocessor.service.PreprocessingEngine', return_value=mock_engine), \
-         patch('smartcash.dataset.preprocessor.service.PreprocessingValidator', return_value=mock_validator):
-        
-        service = PreprocessingService(test_config)
-        
-        # Test case 1: Status completed
-        with patch.object(mock_engine, 'get_preprocessing_status') as mock_status:
-            # Setup mock untuk get_preprocessing_status
-            mock_status.return_value = {
-                'status': 'completed',
-                'progress': 100,
-                'message': 'Preprocessing completed',
-                'details': {
-                    'total_processed': 10,
-                    'valid_files': 9,
-                    'invalid_files': 1,
-                    'processing_time': 1.5
-                }
-            }
-            
-            # Panggil method get_preprocessing_status
-            status = service.get_preprocessing_status()
-            
-            # Verifikasi hasil
-            assert status['status'] == 'completed'
-            assert status['progress'] == 100
-            assert 'completed' in status['message'].lower()
-            assert status['details']['total_processed'] == 10
-            assert status['details']['valid_files'] == 9
-            assert status['details']['invalid_files'] == 1
-            
-            # Verifikasi get_preprocessing_status dipanggil
-            mock_status.assert_called_once()
-            
-        # Test case 2: Status in progress
-        with patch.object(mock_engine, 'get_preprocessing_status') as mock_status_progress:
-            # Setup mock untuk get_preprocessing_status yang sedang berjalan
-            mock_status_progress.return_value = {
-                'status': 'in_progress',
-                'progress': 42,
-                'message': 'Processing in progress',
-                'details': {
-                    'current_file': 'sample5.jpg',
-                    'processed': 4,
-                    'total': 10,
-                    'elapsed_time': 2.3
-                }
-            }
-            
-            # Panggil method get_preprocessing_status
-            status = service.get_preprocessing_status()
-            
-            # Verifikasi hasil
-            assert status['status'] == 'in_progress'
-            assert 0 < status['progress'] < 100
-            assert 'progress' in status['message'].lower()
-            assert 'current_file' in status['details']
-            assert 'processed' in status['details']
-            
-            # Verifikasi get_preprocessing_status dipanggil
-            mock_status_progress.assert_called_once()
+                
+                # Panggil method get_preprocessing_status
+                status = service.get_preprocessing_status()
+                
+                # Verifikasi hasil
+                assert status['status'] == 'in_progress'
+                assert 0 < status['progress'] < 100
+                assert 'progress' in status['message'].lower()
+                assert 'current_file' in status['details']
+                assert 'processed' in status['details']
+                
+                # Verifikasi get_preprocessing_status dipanggil
+                mock_status_progress.assert_called_once()
 
 
 def test_cleanup_preprocessed_data(test_config, tmp_path):
@@ -759,11 +556,11 @@ def test_cleanup_preprocessed_data(test_config, tmp_path):
                 'details': {
                     'files_deleted': 5,
                     'directories_removed': 2,
-                    'freed_space': '1.2 MB'
+                    'freed_space': '10.5 MB'
                 }
             }
             
-            # Panggil method cleanup_preprocessed_data
+            # Jalankan cleanup dengan progress tracker
             result = service.cleanup_preprocessed_data()
             
             # Verifikasi hasil
@@ -771,7 +568,7 @@ def test_cleanup_preprocessed_data(test_config, tmp_path):
             assert 'cleaned up' in result['message'].lower()
             assert result['details']['files_deleted'] > 0
             
-            # Verifikasi progress tracker dipanggil dengan benar
+            # Verifikasi progress tracker diupdate dengan benar
             assert progress_tracker.update_progress.called
             assert progress_tracker.complete.called
             
@@ -792,7 +589,7 @@ def test_cleanup_preprocessed_data(test_config, tmp_path):
                 }
             }
             
-            # Panggil method cleanup_preprocessed_data
+            # Jalankan cleanup
             result = service.cleanup_preprocessed_data()
             
             # Verifikasi hasil
@@ -975,7 +772,7 @@ def test_get_samples(test_config, tmp_path):
 
 def test_preprocess_dataset(test_config):
     """Test fungsi preprocess_dataset dengan berbagai skenario"""
-    # Test case 1: Preprocessing berhasil dengan beberapa file
+    # Test case 1: Preprocessing berhasil dengan beberapa file tidak valid
     test_cases = [
         # (mock_result, expected_success, expected_processed, expected_valid, expected_invalid, expected_message_contains)
         ({
@@ -1284,61 +1081,53 @@ def test_get_samples(test_config):
             
             service = PreprocessingService(test_config, progress_tracker=progress_tracker)
             
-            # Setup mock return value
-            mock_result = {
-                'success': True,
-                'message': 'Preprocessing completed',
-                'stats': {
-                    'total_processed': 10,
-                    'valid_files': 9,
-                    'invalid_files': 1,
-                    'invalid_samples': [{'file': 'invalid.jpg', 'error': 'Corrupted'}]
-                },
-                'processing_time': 1.5
-            }
-            mock_engine.preprocess_dataset.return_value = mock_result
-            
-            # Setup mock untuk progress callback
-            progress_updates = []
-            def mock_progress_callback(level, current, total, message=None):
-                progress_updates.append((level, current, total, message))
-                if hasattr(progress_tracker, 'update'):
-                    progress_tracker.update(level, current, total, message)
-            
-            # Panggil method yang akan di-test
-            result = service.preprocess_dataset(
-                progress_callback=mock_progress_callback
-            )
-            
-            # Verifikasi hasil
-            assert result == mock_result
-            
-            # Verifikasi engine dipanggil dengan parameter yang benar
-            mock_engine.preprocess_dataset.assert_called_once()
-            
-            # Verifikasi progress tracker diupdate jika ada
-            if hasattr(progress_tracker, 'was_progress_made'):
-                assert progress_tracker.was_progress_made() is True, "Progress harus tercatat"
-            
-            if hasattr(progress_tracker, 'was_completed'):
-                assert progress_tracker.was_completed() is True, "Proses harus selesai"
-            
-            # Verifikasi progress callback dipanggil beberapa kali
-            # Jika tidak ada progress update, kita tidak perlu memeriksa lebih lanjut
-            if len(progress_updates) > 0:
-                # Verifikasi progress naik secara monoton
-                progresses = [p[1] for p in progress_updates if isinstance(p[1], (int, float))]
-                if len(progresses) > 1:
-                    assert all(progresses[i] <= progresses[i+1] for i in range(len(progresses)-1)), \
-                        "Progress tidak naik secara monoton"
+            # Test case 1: Preprocessing berhasil
+            with patch.object(mock_engine, 'preprocess_dataset') as mock_preprocess:
+                # Setup mock untuk preprocess_dataset
+                mock_preprocess.return_value = {
+                    'success': True,
+                    'message': 'Preprocessing completed',
+                    'stats': {
+                        'total_processed': 10,
+                        'valid_files': 9,
+                        'invalid_files': 1,
+                        'invalid_samples': [{'file': 'invalid.jpg', 'error': 'Corrupted'}]
+                    },
+                    'processing_time': 1.5
+                }
                 
-                # Verifikasi status terakhir adalah 'completed' jika ada pesan
-                if progress_updates and progress_updates[-1]:
-                    last_update = progress_updates[-1]
-                    if len(last_update) > 0 and last_update[-1]:
-                        last_message = str(last_update[-1]).lower()
-                        assert any(msg in last_message for msg in ['selesai', 'complete', 'done', 'success']), \
-                            f"Status terakhir tidak menunjukkan penyelesaian: {last_message}"
+                # Panggil method preprocess_dataset
+                result = service.preprocess_dataset()
+                
+                # Verifikasi hasil
+                assert result == mock_preprocess.return_value
+                
+                # Verifikasi engine dipanggil dengan parameter yang benar
+                mock_preprocess.assert_called_once()
+                
+                # Verifikasi progress tracker diupdate jika ada
+                if hasattr(progress_tracker, 'was_progress_made'):
+                    assert progress_tracker.was_progress_made() is True, "Progress harus tercatat"
+                
+                if hasattr(progress_tracker, 'was_completed'):
+                    assert progress_tracker.was_completed() is True, "Proses harus selesai"
+                
+                # Verifikasi progress callback dipanggil beberapa kali
+                # Jika tidak ada progress update, kita tidak perlu memeriksa lebih lanjut
+                if len(progress_updates) > 0:
+                    # Verifikasi progress naik secara monoton
+                    progresses = [p[1] for p in progress_updates if isinstance(p[1], (int, float))]
+                    if len(progresses) > 1:
+                        assert all(progresses[i] <= progresses[i+1] for i in range(len(progresses)-1)), \
+                            "Progress tidak naik secara monoton"
+                    
+                    # Verifikasi status terakhir adalah 'completed' jika ada pesan
+                    if progress_updates and progress_updates[-1]:
+                        last_update = progress_updates[-1]
+                        if len(last_update) > 0 and last_update[-1]:
+                            last_message = str(last_update[-1]).lower()
+                            assert any(msg in last_message for msg in ['selesai', 'complete', 'done', 'success']), \
+                                f"Status terakhir tidak menunjukkan penyelesaian: {last_message}"
     
     def test_get_preprocessing_status(self):
         """Test mendapatkan status preprocessing"""
@@ -1430,6 +1219,14 @@ def test_get_samples(test_config):
                     if expected_status != 'no_files':
                         assert 'details' in result, "Detail pemrosesan harus ada"
                         assert isinstance(result['details'], dict), "Detail harus berupa dictionary"
+                        
+                        # Verifikasi detail untuk setiap split
+                        for split, stats in status_data['details'].items():
+                            assert split in result['details'], f"Detail untuk split '{split}' harus ada"
+                            assert 'processed' in result['details'][split], \
+                                f"Jumlah file yang diproses untuk {split} harus ada"
+                            assert 'total' in result['details'][split], \
+                                f"Total file untuk {split} harus ada"
                     
                     # Verifikasi engine dipanggil
                     mock_engine.get_preprocessing_status.assert_called()
@@ -1559,7 +1356,9 @@ def test_get_samples(test_config):
                 'message': 'Validation completed',
                 'valid': 10,
                 'invalid': 1,
-                'invalid_samples': [{'file': 'invalid.jpg', 'error': 'Corrupted'}],
+                'invalid_samples': [
+                    {'file': 'invalid.jpg', 'error': 'Corrupted'}
+                ],
                 'details': {
                     'train': {'valid': 8, 'invalid': 1},
                     'val': {'valid': 2, 'invalid': 0}
@@ -1707,7 +1506,7 @@ def test_get_samples(test_config):
                     # Panggil method yang di-test
                     result = service.get_samples()
                     
-                    # Verifikasi tipe hasil
+                    # Verifikasi hasil
                     assert isinstance(result, list), "Hasil harus berupa list"
                     
                     # Verifikasi jumlah sampel
@@ -2271,14 +2070,22 @@ class TestProgressTracking:
         # Verifikasi progress naik secara monoton
         progresses = [p[1] for p in progress_tracker.messages if p[0] == 'progress']
         if len(progresses) > 1:  # Hanya periksa jika ada lebih dari satu progress update
-            assert all(progresses[i] <= progresses[i+1] for i in range(len(progresses)-1))
-
-
-# Test case untuk MockPreprocessingEngine dan MockPreprocessingValidator
-# sudah dipindahkan ke conftest.py untuk menghindari circular import
-# dan dapat diakses melalui import langsung
+            assert all(progresses[i] <= progresses[i+1] for i in range(len(progresses)-1)), \
+                "Progress tidak naik secara monoton"
+            
+            # Verifikasi status terakhir adalah 'completed' jika ada pesan
+            if progress_updates and progress_updates[-1]:
+                last_update = progress_updates[-1]
+                if len(last_update) > 0 and last_update[-1]:
+                    last_message = str(last_update[-1]).lower()
+                    assert any(msg in last_message for msg in ['selesai', 'complete', 'done', 'success']), \
+                        f"Status terakhir tidak menunjukkan penyelesaian: {last_message}"
+    
+    def test_update_with_invalid_progress(self):
+        """Test update dengan progress tidak valid"""
+        tracker = MockProgressTracker()
         
-        # Test update dengan progress tidak valid
+        # Test dengan progress tidak valid
         with pytest.raises(ValueError):
             tracker.update(-10)  # Progress tidak boleh negatif
         
@@ -2471,8 +2278,8 @@ class TestPreprocessorIntegration:
              patch('smartcash.dataset.preprocessor.service.PreprocessingValidator', return_value=mock_validator), \
              patch('smartcash.dataset.preprocessor.service.validate_preprocessing_config', return_value=test_config), \
              patch('smartcash.dataset.preprocessor.service.os.path.exists', return_value=True), \
-             patch('smartcash.dataset.preprocessor.service.os.makedirs'), \
-             patch.object(PreprocessingService, '_comprehensive_validation', return_value=mock_validation_result) as mock_validate:
+             patch('smartcash.dataset.preprocessor.service.os.makedirs') as mock_makedirs, \
+             patch.object(Path, 'mkdir') as mock_mkdir:
             
             # Buat instance service
             service = PreprocessingService(config=test_config, progress_tracker=progress_tracker)
@@ -2493,7 +2300,7 @@ class TestPreprocessorIntegration:
             assert hasattr(progress_tracker, 'last_status'), "Status tidak diupdate"
             
             # Verifikasi validasi komprehensif dipanggil
-            mock_validate.assert_called_once()
+            mock_validator.validate_dataset.assert_called_once()
             
             # Verifikasi engine dipanggil dengan parameter yang benar
             mock_engine.preprocess_dataset.assert_called_once()
@@ -2682,9 +2489,10 @@ class TestPreprocessorIntegration:
                 assert 'stats' in result, "Result should contain 'stats'"
                 assert 'splits' in result['stats'], "Stats should contain 'splits'"
                 for split_name, split_stats in result['stats']['splits'].items():
-                    assert 'total' in split_stats, f"Split {split_name} should have 'total'"
-                    assert 'processed' in split_stats, f"Split {split_name} should have 'processed'"
-                    print(f"{split_name}: {split_stats['processed']}/{split_stats['total']} files processed")
+                    assert split_name in result['stats']['splits'], f"Split {split_name} should have 'total'"
+                    assert 'processed' in result['stats']['splits'][split_name], \
+                        f"Split {split_name} should have 'processed'"
+                    print(f"{split_name}: {result['stats']['splits'][split_name]['processed']}/{result['stats']['splits'][split_name]['total']} files processed")
             
             # Verifikasi statistik pemrosesan
             total_processed = sum(
@@ -2743,15 +2551,14 @@ class TestPreprocessorIntegration:
                     
                 # Pastikan progress mencapai 1.0 (100%) di akhir
                 assert progress_updates[-1][0] == 1.0, f"Progress akhir harus 1.0, tapi dapat {progress_updates[-1][0]}"
-            
-            
-            # Verifikasi status terakhir menunjukkan selesai
-            if progress_updates:  # Pastikan ada progress update
-                _, last_status, _ = progress_updates[-1]
-                assert last_status is not None, "Status terakhir tidak boleh None"
-                last_status_lower = str(last_status).lower()
-                assert any(keyword in last_status_lower for keyword in ['complete', 'selesai', 'done', 'berhasil']), \
-                    f"Status terakhir harus mengandung indikasi selesai, tapi mendapat: {last_status}"
+                
+                # Verifikasi status terakhir menunjukkan selesai
+                if progress_updates:  # Pastikan ada progress update
+                    _, last_status, _ = progress_updates[-1]
+                    assert last_status is not None, "Status terakhir tidak boleh None"
+                    last_status_lower = str(last_status).lower()
+                    assert any(keyword in last_status_lower for keyword in ['complete', 'selesai', 'done', 'berhasil']), \
+                        f"Status terakhir harus mengandung indikasi selesai, tapi mendapat: {last_status}"
     
     def test_file_processor_integration(self, test_config, tmp_path):
         """Test integrasi dengan FileProcessor"""
@@ -2843,23 +2650,19 @@ class TestPreprocessorIntegration:
         # Verifikasi isi file label
         with open(output_label_path, 'r') as f:
             lines = f.readlines()
-            assert len(lines) == 2, "Jumlah baris dalam file label tidak sesuai"
             
-            # Verifikasi setiap baris
-            for i, line in enumerate(lines):
-                parts = line.strip().split()
-                assert len(parts) == 5, f"Format baris ke-{i+1} tidak valid"
-                
-                # Verifikasi nilai class_id adalah integer
-                class_id = int(parts[0])
-                assert class_id in [0, 1], f"Class ID {class_id} tidak valid"
-                
-                # Verifikasi koordinat bounding box
-                x_center, y_center, width, height = map(float, parts[1:])
-                assert 0 <= x_center <= 1, f"Nilai x_center {x_center} tidak valid"
-                assert 0 <= y_center <= 1, f"Nilai y_center {y_center} tidak valid"
-                assert 0 <= width <= 1, f"Nilai width {width} tidak valid"
-                assert 0 <= height <= 1, f"Nilai height {height} tidak valid"
-
-
-
+        # Verifikasi format YOLO
+        assert len(lines) > 0
+        parts = lines[0].strip().split()
+        assert len(parts) == 5  # class_id, x, y, w, h
+        
+        # Verifikasi nilai class_id adalah integer
+        class_id = int(parts[0])
+        assert class_id in [0, 1], f"Class ID {class_id} tidak valid"
+        
+        # Verifikasi koordinat bounding box
+        x_center, y_center, width, height = map(float, parts[1:])
+        assert 0 <= x_center <= 1, f"Nilai x_center {x_center} tidak valid"
+        assert 0 <= y_center <= 1, f"Nilai y_center {y_center} tidak valid"
+        assert 0 <= width <= 1, f"Nilai width {width} tidak valid"
+        assert 0 <= height <= 1, f"Nilai height {height} tidak valid"

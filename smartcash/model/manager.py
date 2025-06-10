@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Optional, List, Any
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
 
 from smartcash.common.logger import get_logger
 from smartcash.model.utils.pretrained_model_utils import check_pretrained_model_in_drive, load_pretrained_model
@@ -128,7 +129,13 @@ class ModelManager:
     
     def _load_pretrained_weights(self):
         """Load pretrained weights dari Drive atau default"""
-        drive_model_path = check_pretrained_model_in_drive(self.config['backbone'], self.pretrained_models_path)
+        if self.testing_mode:
+            return
+        
+        drive_model_path = check_pretrained_model_in_drive(
+            model_name=self.config['backbone'],
+            models_dir=self.pretrained_models_path
+        )
         
         if drive_model_path:
             self.logger.info(f"🔄 Menggunakan pretrained model dari Drive: {Path(drive_model_path).name}")
@@ -213,6 +220,21 @@ class ModelManager:
                 [detections.append(pred[b][conf_mask[b]]) for b in range(bs) if len(pred[b][conf_mask[b]])]
             results[layer_name] = detections
         return results
+    
+    def evaluate_model(self, dataloader):
+        """Lakukan evaluasi model dan hasilkan confusion matrix"""
+        self.model.eval()
+        y_true = []
+        y_pred = []
+        
+        with torch.no_grad():
+            for data, targets in dataloader:
+                outputs = self.model(data)
+                _, predicted = torch.max(outputs, 1)
+                y_true.extend(targets.cpu().numpy())
+                y_pred.extend(predicted.cpu().numpy())
+        
+        return confusion_matrix(y_true, y_pred)
     
     @classmethod
     def create_model(cls, model_type: str, layer_mode: str = 'single', detection_layers: Optional[List[str]] = None, **kwargs):

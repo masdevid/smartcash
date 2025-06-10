@@ -68,11 +68,12 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         header = create_header("🔧 Dataset Preprocessing", "Preprocessing dataset dengan validasi dan real-time progress")
         status_panel = create_status_panel("🚀 Siap memulai preprocessing dataset", "info")
         
-        # Input options with fallback
+        # Input options dengan fallback dan validasi struktur
         try:
             input_options = create_preprocessing_input_options(config)
-            if not hasattr(input_options, 'get') or 'container' not in input_options:
-                raise ValueError("Format input_options tidak valid")
+            # Validasi struktur seperti di augmentation
+            if not isinstance(input_options, dict) or 'container' not in input_options:
+                raise ValueError("Format input_options tidak valid: harus berupa dictionary dengan key 'container'")
         except Exception as e:
             input_options = {'container': _create_error_component('Input Options', str(e))}
         

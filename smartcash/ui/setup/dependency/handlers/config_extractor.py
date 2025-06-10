@@ -13,16 +13,26 @@ def extract_dependency_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     log_to_ui_safe(ui_components, "🔍 Mengekstrak konfigurasi dari UI...")
     
     try:
+        # Pastikan ui_components adalah dictionary
+        if not isinstance(ui_components, dict):
+            ui_components = {}
+            
         # Get selected packages menggunakan package selector utils
         selected_packages = get_selected_packages(ui_components)
         
         # Extract UI settings dengan safe attribute access - one-liner
-        custom_packages_text = getattr(ui_components.get('custom_packages'), 'value', '').strip()
-        auto_analyze_enabled = getattr(ui_components.get('auto_analyze_checkbox'), 'value', True)
+        custom_packages_text = ''
+        if 'custom_packages' in ui_components and hasattr(ui_components['custom_packages'], 'value'):
+            custom_packages_text = str(ui_components['custom_packages'].value).strip()
+            
+        auto_analyze_enabled = True
+        if 'auto_analyze_checkbox' in ui_components and hasattr(ui_components['auto_analyze_checkbox'], 'value'):
+            auto_analyze_enabled = bool(ui_components['auto_analyze_checkbox'].value)
         
         # Extract installation settings dengan safe fallback - one-liner
-        installation_config = ui_components.get('config', {}).get('installation', _get_default_installation_config())
-        analysis_config = ui_components.get('config', {}).get('analysis', _get_default_analysis_config())
+        config = ui_components.get('config', {}) if isinstance(ui_components, dict) else {}
+        installation_config = config.get('installation', _get_default_installation_config()) if isinstance(config, dict) else _get_default_installation_config()
+        analysis_config = config.get('analysis', _get_default_analysis_config()) if isinstance(config, dict) else _get_default_analysis_config()
         
         log_to_ui_safe(ui_components, "✅ Ekstraksi konfigurasi selesai")
         

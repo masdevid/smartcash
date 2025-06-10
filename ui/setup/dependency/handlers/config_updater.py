@@ -5,8 +5,8 @@ Deskripsi: Config updater untuk dependency installer dengan CommonInitializer pa
 
 from typing import Dict, Any
 import ipywidgets as widgets
-from smartcash.ui.setup.dependency.components.input_options import reset_package_selections
-from smartcash.ui.setup.dependency.utils.ui_utils import log_to_ui_safe
+from smartcash.ui.setup.dependency.components.package_selector import reset_package_selections
+from smartcash.ui.setup.dependency.utils.ui_state_utils import log_to_ui_safe
 
 def update_dependency_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update UI components dari config dengan comprehensive approach - one-liner style"""
@@ -90,7 +90,7 @@ def _manual_update_package_checkboxes(ui_components: Dict[str, Any], selected_pa
     """Manual update package checkboxes sebagai fallback - one-liner approach"""
     
     # Get package keys yang perlu diselect
-    from smartcash.ui.setup.dependency.components.input_options import get_package_categories
+    from smartcash.ui.setup.dependency.components.package_selector import get_package_categories
     
     try:
         package_categories = get_package_categories()

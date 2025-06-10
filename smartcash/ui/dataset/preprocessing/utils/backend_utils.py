@@ -324,8 +324,8 @@ def setup_backend_integration(ui_components: Dict[str, Any], config: Dict[str, A
         })
         
         # Setup button management integration
-        from smartcash.ui.dataset.preprocessing.utils.button_manager import setup_backend_button_management
-        button_manager = setup_backend_button_management(ui_components)
+        from smartcash.ui.dataset.preprocessing.utils.button_manager import create_button_state_manager
+        button_manager = create_button_state_manager(ui_components)
         ui_components['button_manager'] = button_manager
         
         # Setup config handler integration

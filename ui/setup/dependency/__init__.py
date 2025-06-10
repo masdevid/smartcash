@@ -3,7 +3,7 @@ File: smartcash/ui/setup/dependency/__init__.py
 Deskripsi: Main dependency module exports dengan public API
 """
 
-from smartcash.ui.setup.dependency.dependency_initializer import (
+from .dependency_init import (
     initialize_dependency_ui,
     get_dependency_config,
     get_dependency_config_handler,
@@ -16,7 +16,6 @@ from smartcash.ui.setup.dependency.dependency_initializer import (
     get_installation_settings,
     get_analysis_settings,
     is_auto_analyze_enabled,
-    DependencyInitializer
 )
 
 # Main public API
@@ -25,7 +24,6 @@ __all__ = [
     'initialize_dependency_ui',
     'get_dependency_config',
     'get_dependency_config_handler',
-    'DependencyInitializer',
     
     # Config management
     'update_dependency_config',

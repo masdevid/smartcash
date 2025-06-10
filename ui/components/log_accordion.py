@@ -1,7 +1,6 @@
-
 """
 File: smartcash/ui/components/log_accordion.py
-Deskripsi: Komponen log accordion dengan one-liner style
+Deskripsi: Fixed log accordion tanpa scroll_to_bottom yang tidak tersedia
 """
 
 import ipywidgets as widgets
@@ -42,7 +41,8 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
             <span style='word-wrap: break-word; overflow-wrap: break-word;'>{message}</span>
         </div>"""
         
-        with output_widget: display(widgets.HTML(formatted_message))
+        with output_widget: 
+            display(widgets.HTML(formatted_message))
     
     setattr(output_widget, 'append_log', append_log)
     log_accordion = widgets.Accordion(children=[output_widget], layout=widgets.Layout(
@@ -53,7 +53,7 @@ def create_log_accordion(module_name: str = 'process', height: str = '200px', wi
         box_sizing='border-box',
     ))
     log_accordion.set_title(0, f"{ICONS.get('log', '📋')} Log {module_name.capitalize()}")
-    log_accordion.selected_index = 0  # Open by default
+    log_accordion.selected_index = 0
     return {'log_output': output_widget, 'log_accordion': log_accordion}
 
 def update_log(ui_components: Dict[str, Any], message: str, expand: bool = False, clear: bool = False) -> None:

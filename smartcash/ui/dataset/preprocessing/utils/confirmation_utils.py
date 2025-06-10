@@ -100,7 +100,8 @@ def _show_interactive_confirmation(ui_components: Dict[str, Any], title: str, me
         'border_radius': '8px',
         'background_color': bg_color,
         'width': '100%',
-        'max_width': '500px'
+        'max_width': '500px',
+        'margin': '4px auto'
     })
     
     # Display
@@ -133,7 +134,7 @@ def _show_brief_feedback(ui_components: Dict[str, Any], message: str, level: str
     color = colors.get(level, '#17a2b8')
     
     feedback_html = HTML(f"""
-    <div style='padding: 15px; background-color: rgba(248,249,250,0.9); 
+    <div style='padding: 15px; background-color: rgba(248,249,250,0.9); margin: 4px auto;
                border: 1px solid {color}; border-radius: 6px; text-align: center;'>
         <span style='color: {color}; font-weight: 500;'>{message}</span>
     </div>

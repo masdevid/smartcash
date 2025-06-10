@@ -13,7 +13,7 @@ smartcash/ui/[domain]/[module]/
 │   ├── config_extractor.py       # UI → Konfigurasi
 │   ├── config_updater.py         # Konfigurasi → UI
 │   ├── defaults.py               # Nilai default hardcoded
-│   └── [module]_handlers.py      # Handler logika bisnis
+│   └── [module]_handlers.py      # Handler logika bisnis (Jika terlalu panjang, pecah jadi SRP handler)
 ├── components/
 │   ├── __init__.py
 │   ├── ui_components.py          # Penyusun antarmuka utama
@@ -21,10 +21,10 @@ smartcash/ui/[domain]/[module]/
 └── utils/
     ├── __init__.py
     ├── ui_utils.py               # Utilitas tampilan UI
-    ├── button_manager.py         # Manajemen status tombol
-    ├── dialog_utils.py           # Dialog konfirmasi
+    ├── button_manager.py         # Manajemen status tombol (HARUS disable semua tombol saat process)
+    ├── dialog_utils.py           # Dialog konfirmasi (Opsional)
     ├── progress_utils.py         # Pelacakan kemajuan
-    └── backend_utils.py          # Integrasi backend
+    └── backend_utils.py          # Integrasi backend (Opsional)
 ```
 
 ## 🎯 Pola UI Terkini (Modul Augmentasi)

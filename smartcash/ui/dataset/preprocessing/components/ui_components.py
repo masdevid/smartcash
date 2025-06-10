@@ -143,28 +143,19 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         ], layout=widgets.Layout(margin='8px 0'))
         
         # Main UI assembly
-        main_container = widgets.VBox([
+        ui = widgets.VBox([
             header,
             status_panel,
             input_options.get('container', widgets.VBox()),
-            config_section,
-            action_section,
             progress_container,
-            log_accordion
-        ], layout=widgets.Layout(
-            width='100%',
-            max_width='1200px',
-            margin='0 auto',
-            padding='15px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            box_shadow='0 2px 4px rgba(0,0,0,0.05)'
-        ))
+            log_accordion,
+            action_section,
+            config_section
+        ], layout=widgets.Layout(width='100%'))
         
-        # Return components with error handling
-        # Prepare components dictionary
-        components = {
-            'ui': main_container,
+        # Return components dictionary
+        return {
+            'ui': ui,
             'components': {
                 'header': header,
                 'status_panel': status_panel,
@@ -172,33 +163,19 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
                 'progress_container': progress_container,
                 'log_output': log_output,
                 'log_accordion': log_accordion,
-                'action_section': action_section,
+                'action_buttons': action_buttons,
+                'confirmation_area': confirmation_area,
+                'save_reset_buttons': save_reset_buttons,
                 'config_section': config_section,
-                # Input components
-                'resolution_dropdown': getattr(input_options.get('components', {}), 'resolution_dropdown', None),
-                'normalization_dropdown': getattr(input_options.get('components', {}), 'normalization_dropdown', None),
-                'target_splits_select': getattr(input_options.get('components', {}), 'target_splits_select', None),
-                'batch_size_input': getattr(input_options.get('components', {}), 'batch_size_input', None),
-                'validation_checkbox': getattr(input_options.get('components', {}), 'validation_checkbox', None),
-                'preserve_aspect_checkbox': getattr(input_options.get('components', {}), 'preserve_aspect_checkbox', None),
-                'move_invalid_checkbox': getattr(input_options.get('components', {}), 'move_invalid_checkbox', None),
-                'invalid_dir_input': getattr(input_options.get('components', {}), 'invalid_dir_input', None),
-                
-                # Module metadata
-                'module_name': 'preprocessing',
-                'ui_initialized': True
+                'progress_tracker': progress_tracker
             }
         }
-        
-        return components
         
     except Exception as e:
         error_msg = f"Gagal membuat UI: {str(e)}"
         print(f"⚠️ {error_msg}")
         traceback.print_exc()
         return _create_fallback_ui(error_msg)
-    
-    return ui_components
 
 def _create_section_header(title: str, color: str) -> widgets.HTML:
     """Create styled section header"""

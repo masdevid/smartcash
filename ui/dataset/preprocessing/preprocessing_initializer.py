@@ -61,9 +61,7 @@ class PreprocessingInitializer(CommonInitializer):
         """Minimal critical components yang harus ada"""
         return [
             'ui',
-            'preprocess_button', 
-            'save_button', 
-            'log_output'
+           
         ]
 
 # Global instance

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py
-Deskripsi: Fixed handlers dengan polling confirmation system tanpa threading
+Deskripsi: Simplified handlers tanpa complex confirmation untuk fix import error
 """
 
 from typing import Dict, Any
@@ -19,12 +19,11 @@ from smartcash.ui.dataset.preprocessing.utils.backend_utils import (
     _convert_ui_to_backend_config
 )
 from smartcash.ui.dataset.preprocessing.utils.confirmation_utils import (
-    show_cleanup_confirmation, show_preprocessing_confirmation,
-    wait_for_confirmation, clear_confirmation_area
+    get_preprocessing_confirmation, get_cleanup_confirmation, clear_confirmation_area
 )
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handlers dengan fixed confirmation system"""
+    """Setup handlers dengan simplified confirmation system"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -34,10 +33,10 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
         # Setup config handlers (tanpa progress tracking)
         _setup_config_handlers(ui_components)
         
-        # Setup operation handlers (dengan fixed confirmation)
+        # Setup operation handlers (dengan simplified confirmation)
         _setup_operation_handlers(ui_components, config)
         
-        logger.info("✅ Preprocessing handlers setup completed dengan fixed confirmation")
+        logger.info("✅ Preprocessing handlers setup completed")
         return ui_components
         
     except Exception as e:
@@ -108,16 +107,16 @@ def _setup_config_handlers(ui_components: Dict[str, Any]):
         reset_button.on_click(simple_reset_config)
 
 def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup operation handlers dengan fixed confirmation polling"""
+    """Setup operation handlers dengan simplified confirmation"""
     
     def preprocessing_handler(button=None):
-        return _execute_preprocessing_with_polling(ui_components, config)
+        return _execute_preprocessing_simplified(ui_components, config)
     
     def check_handler(button=None):
         return _execute_check_operation(ui_components, config)
     
     def cleanup_handler(button=None):
-        return _execute_cleanup_with_polling(ui_components, config)
+        return _execute_cleanup_simplified(ui_components, config)
     
     # Bind handlers
     if preprocess_button := ui_components.get('preprocess_button'):
@@ -128,30 +127,18 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         cleanup_button.on_click(cleanup_handler)
 
 @with_button_management('preprocessing')
-def _execute_preprocessing_with_polling(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """Execute preprocessing dengan polling confirmation"""
+def _execute_preprocessing_simplified(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """Execute preprocessing dengan simplified confirmation"""
     logger = get_logger('preprocessing_handlers')
     
     try:
         clear_outputs(ui_components)
         
-        # Show confirmation dialog
-        log_to_accordion(ui_components, "🤔 Menunggu konfirmasi user untuk memulai preprocessing...", "info")
-        show_preprocessing_confirmation(ui_components, "Apakah Anda yakin ingin memulai preprocessing dataset?")
-        
-        # Poll for confirmation
-        confirmed = wait_for_confirmation(ui_components, timeout_seconds=30)
-        
-        if confirmed is False:
-            log_to_accordion(ui_components, "🚫 Preprocessing dibatalkan oleh user", "info")
+        # Simplified confirmation
+        confirmed = get_preprocessing_confirmation(ui_components, "preprocessing dataset")
+        if not confirmed:
+            log_to_accordion(ui_components, "🚫 Preprocessing dibatalkan", "info")
             return False
-        elif confirmed is None:
-            handle_ui_error(ui_components, "⏰ Timeout waiting for confirmation - Operasi dibatalkan")
-            return False
-        
-        # User confirmed, proceed dengan processing
-        log_to_accordion(ui_components, "✅ Konfirmasi diterima, memulai preprocessing...", "success")
-        clear_confirmation_area(ui_components)
         
         # Setup progress
         setup_progress_tracking(ui_components, "Dataset Preprocessing")
@@ -160,6 +147,7 @@ def _execute_preprocessing_with_polling(ui_components: Dict[str, Any], config: D
         backend_config = _convert_ui_to_backend_config(ui_components)
         
         # Validation
+        log_to_accordion(ui_components, "🔍 Memvalidasi dataset...", "info")
         is_valid, validation_msg = validate_dataset_ready(backend_config)
         if not is_valid:
             error_progress_tracking(ui_components, "Validation failed")
@@ -169,6 +157,7 @@ def _execute_preprocessing_with_polling(ui_components: Dict[str, Any], config: D
         log_to_accordion(ui_components, f"✅ {validation_msg}", "success")
         
         # Create preprocessor
+        log_to_accordion(ui_components, "🏗️ Membuat preprocessing service...", "info")
         preprocessor = create_backend_preprocessor(backend_config, progress_callback=ui_components.get('progress_callback'))
         if not preprocessor:
             error_progress_tracking(ui_components, "Service creation failed")
@@ -181,9 +170,17 @@ def _execute_preprocessing_with_polling(ui_components: Dict[str, Any], config: D
         
         if result.get('success', False):
             stats = result.get('stats', {})
-            message = f"Preprocessing berhasil: {stats.get('total_processed', 0):,} gambar diproses"
+            processed_count = stats.get('total_processed', 0)
+            processing_time = stats.get('processing_time', 0)
+            
+            message = f"Preprocessing berhasil: {processed_count:,} gambar diproses dalam {processing_time:.1f} detik"
             complete_progress_tracking(ui_components, message)
             show_ui_success(ui_components, message)
+            
+            # Log additional stats jika ada
+            if success_rate := stats.get('success_rate'):
+                log_to_accordion(ui_components, f"📊 Success rate: {success_rate}%", "info")
+            
             return True
         else:
             error_msg = result.get('message', 'Preprocessing failed')
@@ -200,7 +197,7 @@ def _execute_preprocessing_with_polling(ui_components: Dict[str, Any], config: D
 
 @with_button_management('validation')
 def _execute_check_operation(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """Execute dataset check tanpa confirmation"""
+    """Execute dataset check operation"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -218,21 +215,33 @@ def _execute_check_operation(ui_components: Dict[str, Any], config: Dict[str, An
         log_to_accordion(ui_components, "💾 Memeriksa data preprocessed...", "info")
         preprocessed_exists, preprocessed_msg = check_preprocessed_exists(backend_config)
         
+        # Compile results
+        results = []
         if is_valid:
-            message = f"Dataset valid"
-            if preprocessed_exists:
-                message += f" + {preprocessed_msg}"
+            results.append(f"✅ Dataset sumber: {source_msg}")
+        else:
+            results.append(f"❌ Dataset sumber: {source_msg}")
+        
+        if preprocessed_exists:
+            results.append(f"💾 Preprocessed: {preprocessed_msg}")
+        else:
+            results.append("ℹ️ Belum ada data preprocessed")
+        
+        # Show results
+        final_message = " | ".join(results)
+        
+        if is_valid:
+            complete_progress_tracking(ui_components, "Dataset check completed")
+            show_ui_success(ui_components, final_message)
             
-            complete_progress_tracking(ui_components, message)
-            show_ui_success(ui_components, message)
-            
-            if preprocessed_exists:
-                log_to_accordion(ui_components, f"💾 Preprocessed data: {preprocessed_msg}", "info")
+            # Log detailed info
+            for result in results:
+                log_to_accordion(ui_components, result, "info")
             
             return True
         else:
             error_progress_tracking(ui_components, source_msg)
-            handle_ui_error(ui_components, source_msg)
+            handle_ui_error(ui_components, final_message)
             return False
             
     except Exception as e:
@@ -243,8 +252,8 @@ def _execute_check_operation(ui_components: Dict[str, Any], config: Dict[str, An
         return False
 
 @with_button_management('cleanup')
-def _execute_cleanup_with_polling(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-    """Execute cleanup dengan polling confirmation"""
+def _execute_cleanup_simplified(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """Execute cleanup dengan simplified confirmation"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -260,31 +269,20 @@ def _execute_cleanup_with_polling(ui_components: Dict[str, Any], config: Dict[st
             log_to_accordion(ui_components, "ℹ️ Tidak ada data untuk dibersihkan", "info")
             return True
         
-        # Log detailed stats
-        log_to_accordion(ui_components, f"📊 Data ditemukan: {detailed_msg}", "info")
+        # Log what will be deleted
+        log_to_accordion(ui_components, f"📊 Data yang akan dihapus: {detailed_msg}", "info")
         
-        # Show confirmation dialog dengan detail
-        log_to_accordion(ui_components, "🤔 Menunggu konfirmasi user untuk cleanup...", "info")
-        show_cleanup_confirmation(ui_components, detailed_msg)
-        
-        # Poll for confirmation
-        confirmed = wait_for_confirmation(ui_components, timeout_seconds=30)
-        
-        if confirmed is False:
-            log_to_accordion(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
+        # Simplified confirmation
+        confirmed = get_cleanup_confirmation(ui_components, detailed_msg)
+        if not confirmed:
+            log_to_accordion(ui_components, "🚫 Cleanup dibatalkan", "info")
             return False
-        elif confirmed is None:
-            handle_ui_error(ui_components, "⏰ Timeout waiting for confirmation - Operasi dibatalkan")
-            return False
-        
-        # User confirmed, proceed dengan cleanup
-        log_to_accordion(ui_components, "✅ Konfirmasi diterima, memulai cleanup...", "success")
-        clear_confirmation_area(ui_components)
         
         # Setup progress
         setup_progress_tracking(ui_components, "Dataset Cleanup")
         
         # Create cleanup service
+        log_to_accordion(ui_components, "🏗️ Membuat cleanup service...", "info")
         cleanup_service = create_backend_cleanup_service(backend_config, ui_components=ui_components)
         if not cleanup_service:
             error_progress_tracking(ui_components, "Service creation failed")
@@ -298,9 +296,16 @@ def _execute_cleanup_with_polling(ui_components: Dict[str, Any], config: Dict[st
         if result.get('success', False):
             stats = result.get('stats', {})
             files_removed = stats.get('files_removed', 0)
-            message = f"Cleanup berhasil: {files_removed:,} file dihapus"
+            dirs_removed = stats.get('dirs_removed', 0)
+            
+            message = f"Cleanup berhasil: {files_removed:,} file dan {dirs_removed} direktori dihapus"
             complete_progress_tracking(ui_components, message)
             show_ui_success(ui_components, message)
+            
+            # Additional cleanup info
+            log_to_accordion(ui_components, f"🗑️ Files removed: {files_removed:,}", "info")
+            log_to_accordion(ui_components, f"📁 Directories removed: {dirs_removed}", "info")
+            
             return True
         else:
             error_msg = result.get('message', 'Cleanup failed')

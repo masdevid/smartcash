@@ -47,15 +47,41 @@ class TestPretrainedInit(unittest.TestCase):
     @patch('smartcash.ui.pretrained_model.components.create_pretrained_main_ui')
     def test_create_ui_components_success(self, mock_create_ui):
         """Test pembuatan UI components berhasil"""
-        mock_ui = {'ui': MagicMock(), 'progress_tracker': MagicMock()}
-        mock_create_ui.return_value = mock_ui
+        # Mock return value dari create_pretrained_main_ui
+        mock_ui = MagicMock()
+        mock_progress_tracker = MagicMock()
+        mock_create_ui.return_value = {
+            'ui': mock_ui,
+            'progress_tracker': mock_progress_tracker,
+            'log_output': MagicMock(),
+            'models_dir_input': MagicMock(),
+            'drive_models_dir_input': MagicMock(),
+            'yolov5_url_input': MagicMock(),
+            'efficientnet_url_input': MagicMock(),
+            'module_name': 'pretrained_model',
+            'auto_check_enabled': True,
+            'tracker': mock_progress_tracker,
+            'update_primary': mock_progress_tracker.update_primary,
+            'update_overall': mock_progress_tracker.update_overall,
+            'update_current': mock_progress_tracker.update_current,
+            'update_progress': mock_progress_tracker.update,
+            'complete_operation': mock_progress_tracker.complete,
+            'error_operation': mock_progress_tracker.error,
+            'reset_progress': mock_progress_tracker.reset,
+            'show_progress': mock_progress_tracker.show
+        }
         
+        # Panggil method yang diuji
         ui_components = self.pretrained_init._create_ui_components(self.mock_config)
         
+        # Verifikasi hasil
         self.assertIn('ui', ui_components)
         self.assertIn('progress_tracker', ui_components)
         self.assertTrue(ui_components['pretrained_model_initialized'])
         self.assertEqual(ui_components['module_name'], 'pretrained_model')
+        
+        # Verifikasi mock dipanggil dengan benar
+        mock_create_ui.assert_called_once_with(self.mock_config)
         
     @patch('smartcash.ui.pretrained_model.components.create_pretrained_main_ui')
     def test_create_ui_components_failure(self, mock_create_ui):

@@ -34,7 +34,7 @@ class PretrainedInit(CommonInitializer):
         try:
             return setup_pretrained_handlers(ui_components, config, env)
         except Exception as e:
-            self.logger.error(f" Error setup handlers: {str(e)}")
+            self.logger.error(f"💥 Error setup handlers: {str(e)}")
             return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:

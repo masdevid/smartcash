@@ -40,6 +40,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Create progress tracker menggunakan dual progress
     progress_tracker = create_dual_progress_tracker(
+        operation="Download Model",
         primary_label='Progress Keseluruhan', 
         secondary_label='Progress Saat Ini'
     )

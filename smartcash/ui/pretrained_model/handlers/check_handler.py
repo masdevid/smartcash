@@ -26,6 +26,7 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
                 progress_tracker.show("Check Model", ["scan", "verify"], {"scan": 50, "verify": 50})
                 # Update progress dengan API yang benar
                 progress_tracker.update_overall(10, "🔍 Memeriksa model yang tersedia")
+                progress_tracker.update_task("scan", 10, "🔍 Memeriksa model yang tersedia")
             else:
                 # Fallback ke metode lama jika tersedia
                 ui_components.get('show_progress', lambda x: None)("Check Model")

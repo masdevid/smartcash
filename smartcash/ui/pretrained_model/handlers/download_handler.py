@@ -31,11 +31,11 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                 step_weights = {"check": 30, "download": 50, "sync": 20}
                 progress_tracker.show("Download & Sync Model", download_steps, step_weights)
                 # Update progress untuk phase 1
-                progress_tracker.update_overall(10, "🔍 Memeriksa model yang tersedia")
+                progress_tracker.update_overall(5, "🔍 Memeriksa model yang tersedia")
             else:
                 # Fallback ke metode lama jika tersedia
                 ui_components.get('show_progress', lambda x: None)("Download & Sync Model")
-                ui_components.get('update_primary', lambda *a: None)(10, "🔍 Memeriksa model yang tersedia")
+                ui_components.get('update_primary', lambda *a: None)(5, "🔍 Memeriksa model yang tersedia")
             
             # Phase 1: Check existing models (0-30%)
             checker = ModelChecker(ui_components, logger)

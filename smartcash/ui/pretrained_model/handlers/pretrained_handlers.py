@@ -16,8 +16,8 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     def setup_download_handler(ui_components, config):
         # Update progress tracker
         if 'progress_tracker' in ui_components:
-            ui_components['progress_tracker'].update_primary(f'Downloading {model_name}', progress)
-            ui_components['progress_tracker'].update_secondary(f'File: {filename}', subprogress)
+            ui_components['progress_tracker'].update_overall(progress, f'Downloading {model_name}')
+            ui_components['progress_tracker'].update_current(subprogress, f'File: {filename}')
         # Rest of the setup_download_handler function remains the same
     
     setup_download_handler(ui_components, config)

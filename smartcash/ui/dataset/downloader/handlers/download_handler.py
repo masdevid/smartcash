@@ -18,7 +18,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     setup_download_handler_with_cleanup_analysis(ui_components, config)
     
     setup_check_handler(ui_components, config)
-    setup_enhanced_cleanup_handler(ui_components, config)  # Enhanced cleanup
+    setup_cleanup_handler(ui_components, config)  # Enhanced cleanup
     setup_config_handlers(ui_components)
     
     return ui_components
@@ -55,10 +55,10 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
     if check_button:
         check_button.on_click(execute_check)
 
-def setup_enhanced_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
+def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
     """Setup enhanced cleanup handler dengan behavior analysis"""
     
-    def execute_enhanced_cleanup(button=None):
+    def execute_cleanup(button=None):
         button_manager = get_button_manager(ui_components)
         
         clear_outputs(ui_components)
@@ -93,8 +93,8 @@ def setup_enhanced_cleanup_handler(ui_components: Dict[str, Any], config: Dict[s
                 return
             
             # Enhanced confirmation dengan analysis
-            from smartcash.ui.dataset.downloader.utils.enhanced_confirmation import show_enhanced_cleanup_confirmation
-            show_enhanced_cleanup_confirmation(
+            from smartcash.ui.dataset.downloader.utils.enhanced_confirmation import show_cleanup_confirmation
+            show_cleanup_confirmation(
                 ui_components, targets_result, cleanup_analysis,
                 lambda: _execute_analyzed_cleanup(targets_result, ui_components, button_manager, cleanup_analysis)
             )
@@ -104,7 +104,7 @@ def setup_enhanced_cleanup_handler(ui_components: Dict[str, Any], config: Dict[s
     
     cleanup_button = ui_components.get('cleanup_button')
     if cleanup_button:
-        cleanup_button.on_click(execute_enhanced_cleanup)
+        cleanup_button.on_click(execute_cleanup)
 
 def setup_config_handlers(ui_components: Dict[str, Any]):
     """Setup save/reset handlers"""

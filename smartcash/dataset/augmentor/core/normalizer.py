@@ -59,7 +59,7 @@ class NormalizationEngine:
             
             # Phase 3: Enhanced summary (NEW)
             if result.get('status') == 'success':
-                enhanced_summary = self._create_enhanced_summary(result, aug_files, output_path)
+                enhanced_summary = self._create_summary(result, aug_files, output_path)
                 result.update(enhanced_summary)
             
             self._report_progress("overall", 4, 4, "Normalisasi selesai", progress_callback)
@@ -90,7 +90,7 @@ class NormalizationEngine:
         if created_dirs:
             self.logger.info(f"📁 Created preprocessed directories: {', '.join([d.split('/')[-1] for d in created_dirs])}")
     
-    def _create_enhanced_summary(self, result: Dict[str, Any], source_files: List[str], output_path: str) -> Dict[str, Any]:
+    def _create_summary(self, result: Dict[str, Any], source_files: List[str], output_path: str) -> Dict[str, Any]:
         """📊 NEW: Create detailed summary untuk UI logging"""
         total_normalized = result.get('total_normalized', 0)
         processed_files = result.get('processed_files', 0)

@@ -172,55 +172,144 @@ def create_backend_checker(config: Dict[str, Any], logger=None):
             logger.error(f"❌ Error creating checker: {str(e)}")
         return None
 
-def create_backend_cleanup_service(config: Dict[str, Any], logger=None):
-    """🧹 Create cleanup service dengan proper error handling"""
-    try:
-        from smartcash.dataset.preprocessor import cleanup_preprocessed_data
+def create_backend_cleanup_service(config: Dict[str, Any], logger=None, ui_components: Optional[Dict[str, Any]] = None):
+    """
+    Create a cleanup service with enhanced functionality
+    
+    Args:
+        config: Configuration dictionary
+        logger: Optional logger instance
+        ui_components: Optional UI components for interaction
         
-        class EnhancedCleanupService:
-            def __init__(self, config, logger):
-                self.config = config
-                self.logger = logger
+    Returns:
+        EnhancedCleanupService instance
+    """
+    from smartcash.dataset.preprocessor import cleanup_preprocessed_data
+    from typing import Optional, Dict, Any, Callable
+    
+    class EnhancedCleanupService:
+        def __init__(self, config, logger, ui_components=None):
+            self.config = config
+            self.logger = logger
+            self.ui_components = ui_components or {}
             
-            def cleanup_preprocessed_data(self) -> Dict[str, Any]:
-                """Enhanced cleanup dengan detailed reporting"""
-                try:
-                    # Check existing data sebelum cleanup - fixed to return 2 values
-                    has_data, file_count = check_preprocessed_exists(self.config)
+        def show_confirmation_dialog(self, title: str, message: str, 
+                                 confirm_text: str, cancel_text: str) -> bool:
+            """
+            Show confirmation dialog using UI components if available
+            
+            Args:
+                title: Dialog title
+                message: Dialog message
+                confirm_text: Text for confirm button
+                cancel_text: Text for cancel button
+                
+            Returns:
+                bool: True if confirmed, False otherwise
+            """
+            if not self.ui_components:
+                if self.logger:
+                    self.logger.warning("UI components not available, skipping confirmation dialog")
+                return True
+                
+            try:
+                from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import _show_confirmation_in_area
+                import threading
+                
+                response_event = threading.Event()
+                response = None
+                
+                def on_confirm():
+                    nonlocal response
+                    response = True
+                    response_event.set()
                     
-                    if not has_data:
-                        return {
-                            'success': True,
-                            'message': "ℹ️ Tidak ada preprocessed data untuk dibersihkan",
-                            'stats': {'files_removed': 0, 'splits_cleaned': 0}
-                        }
-                    
-                    # Perform cleanup
-                    result = cleanup_preprocessed_data(self.config)
-                    
-                    if result.get('success'):
-                        return {
-                            'success': True,
-                            'message': f"🧹 Cleanup berhasil: {file_count} files removed",
-                            'stats': {
-                                'files_removed': file_count,
-                                'splits_cleaned': len(self.config.get('preprocessing', {}).get('target_splits', ['train', 'valid']))
-                            }
-                        }
-                    else:
-                        return {
-                            'success': False,
-                            'message': result.get('message', 'Cleanup failed')
-                        }
-                        
-                except Exception as e:
+                def on_cancel():
+                    nonlocal response
+                    response = False
+                    response_event.set()
+                
+                # Show dialog in UI thread
+                if 'ipython' in globals():
+                    from IPython.display import display
+                    display("Please check the UI for confirmation dialog")
+                
+                _show_confirmation_in_area(
+                    ui_components=self.ui_components,
+                    title=title,
+                    message=message,
+                    confirm_text=confirm_text,
+                    cancel_text=cancel_text,
+                    on_confirm=on_confirm,
+                    on_cancel=on_cancel
+                )
+                
+                # Wait for user response (with timeout)
+                response_event.wait(timeout=300)  # 5 minutes timeout
+                return response if response is not None else False
+                
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error showing confirmation dialog: {str(e)}", exc_info=True)
+                return True  # Default to True to avoid blocking the operation
+                
+        def cleanup_preprocessed_data(self) -> Dict[str, Any]:
+            """Enhanced cleanup dengan detailed reporting"""
+            try:
+                # Check existing data sebelum cleanup
+                has_data, file_count = check_preprocessed_exists(self.config)
+                
+                if not has_data:
+                    return {
+                        'success': True,
+                        'message': "ℹ️ Tidak ada preprocessed data untuk dibersihkan",
+                        'stats': {'files_removed': 0, 'splits_cleaned': 0}
+                    }
+                
+                # Show confirmation dialog
+                confirmed = self.show_confirmation_dialog(
+                    title="Konfirmasi Cleanup",
+                    message=f"Anda yakin ingin menghapus {file_count} file preprocessed?\n\nTindakan ini tidak dapat dibatalkan.",
+                    confirm_text="Ya, Hapus",
+                    cancel_text="Batal"
+                )
+                
+                if not confirmed:
                     return {
                         'success': False,
-                        'message': f"❌ Cleanup error: {str(e)}"
+                        'message': 'Cleanup dibatalkan oleh pengguna',
+                        'cancelled': True
                     }
+                
+                # Perform cleanup
+                result = cleanup_preprocessed_data(self.config)
+                
+                if result.get('success'):
+                    return {
+                        'success': True,
+                        'message': f"🧹 Cleanup berhasil: {file_count} file dihapus",
+                        'stats': {
+                            'files_removed': file_count,
+                            'splits_cleaned': len(self.config.get('preprocessing', {}).get('target_splits', ['train', 'valid']))
+                        }
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'message': result.get('message', 'Gagal membersihkan data')
+                    }
+                    
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
+                return {
+                    'success': False,
+                    'message': f"❌ Terjadi kesalahan saat membersihkan data: {str(e)}"
+                }
         
-        return EnhancedCleanupService(config, logger)
-        
+    try:
+        # Create and return an instance of the EnhancedCleanupService
+        return EnhancedCleanupService(config, logger, ui_components)
     except Exception as e:
         if logger:
             logger.error(f"❌ Error creating cleanup service: {str(e)}")

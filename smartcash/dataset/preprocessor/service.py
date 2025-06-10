@@ -118,12 +118,12 @@ class PreprocessingService:
                 'success': True,
                 'message': "✅ Preprocessing completed successfully",
                 'processing_time': processing_time,
-                'stats': self._compile_enhanced_stats(preprocessing_result, validation_result, processing_time),
+                'stats': self._compile_stats(preprocessing_result, validation_result, processing_time),
                 'configuration': self._get_config_summary()
             }
             
             self._update_progress("✅ Preprocessing selesai", 1.0)
-            self._log_enhanced_summary(final_result)
+            self._log_summary(final_result)
             
             return final_result
             
@@ -218,7 +218,7 @@ class PreprocessingService:
                 'errors': [str(e)]
             }
     
-    def _compile_enhanced_stats(self, preprocessing_result: Dict, validation_result: Dict, processing_time: float) -> Dict[str, Any]:
+    def _compile_stats(self, preprocessing_result: Dict, validation_result: Dict, processing_time: float) -> Dict[str, Any]:
         """📊 Compile enhanced statistics untuk UI logging"""
         preprocessing_stats = preprocessing_result.get('stats', {})
         validation_stats = validation_result.get('stats', {})
@@ -267,7 +267,7 @@ class PreprocessingService:
             }
         }
     
-    def _log_enhanced_summary(self, result: Dict[str, Any]):
+    def _log_summary(self, result: Dict[str, Any]):
         """📋 Log enhanced summary untuk UI"""
         stats = result.get('stats', {})
         input_stats = stats.get('input', {})

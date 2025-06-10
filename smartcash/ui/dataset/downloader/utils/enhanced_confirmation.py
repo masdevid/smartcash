@@ -7,7 +7,7 @@ from typing import Dict, Any, Callable
 from IPython.display import display, clear_output
 import ipywidgets as widgets
 
-def show_enhanced_cleanup_confirmation(ui_components: Dict[str, Any], targets_result: Dict[str, Any],
+def show_cleanup_confirmation(ui_components: Dict[str, Any], targets_result: Dict[str, Any],
                                      cleanup_analysis: Dict[str, Any], on_confirm_callback: Callable):
     """Show enhanced cleanup confirmation dengan behavior analysis"""
     confirmation_area = ui_components.get('confirmation_area')
@@ -24,13 +24,13 @@ def show_enhanced_cleanup_confirmation(ui_components: Dict[str, Any], targets_re
         _force_confirmation_area_ready(confirmation_area, logger)
         
         # Build enhanced message dengan cleanup analysis
-        message = _build_enhanced_cleanup_message(targets_result, cleanup_analysis)
+        message = _build_cleanup_message(targets_result, cleanup_analysis)
         
         # Create enhanced confirmation widget
-        confirmation_widget = _create_enhanced_cleanup_widget(
+        confirmation_widget = _create_cleanup_widget(
             message,
-            lambda: _handle_enhanced_confirm(confirmation_area, on_confirm_callback, logger),
-            lambda: _handle_enhanced_cancel(confirmation_area, ui_components, logger)
+            lambda: _handle_confirm(confirmation_area, on_confirm_callback, logger),
+            lambda: _handle_cancel(confirmation_area, ui_components, logger)
         )
         
         # Display dengan force update
@@ -67,7 +67,7 @@ def _force_confirmation_area_ready(confirmation_area, logger):
             if logger:
                 logger.debug(f"Could not set {attr}: {str(e)}")
 
-def _build_enhanced_cleanup_message(targets_result: Dict[str, Any], cleanup_analysis: Dict[str, Any]) -> str:
+def _build_cleanup_message(targets_result: Dict[str, Any], cleanup_analysis: Dict[str, Any]) -> str:
     """Build enhanced cleanup message dengan behavior analysis"""
     summary = targets_result.get('summary', {})
     targets = targets_result.get('targets', {})
@@ -116,7 +116,7 @@ def _build_enhanced_cleanup_message(targets_result: Dict[str, Any], cleanup_anal
     
     return '\n'.join(lines)
 
-def _create_enhanced_cleanup_widget(message: str, on_confirm: Callable, on_cancel: Callable) -> widgets.VBox:
+def _create_cleanup_widget(message: str, on_confirm: Callable, on_cancel: Callable) -> widgets.VBox:
     """Create enhanced cleanup confirmation widget dengan analysis styling"""
     
     # Enhanced title dengan analysis indicator
@@ -180,7 +180,7 @@ def _create_enhanced_cleanup_widget(message: str, on_confirm: Callable, on_cance
         background_color='#fff'
     ))
 
-def _handle_enhanced_confirm(confirmation_area, on_confirm_callback: Callable, logger):
+def _handle_confirm(confirmation_area, on_confirm_callback: Callable, logger):
     """Handle enhanced cleanup confirm dengan analysis context"""
     try:
         if logger:
@@ -197,7 +197,7 @@ def _handle_enhanced_confirm(confirmation_area, on_confirm_callback: Callable, l
         if logger:
             logger.error(f"❌ Error in enhanced cleanup confirm: {str(e)}")
 
-def _handle_enhanced_cancel(confirmation_area, ui_components: Dict[str, Any], logger):
+def _handle_cancel(confirmation_area, ui_components: Dict[str, Any], logger):
     """Handle enhanced cleanup cancel dengan proper state reset"""
     try:
         if logger:

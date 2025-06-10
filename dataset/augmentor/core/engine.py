@@ -75,7 +75,7 @@ class AugmentationEngine:
             
             # Phase 3: Enhanced summary (NEW)
             if aug_result.get('status') == 'success':
-                enhanced_summary = self._create_enhanced_summary(aug_result, source_files, target_split)
+                enhanced_summary = self._create_summary(aug_result, source_files, target_split)
                 aug_result.update(enhanced_summary)
             
             self._report_progress("overall", 4, 4, "Augmentasi selesai", progress_callback)
@@ -113,7 +113,7 @@ class AugmentationEngine:
         
         return Path(base_dir) / 'augmented' / target_split
     
-    def _create_enhanced_summary(self, aug_result: Dict[str, Any], source_files: List[str], target_split: str) -> Dict[str, Any]:
+    def _create_summary(self, aug_result: Dict[str, Any], source_files: List[str], target_split: str) -> Dict[str, Any]:
         """📊 NEW: Create detailed summary untuk UI logging"""
         total_generated = aug_result.get('total_generated', 0)
         processed_files = aug_result.get('processed_files', 0)

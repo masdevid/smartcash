@@ -173,7 +173,7 @@ def format_log_message_html(ui_components: Dict[str, Any], message: str,
     color = config["color"]
     
     # Enhanced message cleaning
-    clean_message = _clean_message_enhanced(message)
+    clean_message = _clean_message(message)
     
     # Enhanced namespace untuk augmentation operations
     namespace_id = get_namespace_id(ui_components)
@@ -191,7 +191,7 @@ def format_log_message_html(ui_components: Dict[str, Any], message: str,
     """
     return html.strip()
 
-def _clean_message_enhanced(message: str) -> str:
+def _clean_message(message: str) -> str:
     """Enhanced message cleaning dengan augmentation patterns"""
     import re
     

@@ -44,7 +44,7 @@ def setup_download_handler_with_cleanup_analysis(ui_components: Dict[str, Any], 
                     return
                 
                 # 5. Show enhanced confirmation dengan cleanup analysis
-                _show_enhanced_confirmation_with_analysis(
+                _show_confirmation_with_analysis(
                     ui_components, total_images, ui_config, cleanup_analysis,
                     lambda btn: _execute_analyzed_download(ui_config, ui_components, button_manager, cleanup_analysis)
                 )
@@ -59,7 +59,7 @@ def setup_download_handler_with_cleanup_analysis(ui_components: Dict[str, Any], 
     if download_button:
         download_button.on_click(execute_download_with_analysis)
 
-def _show_enhanced_confirmation_with_analysis(ui_components: Dict[str, Any], existing_count: int, 
+def _show_confirmation_with_analysis(ui_components: Dict[str, Any], existing_count: int, 
                                             config: Dict[str, Any], cleanup_analysis: Dict[str, Any],
                                             on_confirm):
     """Show confirmation dengan enhanced cleanup analysis info"""
@@ -69,7 +69,7 @@ def _show_enhanced_confirmation_with_analysis(ui_components: Dict[str, Any], exi
         return
     
     # Build enhanced message dengan cleanup analysis
-    message = _build_enhanced_confirmation_message(existing_count, config, cleanup_analysis)
+    message = _build_confirmation_message(existing_count, config, cleanup_analysis)
     
     from IPython.display import display, clear_output
     from smartcash.ui.components.dialogs import show_destructive_confirmation
@@ -102,7 +102,7 @@ def _show_enhanced_confirmation_with_analysis(ui_components: Dict[str, Any], exi
         )
         display(dialog)
 
-def _build_enhanced_confirmation_message(existing_count: int, config: Dict[str, Any], 
+def _build_confirmation_message(existing_count: int, config: Dict[str, Any], 
                                        cleanup_analysis: Dict[str, Any]) -> str:
     """Build message dengan cleanup behavior analysis"""
     roboflow = config.get('data', {}).get('roboflow', {})

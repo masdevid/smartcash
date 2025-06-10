@@ -91,9 +91,9 @@ def reset_preprocessing_ui(ui_components: Dict[str, Any]) -> None:
         default_config = get_default_preprocessing_config()
         update_preprocessing_ui(ui_components, default_config)
     except Exception:
-        _apply_enhanced_hardcoded_defaults(ui_components)
+        _apply_hardcoded_defaults(ui_components)
 
-def _apply_enhanced_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
+def _apply_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
     """Enhanced hardcoded defaults fallback"""
     defaults = {
         'resolution_dropdown': '640x640',

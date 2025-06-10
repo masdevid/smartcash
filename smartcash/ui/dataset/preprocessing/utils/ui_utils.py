@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/ui_utils.py
-Deskripsi: Fixed UI utilities dengan scroll fix dan simplified logging
+Deskripsi: Fixed UI utilities tanpa double logging dengan single source of truth
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -10,40 +10,22 @@ from datetime import datetime
 from smartcash.common.logger import get_logger
 
 def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Fixed log to accordion tanpa scroll_to_bottom error"""
+    """🔑 KEY: Single source of truth untuk UI logging - TIDAK ada console logging"""
     try:
-        # Get logger dengan fallback
-        logger = ui_components.get('logger') or get_logger('preprocessing_ui')
-        
-        # Clean message untuk console
-        console_message = _clean_html_message(message)
-        
-        # Log ke console
-        log_methods = {
-            'info': logger.info,
-            'success': getattr(logger, 'success', logger.info),
-            'warning': logger.warning,
-            'error': logger.error,
-            'debug': logger.debug
-        }
-        
-        log_method = log_methods.get(level.lower(), logger.info)
-        log_method(console_message)
-        
-        # Update UI log dengan safe handling
-        _update_ui_log_safe(ui_components, message, level)
+        # 🎯 CRITICAL: HANYA log ke UI, JANGAN log ke console untuk avoid double logging
+        _update_ui_log_only(ui_components, message, level)
         
         # Auto-expand untuk important messages
         if level.lower() in ['error', 'warning']:
             _expand_log_accordion(ui_components)
                 
     except Exception as e:
-        # Safe fallback
-        print(f"[{level.upper()}] {_clean_html_message(message)}")
-        print(f"Log error: {str(e)}")
+        # Emergency fallback ke print HANYA jika UI benar-benar gagal
+        print(f"[UI-{level.upper()}] {_clean_html_message(message)}")
+        print(f"UI Log error: {str(e)}")
 
-def _update_ui_log_safe(ui_components: Dict[str, Any], message: str, level: str):
-    """Safe UI log update tanpa scroll errors"""
+def _update_ui_log_only(ui_components: Dict[str, Any], message: str, level: str):
+    """🎯 CRITICAL: Update UI log TANPA console logging untuk avoid double log"""
     log_output = ui_components.get('log_output')
     if not log_output:
         return
@@ -69,7 +51,7 @@ def _update_ui_log_safe(ui_components: Dict[str, Any], message: str, level: str)
         </div>
         """
         
-        # Display tanpa scroll method
+        # Display HANYA ke UI
         with log_output:
             display(HTML(formatted_msg))
             
@@ -117,7 +99,8 @@ def clear_outputs(ui_components: Dict[str, Any], clear_logs: bool = True, clear_
         return True
         
     except Exception as e:
-        get_logger('preprocessing_ui').error(f"Error clearing outputs: {str(e)}")
+        # Emergency fallback logging HANYA untuk critical errors
+        print(f"Error clearing outputs: {str(e)}")
         return False
 
 def _reset_progress_tracker_safe(ui_components: Dict[str, Any]):
@@ -130,18 +113,14 @@ def _reset_progress_tracker_safe(ui_components: Dict[str, Any]):
         pass
 
 def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, exception: Optional[Exception] = None):
-    """Handle error dengan UI updates"""
+    """🔑 KEY: Handle error dengan UI updates TANPA backend logging"""
     try:
-        logger = get_logger('preprocessing_ui')
-        
         # Format error message
         full_error_msg = f"❌ {error_msg}"
         if exception:
             full_error_msg += f"\nDetail: {str(exception)}"
         
-        # Log error
-        logger.error(full_error_msg)
-        
+        # 🎯 CRITICAL: JANGAN log ke backend console - hanya UI logging
         # Update progress tracker
         _update_progress_error(ui_components, error_msg)
         
@@ -164,7 +143,7 @@ def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, exception: Op
         return False
         
     except Exception as e:
-        # Fallback error handling
+        # Emergency fallback HANYA untuk critical UI failures
         print(f"❌ {error_msg}")
         if exception:
             print(f"Detail: {str(exception)}")
@@ -172,13 +151,9 @@ def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, exception: Op
         return False
 
 def show_ui_success(ui_components: Dict[str, Any], message: str):
-    """Show success message dengan UI updates"""
+    """🔑 KEY: Show success message TANPA backend logging"""
     try:
-        logger = get_logger('preprocessing_ui')
-        
-        # Log success
-        success_msg = f"✅ {message}"
-        logger.info(success_msg)
+        # 🎯 CRITICAL: JANGAN log ke backend console - hanya UI
         
         # Update progress tracker
         _update_progress_success(ui_components, message)
@@ -206,6 +181,7 @@ def show_ui_success(ui_components: Dict[str, Any], message: str):
         return True
         
     except Exception as e:
+        # Emergency fallback HANYA untuk critical UI failures
         print(f"✅ {message}")
         print(f"UI Success handler failed: {str(e)}")
         return False
@@ -239,7 +215,7 @@ def _update_status_panel_safe(ui_components: Dict[str, Any], message: str, statu
         pass
 
 def log_preprocessing_config(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Log preprocessing configuration"""
+    """🔑 KEY: Log preprocessing configuration HANYA ke UI"""
     try:
         preprocessing = config.get('preprocessing', {})
         normalization = preprocessing.get('normalization', {})
@@ -258,10 +234,38 @@ def log_preprocessing_config(ui_components: Dict[str, Any], config: Dict[str, An
     except Exception as e:
         handle_ui_error(ui_components, f"Gagal menampilkan konfigurasi: {str(e)}")
 
-# One-liner utilities
+# One-liner utilities dengan UI-only logging
 get_ui_logger = lambda ui_components: ui_components.get('logger') or get_logger('preprocessing_ui')
 is_milestone_step = lambda step, progress: progress in [0, 25, 50, 75, 100] or 'error' in step.lower()
 safe_log = lambda ui_components, msg, level='info': log_to_accordion(ui_components, msg, level)
 safe_clear = lambda ui_components: clear_outputs(ui_components, clear_logs=False, clear_confirm=True)
 safe_error = lambda ui_components, msg: handle_ui_error(ui_components, msg)
 safe_success = lambda ui_components, msg: show_ui_success(ui_components, msg)
+
+def log_milestone_only(ui_components: Dict[str, Any], message: str, current: int, total: int, level: str = 'info'):
+    """🎯 CRITICAL: Log milestone progress HANYA untuk avoid flooding"""
+    if current % max(1, total // 10) == 0 or current == total or current == 0:
+        log_to_accordion(ui_components, f"🔄 {message} ({current}/{total})", level)
+
+def create_ui_logger_for_backend(ui_components: Dict[str, Any]):
+    """🔑 KEY: Create logger yang HANYA output ke UI untuk backend integration"""
+    class UIOnlyLogger:
+        def __init__(self, ui_components):
+            self.ui_components = ui_components
+        
+        def info(self, message: str):
+            log_to_accordion(self.ui_components, message, 'info')
+        
+        def success(self, message: str):
+            log_to_accordion(self.ui_components, message, 'success')
+        
+        def warning(self, message: str):
+            log_to_accordion(self.ui_components, message, 'warning')
+        
+        def error(self, message: str):
+            log_to_accordion(self.ui_components, message, 'error')
+        
+        def debug(self, message: str):
+            log_to_accordion(self.ui_components, message, 'debug')
+    
+    return UIOnlyLogger(ui_components)

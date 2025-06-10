@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/service.py
-Deskripsi: Backend preprocessing service dengan Progress Bridge callback untuk UI integration
+Deskripsi: Fixed backend service tanpa double logging dengan proper UI integration
 """
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List, Tuple
@@ -20,20 +20,25 @@ from smartcash.dataset.preprocessor.utils import (
 )
 
 class PreprocessingService:
-    """🎯 Backend preprocessing service dengan Progress Bridge untuk UI callback"""
+    """🎯 Fixed backend service tanpa double logging dengan UI integration"""
     
     def __init__(self, config: Dict[str, Any] = None, progress_callback: Optional[Callable] = None):
+        # Setup logger dengan minimal output untuk avoid double logging
         self.logger = get_logger(__name__)
+        # 🔑 KEY: Disable backend logger output saat ada UI callback
+        self._ui_mode = progress_callback is not None
         
         # Config validation
         if config is None:
-            self.logger.warning("⚠️ Konfigurasi tidak disediakan, menggunakan default")
+            if not self._ui_mode:
+                self.logger.warning("⚠️ Konfigurasi tidak disediakan, menggunakan default")
             self.config = get_default_preprocessing_config()
         else:
             try:
                 self.config = validate_preprocessing_config(config)
             except ValueError as e:
-                self.logger.error(f"❌ Konfigurasi tidak valid: {str(e)}")
+                if not self._ui_mode:
+                    self.logger.error(f"❌ Konfigurasi tidak valid: {str(e)}")
                 raise ValueError(f"Konfigurasi tidak valid: {str(e)}") from e
         
         # Progress Bridge setup
@@ -59,7 +64,7 @@ class PreprocessingService:
         self.validation_config = self.preprocessing_config.get('validation', {})
     
     def preprocess_dataset(self) -> Dict[str, Any]:
-        """🚀 Main preprocessing method dengan Progress Bridge callbacks"""
+        """🚀 Main preprocessing method dengan fixed progress callbacks"""
         start_time = time.time()
         
         try:
@@ -114,7 +119,8 @@ class PreprocessingService:
             
         except Exception as e:
             error_msg = f"❌ Error preprocessing: {str(e)}"
-            self.logger.error(error_msg)
+            if not self._ui_mode:
+                self.logger.error(error_msg)
             self._update_progress("overall", 0, 100, error_msg)
             return {
                 'success': False,
@@ -124,7 +130,7 @@ class PreprocessingService:
             }
     
     def validate_dataset_only(self, target_split: str = None) -> Dict[str, Any]:
-        """🔍 Backend validation method"""
+        """🔍 Backend validation method tanpa excessive logging"""
         try:
             if target_split:
                 result = self.validator.validate_split(target_split)
@@ -163,7 +169,7 @@ class PreprocessingService:
             }
     
     def cleanup_preprocessed_data(self, target_split: str = None) -> Dict[str, Any]:
-        """🧹 Backend cleanup method"""
+        """🧹 Backend cleanup method tanpa excessive logging"""
         try:
             output_dir = Path(self.preprocessing_config.get('output_dir', 'data/preprocessed'))
             
@@ -184,8 +190,14 @@ class PreprocessingService:
                     'stats': {'files_removed': 0}
                 }
             
+            # Update progress untuk cleanup start
+            self._update_progress("current", 25, 100, f"Menghapus {files_count} files...")
+            
             # Perform cleanup
             cleanup_stats = self._perform_cleanup(output_dir, target_split)
+            
+            # Update progress untuk completion
+            self._update_progress("current", 100, 100, "Cleanup selesai")
             
             return {
                 'success': True,
@@ -201,7 +213,7 @@ class PreprocessingService:
             }
     
     def check_preprocessed_exists(self, target_split: str = None) -> Tuple[bool, int]:
-        """📊 Check preprocessed data existence"""
+        """📊 Check preprocessed data existence tanpa logging"""
         try:
             output_dir = Path(self.preprocessing_config.get('output_dir', 'data/preprocessed'))
             
@@ -215,7 +227,7 @@ class PreprocessingService:
             return False, 0
     
     def _comprehensive_validation(self) -> Dict[str, Any]:
-        """🔍 Internal validation logic"""
+        """🔍 Internal validation logic tanpa excessive logging"""
         try:
             target_splits = self.preprocessing_config.get('target_splits', ['train', 'valid'])
             if isinstance(target_splits, str):
@@ -281,24 +293,30 @@ class PreprocessingService:
         return total_files
     
     def _perform_cleanup(self, output_dir: Path, target_split: str = None) -> Dict[str, int]:
-        """🧹 Internal cleanup logic"""
+        """🧹 Internal cleanup logic dengan progress updates"""
         stats = {'files_removed': 0, 'dirs_removed': 0, 'errors': 0}
         
         splits = [target_split] if target_split else self.preprocessing_config.get('target_splits', ['train', 'valid'])
         if isinstance(splits, str):
             splits = [splits] if splits != 'all' else ['train', 'valid', 'test']
         
-        for split in splits:
+        total_splits = len(splits)
+        for i, split in enumerate(splits):
             split_dir = output_dir / split
             if split_dir.exists():
                 try:
+                    # Update progress per split
+                    progress = 25 + int((i / total_splits) * 50)  # 25-75%
+                    self._update_progress("current", progress, 100, f"Menghapus {split} split...")
+                    
                     import shutil
                     files_in_split = sum(1 for _ in split_dir.rglob('*.*'))
                     shutil.rmtree(split_dir)
                     stats['files_removed'] += files_in_split
                     stats['dirs_removed'] += 1
                 except Exception as e:
-                    self.logger.error(f"Error removing {split_dir}: {str(e)}")
+                    if not self._ui_mode:
+                        self.logger.error(f"Error removing {split_dir}: {str(e)}")
                     stats['errors'] += 1
         
         return stats
@@ -341,7 +359,7 @@ class PreprocessingService:
         }
     
     def _engine_progress_callback(self, level: str, current: int, total: int, message: str):
-        """🔧 Engine progress callback yang meneruskan ke UI callback"""
+        """🔧 Engine progress callback yang meneruskan ke UI callback TANPA logging backend"""
         # Map engine progress ke overall progress (25-90%)
         if level in ['overall', 'step']:
             engine_progress = (current / total) if total > 0 else 0
@@ -352,12 +370,13 @@ class PreprocessingService:
         self._update_progress("current", current, total, message)
     
     def _update_progress(self, level: str, current: int, total: int, message: str):
-        """📊 Update progress via Progress Bridge"""
+        """📊 Update progress via Progress Bridge TANPA backend logging"""
         try:
             if self.progress_bridge:
                 self.progress_bridge.update(level, current, total, message)
         except Exception as e:
-            self.logger.debug(f"Progress callback error: {str(e)}")
+            if not self._ui_mode:
+                self.logger.debug(f"Progress callback error: {str(e)}")
 
 def create_preprocessing_service(config: Dict[str, Any] = None, 
                                progress_callback: Optional[Callable] = None) -> PreprocessingService:

@@ -1,79 +1,66 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/__init__.py
-Deskripsi: Fixed utils module dengan complete function exports dan missing implementations
+Deskripsi: Exports untuk preprocessing utilities dengan domain separation yang jelas
 """
 
-# Import dari ui_utils
+# UI utilities
 from .ui_utils import (
-    clear_outputs, handle_ui_error, show_ui_success, log_to_accordion,
-    log_preprocessing_config, display_preprocessing_results,
-    show_preprocessing_success, is_milestone_step
+    log_to_accordion, clear_outputs, handle_ui_error, show_ui_success,
+    log_preprocessing_config, get_ui_logger, is_milestone_step,
+    safe_log, safe_clear, safe_error, safe_success
 )
 
-# Import dari progress_utils
+# Progress utilities
 from .progress_utils import (
-    create_dual_progress_callback, setup_dual_progress_tracker,
-    complete_progress_tracker, error_progress_tracker, reset_progress_tracker,
-    ProgressBridgeManager, register_progress_callback_to_backend,
-    create_progress_reporter, sync_progress_with_config_operations
+    create_dual_progress_callback, setup_progress_tracking,
+    complete_progress_tracking, error_progress_tracking, hide_progress_tracking,
+    create_progress_callback, setup_progress, complete_progress, 
+    error_progress, hide_progress
 )
 
-# Import dari button_manager
+# Button management
 from .button_manager import (
-    disable_all_buttons, enable_all_buttons, with_backend_operation_management,
-    BackendAwareButtonManager, setup_backend_button_management,
-    notify_backend_operation_start, notify_backend_operation_complete
+    disable_operation_buttons, enable_operation_buttons, 
+    set_button_processing_state, with_button_management,
+    disable_all_buttons, enable_all_buttons, set_processing, clear_processing
 )
 
-# Import dari backend_utils
+# Confirmation utilities  
+from .confirmation_utils import (
+    show_cleanup_confirmation, show_preprocessing_confirmation,
+    clear_confirmation_area, show_info_message, show_success_message
+)
+
+# Backend integration
 from .backend_utils import (
     validate_dataset_ready, check_preprocessed_exists,
-    create_backend_preprocessor, create_backend_checker,
+    create_backend_preprocessor, create_backend_checker, 
     create_backend_cleanup_service, _convert_ui_to_backend_config
 )
 
-# Import dari confirmation_utils
-from .confirmation_utils import (
-    show_cleanup_confirmation, show_preprocessing_confirmation,
-    clear_confirmation_area
-)
-
-# Missing functions implementation
-def setup_backend_integration(ui_components, config):
-    """🔗 Setup complete backend integration"""
-    from .backend_utils import setup_backend_integration as backend_setup
-    return backend_setup(ui_components, config)
-
-def test_backend_connectivity(ui_components, config):
-    """🧪 Test backend connectivity"""
-    from .backend_utils import test_backend_connectivity as backend_test
-    return backend_test(ui_components, config)
-
-# Export semua functions
 __all__ = [
-    # UI Utils
-    'clear_outputs', 'handle_ui_error', 'show_ui_success', 'log_to_accordion',
-    'log_preprocessing_config', 'display_preprocessing_results',
-    'show_preprocessing_success', 'is_milestone_step',
+    # UI utilities
+    'log_to_accordion', 'clear_outputs', 'handle_ui_error', 'show_ui_success',
+    'log_preprocessing_config', 'get_ui_logger', 'is_milestone_step',
+    'safe_log', 'safe_clear', 'safe_error', 'safe_success',
     
-    # Progress Utils
-    'create_dual_progress_callback', 'setup_dual_progress_tracker',
-    'complete_progress_tracker', 'error_progress_tracker', 'reset_progress_tracker',
-    'ProgressBridgeManager', 'register_progress_callback_to_backend',
-    'create_progress_reporter', 'sync_progress_with_config_operations',
+    # Progress utilities
+    'create_dual_progress_callback', 'setup_progress_tracking',
+    'complete_progress_tracking', 'error_progress_tracking', 'hide_progress_tracking',
+    'create_progress_callback', 'setup_progress', 'complete_progress', 
+    'error_progress', 'hide_progress',
     
-    # Button Manager
-    'disable_all_buttons', 'enable_all_buttons', 'with_backend_operation_management',
-    'BackendAwareButtonManager', 'setup_backend_button_management',
-    'notify_backend_operation_start', 'notify_backend_operation_complete',
+    # Button management
+    'disable_operation_buttons', 'enable_operation_buttons', 
+    'set_button_processing_state', 'with_button_management',
+    'disable_all_buttons', 'enable_all_buttons', 'set_processing', 'clear_processing',
     
-    # Backend Utils
-    'validate_dataset_ready', 'check_preprocessed_exists',
-    'create_backend_preprocessor', 'create_backend_checker',
-    'create_backend_cleanup_service', '_convert_ui_to_backend_config',
-    'setup_backend_integration', 'test_backend_connectivity',
-    
-    # Confirmation Utils
+    # Confirmation utilities
     'show_cleanup_confirmation', 'show_preprocessing_confirmation',
-    'clear_confirmation_area'
+    'clear_confirmation_area', 'show_info_message', 'show_success_message',
+    
+    # Backend integration
+    'validate_dataset_ready', 'check_preprocessed_exists',
+    'create_backend_preprocessor', 'create_backend_checker', 
+    'create_backend_cleanup_service', '_convert_ui_to_backend_config'
 ]

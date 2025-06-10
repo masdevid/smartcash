@@ -42,10 +42,26 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         ))
         
         # === DUAL PROGRESS TRACKER ===
-        progress_components = create_dual_progress_tracker(operation="Preprocessing", auto_hide=False)
+        try:
+            progress_components = create_dual_progress_tracker(operation="Preprocessing", auto_hide=False)
+        except Exception:
+            # Fallback manual progress tracker
+            progress_components = _create_fallback_progress_tracker()
         
         # === LOG ACCORDION ===
-        log_components = create_log_accordion(module_name='preprocessing')
+        try:
+            log_components = create_log_accordion(module_name='preprocessing')
+        except Exception:
+            # Fallback log
+            log_output = widgets.Output(layout=widgets.Layout(
+                width='100%', height='200px', border='1px solid #ddd',
+                overflow='auto', margin='10px 0'
+            ))
+            log_components = {
+                'log_output': log_output,
+                'log_accordion': widgets.Accordion([log_output])
+            }
+            log_components['log_accordion'].set_title(0, "📋 Log Preprocessing")
         
         # === MAIN UI ASSEMBLY ===
         ui = widgets.VBox([
@@ -55,7 +71,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             save_reset_buttons['container'],
             action_buttons['container'],
             confirmation_area,
-            progress_components['container'],
+            progress_components.get('container') if isinstance(progress_components, dict) else widgets.VBox([]),
             log_components['log_accordion']
         ], layout=widgets.Layout(width='100%', padding='8px'))
         
@@ -75,9 +91,9 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             # Confirmation
             'confirmation_area': confirmation_area,
             
-            # Progress tracker
-            'progress_tracker': progress_components['tracker'],
-            'progress_container': progress_components['container'],
+            # Progress tracker dengan safe access
+            'progress_tracker': progress_components.get('tracker') if isinstance(progress_components, dict) else progress_components,
+            'progress_container': progress_components.get('container') if isinstance(progress_components, dict) else widgets.VBox([]),
             
             # Log - CRITICAL
             'log_output': log_components['log_output'],
@@ -99,6 +115,44 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     except Exception as e:
         # === FALLBACK MINIMAL UI ===
         return _create_minimal_fallback_ui(str(e))
+
+def _create_fallback_progress_tracker() -> Dict[str, Any]:
+    """Create minimal fallback progress tracker"""
+    
+    # Single progress bar
+    progress_bar = widgets.IntProgress(
+        value=0, min=0, max=100,
+        description='Progress:',
+        layout=widgets.Layout(width='100%')
+    )
+    
+    # Minimal tracker object
+    class MinimalTracker:
+        def __init__(self):
+            self.bar = progress_bar
+            
+        def show(self, operation, **kwargs):
+            pass
+            
+        def update_overall(self, value, message=None):
+            self.bar.value = min(100, max(0, value))
+                
+        def update_current(self, value, message=None):
+            self.bar.value = min(100, max(0, value))
+            
+        def complete(self, message="Complete"):
+            self.bar.value = 100
+            
+        def error(self, message="Error"):
+            pass
+            
+        def reset(self):
+            self.bar.value = 0
+    
+    return {
+        'tracker': MinimalTracker(),
+        'container': progress_bar
+    }
 
 def _create_minimal_fallback_ui(error_msg: str) -> Dict[str, Any]:
     """Create minimal fallback UI jika main UI gagal"""

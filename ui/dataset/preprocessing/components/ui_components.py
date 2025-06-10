@@ -168,17 +168,12 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             'components': {
                 'header': header,
                 'status_panel': status_panel,
-                'input_options': input_options,
-                'save_reset_buttons': save_reset_buttons,
-                'action_buttons': action_buttons,
-                'confirmation_area': confirmation_area,
-                'progress_tracker': progress_tracker,  # Simpan objek asli
+                'input_container': input_options.get('container', widgets.VBox()),
                 'progress_container': progress_container,
                 'log_output': log_output,
                 'log_accordion': log_accordion,
                 'action_section': action_section,
                 'config_section': config_section,
-                'main_container': main_container,  # Tambahkan kunci ini
                 # Input components
                 'resolution_dropdown': getattr(input_options.get('components', {}), 'resolution_dropdown', None),
                 'normalization_dropdown': getattr(input_options.get('components', {}), 'normalization_dropdown', None),

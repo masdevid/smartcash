@@ -1,14 +1,15 @@
 """
-File: smartcash/ui/setup/dependency/dependency_init.py
-Deskripsi: Dependency installer init dengan fixed logger, generator cleanup, dan public API
+File: smartcash/ui/setup/dependency/dependency_initializer.py
+Deskripsi: Dependency installer init dengan struktur yang direfaktor mengikuti CommonInitializer
 """
 
 from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
+
 # Import handlers
 from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependency_config
 from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
-from smartcash.ui.setup.dependency.handlers.dependency_handler import setup_dependency_handlers
+from smartcash.ui.setup.dependency.handlers.dependency_handlers import DependencyHandlers
 from smartcash.ui.setup.dependency.handlers.config_handler import DependencyConfigHandler
 
 class DependencyInitializer(CommonInitializer):
@@ -28,7 +29,14 @@ class DependencyInitializer(CommonInitializer):
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers"""
-        return setup_dependency_handlers(ui_components, config, env)
+        # Buat instance DependencyHandlers
+        handlers = DependencyHandlers(ui_components, config)
+        
+        # Simpan instance ke ui_components
+        ui_components['handlers'] = handlers
+        
+        # Kembalikan ui_components yang sudah diupdate
+        return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Default config"""

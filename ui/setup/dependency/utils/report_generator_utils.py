@@ -1,10 +1,11 @@
 """
 File: smartcash/ui/setup/dependency/utils/report_generator_utils.py
-Deskripsi: Report generation utilities dengan consolidated HTML templates
+Deskripsi: Report generation utilities dengan consolidated HTML templates dan absolute imports
 """
 
 from typing import Dict, Any, List
-from smartcash.ui.setup.dependency.components.package_selector import get_package_categories
+from smartcash.ui.setup.dependency.components.input_options import get_package_categories
+from smartcash.ui.utils.constants import COLORS
 
 def generate_comprehensive_status_report(system_info: Dict[str, Any], 
                                         package_status: Dict[str, Dict[str, Any]]) -> str:

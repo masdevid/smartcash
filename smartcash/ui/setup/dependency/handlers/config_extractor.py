@@ -4,8 +4,8 @@ Deskripsi: Config extractor untuk dependency installer dengan CommonInitializer 
 """
 
 from typing import Dict, Any
-from smartcash.ui.setup.dependency.components.package_selector import get_selected_packages
-from smartcash.ui.setup.dependency.utils.ui_state_utils import log_to_ui_safe
+from smartcash.ui.setup.dependency.components.input_options import get_selected_packages
+from smartcash.ui.setup.dependency.utils.ui_utils import log_to_ui_safe
 
 def extract_dependency_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract konfigurasi dependency installer dari UI components dengan one-liner approach"""

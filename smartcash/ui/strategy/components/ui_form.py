@@ -78,7 +78,7 @@ def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str]
     utils = config.get('training_utils', {})
     multi_scale = config.get('multi_scale', {})
     early_stopping = config.get('early_stopping', {})
-    save_best = config.get('save_best', {})  # Add save_best section
+    save_best = config.get('save_best', {}) 
 
     # Timestamp display dengan conditional formatting
     timestamp_display = f" | 📅 {last_saved}" if last_saved else ""
@@ -109,7 +109,7 @@ def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str]
                 Warmup Epochs: {get_val(scheduler, 'warmup_epochs', 3)}<br>
                 Patience: {get_val(early_stopping, 'patience', 15)}<br>
                 Min Delta: {get_val(early_stopping, 'min_delta', 0.001)}<br>
-                Save Best: {bool_icon(get_val(save_best, 'enabled', True))}  # Updated to use save_best.enabled
+                Save Best: {bool_icon(get_val(save_best, 'enabled', True))} 
             </div>
             
             <div style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px;">

@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from smartcash.ui.components.header import create_header
 from smartcash.ui.utils.layout_utils import create_divider, get_layout
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.ui.components.progress_tracker import create_single_progress_tracker
+from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
 
 def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create pretrained model UI dengan existing progress tracker"""
@@ -38,8 +38,11 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
                                                      border='1px solid #ddd', overflow='auto',
                                                      padding='10px', margin='10px 0'))
     
-    # Create progress tracker menggunakan single progress
-    progress_tracker = create_single_progress_tracker()
+    # Create progress tracker menggunakan dual progress
+    progress_tracker = create_dual_progress_tracker(
+        primary_label='Progress Keseluruhan', 
+        secondary_label='Progress Saat Ini'
+    )
     
     # Button group
     button_group = widgets.VBox([
@@ -63,7 +66,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         save_reset_components['container'],
         action_header, 
         button_group,
-        progress_tracker.container,
+        progress_tracker.container,  
         log_header, 
         log_output
     ], layout=get_layout('container'))

@@ -13,6 +13,13 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     from smartcash.ui.pretrained_model.handlers.check_handler import setup_check_handler
     
     # Setup handlers
+    def setup_download_handler(ui_components, config):
+        # Update progress tracker
+        if 'progress_tracker' in ui_components:
+            ui_components['progress_tracker'].update_primary(f'Downloading {model_name}', progress)
+            ui_components['progress_tracker'].update_secondary(f'File: {filename}', subprogress)
+        # Rest of the setup_download_handler function remains the same
+    
     setup_download_handler(ui_components, config)
     
     # Auto-check handler jika diaktifkan

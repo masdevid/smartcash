@@ -34,7 +34,7 @@ class PretrainedInit(CommonInitializer):
         try:
             return setup_pretrained_handlers(ui_components, config, env)
         except Exception as e:
-            self.logger.error(f"💥 Error setup handlers: {str(e)}")
+            self.logger.error(f" Error setup handlers: {str(e)}")
             return ui_components
     
     def _get_default_config(self) -> Dict[str, Any]:
@@ -43,7 +43,7 @@ class PretrainedInit(CommonInitializer):
     
     def _get_critical_components(self) -> List[str]:
         """Critical components untuk validasi"""
-        return ['ui', 'download_sync_button', 'log_output']
+        return ['ui', 'download_sync_button', 'log_output', 'progress_tracker']
     
     
 

@@ -153,8 +153,8 @@ def get_package_categories() -> list[Dict[str, Any]]:
             'description': 'Package inti SmartCash',
             'packages': [
                 {
-                    'key': 'smartcash_core',
-                    'name': 'SmartCash Core',
+                    'key': 'ipywidgets',
+                    'name': 'IPython Widgets',
                     'description': 'Core utilities dan helpers untuk UI',
                     'pip_name': 'ipywidgets>=7.6.0',
                     'default': True  # Essential
@@ -166,13 +166,13 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'pip_name': 'ipython>=7.0.0',
                     'default': True  # Essential
                 },
-                # {
-                #     'key': 'file_utils',
-                #     'name': 'File Utilities',
-                #     'description': 'Path handling dan file operations',
-                #     'pip_name': 'pathlib2>=2.3.0',
-                #     'default': True  # Essential
-                # },
+                {
+                    'key': 'albumentations',
+                    'name': 'Albumentations',
+                    'description': 'Augmentation library',
+                    'pip_name': 'albumentations>=0.5.2',
+                    'default': True  # Essential
+                },
                 {
                     'key': 'yaml_parser',
                     'name': 'YAML Parser',
@@ -201,20 +201,20 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'pip_name': 'torchvision>=0.10.0',
                     'default': True  # Essential untuk computer vision
                 },
-                # {
-                #     'key': 'yolov5',
-                #     'name': 'YOLOv5',
-                #     'description': 'Object detection model',
-                #     'pip_name': 'yolov5>=6.0.0',
-                #     'default': True  # Essential untuk SmartCash detection
-                # },
                 {
                     'key': 'ultralytics',
                     'name': 'Ultralytics',
                     'description': 'YOLO implementation terbaru',
                     'pip_name': 'ultralytics>=8.0.0',
                     'default': True 
-                }
+                },
+                {
+                    'key': 'timm',
+                    'name': 'Timm',
+                    'description': 'Library untuk model vision transformer dan CNN',
+                    'pip_name': 'timm>=0.9.0',
+                    'default': True 
+                },
             ]
         },
         {

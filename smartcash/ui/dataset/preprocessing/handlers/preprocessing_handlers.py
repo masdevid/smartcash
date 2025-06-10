@@ -1,39 +1,40 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py
-Deskripsi: Fixed handlers dengan direct import resolution dan simplified backend integration
+Deskripsi: Fixed handlers dengan simplified structure tanpa progress untuk config operations
 """
 
-from typing import Dict, Any, Callable
-from smartcash.ui.dataset.preprocessing.utils import (
-    clear_outputs, handle_ui_error, show_ui_success, log_to_accordion,
-    create_dual_progress_callback, setup_dual_progress_tracker,
-    complete_progress_tracker, error_progress_tracker,
-    setup_backend_button_management, validate_dataset_ready,
-    check_preprocessed_exists, create_backend_preprocessor,
-    create_backend_checker, create_backend_cleanup_service,
+from typing import Dict, Any
+from smartcash.common.logger import get_logger
+from smartcash.ui.dataset.preprocessing.utils.ui_utils import (
+    clear_outputs, handle_ui_error, show_ui_success, log_to_accordion
+)
+from smartcash.ui.dataset.preprocessing.utils.progress_utils import (
+    create_dual_progress_callback, setup_progress_tracking,
+    complete_progress_tracking, error_progress_tracking
+)
+from smartcash.ui.dataset.preprocessing.utils.button_manager import with_button_management
+from smartcash.ui.dataset.preprocessing.utils.backend_utils import (
+    validate_dataset_ready, check_preprocessed_exists,
+    create_backend_preprocessor, create_backend_checker, create_backend_cleanup_service,
     _convert_ui_to_backend_config
 )
-from smartcash.common.logger import get_logger
+from smartcash.ui.dataset.preprocessing.utils.confirmation_utils import (
+    show_cleanup_confirmation, show_preprocessing_confirmation
+)
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """🚀 Setup handlers dengan complete backend integration"""
+    """Setup handlers dengan structure yang disederhanakan"""
     logger = get_logger('preprocessing_handlers')
     
     try:
-        # Phase 1: Setup Progress Bridge Integration
+        # Setup progress integration
         _setup_progress_integration(ui_components)
         
-        # Phase 2: Setup Backend Button Management
-        _setup_button_management(ui_components)
+        # Setup config handlers (tanpa progress tracking)
+        _setup_config_handlers(ui_components)
         
-        # Phase 3: Setup Config Integration
-        _setup_config_integration(ui_components, config)
-        
-        # Phase 4: Setup Operation Handlers
+        # Setup operation handlers (dengan progress tracking)
         _setup_operation_handlers(ui_components, config)
-        
-        # Phase 5: Test Connectivity
-        _test_and_log_connectivity(ui_components, config)
         
         logger.info("✅ Preprocessing handlers setup completed")
         return ui_components
@@ -45,357 +46,251 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
         return ui_components
 
 def _setup_progress_integration(ui_components: Dict[str, Any]):
-    """📊 Setup progress integration"""
-    try:
-        if 'progress_callback' not in ui_components:
-            progress_callback = create_dual_progress_callback(ui_components)
-            ui_components['progress_callback'] = progress_callback
-        
-        # Register utility functions
-        ui_components.update({
-            'clear_outputs': clear_outputs,
-            'handle_ui_error': handle_ui_error,
-            'show_ui_success': show_ui_success,
-            'log_to_accordion': log_to_accordion,
-            'setup_dual_progress_tracker': setup_dual_progress_tracker,
-            'complete_progress_tracker': complete_progress_tracker,
-            'error_progress_tracker': error_progress_tracker,
-            'validate_dataset_ready': lambda cfg: validate_dataset_ready(cfg),
-            'check_preprocessed_exists': check_preprocessed_exists,
-            'create_backend_preprocessor': lambda cfg: create_backend_preprocessor(cfg, progress_callback=ui_components.get('progress_callback')),
-            'create_backend_checker': create_backend_checker,
-            'create_backend_cleanup_service': lambda cfg: create_backend_cleanup_service(cfg, ui_components=ui_components),
-            '_convert_ui_to_backend_config': lambda: _convert_ui_to_backend_config(ui_components)
-        })
-    except Exception as e:
-        get_logger('preprocessing_handlers').warning(f"⚠️ Progress integration warning: {str(e)}")
+    """Setup progress callback integration"""
+    if 'progress_callback' not in ui_components:
+        progress_callback = create_dual_progress_callback(ui_components)
+        ui_components['progress_callback'] = progress_callback
 
-def _setup_button_management(ui_components: Dict[str, Any]):
-    """🔘 Setup backend-aware button management"""
-    try:
-        button_manager = setup_backend_button_management(ui_components)
-        ui_components['button_manager'] = button_manager
+def _setup_config_handlers(ui_components: Dict[str, Any]):
+    """Setup config handlers TANPA progress tracking untuk save/reset"""
+    
+    def simple_save_config(button=None):
+        """Simple save config tanpa progress tracking"""
+        clear_outputs(ui_components, clear_logs=False, clear_confirm=True)
         
-        # Enhanced progress callback dengan button updates
-        if 'progress_callback' in ui_components:
-            original_callback = ui_components['progress_callback']
-            enhanced_callback = button_manager.register_progress_updates(original_callback)
-            ui_components['progress_callback'] = enhanced_callback
+        try:
+            config_handler = ui_components.get('config_handler')
+            if not config_handler:
+                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                return
             
-    except Exception as e:
-        get_logger('preprocessing_handlers').warning(f"⚠️ Button management warning: {str(e)}")
-
-def _setup_config_integration(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """🔄 Setup config handler integration"""
-    try:
-        config_handler = ui_components.get('config_handler')
-        if config_handler:
-            # Set UI components for logging
+            # Set UI components untuk logging
             if hasattr(config_handler, 'set_ui_components'):
                 config_handler.set_ui_components(ui_components)
             
-            # Set progress callback
-            if hasattr(config_handler, 'set_progress_callback'):
-                progress_callback = ui_components.get('progress_callback')
-                if progress_callback:
-                    config_handler.set_progress_callback(progress_callback)
+            # Save config
+            success = config_handler.save_config(ui_components)
             
-            # Setup save/reset handlers
-            _setup_config_handlers(ui_components)
-            
-    except Exception as e:
-        get_logger('preprocessing_handlers').warning(f"⚠️ Config integration warning: {str(e)}")
-
-def _setup_config_handlers(ui_components: Dict[str, Any]):
-    """⚙️ Setup save/reset button handlers"""
-    def enhanced_save_config(button=None):
-        clear_outputs(ui_components)
-        
-        try:
-            button_manager = ui_components.get('button_manager')
-            if button_manager:
-                button_manager.push_backend_operation('config_save')
-            
-            config_handler = ui_components.get('config_handler')
-            if config_handler:
-                success = config_handler.save_config(ui_components)
-                if button_manager:
-                    button_manager.pop_backend_operation(success, "Config save completed" if success else "Config save failed")
+            if success:
+                log_to_accordion(ui_components, "✅ Konfigurasi berhasil disimpan", "success")
             else:
-                handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                handle_ui_error(ui_components, "❌ Gagal menyimpan konfigurasi")
                 
         except Exception as e:
-            if 'button_manager' in ui_components:
-                ui_components['button_manager'].pop_backend_operation(False, f"Config save error: {str(e)}")
             handle_ui_error(ui_components, f"❌ Error save config: {str(e)}")
     
-    def enhanced_reset_config(button=None):
-        clear_outputs(ui_components)
+    def simple_reset_config(button=None):
+        """Simple reset config tanpa progress tracking"""
+        clear_outputs(ui_components, clear_logs=False, clear_confirm=True)
         
         try:
-            button_manager = ui_components.get('button_manager')
-            if button_manager:
-                button_manager.push_backend_operation('config_reset')
-            
             config_handler = ui_components.get('config_handler')
-            if config_handler:
-                success = config_handler.reset_config(ui_components)
-                if button_manager:
-                    button_manager.pop_backend_operation(success, "Config reset completed" if success else "Config reset failed")
-            else:
+            if not config_handler:
                 handle_ui_error(ui_components, "❌ Config handler tidak tersedia")
+                return
+            
+            # Set UI components untuk logging
+            if hasattr(config_handler, 'set_ui_components'):
+                config_handler.set_ui_components(ui_components)
+            
+            # Reset config
+            success = config_handler.reset_config(ui_components)
+            
+            if success:
+                log_to_accordion(ui_components, "🔄 Konfigurasi berhasil direset ke default", "success")
+            else:
+                handle_ui_error(ui_components, "❌ Gagal reset konfigurasi")
                 
         except Exception as e:
-            if 'button_manager' in ui_components:
-                ui_components['button_manager'].pop_backend_operation(False, f"Config reset error: {str(e)}")
             handle_ui_error(ui_components, f"❌ Error reset config: {str(e)}")
     
     # Bind handlers
     if save_button := ui_components.get('save_button'):
-        save_button.on_click(enhanced_save_config)
+        save_button.on_click(simple_save_config)
     if reset_button := ui_components.get('reset_button'):
-        reset_button.on_click(enhanced_reset_config)
+        reset_button.on_click(simple_reset_config)
 
 def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """⚙️ Setup operation button handlers"""
-    def coordinated_preprocessing_handler(button=None):
-        return _execute_coordinated_operation(ui_components, 'preprocessing', config)
+    """Setup operation handlers dengan progress tracking"""
     
-    def coordinated_check_handler(button=None):
-        return _execute_coordinated_operation(ui_components, 'validation', config)
+    def preprocessing_handler(button=None):
+        return _execute_preprocessing_operation(ui_components, config)
     
-    def coordinated_cleanup_handler(button=None):
-        return _execute_coordinated_operation(ui_components, 'cleanup', config)
+    def check_handler(button=None):
+        return _execute_check_operation(ui_components, config)
+    
+    def cleanup_handler(button=None):
+        return _execute_cleanup_operation(ui_components, config)
     
     # Bind handlers
-    operation_handlers = {
-        'preprocess_button': coordinated_preprocessing_handler,
-        'check_button': coordinated_check_handler,
-        'cleanup_button': coordinated_cleanup_handler
-    }
-    
-    for button_key, handler in operation_handlers.items():
-        if button := ui_components.get(button_key):
-            if hasattr(button, 'on_click'):
-                button.on_click(handler)
+    if preprocess_button := ui_components.get('preprocess_button'):
+        preprocess_button.on_click(preprocessing_handler)
+    if check_button := ui_components.get('check_button'):
+        check_button.on_click(check_handler)
+    if cleanup_button := ui_components.get('cleanup_button'):
+        cleanup_button.on_click(cleanup_handler)
 
-def _execute_coordinated_operation(ui_components: Dict[str, Any], operation_type: str, config: Dict[str, Any]) -> bool:
-    """🎯 Execute operation dengan complete coordination"""
+@with_button_management('preprocessing')
+def _execute_preprocessing_operation(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """Execute preprocessing dengan confirmation dan progress tracking"""
     logger = get_logger('preprocessing_handlers')
-    button_manager = ui_components.get('button_manager')
     
     try:
         clear_outputs(ui_components)
-        log_to_accordion(ui_components, f"🚀 Memulai {operation_type}", "info")
         
-        if button_manager:
-            button_manager.push_backend_operation(operation_type)
+        # Confirmation
+        confirmed = show_preprocessing_confirmation(ui_components, "Apakah Anda yakin ingin memulai preprocessing dataset?")
+        if confirmed is False:
+            log_to_accordion(ui_components, "🚫 Preprocessing dibatalkan", "info")
+            return False
+        elif confirmed is None:
+            handle_ui_error(ui_components, "⏰ Timeout waiting for confirmation")
+            return False
         
-        # Extract config
-        ui_config = ui_components['_convert_ui_to_backend_config']()
+        # Setup progress
+        setup_progress_tracking(ui_components, "Dataset Preprocessing")
         
-        # Execute by type
-        if operation_type == 'preprocessing':
-            success, result = _execute_preprocessing(ui_components, ui_config)
-        elif operation_type == 'validation':
-            success, result = _execute_validation(ui_components, ui_config)
-        elif operation_type == 'cleanup':
-            success, result = _execute_cleanup(ui_components, ui_config)
-        else:
-            success, result = False, f"Unknown operation: {operation_type}"
+        # Get backend config
+        backend_config = _convert_ui_to_backend_config(ui_components)
         
-        # Handle results
-        if success:
-            _handle_success(ui_components, operation_type, result)
-            if button_manager:
-                button_manager.pop_backend_operation(True, f"{operation_type} completed")
-        else:
-            _handle_failure(ui_components, operation_type, result)
-            if button_manager:
-                button_manager.pop_backend_operation(False, f"{operation_type} failed")
-        
-        return success
-        
-    except Exception as e:
-        error_msg = f"❌ Error {operation_type}: {str(e)}"
-        logger.error(error_msg)
-        handle_ui_error(ui_components, error_msg)
-        
-        if button_manager:
-            button_manager.pop_backend_operation(False, f"{operation_type} error")
-        
-        return False
-
-def _execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any]) -> tuple[bool, Any]:
-    """🚀 Execute preprocessing operation"""
-    try:
         # Validation
-        is_valid, validation_msg = ui_components['validate_dataset_ready'](config)
+        is_valid, validation_msg = validate_dataset_ready(backend_config)
         if not is_valid:
-            return False, f"Pre-validation failed: {validation_msg}"
+            error_progress_tracking(ui_components, "Validation failed")
+            handle_ui_error(ui_components, f"Pre-validation failed: {validation_msg}")
+            return False
         
         log_to_accordion(ui_components, f"✅ {validation_msg}", "success")
         
-        # Setup progress
-        progress_manager = ui_components.get('progress_manager')
-        if progress_manager:
-            progress_manager.setup_for_operation("Dataset Preprocessing")
-        
-        # Create service
-        preprocessor = ui_components['create_backend_preprocessor'](config)
+        # Create preprocessor
+        preprocessor = create_backend_preprocessor(backend_config, progress_callback=ui_components.get('progress_callback'))
         if not preprocessor:
-            return False, "Failed to create preprocessing service"
+            error_progress_tracking(ui_components, "Service creation failed")
+            handle_ui_error(ui_components, "Failed to create preprocessing service")
+            return False
         
-        # Execute
+        # Execute preprocessing
         result = preprocessor.preprocess_dataset()
         
         if result.get('success', False):
             stats = result.get('stats', {})
-            message = f"Preprocessing berhasil: {stats.get('output', {}).get('total_processed', 0):,} gambar diproses"
-            return True, {'message': message, 'stats': stats}
+            message = f"Preprocessing berhasil: {stats.get('total_processed', 0):,} gambar diproses"
+            complete_progress_tracking(ui_components, message)
+            show_ui_success(ui_components, message)
+            return True
         else:
-            return False, result.get('message', 'Preprocessing failed')
+            error_msg = result.get('message', 'Preprocessing failed')
+            error_progress_tracking(ui_components, error_msg)
+            handle_ui_error(ui_components, error_msg)
+            return False
             
     except Exception as e:
-        return False, f"Preprocessing error: {str(e)}"
+        error_msg = f"Preprocessing error: {str(e)}"
+        logger.error(error_msg)
+        error_progress_tracking(ui_components, error_msg)
+        handle_ui_error(ui_components, error_msg)
+        return False
 
-def _execute_validation(ui_components: Dict[str, Any], config: Dict[str, Any]) -> tuple[bool, Any]:
-    """🔍 Execute validation operation"""
+@with_button_management('validation')
+def _execute_check_operation(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """Execute dataset check dengan progress tracking"""
+    logger = get_logger('preprocessing_handlers')
+    
     try:
-        progress_manager = ui_components.get('progress_manager')
-        if progress_manager:
-            progress_manager.setup_for_operation("Dataset Validation")
+        clear_outputs(ui_components)
+        setup_progress_tracking(ui_components, "Dataset Validation")
         
-        is_valid, source_msg = ui_components['validate_dataset_ready'](config)
-        preprocessed_exists, preprocessed_count = ui_components['check_preprocessed_exists'](config)
+        # Get backend config
+        backend_config = _convert_ui_to_backend_config(ui_components)
+        
+        # Check source dataset
+        is_valid, source_msg = validate_dataset_ready(backend_config)
+        
+        # Check preprocessed data
+        preprocessed_exists, preprocessed_msg = check_preprocessed_exists(backend_config)
         
         if is_valid:
             message = f"Dataset valid"
             if preprocessed_exists:
-                message += f" + {preprocessed_count:,} preprocessed file tersedia"
+                message += f" + {preprocessed_msg}"
             
-            return True, {
-                'message': message,
-                'source_valid': True,
-                'preprocessed_exists': preprocessed_exists,
-                'preprocessed_count': preprocessed_count
-            }
+            complete_progress_tracking(ui_components, message)
+            show_ui_success(ui_components, message)
+            
+            if preprocessed_exists:
+                log_to_accordion(ui_components, f"💾 Preprocessed data: {preprocessed_msg}", "info")
+            
+            return True
         else:
-            return False, source_msg
+            error_progress_tracking(ui_components, source_msg)
+            handle_ui_error(ui_components, source_msg)
+            return False
             
     except Exception as e:
-        return False, f"Validation error: {str(e)}"
+        error_msg = f"Validation error: {str(e)}"
+        logger.error(error_msg)
+        error_progress_tracking(ui_components, error_msg)
+        handle_ui_error(ui_components, error_msg)
+        return False
 
-def _execute_cleanup(ui_components: Dict[str, Any], config: Dict[str, Any]) -> tuple[bool, Any]:
-    """🧹 Execute cleanup operation"""
+@with_button_management('cleanup')
+def _execute_cleanup_operation(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
+    """Execute cleanup dengan confirmation dan progress tracking"""
+    logger = get_logger('preprocessing_handlers')
+    
     try:
-        progress_manager = ui_components.get('progress_manager')
-        if progress_manager:
-            progress_manager.setup_for_operation("Dataset Cleanup")
+        clear_outputs(ui_components)
         
-        cleanup_service = ui_components['create_backend_cleanup_service'](config)
+        # Get backend config
+        backend_config = _convert_ui_to_backend_config(ui_components)
+        
+        # Check files exist  
+        exists, detailed_msg = check_preprocessed_exists(backend_config)
+        if not exists:
+            log_to_accordion(ui_components, "ℹ️ Tidak ada data untuk dibersihkan", "info")
+            return True
+        
+        # Log detailed stats
+        log_to_accordion(ui_components, f"📊 Data ditemukan: {detailed_msg}", "info")
+        
+        # Confirmation
+        confirmed = show_cleanup_confirmation(ui_components, detailed_msg)
+        if confirmed is False:
+            log_to_accordion(ui_components, "🚫 Cleanup dibatalkan", "info")
+            return False
+        elif confirmed is None:
+            handle_ui_error(ui_components, "⏰ Timeout waiting for confirmation")
+            return False
+        
+        # Setup progress
+        setup_progress_tracking(ui_components, "Dataset Cleanup")
+        
+        # Create cleanup service
+        cleanup_service = create_backend_cleanup_service(backend_config, ui_components=ui_components)
         if not cleanup_service:
-            return False, "Failed to create cleanup service"
+            error_progress_tracking(ui_components, "Service creation failed")
+            handle_ui_error(ui_components, "Failed to create cleanup service")
+            return False
         
+        # Execute cleanup
         result = cleanup_service.cleanup_preprocessed_data()
         
         if result.get('success', False):
-            if result.get('cancelled'):
-                return True, {'message': "Cleanup dibatalkan", 'cancelled': True}
-            
             stats = result.get('stats', {})
             files_removed = stats.get('files_removed', 0)
             message = f"Cleanup berhasil: {files_removed:,} file dihapus"
-            return True, {'message': message, 'stats': stats}
+            complete_progress_tracking(ui_components, message)
+            show_ui_success(ui_components, message)
+            return True
         else:
-            return False, result.get('message', 'Cleanup failed')
+            error_msg = result.get('message', 'Cleanup failed')
+            error_progress_tracking(ui_components, error_msg)
+            handle_ui_error(ui_components, error_msg)
+            return False
             
     except Exception as e:
-        return False, f"Cleanup error: {str(e)}"
-
-def _handle_success(ui_components: Dict[str, Any], operation_type: str, result: Dict[str, Any]):
-    """✅ Handle successful operation"""
-    message = result.get('message', f"{operation_type} completed")
-    
-    progress_manager = ui_components.get('progress_manager')
-    if progress_manager:
-        progress_manager.complete_operation(message)
-    
-    log_to_accordion(ui_components, f"✅ {message}", "success")
-    show_ui_success(ui_components, message)
-    
-    # Operation-specific handling
-    if operation_type == 'preprocessing':
-        stats = result.get('stats', {})
-        if stats:
-            performance = stats.get('performance', {})
-            processing_time = performance.get('processing_time_seconds', 0)
-            if processing_time > 0:
-                log_to_accordion(ui_components, f"⏱️ Processing time: {processing_time:.1f} detik", "info")
-    
-    elif operation_type == 'validation':
-        if result.get('preprocessed_exists'):
-            count = result.get('preprocessed_count', 0)
-            log_to_accordion(ui_components, f"💾 Preprocessed data: {count:,} file tersedia", "info")
-
-def _handle_failure(ui_components: Dict[str, Any], operation_type: str, error_result: str):
-    """❌ Handle failed operation"""
-    progress_manager = ui_components.get('progress_manager')
-    if progress_manager:
-        progress_manager.error_operation(f"{operation_type} failed")
-    
-    handle_ui_error(ui_components, f"❌ {operation_type.capitalize()} gagal: {error_result}")
-
-def _test_and_log_connectivity(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """🧪 Test dan log backend connectivity"""
-    try:
-        # Simple connectivity test
-        results = {
-            'validation_service': False,
-            'preprocessing_service': False,
-            'cleanup_service': False,
-            'progress_integration': False
-        }
-        
-        # Test each service
-        try:
-            checker = create_backend_checker(config)
-            results['validation_service'] = checker is not None
-        except Exception:
-            pass
-        
-        try:
-            preprocessor = create_backend_preprocessor(config)
-            results['preprocessing_service'] = preprocessor is not None
-        except Exception:
-            pass
-        
-        try:
-            cleanup = create_backend_cleanup_service(config, ui_components=ui_components)
-            results['cleanup_service'] = cleanup is not None
-        except Exception:
-            pass
-        
-        try:
-            if 'progress_callback' in ui_components:
-                ui_components['progress_callback']('test', 50, 100, 'Test message')
-                results['progress_integration'] = True
-        except Exception:
-            pass
-        
-        # Log results
-        working_services = sum(results.values())
-        total_services = len(results)
-        
-        if working_services == total_services:
-            log_to_accordion(ui_components, f"✅ Backend integration: {working_services}/{total_services} services ready", "success")
-        else:
-            log_to_accordion(ui_components, f"⚠️ Backend integration: {working_services}/{total_services} services ready", "warning")
-            
-    except Exception as e:
-        get_logger('preprocessing_handlers').warning(f"⚠️ Connectivity test warning: {str(e)}")
-
-# Backward compatibility
-def setup_config_handlers_fixed(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """🔧 Backward compatibility"""
-    _setup_config_handlers(ui_components)
+        error_msg = f"Cleanup error: {str(e)}"
+        logger.error(error_msg)
+        error_progress_tracking(ui_components, error_msg)
+        handle_ui_error(ui_components, error_msg)
+        return False

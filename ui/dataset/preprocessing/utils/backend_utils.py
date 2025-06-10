@@ -1,25 +1,21 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/backend_utils.py
-Deskripsi: Completed backend utils dengan full Progress Bridge integration dan enhanced service wrappers
+Deskripsi: Simplified backend utils dengan clear domain separation
 """
 
-from typing import Dict, Any, Optional, Callable, Tuple
+from typing import Dict, Any, Tuple, Optional, Callable
+from pathlib import Path
 from smartcash.common.logger import get_logger
 
-def validate_dataset_ready(config: Dict[str, Any], logger=None) -> Tuple[bool, str]:
-    """🔍 Enhanced dataset validation dengan progress callback integration"""
-    logger = logger or get_logger('backend_utils')
-    
+def validate_dataset_ready(config: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validate dataset readiness"""
     try:
-        # Extract target splits dari config
+        # Extract target splits
         preprocessing_config = config.get('preprocessing', {})
         target_splits = preprocessing_config.get('target_splits', ['train', 'valid'])
         
         if isinstance(target_splits, str):
             target_splits = [target_splits] if target_splits != 'all' else ['train', 'valid', 'test']
-        
-        # Validate basic structure
-        from pathlib import Path
         
         missing_splits = []
         total_images = 0
@@ -38,7 +34,7 @@ def validate_dataset_ready(config: Dict[str, Any], logger=None) -> Tuple[bool, s
             label_dir = base_path / 'labels'
             
             if not img_dir.exists() or not label_dir.exists():
-                missing_splits.append(f"{split} (missing {img_dir} atau {label_dir})")
+                missing_splits.append(f"{split} (missing directories)")
                 continue
             
             # Count images
@@ -60,79 +56,99 @@ def validate_dataset_ready(config: Dict[str, Any], logger=None) -> Tuple[bool, s
         
     except Exception as e:
         error_msg = f"Error validasi dataset: {str(e)}"
-        logger.error(error_msg)
+        get_logger('backend_utils').error(error_msg)
         return False, error_msg
 
-def check_preprocessed_exists(config: Dict[str, Any]) -> Tuple[bool, int]:
-    """📊 Enhanced check preprocessed data dengan detailed counting"""
+def check_preprocessed_exists(config: Dict[str, Any]) -> Tuple[bool, str]:
+    """Check preprocessed data existence menggunakan backend service"""
     try:
-        from pathlib import Path
+        from smartcash.dataset.preprocessor.service import create_preprocessing_service
+        service = create_preprocessing_service(config)
         
+        if not service:
+            return False, "Backend service tidak tersedia"
+        
+        exists, count = service.check_preprocessed_exists()
+        
+        if not exists:
+            return False, "Tidak ada data preprocessed"
+        
+        # Get detailed count dengan pattern analysis
+        detailed_stats = _get_detailed_preprocessed_stats(config)
+        message = f"{count:,} total files - {detailed_stats}"
+        
+        return True, message
+        
+    except Exception as e:
+        get_logger('backend_utils').error(f"Error checking preprocessed: {str(e)}")
+        return False, f"Error: {str(e)}"
+
+def _get_detailed_preprocessed_stats(config: Dict[str, Any]) -> str:
+    """Get detailed stats untuk preprocessed files"""
+    try:
         preprocessing_config = config.get('preprocessing', {})
         output_dir = Path(preprocessing_config.get('output_dir', 'data/preprocessed'))
         
         if not output_dir.exists():
-            return False, 0
+            return "Folder tidak ditemukan"
         
-        # Count files in all splits
         target_splits = preprocessing_config.get('target_splits', ['train', 'valid'])
         if isinstance(target_splits, str):
             target_splits = [target_splits] if target_splits != 'all' else ['train', 'valid', 'test']
         
-        total_files = 0
-        for split in target_splits:
-            split_dir = output_dir / split
-            if split_dir.exists():
-                # Count both images and labels
-                for subdir in ['images', 'labels']:
-                    dir_path = split_dir / subdir
-                    if dir_path.exists():
-                        extensions = ['.jpg', '.jpeg', '.png', '.npy'] if subdir == 'images' else ['.txt']
-                        for ext in extensions:
-                            total_files += len(list(dir_path.glob(f'*{ext}')))
+        preprocessed_count = 0
+        augmented_count = 0
+        npy_count = 0
         
-        return total_files > 0, total_files
+        for split in target_splits:
+            split_dir = output_dir / split / 'images'
+            if split_dir.exists():
+                # Count preprocessed files (pre_*.npy)
+                pre_files = list(split_dir.glob('pre_*.npy'))
+                preprocessed_count += len(pre_files)
+                
+                # Count augmented files (aug_*.npy) 
+                aug_files = list(split_dir.glob('aug_*.npy'))
+                augmented_count += len(aug_files)
+                
+                # Count all .npy files
+                all_npy = list(split_dir.glob('*.npy'))
+                npy_count += len(all_npy)
+        
+        stats_parts = []
+        if preprocessed_count > 0:
+            stats_parts.append(f"{preprocessed_count:,} preprocessed")
+        if augmented_count > 0:
+            stats_parts.append(f"{augmented_count:,} augmented")
+        if npy_count > 0:
+            stats_parts.append(f"{npy_count:,} .npy files")
+        
+        return ", ".join(stats_parts) if stats_parts else "File pattern tidak dikenali"
         
     except Exception:
-        return False, 0
+        return "Error saat analisis file"
 
-def create_backend_preprocessor(config: Dict[str, Any], logger=None, progress_callback: Optional[Callable] = None):
-    """🏭 Enhanced factory untuk backend preprocessing service dengan Progress Bridge integration"""
-    logger = logger or get_logger('backend_utils')
-    
+def create_backend_preprocessor(config: Dict[str, Any], progress_callback: Optional[Callable] = None):
+    """Create backend preprocessing service"""
     try:
-        # Import backend service
         from smartcash.dataset.preprocessor.service import create_preprocessing_service
-        
-        # Create service dengan progress callback
-        service = create_preprocessing_service(config, progress_callback)
-        
-        logger.info("🚀 Backend preprocessing service created dengan progress callback")
-        return service
+        return create_preprocessing_service(config, progress_callback)
         
     except Exception as e:
-        error_msg = f"❌ Error creating backend preprocessor: {str(e)}"
-        logger.error(error_msg)
+        get_logger('backend_utils').error(f"Error creating preprocessor: {str(e)}")
         return None
 
-def create_backend_checker(config: Dict[str, Any], logger=None):
-    """🔍 Enhanced factory untuk backend validation service"""
-    logger = logger or get_logger('backend_utils')
-    
+def create_backend_checker(config: Dict[str, Any]):
+    """Create backend validation service"""
     try:
-        # Import backend validation
         from smartcash.dataset.preprocessor.service import create_preprocessing_service
-        
-        # Create service untuk validation
         service = create_preprocessing_service(config)
         
-        # Return wrapper dengan validation methods
         class ValidationServiceWrapper:
             def __init__(self, service):
                 self.service = service
             
             def validate(self) -> Tuple[bool, str]:
-                """Validate dataset dengan backend service"""
                 try:
                     result = self.service.validate_dataset_only()
                     success = result.get('success', False)
@@ -148,108 +164,55 @@ def create_backend_checker(config: Dict[str, Any], logger=None):
                 except Exception as e:
                     return False, f"❌ Validation error: {str(e)}"
         
-        wrapper = ValidationServiceWrapper(service)
-        logger.info("🔍 Backend validation service created")
-        return wrapper
+        return ValidationServiceWrapper(service)
         
     except Exception as e:
-        error_msg = f"❌ Error creating backend checker: {str(e)}"
-        logger.error(error_msg)
+        get_logger('backend_utils').error(f"Error creating checker: {str(e)}")
         return None
 
-def create_backend_cleanup_service(config: Dict[str, Any], logger=None, ui_components: Optional[Dict[str, Any]] = None):
-    """🧹 Enhanced factory untuk backend cleanup service dengan UI confirmation integration"""
-    logger = logger or get_logger('backend_utils')
-    
+def create_backend_cleanup_service(config: Dict[str, Any], ui_components: Optional[Dict[str, Any]] = None):
+    """Create backend cleanup service"""
     try:
-        # Import backend service
         from smartcash.dataset.preprocessor.service import create_preprocessing_service
-        
-        # Create service
         service = create_preprocessing_service(config)
         
-        # Return wrapper dengan UI confirmation integration
         class CleanupServiceWrapper:
-            def __init__(self, service, ui_components=None):
+            def __init__(self, service):
                 self.service = service
-                self.ui_components = ui_components or {}
             
             def cleanup_preprocessed_data(self, target_split: str = None) -> Dict[str, Any]:
-                """Cleanup dengan UI confirmation integration"""
                 try:
-                    # Check files exist first
-                    exists, file_count = check_preprocessed_exists(config)
-                    if not exists:
-                        return {
-                            'success': True,
-                            'message': "ℹ️ Tidak ada data untuk dibersihkan",
-                            'stats': {'files_removed': 0}
-                        }
-                    
-                    # UI confirmation jika ada UI components
-                    if self.ui_components and 'confirmation_area' in self.ui_components:
-                        confirmed = self._show_ui_confirmation(file_count, target_split or "semua split")
-                        if confirmed is False:
-                            return {
-                                'success': True,
-                                'cancelled': True,
-                                'message': "🚫 Cleanup dibatalkan oleh user",
-                                'stats': {'files_removed': 0}
-                            }
-                        elif confirmed is None:
-                            return {
-                                'success': False,
-                                'message': "⏰ Timeout waiting for confirmation",
-                                'stats': {'files_removed': 0}
-                            }
-                    
-                    # Execute backend cleanup
-                    result = self.service.cleanup_preprocessed_data(target_split)
-                    return result
-                    
+                    return self.service.cleanup_preprocessed_data(target_split)
                 except Exception as e:
                     return {
                         'success': False,
                         'message': f"❌ Cleanup error: {str(e)}",
                         'stats': {'files_removed': 0}
                     }
-            
-            def _show_ui_confirmation(self, files_count: int, target_split: str) -> Optional[bool]:
-                """Show UI confirmation untuk cleanup"""
-                try:
-                    from smartcash.ui.dataset.preprocessing.utils.confirmation_utils import show_cleanup_confirmation
-                    return show_cleanup_confirmation(self.ui_components, files_count, target_split)
-                except Exception as e:
-                    logger.warning(f"⚠️ UI confirmation error: {str(e)}")
-                    return True  # Default to proceed jika UI confirmation gagal
         
-        wrapper = CleanupServiceWrapper(service, ui_components)
-        logger.info("🧹 Backend cleanup service created dengan UI integration")
-        return wrapper
+        return CleanupServiceWrapper(service)
         
     except Exception as e:
-        error_msg = f"❌ Error creating backend cleanup service: {str(e)}"
-        logger.error(error_msg)
+        get_logger('backend_utils').error(f"Error creating cleanup service: {str(e)}")
         return None
 
 def _convert_ui_to_backend_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """🔄 Enhanced conversion dari UI components ke backend config format"""
+    """Convert UI components ke backend config format"""
     try:
         from smartcash.ui.dataset.preprocessing.handlers.config_extractor import extract_preprocessing_config
         
-        # Extract config dari UI dengan validation
+        # Extract config dari UI
         ui_config = extract_preprocessing_config(ui_components)
         
-        # Enhanced conversion untuk backend compatibility
+        # Enhance untuk backend compatibility
         backend_config = _enhance_config_for_backend(ui_config)
         
         return backend_config
         
     except Exception as e:
-        logger = get_logger('backend_utils')
-        logger.error(f"❌ Error converting UI to backend config: {str(e)}")
+        get_logger('backend_utils').error(f"Error converting config: {str(e)}")
         
-        # Fallback ke basic config
+        # Fallback config
         return {
             'preprocessing': {
                 'enabled': True,
@@ -261,10 +224,10 @@ def _convert_ui_to_backend_config(ui_components: Dict[str, Any]) -> Dict[str, An
         }
 
 def _enhance_config_for_backend(ui_config: Dict[str, Any]) -> Dict[str, Any]:
-    """🚀 Enhanced config untuk backend service compatibility"""
+    """Enhance config untuk backend service compatibility"""
     enhanced = ui_config.copy()
     
-    # Ensure required sections exist
+    # Ensure required sections
     preprocessing = enhanced.setdefault('preprocessing', {})
     performance = enhanced.setdefault('performance', {})
     
@@ -276,7 +239,6 @@ def _enhance_config_for_backend(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     validation = preprocessing.setdefault('validation', {})
     validation.setdefault('enabled', True)
     validation.setdefault('move_invalid', True)
-    validation.setdefault('fix_issues', False)
     
     # Normalization enhancements
     normalization = preprocessing.setdefault('normalization', {})
@@ -289,112 +251,4 @@ def _enhance_config_for_backend(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     performance.setdefault('batch_size', 32)
     performance.setdefault('use_gpu', True)
     
-    # Threading configuration
-    threading = performance.setdefault('threading', {})
-    threading.setdefault('io_workers', 8)
-    threading.setdefault('parallel_threshold', 100)
-    
     return enhanced
-
-def setup_backend_integration(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """🔗 Enhanced setup untuk complete backend integration dengan Progress Bridge"""
-    logger = get_logger('backend_utils')
-    
-    try:
-        # Setup progress callback integration
-        from smartcash.ui.dataset.preprocessing.utils.progress_utils import create_dual_progress_callback
-        
-        if 'progress_callback' not in ui_components:
-            progress_callback = create_dual_progress_callback(ui_components)
-            ui_components['progress_callback'] = progress_callback
-            logger.info("📊 Progress callback created")
-        
-        # Setup backend service factories dengan progress integration
-        ui_components.update({
-            'validate_dataset_ready': lambda cfg: validate_dataset_ready(cfg, logger),
-            'check_preprocessed_exists': lambda cfg: check_preprocessed_exists(cfg),
-            'create_backend_preprocessor': lambda cfg: create_backend_preprocessor(
-                cfg, logger, ui_components.get('progress_callback')
-            ),
-            'create_backend_checker': lambda cfg: create_backend_checker(cfg, logger),
-            'create_backend_cleanup_service': lambda cfg: create_backend_cleanup_service(
-                cfg, logger, ui_components
-            ),
-            '_convert_ui_to_backend_config': lambda: _convert_ui_to_backend_config(ui_components)
-        })
-        
-        # Setup button management integration
-        from smartcash.ui.dataset.preprocessing.utils.button_manager import create_button_state_manager
-        button_manager = create_button_state_manager(ui_components)
-        ui_components['button_manager'] = button_manager
-        
-        # Setup config handler integration
-        config_handler = ui_components.get('config_handler')
-        if config_handler and hasattr(config_handler, 'set_progress_callback'):
-            config_handler.set_progress_callback(ui_components['progress_callback'])
-            logger.info("🔄 Config handler progress integration enabled")
-        
-        logger.info("🔗 Complete backend integration setup completed")
-        return ui_components
-        
-    except Exception as e:
-        error_msg = f"❌ Error setting up backend integration: {str(e)}"
-        logger.error(error_msg)
-        return ui_components
-
-def test_backend_connectivity(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, bool]:
-    """🧪 Test backend service connectivity dan functionality"""
-    logger = get_logger('backend_utils')
-    
-    results = {
-        'validation_service': False,
-        'preprocessing_service': False,
-        'cleanup_service': False,
-        'progress_integration': False
-    }
-    
-    try:
-        # Test validation service
-        checker = create_backend_checker(config, logger)
-        if checker:
-            is_valid, msg = checker.validate()
-            results['validation_service'] = True
-            logger.info(f"✅ Validation service: {msg}")
-        
-        # Test preprocessing service
-        preprocessor = create_backend_preprocessor(config, logger)
-        if preprocessor:
-            results['preprocessing_service'] = True
-            logger.info("✅ Preprocessing service created")
-        
-        # Test cleanup service
-        cleanup = create_backend_cleanup_service(config, logger, ui_components)
-        if cleanup:
-            results['cleanup_service'] = True
-            logger.info("✅ Cleanup service created")
-        
-        # Test progress integration
-        if 'progress_callback' in ui_components:
-            try:
-                ui_components['progress_callback']('test', 50, 100, 'Test message')
-                results['progress_integration'] = True
-                logger.info("✅ Progress integration working")
-            except Exception:
-                logger.warning("⚠️ Progress integration test failed")
-        
-        all_working = all(results.values())
-        status = "✅ All services working" if all_working else "⚠️ Some services have issues"
-        logger.info(f"🧪 Backend connectivity test: {status}")
-        
-        return results
-        
-    except Exception as e:
-        logger.error(f"❌ Backend connectivity test error: {str(e)}")
-        return results
-
-# One-liner utilities untuk convenience
-create_progress_enabled_preprocessor = lambda config, ui_components: create_backend_preprocessor(config, progress_callback=ui_components.get('progress_callback'))
-validate_with_progress = lambda config, ui_components: validate_dataset_ready(config)
-check_data_status = lambda config: check_preprocessed_exists(config)
-is_backend_ready = lambda ui_components: all(key in ui_components for key in ['progress_callback', 'button_manager'])
-get_backend_config = lambda ui_components: _convert_ui_to_backend_config(ui_components)

@@ -74,7 +74,7 @@ clear_confirmation_area(ui_components)
 
 #### 2.1. Penggunaan Dasar
 ```python
-from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui, log_to_accordion
+from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
 
 # Mencatat log dengan level berbeda
 log_to_ui(ui_components, "Pesan informasi", level='info')
@@ -83,14 +83,10 @@ log_to_ui(ui_components, "Pesan peringatan", level='warning')
 log_to_ui(ui_components, "Pesan kesalahan", level='error')
 log_to_ui(ui_components, "Pesan debug", level='debug')
 
-# Mencatat ke accordion yang otomatis terbuka untuk error/peringatan
-log_to_accordion(ui_components, "Penting: Proses gagal", level='error')
-```
 
 #### 2.2. Praktik Terbaik
 - Gunakan level yang sesuai untuk setiap jenis pesan
 - Sertakan konteks yang cukup dalam pesan log
-- Gunakan `log_to_accordion` untuk pesan penting yang membutuhkan perhatian khusus
 - Hindari pencatatan log berlebihan yang dapat membanjiri antarmuka pengguna
 
 ### 3. Pelacakan Kemajuan

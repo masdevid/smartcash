@@ -29,14 +29,14 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
     return ui_components
 
 def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Simplified preprocessing handler"""
+    """Simplified preprocessing handler dengan disable ALL buttons"""
     
     def execute_preprocessing(button=None):
         button_manager = get_button_manager(ui_components)
         logger = ui_components.get('logger')
         
         clear_outputs(ui_components)
-        button_manager.disable_buttons('preprocess_button')
+        button_manager.set_processing_mode('preprocess_button')  # Disable ALL buttons
         
         try:
             if logger:
@@ -78,21 +78,21 @@ def setup_preprocessing_handler(ui_components: Dict[str, Any], config: Dict[str,
             handle_ui_error(ui_components, f"❌ Error preprocessing: {str(e)}", button_manager)
         
         finally:
-            button_manager.enable_buttons()
+            button_manager.reset_from_processing_mode()  # Enable ALL buttons
     
     preprocess_button = ui_components.get('preprocess_button')
     if preprocess_button:
         preprocess_button.on_click(execute_preprocessing)
 
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Simplified check handler"""
+    """Simplified check handler dengan disable ALL buttons"""
     
     def execute_check(button=None):
         button_manager = get_button_manager(ui_components)
         logger = ui_components.get('logger')
         
         clear_outputs(ui_components)
-        button_manager.disable_buttons('check_button')
+        button_manager.set_processing_mode('check_button')  # Disable ALL buttons
         
         try:
             if logger:
@@ -125,16 +125,17 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             handle_ui_error(ui_components, f"❌ Error check: {str(e)}", button_manager)
         
         finally:
-            button_manager.enable_buttons()
+            button_manager.reset_from_processing_mode()  # Enable ALL buttons
     
     check_button = ui_components.get('check_button')
     if check_button:
         check_button.on_click(execute_check)
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Simplified cleanup handler"""
+    """Simplified cleanup handler dengan disable ALL buttons"""
     
     def execute_cleanup(button=None):
+        button_manager = get_button_manager(ui_components)
         logger = ui_components.get('logger')
         clear_outputs(ui_components)
         
@@ -145,8 +146,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
                 return
             
             def confirmed_cleanup():
-                button_manager = get_button_manager(ui_components)
-                button_manager.disable_buttons('cleanup_button')
+                button_manager.set_processing_mode('cleanup_button')  # Disable ALL buttons
                 
                 try:
                     if logger:
@@ -175,7 +175,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
                     handle_ui_error(ui_components, f"❌ Error cleanup: {str(e)}", button_manager)
                 
                 finally:
-                    button_manager.enable_buttons()
+                    button_manager.reset_from_processing_mode()  # Enable ALL buttons
             
             # Show confirmation
             from IPython.display import display, clear_output
@@ -213,10 +213,13 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
         cleanup_button.on_click(execute_cleanup)
 
 def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Simplified config handlers"""
+    """Simplified config handlers dengan disable ALL buttons"""
     
     def save_config(button=None):
+        button_manager = get_button_manager(ui_components)
         clear_outputs(ui_components)
+        button_manager.set_processing_mode('save_button')  # Disable ALL buttons
+        
         try:
             config_handler = ui_components.get('config_handler')
             if config_handler:
@@ -225,9 +228,14 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
                 config_handler.save_config(ui_components)
         except Exception as e:
             handle_ui_error(ui_components, f"❌ Error save config: {str(e)}")
+        finally:
+            button_manager.reset_from_processing_mode()  # Enable ALL buttons
     
     def reset_config(button=None):
+        button_manager = get_button_manager(ui_components)
         clear_outputs(ui_components)
+        button_manager.set_processing_mode('reset_button')  # Disable ALL buttons
+        
         try:
             config_handler = ui_components.get('config_handler')
             if config_handler:
@@ -236,6 +244,8 @@ def setup_config_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
                 config_handler.reset_config(ui_components)
         except Exception as e:
             handle_ui_error(ui_components, f"❌ Error reset config: {str(e)}")
+        finally:
+            button_manager.reset_from_processing_mode()  # Enable ALL buttons
     
     save_button = ui_components.get('save_button')
     reset_button = ui_components.get('reset_button')

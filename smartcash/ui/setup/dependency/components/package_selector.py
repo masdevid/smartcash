@@ -201,13 +201,13 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'pip_name': 'torchvision>=0.10.0',
                     'default': True  # Essential untuk computer vision
                 },
-                {
-                    'key': 'yolov5',
-                    'name': 'YOLOv5',
-                    'description': 'Object detection model',
-                    'pip_name': 'yolov5>=6.0.0',
-                    'default': True  # Essential untuk SmartCash detection
-                },
+                # {
+                #     'key': 'yolov5',
+                #     'name': 'YOLOv5',
+                #     'description': 'Object detection model',
+                #     'pip_name': 'yolov5>=6.0.0',
+                #     'default': True  # Essential untuk SmartCash detection
+                # },
                 {
                     'key': 'ultralytics',
                     'name': 'Ultralytics',

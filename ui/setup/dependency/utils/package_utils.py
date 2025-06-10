@@ -122,18 +122,41 @@ def install_single_package(package: str, timeout: int = 300) -> Tuple[bool, str]
     """Install single package dan return (success, message) - one-liner result processing"""
     
     try:
-        process = subprocess.run(
-            [sys.executable, "-m", "pip", "install", package, "--no-cache-dir", "--quiet"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, 
-            check=False, timeout=timeout
-        )
+        # Pastikan package adalah string
+        if not isinstance(package, str):
+            return False, f"Invalid package format: {package}. Expected string."
+            
+        # Bersihkan input package
+        package = package.strip()
+        if not package:
+            return False, "Empty package name provided"
+            
+        # Log command yang akan dijalankan
+        cmd = [sys.executable, "-m", "pip", "install", package, "--no-cache-dir"]
         
-        return (True, f"Successfully installed {package}") if process.returncode == 0 else (False, f"pip error: {process.stderr}")
-        
-    except subprocess.TimeoutExpired:
-        return False, f"Installation timeout ({timeout}s)"
+        try:
+            process = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                text=True, 
+                check=False, 
+                timeout=timeout
+            )
+            
+            if process.returncode == 0:
+                return True, f"Successfully installed {package}"
+            else:
+                error_msg = process.stderr.strip() or "Unknown error"
+                return False, f"Failed to install {package}: {error_msg}"
+                
+        except subprocess.TimeoutExpired:
+            return False, f"Installation timeout ({timeout}s) for {package}"
+            
     except Exception as e:
-        return False, f"Exception: {str(e)}"
+        import traceback
+        error_trace = traceback.format_exc()
+        return False, f"Error installing {package}: {str(e)}\n{error_trace}"
 
 def get_package_detailed_info(package_name: str) -> Dict[str, Any]:
     """Get detailed info untuk package menggunakan pip show - one-liner parsing"""

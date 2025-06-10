@@ -26,9 +26,18 @@ class PreprocessingService:
     """🎯 Enhanced preprocessing service dengan dual progress tracker integration"""
     
     def __init__(self, config: Dict[str, Any] = None, progress_tracker=None):
-        # Enhanced config validation dan merging
-        self.config = validate_preprocessing_config(config) if config else get_default_preprocessing_config()
         self.logger = get_logger(__name__)
+        
+        # Enhanced config validation dan merging
+        if config is None:
+            self.logger.warning("⚠️ Konfigurasi tidak disediakan, menggunakan konfigurasi default")
+            self.config = get_default_preprocessing_config()
+        else:
+            try:
+                self.config = validate_preprocessing_config(config)
+            except ValueError as e:
+                self.logger.error(f"❌ Konfigurasi tidak valid: {str(e)}")
+                raise ValueError(f"Konfigurasi tidak valid: {str(e)}") from e
         
         # Enhanced progress bridge untuk dual tracker compatibility
         self.progress_bridge = ProgressBridge(progress_tracker) if progress_tracker else None
@@ -65,21 +74,33 @@ class PreprocessingService:
             
             # Phase 1: Enhanced validation (0-20%)
             self._update_progress("🔍 Validating dataset structure", 0.1)
+            print("\n=== Memulai Validasi ===")
+            print(f"Config yang digunakan: {self.config}")
+            
             validation_result = self._comprehensive_validation()
+            print(f"Hasil validasi: {validation_result}")
             
             if not validation_result.get('success', False):
+                error_msg = validation_result.get('message', 'Validation failed')
+                print(f"❌ Validasi gagal: {error_msg}")
                 return {
                     'success': False,
-                    'message': validation_result.get('message', 'Validation failed'),
+                    'message': error_msg,
                     'validation_errors': validation_result.get('errors', []),
                     'stats': validation_result.get('stats', {})
                 }
+                
+            print("✅ Validasi berhasil")
             
             self._update_progress("✅ Validation completed", 0.2)
             
             # Phase 2: Enhanced preprocessing (20-90%)
             self._update_progress("🔄 Starting preprocessing pipeline", 0.3)
-            preprocessing_result = self.engine.preprocess_dataset()
+            
+            # Pass the progress callback to the engine
+            preprocessing_result = self.engine.preprocess_dataset(
+                progress_callback=lambda level, current, total, msg: self._update_progress(msg, 0.3 + (0.6 * (current / max(1, total))))
+            )
             
             if not preprocessing_result.get('success', False):
                 return {
@@ -121,28 +142,51 @@ class PreprocessingService:
     
     def _comprehensive_validation(self) -> Dict[str, Any]:
         """🔍 Enhanced comprehensive validation"""
+        print("\n=== Memulai Validasi Komprehensif ===")
+        print(f"  - Preprocessing config: {self.preprocessing_config}")
+        
         try:
+            # Get target splits from config
             target_splits = self.preprocessing_config.get('target_splits', ['train', 'valid'])
             if isinstance(target_splits, str):
                 target_splits = [target_splits] if target_splits != 'all' else ['train', 'valid', 'test']
             
+            print(f"  - Target splits: {target_splits}")
+            
+            # Validate each split
             validation_results = {}
             total_valid_images = 0
             all_errors = []
             
             for split in target_splits:
-                result = self.validator.validate_split(split)
-                validation_results[split] = result
-                
-                if result.get('is_valid', False):
-                    total_valid_images += result.get('summary', {}).get('valid_images', 0)
-                else:
-                    all_errors.extend(result.get('summary', {}).get('validation_errors', []))
+                print(f"\n  🔍 Memvalidasi split: {split}")
+                try:
+                    result = self.validator.validate_split(split)
+                    validation_results[split] = result
+                    print(f"  - Hasil validasi {split}: {result.get('is_valid', False)}")
+                    
+                    if result.get('is_valid', False):
+                        valid_imgs = result.get('summary', {}).get('valid_images', 0)
+                        total_valid_images += valid_imgs
+                        print(f"  - Jumlah gambar valid: {valid_imgs}")
+                    else:
+                        errors = result.get('summary', {}).get('validation_errors', [])
+                        all_errors.extend(errors)
+                        print(f"  - Ditemukan {len(errors)} error")
+                        for i, error in enumerate(errors[:3], 1):
+                            print(f"    {i}. {error}")
+                        if len(errors) > 3:
+                            print(f"    ... dan {len(errors) - 3} error lainnya")
+                except Exception as e:
+                    error_msg = f"Error saat memvalidasi split {split}: {str(e)}"
+                    print(f"  ❌ {error_msg}")
+                    all_errors.append(error_msg)
+                    validation_results[split] = {'is_valid': False, 'error': error_msg}
             
             # Overall validation success
             all_valid = all(result.get('is_valid', False) for result in validation_results.values())
             
-            return {
+            result = {
                 'success': all_valid,
                 'message': f"✅ Validation passed untuk {len(target_splits)} splits" if all_valid else f"⚠️ Validation issues di beberapa splits",
                 'stats': {
@@ -152,6 +196,19 @@ class PreprocessingService:
                 },
                 'errors': all_errors[:10]  # Limit error list
             }
+            
+            print(f"\n=== Hasil Validasi ===")
+            print(f"  - Status: {'✅ Berhasil' if result['success'] else '❌ Gagal'}")
+            print(f"  - Pesan: {result['message']}")
+            print(f"  - Total gambar valid: {total_valid_images}")
+            if result['errors']:
+                print(f"  - Error ditemukan: {len(result['errors'])}")
+                for i, error in enumerate(result['errors'][:3], 1):
+                    print(f"    {i}. {error}")
+                if len(result['errors']) > 3:
+                    print(f"    ... dan {len(result['errors']) - 3} error lainnya")
+                    
+            return result
             
         except Exception as e:
             return {
@@ -399,12 +456,13 @@ class PreprocessingService:
     
     def _update_progress(self, message: str, progress: float):
         """📊 Update progress dengan dual tracker compatibility"""
-        if self.progress_bridge:
-            self.progress_bridge.update(progress * 100, message)
-        
-        # Call dual progress callback
         total_steps = 100
         current_step = int(progress * total_steps)
+        
+        if self.progress_bridge:
+            self.progress_bridge.update("overall", current_step, total_steps, message)
+        
+        # Call dual progress callback
         self._dual_progress_callback("overall", current_step, total_steps, message)
 
 def create_preprocessing_service(config: Dict[str, Any] = None, 

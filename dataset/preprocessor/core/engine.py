@@ -36,6 +36,15 @@ class PreprocessingValidator:
     def validate_split(self, split: str) -> Dict[str, Any]:
         """🎯 Enhanced validation dengan detailed stats"""
         try:
+            # Periksa apakah validasi dinonaktifkan
+            validation_config = self.config.get('validation', {})
+            if not validation_config.get('enabled', True):
+                return {
+                    'is_valid': True,
+                    'message': "✅ Validasi dinonaktifkan dalam konfigurasi",
+                    'summary': {'total_images': 0, 'valid_images': 0}
+                }
+                
             from smartcash.dataset.preprocessor.utils.path_resolver import PathResolver
             resolver = PathResolver({'data': {'dir': 'data'}})
             
@@ -72,16 +81,47 @@ class PreprocessingValidator:
                 'validation_errors': []
             }
             
+            # Skip validation if disabled in config
+            if not validation_config.get('check_image_quality', True) and \
+               not validation_config.get('check_labels', True) and \
+               not validation_config.get('check_coordinates', True) and \
+               not validation_config.get('check_uuid_consistency', True):
+                return {
+                    'is_valid': True,
+                    'message': f"✅ Semua validasi dinonaktifkan, melewati validasi untuk {len(img_files)} gambar",
+                    'summary': {
+                        'total_images': len(img_files),
+                        'valid_images': len(img_files),
+                        'invalid_images': 0,
+                        'missing_labels': 0,
+                        'class_distribution': {},
+                        'avg_image_size': None,
+                        'validation_errors': []
+                    }
+                }
+            
             valid_count = 0
             for img_file in img_files:
                 # Validate image
-                img_valid, img_errors, img_stats = self.image_validator.validate(img_file)
+                img_valid = True
+                img_errors = []
+                img_stats = {}
+                
+                # Hanya jalankan validasi gambar jika diaktifkan
+                if validation_config.get('check_image_quality', True):
+                    img_valid, img_errors, img_stats = self.image_validator.validate(img_file)
                 
                 # Find corresponding label
                 label_file = label_dir / f"{img_file.stem}.txt"
-                label_valid, label_errors, label_stats = self.label_validator.validate(
-                    label_file, (img_stats.get('width', 640), img_stats.get('height', 640))
-                )
+                label_valid = True
+                label_errors = []
+                label_stats = {}
+                
+                # Hanya jalankan validasi label jika diaktifkan
+                if validation_config.get('check_labels', True) or validation_config.get('check_coordinates', True):
+                    label_valid, label_errors, label_stats = self.label_validator.validate(
+                        label_file, (img_stats.get('width', 640), img_stats.get('height', 640))
+                    )
                 
                 if img_valid and label_valid:
                     valid_count += 1
@@ -96,7 +136,8 @@ class PreprocessingValidator:
             stats['valid_images'] = valid_count
             stats['invalid_images'] = len(img_files) - valid_count
             
-            success = valid_count == len(img_files)
+            # Jika validasi dinonaktifkan, anggap semua gambar valid
+            success = valid_count == len(img_files) if validation_config.get('enabled', True) else True
             return {
                 'is_valid': success,
                 'message': f"✅ Validasi berhasil: {valid_count}/{len(img_files)} gambar valid" if success else f"⚠️ Validasi partial: {valid_count}/{len(img_files)} gambar valid",
@@ -146,12 +187,21 @@ class PreprocessingEngine:
     
     def register_progress_callback(self, callback: Callable[[str, int, int, str], None]):
         """📊 Register dual progress callback untuk UI integration"""
-        self.progress_callback = callback
+        self.progress_bridge = callback
     
-    def preprocess_dataset(self) -> Dict[str, Any]:
-        """🎯 Enhanced preprocessing untuk multi-split dengan dual progress tracking"""
+    def preprocess_dataset(self, progress_callback: Optional[Callable[[str, int, int, str], None]] = None) -> Dict[str, Any]:
+        """🎯 Enhanced preprocessing untuk multi-split dengan dual progress tracking
+        
+        Args:
+            progress_callback: Fungsi callback untuk melacak kemajuan
+                Format: callback(level: str, current: int, total: int, message: str)
+        """
+        # Gunakan callback yang diberikan atau yang sudah terdaftar
+        current_callback = progress_callback or self.progress_bridge
+        
         try:
-            self._report_progress("overall", 0, 100, "🚀 Memulai preprocessing dataset")
+            if current_callback:
+                current_callback("overall", 0, 100, "🚀 Memulai preprocessing dataset")
             
             # Phase 1: Validation (0-20%)
             validation_results = self._validate_all_splits()
@@ -231,19 +281,28 @@ class PreprocessingEngine:
         """📁 Setup direktori output untuk semua splits"""
         output_dir = Path(self.preprocessing_config.get('output_dir', 'data/preprocessed'))
         
+        # Pastikan output directory root ada
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Buat direktori untuk setiap split
         for split in self.target_splits:
+            split_dir = output_dir / split
             for subdir in ['images', 'labels']:
-                dir_path = output_dir / split / subdir
+                dir_path = split_dir / subdir
                 dir_path.mkdir(parents=True, exist_ok=True)
         
-        self.logger.info(f"📁 Created output directories untuk {len(self.target_splits)} splits")
+        self.logger.info(f"📁 Created output directories untuk {len(self.target_splits)} splits di {output_dir}")
     
     def _process_single_split(self, split: str, progress_callback: Callable) -> Dict[str, Any]:
         """🔄 Process single split dengan enhanced normalization"""
         try:
-            # Get source and destination paths
-            src_img_dir = Path('data') / split / 'images'
-            src_label_dir = Path('data') / split / 'labels'
+            # Get source and destination paths from config
+            data_config = self.config.get('data', {})
+            split_paths = data_config.get('splits', {})
+            
+            # Gunakan path dari config jika ada, jika tidak gunakan default
+            src_img_dir = Path(split_paths.get(split, f'data/{split}')) / 'images'
+            src_label_dir = Path(split_paths.get(split, f'data/{split}')) / 'labels'
             dst_base = Path(self.preprocessing_config.get('output_dir', 'data/preprocessed')) / split
             
             # Scan image files
@@ -446,21 +505,21 @@ class PreprocessingEngine:
                 'method': self.normalization_method,
                 'target_size': f"{self.target_size[0]}x{self.target_size[1]}",
                 'preserve_aspect_ratio': self.preserve_aspect_ratio,
-                'normalize_enabled': self.normalize_enabled
             }
         }
     
     def _report_progress(self, level: str, current: int, total: int, message: str):
         """📈 Report progress ke dual tracker"""
-        if hasattr(self, 'progress_callback') and callable(self.progress_callback):
-            try:
-                self.progress_callback(level, current, total, message)
-            except Exception:
-                pass
-        
         # Log milestone progress
         if current % max(1, total // 10) == 0 or current == total:
             self.logger.info(f"🔄 {message} ({current}/{total})")
+        
+        # Call progress callback if available
+        if hasattr(self, 'progress_bridge') and self.progress_bridge is not None:
+            try:
+                self.progress_bridge(level, current, total, message)
+            except Exception as e:
+                self.logger.warning(f"⚠️ Gagal memanggil progress callback: {str(e)}")
     
     def _report_split_progress(self, split: str, current: int, total: int, message: str, start_pct: float, end_pct: float):
         """📊 Report progress untuk individual split"""

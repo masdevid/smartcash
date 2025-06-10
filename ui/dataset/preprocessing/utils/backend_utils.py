@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/backend_utils.py
-Deskripsi: Updated backend integration dengan enhanced preprocessor compatibility
+Deskripsi: Fixed backend integration dengan proper return values dan pola augmentasi
 """
 
 from typing import Dict, Any, Tuple, List
 
-def validate_enhanced_dataset_ready(config: Dict[str, Any], logger=None) -> Tuple[bool, str]:
-    """🔍 Enhanced validation dengan comprehensive checks"""
+def validate_dataset_ready(config: Dict[str, Any], logger=None) -> Tuple[bool, str]:
+    """🔍 Fixed validation dengan proper return format"""
     try:
         # Use enhanced preprocessor validation
         from smartcash.dataset.preprocessor import validate_dataset
@@ -57,18 +57,17 @@ def validate_enhanced_dataset_ready(config: Dict[str, Any], logger=None) -> Tupl
             logger.error(error_msg)
         return False, error_msg
 
-def check_enhanced_preprocessed_exists(config: Dict[str, Any]) -> Tuple[bool, int, Dict[str, int]]:
-    """📊 Enhanced check dengan detailed split breakdown"""
+def check_preprocessed_exists(config: Dict[str, Any]) -> Tuple[bool, int]:
+    """📊 Fixed check dengan proper return format - only return 2 values"""
     try:
         from pathlib import Path
         
         output_dir = Path(config.get('preprocessing', {}).get('output_dir', 'data/preprocessed'))
         
         if not output_dir.exists():
-            return False, 0, {}
+            return False, 0
         
         total_files = 0
-        split_breakdown = {}
         
         # Check for both .npy and regular image files
         image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.npy']
@@ -88,21 +87,20 @@ def check_enhanced_preprocessed_exists(config: Dict[str, Any]) -> Tuple[bool, in
                 
                 split_count = len(split_files)
                 if split_count > 0:
-                    split_breakdown[split] = split_count
                     total_files += split_count
         
-        return total_files > 0, total_files, split_breakdown
+        return total_files > 0, total_files
         
     except Exception:
-        return False, 0, {}
+        return False, 0
 
-def create_enhanced_backend_preprocessor(ui_config: Dict[str, Any], logger=None):
+def create_backend_preprocessor(ui_config: Dict[str, Any], logger=None):
     """🏭 Create enhanced preprocessor dengan dual progress support"""
     try:
         from smartcash.dataset.preprocessor import create_preprocessing_service
         
         # Convert UI config ke backend format
-        backend_config = _convert_ui_to_enhanced_backend_config(ui_config)
+        backend_config = _convert_ui_to_backend_config(ui_config)
         
         # Create service dengan enhanced features
         service = create_preprocessing_service(backend_config)
@@ -115,11 +113,11 @@ def create_enhanced_backend_preprocessor(ui_config: Dict[str, Any], logger=None)
         
     except Exception as e:
         if logger:
-            logger.error(f"❌ Error creating enhanced preprocessor: {str(e)}")
+            logger.error(f"❌ Error creating preprocessor: {str(e)}")
         return None
 
-def create_enhanced_backend_checker(config: Dict[str, Any], logger=None):
-    """🔍 Create enhanced dataset checker"""
+def create_backend_checker(config: Dict[str, Any], logger=None):
+    """🔍 Create dataset checker dengan proper error handling"""
     try:
         from smartcash.dataset.preprocessor import validate_dataset, get_preprocessing_statistics
         
@@ -147,13 +145,17 @@ def create_enhanced_backend_checker(config: Dict[str, Any], logger=None):
                             total_valid += result.get('summary', {}).get('valid_images', 0)
                     
                     # Get comprehensive statistics
-                    stats_result = get_preprocessing_statistics(self.config)
+                    try:
+                        stats_result = get_preprocessing_statistics(self.config)
+                        stats = stats_result.get('stats', {})
+                    except Exception:
+                        stats = {}
                     
                     return {
                         'success': True,
                         'message': f"✅ Dataset check completed: {total_valid} valid images",
                         'results': results,
-                        'statistics': stats_result.get('stats', {}),
+                        'statistics': stats,
                         'total_valid_images': total_valid
                     }
                     
@@ -167,11 +169,11 @@ def create_enhanced_backend_checker(config: Dict[str, Any], logger=None):
         
     except Exception as e:
         if logger:
-            logger.error(f"❌ Error creating enhanced checker: {str(e)}")
+            logger.error(f"❌ Error creating checker: {str(e)}")
         return None
 
-def create_enhanced_backend_cleanup_service(config: Dict[str, Any], logger=None):
-    """🧹 Create enhanced cleanup service"""
+def create_backend_cleanup_service(config: Dict[str, Any], logger=None):
+    """🧹 Create cleanup service dengan proper error handling"""
     try:
         from smartcash.dataset.preprocessor import cleanup_preprocessed_data
         
@@ -183,8 +185,8 @@ def create_enhanced_backend_cleanup_service(config: Dict[str, Any], logger=None)
             def cleanup_preprocessed_data(self) -> Dict[str, Any]:
                 """Enhanced cleanup dengan detailed reporting"""
                 try:
-                    # Check existing data sebelum cleanup
-                    has_data, file_count, split_breakdown = check_enhanced_preprocessed_exists(self.config)
+                    # Check existing data sebelum cleanup - fixed to return 2 values
+                    has_data, file_count = check_preprocessed_exists(self.config)
                     
                     if not has_data:
                         return {
@@ -202,8 +204,7 @@ def create_enhanced_backend_cleanup_service(config: Dict[str, Any], logger=None)
                             'message': f"🧹 Cleanup berhasil: {file_count} files removed",
                             'stats': {
                                 'files_removed': file_count,
-                                'splits_cleaned': len(split_breakdown),
-                                'split_breakdown': split_breakdown
+                                'splits_cleaned': len(self.config.get('preprocessing', {}).get('target_splits', ['train', 'valid']))
                             }
                         }
                     else:
@@ -222,11 +223,11 @@ def create_enhanced_backend_cleanup_service(config: Dict[str, Any], logger=None)
         
     except Exception as e:
         if logger:
-            logger.error(f"❌ Error creating enhanced cleanup service: {str(e)}")
+            logger.error(f"❌ Error creating cleanup service: {str(e)}")
         return None
 
-def _convert_ui_to_enhanced_backend_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
-    """🔄 Convert UI config ke enhanced backend format dengan full compatibility"""
+def _convert_ui_to_backend_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
+    """🔄 Convert UI config ke backend format dengan full compatibility"""
     preprocessing = ui_config.get('preprocessing', {})
     normalization = preprocessing.get('normalization', {})
     validation = preprocessing.get('validation', {})
@@ -292,55 +293,3 @@ def _convert_ui_to_enhanced_backend_config(ui_config: Dict[str, Any]) -> Dict[st
         'output_dir': preprocessing.get('output_dir', 'data/preprocessed'),
         'force_reprocess': preprocessing.get('force_reprocess', False)
     }
-
-def validate_enhanced_backend_compatibility(config: Dict[str, Any], logger=None) -> Dict[str, Any]:
-    """🔍 Validate enhanced backend compatibility"""
-    compatibility_report = {
-        'enhanced_preprocessor': False,
-        'dual_progress_support': False,
-        'multi_split_support': False,
-        'augmentor_consistency': False,
-        'features_supported': {}
-    }
-    
-    try:
-        # Test enhanced preprocessor
-        from smartcash.dataset.preprocessor import create_preprocessing_service, check_preprocessing_compatibility
-        
-        compatibility_report['enhanced_preprocessor'] = True
-        
-        # Check enhanced features
-        compat_check = check_preprocessing_compatibility()
-        compatibility_report['dual_progress_support'] = compat_check.get('dual_progress_tracker', False)
-        compatibility_report['augmentor_consistency'] = compat_check.get('augmentor_consistency', False)
-        compatibility_report['features_supported'] = compat_check.get('enhanced_features', [])
-        
-        # Test multi-split support
-        test_config = _convert_ui_to_enhanced_backend_config(config)
-        if 'target_splits' in test_config.get('preprocessing', {}):
-            compatibility_report['multi_split_support'] = True
-        
-        # Log compatibility status
-        if logger:
-            feature_count = len(compatibility_report['features_supported'])
-            logger.info(f"🔍 Backend compatibility: {feature_count} enhanced features available")
-            
-            if compatibility_report['enhanced_preprocessor']:
-                logger.success("✅ Enhanced preprocessor available")
-            if compatibility_report['dual_progress_support']:
-                logger.success("✅ Dual progress tracker support")
-            if compatibility_report['augmentor_consistency']:
-                logger.success("✅ Augmentor consistency support")
-        
-    except Exception as e:
-        if logger:
-            logger.warning(f"⚠️ Compatibility check error: {str(e)}")
-    
-    return compatibility_report
-
-# Backward compatibility aliases
-validate_dataset_ready = validate_enhanced_dataset_ready
-check_preprocessed_exists = check_enhanced_preprocessed_exists
-create_backend_preprocessor = create_enhanced_backend_preprocessor
-create_backend_checker = create_enhanced_backend_checker
-create_backend_cleanup_service = create_enhanced_backend_cleanup_service

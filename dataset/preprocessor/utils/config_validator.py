@@ -70,26 +70,40 @@ class PreprocessingConfigValidator:
         }
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Validasi dan normalisasi konfigurasi"""
+        """Validasi dan normalisasi konfigurasi
+        
+        Args:
+            config: Konfigurasi yang akan divalidasi
+            
+        Returns:
+            Dict: Konfigurasi yang sudah divalidasi atau dict dengan key 'error' jika validasi gagal
+        """
         if not config:
-            return self.get_default_config()
+            return {'error': 'Konfigurasi tidak boleh kosong'}
             
         # Lakukan deep copy untuk menghindari modifikasi input
         validated = self.get_default_config().copy()
         
-        # Update dengan konfigurasi yang diberikan
-        self._update_nested_dict(validated, config)
-        
-        # Validasi nilai-nilai penting
-        if 'preprocessing' in config:
-            prep = config['preprocessing']
-            if 'normalization' in prep:
-                norm = prep['normalization']
-                if 'method' in norm and norm['method'] not in ['minmax', 'standard', 'imagenet', 'none']:
-                    self.logger.warning(f"Metode normalisasi tidak valid: {norm['method']}. Menggunakan default: minmax")
-                    validated['preprocessing']['normalization']['method'] = 'minmax'
-        
-        return validated
+        try:
+            # Update dengan konfigurasi yang diberikan
+            self._update_nested_dict(validated, config)
+            
+            # Validasi nilai-nilai penting
+            if 'preprocessing' in config:
+                prep = config['preprocessing']
+                if 'normalization' in prep:
+                    norm = prep['normalization']
+                    if 'method' in norm and norm['method'] not in ['minmax', 'standard', 'imagenet', 'none']:
+                        error_msg = f"Metode normalisasi tidak valid: {norm['method']}"
+                        self.logger.error(error_msg)
+                        return {'error': error_msg}
+            
+            return validated
+            
+        except Exception as e:
+            error_msg = f"Gagal memvalidasi konfigurasi: {str(e)}"
+            self.logger.error(error_msg)
+            return {'error': error_msg}
     
     def _update_nested_dict(self, original: Dict[str, Any], updates: Dict[str, Any]) -> None:
         """Update nested dictionary secara rekursif"""
@@ -103,8 +117,27 @@ class PreprocessingConfigValidator:
 _validator = PreprocessingConfigValidator()
 
 def validate_preprocessing_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Validasi konfigurasi preprocessing"""
-    return _validator.validate_config(config or {})
+    """Validasi konfigurasi preprocessing
+    
+    Args:
+        config: Konfigurasi yang akan divalidasi
+        
+    Returns:
+        Dict: Konfigurasi yang sudah divalidasi
+        
+    Raises:
+        ValueError: Jika konfigurasi tidak valid
+    """
+    if config is None:
+        raise ValueError("Konfigurasi tidak boleh None")
+        
+    validated = _validator.validate_config(config)
+    
+    # Periksa apakah ada error dalam validasi
+    if isinstance(validated, dict) and 'error' in validated:
+        raise ValueError(validated['error'])
+        
+    return validated
 
 def get_default_preprocessing_config() -> Dict[str, Any]:
     """Dapatkan konfigurasi default"""

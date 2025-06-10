@@ -40,31 +40,20 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
     progress_tracker = ui_components.get('progress_tracker')
     
     try:
-        # Step 1: Get selected packages dengan emoji untuk visual feedback
+        # Step 1: Initialize progress tracker for installation
         try:
-            if progress_tracker:
-                # Initialize progress tracker for installation
-                if hasattr(progress_tracker, 'update_overall'):
-                    # Dual progress tracker
-                    progress_tracker.update_overall(0, "🔍 Mempersiapkan instalasi...", "info")
-                    progress_tracker.update_current(0, "Menunggu...", "info")
-                elif hasattr(progress_tracker, 'show'):
-                    # Legacy progress tracker
-                    progress_tracker.show("Instalasi Packages", [
-                        "🔍 Analisis", 
-                        "📦 Instalasi", 
-                        "✅ Verifikasi"
-                    ])
-                
-                # Progress tracking is now handled by the dual progress tracker initialization above
+            if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+                # Dual progress tracker initialization
+                progress_tracker.update_overall(0, "🚀 Memulai proses instalasi...", "info")
+                progress_tracker.update_current(0, "Menyiapkan...", "info")
             else:
-                # Fallback untuk progress tracking lama
-                ctx.stepped_progress('INSTALL_INIT', "🚀 Mempersiapkan instalasi...")
+                # Fallback to legacy progress tracking
+                ctx.stepped_progress('INSTALL_INIT', "🚀 Memulai proses instalasi...")
         except Exception as e:
-            # Silent fail untuk compatibility
+            # Silent fail for compatibility
             if logger:
                 logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
-            # Tetap lanjutkan proses
+            # Continue with the process
         
         log_to_ui_safe(ui_components, "🚀 Memulai proses instalasi packages")
         
@@ -74,20 +63,18 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
             log_to_ui_safe(ui_components, "⚠️ Tidak ada packages yang dipilih untuk instalasi", "warning")
             return
         
-        # Step 2: Filter uninstalled packages dengan emoji untuk visual feedback
+        # Step 2: Update progress for package analysis
         try:
-            if progress_tracker:
-                if hasattr(progress_tracker, 'update_overall'):
-                    progress_tracker.update_overall(30, "📊 Menganalisis packages...")
-                if hasattr(progress_tracker, 'update_current'):
-                    progress_tracker.update_current(50, f"🔍 Menganalisis {len(selected_packages)} packages...")
+            if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(20, "📊 Menganalisis packages...", "info")
+                progress_tracker.update_current(30, f"🔍 Memeriksa {len(selected_packages)} packages...")
             else:
                 ctx.stepped_progress('INSTALL_ANALYSIS', "📊 Menganalisis packages...")
         except Exception as e:
-            # Silent fail untuk compatibility
+            # Silent fail for compatibility
             if logger:
                 logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
-            # Tetap lanjutkan proses
+            # Continue with the process
         
         log_to_ui_safe(ui_components, f"📦 Menganalisis {len(selected_packages)} packages yang dipilih")
         
@@ -174,11 +161,10 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         try:
             if progress_tracker:
                 if hasattr(progress_tracker, 'update_overall'):
-                    progress_tracker.update_overall(80, "📊 Membuat laporan...")
-                if hasattr(progress_tracker, 'update_current'):
-                    progress_tracker.update_current(0, "📊 Membuat laporan instalasi...")
-            else:
-                ctx.stepped_progress('INSTALL_REPORT', "📊 Membuat laporan...")
+                    progress_tracker.update_overall(95, "✅ Instalasi selesai", "success")
+                    progress_tracker.update_current(100, "Memverifikasi hasil...", "info")
+                else:
+                    ctx.stepped_progress('INSTALL_REPORT', "📊 Membuat laporan...")
         except Exception as e:
             # Silent fail untuk compatibility
             if logger:
@@ -224,75 +210,87 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
         raise
 
 def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[str, Any], 
-                                         config: Dict[str, Any], logger_func, ctx, logger) -> Dict[str, bool]:
+                                         config: Dict[str, Any], logger_func, ctx, logger):
     """Install packages dengan parallel processing dan detailed progress tracking"""
     
+    progress_tracker = ui_components.get('progress_tracker')
     results = {}
     total_packages = len(packages)
-    completed_count = 0
     
-    # Update progress
-    def update_installation_progress(package: str, success: bool):
-        nonlocal completed_count
-        completed_count += 1
-        progress = int((completed_count / total_packages) * 100)
+    # Update progress untuk memulai instalasi paralel
+    try:
+        if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+            progress_tracker.update_overall(30, "🚀 Memulai instalasi paralel...", "info")
+            progress_tracker.update_current(0, "Menyiapkan proses paralel...", "info")
+        else:
+            ctx.stepped_progress('INSTALL_START', "🚀 Memulai instalasi paralel...")
+    except Exception as e:
+        if logger:
+            logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
+    
+    # Install packages in parallel
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {}
+        for pkg in packages:
+            futures[executor.submit(install_single_package, pkg, logger_func)] = pkg
         
-        # Get progress tracker if available
-        progress_tracker = ui_components.get('progress_tracker')
-        if not progress_tracker:
-            return
+        completed = []
+        for future in as_completed(futures):
+            pkg = futures[future]
+            pkg_name = pkg['name'] if isinstance(pkg, dict) else pkg
             
-        # Prepare status message and color
-        status_icon = "✅" if success else "❌"
-        status_msg = "Berhasil" if success else "Gagal"
-        color = "success" if success else "error"
-        
-        try:
-            # Update progress based on tracker type
-            if hasattr(progress_tracker, 'update_overall'):
-                # Dual progress tracker
-                overall_progress = 50 + int((completed_count / total_packages) * 30)
-                progress_tracker.update_overall(
-                    overall_progress, 
-                    f"📦 Memproses {completed_count}/{total_packages} paket",
-                    "info"
-                )
+            try:
+                result = future.result()
+                success = result.get('success', False)
+                results[pkg_name] = success
+                completed.append(pkg_name)
                 
-                # Update current package status
-                progress_tracker.update_current(
-                    progress,
-                    f"{status_icon} {package}: {status_msg}",
-                    color
-                )
-                
-                # Update status if available
-                if hasattr(progress_tracker, 'update_status'):
-                    progress_tracker.update_status(
-                        f"{status_icon} {package}: {status_msg}",
-                        level='info'
+                # Update progress
+                if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+                    progress = int((len(completed) / total_packages) * 100)
+                    overall_progress = 30 + int(progress * 0.6)  # 30-90% of overall progress
+                    status_icon = "✅" if success else "❌"
+                    status_msg = "Berhasil" if success else "Gagal"
+                    
+                    progress_tracker.update_overall(
+                        overall_progress,
+                        f"📦 {status_icon} {pkg_name}: {status_msg}",
+                        "success" if success else "error"
                     )
-            elif hasattr(progress_tracker, 'update'):
-                # Fallback to single progress bar
-                progress_tracker.update(
-                    progress,
-                    f"{status_icon} {package}: {status_msg}",
-                    color
-                )
+                    progress_tracker.update_current(
+                        progress,
+                        f"Diproses: {len(completed)}/{total_packages}",
+                        "info"
+                    )
+                
+                log_msg = f"{'✅' if success else '❌'} {pkg_name}: {'Berhasil' if success else 'Gagal'}"
+                log_to_ui_safe(ui_components, log_msg, "success" if success else "error")
+                
+            except Exception as e:
+                error_msg = f"❌ Error saat menginstall {pkg_name}: {str(e)}"
+                log_to_ui_safe(ui_components, error_msg, "error")
+                results[pkg_name] = False
+        
+        # Update package status for all packages
+        for pkg_name, success in results.items():
+            update_package_status_by_name(ui_components, pkg_name, 'installed' if success else 'error')
+        
+        # Final progress update
+        try:
+            if progress_tracker and hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(100, "✅ Instalasi selesai", "success")
+                progress_tracker.update_current(100, "Semua proses selesai", "success")
         except Exception as e:
-            log_to_ui_safe(ui_components, f"Error updating progress: {str(e)}", "error")
+            if logger:
+                logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
         
-        # Update package status
-        update_package_status_by_name(ui_components, package, 'installed' if success else 'error')
+        # Log completion
+        success_count = sum(1 for r in results.values() if r)
+        total = len(results)
+        completion_msg = f"✅ Selesai! {success_count} dari {total} package berhasil diinstall"
+        log_to_ui_safe(ui_components, completion_msg, "success")
         
-        # Log progress
-        status_emoji = "✅" if success else "❌"
-        logger_func(f"{status_emoji} {package}: {completed_count}/{total_packages} ({progress}%)")
-    
-    # Get installation configuration
-    max_workers = min(len(packages), config.get('installation', {}).get('parallel_workers', 3))
-    timeout = config.get('installation', {}).get('timeout', 300)
-    use_cache = config.get('installation', {}).get('use_cache', True)
-    force_reinstall = config.get('installation', {}).get('force_reinstall', False)
+        return results
     
     if logger:
         logger.info(f"🔧 Installation config: {max_workers} workers, {timeout}s timeout, cache: {use_cache}, force: {force_reinstall}")

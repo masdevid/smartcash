@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/service.py
-Deskripsi: Service utama untuk melakukan preprocessing dataset YOLOv5 dengan validasi dan normalisasi.
+Deskripsi: Enhanced preprocessing service dengan dual progress tracker integration dan API consistency
 """
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List, Tuple, Union
@@ -22,248 +22,392 @@ from smartcash.dataset.preprocessor.utils import (
     CleanupManager
 )
 
-
 class PreprocessingService:
-    """🎯 Service preprocessing dengan validasi dan visualisasi"""
+    """🎯 Enhanced preprocessing service dengan dual progress tracker integration"""
     
     def __init__(self, config: Dict[str, Any] = None, progress_tracker=None):
-        """Inisialisasi preprocessing service dengan konfigurasi.
-        
-        Args:
-            config: Konfigurasi preprocessing (opsional)
-            progress_tracker: Objek untuk melacak progress (opsional)
-        """
-        # Validasi dan dapatkan konfigurasi
+        # Enhanced config validation dan merging
         self.config = validate_preprocessing_config(config) if config else get_default_preprocessing_config()
         self.logger = get_logger(__name__)
+        
+        # Enhanced progress bridge untuk dual tracker compatibility
         self.progress_bridge = ProgressBridge(progress_tracker) if progress_tracker else None
         
-        # Inisialisasi komponen inti dengan konfigurasi yang sudah divalidasi
+        # Initialize enhanced components
         self.validator = PreprocessingValidator(self.config, self.logger)
         self.engine = PreprocessingEngine(self.config)
         
-        # Inisialisasi utilities
+        # Register progress callback jika ada
+        if hasattr(self.engine, 'register_progress_callback') and self.progress_bridge:
+            self.engine.register_progress_callback(self._dual_progress_callback)
+        
+        # Initialize utility components
         self.file_processor = FileProcessor(self.config)
         self.file_scanner = FileScanner()
         self.path_resolver = PathResolver(self.config)
         self.cleanup_manager = CleanupManager(self.config)
         
-        # Inisialisasi progress bridge
-        self.progress_bridge = ProgressBridge(progress_tracker) if progress_tracker else None
-        
-        # Ambil konfigurasi yang sering digunakan
+        # Extract commonly used config
         self.preprocessing_config = self.config.get('preprocessing', {})
         self.validation_config = self.preprocessing_config.get('validation', {})
         self.output_config = self.preprocessing_config.get('output', {})
     
-    def preprocess_and_visualize(self, target_split: str = "train", 
-                              progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """Pipeline lengkap preprocessing dengan visualisasi
-        
-        Args:
-            target_split: Target split yang akan diproses ('train', 'valid', 'test')
-            progress_callback: Fungsi callback untuk update progress (opsional)
-            
-        Returns:
-            Dict berisi hasil preprocessing
-        """
+    def preprocess_dataset(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """🚀 Enhanced preprocessing dengan dual progress integration"""
         start_time = time.time()
-        self._update_progress(progress_callback, "Memulai preprocessing...", 0.0)
         
         try:
-            # 1. Validasi dataset
-            self._update_progress(progress_callback, "Memvalidasi dataset...", 0.1)
-            validation_result = self.validator.validate_split(target_split)
+            # Register external progress callback
+            if progress_callback:
+                self._external_progress_callback = progress_callback
             
-            if not validation_result.get('is_valid', False):
-                error_msg = f"Validasi gagal: {validation_result.get('message', 'Unknown error')}"
-                self.logger.error(error_msg)
+            self._update_progress("Memulai preprocessing dataset", 0.0)
+            
+            # Phase 1: Enhanced validation (0-20%)
+            self._update_progress("🔍 Validating dataset structure", 0.1)
+            validation_result = self._comprehensive_validation()
+            
+            if not validation_result.get('success', False):
                 return {
-                    'status': 'error',
-                    'message': error_msg,
-                    'validation_errors': validation_result.get('errors', [])
+                    'success': False,
+                    'message': validation_result.get('message', 'Validation failed'),
+                    'validation_errors': validation_result.get('errors', []),
+                    'stats': validation_result.get('stats', {})
                 }
             
-            # 2. Preprocessing
-            self._update_progress(progress_callback, "Memproses dataset...", 0.3)
-            preprocessing_result = self.engine.preprocess_split(
-                target_split, 
-                progress_callback=progress_callback
-            )
+            self._update_progress("✅ Validation completed", 0.2)
             
-            # 3. Hasil akhir
+            # Phase 2: Enhanced preprocessing (20-90%)
+            self._update_progress("🔄 Starting preprocessing pipeline", 0.3)
+            preprocessing_result = self.engine.preprocess_dataset()
+            
+            if not preprocessing_result.get('success', False):
+                return {
+                    'success': False,
+                    'message': preprocessing_result.get('message', 'Preprocessing failed'),
+                    'stats': preprocessing_result.get('stats', {})
+                }
+            
+            # Phase 3: Finalization (90-100%)
+            self._update_progress("🏁 Finalizing preprocessing", 0.9)
             processing_time = time.time() - start_time
-            self.logger.info(f"Preprocessing selesai dalam {processing_time:.2f} detik")
             
-            return {
-                'status': 'success',
+            # Enhanced final result
+            final_result = {
+                'success': True,
+                'message': "✅ Preprocessing completed successfully",
                 'processing_time': processing_time,
-                'target_split': target_split,
-                'preprocessing_result': preprocessing_result,
-                'validation_summary': validation_result.get('summary', {})
+                'stats': self._compile_enhanced_stats(preprocessing_result, validation_result, processing_time),
+                'configuration': self._get_config_summary()
             }
+            
+            self._update_progress("✅ Preprocessing selesai", 1.0)
+            self._log_enhanced_summary(final_result)
+            
+            return final_result
             
         except Exception as e:
             import traceback
             error_traceback = '\n'.join(traceback.format_exception(type(e), e, e.__traceback__))
-            self.logger.error(f"Error dalam preprocessing: {str(e)}\n{error_traceback}")
+            error_msg = f"❌ Error dalam preprocessing: {str(e)}"
+            self.logger.error(f"{error_msg}\n{error_traceback}")
+            
             return {
-                'status': 'error',
-                'message': str(e),
-                'target_split': target_split
+                'success': False,
+                'message': error_msg,
+                'processing_time': time.time() - start_time,
+                'stats': {}
             }
     
-    def get_sampling(self, target_split: str = "train", max_samples: int = 5) -> Dict[str, Any]:
-        """Ambil sampel acak untuk evaluasi
-        
-        Args:
-            target_split: Target split yang akan diambil sampelnya
-            max_samples: Jumlah maksimal sampel yang diambil
-            
-        Returns:
-            Dict berisi sampel data
-        """
+    def _comprehensive_validation(self) -> Dict[str, Any]:
+        """🔍 Enhanced comprehensive validation"""
         try:
-            # Dapatkan daftar file gambar
+            target_splits = self.preprocessing_config.get('target_splits', ['train', 'valid'])
+            if isinstance(target_splits, str):
+                target_splits = [target_splits] if target_splits != 'all' else ['train', 'valid', 'test']
+            
+            validation_results = {}
+            total_valid_images = 0
+            all_errors = []
+            
+            for split in target_splits:
+                result = self.validator.validate_split(split)
+                validation_results[split] = result
+                
+                if result.get('is_valid', False):
+                    total_valid_images += result.get('summary', {}).get('valid_images', 0)
+                else:
+                    all_errors.extend(result.get('summary', {}).get('validation_errors', []))
+            
+            # Overall validation success
+            all_valid = all(result.get('is_valid', False) for result in validation_results.values())
+            
+            return {
+                'success': all_valid,
+                'message': f"✅ Validation passed untuk {len(target_splits)} splits" if all_valid else f"⚠️ Validation issues di beberapa splits",
+                'stats': {
+                    'splits_validated': len(target_splits),
+                    'total_valid_images': total_valid_images,
+                    'validation_results': validation_results
+                },
+                'errors': all_errors[:10]  # Limit error list
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"❌ Validation error: {str(e)}",
+                'stats': {},
+                'errors': [str(e)]
+            }
+    
+    def _compile_enhanced_stats(self, preprocessing_result: Dict, validation_result: Dict, processing_time: float) -> Dict[str, Any]:
+        """📊 Compile enhanced statistics untuk UI logging"""
+        preprocessing_stats = preprocessing_result.get('stats', {})
+        validation_stats = validation_result.get('stats', {})
+        
+        return {
+            'processing_time': round(processing_time, 2),
+            'input': {
+                'splits_processed': len(preprocessing_stats.get('target_splits', [])),
+                'total_input_images': validation_stats.get('total_valid_images', 0)
+            },
+            'output': {
+                'total_processed': preprocessing_stats.get('total_processed', 0),
+                'total_normalized': preprocessing_stats.get('total_normalized', 0),
+                'total_errors': preprocessing_stats.get('total_errors', 0),
+                'success_rate': f"{preprocessing_stats.get('success_rate', 0):.1f}%",
+                'normalization_rate': f"{preprocessing_stats.get('normalization_rate', 0):.1f}%"
+            },
+            'performance': {
+                'processing_time_seconds': round(processing_time, 2),
+                'avg_time_per_image': round(processing_time / max(preprocessing_stats.get('total_processed', 1), 1), 3),
+                'images_per_second': round(preprocessing_stats.get('total_processed', 0) / max(processing_time, 0.1), 2)
+            },
+            'configuration': preprocessing_stats.get('configuration', {}),
+            'splits_detail': preprocessing_stats.get('splits', {}),
+            'validation_summary': validation_stats
+        }
+    
+    def _get_config_summary(self) -> Dict[str, Any]:
+        """⚙️ Get configuration summary untuk logging"""
+        norm_config = self.preprocessing_config.get('normalization', {})
+        return {
+            'target_splits': self.preprocessing_config.get('target_splits', ['train', 'valid']),
+            'normalization': {
+                'enabled': norm_config.get('enabled', True),
+                'method': norm_config.get('method', 'minmax'),
+                'target_size': norm_config.get('target_size', [640, 640]),
+                'preserve_aspect_ratio': norm_config.get('preserve_aspect_ratio', True)
+            },
+            'validation': {
+                'enabled': self.validation_config.get('enabled', True),
+                'move_invalid': self.validation_config.get('move_invalid', True)
+            },
+            'output': {
+                'output_dir': self.preprocessing_config.get('output_dir', 'data/preprocessed'),
+                'create_npy': self.output_config.get('create_npy', True)
+            }
+        }
+    
+    def _log_enhanced_summary(self, result: Dict[str, Any]):
+        """📋 Log enhanced summary untuk UI"""
+        stats = result.get('stats', {})
+        input_stats = stats.get('input', {})
+        output_stats = stats.get('output', {})
+        perf_stats = stats.get('performance', {})
+        
+        self.logger.success(f"✅ Preprocessing berhasil!")
+        self.logger.info(f"📊 Input: {input_stats.get('splits_processed', 0)} splits, {input_stats.get('total_input_images', 0)} gambar")
+        self.logger.info(f"🎯 Output: {output_stats.get('total_processed', 0)} processed ({output_stats.get('success_rate', '0%')})")
+        self.logger.info(f"🎨 Normalized: {output_stats.get('total_normalized', 0)} files ({output_stats.get('normalization_rate', '0%')})")
+        self.logger.info(f"⚡ Performance: {perf_stats.get('images_per_second', 0)} img/sec, {perf_stats.get('processing_time_seconds', 0)}s total")
+        self.logger.info(f"📁 Output saved to: {self.preprocessing_config.get('output_dir', 'data/preprocessed')}")
+    
+    def get_sampling(self, target_split: str = "train", max_samples: int = 5) -> Dict[str, Any]:
+        """🎲 Enhanced sampling dengan better error handling"""
+        try:
+            # Get split directory
             split_dir = self.path_resolver.get_split_dir(target_split)
             image_files = self.file_scanner.scan_directory(
                 split_dir / 'images', 
                 extensions=['.jpg', '.jpeg', '.png']
             )
             
-            # Ambil sampel acak
+            if not image_files:
+                return {
+                    'success': False,
+                    'message': f"❌ Tidak ada gambar ditemukan di {target_split}",
+                    'samples': [],
+                    'total_samples': 0
+                }
+            
+            # Get random samples
             selected_files = random.sample(image_files, min(max_samples, len(image_files)))
             
-            # Proses setiap sampel
+            # Process each sample
             samples = []
             for img_path in selected_files:
                 try:
-                    # Baca gambar
+                    # Read image
                     img = Image.open(img_path)
                     
-                    # Dapatkan path label yang sesuai
+                    # Get corresponding label path
                     label_path = self.path_resolver.get_label_path(img_path)
                     
                     samples.append({
                         'filename': img_path.name,
                         'image': np.array(img),
                         'image_path': str(img_path),
-                        'label_path': str(label_path) if label_path.exists() else None
+                        'label_path': str(label_path) if label_path.exists() else None,
+                        'image_size': img.size
                     })
                 except Exception as e:
-                    self.logger.warning(f"Gagal memproses {img_path}: {str(e)}")
+                    self.logger.warning(f"⚠️ Gagal memproses sample {img_path}: {str(e)}")
             
             return {
-                'status': 'success',
+                'success': True,
+                'message': f"✅ Berhasil mengambil {len(samples)} sample dari {target_split}",
                 'samples': samples,
                 'total_samples': len(samples),
                 'target_split': target_split
             }
             
         except Exception as e:
-            self.logger.error(f"Error dalam pengambilan sampel: {str(e)}", exc_info=True)
+            error_msg = f"❌ Error sampling: {str(e)}"
+            self.logger.error(error_msg)
             return {
-                'status': 'error',
-                'message': str(e),
-                'target_split': target_split
+                'success': False,
+                'message': error_msg,
+                'samples': [],
+                'total_samples': 0
             }
     
     def validate_dataset_only(self, target_split: str = "train") -> Dict[str, Any]:
-        """Validasi dataset tanpa melakukan preprocessing
-        
-        Args:
-            target_split: Target split yang akan divalidasi
-            
-        Returns:
-            Dict berisi hasil validasi
-        """
+        """🔍 Enhanced validation only dengan detailed reporting"""
         try:
             result = self.validator.validate_split(target_split)
+            
             return {
-                'status': 'success' if result.get('is_valid', False) else 'failed',
+                'success': result.get('is_valid', False),
+                'message': result.get('message', 'Validation completed'),
                 'target_split': target_split,
                 'validation_result': result,
                 'summary': result.get('summary', {})
             }
         except Exception as e:
-            self.logger.error(f"Error dalam validasi dataset: {str(e)}", exc_info=True)
+            error_msg = f"❌ Error validasi dataset: {str(e)}"
+            self.logger.error(error_msg)
             return {
-                'status': 'error',
-                'message': str(e),
-                'target_split': target_split
+                'success': False,
+                'message': error_msg,
+                'target_split': target_split,
+                'summary': {}
             }
     
     def cleanup_preprocessed_data(self, target_split: str = None) -> Dict[str, Any]:
-        """Hapus file-file hasil preprocessing
-        
-        Args:
-            target_split: Target split yang akan dibersihkan (None untuk semua split)
-            
-        Returns:
-            Dict berisi status cleanup
-        """
+        """🧹 Enhanced cleanup dengan detailed stats"""
         try:
-            from smartcash.dataset.preprocessor.utils import create_cleanup_manager
+            from smartcash.dataset.preprocessor.utils import create_preprocessing_cleanup_manager
             
-            cleanup_mgr = create_cleanup_manager(self.config, self.progress_bridge)
-            return cleanup_mgr.cleanup_data(target='preprocessed', target_split=target_split)
+            cleanup_mgr = create_preprocessing_cleanup_manager(self.config, self.progress_bridge)
+            result = cleanup_mgr.cleanup_data(target='preprocessed', target_split=target_split)
             
+            # Enhanced result formatting
+            if result.get('status') == 'success':
+                stats = result.get('stats', {})
+                return {
+                    'success': True,
+                    'message': f"🧹 Cleanup berhasil: {stats.get('files_removed', 0)} file dihapus",
+                    'stats': stats,
+                    'target_split': target_split or 'all'
+                }
+            else:
+                return {
+                    'success': False,
+                    'message': result.get('message', 'Cleanup failed'),
+                    'target_split': target_split or 'all'
+                }
+                
         except Exception as e:
-            self.logger.error(f"Error dalam membersihkan data: {str(e)}", exc_info=True)
+            error_msg = f"❌ Error cleanup: {str(e)}"
+            self.logger.error(error_msg)
             return {
-                'status': 'error',
-                'message': str(e),
+                'success': False,
+                'message': error_msg,
                 'target_split': target_split or 'all'
             }
     
     def get_preprocessing_status(self) -> Dict[str, Any]:
-        """Dapatkan status preprocessing
-        
-        Returns:
-            Dict berisi status preprocessing
-        """
+        """📊 Enhanced status dengan detailed system info"""
         try:
-            # Implementasi sederhana, bisa dikembangkan lebih lanjut
+            # Check directory structure
+            data_dir = Path(self.config.get('data', {}).get('dir', 'data'))
+            output_dir = Path(self.preprocessing_config.get('output_dir', 'data/preprocessed'))
+            
+            # Check splits
+            target_splits = self.preprocessing_config.get('target_splits', ['train', 'valid'])
+            if isinstance(target_splits, str):
+                target_splits = [target_splits] if target_splits != 'all' else ['train', 'valid', 'test']
+            
+            split_status = {}
+            for split in target_splits:
+                split_dir = data_dir / split
+                images_dir = split_dir / 'images'
+                labels_dir = split_dir / 'labels'
+                
+                split_status[split] = {
+                    'exists': split_dir.exists(),
+                    'has_images': images_dir.exists() and any(images_dir.glob('*.jpg')),
+                    'has_labels': labels_dir.exists() and any(labels_dir.glob('*.txt')),
+                    'image_count': len(list(images_dir.glob('*.*'))) if images_dir.exists() else 0
+                }
+            
             return {
-                'status': 'success',
+                'success': True,
                 'service_ready': True,
-                'config': self.config,
-                'message': 'Service preprocessing berjalan dengan baik'
+                'message': '✅ Preprocessing service ready',
+                'system_info': {
+                    'data_directory': str(data_dir),
+                    'output_directory': str(output_dir),
+                    'target_splits': target_splits,
+                    'split_status': split_status
+                },
+                'configuration': self._get_config_summary()
             }
         except Exception as e:
             return {
-                'status': 'error',
+                'success': False,
                 'service_ready': False,
-                'message': f'Error: {str(e)}'
+                'message': f'❌ Service error: {str(e)}'
             }
     
-    def _update_progress(self, callback: Optional[Callable], message: str, progress: float):
-        """Update progress dengan dukungan untuk progress bridge.
+    def _dual_progress_callback(self, level: str, current: int, total: int, message: str):
+        """📈 Dual progress callback untuk UI integration"""
+        try:
+            # Update progress bridge
+            if self.progress_bridge:
+                progress_value = (current / total) * 100 if total > 0 else 0
+                self.progress_bridge.update(progress_value, message)
+            
+            # Call external callback jika ada
+            if hasattr(self, '_external_progress_callback') and callable(self._external_progress_callback):
+                self._external_progress_callback(level, current, total, message)
         
-        Args:
-            callback: Fungsi callback untuk update progress
-            message: Pesan progress
-            progress: Nilai progress (0.0 - 1.0)
-        """
-        if callback and callable(callback):
-            try:
-                callback(progress, message)
-            except Exception as e:
-                self.logger.warning(f"Error dalam progress callback: {str(e)}")
-        
-        # Update progress bridge jika ada
-        if self.progress_bridge:
-            self.progress_bridge.update(progress, message)
-
-
-def create_preprocessing_service(config: Dict[str, Any] = None, progress_tracker=None):
-    """Factory function untuk membuat instance PreprocessingService.
+        except Exception as e:
+            self.logger.debug(f"Progress callback error: {str(e)}")
     
-    Args:
-        config: Konfigurasi preprocessing (opsional)
-        progress_tracker: Objek untuk melacak progress (opsional)
+    def _update_progress(self, message: str, progress: float):
+        """📊 Update progress dengan dual tracker compatibility"""
+        if self.progress_bridge:
+            self.progress_bridge.update(progress * 100, message)
         
-    Returns:
-        Instance PreprocessingService
-    """
-    return PreprocessingService(config=config, progress_tracker=progress_tracker)
+        # Call dual progress callback
+        total_steps = 100
+        current_step = int(progress * total_steps)
+        self._dual_progress_callback("overall", current_step, total_steps, message)
+
+def create_preprocessing_service(config: Dict[str, Any] = None, 
+                             progress_tracker=None) -> PreprocessingService:
+    """🏭 Factory untuk create enhanced preprocessing service"""
+    return PreprocessingService(config, progress_tracker)

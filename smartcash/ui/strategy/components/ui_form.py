@@ -79,14 +79,14 @@ def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str]
     utils = config.get('training_utils', {})
     multi_scale = config.get('multi_scale', {})
     early_stopping = config.get('early_stopping', {})
-    
+    save_best = config.get('save_best', {}) 
     # Timestamp display dengan conditional formatting
     timestamp_display = f" | 📅 {last_saved}" if last_saved else ""
-    
+
     # One-liner untuk safe value extraction dengan fallback
     get_val = lambda section, key, default: section.get(key, default)
     bool_icon = lambda val: '✅' if val else '❌'
-    
+
     summary_html = f"""
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                 border-radius: 8px; padding: 16px; margin: 10px 0; color: white;">
@@ -109,7 +109,7 @@ def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str]
                 Warmup Epochs: {get_val(scheduler, 'warmup_epochs', 3)}<br>
                 Patience: {get_val(early_stopping, 'patience', 15)}<br>
                 Min Delta: {get_val(early_stopping, 'min_delta', 0.001)}<br>
-                Save Best: {bool_icon(get_val(training, 'save_best_only', True))}
+                Save Best: {bool_icon(get_val(save_best, 'enabled', True))} 
             </div>
             
             <div style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px;">

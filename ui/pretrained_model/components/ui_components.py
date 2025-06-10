@@ -9,10 +9,22 @@ from smartcash.ui.components.header import create_header
 from smartcash.ui.utils.layout_utils import create_divider, get_layout
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+from smartcash.common.logger import get_logger
 
 def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create pretrained model UI dengan existing progress tracker"""
+    logger = get_logger('pretrained_model')
+    logger.info("🔧 Memulai pembuatan UI components")
+    
     config = config or {}
+    
+    # Pastikan modul progress_tracker tersedia
+    try:
+        from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+        logger.info("✅ Modul progress_tracker berhasil diimpor")
+    except ImportError as e:
+        logger.error(f"💥 Gagal mengimpor modul progress_tracker: {str(e)}")
+        raise
     
     # Header
     header = create_header(f"{ICONS.get('model', '🤖')} Persiapan Model Pre-trained", 
@@ -39,11 +51,16 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
                                                      padding='10px', margin='10px 0'))
     
     # Create progress tracker menggunakan dual progress
-    progress_tracker = create_dual_progress_tracker(
-        operation="Download Model",
-        primary_label='Progress Keseluruhan', 
-        secondary_label='Progress Saat Ini'
-    )
+    try:
+        progress_tracker = create_dual_progress_tracker(
+            operation="Download Model",
+            primary_label='Progress Keseluruhan', 
+            secondary_label='Progress Saat Ini'
+        )
+    except Exception as e:
+        logger = get_logger('pretrained_model')
+        logger.error(f"💥 Gagal membuat progress tracker: {str(e)}")
+        raise
     
     # Button group
     button_group = widgets.VBox([

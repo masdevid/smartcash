@@ -19,13 +19,30 @@ class PretrainedInit(CommonInitializer):
         # Clear any existing widgets untuk avoid conflicts
         self._clear_existing_widgets()
         
-        ui_components = create_pretrained_main_ui(config)
+        try:
+            ui_components = create_pretrained_main_ui(config)
+            self.logger.info("✅ Berhasil membuat UI components")
+        except Exception as e:
+            self.logger.error(f"💥 Gagal membuat UI components: {str(e)}")
+            try:
+                # tambahkan error handling untuk mengatasi kesalahan
+                self._handle_create_ui_components_error(e)
+            except Exception as e:
+                self.logger.error(f"💥 Gagal menangani kesalahan: {str(e)}")
+                raise
+        
         ui_components.update({
             'pretrained_model_initialized': True,
             'module_name': 'pretrained_model'
         })
         
         return ui_components
+    
+    def _handle_create_ui_components_error(self, e: Exception):
+        """Handle error pada create ui components"""
+        # tambahkan logika untuk menangani kesalahan
+        self.logger.error(f"💥 Kesalahan tidak terduga: {str(e)}")
+        # tambahkan aksi lain jika diperlukan
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup handlers dengan proper error handling"""

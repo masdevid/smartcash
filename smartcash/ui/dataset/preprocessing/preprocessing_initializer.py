@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
-Deskripsi: Updated preprocessing initializer dengan critical components yang tepat
+Deskripsi: Simplified preprocessing initializer dengan minimal critical components dan dual progress
 """
 
 from typing import Dict, Any, List
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.preprocessing.components.ui_components import create_p
 from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import setup_preprocessing_handlers
 
 class PreprocessingInitializer(CommonInitializer):
-    """Optimized preprocessing initializer dengan updated critical components"""
+    """Simplified preprocessing initializer dengan minimal critical components"""
     
     def __init__(self):
         super().__init__(
@@ -20,13 +20,12 @@ class PreprocessingInitializer(CommonInitializer):
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan proper config"""
+        """Create UI components dengan minimal structure"""
         ui_components = create_preprocessing_main_ui(config)
         ui_components.update({
             'preprocessing_initialized': True,
             'module_name': 'preprocessing',
-            'data_dir': config.get('data', {}).get('dir', 'data'),
-            'preprocessed_dir': config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+            'data_dir': config.get('data', {}).get('dir', 'data')
         })
         return ui_components
     
@@ -59,17 +58,12 @@ class PreprocessingInitializer(CommonInitializer):
         return get_default_preprocessing_config()
     
     def _get_critical_components(self) -> List[str]:
-        """Updated critical components sesuai dengan UI struktur baru"""
+        """Minimal critical components yang harus ada"""
         return [
-            'ui', 'header', 'status_panel',
-            'preprocess_button', 'check_button', 'cleanup_button',
-            'save_button', 'reset_button',
-            'confirmation_area',
-            'progress_tracker', 'progress_container',
-            'log_output', 'log_accordion',
-            'resolution_dropdown', 'normalization_dropdown', 
-            'target_splits_select', 'batch_size_input',
-            'validation_checkbox', 'preserve_aspect_checkbox'
+            'ui',
+            'preprocess_button', 
+            'save_button', 
+            'log_output'
         ]
 
 # Global instance

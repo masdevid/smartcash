@@ -166,13 +166,13 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'pip_name': 'ipython>=7.0.0',
                     'default': True  # Essential
                 },
-                {
-                    'key': 'file_utils',
-                    'name': 'File Utilities',
-                    'description': 'Path handling dan file operations',
-                    'pip_name': 'pathlib2>=2.3.0',
-                    'default': True  # Essential
-                },
+                # {
+                #     'key': 'file_utils',
+                #     'name': 'File Utilities',
+                #     'description': 'Path handling dan file operations',
+                #     'pip_name': 'pathlib2>=2.3.0',
+                #     'default': True  # Essential
+                # },
                 {
                     'key': 'yaml_parser',
                     'name': 'YAML Parser',
@@ -213,7 +213,7 @@ def get_package_categories() -> list[Dict[str, Any]]:
                     'name': 'Ultralytics',
                     'description': 'YOLO implementation terbaru',
                     'pip_name': 'ultralytics>=8.0.0',
-                    'default': False  # Optional (alternative)
+                    'default': True 
                 }
             ]
         },

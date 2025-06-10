@@ -1,13 +1,13 @@
 """
 File: smartcash/dataset/preprocessor/core/engine.py
-Deskripsi: Enhanced preprocessing engine dengan dual progress tracker compatibility dan improved normalization
+Deskripsi: Fixed preprocessing engine tanpa threading dengan proper progress callback integration
 """
 import cv2
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
+import time
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.preprocessor.utils.file_processor import FileProcessor
@@ -22,7 +22,7 @@ from smartcash.dataset.preprocessor.validators import (
 )
 
 class PreprocessingValidator:
-    """🔍 Enhanced validator dengan dual progress support"""
+    """🔍 Enhanced validator dengan progress callback support"""
     
     def __init__(self, config: Dict[str, Any], logger=None):
         self.config = config.get('preprocessing', {})
@@ -33,12 +33,14 @@ class PreprocessingValidator:
         self.label_validator = create_label_validator(self.config.get('validation', {}))
         self.pair_validator = create_pair_validator(self.config.get('validation', {}))
     
-    def validate_split(self, split: str) -> Dict[str, Any]:
-        """🎯 Enhanced validation dengan detailed stats"""
+    def validate_split(self, split: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """🎯 Enhanced validation dengan progress callback"""
         try:
             # Periksa apakah validasi dinonaktifkan
             validation_config = self.config.get('validation', {})
             if not validation_config.get('enabled', True):
+                if progress_callback:
+                    progress_callback("current", 100, 100, "Validasi dinonaktifkan")
                 return {
                     'is_valid': True,
                     'message': "✅ Validasi dinonaktifkan dalam konfigurasi",
@@ -53,17 +55,24 @@ class PreprocessingValidator:
             label_dir = Path('data') / split / 'labels'
             
             if not img_dir.exists() or not label_dir.exists():
+                if progress_callback:
+                    progress_callback("current", 0, 100, f"Direktori {split} tidak ditemukan")
                 return {
                     'is_valid': False,
                     'message': f"❌ Direktori tidak ditemukan: {img_dir} atau {label_dir}",
                     'summary': {'total_images': 0, 'valid_images': 0}
                 }
             
-            # Scan image files
+            # Scan image files dengan progress
+            if progress_callback:
+                progress_callback("current", 10, 100, f"Scanning {split} images...")
+            
             scanner = FileScanner()
             img_files = scanner.scan_directory(img_dir, {'.jpg', '.jpeg', '.png'})
             
             if not img_files:
+                if progress_callback:
+                    progress_callback("current", 0, 100, f"Tidak ada gambar di {split}")
                 return {
                     'is_valid': False,
                     'message': f"❌ Tidak ada gambar ditemukan di {img_dir}",
@@ -81,27 +90,17 @@ class PreprocessingValidator:
                 'validation_errors': []
             }
             
-            # Skip validation if disabled in config
-            if not validation_config.get('check_image_quality', True) and \
-               not validation_config.get('check_labels', True) and \
-               not validation_config.get('check_coordinates', True) and \
-               not validation_config.get('check_uuid_consistency', True):
-                return {
-                    'is_valid': True,
-                    'message': f"✅ Semua validasi dinonaktifkan, melewati validasi untuk {len(img_files)} gambar",
-                    'summary': {
-                        'total_images': len(img_files),
-                        'valid_images': len(img_files),
-                        'invalid_images': 0,
-                        'missing_labels': 0,
-                        'class_distribution': {},
-                        'avg_image_size': None,
-                        'validation_errors': []
-                    }
-                }
-            
+            # Progress tracking untuk validation
+            total_files = len(img_files)
             valid_count = 0
-            for img_file in img_files:
+            
+            # Process files dengan progress updates (NO THREADING)
+            for i, img_file in enumerate(img_files):
+                # Update progress
+                progress = 10 + int((i / total_files) * 80)  # 10-90%
+                if progress_callback:
+                    progress_callback("current", progress, 100, f"Validating {img_file.name}")
+                
                 # Validate image
                 img_valid = True
                 img_errors = []
@@ -133,6 +132,10 @@ class PreprocessingValidator:
                     if not label_file.exists():
                         stats['missing_labels'] += 1
             
+            # Completion
+            if progress_callback:
+                progress_callback("current", 100, 100, f"Validation {split} completed")
+            
             stats['valid_images'] = valid_count
             stats['invalid_images'] = len(img_files) - valid_count
             
@@ -145,6 +148,8 @@ class PreprocessingValidator:
             }
             
         except Exception as e:
+            if progress_callback:
+                progress_callback("current", 0, 100, f"Error validasi: {str(e)}")
             return {
                 'is_valid': False,
                 'message': f"❌ Error validasi: {str(e)}",
@@ -152,7 +157,7 @@ class PreprocessingValidator:
             }
 
 class PreprocessingEngine:
-    """🚀 Enhanced preprocessing engine dengan dual progress tracker compatibility"""
+    """🚀 Fixed preprocessing engine tanpa threading dengan proper progress callbacks"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
@@ -178,33 +183,27 @@ class PreprocessingEngine:
         if isinstance(self.target_splits, str):
             self.target_splits = [self.target_splits] if self.target_splits != 'all' else ['train', 'valid', 'test']
         
-        # Performance config
+        # Performance config - NO THREADING
         self.batch_size = config.get('performance', {}).get('batch_size', 32)
-        self.max_workers = min(4, self.batch_size // 8) if self.batch_size > 8 else 2
         
         # Progress tracking
-        self.progress_bridge = None
+        self.progress_callback = None
     
     def register_progress_callback(self, callback: Callable[[str, int, int, str], None]):
-        """📊 Register dual progress callback untuk UI integration"""
-        self.progress_bridge = callback
+        """📊 Register progress callback untuk UI integration"""
+        self.progress_callback = callback
     
     def preprocess_dataset(self, progress_callback: Optional[Callable[[str, int, int, str], None]] = None) -> Dict[str, Any]:
-        """🎯 Enhanced preprocessing untuk multi-split dengan dual progress tracking
-        
-        Args:
-            progress_callback: Fungsi callback untuk melacak kemajuan
-                Format: callback(level: str, current: int, total: int, message: str)
-        """
-        # Gunakan callback yang diberikan atau yang sudah terdaftar
-        current_callback = progress_callback or self.progress_bridge
+        """🎯 Main preprocessing tanpa threading dengan proper progress callbacks"""
+        # Use provided callback atau yang sudah terdaftar
+        current_callback = progress_callback or self.progress_callback
         
         try:
             if current_callback:
                 current_callback("overall", 0, 100, "🚀 Memulai preprocessing dataset")
             
             # Phase 1: Validation (0-20%)
-            validation_results = self._validate_all_splits()
+            validation_results = self._validate_all_splits_with_progress(current_callback)
             if not validation_results['valid']:
                 return {
                     'success': False,
@@ -212,13 +211,13 @@ class PreprocessingEngine:
                     'stats': validation_results.get('stats', {})
                 }
             
-            self._report_progress("overall", 20, 100, "✅ Validasi selesai, mulai preprocessing")
+            self._report_progress("overall", 20, 100, "✅ Validasi selesai, mulai preprocessing", current_callback)
             
             # Phase 2: Setup directories (20-30%)
             self._setup_output_directories()
-            self._report_progress("overall", 30, 100, "📁 Direktori output siap")
+            self._report_progress("overall", 30, 100, "📁 Direktori output siap", current_callback)
             
-            # Phase 3: Process each split (30-90%)
+            # Phase 3: Process each split (30-90%) - TANPA THREADING
             all_stats = {}
             split_progress_step = 60 / len(self.target_splits)
             
@@ -226,11 +225,11 @@ class PreprocessingEngine:
                 split_start = 30 + (i * split_progress_step)
                 split_end = 30 + ((i + 1) * split_progress_step)
                 
-                self._report_progress("overall", int(split_start), 100, f"🔄 Processing split: {split}")
+                self._report_progress("overall", int(split_start), 100, f"🔄 Processing split: {split}", current_callback)
                 
-                split_result = self._process_single_split(
+                split_result = self._process_single_split_sequential(
                     split, 
-                    lambda current, total, msg: self._report_split_progress(split, current, total, msg, split_start, split_end)
+                    lambda current, total, msg: self._report_split_progress(split, current, total, msg, split_start, split_end, current_callback)
                 )
                 
                 all_stats[split] = split_result.get('stats', {})
@@ -239,10 +238,10 @@ class PreprocessingEngine:
                     self.logger.warning(f"⚠️ Split {split} processing had issues: {split_result.get('message', 'Unknown error')}")
             
             # Phase 4: Finalization (90-100%)
-            self._report_progress("overall", 90, 100, "🏁 Finalizing preprocessing")
+            self._report_progress("overall", 90, 100, "🏁 Finalizing preprocessing", current_callback)
             
             final_stats = self._compile_final_stats(all_stats)
-            self._report_progress("overall", 100, 100, "✅ Preprocessing selesai")
+            self._report_progress("overall", 100, 100, "✅ Preprocessing selesai", current_callback)
             
             return {
                 'success': True,
@@ -253,17 +252,28 @@ class PreprocessingEngine:
         except Exception as e:
             error_msg = f"❌ Error preprocessing: {str(e)}"
             self.logger.error(error_msg)
-            self._report_progress("overall", 0, 100, error_msg)
+            self._report_progress("overall", 0, 100, error_msg, current_callback)
             return {'success': False, 'message': error_msg, 'stats': {}}
     
-    def _validate_all_splits(self) -> Dict[str, Any]:
-        """🔍 Validate semua target splits"""
+    def _validate_all_splits_with_progress(self, callback: Optional[Callable]) -> Dict[str, Any]:
+        """🔍 Validate semua target splits dengan progress"""
         all_valid = True
         total_images = 0
         validation_messages = []
         
-        for split in self.target_splits:
-            result = self.validator.validate_split(split)
+        for i, split in enumerate(self.target_splits):
+            # Update progress untuk validation phase
+            progress = int((i / len(self.target_splits)) * 20)  # 0-20%
+            self._report_progress("overall", progress, 100, f"Validating {split}...", callback)
+            
+            # Validation dengan progress callback
+            def validation_progress(level, current, total, message):
+                # Map validation progress ke current level
+                if callback:
+                    callback("current", current, total, f"{split}: {message}")
+            
+            result = self.validator.validate_split(split, validation_progress)
+            
             if not result['is_valid']:
                 all_valid = False
                 validation_messages.append(f"❌ {split}: {result['message']}")
@@ -293,8 +303,8 @@ class PreprocessingEngine:
         
         self.logger.info(f"📁 Created output directories untuk {len(self.target_splits)} splits di {output_dir}")
     
-    def _process_single_split(self, split: str, progress_callback: Callable) -> Dict[str, Any]:
-        """🔄 Process single split dengan enhanced normalization"""
+    def _process_single_split_sequential(self, split: str, progress_callback: Callable) -> Dict[str, Any]:
+        """🔄 Process single split TANPA threading dengan sequential processing"""
         try:
             # Get source and destination paths from config
             data_config = self.config.get('data', {})
@@ -311,17 +321,18 @@ class PreprocessingEngine:
             if not img_files:
                 return {'status': 'skipped', 'message': f'Tidak ada gambar di {split}', 'stats': {}}
             
-            # Process with threading
+            # Process SEQUENTIAL - NO THREADING
             stats = {'total': len(img_files), 'processed': 0, 'normalized': 0, 'errors': 0}
             
-            def process_file(img_file: Path) -> Dict[str, Any]:
-                return self._process_single_file(img_file, src_label_dir, dst_base)
-            
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                future_to_file = {executor.submit(process_file, img_file): img_file for img_file in img_files}
-                
-                for i, future in enumerate(as_completed(future_to_file)):
-                    result = future.result()
+            # Process files satu per satu dengan progress updates
+            for i, img_file in enumerate(img_files):
+                try:
+                    # Update progress
+                    progress_pct = ((i + 1) / len(img_files)) * 100
+                    progress_callback(i + 1, len(img_files), f"Processing {img_file.name} ({progress_pct:.1f}%)")
+                    
+                    # Process single file
+                    result = self._process_single_file(img_file, src_label_dir, dst_base)
                     
                     if result['status'] == 'success':
                         stats['processed'] += 1
@@ -329,10 +340,14 @@ class PreprocessingEngine:
                             stats['normalized'] += 1
                     else:
                         stats['errors'] += 1
+                        self.logger.warning(f"⚠️ Error processing {img_file.name}: {result.get('error', 'Unknown')}")
                     
-                    # Report progress dengan detail
-                    progress_pct = ((i + 1) / len(img_files)) * 100
-                    progress_callback(i + 1, len(img_files), f"Processed {stats['processed']} files ({progress_pct:.1f}%)")
+                    # Small delay untuk UI responsiveness
+                    time.sleep(0.001)  # 1ms delay
+                    
+                except Exception as e:
+                    stats['errors'] += 1
+                    self.logger.error(f"❌ Error processing {img_file.name}: {str(e)}")
             
             return {
                 'status': 'success',
@@ -508,26 +523,28 @@ class PreprocessingEngine:
             }
         }
     
-    def _report_progress(self, level: str, current: int, total: int, message: str):
-        """📈 Report progress ke dual tracker"""
-        # Log milestone progress
+    def _report_progress(self, level: str, current: int, total: int, message: str, callback: Optional[Callable]):
+        """📈 Report progress dengan proper logging"""
+        # Log milestone progress (every 10% or completion)
         if current % max(1, total // 10) == 0 or current == total:
             self.logger.info(f"🔄 {message} ({current}/{total})")
         
         # Call progress callback if available
-        if hasattr(self, 'progress_bridge') and self.progress_bridge is not None:
+        if callback:
             try:
-                self.progress_bridge(level, current, total, message)
+                callback(level, current, total, message)
             except Exception as e:
-                self.logger.warning(f"⚠️ Gagal memanggil progress callback: {str(e)}")
+                self.logger.warning(f"⚠️ Progress callback error: {str(e)}")
     
-    def _report_split_progress(self, split: str, current: int, total: int, message: str, start_pct: float, end_pct: float):
+    def _report_split_progress(self, split: str, current: int, total: int, message: str, start_pct: float, end_pct: float, callback: Optional[Callable]):
         """📊 Report progress untuk individual split"""
         split_progress = (current / total) if total > 0 else 0
         overall_progress = int(start_pct + (split_progress * (end_pct - start_pct)))
         
-        self._report_progress("current", current, total, f"{split}: {message}")
-        self._report_progress("overall", overall_progress, 100, f"Processing {split}: {message}")
+        # Report to both levels
+        if callback:
+            callback("current", current, total, f"{split}: {message}")
+            callback("overall", overall_progress, 100, f"Processing {split}: {message}")
 
 def create_preprocessing_engine(config: Dict[str, Any]) -> PreprocessingEngine:
     """🏭 Factory untuk create preprocessing engine"""

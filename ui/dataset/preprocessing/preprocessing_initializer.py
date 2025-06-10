@@ -65,7 +65,7 @@ class PreprocessingInitializer(CommonInitializer):
     def _get_critical_components(self) -> List[str]:
         """Minimal critical components yang harus ada"""
         return [
-            'ui',
+            'main_container',
             'progress_tracker',
             'log_accordion',
             'action_buttons'

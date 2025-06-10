@@ -143,7 +143,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         ], layout=widgets.Layout(margin='8px 0'))
         
         # Main UI assembly
-        ui = widgets.VBox([
+        main_container = widgets.VBox([
             header,
             status_panel,
             input_options.get('container', widgets.VBox()),
@@ -164,7 +164,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         # Return components with error handling
         # Prepare components dictionary
         components = {
-            'ui': ui,
+            'ui': main_container,
             'components': {
                 'header': header,
                 'status_panel': status_panel,
@@ -178,7 +178,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
                 'log_accordion': log_accordion,
                 'action_section': action_section,
                 'config_section': config_section,
-                
+                'main_container': main_container,  # Tambahkan kunci ini
                 # Input components
                 'resolution_dropdown': getattr(input_options.get('components', {}), 'resolution_dropdown', None),
                 'normalization_dropdown': getattr(input_options.get('components', {}), 'normalization_dropdown', None),

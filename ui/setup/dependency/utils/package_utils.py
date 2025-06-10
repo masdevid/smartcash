@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency/utils/package_utils.py
-Deskripsi: Consolidated utilities untuk package operations dengan DRY pattern
+Deskripsi: Fixed package utilities dengan konsisten return types dan error handling
 """
 
 from typing import Dict, Any, List, Tuple, Optional
@@ -118,8 +118,20 @@ def filter_uninstalled_packages(selected_packages: List[str], logger_func=None) 
     
     return packages_to_install
 
-def install_single_package(package: str, timeout: int = 300) -> Tuple[bool, str]:
-    """Install single package dan return (success, message) - one-liner result processing"""
+def install_single_package(package: str, timeout: int = 300) -> Dict[str, Any]:
+    """
+    FIXED: Install single package dan return Dict dengan consistent structure
+    
+    Args:
+        package: Package requirement string
+        timeout: Installation timeout dalam detik
+        
+    Returns:
+        Dict dengan keys: success (bool), message (str), package_name (str)
+    """
+    
+    # Extract package name untuk logging
+    package_name = parse_package_requirement(package)[0]
     
     try:
         process = subprocess.run(
@@ -128,12 +140,35 @@ def install_single_package(package: str, timeout: int = 300) -> Tuple[bool, str]
             check=False, timeout=timeout
         )
         
-        return (True, f"Successfully installed {package}") if process.returncode == 0 else (False, f"pip error: {process.stderr}")
+        if process.returncode == 0:
+            return {
+                'success': True,
+                'message': f"Successfully installed {package}",
+                'package_name': package_name,
+                'package': package
+            }
+        else:
+            return {
+                'success': False,
+                'message': f"pip error: {process.stderr}",
+                'package_name': package_name,
+                'package': package
+            }
         
     except subprocess.TimeoutExpired:
-        return False, f"Installation timeout ({timeout}s)"
+        return {
+            'success': False,
+            'message': f"Installation timeout ({timeout}s)",
+            'package_name': package_name,
+            'package': package
+        }
     except Exception as e:
-        return False, f"Exception: {str(e)}"
+        return {
+            'success': False,
+            'message': f"Exception: {str(e)}",
+            'package_name': package_name,
+            'package': package
+        }
 
 def get_package_detailed_info(package_name: str) -> Dict[str, Any]:
     """Get detailed info untuk package menggunakan pip show - one-liner parsing"""

@@ -99,13 +99,13 @@ def _setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         # Dapatkan konfigurasi operasi
         _, button_key, _ = get_operation_config(operation_type)
         
-        # Jalankan operasi dengan button management
-        @with_button_management(ui_components, button_key)
-        def _execute():
+        # Buat wrapper function untuk button management
+        @with_button_management
+        def _execute(ui_components):
             return execute_operation(ui_components, operation_type, config)
             
-        # Eksekusi operasi
-        _execute()
+        # Eksekusi operasi dengan ui_components
+        _execute(ui_components)
     
     # Setup button handlers
     for op_type in ['preprocess', 'check', 'cleanup']:

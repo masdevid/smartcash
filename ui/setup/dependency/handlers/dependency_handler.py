@@ -23,33 +23,48 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     
     # Setup progress callback dengan support untuk dual progress tracker
     def progress_callback(**kwargs):
+        """
+        Handle progress updates with support for dual progress tracking
+        
+        Args:
+            level: 'overall' for main progress, 'step' for current step progress
+            progress: 0-100 value indicating progress percentage
+            message: Status message to display
+            color: Optional color for the progress bar
+            status_level: Optional level for status message ('info', 'warning', 'error')
+        """
         progress_tracker = ui_components.get('progress_tracker')
         if not progress_tracker:
             return
             
         level = kwargs.get('level', 'overall')
-        progress = kwargs.get('progress', 0)
-        message = kwargs.get('message', 'Processing...')
-        color = kwargs.get('color', None)
+        progress = max(0, min(100, int(kwargs.get('progress', 0))))  # Clamp to 0-100
+        message = str(kwargs.get('message', 'Memproses...'))
+        color = kwargs.get('color')
+        status_level = kwargs.get('status_level', 'info')
         
         try:
             # Handle different progress tracker APIs
             if hasattr(progress_tracker, 'update_overall') and hasattr(progress_tracker, 'update_current'):
-                # New dual progress tracker API
+                # Dual progress tracker API
                 if level in ['overall', 'level1']:
+                    # Update main progress bar
                     progress_tracker.update_overall(progress, message, color)
-                elif level in ['step', 'level2']:
+                elif level in ['step', 'level2', 'level3']:
+                    # Update current step progress bar (treat level3 as step for backward compatibility)
                     progress_tracker.update_current(progress, message, color)
+                
+                # Update status if available
+                if hasattr(progress_tracker, 'update_status'):
+                    progress_tracker.update_status(message, level=status_level)
+                    
             elif hasattr(progress_tracker, 'update'):
                 # Fallback to single progress bar
                 progress_tracker.update(progress, message, color)
                 
-            # Update status widget if available
-            if hasattr(progress_tracker, 'update_status'):
-                progress_tracker.update_status(message, level)
-                
         except Exception as e:
-            log_to_ui_safe(ui_components, f"Error updating progress: {str(e)}", "error")
+            error_msg = f"⚠️ Gagal memperbarui progress: {str(e)}"
+            log_to_ui_safe(ui_components, error_msg, "error")
     
     ui_components['progress_callback'] = progress_callback
     

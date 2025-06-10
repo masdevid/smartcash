@@ -21,35 +21,35 @@ def setup_dependency_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     # Force cleanup generators terlebih dahulu
     _cleanup_existing_generators(ui_components)
     
-    # Setup progress callback dengan support untuk progress tracker baru (triple level)
+    # Setup progress callback dengan support untuk dual progress tracker
     def progress_callback(**kwargs):
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            level = kwargs.get('type', 'overall')
-            progress = kwargs.get('progress', 0)
-            message = kwargs.get('message', 'Processing...')
-            color = kwargs.get('color', None)
+        if not progress_tracker:
+            return
             
-            # Gunakan metode yang benar sesuai API progress tracker baru
-            if level == 'overall' or level == 'level1':
-                progress_tracker.update_overall(progress, message, color)
-            elif level == 'step' or level == 'level2':
-                progress_tracker.update_current(progress, message, color)
-            elif level == 'step_progress' or level == 'level3':
-                # Untuk triple level progress tracker
-                if hasattr(progress_tracker, 'update_step_progress'):
-                    progress_tracker.update_step_progress(progress, message, color)
-                else:
-                    # Fallback ke level2 jika tidak ada level3
+        level = kwargs.get('level', 'overall')
+        progress = kwargs.get('progress', 0)
+        message = kwargs.get('message', 'Processing...')
+        color = kwargs.get('color', None)
+        
+        try:
+            # Handle different progress tracker APIs
+            if hasattr(progress_tracker, 'update_overall') and hasattr(progress_tracker, 'update_current'):
+                # New dual progress tracker API
+                if level in ['overall', 'level1']:
+                    progress_tracker.update_overall(progress, message, color)
+                elif level in ['step', 'level2']:
                     progress_tracker.update_current(progress, message, color)
-        else:
-            # Fallback untuk progress tracking lama
-            ui_components.get('update_progress', lambda *a: None)(
-                kwargs.get('type', 'overall'), 
-                kwargs.get('progress', 0), 
-                kwargs.get('message', 'Processing...'), 
-                kwargs.get('color', None)
-            )
+            elif hasattr(progress_tracker, 'update'):
+                # Fallback to single progress bar
+                progress_tracker.update(progress, message, color)
+                
+            # Update status widget if available
+            if hasattr(progress_tracker, 'update_status'):
+                progress_tracker.update_status(message, level)
+                
+        except Exception as e:
+            log_to_ui_safe(ui_components, f"Error updating progress: {str(e)}", "error")
     
     ui_components['progress_callback'] = progress_callback
     

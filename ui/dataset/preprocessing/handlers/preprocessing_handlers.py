@@ -385,7 +385,7 @@ def _show_confirmation_in_area(ui_components: Dict[str, Any], title: str, messag
     
     dialog = VBox([
         HTML(f"<h4>{title}</h4>"),
-        HTML(f"<p>{message.replace('\n', '<br>')}</p>"),
+        HTML(f'<p>{"<br>".join(message.splitlines())}</p>'),
         HBox([confirm_btn, cancel_btn])
     ])
     

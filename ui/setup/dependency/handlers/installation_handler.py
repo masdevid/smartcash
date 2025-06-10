@@ -42,19 +42,21 @@ def _execute_installation_with_utils(ui_components: Dict[str, Any], config: Dict
     try:
         # Step 1: Get selected packages dengan emoji untuk visual feedback
         try:
-            if progress_tracker and hasattr(progress_tracker, 'show'):
-                # Gunakan steps yang konsisten dengan yang dibuat di create_triple_progress_tracker
-                progress_tracker.show("Instalasi Packages", [
-                    "🔍 Analisis", 
-                    "📦 Instalasi", 
-                    "✅ Verifikasi"
-                ])
-                
-                # Update progress dengan safe error handling
+            if progress_tracker:
+                # Initialize progress tracker for installation
                 if hasattr(progress_tracker, 'update_overall'):
-                    progress_tracker.update_overall(10, "🚀 Mempersiapkan instalasi...")
-                if hasattr(progress_tracker, 'update_current'):
-                    progress_tracker.update_current(25, "📜 Mengumpulkan packages...")
+                    # Dual progress tracker
+                    progress_tracker.update_overall(0, "🔍 Mempersiapkan instalasi...", "info")
+                    progress_tracker.update_current(0, "Menunggu...", "info")
+                elif hasattr(progress_tracker, 'show'):
+                    # Legacy progress tracker
+                    progress_tracker.show("Instalasi Packages", [
+                        "🔍 Analisis", 
+                        "📦 Instalasi", 
+                        "✅ Verifikasi"
+                    ])
+                
+                # Progress tracking is now handled by the dual progress tracker initialization above
             else:
                 # Fallback untuk progress tracking lama
                 ctx.stepped_progress('INSTALL_INIT', "🚀 Mempersiapkan instalasi...")
@@ -235,33 +237,49 @@ def _install_packages_parallel_with_utils(packages: list, ui_components: Dict[st
         completed_count += 1
         progress = int((completed_count / total_packages) * 100)
         
-        # Get progress tracker jika tersedia
+        # Get progress tracker if available
         progress_tracker = ui_components.get('progress_tracker')
+        if not progress_tracker:
+            return
+            
+        # Prepare status message and color
+        status_icon = "✅" if success else "❌"
+        status_msg = "Berhasil" if success else "Gagal"
+        color = "success" if success else "error"
         
-        # Update progress bars
-        if progress_tracker:
-            # Update progress dengan metode yang benar
-            progress_tracker.update_overall(50 + int((completed_count / total_packages) * 30), 
-                                   f"Installing {completed_count}/{total_packages}")
-            
-            status_icon = "✅" if success else "❌"
-            status_msg = "Success" if success else "Failed"
-            color = "green" if success else "red"
-            
-            progress_tracker.update_current(progress, f"{status_icon} {package} {status_msg}", color)
-        else:
-            ui_components.get('update_progress', lambda *a: None)(
-                'overall', 
-                ProgressSteps.INSTALL_START + int((completed_count / total_packages) * 30),
-                f"Installing packages: {completed_count}/{total_packages}"
-            )
-            
-            ui_components.get('update_progress', lambda *a: None)(
-                'step', 
-                progress,
-                f"{package}: {'✅ Success' if success else '❌ Failed'}",
-                'green' if success else 'red'
-            )
+        try:
+            # Update progress based on tracker type
+            if hasattr(progress_tracker, 'update_overall'):
+                # Dual progress tracker
+                overall_progress = 50 + int((completed_count / total_packages) * 30)
+                progress_tracker.update_overall(
+                    overall_progress, 
+                    f"📦 Memproses {completed_count}/{total_packages} paket",
+                    "info"
+                )
+                
+                # Update current package status
+                progress_tracker.update_current(
+                    progress,
+                    f"{status_icon} {package}: {status_msg}",
+                    color
+                )
+                
+                # Update status if available
+                if hasattr(progress_tracker, 'update_status'):
+                    progress_tracker.update_status(
+                        f"{status_icon} {package}: {status_msg}",
+                        level='info'
+                    )
+            elif hasattr(progress_tracker, 'update'):
+                # Fallback to single progress bar
+                progress_tracker.update(
+                    progress,
+                    f"{status_icon} {package}: {status_msg}",
+                    color
+                )
+        except Exception as e:
+            log_to_ui_safe(ui_components, f"Error updating progress: {str(e)}", "error")
         
         # Update package status
         update_package_status_by_name(ui_components, package, 'installed' if success else 'error')
@@ -344,25 +362,77 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     success_count = sum(1 for result in installation_results.values() if result)
     total_count = len(installation_results)
     failed_count = total_count - success_count
+    success_rate = (success_count / total_count * 100) if total_count > 0 else 0
+    
+    # Get progress tracker if available
+    progress_tracker = ui_components.get('progress_tracker')
+    
+    # Prepare summary message
+    summary_msg = (
+        f"📊 Ringkasan Instalasi:\n"
+        f"   ✅ Berhasil: {success_count}/{total_count}\n"
+        f"   ❌ Gagal: {failed_count}\n"
+        f"   ⏱️  Durasi: {duration:.1f} detik\n"
+        f"   📈 Tingkat Keberhasilan: {success_rate:.1f}%"
+    )
     
     # Log detailed summary
     if logger:
-        logger.info("📊 Installation Summary:")
-        logger.info(f"   ✅ Successful: {success_count}/{total_count}")
-        logger.info(f"   ❌ Failed: {failed_count}/{total_count}")
-        logger.info(f"   ⏱️ Duration: {duration:.1f} seconds")
-        logger.info(f"   📈 Success Rate: {(success_count/total_count*100):.1f}%")
+        logger.info("\n" + "="*50)
+        logger.info("📊 RINGKASAN INSTALASI")
+        logger.info("="*50)
+        logger.info(f"✅ Berhasil: {success_count}/{total_count}")
+        logger.info(f"❌ Gagal: {failed_count}")
+        logger.info(f"⏱️  Durasi: {duration:.1f} detik")
+        logger.info(f"📈 Tingkat Keberhasilan: {success_rate:.1f}%")
     
     # Log failed packages
     if failed_count > 0:
         failed_packages = [pkg for pkg, success in installation_results.items() if not success]
+        failed_packages_str = ", ".join(failed_packages[:5])
+        if len(failed_packages) > 5:
+            failed_packages_str += f" dan {len(failed_packages)-5} lainnya"
+            
         if logger:
-            logger.warning(f"⚠️ Failed packages: {', '.join(failed_packages[:5])}" + 
-                                 (f" and {len(failed_packages)-5} more" if len(failed_packages) > 5 else ""))
+            logger.warning(f"\n⚠️  Paket yang Gagal: {failed_packages_str}")
     
     # Generate dan display detailed report
     report_html = generate_installation_summary_report(installation_results, duration)
     
+    # Update progress tracker if available
+    if progress_tracker:
+        try:
+            # Update to 100% complete
+            if hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(
+                    100,
+                    "✅ Instalasi Selesai",
+                    "success" if success_count == total_count else "warning"
+                )
+                progress_tracker.update_current(
+                    100,
+                    f"✅ {success_count} paket berhasil diinstal" if success_count > 0 else "❌ Gagal menginstal paket",
+                    "success" if success_count > 0 else "error"
+                )
+                
+                # Update status if available
+                if hasattr(progress_tracker, 'update_status'):
+                    progress_tracker.update_status(
+                        summary_msg,
+                        level='info'
+                    )
+            elif hasattr(progress_tracker, 'update'):
+                # Fallback to single progress bar
+                progress_tracker.update(
+                    100,
+                    f"✅ {success_count}/{total_count} paket berhasil" if success_count > 0 else "❌ Gagal",
+                    "success" if success_count > 0 else "error"
+                )
+        except Exception as e:
+            if logger:
+                logger.error(f"Gagal memperbarui progress tracker: {str(e)}")
+    
+    # Display report in log output
     log_output = ui_components.get('log_output')
     if log_output:
         from IPython.display import display, HTML
@@ -371,14 +441,14 @@ def _finalize_installation_results(ui_components: Dict[str, Any], installation_r
     
     # Update status panel
     if success_count == total_count:
-        status_msg = f"✅ Instalasi berhasil: {success_count}/{total_count} packages"
+        status_msg = f"✅ Instalasi berhasil: {success_count}/{total_count} paket"
         if logger:
-            logger.success(f"🎉 Installation completed successfully: all {success_count} packages installed")
+            logger.success(f"🎉 Instalasi selesai: Semua {success_count} paket berhasil diinstal")
         update_status_panel(ui_components, status_msg, "success")
     elif success_count > 0:
-        status_msg = f"⚠️ Instalasi partial: {success_count}/{total_count} berhasil, {failed_count} gagal"
+        status_msg = f"⚠️  Instalasi sebagian: {success_count} berhasil, {failed_count} gagal"
         if logger:
-            logger.warning(f"⚠️ Partial installation: {failed_count} packages failed")
+            logger.warning(f"⚠️  Instalasi sebagian: {failed_count} paket gagal")
         update_status_panel(ui_components, status_msg, "warning")
     else:
         status_msg = f"❌ Instalasi gagal: {failed_count}/{total_count} packages gagal"

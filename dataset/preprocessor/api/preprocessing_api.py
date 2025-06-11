@@ -13,24 +13,18 @@ from ..config.defaults import get_default_config
 
 def preprocess_dataset(config: Dict[str, Any] = None,
                       progress_callback: Optional[Callable] = None,
+                      ui_components: Dict[str, Any] = None,
                       splits: List[str] = None) -> Dict[str, Any]:
     """🚀 Main preprocessing function dengan YOLO normalization
     
     Args:
-        config: Preprocessing configuration (akan divalidasi dan dimerge dengan defaults)
+        config: Preprocessing configuration
         progress_callback: Callback dengan signature (level, current, total, message)
+        ui_components: UI components untuk progress integration
         splits: Override target splits dari config
         
     Returns:
         Dict dengan processing results
-        
-    Example:
-        >>> result = preprocess_dataset({
-        >>>     'preprocessing': {'target_splits': ['train', 'valid']},
-        >>>     'data': {'dir': 'data'}
-        >>> })
-        >>> if result['success']:
-        >>>     print(f"Processed {result['stats']['output']['total_processed']} files")
     """
     try:
         logger = get_logger(__name__)
@@ -46,8 +40,18 @@ def preprocess_dataset(config: Dict[str, Any] = None,
         if splits:
             merged_config['preprocessing']['target_splits'] = splits
         
-        # Create service dan process
-        service = PreprocessingService(merged_config, progress_callback)
+        # Create service dengan UI integration
+        from ..utils.progress_bridge import create_preprocessing_bridge
+        
+        # Setup progress bridge dengan UI components
+        if ui_components and progress_callback:
+            bridge = create_preprocessing_bridge(ui_components)
+            bridge.register_callback(progress_callback)
+            service = PreprocessingService(merged_config)
+            service.progress_bridge = bridge
+        else:
+            service = PreprocessingService(merged_config, progress_callback)
+        
         result = service.preprocess_dataset()
         
         # Enhance result dengan config info
@@ -69,15 +73,9 @@ def preprocess_dataset(config: Dict[str, Any] = None,
             'stats': {}
         }
 
-def get_preprocessing_status(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """📊 Get preprocessing status dan readiness check
-    
-    Args:
-        config: Configuration untuk status check
-        
-    Returns:
-        Dict dengan status information
-    """
+def get_preprocessing_status(config: Dict[str, Any] = None,
+                           ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """📊 Get preprocessing status dan readiness check"""
     try:
         # Validate config
         if config:

@@ -73,7 +73,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         # Confirmation/Dialog area dengan visibility control
         confirmation_area = widgets.Output(layout=widgets.Layout(
             width='100%', 
-            min_height='50px', 
+            min_height='0px', 
             max_height='250px',
             margin='10px 0',
             padding='5px',

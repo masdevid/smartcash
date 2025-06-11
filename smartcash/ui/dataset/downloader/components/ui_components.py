@@ -47,15 +47,15 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
             width='100%', 
-            height='auto',
-            min_height='0px',
-            max_height='400px',
+            min_height='0px', 
+            max_height='250px',
             margin='10px 0',
-            border='1px solid #dee2e6',
+            padding='5px',
+            border='1px solid #e0e0e0',
             border_radius='4px',
+            background_color='#fafafa',
             overflow='auto',
-            justify_content='center',
-            display='block'  # Always visible
+            visibility='hidden'  # Start hidden
         )
     )
     

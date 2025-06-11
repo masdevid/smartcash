@@ -128,7 +128,15 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         if status_result.get('success', False):
             service_ready = status_result.get('service_ready', False)
             file_stats = status_result.get('file_statistics', {})
+            output_directory = status_result.get('output_directory', {})
+            configuration = status_result.get('configuration', {})
+
+            if output_directory.get('exists', False):
+                _log_to_ui(ui_components, f"📂 Output directory: {output_directory['path']}", "info")
+            else:
+                _log_to_ui(ui_components, "❌ Output directory tidak ditemukan", "error")
             
+            _log_to_ui(ui_components, f"🎯 Configuration: {configuration}", "info")
             # Format results
             raw_images = file_stats.get('raw_images', 0)
             preprocessed_files = file_stats.get('preprocessed_files', 0)

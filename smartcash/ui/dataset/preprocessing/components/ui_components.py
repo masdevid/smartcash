@@ -70,21 +70,19 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         
         # === DIALOG AREA ===
         
-        # Confirmation/Dialog area yang dapat di-recreate
-        def create_confirmation_area():
-            return widgets.Output(layout=widgets.Layout(
-                width='100%', 
-                min_height='50px', 
-                max_height='250px',
-                margin='10px 0',
-                padding='5px',
-                border='1px solid #e0e0e0',
-                border_radius='4px',
-                background_color='#fafafa',
-                overflow='auto'
-            ))
-        
-        confirmation_area = create_confirmation_area()
+        # Confirmation/Dialog area dengan visibility control
+        confirmation_area = widgets.Output(layout=widgets.Layout(
+            width='100%', 
+            min_height='50px', 
+            max_height='250px',
+            margin='10px 0',
+            padding='5px',
+            border='1px solid #e0e0e0',
+            border_radius='4px',
+            background_color='#fafafa',
+            overflow='auto',
+            visibility='hidden'  # Start hidden
+        ))
         
         # === LAYOUT SECTIONS ===
         
@@ -183,8 +181,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             'data_dir': config.get('data', {}).get('dir', 'data'),
             'api_integration': True,
             'dialog_support': True,
-            'progress_tracking': True,
-            'create_confirmation_area': create_confirmation_area  # Function to recreate area
+            'progress_tracking': True
         }
         
         return ui_components

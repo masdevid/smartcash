@@ -111,7 +111,6 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         # Validate source
         _log_to_ui(ui_components, "🔍 Validating source dataset...", "info")
         target_split = config.get('preprocessing', {}).get('target_splits', ['train'])[0]
-        _log_to_ui(ui_components, f"🔍 Config: {config}", "info")
         validation_result = validate_dataset(config=config, target_split=target_split)
         
         # Check preprocessed status
@@ -169,7 +168,7 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
         
         config = _extract_config(ui_components)
         progress_callback = _create_progress_callback(ui_components)
-        _log_to_ui(ui_components, f"🔍 Config: {config}", "info")
+        
         _log_to_ui(ui_components, "🏗️ Starting preprocessing pipeline...", "info")
         
         # FIXED: Remove ui_components from API call
@@ -214,7 +213,7 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
         
         config = _extract_config(ui_components)
         cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
-        _log_to_ui(ui_components, f"🔍 Config: {config}", "info")
+        
         _log_to_ui(ui_components, f"🧹 Cleaning up {cleanup_target}...", "info")
         
         # FIXED: Remove ui_components from API call
@@ -274,7 +273,6 @@ def _create_progress_callback(ui_components: Dict[str, Any]):
     
     return progress_callback
 
-
 def _setup_progress(ui_components: Dict[str, Any], message: str):
     """Setup progress tracker"""
     progress_tracker = ui_components.get('progress_tracker')
@@ -326,40 +324,23 @@ def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info")
     except Exception:
         print(f"[{level.upper()}] {message}")
 
-def _recreate_confirmation_area(ui_components: Dict[str, Any]):
-    """Recreate confirmation area to fix dialog persistence"""
-    try:
-        action_section = ui_components.get('action_section')
-        create_func = ui_components.get('create_confirmation_area')
-        old_area = ui_components.get('confirmation_area')
-        
-        if action_section and create_func and old_area:
-            # Create new area
-            new_area = create_func()
-            
-            # Update references
-            ui_components['confirmation_area'] = new_area
-            ui_components['dialog_area'] = new_area
-            
-            # Replace in action_section children
-            if hasattr(action_section, 'children'):
-                children = list(action_section.children)
-                for i, child in enumerate(children):
-                    if child is old_area:
-                        children[i] = new_area
-                        action_section.children = children
-                        old_area.close()  # Close old widget
-                        break
-    except Exception:
-        # Fallback: clear existing
-        if confirmation_area := ui_components.get('confirmation_area'):
-            with confirmation_area:
-                from IPython.display import clear_output
-                clear_output(wait=True)
+def _hide_confirmation_area(ui_components: Dict[str, Any]):
+    """Hide confirmation area dengan visibility toggle"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'hidden'
+        confirmation_area.layout.height = '0px'
+
+def _show_confirmation_area(ui_components: Dict[str, Any]):
+    """Show confirmation area"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'visible'
+        confirmation_area.layout.height = 'auto'
 
 def _clear_outputs(ui_components: Dict[str, Any]):
-    """Clear outputs dengan area recreation"""
-    _recreate_confirmation_area(ui_components)
+    """Clear outputs dengan visibility toggle"""
+    _hide_confirmation_area(ui_components)
 
 def _disable_buttons(ui_components: Dict[str, Any]):
     """Disable operation buttons"""

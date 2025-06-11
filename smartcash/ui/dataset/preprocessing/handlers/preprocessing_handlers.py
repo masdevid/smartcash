@@ -137,6 +137,7 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
                 _log_to_ui(ui_components, "❌ Output directory tidak ditemukan", "error")
             
             _log_to_ui(ui_components, f"🎯 Configuration: {configuration}", "info")
+            _log_to_ui(ui_components, f"File statistics: {file_stats}", "info")
             # Format results
             raw_images = file_stats.get('raw_images', 0)
             preprocessed_files = file_stats.get('preprocessed_files', 0)

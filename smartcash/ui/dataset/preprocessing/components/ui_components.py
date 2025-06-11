@@ -56,12 +56,13 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         )
         
         # Progress tracker
-        progress_components = create_dual_progress_tracker(
+        progress_tracker = create_dual_progress_tracker(
             operation="Dataset Preprocessing",
             auto_hide=False
         )
         
-        # Log accordion
+        # Get container from tracker
+        progress_container = progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([])
         log_components = create_log_accordion(
             module_name='preprocessing',
             height='200px'
@@ -113,7 +114,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             input_options,
             config_section,
             action_section,
-            progress_components['container'],
+            progress_container,
             log_components['log_accordion']
         ], layout=widgets.Layout(
             width='100%',
@@ -155,8 +156,8 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             'dialog_area': confirmation_area,        # Alias untuk compatibility
             
             # PROGRESS TRACKING
-            'progress_tracker': progress_components.get('tracker'),
-            'progress_container': progress_components.get('container'),
+            'progress_tracker': progress_tracker,
+            'progress_container': progress_container,
             
             # LOG COMPONENTS
             'log_accordion': log_components.get('log_accordion'),

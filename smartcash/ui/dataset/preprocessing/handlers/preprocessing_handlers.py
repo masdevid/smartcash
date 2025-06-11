@@ -201,8 +201,7 @@ def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> bool:
         
         _setup_progress(ui_components, "🧹 Membersihkan output preprocessing...")
         
-        # Tambahkan pesan menunggu konfirmasi
-        _log_to_ui(ui_components, "⏳ Menunggu konfirmasi cleanup...", "info")
+        
         
         # Check confirmation flag dan execute jika dikonfirmasi
         if _should_execute_cleanup(ui_components):
@@ -210,6 +209,8 @@ def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> bool:
         
         # Show confirmation dialog jika belum
         if not _is_confirmation_pending(ui_components):
+            # Tambahkan pesan menunggu konfirmasi
+            _log_to_ui(ui_components, "⏳ Menunggu konfirmasi cleanup...", "info")
             _show_cleanup_confirmation(ui_components)
         
         return True
@@ -372,7 +373,7 @@ def _show_preprocessing_confirmation(ui_components: Dict[str, Any]):
         show_confirmation_dialog(
             ui_components,
             title="🚀 Konfirmasi Preprocessing",
-            message="⚠️ Pastikan dataset sudah siap! Lanjutkan preprocessing?",
+            message="Mulai preprocessing dataset dengan API baru?<br><br>✅ <strong>YOLO normalization</strong> dengan aspect ratio preservation<br>📊 <strong>Real-time progress tracking</strong><br>🔍 <strong>Minimal validation</strong> untuk performa optimal<br>🎯 <strong>Main banknotes analysis</strong> (7 classes)",
             on_confirm=lambda: _set_preprocessing_confirmed(ui_components),
             on_cancel=lambda: _handle_preprocessing_cancel(ui_components),
             confirm_text="🚀 Mulai Preprocessing",

@@ -3,7 +3,7 @@ File: smartcash/dataset/preprocessor/api/cleanup_api.py
 Deskripsi: Cleanup API untuk preprocessing artifacts dengan configurable options
 """
 
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Optional
 from pathlib import Path
 
 from smartcash.common.logger import get_logger

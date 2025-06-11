@@ -5,7 +5,7 @@ Deskripsi: Main preprocessing service dengan simplified validation dan YOLO focu
 
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Optional
 
 from smartcash.common.logger import get_logger
 from .config.validator import validate_preprocessing_config

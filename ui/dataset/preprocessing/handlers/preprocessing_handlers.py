@@ -111,6 +111,7 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         # Validate source
         _log_to_ui(ui_components, "🔍 Validating source dataset...", "info")
         target_split = config.get('preprocessing', {}).get('target_splits', ['train'])[0]
+        _log_to_ui(ui_components, f"🔍 Config: {config}", "info")
         validation_result = validate_dataset(config=config, target_split=target_split)
         
         # Check preprocessed status
@@ -168,7 +169,7 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
         
         config = _extract_config(ui_components)
         progress_callback = _create_progress_callback(ui_components)
-        
+        _log_to_ui(ui_components, f"🔍 Config: {config}", "info")
         _log_to_ui(ui_components, "🏗️ Starting preprocessing pipeline...", "info")
         
         # FIXED: Remove ui_components from API call
@@ -213,7 +214,7 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
         
         config = _extract_config(ui_components)
         cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
-        
+        _log_to_ui(ui_components, f"🔍 Config: {config}", "info")
         _log_to_ui(ui_components, f"🧹 Cleaning up {cleanup_target}...", "info")
         
         # FIXED: Remove ui_components from API call

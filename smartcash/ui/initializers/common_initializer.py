@@ -122,20 +122,10 @@ class CommonInitializer(ABC):
                 'reset'
             )
         
-        def safe_cleanup_handler(button):
-            """Safe cleanup handler tanpa context manager"""
-            self._safe_button_operation(
-                button,
-                lambda: self._do_cleanup(ui_components, button),
-                ui_components,
-                'cleanup'
-            )
-        
         # Bind handlers dengan one-liner
         button_handlers = {
             'save_button': safe_save_handler,
-            'reset_button': safe_reset_handler,
-            'cleanup_button': safe_cleanup_handler
+            'reset_button': safe_reset_handler
         }
         
         [ui_components[btn].on_click(handler) for btn, handler in button_handlers.items() 
@@ -164,19 +154,6 @@ class CommonInitializer(ABC):
         finally:
             # Always restore button state
             button.disabled = original_disabled
-    
-    def _do_cleanup(self, ui_components: Dict[str, Any], button) -> bool:
-        """Implementasi cleanup - override di subclass jika diperlukan"""
-        show_status_safe("🧹 Membersihkan resources...", "info", ui_components)
-        
-        # Default cleanup: clear outputs dan reset progress
-        config_handler = ui_components.get('config_handler')
-        if config_handler:
-            config_handler._clear_ui_outputs(ui_components)
-            config_handler._reset_progress_bars(ui_components)
-        
-        show_status_safe("✅ Cleanup selesai", "success", ui_components)
-        return True
     
     # Abstract methods - tetap sama
     @abstractmethod

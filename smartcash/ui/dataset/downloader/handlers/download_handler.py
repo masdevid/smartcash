@@ -172,6 +172,10 @@ def _show_download_confirmation(ui_components: Dict[str, Any], ui_config: Dict[s
     try:
         from smartcash.ui.components.dialog import show_confirmation_dialog
         
+        # Show confirmation area dan log waiting
+        _show_confirmation_area(ui_components)
+        log_to_accordion(ui_components, "⏳ Menunggu konfirmasi download dari user...", "info")
+        
         roboflow = ui_config.get('data', {}).get('roboflow', {})
         download = ui_config.get('download', {})
         backup_enabled = download.get('backup_existing', False)
@@ -201,14 +205,20 @@ def _show_download_confirmation(ui_components: Dict[str, Any], ui_config: Dict[s
         
     except ImportError:
         log_to_accordion(ui_components, "⚠️ Dialog tidak tersedia, langsung execute", "warning")
+        _hide_confirmation_area(ui_components)
         _execute_download_operation(ui_components, ui_config, get_button_manager(ui_components))
     except Exception as e:
         log_to_accordion(ui_components, f"⚠️ Error showing confirmation: {str(e)}", "warning")
+        _hide_confirmation_area(ui_components)
 
 def _show_cleanup_confirmation(ui_components: Dict[str, Any], targets_result: Dict[str, Any]):
     """Show cleanup confirmation menggunakan shared dialog API"""
     try:
         from smartcash.ui.components.dialog import show_confirmation_dialog
+        
+        # Show confirmation area dan log waiting
+        _show_confirmation_area(ui_components)
+        log_to_accordion(ui_components, "⏳ Menunggu konfirmasi cleanup dari user...", "info")
         
         summary = targets_result.get('summary', {})
         targets = targets_result.get('targets', {})
@@ -239,33 +249,51 @@ def _show_cleanup_confirmation(ui_components: Dict[str, Any], targets_result: Di
         
     except ImportError:
         log_to_accordion(ui_components, "⚠️ Dialog tidak tersedia, langsung execute", "warning")
+        _hide_confirmation_area(ui_components)
         _execute_cleanup_operation(ui_components, targets_result, get_button_manager(ui_components))
     except Exception as e:
         log_to_accordion(ui_components, f"⚠️ Error showing cleanup confirmation: {str(e)}", "warning")
+        _hide_confirmation_area(ui_components)
 
 def _handle_download_confirm(ui_components: Dict[str, Any], ui_config: Dict[str, Any]):
     """Handle download confirmation"""
+    _hide_confirmation_area(ui_components)
     log_to_accordion(ui_components, "✅ Download dikonfirmasi, memulai...", "success")
     button_manager = get_button_manager(ui_components)
     _execute_download_operation(ui_components, ui_config, button_manager)
 
 def _handle_download_cancel(ui_components: Dict[str, Any]):
     """Handle download cancellation"""
+    _hide_confirmation_area(ui_components)
     log_to_accordion(ui_components, "🚫 Download dibatalkan oleh user", "info")
     button_manager = get_button_manager(ui_components)
     button_manager.enable_buttons()
 
 def _handle_cleanup_confirm(ui_components: Dict[str, Any], targets_result: Dict[str, Any]):
     """Handle cleanup confirmation"""
+    _hide_confirmation_area(ui_components)
     log_to_accordion(ui_components, "✅ Cleanup dikonfirmasi, memulai...", "success")
     button_manager = get_button_manager(ui_components)
     _execute_cleanup_operation(ui_components, targets_result, button_manager)
 
 def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     """Handle cleanup cancellation"""
+    _hide_confirmation_area(ui_components)
     log_to_accordion(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
     button_manager = get_button_manager(ui_components)
     button_manager.enable_buttons()
+
+# === CONFIRMATION AREA MANAGEMENT ===
+
+def _show_confirmation_area(ui_components: Dict[str, Any]):
+    """Show confirmation area dengan visibility management"""
+    from smartcash.ui.dataset.downloader.utils.ui_utils import show_confirmation_area
+    show_confirmation_area(ui_components)
+
+def _hide_confirmation_area(ui_components: Dict[str, Any]):
+    """Hide confirmation area dengan visibility management"""
+    from smartcash.ui.dataset.downloader.utils.ui_utils import hide_confirmation_area
+    hide_confirmation_area(ui_components)
 
 # === EXECUTION HELPERS ===
 

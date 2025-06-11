@@ -13,6 +13,10 @@ def show_download_confirmation_dialog(ui_config: Dict[str, Any], ui_components: 
     try:
         from smartcash.ui.components.dialog import show_confirmation_dialog
         
+        # Show confirmation area dan log waiting
+        _show_confirmation_area(ui_components)
+        _log_to_ui(ui_components, "⏳ Menunggu konfirmasi download dari user...", "info")
+        
         roboflow = ui_config.get('data', {}).get('roboflow', {})
         download = ui_config.get('download', {})
         
@@ -31,18 +35,16 @@ def show_download_confirmation_dialog(ui_config: Dict[str, Any], ui_components: 
             ui_components,
             title="⚠️ Konfirmasi Download Dataset",
             message="<br>".join(message_lines),
-            on_confirm=on_confirm,
-            on_cancel=on_cancel or create_cancel_callback(ui_components, "download"),
+            on_confirm=lambda: _handle_confirm_with_hide(ui_components, on_confirm, "download"),
+            on_cancel=lambda: _handle_cancel_with_hide(ui_components, on_cancel, "download"),
             confirm_text="Ya, Download",
             cancel_text="Batal",
             danger_mode=True
         )
         
     except ImportError:
-        # Fallback: proceed with download
-        logger = ui_components.get('logger')
-        if logger:
-            logger.warning("⚠️ Dialog API tidak tersedia, melanjutkan download")
+        _log_to_ui(ui_components, "⚠️ Dialog API tidak tersedia, melanjutkan download", "warning")
+        _hide_confirmation_area(ui_components)
         if on_confirm:
             on_confirm()
 
@@ -51,6 +53,10 @@ def show_cleanup_confirmation_dialog(ui_components: Dict[str, Any], targets_resu
     """Show cleanup confirmation menggunakan shared dialog API"""
     try:
         from smartcash.ui.components.dialog import show_confirmation_dialog
+        
+        # Show confirmation area dan log waiting
+        _show_confirmation_area(ui_components)
+        _log_to_ui(ui_components, "⏳ Menunggu konfirmasi cleanup dari user...", "info")
         
         summary = targets_result.get('summary', {})
         targets = targets_result.get('targets', {})
@@ -72,20 +78,63 @@ def show_cleanup_confirmation_dialog(ui_components: Dict[str, Any], targets_resu
             ui_components,
             title="⚠️ Konfirmasi Cleanup Dataset",
             message="<br>".join(message_lines),
-            on_confirm=on_confirm,
-            on_cancel=on_cancel or create_cancel_callback(ui_components, "cleanup"),
+            on_confirm=lambda: _handle_confirm_with_hide(ui_components, on_confirm, "cleanup"),
+            on_cancel=lambda: _handle_cancel_with_hide(ui_components, on_cancel, "cleanup"),
             confirm_text="Ya, Hapus",
             cancel_text="Batal",
             danger_mode=True
         )
         
     except ImportError:
-        # Fallback: enable buttons
-        logger = ui_components.get('logger')
-        if logger:
-            logger.warning("⚠️ Dialog API tidak tersedia, operasi dibatalkan")
+        _log_to_ui(ui_components, "⚠️ Dialog API tidak tersedia, operasi dibatalkan", "warning")
+        _hide_confirmation_area(ui_components)
         button_manager = get_button_manager(ui_components)
         button_manager.enable_buttons()
+
+def _handle_confirm_with_hide(ui_components: Dict[str, Any], on_confirm: Callable, operation_type: str):
+    """Handle confirm dengan hide confirmation area"""
+    _hide_confirmation_area(ui_components)
+    _log_to_ui(ui_components, f"✅ {operation_type.capitalize()} dikonfirmasi oleh user", "success")
+    if on_confirm:
+        on_confirm()
+
+def _handle_cancel_with_hide(ui_components: Dict[str, Any], on_cancel: Callable, operation_type: str):
+    """Handle cancel dengan hide confirmation area"""
+    from .ui_utils import hide_confirmation_area
+    
+    hide_confirmation_area(ui_components)
+    _log_to_ui(ui_components, f"🚫 {operation_type.capitalize()} dibatalkan oleh user", "info")
+    
+    if on_cancel:
+        on_cancel()
+    else:
+        # Default cancel behavior jika tidak ada custom callback
+        button_manager = get_button_manager(ui_components)
+        button_manager.enable_buttons()
+        clear_outputs(ui_components)
+
+def _show_confirmation_area(ui_components: Dict[str, Any]):
+    """Show confirmation area dengan visibility management"""
+    from .ui_utils import show_confirmation_area
+    show_confirmation_area(ui_components)
+
+def _hide_confirmation_area(ui_components: Dict[str, Any]):
+    """Hide confirmation area dengan visibility management"""
+    from .ui_utils import hide_confirmation_area
+    hide_confirmation_area(ui_components)
+
+def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
+    """Log message ke UI dengan fallback"""
+    logger = ui_components.get('logger')
+    if logger and hasattr(logger, level):
+        getattr(logger, level)(message)
+    else:
+        # Fallback ke log_to_accordion
+        try:
+            from .ui_utils import log_to_accordion
+            log_to_accordion(ui_components, message, level)
+        except ImportError:
+            print(f"[{level.upper()}] {message}")
 
 def create_cancel_callback(ui_components: Dict[str, Any], operation_type: str) -> Callable:
     """Create cancel callback dengan proper state reset"""

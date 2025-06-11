@@ -441,6 +441,7 @@ def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     """Handle cleanup cancellation"""
     _clear_outputs(ui_components)
     _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
+    _enable_buttons(ui_components)
 
 def _should_execute_preprocessing(ui_components: Dict[str, Any]) -> bool:
     """Check if preprocessing should execute (consume confirmation flag)"""

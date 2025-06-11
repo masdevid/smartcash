@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/downloader/utils/ui_utils.py
-Deskripsi: Utilitas UI untuk download operations
+Deskripsi: Optimized UI utilities untuk download operations dengan confirmation management
 """
 
 from typing import Dict, Any
@@ -107,13 +107,6 @@ def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = '
         if hasattr(ui_components['log_accordion'], 'selected_index'):
             ui_components['log_accordion'].selected_index = 0
 
-def clear_dialog_area(ui_components: Dict[str, Any]):
-    """Clear dialog/confirmation area seperti preprocessing"""
-    confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area and hasattr(confirmation_area, 'layout'):
-        confirmation_area.layout.visibility = 'hidden'
-        confirmation_area.layout.height = '0px'
-
 def clear_outputs(ui_components: Dict[str, Any]):
     """Clear UI output areas"""
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
@@ -142,6 +135,9 @@ def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, button_manage
     # Show status
     show_status_safe(error_msg, 'error', ui_components)
     
+    # Hide confirmation area
+    hide_confirmation_area(ui_components)
+    
     # Enable buttons
     if button_manager:
         button_manager.enable_buttons()
@@ -166,9 +162,36 @@ def show_ui_success(ui_components: Dict[str, Any], message: str, button_manager=
     # Show status
     show_status_safe(message, 'success', ui_components)
     
+    # Hide confirmation area
+    hide_confirmation_area(ui_components)
+    
     # Enable buttons
     if button_manager:
         button_manager.enable_buttons()
+
+# === CONFIRMATION AREA MANAGEMENT ===
+
+def show_confirmation_area(ui_components: Dict[str, Any]):
+    """Show confirmation area untuk dialog visibility"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'visible'
+        confirmation_area.layout.height = 'auto'
+        confirmation_area.layout.min_height = '50px'
+
+def hide_confirmation_area(ui_components: Dict[str, Any]):
+    """Hide confirmation area setelah dialog selesai"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'hidden'
+        confirmation_area.layout.height = '0px'
+        confirmation_area.layout.min_height = '0px'
+
+def clear_dialog_area(ui_components: Dict[str, Any]):
+    """Clear dialog/confirmation area seperti preprocessing (alias untuk hide)"""
+    hide_confirmation_area(ui_components)
+
+# === PROGRESS MAPPING UTILITIES ===
 
 def map_step_to_current_progress(step: str, overall_progress: int) -> int:
     """Map step progress to current operation progress bar"""
@@ -190,3 +213,17 @@ def is_milestone_step(step: str, progress: int) -> bool:
     """Only log major milestones to prevent browser crash"""
     milestone_steps = ['init', 'metadata', 'backup', 'extract', 'organize', 'validate', 'complete']
     return (step.lower() in milestone_steps or progress in [0, 25, 50, 75, 100] or progress % 25 == 0)
+
+# === ONE-LINER UTILITIES ===
+
+# Format utilities
+format_file_count = lambda count: f"{count:,} file{'s' if count != 1 else ''}"
+format_duration = lambda seconds: f"{seconds:.1f} detik" if seconds < 60 else f"{seconds/60:.1f} menit"
+safe_get_widget = lambda ui_components, key, attr='value': getattr(ui_components.get(key, type('', (), {attr: None})()), attr, None)
+
+# Status utilities
+is_confirmation_visible = lambda ui_components: getattr(ui_components.get('confirmation_area', type('', (), {'layout': type('', (), {'visibility': 'hidden'})()})()), 'layout', type('', (), {'visibility': 'hidden'})()).visibility == 'visible'
+has_progress_tracker = lambda ui_components: ui_components.get('progress_tracker') is not None
+
+# Log level mapping
+get_log_emoji = lambda level: {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'debug': '🔍'}.get(level, 'ℹ️')

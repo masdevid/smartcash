@@ -247,10 +247,10 @@ def _create_info_dialog_widget(
 def _handle_confirm(ui_components: Dict[str, Any], callback: Callable):
     """Handle confirm action"""
     try:
-        # Clear dialog first
+        # Clear dialog immediately
         clear_dialog_area(ui_components)
         
-        # Execute callback
+        # Execute callback after clearing
         if callback:
             callback()
     except Exception as e:
@@ -259,10 +259,10 @@ def _handle_confirm(ui_components: Dict[str, Any], callback: Callable):
 def _handle_cancel(ui_components: Dict[str, Any], callback: Callable):
     """Handle cancel action"""
     try:
-        # Clear dialog first
+        # Clear dialog immediately
         clear_dialog_area(ui_components)
         
-        # Execute callback
+        # Execute callback after clearing
         if callback:
             callback()
     except Exception as e:
@@ -271,10 +271,10 @@ def _handle_cancel(ui_components: Dict[str, Any], callback: Callable):
 def _handle_close(ui_components: Dict[str, Any], callback: Callable):
     """Handle close action untuk info dialog"""
     try:
-        # Clear dialog first
+        # Clear dialog immediately
         clear_dialog_area(ui_components)
         
-        # Execute callback
+        # Execute callback after clearing
         if callback:
             callback()
     except Exception as e:

@@ -379,13 +379,12 @@ def _show_preprocessing_confirmation(ui_components: Dict[str, Any]):
             title="🚀 Konfirmasi Preprocessing",
             message="Apakah Anda yakin ingin memulai preprocessing dataset dengan API baru?<br><br>✅ YOLO normalization<br>📊 Real-time progress tracking<br>🔍 Enhanced validation",
             on_confirm=lambda: _set_preprocessing_confirmed(ui_components),
-            on_cancel=lambda: _log_to_ui(ui_components, "🚫 Preprocessing dibatalkan", "info"),
+            on_cancel=lambda: _handle_preprocessing_cancel(ui_components),
             confirm_text="Ya, Mulai",
             cancel_text="Batal"
         )
     except ImportError:
-        # Fallback jika dialog components tidak tersedia
-        _log_to_ui(ui_components, "⚠️ Dialog tidak tersedia, langsung execute preprocessing", "warning")
+        _log_to_ui(ui_components, "⚠️ Dialog tidak tersedia, langsung execute", "warning")
         _set_preprocessing_confirmed(ui_components)
     except Exception as e:
         _log_to_ui(ui_components, f"⚠️ Error showing confirmation: {str(e)}", "warning")
@@ -409,27 +408,42 @@ def _show_cleanup_confirmation(ui_components: Dict[str, Any]):
             title="⚠️ Konfirmasi Cleanup",
             message=f"Anda akan menghapus <strong>{target_display}</strong>.<br><br><span style='color:#dc3545;'>⚠️ Tindakan ini tidak dapat dibatalkan!</span>",
             on_confirm=lambda: _set_cleanup_confirmed(ui_components),
-            on_cancel=lambda: _log_to_ui(ui_components, "🚫 Cleanup dibatalkan", "info"),
+            on_cancel=lambda: _handle_cleanup_cancel(ui_components),
             confirm_text="Ya, Hapus",
             cancel_text="Batal",
             danger_mode=True
         )
     except ImportError:
-        # Fallback jika dialog components tidak tersedia
-        _log_to_ui(ui_components, "⚠️ Dialog tidak tersedia, langsung execute cleanup", "warning")
+        _log_to_ui(ui_components, "⚠️ Dialog tidak tersedia, langsung execute", "warning")
         _set_cleanup_confirmed(ui_components)
     except Exception as e:
         _log_to_ui(ui_components, f"⚠️ Error showing cleanup confirmation: {str(e)}", "warning")
 
+def _handle_preprocessing_cancel(ui_components: Dict[str, Any]):
+    """Handle preprocessing cancellation"""
+    _log_to_ui(ui_components, "🚫 Preprocessing dibatalkan oleh user", "info")
+    _enable_buttons(ui_components)
+
+def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
+    """Handle cleanup cancellation"""
+    _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
+    _enable_buttons(ui_components)
+
 def _set_preprocessing_confirmed(ui_components: Dict[str, Any]):
-    """Set preprocessing confirmation flag"""
+    """Set preprocessing confirmation flag dan trigger execution"""
     ui_components['_preprocessing_confirmed'] = True
-    _log_to_ui(ui_components, "✅ Preprocessing dikonfirmasi", "success")
+    _log_to_ui(ui_components, "✅ Preprocessing dikonfirmasi, memulai...", "success")
+    
+    # Langsung execute setelah konfirmasi
+    _execute_preprocessing_with_api(ui_components)
 
 def _set_cleanup_confirmed(ui_components: Dict[str, Any]):
-    """Set cleanup confirmation flag"""
+    """Set cleanup confirmation flag dan trigger execution"""
     ui_components['_cleanup_confirmed'] = True
-    _log_to_ui(ui_components, "✅ Cleanup dikonfirmasi", "success")
+    _log_to_ui(ui_components, "✅ Cleanup dikonfirmasi, memulai...", "success")
+    
+    # Langsung execute setelah konfirmasi
+    _execute_cleanup_with_api(ui_components)
 
 def _should_execute_preprocessing(ui_components: Dict[str, Any]) -> bool:
     """Check if preprocessing should execute"""

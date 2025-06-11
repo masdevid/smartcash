@@ -3,7 +3,7 @@ File: smartcash/dataset/preprocessor/api/samples_api.py
 Deskripsi: Samples management API untuk main banknotes layer
 """
 
-from typing import Dict, Any, List, Union, Optional
+from typing import Dict, Any, List, Union, Optional, Callable
 from pathlib import Path
 
 from smartcash.common.logger import get_logger

@@ -4,7 +4,7 @@ Deskripsi: Standalone normalization API untuk reuse di modules lain
 """
 
 import numpy as np
-from typing import Dict, Any, Tuple, Union, Optional
+from typing import Dict, Any, Tuple, Union, Optional, Callable
 from pathlib import Path
 
 from smartcash.common.logger import get_logger

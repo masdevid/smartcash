@@ -1,21 +1,21 @@
 """
 File: smartcash/ui/dataset/downloader/utils/dialog_utils.py
-Deskripsi: Dialog confirmation utilities untuk download operations
+Deskripsi: Simplified dialog utilities menggunakan shared dialog API
 """
 
 from typing import Dict, Any, Callable
-from smartcash.ui.components.dialogs import show_destructive_confirmation
 from .ui_utils import clear_outputs
 from .button_manager import get_button_manager
 
 def show_download_confirmation_dialog(ui_config: Dict[str, Any], ui_components: Dict[str, Any], 
                                      existing_count: int, on_confirm: Callable, on_cancel: Callable = None):
-    """Show download confirmation menggunakan proper dialog system"""
+    """Show download confirmation menggunakan shared dialog API"""
     try:
+        from smartcash.ui.components.dialog import show_confirmation_dialog
+        
         roboflow = ui_config.get('data', {}).get('roboflow', {})
         download = ui_config.get('download', {})
         
-        # Build confirmation message
         message_lines = [
             f"Dataset existing akan ditimpa! ({existing_count:,} gambar)",
             "",
@@ -27,38 +27,40 @@ def show_download_confirmation_dialog(ui_config: Dict[str, Any], ui_components: 
             "Lanjutkan download?"
         ]
         
-        # Use destructive confirmation karena akan menimpa data
-        show_destructive_confirmation(
+        show_confirmation_dialog(
+            ui_components,
             title="⚠️ Konfirmasi Download Dataset",
-            message='\n'.join(message_lines),
-            item_name="dataset existing",
+            message="<br>".join(message_lines),
             on_confirm=on_confirm,
-            on_cancel=on_cancel or create_cancel_callback(ui_components, "download")
+            on_cancel=on_cancel or create_cancel_callback(ui_components, "download"),
+            confirm_text="Ya, Download",
+            cancel_text="Batal",
+            danger_mode=True
         )
         
-    except Exception as e:
+    except ImportError:
+        # Fallback: proceed with download
         logger = ui_components.get('logger')
         if logger:
-            logger.error(f"❌ Error showing download confirmation: {str(e)}")
-        # Fallback: proceed with download
+            logger.warning("⚠️ Dialog API tidak tersedia, melanjutkan download")
         if on_confirm:
-            on_confirm(None)
+            on_confirm()
 
 def show_cleanup_confirmation_dialog(ui_components: Dict[str, Any], targets_result: Dict[str, Any], 
                                    on_confirm: Callable, on_cancel: Callable = None):
-    """Show cleanup confirmation menggunakan proper dialog system"""
+    """Show cleanup confirmation menggunakan shared dialog API"""
     try:
+        from smartcash.ui.components.dialog import show_confirmation_dialog
+        
         summary = targets_result.get('summary', {})
         targets = targets_result.get('targets', {})
         
-        # Build confirmation message
         message_lines = [
             f"Akan menghapus {summary.get('total_files', 0):,} file ({summary.get('size_formatted', '0 B')})",
             "",
             "📂 Target cleanup:"
         ]
         
-        # Add target details
         for target_name, target_info in targets.items():
             file_count = target_info.get('file_count', 0)
             size_formatted = target_info.get('size_formatted', '0 B')
@@ -66,26 +68,28 @@ def show_cleanup_confirmation_dialog(ui_components: Dict[str, Any], targets_resu
         
         message_lines.extend(["", "⚠️ Direktori akan tetap dipertahankan", "Lanjutkan cleanup?"])
         
-        # Use destructive confirmation karena akan menghapus files
-        show_destructive_confirmation(
+        show_confirmation_dialog(
+            ui_components,
             title="⚠️ Konfirmasi Cleanup Dataset",
-            message='\n'.join(message_lines),
-            item_name="dataset files",
+            message="<br>".join(message_lines),
             on_confirm=on_confirm,
-            on_cancel=on_cancel or create_cancel_callback(ui_components, "cleanup")
+            on_cancel=on_cancel or create_cancel_callback(ui_components, "cleanup"),
+            confirm_text="Ya, Hapus",
+            cancel_text="Batal",
+            danger_mode=True
         )
         
-    except Exception as e:
+    except ImportError:
+        # Fallback: enable buttons
         logger = ui_components.get('logger')
         if logger:
-            logger.error(f"❌ Error showing cleanup confirmation: {str(e)}")
-        # Fallback: enable buttons
+            logger.warning("⚠️ Dialog API tidak tersedia, operasi dibatalkan")
         button_manager = get_button_manager(ui_components)
         button_manager.enable_buttons()
 
 def create_cancel_callback(ui_components: Dict[str, Any], operation_type: str) -> Callable:
     """Create cancel callback dengan proper state reset"""
-    def on_cancel(btn):
+    def on_cancel():
         logger = ui_components.get('logger')
         button_manager = get_button_manager(ui_components)
         
@@ -105,7 +109,7 @@ def create_cancel_callback(ui_components: Dict[str, Any], operation_type: str) -
 
 def create_confirm_callback(ui_components: Dict[str, Any], operation_type: str, execute_function: Callable) -> Callable:
     """Create confirm callback dengan proper logging"""
-    def on_confirm(btn):
+    def on_confirm():
         logger = ui_components.get('logger')
         if logger:
             logger.info(f"✅ {operation_type.capitalize()} dikonfirmasi oleh user")

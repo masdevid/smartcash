@@ -107,6 +107,13 @@ def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = '
         if hasattr(ui_components['log_accordion'], 'selected_index'):
             ui_components['log_accordion'].selected_index = 0
 
+def clear_dialog_area(ui_components: Dict[str, Any]):
+    """Clear dialog/confirmation area seperti preprocessing"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'hidden'
+        confirmation_area.layout.height = '0px'
+
 def clear_outputs(ui_components: Dict[str, Any]):
     """Clear UI output areas"""
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):

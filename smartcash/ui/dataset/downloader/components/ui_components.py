@@ -42,20 +42,20 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         cleanup_enabled=True,
         button_width='130px'
     )
-    
-    # Confirmation area - VISIBLE dan di bawah action buttons dengan padding
+    # Confirmation area - VISIBLE dan di bawah action buttons seperti preprocessing
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
             width='100%', 
             min_height='0px', 
-            max_height='250px',
+            max_height='400px',
             margin='10px 0',
-            padding='5px',
+            padding='8px',
             border='1px solid #e0e0e0',
             border_radius='4px',
             background_color='#fafafa',
             overflow='auto',
-            visibility='hidden'  # Start hidden
+            visibility='hidden',  # Start hidden
+            display='block'       # Ensure it can be shown
         )
     )
     

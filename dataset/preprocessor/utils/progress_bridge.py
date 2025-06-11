@@ -3,7 +3,7 @@ File: smartcash/dataset/preprocessor/utils/progress_bridge.py
 Deskripsi: Enhanced progress bridge dengan kompatibilitas penuh untuk ui/components/progress_tracker
 """
 
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable, List, Tuple
 from dataclasses import dataclass
 from enum import Enum
 import time

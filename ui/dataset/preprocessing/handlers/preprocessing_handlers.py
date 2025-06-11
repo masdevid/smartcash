@@ -5,6 +5,7 @@ Deskripsi: Enhanced handlers dengan preprocessing API integration dan progress t
 
 from typing import Dict, Any
 from smartcash.common.logger import get_logger
+import time
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
     """Setup handlers dengan API integration dan UI logging"""
@@ -92,15 +93,21 @@ def _setup_operation_handlers(ui_components: Dict[str, Any]):
 def _handle_preprocessing_operation(ui_components: Dict[str, Any]) -> bool:
     """Handle preprocessing dengan confirmation dan API baru"""
     try:
+        import time  # Diimpor di sini untuk menghindari circular import
         _clear_outputs(ui_components)
         
         # Check confirmation flag dan execute jika dikonfirmasi
         if _should_execute_preprocessing(ui_components):
             return _execute_preprocessing_with_api(ui_components)
         
-        # Show confirmation dialog jika belum
-        if not _is_confirmation_pending(ui_components):
+        # Show confirmation dialog jika status pending
+        if _is_confirmation_pending(ui_components):
+            _log_to_ui(ui_components, "🔄 Menampilkan dialog konfirmasi...", "info")
             _show_preprocessing_confirmation(ui_components)
+            # Set timeout 2 menit untuk konfirmasi
+            ui_components['_confirmation_timeout'] = time.time() + 120
+        else:
+            _log_to_ui(ui_components, "⏳ Menunggu konfirmasi pengguna...", "info")
         
         return True
         

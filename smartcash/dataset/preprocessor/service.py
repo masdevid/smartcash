@@ -191,7 +191,7 @@ class PreprocessingService:
             }
     
     def _process_all_splits(self) -> Dict[str, Any]:
-        """🔄 Process all target splits"""
+        """🔄 Process all target splits dengan progress format baru"""
         splits = self._get_target_splits()
         split_results = {}
         total_processed = 0
@@ -200,17 +200,19 @@ class PreprocessingService:
         output_dir = Path(self.data_config['preprocessed_dir'])
         self.dir_validator.create_preprocessing_structure(output_dir, splits)
         
-        for i, split in enumerate(splits):
-            split_progress_start = (i / len(splits)) * 100
-            split_progress_end = ((i + 1) / len(splits)) * 100
+        # Setup split processing
+        self.progress_bridge.setup_split_processing(splits)
+        
+        for split in splits:
+            # Start split processing
+            self.progress_bridge.start_split(split)
             
-            self.progress_bridge.update_phase_progress(
-                int(split_progress_start), 100, f"Processing {split}"
-            )
-            
-            split_result = self._process_single_split(split, split_progress_start, split_progress_end)
+            split_result = self._process_single_split(split)
             split_results[split] = split_result
             total_processed += split_result.get('processed', 0)
+            
+            # Complete split
+            self.progress_bridge.complete_split(split)
         
         return {
             'success': True,
@@ -218,8 +220,8 @@ class PreprocessingService:
             'by_split': split_results
         }
     
-    def _process_single_split(self, split: str, progress_start: float, progress_end: float) -> Dict[str, Any]:
-        """🎯 Process single split dengan normalization"""
+    def _process_single_split(self, split: str) -> Dict[str, Any]:
+        """🎯 Process single split dengan split-specific progress"""
         try:
             # Get paths
             input_dir = Path(self.data_config['dir']) / split
@@ -231,16 +233,15 @@ class PreprocessingService:
             if not image_files:
                 return {'processed': 0, 'errors': 0, 'message': f'No images in {split}'}
             
-            # Process files
+            # Process files dengan split progress
             processed = 0
             errors = 0
             
             for i, img_file in enumerate(image_files):
                 try:
-                    # Update progress
-                    file_progress = progress_start + ((i / len(image_files)) * (progress_end - progress_start))
-                    self.progress_bridge.update_phase_progress(
-                        int(file_progress), 100, f"Processing {img_file.name}"
+                    # Update split progress
+                    self.progress_bridge.update_split_progress(
+                        i + 1, len(image_files), f"Processing {img_file.name}"
                     )
                     
                     # Load image

@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/core/stats_collector.py
-Deskripsi: Statistics collection untuk dataset analysis
+Deskripsi: Updated stats collector menggunakan FileNamingManager patterns
 """
 
 import numpy as np
@@ -9,26 +9,27 @@ from typing import Dict, Any, List, Union
 from collections import defaultdict
 
 from smartcash.common.logger import get_logger
+from smartcash.common.utils.file_naming_manager import create_file_naming_manager
 from ..config.defaults import MAIN_BANKNOTE_CLASSES, LAYER_CLASSES
 
 class StatsCollector:
-    """📊 Dataset statistics collector"""
+    """📊 Updated stats collector dengan FileNamingManager integration"""
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.logger = get_logger(__name__)
-        self.file_processor = None  # Injected saat diperlukan
+        self.naming_manager = create_file_naming_manager()
     
     def collect_dataset_stats(self, data_dir: Union[str, Path], 
                             splits: List[str] = None) -> Dict[str, Any]:
-        """📈 Collect comprehensive dataset statistics"""
+        """📈 Collect stats menggunakan naming manager"""
         splits = splits or ['train', 'valid', 'test']
         data_path = Path(data_dir)
         
         stats = {
             'overview': {'total_splits': 0, 'total_files': 0, 'total_size_mb': 0},
+            'by_type': {file_type: 0 for file_type in self.naming_manager.get_supported_types()},
             'by_split': {},
-            'by_type': {'raw': 0, 'preprocessed': 0, 'augmented': 0, 'samples': 0},
             'class_distribution': defaultdict(int),
             'layer_distribution': defaultdict(int),
             'file_sizes': {'avg_image_mb': 0, 'avg_npy_mb': 0}
@@ -43,14 +44,14 @@ class StatsCollector:
                 
                 # Aggregate counts
                 for file_type, count in split_stats['file_counts'].items():
-                    stats['by_type'][file_type] += count
+                    if file_type in stats['by_type']:
+                        stats['by_type'][file_type] += count
                     stats['overview']['total_files'] += count
                 
-                # Aggregate class distribution
+                # Aggregate distributions
                 for class_id, count in split_stats['class_distribution'].items():
                     stats['class_distribution'][class_id] += count
                 
-                # Aggregate layer distribution
                 for layer, count in split_stats['layer_distribution'].items():
                     stats['layer_distribution'][layer] += count
                 
@@ -70,7 +71,7 @@ class StatsCollector:
                 for split_data in stats['by_split'].values()
             )
             
-            total_images = stats['by_type']['raw'] + stats['by_type']['samples']
+            total_images = stats['by_type']['raw'] + stats['by_type']['sample']
             total_npy = stats['by_type']['preprocessed'] + stats['by_type']['augmented']
             
             stats['file_sizes']['avg_image_mb'] = round(total_image_size / max(total_images, 1), 2)
@@ -79,37 +80,35 @@ class StatsCollector:
         return stats
     
     def _analyze_split(self, split_path: Path) -> Dict[str, Any]:
-        """📊 Analyze single split directory"""
+        """📊 Analyze split menggunakan naming manager"""
         from .file_processor import FileProcessor
-        fp = FileProcessor()
         
-        # Scan different file types
+        fp = FileProcessor()
         images_dir = split_path / 'images'
         labels_dir = split_path / 'labels'
         
-        raw_files = fp.scan_files(images_dir, 'rp_') if images_dir.exists() else []
-        preprocessed_files = fp.scan_files(images_dir, 'pre_', {'.npy'}) if images_dir.exists() else []
-        augmented_files = fp.scan_files(images_dir, 'aug_', {'.npy'}) if images_dir.exists() else []
-        sample_files = fp.scan_files(images_dir, 'sample_') if images_dir.exists() else []
+        # Scan files by type menggunakan naming manager
+        file_counts = {}
+        all_files = []
         
-        # File counts
-        file_counts = {
-            'raw': len(raw_files),
-            'preprocessed': len(preprocessed_files),
-            'augmented': len(augmented_files),
-            'samples': len(sample_files)
-        }
+        for file_type in self.naming_manager.get_supported_types():
+            if images_dir.exists():
+                files = fp.scan_files_by_type(images_dir, file_type)
+                file_counts[file_type] = len(files)
+                all_files.extend(files)
+            else:
+                file_counts[file_type] = 0
         
         # Class dan layer distribution
         class_dist, layer_dist = self._analyze_labels(labels_dir)
         
         # File sizes
         avg_sizes = self._calculate_average_sizes({
-            'images': raw_files + sample_files,
-            'npy': preprocessed_files + augmented_files
+            'images': [f for f in all_files if f.suffix.lower() in {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}],
+            'npy': [f for f in all_files if f.suffix.lower() == '.npy']
         })
         
-        total_size = sum(fp.get_file_info(f).get('size_mb', 0) for files in [raw_files, preprocessed_files, augmented_files, sample_files] for f in files)
+        total_size = sum(fp.get_file_info(f).get('size_mb', 0) for f in all_files)
         
         return {
             'file_counts': file_counts,
@@ -120,7 +119,7 @@ class StatsCollector:
         }
     
     def _analyze_labels(self, labels_dir: Path) -> tuple:
-        """📋 Analyze YOLO labels untuk class/layer distribution"""
+        """📋 Analyze labels untuk class/layer distribution"""
         class_dist = defaultdict(int)
         layer_dist = defaultdict(int)
         
@@ -130,6 +129,7 @@ class StatsCollector:
         from .file_processor import FileProcessor
         fp = FileProcessor()
         
+        # Scan all label files
         label_files = fp.scan_files(labels_dir, extensions={'.txt'})
         
         for label_file in label_files:
@@ -153,7 +153,6 @@ class StatsCollector:
         fp = FileProcessor()
         
         avg_sizes = {}
-        
         for file_type, files in file_groups.items():
             if files:
                 total_size = sum(fp.get_file_info(f).get('size_mb', 0) for f in files)
@@ -168,14 +167,9 @@ class StatsCollector:
         if class_id in MAIN_BANKNOTE_CLASSES:
             return MAIN_BANKNOTE_CLASSES[class_id]
         
-        # Determine layer
         for layer_name, class_range in LAYER_CLASSES.items():
             if class_id in class_range:
-                return {
-                    'layer': layer_name,
-                    'class_id': class_id,
-                    'display': f"{layer_name}_{class_id:02d}"
-                }
+                return {'layer': layer_name, 'class_id': class_id, 'display': f"{layer_name}_{class_id:02d}"}
         
         return {'class_id': class_id, 'display': f"unknown_{class_id}"}
     
@@ -196,14 +190,13 @@ class StatsCollector:
         return layer_summary
     
     def export_stats_report(self, stats: Dict[str, Any], output_path: Union[str, Path]) -> bool:
-        """📄 Export statistics report"""
+        """📄 Export comprehensive stats report"""
         try:
             import json
             
-            # Enhance stats dengan readable info
             enhanced_stats = stats.copy()
             
-            # Add class name mapping
+            # Add class info
             enhanced_stats['class_info'] = {}
             for class_id in enhanced_stats['class_distribution'].keys():
                 enhanced_stats['class_info'][class_id] = self.get_class_info(class_id)
@@ -211,7 +204,9 @@ class StatsCollector:
             # Add layer summary
             enhanced_stats['layer_summary'] = self.get_layer_summary(enhanced_stats['class_distribution'])
             
-            # Save report
+            # Add naming manager info
+            enhanced_stats['naming_manager_stats'] = self.naming_manager.get_nominal_statistics()
+            
             with open(output_path, 'w') as f:
                 json.dump(enhanced_stats, f, indent=2, ensure_ascii=False)
             

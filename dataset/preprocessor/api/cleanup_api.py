@@ -1,409 +1,13 @@
 """
 File: smartcash/dataset/preprocessor/api/cleanup_api.py
-Deskripsi: Cleanup API untuk preprocessing artifacts dengan configurable options
+Deskripsi: Updated cleanup API menggunakan FileNamingManager patterns
 """
 
 from typing import Dict, Any, List, Union, Optional, Callable
 from pathlib import Path
 
 from smartcash.common.logger import get_logger
-
-def cleanup_preprocessing_files(data_dir: Union[str, Path],
-                               target: str = 'preprocessed',
-                               splits: List[str] = None,
-                               confirm: bool = False) -> Dict[str, Any]:
-    """🧹 Cleanup preprocessing artifacts dengan configurable target
-    
-    Args:
-        data_dir: Base data directory
-        target: Target files ('preprocessed', 'samples', 'both')
-        splits: Target splits (None = all splits)
-        confirm: Safety confirmation required
-        
-    Returns:
-        Dict dengan cleanup results
-        
-    Example:
-        >>> # Clean only preprocessing .npy files
-        >>> result = cleanup_preprocessing_files('data', 'preprocessed', confirm=True)
-        >>> # Clean only generated samples
-        >>> result = cleanup_preprocessing_files('data', 'samples', confirm=True)
-        >>> # Clean both
-        >>> result = cleanup_preprocessing_files('data', 'both', confirm=True)
-    """
-    try:
-        logger = get_logger(__name__)
-        
-        if not confirm:
-            return {
-                'success': False,
-                'message': "❌ Cleanup requires confirmation. Set confirm=True",
-                'files_removed': 0
-            }
-        
-        valid_targets = ['preprocessed', 'samples', 'both']
-        if target not in valid_targets:
-            return {
-                'success': False,
-                'message': f"❌ Invalid target '{target}'. Valid: {valid_targets}",
-                'files_removed': 0
-            }
-        
-        data_path = Path(data_dir)
-        if not data_path.exists():
-            return {
-                'success': False,
-                'message': f"❌ Data directory not found: {data_dir}",
-                'files_removed': 0
-            }
-        
-        # Determine splits
-        if splits is None:
-            splits = [d.name for d in data_path.iterdir() if d.is_dir() and d.name in ['train', 'valid', 'test']]
-        
-        total_removed = 0
-        cleanup_stats = {}
-        
-        for split in splits:
-            split_stats = _cleanup_split_files(data_path / split, target)
-            cleanup_stats[split] = split_stats
-            total_removed += split_stats['files_removed']
-        
-        message = f"✅ Cleanup completed: {total_removed} files removed"
-        if target == 'preprocessed':
-            message += " (preprocessing .npy files only)"
-        elif target == 'samples':
-            message += " (sample images only)"
-        else:
-            message += " (preprocessing .npy and sample images)"
-        
-        return {
-            'success': True,
-            'message': message,
-            'target': target,
-            'files_removed': total_removed,
-            'by_split': cleanup_stats
-        }
-        
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"❌ Cleanup error: {str(e)}")
-        return {
-            'success': False,
-            'message': f"❌ Error: {str(e)}",
-            'files_removed': 0
-        }
-
-def cleanup_split_files(data_dir: Union[str, Path],
-                       split: str,
-                       target: str = 'preprocessed',
-                       confirm: bool = False) -> Dict[str, Any]:
-    """🧹 Cleanup files untuk specific split
-    
-    Args:
-        data_dir: Base data directory
-        split: Target split name
-        target: Target files ('preprocessed', 'samples', 'both')
-        confirm: Safety confirmation
-        
-    Returns:
-        Dict dengan cleanup results
-    """
-    if not confirm:
-        return {
-            'success': False,
-            'message': "❌ Cleanup requires confirmation",
-            'files_removed': 0
-        }
-    
-    data_path = Path(data_dir)
-    split_path = data_path / split
-    
-    if not split_path.exists():
-        return {
-            'success': False,
-            'message': f"❌ Split directory not found: {split_path}",
-            'files_removed': 0
-        }
-    
-    stats = _cleanup_split_files(split_path, target)
-    
-    return {
-        'success': True,
-        'message': f"✅ Cleaned {split}: {stats['files_removed']} files removed",
-        'split': split,
-        'target': target,
-        'files_removed': stats['files_removed'],
-        'details': stats
-    }
-
-def get_cleanup_preview(data_dir: Union[str, Path],
-                       target: str = 'preprocessed',
-                       splits: List[str] = None) -> Dict[str, Any]:
-    """👀 Preview files yang akan dihapus tanpa execute cleanup
-    
-    Args:
-        data_dir: Base data directory
-        target: Target files ('preprocessed', 'samples', 'both')
-        splits: Target splits
-        
-    Returns:
-        Dict dengan preview information
-    """
-    try:
-        from ..core.file_processor import FileProcessor
-        
-        data_path = Path(data_dir)
-        if not data_path.exists():
-            return {
-                'success': False,
-                'message': f"❌ Data directory not found: {data_dir}"
-            }
-        
-        # Determine splits
-        if splits is None:
-            splits = [d.name for d in data_path.iterdir() if d.is_dir() and d.name in ['train', 'valid', 'test']]
-        
-        fp = FileProcessor()
-        preview = {
-            'success': True,
-            'target': target,
-            'total_files': 0,
-            'total_size_mb': 0,
-            'by_split': {}
-        }
-        
-        for split in splits:
-            split_path = data_path / split
-            if not split_path.exists():
-                continue
-            
-            # Get files based on target
-            files_to_remove = []
-            
-            if target in ['preprocessed', 'both']:
-                # Preprocessing .npy files (pre_*.npy)
-                npy_files = fp.scan_files(split_path / 'images', 'pre_', {'.npy'})
-                files_to_remove.extend(npy_files)
-                
-                # Also remove corresponding .meta.json files
-                for npy_file in npy_files:
-                    meta_file = npy_file.with_suffix('.meta.json')
-                    if meta_file.exists():
-                        files_to_remove.append(meta_file)
-            
-            if target in ['samples', 'both']:
-                # Sample image files (sample_*.jpg, sample_*.png, etc)
-                sample_files = fp.scan_files(split_path / 'images', 'sample_')
-                files_to_remove.extend(sample_files)
-            
-            # Calculate stats
-            split_size = sum(fp.get_file_info(f).get('size_mb', 0) for f in files_to_remove)
-            
-            preview['by_split'][split] = {
-                'files_count': len(files_to_remove),
-                'size_mb': round(split_size, 2),
-                'file_list': [str(f) for f in files_to_remove[:10]]  # First 10 for preview
-            }
-            
-            preview['total_files'] += len(files_to_remove)
-            preview['total_size_mb'] += split_size
-        
-        preview['total_size_mb'] = round(preview['total_size_mb'], 2)
-        
-        return preview
-        
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"❌ Cleanup preview error: {str(e)}")
-        return {
-            'success': False,
-            'message': f"❌ Error: {str(e)}"
-        }
-
-def cleanup_empty_directories(data_dir: Union[str, Path]) -> Dict[str, Any]:
-    """📁 Cleanup empty directories yang tertinggal setelah cleanup
-    
-    Args:
-        data_dir: Base data directory
-        
-    Returns:
-        Dict dengan cleanup results
-    """
-    try:
-        data_path = Path(data_dir)
-        removed_dirs = []
-        
-        # Check untuk empty directories
-        for split_dir in data_path.iterdir():
-            if split_dir.is_dir():
-                images_dir = split_dir / 'images'
-                labels_dir = split_dir / 'labels'
-                
-                # Check jika images directory kosong
-                if images_dir.exists() and not any(images_dir.iterdir()):
-                    images_dir.rmdir()
-                    removed_dirs.append(str(images_dir))
-                
-                # Check jika labels directory kosong
-                if labels_dir.exists() and not any(labels_dir.iterdir()):
-                    labels_dir.rmdir()
-                    removed_dirs.append(str(labels_dir))
-                
-                # Check jika split directory kosong
-                if split_dir.exists() and not any(split_dir.iterdir()):
-                    split_dir.rmdir()
-                    removed_dirs.append(str(split_dir))
-        
-        return {
-            'success': True,
-            'message': f"✅ Removed {len(removed_dirs)} empty directories",
-            'removed_directories': removed_dirs
-        }
-        
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"❌ Empty directory cleanup error: {str(e)}")
-        return {
-            'success': False,
-            'message': f"❌ Error: {str(e)}"
-        }
-
-def _cleanup_split_files(split_path: Path, target: str) -> Dict[str, Any]:
-    """🗑️ Internal cleanup untuk single split"""
-    from ..core.file_processor import FileProcessor
-    
-    fp = FileProcessor()
-    files_removed = 0
-    size_removed = 0
-    
-    # Get target files dari preprocessed directory
-    images_dir = split_path / 'images'
-    labels_dir = split_path / 'labels'
-    
-    files_to_remove = []
-    
-    if target in ['preprocessed', 'both']:
-        # Preprocessing .npy files
-        if images_dir.exists():
-            npy_files = fp.scan_files(images_dir, 'pre_', {'.npy'})
-            files_to_remove.extend(npy_files)
-            
-            # Corresponding metadata files
-            for npy_file in npy_files:
-                meta_file = npy_file.with_suffix('.meta.json')
-                if meta_file.exists():
-                    files_to_remove.append(meta_file)
-        
-        # Preprocessing label files
-        if labels_dir.exists():
-            label_files = fp.scan_files(labels_dir, 'pre_', {'.txt'})
-            files_to_remove.extend(label_files)
-    
-    if target in ['samples', 'both']:
-        # Sample files (in images directory)
-        if images_dir.exists():
-            sample_files = fp.scan_files(images_dir, 'sample_')
-            files_to_remove.extend(sample_files)
-    
-    # Remove files
-    for file_path in files_to_remove:
-        try:
-            if file_path.exists():
-                file_size = fp.get_file_info(file_path).get('size_mb', 0)
-                file_path.unlink()
-                files_removed += 1
-                size_removed += file_size
-        except Exception as e:
-            logger = get_logger(__name__)
-            logger.warning(f"⚠️ Failed to remove {file_path}: {str(e)}")
-    
-    return {
-        'files_removed': files_removed,
-        'size_removed_mb': round(size_removed, 2),
-        'target': target
-    }
-
-def get_cleanup_preview(data_dir: Union[str, Path],
-                       target: str = 'preprocessed',
-                       splits: List[str] = None) -> Dict[str, Any]:
-    """👀 Preview files yang akan dihapus dari preprocessed directory"""
-    try:
-        from ..core.file_processor import FileProcessor
-        
-        # Use preprocessed directory instead of raw data directory
-        preprocessed_dir = Path(data_dir).parent / 'preprocessed' if 'preprocessed' not in str(data_dir) else Path(data_dir)
-        
-        if not preprocessed_dir.exists():
-            return {
-                'success': False,
-                'message': f"❌ Preprocessed directory not found: {preprocessed_dir}"
-            }
-        
-        # Determine splits
-        if splits is None:
-            splits = [d.name for d in preprocessed_dir.iterdir() if d.is_dir() and d.name in ['train', 'valid', 'test']]
-        
-        fp = FileProcessor()
-        preview = {
-            'success': True,
-            'target': target,
-            'total_files': 0,
-            'total_size_mb': 0,
-            'by_split': {}
-        }
-        
-        for split in splits:
-            split_path = preprocessed_dir / split
-            if not split_path.exists():
-                continue
-            
-            # Get files based on target
-            files_to_remove = []
-            
-            if target in ['preprocessed', 'both']:
-                # Preprocessing .npy files
-                npy_files = fp.scan_files(split_path / 'images', 'pre_', {'.npy'})
-                files_to_remove.extend(npy_files)
-                
-                # Preprocessing label files
-                label_files = fp.scan_files(split_path / 'labels', 'pre_', {'.txt'})
-                files_to_remove.extend(label_files)
-                
-                # Metadata files
-                for npy_file in npy_files:
-                    meta_file = npy_file.with_suffix('.meta.json')
-                    if meta_file.exists():
-                        files_to_remove.append(meta_file)
-            
-            if target in ['samples', 'both']:
-                # Sample image files
-                sample_files = fp.scan_files(split_path / 'images', 'sample_')
-                files_to_remove.extend(sample_files)
-            
-            # Calculate stats
-            split_size = sum(fp.get_file_info(f).get('size_mb', 0) for f in files_to_remove)
-            
-            preview['by_split'][split] = {
-                'files_count': len(files_to_remove),
-                'size_mb': round(split_size, 2),
-                'file_list': [str(f) for f in files_to_remove[:10]]
-            }
-            
-            preview['total_files'] += len(files_to_remove)
-            preview['total_size_mb'] += split_size
-        
-        preview['total_size_mb'] = round(preview['total_size_mb'], 2)
-        
-        return preview
-        
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"❌ Cleanup preview error: {str(e)}")
-        return {
-            'success': False,
-            'message': f"❌ Error: {str(e)}"
-        }
+from smartcash.common.utils.file_naming_manager import create_file_naming_manager
 
 def cleanup_preprocessing_files(data_dir: Union[str, Path],
                                target: str = 'preprocessed',
@@ -411,7 +15,7 @@ def cleanup_preprocessing_files(data_dir: Union[str, Path],
                                confirm: bool = False,
                                progress_callback: Optional[Callable] = None,
                                ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """🧹 Cleanup preprocessing artifacts dengan progress tracking"""
+    """🧹 Cleanup dengan FileNamingManager patterns"""
     try:
         logger = get_logger(__name__)
         
@@ -451,46 +55,146 @@ def cleanup_preprocessing_files(data_dir: Union[str, Path],
             if progress_bridge:
                 progress_bridge.complete_split(split)
         
-        message = f"✅ Cleanup completed: {total_removed} files removed"
-        return {'success': True, 'message': message, 'target': target, 'files_removed': total_removed, 'by_split': cleanup_stats}
+        return {'success': True, 'message': f"✅ Cleanup completed: {total_removed} files removed", 'target': target, 'files_removed': total_removed, 'by_split': cleanup_stats}
         
     except Exception as e:
         logger = get_logger(__name__)
         logger.error(f"❌ Cleanup error: {str(e)}")
         return {'success': False, 'message': f"❌ Error: {str(e)}", 'files_removed': 0}
 
+def get_cleanup_preview(data_dir: Union[str, Path],
+                       target: str = 'preprocessed',
+                       splits: List[str] = None) -> Dict[str, Any]:
+    """👀 Preview cleanup menggunakan naming manager"""
+    try:
+        from ..core.file_processor import FileProcessor
+        
+        preprocessed_dir = Path(data_dir).parent / 'preprocessed' if 'preprocessed' not in str(data_dir) else Path(data_dir)
+        
+        if not preprocessed_dir.exists():
+            return {'success': False, 'message': f"❌ Preprocessed directory not found: {preprocessed_dir}"}
+        
+        if splits is None:
+            splits = [d.name for d in preprocessed_dir.iterdir() if d.is_dir() and d.name in ['train', 'valid', 'test']]
+        
+        naming_manager = create_file_naming_manager()
+        fp = FileProcessor()
+        preview = {'success': True, 'target': target, 'total_files': 0, 'total_size_mb': 0, 'by_split': {}}
+        
+        for split in splits:
+            split_path = preprocessed_dir / split
+            if not split_path.exists():
+                continue
+            
+            files_to_remove = []
+            
+            if target in ['preprocessed', 'both']:
+                # Scan preprocessed files
+                for file_type in ['preprocessed']:
+                    prefix = naming_manager.get_prefix(file_type)
+                    if prefix:
+                        # Images
+                        npy_files = fp.scan_files(split_path / 'images', prefix, {'.npy'})
+                        files_to_remove.extend(npy_files)
+                        
+                        # Labels
+                        label_files = fp.scan_files(split_path / 'labels', prefix, {'.txt'})
+                        files_to_remove.extend(label_files)
+                        
+                        # Metadata files
+                        for npy_file in npy_files:
+                            meta_file = npy_file.with_suffix('.meta.json')
+                            if meta_file.exists():
+                                files_to_remove.append(meta_file)
+            
+            if target in ['augmented', 'both']:
+                # Scan augmented files
+                for file_type in ['augmented']:
+                    prefix = naming_manager.get_prefix(file_type)
+                    if prefix:
+                        # Images dengan variance pattern
+                        aug_files = fp.scan_files(split_path / 'images', prefix, {'.npy', '.jpg'})
+                        files_to_remove.extend(aug_files)
+                        
+                        # Labels dengan variance pattern
+                        aug_labels = fp.scan_files(split_path / 'labels', prefix, {'.txt'})
+                        files_to_remove.extend(aug_labels)
+            
+            if target in ['samples', 'both']:
+                # Scan sample files
+                for file_type in ['sample', 'augmented_sample']:
+                    prefix = naming_manager.get_prefix(file_type)
+                    if prefix:
+                        sample_files = fp.scan_files(split_path / 'images', prefix)
+                        files_to_remove.extend(sample_files)
+            
+            split_size = sum(fp.get_file_info(f).get('size_mb', 0) for f in files_to_remove)
+            
+            preview['by_split'][split] = {
+                'files_count': len(files_to_remove),
+                'size_mb': round(split_size, 2),
+                'file_list': [str(f) for f in files_to_remove[:10]]
+            }
+            
+            preview['total_files'] += len(files_to_remove)
+            preview['total_size_mb'] += split_size
+        
+        preview['total_size_mb'] = round(preview['total_size_mb'], 2)
+        return preview
+        
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"❌ Cleanup preview error: {str(e)}")
+        return {'success': False, 'message': f"❌ Error: {str(e)}"}
+
 def _cleanup_split_files_with_progress(split_path: Path, target: str, progress_bridge=None) -> Dict[str, Any]:
-    """🗑️ Internal cleanup dengan progress tracking"""
+    """🗑️ Internal cleanup menggunakan naming manager"""
     from ..core.file_processor import FileProcessor
     
+    naming_manager = create_file_naming_manager()
     fp = FileProcessor()
     files_removed = 0
     size_removed = 0
     
-    # Collect all files to remove
     files_to_remove = []
     images_dir = split_path / 'images'
     labels_dir = split_path / 'labels'
     
     if target in ['preprocessed', 'both']:
-        if images_dir.exists():
-            npy_files = fp.scan_files(images_dir, 'pre_', {'.npy'})
-            files_to_remove.extend(npy_files)
-            for npy_file in npy_files:
-                meta_file = npy_file.with_suffix('.meta.json')
-                if meta_file.exists():
-                    files_to_remove.append(meta_file)
-        
-        if labels_dir.exists():
-            label_files = fp.scan_files(labels_dir, 'pre_', {'.txt'})
-            files_to_remove.extend(label_files)
+        for file_type in ['preprocessed']:
+            prefix = naming_manager.get_prefix(file_type)
+            if prefix and images_dir.exists():
+                npy_files = fp.scan_files(images_dir, prefix, {'.npy'})
+                files_to_remove.extend(npy_files)
+                
+                for npy_file in npy_files:
+                    meta_file = npy_file.with_suffix('.meta.json')
+                    if meta_file.exists():
+                        files_to_remove.append(meta_file)
+            
+            if prefix and labels_dir.exists():
+                label_files = fp.scan_files(labels_dir, prefix, {'.txt'})
+                files_to_remove.extend(label_files)
+    
+    if target in ['augmented', 'both']:
+        for file_type in ['augmented']:
+            prefix = naming_manager.get_prefix(file_type)
+            if prefix and images_dir.exists():
+                aug_files = fp.scan_files(images_dir, prefix, {'.npy', '.jpg'})
+                files_to_remove.extend(aug_files)
+            
+            if prefix and labels_dir.exists():
+                aug_labels = fp.scan_files(labels_dir, prefix, {'.txt'})
+                files_to_remove.extend(aug_labels)
     
     if target in ['samples', 'both']:
-        if images_dir.exists():
-            sample_files = fp.scan_files(images_dir, 'sample_')
-            files_to_remove.extend(sample_files)
+        for file_type in ['sample', 'augmented_sample']:
+            prefix = naming_manager.get_prefix(file_type)
+            if prefix and images_dir.exists():
+                sample_files = fp.scan_files(images_dir, prefix)
+                files_to_remove.extend(sample_files)
     
-    # Remove files with progress
+    # Remove files dengan progress
     total_files = len(files_to_remove)
     for i, file_path in enumerate(files_to_remove):
         try:
@@ -507,3 +211,77 @@ def _cleanup_split_files_with_progress(split_path: Path, target: str, progress_b
             logger.warning(f"⚠️ Failed to remove {file_path}: {str(e)}")
     
     return {'files_removed': files_removed, 'size_removed_mb': round(size_removed, 2), 'target': target}
+
+def get_cleanup_summary(data_dir: Union[str, Path], target: str = 'preprocessed') -> Dict[str, Any]:
+    """📊 Cleanup summary menggunakan naming manager"""
+    try:
+        valid_targets = ['preprocessed', 'augmented', 'samples', 'both']
+        if target not in valid_targets:
+            return {'success': False, 'message': f"❌ Invalid target '{target}'. Valid: {valid_targets}"}
+        
+        preview = get_cleanup_preview(data_dir, target)
+        if not preview['success']:
+            return preview
+        
+        naming_manager = create_file_naming_manager()
+        
+        summary = {
+            'success': True,
+            'target': target,
+            'total_files': preview['total_files'],
+            'total_size_mb': preview['total_size_mb'],
+            'affected_splits': len(preview['by_split']),
+            'file_patterns': []
+        }
+        
+        # Add patterns yang akan dihapus
+        if target in ['preprocessed', 'both']:
+            summary['file_patterns'].extend([
+                'pre_{nominal}_{uuid}.npy',
+                'pre_{nominal}_{uuid}.txt',
+                'pre_{nominal}_{uuid}.meta.json'
+            ])
+        
+        if target in ['augmented', 'both']:
+            summary['file_patterns'].extend([
+                'aug_{nominal}_{uuid}_{variance}.npy',
+                'aug_{nominal}_{uuid}_{variance}.txt'
+            ])
+        
+        if target in ['samples', 'both']:
+            summary['file_patterns'].extend([
+                'sample_pre_{nominal}_{uuid}.jpg',
+                'sample_aug_{nominal}_{uuid}_{variance}.jpg'
+            ])
+        
+        return summary
+        
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"❌ Cleanup summary error: {str(e)}")
+        return {'success': False, 'message': f"❌ Error: {str(e)}"}
+
+def cleanup_empty_directories(data_dir: Union[str, Path]) -> Dict[str, Any]:
+    """📁 Cleanup empty directories"""
+    try:
+        data_path = Path(data_dir)
+        removed_dirs = []
+        
+        for split_dir in data_path.iterdir():
+            if split_dir.is_dir():
+                for subdir in ['images', 'labels']:
+                    dir_path = split_dir / subdir
+                    if dir_path.exists() and not any(dir_path.iterdir()):
+                        dir_path.rmdir()
+                        removed_dirs.append(str(dir_path))
+                
+                if split_dir.exists() and not any(split_dir.iterdir()):
+                    split_dir.rmdir()
+                    removed_dirs.append(str(split_dir))
+        
+        return {'success': True, 'message': f"✅ Removed {len(removed_dirs)} empty directories", 'removed_directories': removed_dirs}
+        
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"❌ Empty directory cleanup error: {str(e)}")
+        return {'success': False, 'message': f"❌ Error: {str(e)}"}

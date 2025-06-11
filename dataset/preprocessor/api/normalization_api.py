@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/preprocessor/api/normalization_api.py
-Deskripsi: Standalone normalization API untuk reuse di modules lain
+Deskripsi: Updated normalization API menggunakan FileNamingManager
 """
 
 import numpy as np
@@ -8,6 +8,7 @@ from typing import Dict, Any, Tuple, Union, Optional, Callable
 from pathlib import Path
 
 from smartcash.common.logger import get_logger
+from smartcash.common.utils.file_naming_manager import create_file_naming_manager
 from ..core.normalizer import YOLONormalizer
 from ..config.defaults import NORMALIZATION_PRESETS
 from ..config.validator import validate_normalization_preset
@@ -15,21 +16,7 @@ from ..config.validator import validate_normalization_preset
 def normalize_for_yolo(image: np.ndarray, 
                       preset: str = 'default',
                       **kwargs) -> Tuple[np.ndarray, Dict[str, Any]]:
-    """🎯 Normalize image untuk YOLOv5 inference/training
-    
-    Args:
-        image: Input image array (RGB format)
-        preset: Normalization preset ('default', 'yolov5s', 'yolov5m', etc)
-        **kwargs: Override preset parameters
-        
-    Returns:
-        Tuple of (normalized_image, metadata)
-        
-    Example:
-        >>> normalized, meta = normalize_for_yolo(image, 'yolov5s')
-        >>> # For custom augmentation module
-        >>> normalized, meta = normalize_for_yolo(image, 'inference', target_size=[832, 832])
-    """
+    """🎯 Normalize image untuk YOLOv5"""
     try:
         validate_normalization_preset(preset)
         config = NORMALIZATION_PRESETS[preset].copy()
@@ -45,21 +32,8 @@ def normalize_for_yolo(image: np.ndarray,
 
 def denormalize_for_visualization(normalized_image: np.ndarray, 
                                 metadata: Dict[str, Any]) -> np.ndarray:
-    """🔄 Denormalize untuk visualization
-    
-    Args:
-        normalized_image: Normalized image array
-        metadata: Metadata dari normalize_for_yolo()
-        
-    Returns:
-        Denormalized image untuk display
-        
-    Example:
-        >>> original = denormalize_for_visualization(normalized, metadata)
-        >>> # Display atau save untuk preview
-    """
+    """🔄 Denormalize untuk visualization"""
     try:
-        # Extract config dari metadata
         norm_info = metadata.get('normalization', {})
         target_size = metadata.get('target_shape', [640, 640])
         
@@ -75,22 +49,12 @@ def denormalize_for_visualization(normalized_image: np.ndarray,
     except Exception as e:
         logger = get_logger(__name__)
         logger.warning(f"⚠️ Denormalization warning: {str(e)}")
-        # Fallback: simple pixel denormalization
         return (normalized_image * 255).astype(np.uint8)
 
 def batch_normalize_for_yolo(images: list, 
                            preset: str = 'default',
                            **kwargs) -> Tuple[np.ndarray, list]:
-    """📦 Batch normalize multiple images
-    
-    Args:
-        images: List of image arrays
-        preset: Normalization preset
-        **kwargs: Override parameters
-        
-    Returns:
-        Tuple of (batch_array, metadata_list)
-    """
+    """📦 Batch normalize multiple images"""
     config = NORMALIZATION_PRESETS[preset].copy()
     config.update(kwargs)
     config['batch_processing'] = True
@@ -101,23 +65,7 @@ def batch_normalize_for_yolo(images: list,
 def transform_coordinates_for_yolo(coordinates: np.ndarray,
                                  metadata: Dict[str, Any],
                                  reverse: bool = False) -> np.ndarray:
-    """🔧 Transform YOLO coordinates
-    
-    Args:
-        coordinates: YOLO format coordinates [class, x, y, w, h]
-        metadata: Metadata dari normalize_for_yolo()
-        reverse: True untuk normalized→original, False untuk original→normalized
-        
-    Returns:
-        Transformed coordinates
-        
-    Example:
-        >>> # Training: original → normalized
-        >>> norm_coords = transform_coordinates_for_yolo(orig_coords, metadata, reverse=False)
-        >>> # Inference: normalized → original
-        >>> orig_coords = transform_coordinates_for_yolo(norm_coords, metadata, reverse=True)
-    """
-    # Extract config dari metadata untuk create normalizer
+    """🔧 Transform YOLO coordinates"""
     norm_info = metadata.get('normalization', {})
     target_size = metadata.get('target_shape', [640, 640])
     
@@ -131,64 +79,31 @@ def transform_coordinates_for_yolo(coordinates: np.ndarray,
     return normalizer.transform_coordinates(coordinates, metadata, reverse)
 
 def create_normalizer(preset: str = 'default', **kwargs) -> YOLONormalizer:
-    """🏭 Create normalizer instance untuk advanced use
-    
-    Args:
-        preset: Normalization preset
-        **kwargs: Override parameters
-        
-    Returns:
-        YOLONormalizer instance
-        
-    Example:
-        >>> normalizer = create_normalizer('yolov5l', target_size=[832, 832])
-        >>> # Use for multiple operations
-        >>> normalized1, meta1 = normalizer.normalize(image1)
-        >>> normalized2, meta2 = normalizer.normalize(image2)
-    """
+    """🏭 Create normalizer instance"""
     validate_normalization_preset(preset)
     config = NORMALIZATION_PRESETS[preset].copy()
     config.update(kwargs)
     return YOLONormalizer(config)
 
 def get_normalization_info(preset: str = 'default') -> Dict[str, Any]:
-    """📋 Get normalization preset information
-    
-    Args:
-        preset: Preset name
-        
-    Returns:
-        Preset configuration dict
-    """
+    """📋 Get normalization preset info"""
     validate_normalization_preset(preset)
     return NORMALIZATION_PRESETS[preset].copy()
 
 def list_available_presets() -> list:
-    """📜 List available normalization presets"""
+    """📜 List available presets"""
     return list(NORMALIZATION_PRESETS.keys())
-
-# === File-based operations ===
 
 def normalize_image_file(image_path: Union[str, Path],
                         output_path: Union[str, Path] = None,
                         preset: str = 'default',
                         save_metadata: bool = True,
                         **kwargs) -> Dict[str, Any]:
-    """📁 Normalize image file dan save hasil
-    
-    Args:
-        image_path: Path ke input image
-        output_path: Path untuk output .npy (auto-generated jika None)
-        preset: Normalization preset
-        save_metadata: Save metadata ke .meta.json
-        **kwargs: Override parameters
-        
-    Returns:
-        Dict dengan output paths dan metadata
-    """
+    """📁 Normalize image file menggunakan naming manager"""
     try:
         from ..core.file_processor import FileProcessor
         
+        naming_manager = create_file_naming_manager()
         fp = FileProcessor()
         image = fp.read_image(image_path)
         
@@ -198,10 +113,13 @@ def normalize_image_file(image_path: Union[str, Path],
         # Normalize
         normalized, metadata = normalize_for_yolo(image, preset, **kwargs)
         
-        # Determine output path
+        # Generate output path menggunakan naming manager
         if output_path is None:
             input_path = Path(image_path)
-            output_path = input_path.with_suffix('.npy')
+            output_filename = naming_manager.generate_corresponding_filename(
+                input_path.name, 'preprocessed', '.npy'
+            )
+            output_path = input_path.parent / output_filename
         
         # Save normalized array
         success = fp.save_normalized_array(output_path, normalized, metadata if save_metadata else None)
@@ -218,32 +136,20 @@ def normalize_image_file(image_path: Union[str, Path],
         }
         
     except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
-            'input_path': str(image_path)
-        }
+        return {'success': False, 'error': str(e), 'input_path': str(image_path)}
 
 def denormalize_npy_file(npy_path: Union[str, Path],
                         output_path: Union[str, Path] = None,
                         format: str = 'jpg') -> Dict[str, Any]:
-    """📁 Denormalize .npy file ke image untuk visualization
-    
-    Args:
-        npy_path: Path ke .npy file
-        output_path: Output image path (auto-generated jika None)
-        format: Output format ('jpg', 'png')
-        
-    Returns:
-        Dict dengan output path dan info
-    """
+    """📁 Denormalize .npy file menggunakan naming manager"""
     try:
         from ..core.file_processor import FileProcessor
         import cv2
         
+        naming_manager = create_file_naming_manager()
         fp = FileProcessor()
         
-        # Load normalized array dan metadata
+        # Load normalized array
         normalized, metadata = fp.load_normalized_array(npy_path)
         if normalized is None:
             raise ValueError(f"Cannot load normalized array: {npy_path}")
@@ -251,10 +157,13 @@ def denormalize_npy_file(npy_path: Union[str, Path],
         # Denormalize
         denormalized = denormalize_for_visualization(normalized, metadata or {})
         
-        # Determine output path
+        # Generate output path menggunakan naming manager
         if output_path is None:
             input_path = Path(npy_path)
-            output_path = input_path.with_suffix(f'.{format}')
+            output_filename = naming_manager.generate_corresponding_filename(
+                input_path.name, 'sample', f'.{format}'
+            )
+            output_path = input_path.parent / output_filename
         
         # Save image
         success = cv2.imwrite(str(output_path), cv2.cvtColor(denormalized, cv2.COLOR_RGB2BGR))
@@ -270,8 +179,4 @@ def denormalize_npy_file(npy_path: Union[str, Path],
         }
         
     except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
-            'input_path': str(npy_path)
-        }
+        return {'success': False, 'error': str(e), 'input_path': str(npy_path)}

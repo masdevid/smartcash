@@ -1,32 +1,25 @@
 """
 File: smartcash/dataset/preprocessor/utils/metadata_extractor.py
-Deskripsi: Metadata extraction dari filenames dan file content
+Deskripsi: Simplified metadata extractor menggunakan FileNamingManager patterns
 """
 
-import re
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
 
 from smartcash.common.logger import get_logger
+from smartcash.common.utils.file_naming_manager import create_file_naming_manager
 from ..config.defaults import MAIN_BANKNOTE_CLASSES, LAYER_CLASSES
 
 class MetadataExtractor:
-    """📋 Extract metadata dari files dan filenames"""
+    """📋 Simplified metadata extractor menggunakan FileNamingManager patterns"""
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        
-        # Patterns untuk research format
-        self.patterns = {
-            'raw': re.compile(r'rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)'),
-            'preprocessed': re.compile(r'pre_rp_(\d{6})_([a-f0-9-]{36})_(\d+)_(\d+)\.(\w+)'),
-            'augmented': re.compile(r'aug_rp_(\d{6})_([a-f0-9-]{36})_(\d+)_(\d+)\.(\w+)'),
-            'sample': re.compile(r'sample_rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)')
-        }
+        self.naming_manager = create_file_naming_manager()
     
     def extract_file_metadata(self, file_path: Union[str, Path]) -> Dict[str, Any]:
-        """📊 Extract comprehensive file metadata"""
+        """📊 Extract metadata menggunakan FileNamingManager"""
         path = Path(file_path)
         
         metadata = {
@@ -50,82 +43,59 @@ class MetadataExtractor:
             'extension': path.suffix.lower()
         })
         
-        # Parse filename
-        filename_data = self.parse_research_filename(path.name)
+        # Parse filename menggunakan FileNamingManager
+        filename_data = self.naming_manager.parse_filename(path.name)
         if filename_data:
             metadata.update({
                 'research_format': True,
                 'file_type': filename_data['type'],
-                'components': filename_data
+                'components': {
+                    **filename_data,
+                    'class_info': self._get_class_info_from_nominal(filename_data['nominal'])
+                }
             })
         
-        # Load additional metadata untuk .npy files
+        # Load .npy metadata
         if path.suffix.lower() == '.npy':
             meta_file = path.with_suffix('.meta.json')
             if meta_file.exists():
                 try:
                     with open(meta_file, 'r') as f:
-                        additional_meta = json.load(f)
-                    metadata['normalization_info'] = additional_meta
+                        metadata['normalization_info'] = json.load(f)
                 except Exception:
                     pass
         
         return metadata
     
     def parse_research_filename(self, filename: str) -> Optional[Dict[str, Any]]:
-        """📝 Parse research format filename"""
-        for file_type, pattern in self.patterns.items():
-            match = pattern.match(filename)
-            if match:
-                if file_type == 'raw' or file_type == 'sample':
-                    nominal, uuid_str, sequence, extension = match.groups()
-                    return {
-                        'type': file_type,
-                        'nominal': nominal,
-                        'uuid': uuid_str,
-                        'sequence': int(sequence),
-                        'extension': extension,
-                        'class_info': self._get_class_info_from_nominal(nominal)
-                    }
-                else:  # preprocessed, augmented
-                    nominal, uuid_str, sequence, variance, extension = match.groups()
-                    return {
-                        'type': file_type,
-                        'nominal': nominal,
-                        'uuid': uuid_str,
-                        'sequence': int(sequence),
-                        'variance': int(variance),
-                        'extension': extension,
-                        'class_info': self._get_class_info_from_nominal(nominal)
-                    }
-        
-        return None
+        """📝 Parse research filename menggunakan FileNamingManager"""
+        parsed = self.naming_manager.parse_filename(filename)
+        if parsed:
+            parsed['class_info'] = self._get_class_info_from_nominal(parsed['nominal'])
+        return parsed
     
     def _get_class_info_from_nominal(self, nominal: str) -> Dict[str, Any]:
-        """💰 Get class info dari nominal string"""
-        # Map nominal ke class_id (main banknotes only)
-        nominal_to_class = {
-            '001000': 0, '002000': 1, '005000': 2, '010000': 3,
-            '020000': 4, '050000': 5, '100000': 6
-        }
+        """💰 Get class info dari nominal"""
+        class_id = None
+        for cid, nom in self.naming_manager.CLASS_TO_NOMINAL.items():
+            if nom == nominal:
+                class_id = cid
+                break
         
-        class_id = nominal_to_class.get(nominal, -1)
-        
-        if class_id in MAIN_BANKNOTE_CLASSES:
+        if class_id is not None and class_id in MAIN_BANKNOTE_CLASSES:
             class_info = MAIN_BANKNOTE_CLASSES[class_id].copy()
-            class_info['class_id'] = class_id
-            class_info['layer'] = 'l1_main'
+            class_info.update({'class_id': class_id, 'layer': 'l1_main'})
             return class_info
         
         return {
             'class_id': -1,
             'nominal': nominal,
-            'display': f'Unknown {nominal}',
+            'display': self.naming_manager.NOMINAL_TO_DESCRIPTION.get(nominal, f'Unknown {nominal}'),
             'layer': 'unknown'
         }
     
     def get_class_ids_from_labels(self, label_path: Union[str, Path]) -> list:
-        """🏷️ Extract class IDs dari YOLO label file"""
+        """🏷️ Extract class IDs dari YOLO label"""
         try:
             path = Path(label_path)
             if not path.exists():
@@ -139,26 +109,24 @@ class MetadataExtractor:
                         try:
                             parts = line.split()
                             if len(parts) >= 1:
-                                class_id = int(float(parts[0]))
-                                class_ids.append(class_id)
+                                class_ids.append(int(float(parts[0])))
                         except (ValueError, IndexError):
                             continue
             
-            return list(set(class_ids))  # Unique class IDs
+            return list(set(class_ids))
             
         except Exception as e:
             self.logger.debug(f"⚠️ Error reading labels {label_path}: {str(e)}")
             return []
     
     def get_class_names_from_ids(self, class_ids: list) -> Dict[int, str]:
-        """🏷️ Map class IDs ke human-readable names"""
+        """🏷️ Map class IDs ke names"""
         class_names = {}
         
         for class_id in class_ids:
             if class_id in MAIN_BANKNOTE_CLASSES:
                 class_names[class_id] = MAIN_BANKNOTE_CLASSES[class_id]['display']
             else:
-                # Check layer classes
                 for layer_name, class_range in LAYER_CLASSES.items():
                     if class_id in class_range:
                         class_names[class_id] = f"{layer_name}_{class_id:02d}"
@@ -170,25 +138,15 @@ class MetadataExtractor:
     
     def extract_sample_metadata(self, image_path: Union[str, Path], 
                               label_path: Union[str, Path] = None) -> Dict[str, Any]:
-        """🎲 Extract metadata untuk sample generation"""
+        """🎲 Extract sample metadata"""
         img_path = Path(image_path)
-        
-        # Base metadata
         sample_meta = self.extract_file_metadata(img_path)
         
-        # Auto-detect label path jika tidak provided
         if label_path is None:
-            label_path = img_path.with_suffix('.txt')
-            # Try labels directory structure
-            if not label_path.exists() and img_path.parent.name == 'images':
-                labels_dir = img_path.parent.parent / 'labels'
-                label_path = labels_dir / f"{img_path.stem}.txt"
+            label_path = self._find_corresponding_label(img_path)
         
-        # Extract class information dari labels
-        if Path(label_path).exists():
+        if label_path and Path(label_path).exists():
             class_ids = self.get_class_ids_from_labels(label_path)
-            
-            # Filter hanya main banknote classes untuk samples
             main_class_ids = [cid for cid in class_ids if cid in MAIN_BANKNOTE_CLASSES]
             
             sample_meta.update({
@@ -208,10 +166,94 @@ class MetadataExtractor:
             })
         
         return sample_meta
+    
+    def _find_corresponding_label(self, image_path: Path) -> Optional[Path]:
+        """🔍 Find corresponding label menggunakan naming consistency"""
+        parsed = self.naming_manager.parse_filename(image_path.name)
+        
+        if parsed:
+            label_name = self.naming_manager.generate_corresponding_filename(
+                image_path.name, parsed['type'], '.txt'
+            )
+        else:
+            label_name = f"{image_path.stem}.txt"
+        
+        # Check same directory first
+        same_dir_label = image_path.parent / label_name
+        if same_dir_label.exists():
+            return same_dir_label
+        
+        # Check labels directory structure
+        if image_path.parent.name == 'images':
+            labels_dir = image_path.parent.parent / 'labels'
+            labels_dir_file = labels_dir / label_name
+            if labels_dir_file.exists():
+                return labels_dir_file
+        
+        return None
+    
+    def generate_preprocessed_filename(self, original_filename: str) -> str:
+        """🔧 Generate preprocessed filename"""
+        return self.naming_manager.generate_corresponding_filename(
+            original_filename, 'preprocessed', '.npy'
+        )
+    
+    def generate_sample_filename(self, preprocessed_filename: str) -> str:
+        """🎲 Generate sample filename"""
+        return self.naming_manager.generate_corresponding_filename(
+            preprocessed_filename, 'sample', '.jpg'
+        )
+    
+    def generate_augmented_filename(self, original_filename: str, variance: int = 1) -> str:
+        """🔄 Generate augmented filename dengan variance"""
+        parsed = self.naming_manager.parse_filename(original_filename)
+        if parsed:
+            return f"aug_{parsed['nominal']}_{parsed['uuid']}_{variance:03d}.{parsed['extension']}"
+        
+        # Fallback generation
+        file_info = self.naming_manager.generate_file_info(original_filename, source_type='augmented')
+        return f"aug_{file_info.nominal}_{file_info.uuid}_{variance:03d}.jpg"
+    
+    def validate_filename_consistency(self, image_path: Path, label_path: Path) -> Dict[str, Any]:
+        """🔍 Validate consistency"""
+        img_parsed = self.naming_manager.parse_filename(image_path.name)
+        label_parsed = self.naming_manager.parse_filename(label_path.name)
+        
+        if not img_parsed or not label_parsed:
+            return {
+                'consistent': False,
+                'reason': 'Invalid filename pattern',
+                'img_valid': img_parsed is not None,
+                'label_valid': label_parsed is not None
+            }
+        
+        if img_parsed['nominal'] != label_parsed['nominal'] or img_parsed['uuid'] != label_parsed['uuid']:
+            return {
+                'consistent': False,
+                'reason': 'Nominal/UUID mismatch',
+                'img_nominal': img_parsed['nominal'],
+                'label_nominal': label_parsed['nominal']
+            }
+        
+        return {
+            'consistent': True,
+            'nominal': img_parsed['nominal'],
+            'uuid': img_parsed['uuid'],
+            'description': img_parsed['description']
+        }
+    
+    def get_nominal_from_filename(self, filename: str) -> str:
+        """💰 Extract nominal"""
+        parsed = self.naming_manager.parse_filename(filename)
+        return parsed['nominal'] if parsed else '000000'
+    
+    def is_research_format(self, filename: str) -> bool:
+        """✅ Check research format"""
+        return self.naming_manager.is_valid_format(filename)
 
-# === Factory functions ===
+# Factory functions
 def extract_file_metadata(file_path: Union[str, Path]) -> Dict[str, Any]:
-    """📊 One-liner file metadata extraction"""
+    """📊 One-liner metadata extraction"""
     return MetadataExtractor().extract_file_metadata(file_path)
 
 def parse_research_filename(filename: str) -> Optional[Dict[str, Any]]:

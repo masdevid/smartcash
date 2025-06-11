@@ -1,56 +1,35 @@
 """
 File: smartcash/dataset/preprocessor/validation/filename_validator.py
-Deskripsi: Filename pattern validation dan auto-rename untuk research format
+Deskripsi: Simplified filename validator menggunakan FileNamingManager patterns
 """
 
-import re
-import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Optional
 
 from smartcash.common.logger import get_logger
+from smartcash.common.utils.file_naming_manager import create_file_naming_manager
 
 class FilenameValidator:
-    """📝 Filename pattern validator dengan auto-rename capability"""
+    """📝 Simplified filename validator menggunakan FileNamingManager patterns"""
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.logger = get_logger(__name__)
-        
-        # Research filename pattern: rp_001000_uuid.jpg
-        self.raw_pattern = re.compile(r'rp_(\d{6})_([a-f0-9-]{36})\.(\w+)')
-        self.preprocessed_pattern = re.compile(r'pre_rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)')
-        self.augmented_pattern = re.compile(r'aug_rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)')
-        
-        # Denomination mapping untuk auto-detection
-        self.denomination_patterns = [
-            (r'100000|rp100000|100k', '100000'),
-            (r'50000|rp50000|50k', '050000'),
-            (r'20000|rp20000|20k', '020000'),
-            (r'10000|rp10000|10k', '010000'),
-            (r'5000|rp5000|5k', '005000'),
-            (r'2000|rp2000|2k', '002000'),
-            (r'1000|rp1000|1k', '001000')
-        ]
+        self.naming_manager = create_file_naming_manager(config)
     
     def validate_filename(self, filename: str) -> Dict[str, Any]:
-        """✅ Validate filename pattern"""
-        # Check research patterns
-        for pattern_name, pattern in [
-            ('raw', self.raw_pattern),
-            ('preprocessed', self.preprocessed_pattern),
-            ('augmented', self.augmented_pattern)
-        ]:
-            match = pattern.match(filename)
-            if match:
-                return {
-                    'is_valid': True,
-                    'pattern': pattern_name,
-                    'components': self._extract_components(match, pattern_name),
-                    'needs_rename': False
-                }
+        """✅ Validate filename menggunakan FileNamingManager patterns"""
+        validation = self.naming_manager.validate_filename_format(filename)
         
-        # Invalid pattern - needs rename
+        if validation['valid']:
+            return {
+                'is_valid': True,
+                'pattern': validation['format'],
+                'components': validation['parsed'],
+                'needs_rename': False,
+                'naming_info': validation
+            }
+        
         return {
             'is_valid': False,
             'pattern': 'unknown',
@@ -60,12 +39,12 @@ class FilenameValidator:
         }
     
     def batch_validate(self, filenames: List[str]) -> Dict[str, Dict[str, Any]]:
-        """📦 Batch validate filenames"""
+        """📦 Batch validate menggunakan naming manager"""
         return {filename: self.validate_filename(filename) for filename in filenames}
     
     def rename_invalid_files(self, file_paths: List[Path], 
                            progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-        """🔄 Rename files dengan invalid patterns"""
+        """🔄 Rename files menggunakan FileNamingManager"""
         stats = {'renamed': 0, 'skipped': 0, 'errors': 0}
         rename_map = {}
         
@@ -74,15 +53,27 @@ class FilenameValidator:
                 validation = self.validate_filename(file_path.name)
                 
                 if validation['needs_rename']:
-                    new_name = validation['suggested_name']
+                    primary_class = self._extract_class_from_filename(file_path)
+                    file_info = self.naming_manager.generate_file_info(
+                        file_path.name, primary_class, 'raw'
+                    )
+                    new_name = file_info.get_filename()
                     new_path = file_path.parent / new_name
                     
-                    # Rename file
+                    # Handle duplicates
+                    counter = 1
+                    original_new_path = new_path
+                    while new_path.exists():
+                        stem = original_new_path.stem
+                        ext = original_new_path.suffix
+                        new_path = original_new_path.parent / f"{stem}_{counter}{ext}"
+                        counter += 1
+                    
                     file_path.rename(new_path)
                     rename_map[str(file_path)] = str(new_path)
                     stats['renamed'] += 1
                     
-                    self.logger.info(f"🔄 Renamed: {file_path.name} → {new_name}")
+                    self.logger.info(f"🔄 Renamed: {file_path.name} → {new_path.name}")
                 else:
                     stats['skipped'] += 1
                 
@@ -96,67 +87,122 @@ class FilenameValidator:
         return {
             'stats': stats,
             'rename_map': rename_map,
-            'success': stats['errors'] == 0
+            'success': stats['errors'] == 0,
+            'naming_stats': self.naming_manager.get_nominal_statistics()
         }
     
-    def _extract_components(self, match, pattern_name: str) -> Dict[str, Any]:
-        """📋 Extract filename components dari regex match"""
-        if pattern_name == 'raw':
-            nominal, uuid_str, sequence, extension = match.groups()
-            return {
-                'nominal': nominal,
-                'uuid': uuid_str,
-                # 'sequence': int(sequence),
-                'extension': extension
-            }
-        elif pattern_name in ['preprocessed', 'augmented']:
-            nominal, uuid_str, sequence, variance, extension = match.groups()
-            return {
-                'nominal': nominal,
-                'uuid': uuid_str,
-                # 'sequence': int(sequence),
-                'variance': int(variance),
-                'extension': extension
-            }
-        return {}
-    
     def _generate_research_filename(self, original_filename: str) -> str:
-        """🔧 Generate research format filename dari original"""
-        path = Path(original_filename)
-        stem = path.stem.lower()
-        extension = path.suffix.lower().lstrip('.')
-        
-        # Detect denomination
-        nominal = self._detect_nominal(stem)
-        
-        # Generate UUID
-        uuid_str = str(uuid.uuid4())
-        
-        # Default sequence
-        sequence = 1
-        
-        return f"rp_{nominal}_{uuid_str}.{extension}"
+        """🔧 Generate research filename menggunakan FileNamingManager"""
+        primary_class = self._extract_class_from_filename(Path(original_filename))
+        file_info = self.naming_manager.generate_file_info(
+            original_filename, primary_class, 'raw'
+        )
+        return file_info.get_filename()
     
-    def _detect_nominal(self, filename: str) -> str:
-        """💰 Detect denomination dari filename"""
-        for pattern, nominal in self.denomination_patterns:
-            if re.search(pattern, filename):
-                return nominal
-        return '000000'  # Unknown denomination
+    def _extract_class_from_filename(self, file_path: Path) -> Optional[str]:
+        """💰 Extract class dari corresponding label"""
+        label_path = file_path.with_suffix('.txt')
+        
+        if not label_path.exists() and file_path.parent.name == 'images':
+            labels_dir = file_path.parent.parent / 'labels'
+            label_path = labels_dir / f"{file_path.stem}.txt"
+        
+        if label_path.exists():
+            return self.naming_manager.extract_primary_class_from_label(label_path)
+        
+        return self._detect_class_from_filename_pattern(file_path.name)
+    
+    def _detect_class_from_filename_pattern(self, filename: str) -> Optional[str]:
+        """🔍 Detect class dari filename pattern"""
+        filename_lower = filename.lower()
+        patterns = [
+            (r'100000|100k|rp100000', '6'), (r'50000|50k|rp50000', '5'),
+            (r'20000|20k|rp20000', '4'), (r'10000|10k|rp10000', '3'),
+            (r'5000|5k|rp5000', '2'), (r'2000|2k|rp2000', '1'), (r'1000|1k|rp1000', '0')
+        ]
+        
+        import re
+        for pattern, class_id in patterns:
+            if re.search(pattern, filename_lower):
+                return class_id
+        return None
     
     def get_rename_preview(self, file_paths: List[Path]) -> List[Dict[str, str]]:
-        """👀 Preview rename operations tanpa execute"""
+        """👀 Preview rename operations"""
         previews = []
         
         for file_path in file_paths:
             validation = self.validate_filename(file_path.name)
             
             if validation['needs_rename']:
+                primary_class = self._extract_class_from_filename(file_path)
+                file_info = self.naming_manager.generate_file_info(
+                    file_path.name, primary_class, 'raw'
+                )
+                suggested_name = file_info.get_filename()
+                
                 previews.append({
                     'original': file_path.name,
-                    'suggested': validation['suggested_name'],
+                    'suggested': suggested_name,
                     'path': str(file_path),
-                    'reason': 'Invalid pattern'
+                    'reason': 'Pattern tidak sesuai research format',
+                    'detected_class': primary_class,
+                    'nominal': file_info.nominal,
+                    'description': self.naming_manager.NOMINAL_TO_DESCRIPTION.get(file_info.nominal, 'Unknown')
                 })
         
         return previews
+    
+    def validate_directory_files(self, directory: Path, auto_rename: bool = False) -> Dict[str, Any]:
+        """📁 Validate directory dengan FileNamingManager"""
+        if not directory.exists():
+            return {'success': False, 'message': f"❌ Directory tidak ditemukan: {directory}"}
+        
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+        image_files = [f for f in directory.iterdir() 
+                      if f.is_file() and f.suffix.lower() in image_extensions]
+        
+        if not image_files:
+            return {
+                'success': True,
+                'message': f"✅ Tidak ada image files di {directory}",
+                'stats': {'total': 0, 'valid': 0, 'invalid': 0, 'renamed': 0}
+            }
+        
+        validations = {f.name: self.validate_filename(f.name) for f in image_files}
+        valid_count = sum(1 for v in validations.values() if v['is_valid'])
+        invalid_count = len(image_files) - valid_count
+        
+        stats = {'total': len(image_files), 'valid': valid_count, 'invalid': invalid_count, 'renamed': 0}
+        
+        if auto_rename and invalid_count > 0:
+            invalid_files = [f for f in image_files if not self.validate_filename(f.name)['is_valid']]
+            rename_result = self.rename_invalid_files(invalid_files)
+            stats['renamed'] = rename_result['stats']['renamed']
+            stats['naming_stats'] = rename_result['naming_stats']
+        
+        message = f"✅ Validation complete: {valid_count}/{len(image_files)} valid"
+        if auto_rename and stats['renamed'] > 0:
+            message += f", {stats['renamed']} files renamed dengan research format"
+        elif invalid_count > 0:
+            message += f", {invalid_count} files perlu rename ke research format"
+        
+        return {
+            'success': True,
+            'message': message,
+            'stats': stats,
+            'validations': validations if not auto_rename else None,
+            'naming_manager_stats': self.naming_manager.get_nominal_statistics()
+        }
+    
+    def get_filename_patterns_info(self) -> Dict[str, Any]:
+        """📋 Get supported patterns info"""
+        return {
+            'supported_patterns': {
+                file_type: f"{prefix}{{nominal}}_{{uuid}}.ext"
+                for file_type, prefix in self.naming_manager.PATTERN_PREFIXES.items()
+            },
+            'nominal_mapping': self.naming_manager.NOMINAL_TO_DESCRIPTION,
+            'class_to_nominal': self.naming_manager.CLASS_TO_NOMINAL,
+            'supported_types': self.naming_manager.get_supported_types()
+        }

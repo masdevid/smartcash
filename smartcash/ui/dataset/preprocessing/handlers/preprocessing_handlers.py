@@ -330,7 +330,7 @@ def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info")
 def _hide_confirmation_area(ui_components: Dict[str, Any]):
     """Hide confirmation area dengan visibility toggle"""
     confirmation_area = ui_components.get('confirmation_area')
-    action_section = ui_components.get('_')
+    action_section = ui_components.get('action_section')
     if confirmation_area and hasattr(confirmation_area, 'layout') and action_section and hasattr(action_section,'layout'):
         confirmation_area.layout.visibility = 'hidden'
         confirmation_area.layout.height = '0px'
@@ -421,15 +421,15 @@ def _show_cleanup_confirmation(ui_components: Dict[str, Any]):
 
 def _handle_preprocessing_cancel(ui_components: Dict[str, Any]):
     """Handle preprocessing cancellation"""
+    _clear_outputs(ui_components)
     _log_to_ui(ui_components, "🚫 Preprocessing dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
-    _hide_confirmation_area(ui_components)
 
 def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     """Handle cleanup cancellation"""
+    _clear_outputs(ui_components)
     _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
-    _hide_confirmation_area(ui_components)
 
 def _set_preprocessing_confirmed(ui_components: Dict[str, Any]):
     """Set preprocessing confirmation flag dan trigger execution"""

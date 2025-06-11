@@ -109,22 +109,16 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         config = _extract_config(ui_components)
         progress_callback = _create_progress_callback(ui_components)
         
-        # Validate source
-        _log_to_ui(ui_components, "🔍 Validating source dataset...", "info")
-        target_split = config.get('preprocessing', {}).get('target_splits', ['train'])[0]
-        validation_result = validate_dataset(config=config, target_split=target_split)
-        
         # Check preprocessed status
         _log_to_ui(ui_components, "💾 Checking preprocessed status...", "info")
         status_result = get_preprocessing_status(config=config)
         
         # Show results
         if validation_result.get('success', False):
-            summary = validation_result.get('summary', {})
-            preprocessed_info = status_result.get('preprocessed_data', {}) if status_result.get('success') else {}
+            preprocessed_info = status_result.get('file_statistics', {}) if status_result.get('success') else {}
             
-            source_msg = f"Dataset sumber: {summary.get('total_images', 0):,} gambar"
-            preprocessed_msg = f"Preprocessed: {preprocessed_info.get('total_files', 0):,} files" if preprocessed_info.get('exists') else "Belum ada data preprocessed"
+            source_msg = f"Dataset sumber: {preprocessed_info.get('raw_images', 0):,} gambar"
+            preprocessed_msg = f"Preprocessed: {preprocessed_info.get('preprocessed_files', 0):,} files" if preprocessed_info.get('exists') else "Belum ada data preprocessed"
             
             final_msg = f"✅ {source_msg} | {preprocessed_msg}"
             

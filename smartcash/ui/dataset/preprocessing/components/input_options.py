@@ -1,106 +1,100 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/input_options.py
-Deskripsi: Fixed input options dengan proper component access dan attribute attachment
+Deskripsi: Essential preprocessing input forms sesuai API requirements
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
-    """🎛️ Enhanced form dengan proper component access dan attribute attachment"""
+    """Create essential preprocessing forms dengan API compatibility"""
     if not config:
         config = {}
     
     preprocessing_config = config.get('preprocessing', {})
     normalization_config = preprocessing_config.get('normalization', {})
     validation_config = preprocessing_config.get('validation', {})
+    cleanup_config = preprocessing_config.get('cleanup', {})
     performance_config = config.get('performance', {})
     
-    # === SECTION 1: DATA & FORMAT ===
+    # === NORMALIZATION SECTION ===
     
     # Resolution dropdown
     target_size = normalization_config.get('target_size', [640, 640])
-    resolution_str = f"{target_size[0]}x{target_size[1]}" if isinstance(target_size, list) and len(target_size) >= 2 else "640x640"
+    resolution_str = f"{target_size[0]}x{target_size[1]}" if isinstance(target_size, list) else "640x640"
     
     resolution_dropdown = widgets.Dropdown(
         options=['320x320', '416x416', '512x512', '640x640', '832x832'],
         value=resolution_str if resolution_str in ['320x320', '416x416', '512x512', '640x640', '832x832'] else '640x640',
-        description='Resolusi Output:',
-        style={'description_width': '100px'},
+        description='Resolusi:',
+        style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    # Normalization dropdown
-    normalization_raw = normalization_config.get('method', 'minmax')
+    # Normalization method
     normalization_enabled = normalization_config.get('enabled', True)
-    normalization_value = 'none' if not normalization_enabled else normalization_raw
+    method = normalization_config.get('method', 'minmax')
+    current_value = 'none' if not normalization_enabled else method
     
     normalization_dropdown = widgets.Dropdown(
-        options=[('Min-Max (0-1)', 'minmax'), ('Standard (z-score)', 'standard'), ('Tanpa Normalisasi', 'none')],
-        value=normalization_value if normalization_value in ['minmax', 'standard', 'none'] else 'minmax',
-        description='Normalisasi:',
-        style={'description_width': '100px'},
+        options=[('Min-Max (0-1)', 'minmax'), ('Standard Z-Score', 'standard'), ('Tanpa Normalisasi', 'none')],
+        value=current_value if current_value in ['minmax', 'standard', 'none'] else 'minmax',
+        description='Metode:',
+        style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    # Preserve aspect ratio checkbox
+    # Preserve aspect ratio
     preserve_aspect_checkbox = widgets.Checkbox(
         value=normalization_config.get('preserve_aspect_ratio', True),
-        description='Pertahankan Aspect Ratio',
+        description='Pertahankan Aspect Ratio (YOLO)',
         style={'description_width': 'initial'},
-        layout=widgets.Layout(width='100%', margin='4px 0')
+        layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    data_format_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#495057;margin-bottom:6px;font-size:14px;'>🖼️ Data & Format</div>"),
+    normalization_section = widgets.VBox([
+        widgets.HTML("<div style='font-weight:bold;color:#2196F3;margin-bottom:6px;'>🎨 Normalisasi YOLO</div>"),
         resolution_dropdown,
-        normalization_dropdown,
+        normalization_dropdown, 
         preserve_aspect_checkbox
     ], layout=widgets.Layout(width='48%', padding='8px'))
     
-    # === SECTION 2: TARGET SPLITS ===
+    # === PROCESSING SECTION ===
     
-    # Multi-select untuk target splits
+    # Target splits
     target_splits = preprocessing_config.get('target_splits', ['train', 'valid'])
-    if isinstance(target_splits, str):
-        target_splits = [target_splits] if target_splits != 'all' else ['train', 'valid', 'test']
-    
     target_splits_select = widgets.SelectMultiple(
-        options=[('Training Set', 'train'), ('Validation Set', 'valid'), ('Test Set', 'test')],
+        options=[('Training', 'train'), ('Validation', 'valid'), ('Test', 'test')],
         value=tuple(target_splits) if isinstance(target_splits, list) else ('train', 'valid'),
-        description='Target Splits:',
-        style={'description_width': '90px'},
-        layout=widgets.Layout(width='100%', height='80px', margin='2px 0')
+        description='Target:',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(width='100%', height='70px', margin='2px 0')
     )
     
-    # Batch size input
+    # Batch size
     batch_size_input = widgets.BoundedIntText(
         value=performance_config.get('batch_size', 32),
-        min=1,
-        max=128,
-        step=1,
+        min=1, max=128, step=1,
         description='Batch Size:',
-        style={'description_width': '90px'},
+        style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    splits_performance_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#495057;margin-bottom:6px;font-size:14px;'>🎯 Target & Performance</div>"),
+    processing_section = widgets.VBox([
+        widgets.HTML("<div style='font-weight:bold;color:#FF9800;margin-bottom:6px;'>⚡ Processing</div>"),
         target_splits_select,
         batch_size_input
     ], layout=widgets.Layout(width='48%', padding='8px'))
     
-    # === SECTION 3: VALIDATION SETTINGS ===
+    # === VALIDATION SECTION ===
     
-    # Validation enabled checkbox
     validation_checkbox = widgets.Checkbox(
         value=validation_config.get('enabled', True),
-        description='Aktifkan Validasi Dataset',
+        description='Validasi Dataset',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    # Move invalid checkbox
     move_invalid_checkbox = widgets.Checkbox(
         value=validation_config.get('move_invalid', True),
         description='Pindahkan File Invalid',
@@ -108,50 +102,61 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
         layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    # Invalid directory input
     invalid_dir_input = widgets.Text(
         value=validation_config.get('invalid_dir', 'data/invalid'),
-        description='Lokasi Invalid:',
-        placeholder='data/invalid',
-        style={'description_width': '100px'},
+        description='Dir Invalid:',
+        style={'description_width': '80px'},
         layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
     validation_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#495057;margin-bottom:6px;font-size:14px;'>✅ Validasi Dataset</div>"),
+        widgets.HTML("<div style='font-weight:bold;color:#4CAF50;margin-bottom:6px;'>✅ Validasi</div>"),
         validation_checkbox,
         move_invalid_checkbox,
         invalid_dir_input
-    ], layout=widgets.Layout(width='100%', padding='8px'))
+    ], layout=widgets.Layout(width='48%', padding='8px'))
+    
+    # === CLEANUP SECTION ===
+    
+    cleanup_target_dropdown = widgets.Dropdown(
+        options=[('Data Preprocessed', 'preprocessed'), ('Sample Images', 'samples'), ('Keduanya', 'both')],
+        value=cleanup_config.get('target', 'preprocessed'),
+        description='Target:',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(width='100%', margin='2px 0')
+    )
+    
+    backup_checkbox = widgets.Checkbox(
+        value=cleanup_config.get('backup_enabled', False),
+        description='Buat Backup Sebelum Hapus',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='100%', margin='2px 0')
+    )
+    
+    cleanup_section = widgets.VBox([
+        widgets.HTML("<div style='font-weight:bold;color:#F44336;margin-bottom:6px;'>🧹 Cleanup</div>"),
+        cleanup_target_dropdown,
+        backup_checkbox
+    ], layout=widgets.Layout(width='48%', padding='8px'))
     
     # === LAYOUT ASSEMBLY ===
     
-    # Top row: Data/Format + Splits/Performance
-    top_row = widgets.HBox([
-        data_format_section,
-        splits_performance_section
-    ], layout=widgets.Layout(
-        width='100%',
-        justify_content='space-between',
-        align_items='flex-start'
-    ))
+    top_row = widgets.HBox([normalization_section, processing_section], 
+        layout=widgets.Layout(width='100%', justify_content='space-between'))
     
-    # Main container dengan optimized styling
+    bottom_row = widgets.HBox([validation_section, cleanup_section],
+        layout=widgets.Layout(width='100%', justify_content='space-between'))
+    
     options_container = widgets.VBox([
         widgets.HTML("<h5 style='margin:8px 0;color:#495057;border-bottom:2px solid #28a745;padding-bottom:4px;'>⚙️ Konfigurasi Preprocessing</h5>"),
         top_row,
-        validation_section
+        bottom_row
     ], layout=widgets.Layout(
-        padding='12px',
-        width='100%',
-        max_width='100%',
-        border='1px solid #dee2e6',
-        border_radius='6px',
-        background_color='#f8f9fa',
-        overflow='hidden'
+        padding='12px', width='100%', border='1px solid #dee2e6',
+        border_radius='6px', background_color='#f8f9fa'
     ))
     
-    # 🔑 PENTING: Attach individual components sebagai attributes untuk akses dari parent
+    # Attach components untuk akses dari parent
     options_container.resolution_dropdown = resolution_dropdown
     options_container.normalization_dropdown = normalization_dropdown
     options_container.preserve_aspect_checkbox = preserve_aspect_checkbox
@@ -160,10 +165,7 @@ def create_preprocessing_input_options(config: Optional[Dict[str, Any]] = None) 
     options_container.validation_checkbox = validation_checkbox
     options_container.move_invalid_checkbox = move_invalid_checkbox
     options_container.invalid_dir_input = invalid_dir_input
-    
-    # 🔑 PENTING: Juga attach sections untuk debugging
-    options_container.data_format_section = data_format_section
-    options_container.splits_performance_section = splits_performance_section
-    options_container.validation_section = validation_section
+    options_container.cleanup_target_dropdown = cleanup_target_dropdown
+    options_container.backup_checkbox = backup_checkbox
     
     return options_container

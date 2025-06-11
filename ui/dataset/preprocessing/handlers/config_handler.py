@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_handler.py
-Deskripsi: Simplified config handler tanpa progress tracking untuk save/reset operations
+Deskripsi: Simplified config handler tanpa complexity yang berlebihan
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.preprocessing.handlers.config_updater import update_pr
 from smartcash.common.config.manager import get_config_manager
 
 class PreprocessingConfigHandler(ConfigHandler):
-    """Simplified config handler tanpa progress tracking untuk save/reset"""
+    """Simplified preprocessing config handler"""
     
     def __init__(self, module_name: str = 'preprocessing', parent_module: str = 'dataset'):
         super().__init__(module_name, parent_module)
@@ -18,7 +18,7 @@ class PreprocessingConfigHandler(ConfigHandler):
         self.config_filename = 'preprocessing_config.yaml'
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dari UI components"""
+        """Extract config dari UI"""
         try:
             return extract_preprocessing_config(ui_components)
         except Exception as e:
@@ -29,7 +29,7 @@ class PreprocessingConfigHandler(ConfigHandler):
         """Update UI dengan config"""
         try:
             update_preprocessing_ui(ui_components, config)
-            self._log_to_ui("🔄 UI components updated", "success")
+            self._log_to_ui("🔄 UI updated with config", "success")
         except Exception as e:
             self._log_to_ui(f"❌ Error updating UI: {str(e)}", "error")
     
@@ -39,14 +39,11 @@ class PreprocessingConfigHandler(ConfigHandler):
             from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
             return get_default_preprocessing_config()
         except Exception as e:
-            self._log_to_ui(f"❌ Error loading default config: {str(e)}", "error")
-            return {
-                'preprocessing': {'enabled': True, 'target_splits': ['train', 'valid']}, 
-                'performance': {'batch_size': 32}
-            }
+            self._log_to_ui(f"❌ Error loading defaults: {str(e)}", "error")
+            return {'preprocessing': {'enabled': True}, 'performance': {'batch_size': 32}}
     
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """Load config tanpa progress tracking"""
+        """Load config dengan inheritance handling"""
         try:
             filename = config_filename or self.config_filename
             config = self.config_manager.load_config(filename)
@@ -70,7 +67,7 @@ class PreprocessingConfigHandler(ConfigHandler):
             return self.get_default_config()
     
     def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Save config tanpa progress tracking"""
+        """Save config tanpa complex progress tracking"""
         try:
             filename = config_filename or self.config_filename
             ui_config = self.extract_config(ui_components)
@@ -78,19 +75,19 @@ class PreprocessingConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(ui_config, filename)
             
             if success:
-                self._log_to_ui(f"✅ Config tersimpan ke {filename}", "success")
+                self._log_to_ui(f"✅ Config saved to {filename}", "success")
                 self._refresh_ui_after_save(ui_components, filename)
                 return True
             else:
-                self._log_to_ui(f"❌ Gagal simpan config ke {filename}", "error")
+                self._log_to_ui(f"❌ Failed to save config", "error")
                 return False
                 
         except Exception as e:
-            self._log_to_ui(f"❌ Error save config: {str(e)}", "error")
+            self._log_to_ui(f"❌ Error saving config: {str(e)}", "error")
             return False
     
     def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Reset config tanpa progress tracking"""
+        """Reset config ke defaults"""
         try:
             filename = config_filename or self.config_filename
             default_config = self.get_default_config()
@@ -98,26 +95,25 @@ class PreprocessingConfigHandler(ConfigHandler):
             success = self.config_manager.save_config(default_config, filename)
             
             if success:
-                self._log_to_ui(f"🔄 Config direset ke default", "success")
+                self._log_to_ui("🔄 Config reset to defaults", "success")
                 self.update_ui(ui_components, default_config)
                 return True
             else:
-                self._log_to_ui(f"❌ Gagal reset config", "error")
+                self._log_to_ui("❌ Failed to reset config", "error")
                 return False
                 
         except Exception as e:
-            self._log_to_ui(f"❌ Error reset config: {str(e)}", "error")
+            self._log_to_ui(f"❌ Error resetting config: {str(e)}", "error")
             return False
     
     def _merge_configs(self, base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge configs dengan validation"""
+        """Merge configs dengan deep merge"""
         import copy
         merged = copy.deepcopy(base_config)
         
         for key, value in override_config.items():
             if key == '_base_':
                 continue
-                
             if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
                 merged[key] = self._deep_merge(merged[key], value)
             else:
@@ -126,7 +122,7 @@ class PreprocessingConfigHandler(ConfigHandler):
         return merged
     
     def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge dengan validation"""
+        """Deep merge helper"""
         import copy
         result = copy.deepcopy(base)
         
@@ -144,24 +140,27 @@ class PreprocessingConfigHandler(ConfigHandler):
             saved_config = self.load_config(filename)
             if saved_config:
                 self.update_ui(ui_components, saved_config)
-                self._log_to_ui("🔄 UI disegarkan dengan config tersimpan", "info")
+                self._log_to_ui("🔄 UI refreshed with saved config", "info")
         except Exception as e:
-            self._log_to_ui(f"⚠️ Error refresh UI: {str(e)}", "warning")
+            self._log_to_ui(f"⚠️ Error refreshing UI: {str(e)}", "warning")
     
     def _log_to_ui(self, message: str, level: str = "info"):
-        """Log ke UI tanpa progress tracking"""
+        """Log to UI components"""
         try:
             ui_components = getattr(self, '_ui_components', {})
-            logger = ui_components.get('logger')
             
-            if logger and hasattr(logger, level):
-                log_method = getattr(logger, level)
-                log_method(message)
-                return
+            # Try UI logger first
+            if logger := ui_components.get('logger'):
+                if hasattr(logger, level):
+                    getattr(logger, level)(message)
+                    return
             
-            # Fallback ke log_to_accordion
-            from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
-            log_to_accordion(ui_components, message, level)
+            # Fallback to log accordion
+            try:
+                from smartcash.ui.dataset.preprocessing.utils.ui_utils import log_to_accordion
+                log_to_accordion(ui_components, message, level)
+            except ImportError:
+                print(f"[{level.upper()}] {message}")
                 
         except Exception:
             print(f"[{level.upper()}] {message}")

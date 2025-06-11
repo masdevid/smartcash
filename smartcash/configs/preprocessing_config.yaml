@@ -1,85 +1,49 @@
 # File: configs/preprocessing_config.yaml
-# Deskripsi: Enhanced konfigurasi preprocessing dengan validasi dan multi-split support
+# Deskripsi: Konfigurasi preprocessing essential sesuai API specifications
 
 _base_: 'base_config.yaml'
 
-# Enhanced preprocessing configuration
+# Core preprocessing configuration
 preprocessing:
   enabled: true
+  target_splits: ['train', 'valid']
   output_dir: 'data/preprocessed'
-  save_visualizations: false
-  vis_dir: 'visualizations/preprocessing'
-  sample_size: 0
-  target_splits: ['train', 'valid']  # Multi-select splits
   force_reprocess: false
   
-  # Enhanced validation settings
-  validation:
-    enabled: true
-    fix_issues: true
-    move_invalid: true
-    invalid_dir: 'data/invalid'
-    visualize: false
-    check_image_quality: true
-    check_labels: true
-    check_coordinates: true
-    check_uuid_consistency: true
-    
-  # Enhanced normalization dengan aspect ratio
+  # YOLO-specific normalization
   normalization:
     enabled: true
     method: 'minmax'
     target_size: [640, 640]
-    preserve_aspect_ratio: true  # Preserve aspect ratio option
+    preserve_aspect_ratio: true
     normalize_pixel_values: true
     pixel_range: [0, 1]
     
-  # Analysis settings
-  analysis:
-    enabled: false
-    class_balance: true
-    image_size_distribution: true
-    bbox_statistics: true
-    layer_balance: true
+  # Essential validation
+  validation:
+    enabled: true
+    move_invalid: true
+    invalid_dir: 'data/invalid'
+    check_image_quality: true
+    check_labels: true
+    check_coordinates: true
     
-  # Balance settings
-  balance:
-    enabled: false
-    target_distribution: 'auto'
-    methods:
-      undersampling: false
-      oversampling: true
-      augmentation: true
-    min_samples_per_class: 100
-    max_samples_per_class: 1000
+  # Cleanup configuration
+  cleanup:
+    target: 'preprocessed'  # 'preprocessed', 'samples', 'both'
+    backup_enabled: false
+    patterns:
+      preprocessed: ['pre_*.npy']
+      samples: ['sample_*.jpg']
 
-# Enhanced performance settings
+# Performance settings
 performance:
-  batch_size: 32  # Batch size untuk processing
+  batch_size: 32
   use_gpu: true
-  compression_level: 90
   max_memory_usage_gb: 4.0
-  use_mixed_precision: true
   
-  # Threading configuration (removed worker slider)
-  threading:
-    io_workers: 8
-    cpu_workers: null  # Auto-detect
-    parallel_threshold: 100
-    batch_processing: true
-
-# Enhanced cleanup configuration
-cleanup:
-  augmentation_patterns:
-    - 'aug_.*'
-    - '.*_augmented.*'
-    - '.*_modified.*'
-    - '.*_processed.*'
-    - '.*_norm.*'
-  ignored_patterns:
-    - '.*\.gitkeep'
-    - '.*\.DS_Store'
-    - '.*\.gitignore'
-  backup_dir: 'data/backup/preprocessing'
-  backup_enabled: false
-  auto_cleanup_preprocessed: false
+# API compatibility
+api_settings:
+  progress_tracking: true
+  ui_integration: true
+  enhanced_validation: true

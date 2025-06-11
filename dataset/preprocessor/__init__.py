@@ -94,14 +94,31 @@ __all__ = [
 ]
 
 # === BACKWARD COMPATIBILITY ALIASES ===
-def validate_dataset(*args, **kwargs):
-    """🔄 Compatibility alias untuk validate_dataset_structure"""
-    return validate_dataset_structure(*args, **kwargs)
+def validate_dataset(config=None, target_split=None, ui_components=None):
+    """🔄 Compatibility alias untuk validate_dataset_structure dengan config handling"""
+    if config is None:
+        return {'success': False, 'message': 'Config required'}
+    
+    data_dir = config.get('data', {}).get('dir', 'data')
+    splits = config.get('preprocessing', {}).get('target_splits', ['train', 'valid'])
+    
+    return validate_dataset_structure(data_dir, splits, auto_fix=True)
 
-def cleanup_preprocessed_data(*args, **kwargs):
-    """🔄 Compatibility alias untuk cleanup_preprocessing_files"""
-    return cleanup_preprocessing_files(*args, **kwargs)
+def cleanup_preprocessed_data(config=None, target_split=None, ui_components=None):
+    """🔄 Compatibility alias untuk cleanup_preprocessing_files dengan config handling"""
+    if config is None:
+        return {'success': False, 'message': 'Config required'}
+    
+    data_dir = config.get('data', {}).get('dir', 'data')
+    target = 'preprocessed'  # Default untuk backward compatibility
+    splits = [target_split] if target_split else None
+    
+    return cleanup_preprocessing_files(data_dir, target, splits, confirm=True)
 
-def get_preprocessing_samples(*args, **kwargs):
-    """🔄 Compatibility alias untuk get_samples"""
-    return get_samples(*args, **kwargs)
+def get_preprocessing_samples(config=None, target_split='train', max_samples=5, ui_components=None):
+    """🔄 Compatibility alias untuk get_samples dengan config handling"""
+    if config is None:
+        return {'success': False, 'message': 'Config required', 'samples': []}
+    
+    data_dir = config.get('data', {}).get('preprocessed_dir', 'data/preprocessed')
+    return get_samples(data_dir, target_split, max_samples)

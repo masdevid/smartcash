@@ -107,6 +107,11 @@ def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
     
     # Clear visibility flag
     ui_components.pop('_dialog_visible', None)
+    
+    # Force widget refresh
+    if dialog_area and hasattr(dialog_area, 'layout'):
+        dialog_area.layout.height = '0px'
+        dialog_area.layout.height = 'auto'
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
     """Check apakah dialog sedang visible"""

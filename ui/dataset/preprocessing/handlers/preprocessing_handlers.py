@@ -164,7 +164,6 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
     try:
         from smartcash.dataset.preprocessor import preprocess_dataset
         
-        _disable_buttons(ui_components)
         _setup_progress(ui_components, "🚀 Memulai preprocessing...")
         
         config = _extract_config(ui_components)
@@ -172,9 +171,9 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
         
         _log_to_ui(ui_components, "🏗️ Starting preprocessing pipeline...", "info")
         
+        # FIXED: Remove ui_components from API call
         result = preprocess_dataset(
             config=config,
-            ui_components=ui_components,
             progress_callback=progress_callback
         )
         
@@ -210,7 +209,6 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
     try:
         from smartcash.dataset.preprocessor import cleanup_preprocessed_data
         
-        _disable_buttons(ui_components)
         _setup_progress(ui_components, "🗑️ Memulai cleanup...")
         
         config = _extract_config(ui_components)
@@ -218,10 +216,10 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
         
         _log_to_ui(ui_components, f"🧹 Cleaning up {cleanup_target}...", "info")
         
+        # FIXED: Remove ui_components from API call
         result = cleanup_preprocessed_data(
             config=config,
-            target_split=None,  # Cleanup semua splits
-            ui_components=ui_components
+            target_split=None
         )
         
         if result.get('success', False):
@@ -423,26 +421,52 @@ def _handle_preprocessing_cancel(ui_components: Dict[str, Any]):
     """Handle preprocessing cancellation"""
     _log_to_ui(ui_components, "🚫 Preprocessing dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
+    _force_clear_dialog(ui_components)
 
 def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     """Handle cleanup cancellation"""
     _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
+    _force_clear_dialog(ui_components)
+
+def _force_clear_dialog(ui_components: Dict[str, Any]):
+    """Force clear dialog dengan multiple methods"""
+    try:
+        from smartcash.ui.components.dialog import clear_dialog_area
+        clear_dialog_area(ui_components)
+    except ImportError:
+        pass
+    
+    # Manual clear sebagai backup
+    if confirmation_area := ui_components.get('confirmation_area'):
+        try:
+            with confirmation_area:
+                from IPython.display import clear_output
+                clear_output(wait=True)
+            
+            # Force layout reset
+            if hasattr(confirmation_area, 'layout'):
+                confirmation_area.layout.height = '0px'  
+                confirmation_area.layout.height = 'auto'
+        except Exception:
+            pass
 
 def _set_preprocessing_confirmed(ui_components: Dict[str, Any]):
     """Set preprocessing confirmation flag dan trigger execution"""
     ui_components['_preprocessing_confirmed'] = True
     _log_to_ui(ui_components, "✅ Preprocessing dikonfirmasi, memulai...", "success")
+    _force_clear_dialog(ui_components)  # Clear dialog immediately
     
-    # Langsung execute setelah konfirmasi
+    # Execute setelah clearing
     _execute_preprocessing_with_api(ui_components)
 
 def _set_cleanup_confirmed(ui_components: Dict[str, Any]):
     """Set cleanup confirmation flag dan trigger execution"""
     ui_components['_cleanup_confirmed'] = True
     _log_to_ui(ui_components, "✅ Cleanup dikonfirmasi, memulai...", "success")
+    _force_clear_dialog(ui_components)  # Clear dialog immediately
     
-    # Langsung execute setelah konfirmasi
+    # Execute setelah clearing
     _execute_cleanup_with_api(ui_components)
 
 def _should_execute_preprocessing(ui_components: Dict[str, Any]) -> bool:

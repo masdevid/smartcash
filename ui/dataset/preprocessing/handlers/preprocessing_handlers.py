@@ -107,14 +107,12 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         from smartcash.dataset.preprocessor import validate_dataset, get_preprocessing_status
         
         config = _extract_config(ui_components)
-        progress_callback = _create_progress_callback(ui_components)
-        
         # Check preprocessed status
         _log_to_ui(ui_components, "💾 Checking preprocessed status...", "info")
         status_result = get_preprocessing_status(config=config)
         
         # Show results
-        if validation_result.get('success', False):
+        if status_result.get('success', False):
             preprocessed_info = status_result.get('file_statistics', {}) if status_result.get('success') else {}
             
             source_msg = f"Dataset sumber: {preprocessed_info.get('raw_images', 0):,} gambar"
@@ -125,7 +123,7 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
             _complete_progress(ui_components, final_msg)
             _log_to_ui(ui_components, final_msg, "success")
         else:
-            error_msg = validation_result.get('message', 'Validation failed')
+            error_msg = status_result.get('message')
             _error_progress(ui_components, error_msg)
         
         _enable_buttons(ui_components)

@@ -296,6 +296,9 @@ def _cleanup_split_files(split_path: Path, target: str) -> Dict[str, Any]:
         sample_files = fp.scan_files(split_path / 'images', 'sample_')
         files_to_remove.extend(sample_files)
     
+    label_files = fp.scan_files(split_path / 'labels', 'pre_', {'.npy'})
+    files_to_remove.extend(label_files)
+    
     # Remove files
     for file_path in files_to_remove:
         try:

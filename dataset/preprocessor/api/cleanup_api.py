@@ -65,7 +65,7 @@ def cleanup_preprocessing_files(data_dir: Union[str, Path],
         cleanup_stats = {}
         
         for split in splits:
-            split_stats = _cleanup_split_files(data_path / split, target)
+            split_stats = _cleanup_split_files(data_path / 'preprocessed' /  split, target)
             cleanup_stats[split] = split_stats
             total_removed += split_stats['files_removed']
         

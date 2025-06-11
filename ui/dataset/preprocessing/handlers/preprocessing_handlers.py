@@ -85,6 +85,7 @@ def _handle_preprocessing_operation(ui_components: Dict[str, Any]) -> bool:
         
         # Show confirmation jika belum
         if not _is_confirmation_pending(ui_components):
+            _show_confirmation_area(ui_components)
             _show_preprocessing_confirmation(ui_components)
         
         return True
@@ -151,6 +152,7 @@ def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> bool:
         
         # Show confirmation jika belum
         if not _is_confirmation_pending(ui_components):
+            _show_confirmation_area(ui_components)
             _show_cleanup_confirmation(ui_components)
         
         return True
@@ -272,6 +274,14 @@ def _create_progress_callback(ui_components: Dict[str, Any]):
             pass  # Silent fail
     
     return progress_callback
+
+def _is_milestone(current: int, total: int) -> bool:
+    """Check if progress adalah milestone"""
+    if total <= 10:
+        return True
+    milestones = [0, 25, 50, 75, 100]
+    progress_pct = (current / total) * 100 if total > 0 else 0
+    return any(abs(progress_pct - milestone) < 2 for milestone in milestones) or current == total
 
 def _setup_progress(ui_components: Dict[str, Any], message: str):
     """Setup progress tracker"""
@@ -418,55 +428,19 @@ def _handle_preprocessing_cancel(ui_components: Dict[str, Any]):
     """Handle preprocessing cancellation"""
     _log_to_ui(ui_components, "🚫 Preprocessing dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
-    _force_clear_dialog(ui_components)
+    _hide_confirmation_area(ui_components)
 
 def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     """Handle cleanup cancellation"""
     _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
-    _force_clear_dialog(ui_components)
-
-def _force_clear_dialog(ui_components: Dict[str, Any]):
-    """Force clear dialog dengan widget recreation"""
-    try:
-        from smartcash.ui.components.dialog import clear_dialog_area
-        clear_dialog_area(ui_components)
-    except Exception:
-        # Manual clear dengan widget recreation
-        confirmation_area = ui_components.get('confirmation_area')
-        if confirmation_area:
-            try:
-                # Create new widget dengan layout yang sama
-                new_area = widgets.Output(layout=confirmation_area.layout)
-                
-                # Update references
-                ui_components['confirmation_area'] = new_area
-                ui_components['dialog_area'] = new_area
-                
-                # Find and replace in action_section
-                action_section = ui_components.get('action_section')
-                if action_section and hasattr(action_section, 'children'):
-                    children = list(action_section.children)
-                    for i, child in enumerate(children):
-                        if child is confirmation_area:
-                            children[i] = new_area
-                            action_section.children = children
-                            break
-                
-                # Close old widget
-                confirmation_area.close()
-                
-            except Exception:
-                # Fallback: just clear
-                with confirmation_area:
-                    from IPython.display import clear_output
-                    clear_output(wait=True)
+    _hide_confirmation_area(ui_components)
 
 def _set_preprocessing_confirmed(ui_components: Dict[str, Any]):
     """Set preprocessing confirmation flag dan trigger execution"""
     ui_components['_preprocessing_confirmed'] = True
     _log_to_ui(ui_components, "✅ Preprocessing dikonfirmasi, memulai...", "success")
-    _force_clear_dialog(ui_components)  # Clear dialog immediately
+    _hide_confirmation_area(ui_components)  # Clear dialog immediately
     
     # Execute setelah clearing
     _execute_preprocessing_with_api(ui_components)
@@ -475,7 +449,7 @@ def _set_cleanup_confirmed(ui_components: Dict[str, Any]):
     """Set cleanup confirmation flag dan trigger execution"""
     ui_components['_cleanup_confirmed'] = True
     _log_to_ui(ui_components, "✅ Cleanup dikonfirmasi, memulai...", "success")
-    _force_clear_dialog(ui_components)  # Clear dialog immediately
+    _hide_confirmation_area(ui_components)  # Clear dialog immediately
     
     # Execute setelah clearing
     _execute_cleanup_with_api(ui_components)

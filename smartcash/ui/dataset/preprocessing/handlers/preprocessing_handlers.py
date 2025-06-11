@@ -254,31 +254,25 @@ def _extract_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
 def _create_progress_callback(ui_components: Dict[str, Any]):
-    """Create progress callback untuk API"""
+    """Create progress callback untuk API - only update progress tracker"""
     def progress_callback(level: str, current: int, total: int, message: str):
         try:
             progress_tracker = ui_components.get('progress_tracker')
-            if progress_tracker:
-                if level in ['overall', 'primary'] and hasattr(progress_tracker, 'update_overall'):
-                    progress_tracker.update_overall(current, message)
-                elif level in ['step', 'current', 'batch'] and hasattr(progress_tracker, 'update_current'):
-                    progress_tracker.update_current(current, message)
+            if not progress_tracker:
+                return
             
-            # Log milestone progress
-            if _is_milestone(current, total):
-                _log_to_ui(ui_components, f"📊 {message} ({current}/{total})", "info")
+            # Map API level ke tracker method
+            if level in ['overall', 'primary'] and hasattr(progress_tracker, 'update_overall'):
+                progress_tracker.update_overall(current, message)
+            elif level in ['step', 'current', 'batch'] and hasattr(progress_tracker, 'update_current'):
+                progress_tracker.update_current(current, message)
+            
+            # NO LOGGING - hanya progress tracker untuk avoid flooding
         except Exception:
-            pass
+            pass  # Silent fail
     
     return progress_callback
 
-def _is_milestone(current: int, total: int) -> bool:
-    """Check if progress adalah milestone"""
-    if total <= 10:
-        return True
-    milestones = [0, 25, 50, 75, 100]
-    progress_pct = (current / total) * 100 if total > 0 else 0
-    return any(abs(progress_pct - milestone) < 2 for milestone in milestones) or current == total
 
 def _setup_progress(ui_components: Dict[str, Any], message: str):
     """Setup progress tracker"""
@@ -331,19 +325,40 @@ def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info")
     except Exception:
         print(f"[{level.upper()}] {message}")
 
-def _clear_outputs(ui_components: Dict[str, Any]):
-    """Clear UI outputs"""
+def _recreate_confirmation_area(ui_components: Dict[str, Any]):
+    """Recreate confirmation area to fix dialog persistence"""
     try:
-        from smartcash.ui.components.dialog import clear_dialog_area
-        clear_dialog_area(ui_components)
-    except ImportError:
-        # Fallback manual clear
+        action_section = ui_components.get('action_section')
+        create_func = ui_components.get('create_confirmation_area')
+        old_area = ui_components.get('confirmation_area')
+        
+        if action_section and create_func and old_area:
+            # Create new area
+            new_area = create_func()
+            
+            # Update references
+            ui_components['confirmation_area'] = new_area
+            ui_components['dialog_area'] = new_area
+            
+            # Replace in action_section children
+            if hasattr(action_section, 'children'):
+                children = list(action_section.children)
+                for i, child in enumerate(children):
+                    if child is old_area:
+                        children[i] = new_area
+                        action_section.children = children
+                        old_area.close()  # Close old widget
+                        break
+    except Exception:
+        # Fallback: clear existing
         if confirmation_area := ui_components.get('confirmation_area'):
             with confirmation_area:
                 from IPython.display import clear_output
                 clear_output(wait=True)
-    except Exception:
-        pass
+
+def _clear_outputs(ui_components: Dict[str, Any]):
+    """Clear outputs dengan area recreation"""
+    _recreate_confirmation_area(ui_components)
 
 def _disable_buttons(ui_components: Dict[str, Any]):
     """Disable operation buttons"""
@@ -430,26 +445,40 @@ def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     _force_clear_dialog(ui_components)
 
 def _force_clear_dialog(ui_components: Dict[str, Any]):
-    """Force clear dialog dengan multiple methods"""
+    """Force clear dialog dengan widget recreation"""
     try:
         from smartcash.ui.components.dialog import clear_dialog_area
         clear_dialog_area(ui_components)
-    except ImportError:
-        pass
-    
-    # Manual clear sebagai backup
-    if confirmation_area := ui_components.get('confirmation_area'):
-        try:
-            with confirmation_area:
-                from IPython.display import clear_output
-                clear_output(wait=True)
-            
-            # Force layout reset
-            if hasattr(confirmation_area, 'layout'):
-                confirmation_area.layout.height = '0px'  
-                confirmation_area.layout.height = 'auto'
-        except Exception:
-            pass
+    except Exception:
+        # Manual clear dengan widget recreation
+        confirmation_area = ui_components.get('confirmation_area')
+        if confirmation_area:
+            try:
+                # Create new widget dengan layout yang sama
+                new_area = widgets.Output(layout=confirmation_area.layout)
+                
+                # Update references
+                ui_components['confirmation_area'] = new_area
+                ui_components['dialog_area'] = new_area
+                
+                # Find and replace in action_section
+                action_section = ui_components.get('action_section')
+                if action_section and hasattr(action_section, 'children'):
+                    children = list(action_section.children)
+                    for i, child in enumerate(children):
+                        if child is confirmation_area:
+                            children[i] = new_area
+                            action_section.children = children
+                            break
+                
+                # Close old widget
+                confirmation_area.close()
+                
+            except Exception:
+                # Fallback: just clear
+                with confirmation_area:
+                    from IPython.display import clear_output
+                    clear_output(wait=True)
 
 def _set_preprocessing_confirmed(ui_components: Dict[str, Any]):
     """Set preprocessing confirmation flag dan trigger execution"""

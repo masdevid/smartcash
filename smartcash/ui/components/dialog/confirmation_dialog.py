@@ -99,19 +99,37 @@ def show_info_dialog(
         display(dialog)
 
 def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
-    """Clear dialog area dan reset visibility flag"""
+    """Clear dialog area dengan force refresh"""
     dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
     if dialog_area:
-        with dialog_area:
-            clear_output(wait=True)
+        try:
+            with dialog_area:
+                clear_output(wait=True)
+            
+            # Force complete widget refresh
+            dialog_area.close()
+            
+            # Recreate widget if parent container exists
+            if hasattr(dialog_area, 'parent') and dialog_area.parent:
+                new_dialog_area = widgets.Output(layout=dialog_area.layout)
+                ui_components['confirmation_area'] = new_dialog_area
+                ui_components['dialog_area'] = new_dialog_area
+                
+                # Replace in parent container
+                parent = dialog_area.parent
+                if hasattr(parent, 'children'):
+                    children_list = list(parent.children)
+                    if dialog_area in children_list:
+                        idx = children_list.index(dialog_area)
+                        children_list[idx] = new_dialog_area
+                        parent.children = children_list
+        except Exception:
+            # Fallback: just clear output
+            with dialog_area:
+                clear_output(wait=True)
     
     # Clear visibility flag
     ui_components.pop('_dialog_visible', None)
-    
-    # Force widget refresh
-    if dialog_area and hasattr(dialog_area, 'layout'):
-        dialog_area.layout.height = '0px'
-        dialog_area.layout.height = 'auto'
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
     """Check apakah dialog sedang visible"""

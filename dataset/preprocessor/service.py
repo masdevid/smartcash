@@ -109,7 +109,7 @@ class PreprocessingService:
             # Get basic file counts
             file_stats = {}
             for split in self._get_target_splits():
-                split_path = output_dir / split # Path(self.data_config['dir']) / split
+                split_path = Path(self.data_config['dir']) / split
                 if split_path.exists():
                     raw_count = len(self.file_processor.scan_files(split_path / 'images', 'rp_'))
                     preprocessed_count = len(self.file_processor.scan_files(output_dir / split / 'images', 'pre_', {'.npy'}))

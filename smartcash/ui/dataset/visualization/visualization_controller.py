@@ -42,3 +42,6 @@ class VisualizationController:
                 "val": [(640, 480), (800, 600)]
             }
         }
+
+    def get_ui_components(self) -> Dict[str, Any]:
+        return self.handler.get_ui_components()

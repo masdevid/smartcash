@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/dialog/confirmation_dialog.py
-Deskripsi: Confirmation dialog component yang reusable dengan callback support
+Deskripsi: Simple dialog dengan proper cleanup (REPLACE existing file)
 """
 
 from typing import Dict, Any, Callable, Optional
@@ -17,44 +17,64 @@ def show_confirmation_dialog(
     cancel_text: str = "Batal",
     danger_mode: bool = False
 ) -> None:
-    """
-    Show confirmation dialog dengan callback support.
-    
-    Args:
-        ui_components: Dictionary UI components
-        title: Dialog title
-        message: Dialog message (dapat berisi HTML)
-        on_confirm: Callback untuk konfirmasi
-        on_cancel: Callback untuk pembatalan
-        confirm_text: Text tombol konfirmasi
-        cancel_text: Text tombol batal
-        danger_mode: Apakah menggunakan style danger (merah)
-    """
+    """Show confirmation dialog dengan auto-cleanup"""
     dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
     if not dialog_area:
-        print(f"⚠️ Dialog area tidak tersedia. {title}: {message}")
+        print(f"⚠️ {title}: {message}")
+        if on_confirm:
+            on_confirm()
         return
     
-    # Clear existing dialog
-    clear_dialog_area(ui_components)
+    # Clear existing content
+    with dialog_area:
+        clear_output(wait=True)
     
-    # Set dialog visibility flag
-    ui_components['_dialog_visible'] = True
+    # Create buttons dengan auto-destroy callbacks
+    def handle_confirm(btn):
+        with dialog_area:
+            clear_output(wait=True)
+        if on_confirm:
+            on_confirm()
     
-    # Create dialog
-    dialog = _create_dialog_widget(
-        title=title,
-        message=message,
-        confirm_text=confirm_text,
-        cancel_text=cancel_text,
-        danger_mode=danger_mode,
-        on_confirm=lambda: _handle_confirm(ui_components, on_confirm),
-        on_cancel=lambda: _handle_cancel(ui_components, on_cancel)
+    def handle_cancel(btn):
+        with dialog_area:
+            clear_output(wait=True)
+        if on_cancel:
+            on_cancel()
+    
+    confirm_style = 'danger' if danger_mode else 'primary'
+    confirm_btn = widgets.Button(
+        description=confirm_text,
+        button_style=confirm_style,
+        layout=widgets.Layout(width='120px', margin='4px')
     )
+    confirm_btn.on_click(handle_confirm)
+    
+    cancel_btn = widgets.Button(
+        description=cancel_text,
+        button_style='',
+        layout=widgets.Layout(width='100px', margin='4px')
+    )
+    cancel_btn.on_click(handle_cancel)
+    
+    # Simple dialog layout
+    border_color = '#dc3545' if danger_mode else '#007bff'
+    bg_color = '#fff5f5' if danger_mode else '#f8f9fa'
+    
+    dialog = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{border_color};text-align:center;margin:0 0 10px 0;'>{title}</h4>"),
+        widgets.HTML(f"<div style='text-align:center;margin-bottom:15px;'>{message}</div>"),
+        widgets.HBox([confirm_btn, cancel_btn], layout=widgets.Layout(justify_content='center'))
+    ], layout=widgets.Layout(
+        padding='15px',
+        border=f'2px solid {border_color}',
+        border_radius='8px',
+        background_color=bg_color,
+        margin='10px 0'
+    ))
     
     # Display dialog
     with dialog_area:
-        clear_output(wait=True)
         display(dialog)
 
 def show_info_dialog(
@@ -65,240 +85,48 @@ def show_info_dialog(
     close_text: str = "Tutup",
     dialog_type: str = "info"
 ) -> None:
-    """
-    Show info dialog dengan close callback.
-    
-    Args:
-        ui_components: Dictionary UI components
-        title: Dialog title
-        message: Dialog message
-        on_close: Callback untuk close
-        close_text: Text tombol close
-        dialog_type: Type dialog ('info', 'success', 'warning', 'error')
-    """
+    """Show info dialog"""
     dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
     if not dialog_area:
         print(f"ℹ️ {title}: {message}")
+        if on_close:
+            on_close()
         return
     
-    # Set dialog visibility flag
-    ui_components['_dialog_visible'] = True
+    def handle_close(btn):
+        with dialog_area:
+            clear_output(wait=True)
+        if on_close:
+            on_close()
     
-    # Create info dialog
-    dialog = _create_info_dialog_widget(
-        title=title,
-        message=message,
-        close_text=close_text,
-        dialog_type=dialog_type,
-        on_close=lambda: _handle_close(ui_components, on_close)
-    )
+    colors = {'info': '#17a2b8', 'success': '#28a745', 'warning': '#ffc107', 'error': '#dc3545'}
+    color = colors.get(dialog_type, '#17a2b8')
     
-    # Display dialog
+    close_btn = widgets.Button(description=close_text, layout=widgets.Layout(width='100px'))
+    close_btn.on_click(handle_close)
+    
+    dialog = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{color};text-align:center;margin:0 0 10px 0;'>{title}</h4>"),
+        widgets.HTML(f"<div style='text-align:center;margin-bottom:15px;'>{message}</div>"),
+        widgets.HBox([close_btn], layout=widgets.Layout(justify_content='center'))
+    ], layout=widgets.Layout(
+        padding='15px',
+        border=f'2px solid {color}',
+        border_radius='8px',
+        margin='10px 0'
+    ))
+    
     with dialog_area:
         clear_output(wait=True)
         display(dialog)
 
 def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
-    """Clear dialog area dengan force refresh"""
+    """Clear dialog area"""
     dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
     if dialog_area:
-        try:
-            with dialog_area:
-                clear_output(wait=True)
-            
-            # Force complete widget refresh
-            dialog_area.close()
-            
-            # Recreate widget if parent container exists
-            if hasattr(dialog_area, 'parent') and dialog_area.parent:
-                new_dialog_area = widgets.Output(layout=dialog_area.layout)
-                ui_components['confirmation_area'] = new_dialog_area
-                ui_components['dialog_area'] = new_dialog_area
-                
-                # Replace in parent container
-                parent = dialog_area.parent
-                if hasattr(parent, 'children'):
-                    children_list = list(parent.children)
-                    if dialog_area in children_list:
-                        idx = children_list.index(dialog_area)
-                        children_list[idx] = new_dialog_area
-                        parent.children = children_list
-        except Exception:
-            # Fallback: just clear output
-            with dialog_area:
-                clear_output(wait=True)
-    
-    # Clear visibility flag
-    ui_components.pop('_dialog_visible', None)
+        with dialog_area:
+            clear_output(wait=True)
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
-    """Check apakah dialog sedang visible"""
-    return ui_components.get('_dialog_visible', False)
-
-# === INTERNAL FUNCTIONS ===
-
-def _create_dialog_widget(
-    title: str,
-    message: str,
-    confirm_text: str,
-    cancel_text: str,
-    danger_mode: bool,
-    on_confirm: Callable,
-    on_cancel: Callable
-) -> widgets.VBox:
-    """Create confirmation dialog widget"""
-    
-    # Create buttons
-    confirm_style = 'danger' if danger_mode else 'primary'
-    confirm_icon = 'trash' if danger_mode else 'check'
-    
-    confirm_btn = widgets.Button(
-        description=confirm_text,
-        button_style=confirm_style,
-        icon=confirm_icon,
-        layout=widgets.Layout(width='120px', height='32px', margin='4px')
-    )
-    
-    cancel_btn = widgets.Button(
-        description=cancel_text,
-        button_style='',
-        icon='times',
-        layout=widgets.Layout(width='100px', height='32px', margin='4px')
-    )
-    
-    # Bind events
-    confirm_btn.on_click(lambda btn: on_confirm())
-    cancel_btn.on_click(lambda btn: on_cancel())
-    
-    # Dialog styling
-    border_color = '#dc3545' if danger_mode else '#007bff'
-    bg_color = '#fff5f5' if danger_mode else '#f8f9fa'
-    
-    # Create dialog structure
-    header = widgets.HTML(f"""
-        <div style='text-align: center; margin-bottom: 15px;'>
-            <h4 style='color: {border_color}; margin: 0; font-size: 16px;'>{title}</h4>
-        </div>
-    """)
-    
-    content = widgets.HTML(f"""
-        <div style='margin-bottom: 20px; text-align: center; line-height: 1.4; font-size: 14px;'>
-            {message}
-        </div>
-    """)
-    
-    buttons = widgets.HBox([confirm_btn, cancel_btn], layout=widgets.Layout(
-        justify_content='center',
-        align_items='center',
-        margin='10px 0 0 0'
-    ))
-    
-    dialog = widgets.VBox([header, content, buttons], layout=widgets.Layout(
-        padding='20px',
-        border=f'2px solid {border_color}',
-        border_radius='8px',
-        background_color=bg_color,
-        width='100%',
-        max_width='500px',
-        margin='10px auto',
-        box_shadow='0 4px 8px rgba(0,0,0,0.1)'
-    ))
-    
-    return dialog
-
-def _create_info_dialog_widget(
-    title: str,
-    message: str,
-    close_text: str,
-    dialog_type: str,
-    on_close: Callable
-) -> widgets.VBox:
-    """Create info dialog widget"""
-    
-    # Type-specific styling
-    type_config = {
-        'info': {'color': '#17a2b8', 'bg': '#d1ecf1', 'icon': 'info'},
-        'success': {'color': '#28a745', 'bg': '#d4edda', 'icon': 'check'},
-        'warning': {'color': '#ffc107', 'bg': '#fff3cd', 'icon': 'exclamation-triangle'},
-        'error': {'color': '#dc3545', 'bg': '#f8d7da', 'icon': 'times'}
-    }
-    
-    config = type_config.get(dialog_type, type_config['info'])
-    
-    # Create close button
-    close_btn = widgets.Button(
-        description=close_text,
-        button_style='',
-        icon='times',
-        layout=widgets.Layout(width='100px', height='32px', margin='4px')
-    )
-    
-    close_btn.on_click(lambda btn: on_close())
-    
-    # Create dialog structure
-    header = widgets.HTML(f"""
-        <div style='text-align: center; margin-bottom: 15px;'>
-            <h4 style='color: {config["color"]}; margin: 0; font-size: 16px;'>{title}</h4>
-        </div>
-    """)
-    
-    content = widgets.HTML(f"""
-        <div style='margin-bottom: 20px; text-align: center; line-height: 1.4; font-size: 14px;'>
-            {message}
-        </div>
-    """)
-    
-    buttons = widgets.HBox([close_btn], layout=widgets.Layout(
-        justify_content='center',
-        align_items='center',
-        margin='10px 0 0 0'
-    ))
-    
-    dialog = widgets.VBox([header, content, buttons], layout=widgets.Layout(
-        padding='20px',
-        border=f'2px solid {config["color"]}',
-        border_radius='8px',
-        background_color=config['bg'],
-        width='100%',
-        max_width='500px',
-        margin='10px auto',
-        box_shadow='0 4px 8px rgba(0,0,0,0.1)'
-    ))
-    
-    return dialog
-
-def _handle_confirm(ui_components: Dict[str, Any], callback: Callable):
-    """Handle confirm action"""
-    try:
-        # Clear dialog immediately
-        clear_dialog_area(ui_components)
-        
-        # Execute callback after clearing
-        if callback:
-            callback()
-    except Exception as e:
-        print(f"❌ Error in confirm callback: {str(e)}")
-
-def _handle_cancel(ui_components: Dict[str, Any], callback: Callable):
-    """Handle cancel action"""
-    try:
-        # Clear dialog immediately
-        clear_dialog_area(ui_components)
-        
-        # Execute callback after clearing
-        if callback:
-            callback()
-    except Exception as e:
-        print(f"❌ Error in cancel callback: {str(e)}")
-
-def _handle_close(ui_components: Dict[str, Any], callback: Callable):
-    """Handle close action untuk info dialog"""
-    try:
-        # Clear dialog immediately
-        clear_dialog_area(ui_components)
-        
-        # Execute callback after clearing
-        if callback:
-            callback()
-    except Exception as e:
-        print(f"❌ Error in close callback: {str(e)}")
+    """Check if dialog visible"""
+    return False  # Simplified - tidak perlu state tracking

@@ -275,13 +275,6 @@ def _create_progress_callback(ui_components: Dict[str, Any]):
     
     return progress_callback
 
-def _is_milestone(current: int, total: int) -> bool:
-    """Check if progress adalah milestone"""
-    if total <= 10:
-        return True
-    milestones = [0, 25, 50, 75, 100]
-    progress_pct = (current / total) * 100 if total > 0 else 0
-    return any(abs(progress_pct - milestone) < 2 for milestone in milestones) or current == total
 
 def _setup_progress(ui_components: Dict[str, Any], message: str):
     """Setup progress tracker"""
@@ -337,9 +330,11 @@ def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info")
 def _hide_confirmation_area(ui_components: Dict[str, Any]):
     """Hide confirmation area dengan visibility toggle"""
     confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area and hasattr(confirmation_area, 'layout'):
+    action_section = ui_components.get('_')
+    if confirmation_area and hasattr(confirmation_area, 'layout') and action_section and hasattr(action_section,'layout'):
         confirmation_area.layout.visibility = 'hidden'
         confirmation_area.layout.height = '0px'
+        action_section.layout.height = 'auto'
 
 def _show_confirmation_area(ui_components: Dict[str, Any]):
     """Show confirmation area"""

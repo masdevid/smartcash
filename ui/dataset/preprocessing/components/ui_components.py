@@ -91,12 +91,12 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             widgets.Box([save_reset_components['container']], 
                 layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
         ], layout=widgets.Layout(margin='8px 0'))
-        
+        confirmation_title =  widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Konfirmasi & Status:</strong></div>"),
         # Action section dengan confirmation area
         action_section = widgets.VBox([
             widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
             action_components['container'],
-            widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Konfirmasi & Status:</strong></div>"),
+            confirmation_title,
             confirmation_area  # NOW PROPERLY INCLUDED
         ], layout=widgets.Layout(
             width='100%', 

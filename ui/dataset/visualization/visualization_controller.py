@@ -5,10 +5,7 @@ Deskripsi: Controller utama untuk visualisasi dataset
 
 from typing import Dict, Any, Optional
 from smartcash.common.logger import get_logger
-import ipywidgets as widgets
-from IPython.display import display
 from typing import Optional, Dict
-from smartcash.ui.dataset.visualization.components.stats_component import DatasetStatsComponent
 
 logger = get_logger(__name__)
 
@@ -25,11 +22,6 @@ class VisualizationController:
         self.ui_components = {}
         self.current_dataset = None
         self.dataset_stats = {}
-        
-        # Inisialisasi komponen
-        self.stats_component = DatasetStatsComponent(
-            config=self.config.get('stats', {})
-        )
         
         # Inisialisasi handler visualisasi
         from smartcash.ui.dataset.visualization.handlers.visualization_handler import DatasetVisualizationHandler
@@ -50,6 +42,3 @@ class VisualizationController:
                 "val": [(640, 480), (800, 600)]
             }
         }
-        
-        # Update komponen statistik
-        self.stats_component.update_stats(self.dataset_stats)

@@ -5,10 +5,11 @@ Deskripsi: Main API exports untuk preprocessor module dengan clean interface
 
 # === MAIN SERVICES ===
 from .service import PreprocessingService
-from .api.preprocessing_api import preprocess_dataset, get_preprocessing_status
+from .api.preprocessing_api import preprocess_dataset, get_preprocessing_status, validate_dataset_structure, validate_filenames
 from .api.normalization_api import normalize_for_yolo, create_normalizer, denormalize_for_visualization
 from .api.samples_api import get_samples, generate_sample_previews
 from .api.stats_api import get_dataset_stats, get_file_stats
+from .api.cleanup_api import cleanup_preprocessing_files
 
 # === CORE COMPONENTS ===
 from .core.normalizer import YOLONormalizer
@@ -50,6 +51,8 @@ __all__ = [
     'PreprocessingService',
     'preprocess_dataset',
     'get_preprocessing_status',
+    'validate_dataset_structure',
+    'validate_filenames',
     
     # Normalization API
     'normalize_for_yolo',
@@ -63,6 +66,9 @@ __all__ = [
     # Statistics API
     'get_dataset_stats',
     'get_file_stats',
+    
+    # Cleanup API
+    'cleanup_preprocessing_files',
     
     # Core components
     'YOLONormalizer',
@@ -86,3 +92,16 @@ __all__ = [
     'create_file_processor',
     'create_stats_collector'
 ]
+
+# === BACKWARD COMPATIBILITY ALIASES ===
+def validate_dataset(*args, **kwargs):
+    """🔄 Compatibility alias untuk validate_dataset_structure"""
+    return validate_dataset_structure(*args, **kwargs)
+
+def cleanup_preprocessed_data(*args, **kwargs):
+    """🔄 Compatibility alias untuk cleanup_preprocessing_files"""
+    return cleanup_preprocessing_files(*args, **kwargs)
+
+def get_preprocessing_samples(*args, **kwargs):
+    """🔄 Compatibility alias untuk get_samples"""
+    return get_samples(*args, **kwargs)

@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_extractor.py
-Deskripsi: Enhanced config extractor yang menggunakan existing environment detection
+Deskripsi: Enhanced config extractor dengan API compatibility dan YOLO-specific features
 """
 
 from typing import Dict, Any, List
 
 def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Enhanced config extraction dengan proper path handling menggunakan existing environment manager"""
+    """Enhanced config extraction dengan API compatibility dan YOLO features"""
     from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
     
     # Base structure dari defaults (DRY)
@@ -51,24 +51,47 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
     config['preprocessing']['normalization']['target_size'] = [width, height]
     config['preprocessing']['normalization']['preserve_aspect_ratio'] = preserve_aspect_ratio
     
+    # 🎯 NEW: YOLO-specific normalization settings for API compatibility
+    config['preprocessing']['normalization']['normalize_pixel_values'] = True
+    config['preprocessing']['normalization']['pixel_range'] = [0, 1]
+    
     # Update validation settings
     config['preprocessing']['validation']['enabled'] = validation_enabled
     config['preprocessing']['validation']['move_invalid'] = move_invalid
     config['preprocessing']['validation']['invalid_dir'] = invalid_dir
     
+    # 🎯 NEW: Enhanced validation settings untuk API
+    config['preprocessing']['validation']['check_image_quality'] = True
+    config['preprocessing']['validation']['check_labels'] = True
+    config['preprocessing']['validation']['check_coordinates'] = True
+    config['preprocessing']['validation']['check_uuid_consistency'] = True
+    
     # Update performance settings
     config['performance']['batch_size'] = batch_size
+    
+    # 🎯 NEW: Enhanced performance settings untuk API
+    config['performance']['use_gpu'] = True
+    config['performance']['compression_level'] = 90
+    config['performance']['max_memory_usage_gb'] = 4.0
+    config['performance']['use_mixed_precision'] = True
     
     # 🔑 KEY: Update data configuration dengan paths dari environment manager
     config['data'] = data_config
     
-    # 🔑 KEY: Add file naming configuration
+    # 🎯 CRITICAL: File naming configuration untuk API compatibility
     config['file_naming'] = {
         'raw_pattern': 'rp_{nominal}_{uuid}_{sequence}',
         'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}_{sequence}_{variance}',
         'augmented_pattern': 'aug_rp_{nominal}_{uuid}_{sequence}_{variance}',
         'preserve_uuid': True,
         'auto_rename_to_raw': True
+    }
+    
+    # 🎯 NEW: Output configuration untuk API
+    config['preprocessing']['output'] = {
+        'create_npy': True,
+        'organize_by_split': True,
+        'save_metadata': True
     }
     
     return config
@@ -115,6 +138,7 @@ def _setup_paths_with_environment_manager(target_splits: List[str]) -> Dict[str,
         # Setup output directories
         preprocessed_dir = f"{base_dir}/preprocessed"
         invalid_dir = f"{base_dir}/invalid"
+        backup_dir = f"{base_dir}/backup/preprocessing"
         
         # Auto-create preprocessing directories
         try:
@@ -123,12 +147,14 @@ def _setup_paths_with_environment_manager(target_splits: List[str]) -> Dict[str,
                 Path(f"{preprocessed_dir}/{split}/images").mkdir(parents=True, exist_ok=True)
                 Path(f"{preprocessed_dir}/{split}/labels").mkdir(parents=True, exist_ok=True)
             Path(invalid_dir).mkdir(parents=True, exist_ok=True)
+            Path(backup_dir).mkdir(parents=True, exist_ok=True)
         except Exception:
             pass  # Silent fail untuk permission issues
         
         data_config.update({
             'preprocessed_dir': preprocessed_dir,
             'invalid_dir': invalid_dir,
+            'backup_dir': backup_dir,
             'drive_mounted': is_drive_mounted,
             'colab_environment': is_colab
         })
@@ -160,7 +186,8 @@ def _fallback_path_setup(target_splits: List[str], error_reason: str) -> Dict[st
     
     data_config.update({
         'preprocessed_dir': f"{base_dir}/preprocessed",
-        'invalid_dir': f"{base_dir}/invalid"
+        'invalid_dir': f"{base_dir}/invalid",
+        'backup_dir': f"{base_dir}/backup/preprocessing"
     })
     
     return data_config
@@ -196,7 +223,7 @@ def get_environment_info() -> Dict[str, Any]:
         }
 
 def validate_paths_exist(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate jika paths dalam config benar-benar ada"""
+    """Validate jika paths dalam config benar-benar ada dan create jika missing"""
     validation_result = {
         'valid': True,
         'missing_paths': [],
@@ -239,8 +266,106 @@ def validate_paths_exist(config: Dict[str, Any]) -> Dict[str, Any]:
                 validation_result['errors'].append(f"Cannot create output dir {output_dir}: {str(e)}")
                 validation_result['valid'] = False
         
+        # Check backup directory
+        backup_dir = Path(data_config.get('backup_dir', 'data/backup/preprocessing'))
+        if not backup_dir.exists():
+            try:
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                validation_result['created_paths'].append(str(backup_dir))
+            except Exception as e:
+                validation_result['errors'].append(f"Cannot create backup dir {backup_dir}: {str(e)}")
+        
     except Exception as e:
         validation_result['valid'] = False
         validation_result['errors'].append(f"Path validation error: {str(e)}")
     
     return validation_result
+
+def validate_preprocessing_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """🔍 Validate preprocessing config untuk API compatibility"""
+    try:
+        from smartcash.dataset.preprocessor.utils.config_validator import validate_preprocessing_config as api_validator
+        return api_validator(config)
+    except ImportError:
+        # Fallback validation
+        return _basic_config_validation(config)
+
+def _basic_config_validation(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Basic config validation sebagai fallback"""
+    validation_result = {'valid': True, 'errors': [], 'warnings': []}
+    
+    try:
+        # Validate preprocessing section
+        preprocessing = config.get('preprocessing', {})
+        if not preprocessing.get('enabled', True):
+            validation_result['warnings'].append("Preprocessing disabled")
+        
+        # Validate target_size
+        normalization = preprocessing.get('normalization', {})
+        target_size = normalization.get('target_size', [640, 640])
+        if not isinstance(target_size, list) or len(target_size) != 2:
+            validation_result['errors'].append("Invalid target_size format")
+            validation_result['valid'] = False
+        
+        # Validate target_splits
+        target_splits = preprocessing.get('target_splits', [])
+        if not target_splits:
+            validation_result['errors'].append("No target splits specified")
+            validation_result['valid'] = False
+        
+        # Validate data paths
+        data_config = config.get('data', {})
+        if not data_config.get('dir'):
+            validation_result['errors'].append("No data directory specified")
+            validation_result['valid'] = False
+        
+        # Validate file_naming
+        file_naming = config.get('file_naming', {})
+        required_patterns = ['raw_pattern', 'preprocessed_pattern']
+        for pattern in required_patterns:
+            if not file_naming.get(pattern):
+                validation_result['warnings'].append(f"Missing {pattern} in file_naming")
+        
+    except Exception as e:
+        validation_result['valid'] = False
+        validation_result['errors'].append(f"Validation error: {str(e)}")
+    
+    return validation_result
+
+def get_preprocessing_config_summary(config: Dict[str, Any]) -> Dict[str, Any]:
+    """📊 Get preprocessing config summary untuk UI display"""
+    try:
+        preprocessing = config.get('preprocessing', {})
+        normalization = preprocessing.get('normalization', {})
+        validation = preprocessing.get('validation', {})
+        performance = config.get('performance', {})
+        
+        summary = {
+            'enabled': preprocessing.get('enabled', True),
+            'target_splits': preprocessing.get('target_splits', []),
+            'resolution': f"{normalization.get('target_size', [640, 640])[0]}x{normalization.get('target_size', [640, 640])[1]}",
+            'normalization_method': normalization.get('method', 'minmax'),
+            'preserve_aspect_ratio': normalization.get('preserve_aspect_ratio', True),
+            'validation_enabled': validation.get('enabled', True),
+            'batch_size': performance.get('batch_size', 32),
+            'use_gpu': performance.get('use_gpu', True),
+            'total_splits': len(preprocessing.get('target_splits', [])),
+            'api_compatible': True
+        }
+        
+        return summary
+        
+    except Exception as e:
+        return {
+            'enabled': False,
+            'error': str(e),
+            'api_compatible': False
+        }
+
+# One-liner utilities untuk config manipulation
+extract_target_splits = lambda config: config.get('preprocessing', {}).get('target_splits', ['train', 'valid'])
+extract_resolution = lambda config: config.get('preprocessing', {}).get('normalization', {}).get('target_size', [640, 640])
+extract_batch_size = lambda config: config.get('performance', {}).get('batch_size', 32)
+extract_data_dir = lambda config: config.get('data', {}).get('dir', 'data')
+is_validation_enabled = lambda config: config.get('preprocessing', {}).get('validation', {}).get('enabled', True)
+is_normalization_enabled = lambda config: config.get('preprocessing', {}).get('normalization', {}).get('enabled', True)

@@ -200,8 +200,8 @@ def _extract_and_enhance_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
         return enhanced_config
         
     except Exception as e:
-        get_logger('backend_utils').error(f"Error extracting config: {str(e)}")
-        return _get_fallback_config()
+        get_logger('backend_utils').error(f"⚠️ Error extracting config: {str(e)}")
+        raise ValueError(f"Cannot extract and enhance config: {str(e)}")
 
 def _enhance_config_for_api(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     """Enhance config untuk compatibility dengan consolidated API"""
@@ -254,41 +254,9 @@ def _enhance_config_for_api(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     return enhanced
 
 def _get_fallback_config() -> Dict[str, Any]:
-    """Get fallback config untuk error cases"""
-    return {
-        'preprocessing': {
-            'enabled': True,
-            'target_splits': ['train', 'valid'],
-            'output_dir': 'data/preprocessed',
-            'normalization': {
-                'enabled': True,
-                'method': 'minmax',
-                'target_size': [640, 640],
-                'preserve_aspect_ratio': True
-            },
-            'validation': {
-                'enabled': True,
-                'move_invalid': True,
-                'invalid_dir': 'data/invalid'
-            }
-        },
-        'performance': {
-            'batch_size': 32,
-            'use_gpu': True
-        },
-        'data': {
-            'dir': 'data',
-            'local': {
-                'train': 'data/train',
-                'valid': 'data/valid'
-            }
-        },
-        'file_naming': {
-            'raw_pattern': 'rp_{nominal}_{uuid}_{sequence}',
-            'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}_{sequence}_{variance}',
-            'preserve_uuid': True
-        }
-    }
+    """⚠️ DEPRECATED: Throw warning instead of using fallback"""
+    get_logger('backend_utils').warning("⚠️ Fallback config requested - this indicates a configuration issue")
+    raise RuntimeError("Cannot provide fallback config - please check configuration extraction process")
 
 # Backward compatibility exports
 _convert_ui_to_backend_config = _extract_and_enhance_config

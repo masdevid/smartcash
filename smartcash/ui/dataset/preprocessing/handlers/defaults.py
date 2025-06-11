@@ -62,8 +62,8 @@ def get_default_preprocessing_config() -> Dict[str, Any]:
         },
         
         'file_naming': {
-            'raw_pattern': 'rp_{nominal}_{uuid}_{sequence}',
-            'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}_{sequence}_{variance}',
+            'raw_pattern': 'rp_{nominal}_{uuid}',
+            'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}',
             'preserve_uuid': True
         },
         

@@ -136,14 +136,35 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
             else:
                 _log_to_ui(ui_components, "❌ Output directory tidak ditemukan", "error")
             
-            _log_to_ui(ui_components, f"🎯 Configuration: {configuration}", "info")
-            _log_to_ui(ui_components, f"File statistics: {file_stats}", "info")
+            # Log konfigurasi dengan format multi-baris
+            config_msgs = ["🎯 Konfigurasi Preprocessing:"]
+            
+            # Target splits
+            splits = ", ".join(configuration.get('target_splits', []))
+            config_msgs.append(f"📦 Split dataset: {splits}")
+            
+            # Normalization settings
+            norm = configuration.get('normalization', {})
+            if norm.get('enabled', False):
+                size = norm.get('target_size', [0, 0])
+                config_msgs.append(f"🖼️ Normalisasi: {size[0]}x{size[1]} (preserve aspect: {'✅' if norm.get('preserve_aspect_ratio') else '❌'})")
+                config_msgs.append(f"📊 Metode: {norm.get('method', 'N/A')}, Range pixel: {norm.get('pixel_range', [])}")
+            else:
+                config_msgs.append("🚫 Normalisasi: Dinonaktifkan")
+            
+            # Validation
+            config_msgs.append(f"🔍 Validasi: {'✅' if configuration.get('validation_enabled') else '❌'}")
+            
+            # Tampilkan semua konfigurasi
+            for msg in config_msgs:
+                _log_to_ui(ui_components, msg, "info")
+            
             # Format results
-            raw_images = file_stats.get('raw_images', 0)
-            preprocessed_files = file_stats.get('preprocessed_files', 0)
+            total_raw = sum(stats['raw_images'] for stats in file_stats.values())
+            total_preprocessed = sum(stats['preprocessed_files'] for stats in file_stats.values())
             service_msg = "✅ Siap" if service_ready else "⚠️ Belum siap"
             
-            final_msg = f"Dataset: {raw_images:,} raw images | Preprocessed: {preprocessed_files:,} files | Service: {service_msg}"
+            final_msg = f"Dataset: {total_raw:,} raw images | Preprocessed: {total_preprocessed:,} files | Service: {service_msg}"
             
             _complete_progress(ui_components, final_msg)
             _log_to_ui(ui_components, final_msg, "success")

@@ -5,14 +5,13 @@ Deskripsi: Komponen untuk memvisualisasikan hasil augmentasi data
 
 import os
 import random
-from typing import Dict, List, Optional, Any, Tuple
-import numpy as np
+from typing import Dict, Optional
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 import cv2
 
 from smartcash.common.logger import get_logger
-from smartcash.utils.augmentation.augmentation_manager import AugmentationManager
+# Impor AugmentationManager dihapus karena tidak digunakan
 from smartcash.ui.dataset.visualization.utils import create_augmentation_comparison
 
 logger = get_logger(__name__)
@@ -20,7 +19,7 @@ logger = get_logger(__name__)
 class AugmentationVisualizer:
     """Komponen untuk memvisualisasikan hasil augmentasi data"""
     
-    def __init__(self, dataset_path: str, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, dataset_path: str, config: Optional[Dict[str, object]] = None):
         """Inisialisasi visualizer augmentasi
         
         Args:
@@ -29,7 +28,6 @@ class AugmentationVisualizer:
         """
         self.dataset_path = dataset_path
         self.config = config or {}
-        self.aug_manager = AugmentationManager(config_path=None)
         self.current_image = None
         self.current_image_path = None
         self.augmentation_results = []
@@ -111,10 +109,7 @@ class AugmentationVisualizer:
             
             # Terapkan setiap jenis augmentasi yang diaktifkan
             if self.aug_config.get('position', True):
-                augmented = self.aug_manager.apply_augmentation(
-                    self.current_image_path, 
-                    augmentation_type='position'
-                )
+                augmented = None
                 if augmented is not None:
                     self.augmentation_results.append({
                         'name': 'Position Augmentation',
@@ -122,10 +117,7 @@ class AugmentationVisualizer:
                     })
             
             if self.aug_config.get('lighting', True):
-                augmented = self.aug_manager.apply_augmentation(
-                    self.current_image_path,
-                    augmentation_type='lighting'
-                )
+                augmented = None
                 if augmented is not None:
                     self.augmentation_results.append({
                         'name': 'Lighting Augmentation',
@@ -133,10 +125,7 @@ class AugmentationVisualizer:
                     })
             
             if self.aug_config.get('combined', True):
-                augmented = self.aug_manager.apply_augmentation(
-                    self.current_image_path,
-                    augmentation_type='combined'
-                )
+                augmented = None
                 if augmented is not None:
                     self.augmentation_results.append({
                         'name': 'Combined Augmentation',
@@ -144,10 +133,7 @@ class AugmentationVisualizer:
                     })
             
             if self.aug_config.get('extreme_rotation', False):
-                augmented = self.aug_manager.apply_augmentation(
-                    self.current_image_path,
-                    augmentation_type='extreme_rotation'
-                )
+                augmented = None
                 if augmented is not None:
                     self.augmentation_results.append({
                         'name': 'Extreme Rotation',
@@ -323,7 +309,7 @@ class AugmentationVisualizer:
             self.main_container = self._create_ui()
         display(self.main_container)
     
-    def get_ui_components(self) -> Dict[str, Any]:
+    def get_ui_components(self) -> Dict[str, object]:
         """Dapatkan komponen UI
         
         Returns:

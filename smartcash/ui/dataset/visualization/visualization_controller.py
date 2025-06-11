@@ -3,18 +3,10 @@ File: smartcash/ui/dataset/visualization/visualization_controller.py
 Deskripsi: Controller utama untuk visualisasi dataset
 """
 
-from typing import Dict, Any, Optional, List
-import os
-import ipywidgets as widgets
-from IPython.display import display, clear_output
-
 from smartcash.common.logger import get_logger
-from smartcash.dataset.preprocessor import get_preprocessing_stats, list_available_datasets
-from smartcash.ui.dataset.visualization.components import (
-    DatasetStatsComponent,
-    AugmentationVisualizer
-)
-from smartcash.ui.utils.constants import ICONS
+from smartcash.dataset.preprocessor import get_preprocessing_stats
+import ipywidgets as widgets
+from IPython.display import display
 
 logger = get_logger(__name__)
 
@@ -38,101 +30,101 @@ class VisualizationController:
         )
         
         # Inisialisasi visualizer augmentasi (akan diinisialisasi setelah memuat dataset)
-        self.aug_visualizer = None
-    
-    def load_dataset(self, dataset_name: str) -> bool:
-        """Memuat dataset untuk divisualisasikan
+        self.augmentation_visualizer = None
         
-        Args:
-            dataset_name: Nama dataset yang akan dimuat
-            
-        Returns:
-            bool: True jika berhasil, False jika gagal
-        """
-        try:
-            # Cek ketersediaan dataset
-            available_datasets = list_available_datasets()
-            if dataset_name not in available_datasets:
-                logger.error(f"Dataset '{dataset_name}' tidak ditemukan")
-                return False
-                
-            self.current_dataset = dataset_name
-            
-            # Muat statistik preprocessing
-            self.dataset_stats = get_preprocessing_stats(dataset_name)
-            
-            # Perbarui komponen statistik
-            self.stats_component.update_stats(self.dataset_stats)
-            
-            # Inisialisasi visualizer augmentasi
+        # Inisialisasi handler visualisasi
+        from smartcash.ui.dataset.visualization.handlers.visualization_handler import DatasetVisualizationHandler
+        self.handler = DatasetVisualizationHandler(self.config)
+        
+        # Inisialisasi komponen visualisasi
+        self.dataset_comparator = dataset_comparator.DatasetComparator(self.handler)
+        
+    def load_dataset(self, dataset_name: str):
+        """Memuat dataset dan statistik terkait"""
+        self.current_dataset = dataset_name
+        
+        # Ambil statistik preprocessing
+        self.dataset_stats = get_preprocessing_stats(dataset_name)
+        
+        # Update komponen statistik
+        self.stats_component.update_stats(self.dataset_stats)
+        
+        # Inisialisasi visualizer augmentasi jika diperlukan
+        if 'augmentation' in self.config:
             dataset_path = os.path.join("data", "processed", dataset_name)
-            self.aug_visualizer = AugmentationVisualizer(
+            self.augmentation_visualizer = AugmentationVisualizer(
                 dataset_path=dataset_path,
-                config=self.config.get('augmentation', {})
+                config=self.config['augmentation']
             )
             
-            logger.info(f"Dataset '{dataset_name}' berhasil dimuat")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Gagal memuat dataset '{dataset_name}': {e}")
-            return False
-    
-    def _create_dataset_selector(self) -> widgets.Widget:
-        """Buat komponen pemilih dataset"""
-        # Dapatkan daftar dataset yang tersedia
-        available_datasets = list_available_datasets()
-        
-        # Buat dropdown untuk memilih dataset
-        self.dataset_dropdown = widgets.Dropdown(
-            options=available_datasets,
-            value=available_datasets[0] if available_datasets else None,
-            description='Dataset:',
-            disabled=not available_datasets
+    def render(self):
+        """Render UI visualisasi"""
+        # Tampilkan pilihan dataset
+        datasets = list_available_datasets()
+        dataset_selector = widgets.Dropdown(
+            options=datasets,
+            description='Pilih Dataset:',
+            disabled=False
         )
+        dataset_selector.observe(self._on_dataset_change, names='value')
         
-        # Tombol untuk memuat dataset
-        self.load_btn = widgets.Button(
-            description='Muat Dataset',
-            button_style='primary',
-            icon='folder-open',
-            disabled=not available_datasets
-        )
-        self.load_btn.on_click(self._on_load_dataset)
+        # Tampilkan komponen
+        display(dataset_selector)
+        self.stats_component.render()
         
-        # Tampilkan status
-        self.status_output = widgets.Output()
+        # Render visualisasi dataset
+        self.handler.render()
         
-        # Gabungkan komponen
-        return widgets.VBox([
-            widgets.HBox([self.dataset_dropdown, self.load_btn]),
-            self.status_output
-        ])
+    def _on_dataset_change(self, change):
+        """Handler ketika dataset berubah"""
+        if change['new']:
+            self.load_dataset(change['new'])
+            clear_output(wait=True)
+            self.render()
     
-    def _create_main_tabs(self) -> widgets.Widget:
-        """Buat tab utama untuk visualisasi"""
-        # Buat tab untuk berbagai jenis visualisasi
-        self.tabs = widgets.Tab()
-        
-        # Tab statistik dataset
+    def _create_stats_tab(self) -> widgets.Widget:
+        """Buat tab statistik dataset"""
         stats_tab = widgets.VBox([
             widgets.HTML("<h3>Statistik Dataset</h3>"),
             self.stats_component.get_ui_components()['main_container']
         ])
-        
-        # Tab augmentasi
-        aug_tab = widgets.VBox([
-            widgets.HTML("<h3>Visualisasi Augmentasi</h3>"),
-            self.aug_visualizer.get_ui_components()['main_container'] if self.aug_visualizer else 
-            widgets.HTML("<p>Muat dataset terlebih dahulu untuk melihat visualisasi augmentasi</p>")
+        return stats_tab
+    
+    def _create_advanced_viz_tab(self) -> widgets.Widget:
+        """Buat tab visualisasi lanjut"""
+        advanced_viz_tab = widgets.VBox([
+            widgets.HTML("<h3>Visualisasi Lanjut</h3>"),
+            self.advanced_visualizer.get_ui_components()['main_container']
         ])
-        
-        # Atur tab
-        self.tabs.children = [stats_tab, aug_tab]
-        self.tabs.set_title(0, '📊 Statistik')
-        self.tabs.set_title(1, '🔄 Augmentasi')
+        return advanced_viz_tab
+    
+    def _create_main_tabs(self) -> widgets.Widget:
+        """Buat tab utama untuk visualisasi"""
+        self.tabs = widgets.Tab()
+        self.tabs.children = [
+            self._create_stats_tab(),
+            self._create_advanced_viz_tab(),
+            self.dataset_comparator.create_comparison_ui()  # Tab perbandingan
+        ]
+        self.tabs.set_title(0, 'Statistik')
+        self.tabs.set_title(1, 'Visualisasi Lanjut')
+        self.tabs.set_title(2, 'Perbandingan')
         
         return self.tabs
+    
+    def _update_main_tabs(self) -> None:
+        """Perbarui konten tab utama"""
+        # Perbarui tab statistik
+        stats_tab = self._create_stats_tab()
+        
+        # Perbarui tab visualisasi lanjut
+        advanced_viz_tab = self._create_advanced_viz_tab()
+        
+        # Perbarui tab perbandingan
+        comparison_tab = self.dataset_comparator.create_comparison_ui()
+        
+        # Perbarui tab
+        self.tabs.children = [stats_tab, advanced_viz_tab, comparison_tab]
     
     def _create_ui(self) -> widgets.Widget:
         """Buat UI lengkap"""
@@ -147,7 +139,13 @@ class VisualizationController:
         """)
         
         # Buat selector dataset
-        dataset_selector = self._create_dataset_selector()
+        datasets = list_available_datasets()
+        dataset_selector = widgets.Dropdown(
+            options=datasets,
+            description='Pilih Dataset:',
+            disabled=False
+        )
+        dataset_selector.observe(self._on_dataset_change, names='value')
         
         # Buat tab utama
         main_tabs = self._create_main_tabs()
@@ -176,36 +174,13 @@ class VisualizationController:
             else:
                 print(f"{ICONS.get('error', '❌')} Gagal memuat dataset")
     
-    def _update_main_tabs(self) -> None:
-        """Perbarui konten tab utama"""
-        if not hasattr(self, 'tabs') or self.tabs is None:
-            return
-            
-        # Perbarui tab statistik
-        stats_tab = widgets.VBox([
-            widgets.HTML("<h3>Statistik Dataset</h3>"),
-            self.stats_component.get_ui_components()['main_container']
-        ])
-        
-        # Perbarui tab augmentasi
-        aug_tab = widgets.VBox([
-            widgets.HTML("<h3>Visualisasi Augmentasi</h3>")
-        ])
-        
-        if self.aug_visualizer:
-            aug_tab.children += (self.aug_visualizer.get_ui_components()['main_container'],)
-        else:
-            aug_tab.children += (widgets.HTML("<p>Gagal memuat visualizer augmentasi</p>"),)
-        
-        # Perbarui tab
-        self.tabs.children = [stats_tab, aug_tab]
-    
     def display(self) -> None:
         """Tampilkan UI visualisasi"""
         if not hasattr(self, 'main_container') or self.main_container is None:
             self.main_container = self._create_ui()
+        
         display(self.main_container)
-    
+        
     def get_ui_components(self) -> Dict[str, Any]:
         """Dapatkan komponen UI
         
@@ -218,5 +193,5 @@ class VisualizationController:
         return {
             'main_container': self.main_container,
             'stats_component': self.stats_component,
-            'aug_visualizer': self.aug_visualizer
+            'augmentation_visualizer': self.augmentation_visualizer
         }

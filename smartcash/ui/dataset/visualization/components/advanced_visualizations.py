@@ -10,11 +10,120 @@ import numpy as np
 from typing import Dict, Any, List, Optional
 import pandas as pd
 from IPython.display import display, clear_output
+from plotly.subplots import make_subplots
 
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Fungsi plotting yang dipindahkan dari dataset_stats_cards.py
+def create_class_distribution_plot(summary: Dict[str, Any]) -> go.FigureWidget:
+    """Buat plot distribusi kelas"""
+    try:
+        # Siapkan data
+        splits = list(summary.keys())
+        class_dist = {}
+        
+        # Kumpulkan distribusi kelas per split
+        for split in splits:
+            for cls, count in summary[split].get('class_distribution', {}).items():
+                if cls not in class_dist:
+                    class_dist[cls] = {s: 0 for s in splits}
+                class_dist[cls][split] = count
+        
+        # Buat figure
+        fig = go.Figure()
+        
+        # Warna untuk setiap kelas
+        colors = px.colors.qualitative.Plotly
+        
+        # Tambahkan trace untuk setiap kelas
+        for i, (cls, dist) in enumerate(class_dist.items()):
+            fig.add_trace(go.Bar(
+                x=splits,
+                y=[dist[split] for split in splits],
+                name=cls,
+                marker_color=colors[i % len(colors)],
+                opacity=0.7
+            ))
+        
+        # Update layout
+        fig.update_layout(
+            barmode='group',
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=20, r=20, t=30, b=20),
+            legend=dict(orientation='h', y=1.1),
+            xaxis_title='Split',
+            yaxis_title='Jumlah',
+            height=400
+        )
+        
+        return go.FigureWidget(fig)
+        
+    except Exception as e:
+        logger.error(f"Gagal membuat plot distribusi kelas: {e}")
+        return widgets.HTML(f"<div style='color:red;'>Error: {str(e)}</div>")
+
+def create_image_size_plot(summary: Dict[str, Any]) -> go.FigureWidget:
+    """Buat plot distribusi ukuran gambar"""
+    try:
+        # Siapkan data
+        splits = list(summary.keys())
+        
+        # Buat subplot
+        fig = make_subplots(rows=1, cols=len(splits), 
+                          subplot_titles=[f"{split.upper()}" for split in splits],
+                          shared_yaxes=True)
+        
+        # Warna untuk setiap split
+        colors = ['#4e79a7', '#f28e2b', '#e15759']
+        
+        # Tambahkan scatter plot untuk setiap split
+        for i, split in enumerate(splits):
+            sizes = summary[split].get('image_sizes', [])
+            if not sizes:
+                continue
+                
+            widths = [w for w, h in sizes]
+            heights = [h for w, h in sizes]
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=widths,
+                    y=heights,
+                    mode='markers',
+                    name=split,
+                    marker=dict(
+                        color=colors[i % len(colors)],
+                        size=8,
+                        opacity=0.6,
+                        line=dict(width=0.5, color='white')
+                    )
+                ),
+                row=1, col=i+1
+            )
+            
+            # Update sumbu
+            fig.update_xaxes(title_text='Lebar (px)', row=1, col=i+1)
+            if i == 0:
+                fig.update_yaxes(title_text='Tinggi (px)', row=1, col=1)
+        
+        # Update layout
+        fig.update_layout(
+            title_text='Distribusi Ukuran Gambar per Split',
+            showlegend=False,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=20, r=20, t=50, b=20),
+            height=400
+        )
+        
+        return go.FigureWidget(fig)
+        
+    except Exception as e:
+        logger.error(f"Gagal membuat plot ukuran gambar: {e}")
+        return widgets.HTML(f"<div style='color:red;'>Error: {str(e)}</div>")
 
 def create_heatmap_visualization(stats: Dict[str, Any]) -> widgets.Widget:
     """
@@ -34,60 +143,151 @@ def create_heatmap_visualization(stats: Dict[str, Any]) -> widgets.Widget:
         
         # Siapkan data untuk heatmap
         all_classes = set()
-        split_data = {}
+        class_data = {}
         
+        # Kumpulkan distribusi kelas per split
         for split, data in summary.items():
             class_dist = data.get('class_distribution', {})
-            split_data[split] = class_dist
-            all_classes.update(class_dist.keys())
+            for cls, count in class_dist.items():
+                all_classes.add(cls)
+                if cls not in class_data:
+                    class_data[cls] = {}
+                class_data[cls][split] = count
         
-        # Buat DataFrame untuk heatmap
-        df = pd.DataFrame(index=sorted(all_classes), columns=sorted(summary.keys()))
+        # Buat DataFrame
+        df = pd.DataFrame.from_dict(class_data, orient='index')
         
-        for split, classes in split_data.items():
-            for cls, count in classes.items():
-                df.at[cls, split] = count
-        
-        df = df.fillna(0)
+        # Hitung matriks korelasi
+        corr_matrix = df.corr()
         
         # Buat heatmap
-        fig = px.imshow(
-            df.values,
-            labels=dict(x="Split", y="Kelas", color="Jumlah"),
-            x=df.columns,
-            y=df.index,
-            aspect="auto",
-            color_continuous_scale='Viridis',
-            title="Distribusi Kelas per Split"
-        )
+        fig = go.Figure(data=go.Heatmap(
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.index,
+            colorscale='RdBu',
+            zmin=-1,
+            zmax=1,
+            text=np.round(corr_matrix.values, 2),
+            texttemplate="%{text}"
+        ))
         
         # Update layout
         fig.update_layout(
-            xaxis_title="Split",
-            yaxis_title="Kelas",
-            coloraxis_colorbar=dict(title="Jumlah"),
-            height=400 + len(df.index) * 15,  # Sesuaikan tinggi berdasarkan jumlah kelas
-            margin=dict(l=100, r=20, t=50, b=50)
+            title='Korelasi Antar Kelas',
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=20, r=20, t=50, b=20),
+            height=400
         )
-        
-        # Tambahkan anotasi
-        for i, row in enumerate(df.values):
-            for j, value in enumerate(row):
-                fig.add_annotation(
-                    x=j,
-                    y=i,
-                    text=str(int(value)),
-                    showarrow=False,
-                    font=dict(color='white' if value > df.values.max()/2 else 'black')
-                )
         
         return go.FigureWidget(fig)
         
     except Exception as e:
         logger.error(f"Gagal membuat heatmap: {e}")
-        return widgets.HTML(f"<div style='color:red;'>Error: Gagal membuat heatmap: {str(e)}</div>")
+        return widgets.HTML(f"<div style='color:red;'>Error: {str(e)}</div>")
 
 def create_outlier_detection(stats: Dict[str, Any]) -> widgets.Widget:
+    """
+    Buat visualisasi untuk deteksi outlier dalam jumlah anotasi per gambar
+    
+    Args:
+        stats: Dictionary berisi statistik dataset
+        
+    Returns:
+        Widget berisi box plot interaktif
+    """
+    try:
+        # Ambil data jumlah anotasi per gambar
+        summary = stats.get('summary', {})
+        if not summary:
+            return widgets.HTML("<div>Tidak ada data yang tersedia untuk deteksi outlier</div>")
+        
+        # Siapkan data
+        annotations_per_image = {}
+        for split, data in summary.items():
+            annotations = data.get('annotations_per_image', [])
+            if annotations:
+                annotations_per_image[split] = annotations
+        
+        # Buat box plot
+        fig = go.Figure()
+        
+        for split, annotations in annotations_per_image.items():
+            fig.add_trace(go.Box(
+                y=annotations,
+                name=split,
+                boxpoints='outliers',
+                marker_color='#3D9970',
+                line_color='#3D9970'
+            ))
+        
+        # Update layout
+        fig.update_layout(
+            title='Distribusi Jumlah Anotasi per Gambar',
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=20, r=20, t=50, b=20),
+            height=400,
+            yaxis_title="Jumlah Anotasi",
+            xaxis_title="Split Dataset"
+        )
+        
+        return go.FigureWidget(fig)
+        
+    except Exception as e:
+        logger.error(f"Gagal membuat visualisasi outlier: {e}")
+        return widgets.HTML(f"<div style='color:red;'>Error: {str(e)}</div>")
+
+def create_annotation_distribution(stats: Dict[str, Any]) -> widgets.Widget:
+    """
+    Buat histogram distribusi jumlah anotasi per gambar
+    
+    Args:
+        stats: Dictionary berisi statistik dataset
+        
+    Returns:
+        Widget berisi histogram interaktif
+    """
+    try:
+        # Ambil data jumlah anotasi per gambar
+        summary = stats.get('summary', {})
+        if not summary:
+            return widgets.HTML("<div>Tidak ada data yang tersedia untuk distribusi anotasi</div>")
+        
+        # Siapkan data
+        all_annotations = []
+        for split, data in summary.items():
+            annotations = data.get('annotations_per_image', [])
+            all_annotations.extend(annotations)
+        
+        # Buat histogram
+        fig = go.Figure()
+        fig.add_trace(go.Histogram(
+            x=all_annotations,
+            nbinsx=50,
+            marker_color='#FF851B',
+            opacity=0.7
+        ))
+        
+        # Update layout
+        fig.update_layout(
+            title='Distribusi Jumlah Anotasi per Gambar',
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=20, r=20, t=50, b=20),
+            height=400,
+            xaxis_title="Jumlah Anotasi",
+            yaxis_title="Frekuensi"
+        )
+        
+        return go.FigureWidget(fig)
+        
+    except Exception as e:
+        logger.error(f"Gagal membuat distribusi anotasi: {e}")
+        return widgets.HTML(f"<div style='color:red;'>Error: {str(e)}</div>")
+
+def create_outlier_detection_old(stats: Dict[str, Any]) -> widgets.Widget:
     """
     Buat visualisasi untuk mendeteksi outlier dalam dataset
     

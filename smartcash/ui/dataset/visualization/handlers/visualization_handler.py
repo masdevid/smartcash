@@ -16,7 +16,6 @@ from plotly.subplots import make_subplots
 
 from smartcash.common.logger import get_logger
 from smartcash.common.utils import load_yaml
-from smartcash.dataset.preprocessor import get_preprocessing_stats
 from smartcash.ui.utils.constants import ICONS
 
 logger = get_logger(__name__)
@@ -90,24 +89,26 @@ class DatasetVisualizationHandler:
         """
         try:
             # Cek ketersediaan dataset
-            available_datasets = list_available_datasets()
+            available_datasets = []  # Dummy data
             if dataset_name not in available_datasets:
                 logger.error(f"Dataset '{dataset_name}' tidak ditemukan")
                 return False
                 
             self.current_dataset = dataset_name
             
-            # Muat statistik preprocessing dengan error handling
-            try:
-                self.preprocessing_stats = get_preprocessing_stats(dataset_name)
-            except Exception as e:
-                logger.warning(f"Gagal memuat statistik preprocessing: {e}")
-                self.preprocessing_stats = {}
+            # Gunakan data dummy
+            self.preprocessing_stats = {
+                "class_distribution": {
+                    "train": {"class1": 100, "class2": 200},
+                    "val": {"class1": 30, "class2": 40}
+                },
+                "image_sizes": {
+                    "train": [(640, 480), (800, 600)],
+                    "val": [(640, 480), (800, 600)]
+                }
+            }
             
-            # Muat metadata dataset
-            self.dataset_metadata = get_dataset_metadata(dataset_name)
-            
-            logger.info(f"Dataset '{dataset_name}' berhasil dimuat")
+            logger.info(f"Dataset '{dataset_name}' berhasil dimuat (dummy data)")
             return True
             
         except Exception as e:
@@ -291,14 +292,13 @@ class DatasetVisualizationHandler:
     def fetch_preprocessing_status(self):
         """Ambil status preprocessing (dummy jika API tidak tersedia)"""
         try:
-            from smartcash.dataset.preprocessor import get_preprocessing_status
-            self.preprocessing_data = get_preprocessing_status(self.config)
-        except ImportError:
             # Gunakan data dummy jika API tidak tersedia
             self.preprocessing_data = {
                 'success': False,
                 'stats': {'valid_images': 0}
             }
+        except ImportError:
+            pass
 
     def get_stats(self):
         """Kumpulkan statistik untuk ditampilkan"""

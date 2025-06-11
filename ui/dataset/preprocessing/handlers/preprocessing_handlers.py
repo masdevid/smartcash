@@ -1,14 +1,25 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py
-Deskripsi: Enhanced handlers dengan preprocessing API integration dan progress tracking
+Deskripsi: Fixed handlers dengan proper error handling dan button state management
 """
 
 from typing import Dict, Any
 from smartcash.common.logger import get_logger
-import time
+from smartcash.ui.dataset.preprocessing.utils import (
+    log_to_ui as _log_to_ui,
+    hide_confirmation_area as _hide_confirmation_area,
+    show_confirmation_area as _show_confirmation_area,
+    clear_outputs as _clear_outputs,
+    disable_buttons as _disable_buttons,
+    enable_buttons as _enable_buttons,
+    handle_error as _handle_error,
+    setup_progress as _setup_progress,
+    complete_progress as _complete_progress,
+    error_progress as _error_progress
+)
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
-    """Setup handlers dengan API integration dan UI logging"""
+    """Setup handlers dengan API integration dan proper error handling"""
     logger = get_logger('preprocessing_handlers')
     
     try:
@@ -91,7 +102,7 @@ def _setup_operation_handlers(ui_components: Dict[str, Any]):
 # === OPERATION IMPLEMENTATIONS ===
 
 def _handle_preprocessing_operation(ui_components: Dict[str, Any]) -> bool:
-    """Handle preprocessing dengan confirmation dan API baru"""
+    """Handle preprocessing dengan confirmation dan proper error handling"""
     try:
         _clear_outputs(ui_components)
         
@@ -101,9 +112,9 @@ def _handle_preprocessing_operation(ui_components: Dict[str, Any]) -> bool:
         
         # Show confirmation dialog jika belum
         if not _is_confirmation_pending(ui_components):
-            _show_confirmation_area(ui_components)  # Tampilkan area dulu
-            _log_to_ui(ui_components, "⏳ Menunggu konfirmasi preprocessing...", "info")  # Pesan baru
-            _show_preprocessing_confirmation(ui_components)  # Baru tampilkan dialog
+            _show_confirmation_area(ui_components)
+            _log_to_ui(ui_components, "⏳ Menunggu konfirmasi preprocessing...", "info")
+            _show_preprocessing_confirmation(ui_components)
         
         return True
         
@@ -112,7 +123,7 @@ def _handle_preprocessing_operation(ui_components: Dict[str, Any]) -> bool:
         return False
 
 def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
-    """Handle dataset check dengan preprocessing API"""
+    """Handle dataset check dengan preprocessing API dan error handling"""
     try:
         _clear_outputs(ui_components)
         _disable_buttons(ui_components)
@@ -129,55 +140,7 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         
         # Show results based on API response
         if status_result.get('success', False):
-            service_ready = status_result.get('service_ready', False)
-            file_stats = status_result.get('file_statistics', {})
-            output_directory = status_result.get('output_directory', {})
-            configuration = status_result.get('configuration', {})
-
-            if output_directory.get('exists', False):
-                _log_to_ui(ui_components, f"📂 Output directory: {output_directory['path']}", "info")
-            else:
-                _log_to_ui(ui_components, "❌ Output directory tidak ditemukan", "error")
-            
-            # Log konfigurasi dengan format multi-baris
-            config_msgs = ["🎯 Konfigurasi Preprocessing:"]
-            
-            # Target splits
-            splits = ", ".join(configuration.get('target_splits', []))
-            config_msgs.append(f"📦 Split dataset: {splits}")
-            
-            # Normalization settings
-            norm = configuration.get('normalization', {})
-            if norm.get('enabled', False):
-                size = norm.get('target_size', [0, 0])
-                config_msgs.append(f"🖼️ Normalisasi: {size[0]}x{size[1]} (preserve aspect: {'✅' if norm.get('preserve_aspect_ratio') else '❌'})")
-                config_msgs.append(f"📊 Metode: {norm.get('method', 'N/A')}, Range pixel: {norm.get('pixel_range', [])}")
-            else:
-                config_msgs.append("🚫 Normalisasi: Dinonaktifkan")
-            
-            # Validation
-            config_msgs.append(f"🔍 Validasi: {'✅' if configuration.get('validation_enabled') else '❌'}")
-            
-            # Tampilkan semua konfigurasi
-            for msg in config_msgs:
-                _log_to_ui(ui_components, msg, "info")
-            
-            # Format results
-            total_raw = sum(stats['raw_images'] for stats in file_stats.values())
-            total_preprocessed = sum(stats['preprocessed_files'] for stats in file_stats.values())
-            service_msg = "✅ Siap" if service_ready else "⚠️ Belum siap"
-            
-            final_msg = f"Dataset: {total_raw:,} raw images | Preprocessed: {total_preprocessed:,} files | Service: {service_msg}"
-            
-            _complete_progress(ui_components, final_msg)
-            _log_to_ui(ui_components, final_msg, "success")
-            
-            # Log layer analysis jika ada
-            if 'layer_analysis' in file_stats:
-                layer_info = file_stats['layer_analysis']
-                main_objects = layer_info.get('l1_main', {}).get('objects', 0)
-                _log_to_ui(ui_components, f"🏦 Main banknotes detected: {main_objects:,} objects", "info")
-                
+            _process_status_result(ui_components, status_result)
         else:
             error_msg = status_result.get('message', 'Status check failed')
             _error_progress(ui_components, error_msg)
@@ -190,14 +153,9 @@ def _handle_check_operation(ui_components: Dict[str, Any]) -> bool:
         return False
 
 def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> bool:
-    """Handle cleanup operation"""
+    """Handle cleanup operation dengan proper error handling"""
     try:
         _clear_outputs(ui_components)
-        _disable_buttons(ui_components)
-        
-        _setup_progress(ui_components, "🧹 Membersihkan output preprocessing...")
-        
-        
         
         # Check confirmation flag dan execute jika dikonfirmasi
         if _should_execute_cleanup(ui_components):
@@ -205,11 +163,9 @@ def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> bool:
         
         # Show confirmation dialog jika belum
         if not _is_confirmation_pending(ui_components):
-            # Tambahkan pesan menunggu konfirmasi
-            _show_confirmation_area(ui_components)  # Tampilkan area dulu
-            _log_to_ui(ui_components, "⏳ Menunggu konfirmasi cleanup...", "info")  # Pesan baru
-            _show_cleanup_confirmation(ui_components)  # Baru tampilkan dialog
-        
+            _show_confirmation_area(ui_components)
+            _log_to_ui(ui_components, "⏳ Menunggu konfirmasi cleanup...", "info")
+            _show_cleanup_confirmation(ui_components)
         
         return True
         
@@ -220,7 +176,7 @@ def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> bool:
 # === API EXECUTION FUNCTIONS ===
 
 def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
-    """Execute preprocessing menggunakan preprocessing API baru"""
+    """Execute preprocessing dengan proper error handling dan button management"""
     try:
         _disable_buttons(ui_components)
         _setup_progress(ui_components, "🚀 Memulai preprocessing dengan API baru...")
@@ -236,30 +192,13 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
         # Execute preprocessing dengan API baru
         result = preprocess_dataset(
             config=config,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            ui_components=ui_components
         )
         
         # Handle results
         if result.get('success', False):
-            stats = result.get('stats', {})
-            processing_time = result.get('processing_time', 0)
-            
-            # Extract processing statistics
-            overview = stats.get('overview', {})
-            processed_count = overview.get('total_files', 0)
-            success_rate = overview.get('success_rate', '100%')
-            
-            success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files diproses dalam {processing_time:.1f}s (Success rate: {success_rate})"
-            
-            _complete_progress(ui_components, success_msg)
-            _log_to_ui(ui_components, success_msg, "success")
-            
-            # Log banknote analysis jika ada
-            if 'main_banknotes' in stats:
-                banknote_stats = stats['main_banknotes']
-                total_objects = banknote_stats.get('total_objects', 0)
-                _log_to_ui(ui_components, f"🏦 Main banknotes processed: {total_objects:,} objects", "info")
-            
+            _process_success_result(ui_components, result)
         else:
             error_msg = result.get('message', 'Preprocessing failed')
             _error_progress(ui_components, error_msg)
@@ -274,7 +213,7 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
         return False
 
 def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
-    """Execute cleanup menggunakan preprocessing API baru"""
+    """Execute cleanup dengan proper error handling dan button management"""
     try:
         _disable_buttons(ui_components)
         _setup_progress(ui_components, "🗑️ Memulai cleanup dengan API baru...")
@@ -296,27 +235,14 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
             data_dir=data_dir,
             target=cleanup_target,
             splits=target_splits,
-            confirm=True,  # Already confirmed via dialog
-            progress_callback=progress_callback
+            confirm=True,
+            progress_callback=progress_callback,
+            ui_components=ui_components
         )
         
         # Handle results
         if result.get('success', False):
-            stats = result.get('stats', {})
-            files_removed = stats.get('files_removed', 0)
-            splits_cleaned = stats.get('splits_cleaned', [])
-            
-            success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dihapus dari {len(splits_cleaned)} splits"
-            
-            _complete_progress(ui_components, success_msg)
-            _log_to_ui(ui_components, success_msg, "success")
-            
-            # Log detail per split jika ada
-            if 'split_stats' in stats:
-                for split, split_stat in stats['split_stats'].items():
-                    removed = split_stat.get('files_removed', 0)
-                    _log_to_ui(ui_components, f"  📁 {split}: {removed:,} files removed", "info")
-            
+            _process_cleanup_result(ui_components, result)
         else:
             error_msg = result.get('message', 'Cleanup failed')
             _error_progress(ui_components, error_msg)
@@ -330,10 +256,101 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
         _handle_error(ui_components, f"❌ API cleanup error: {str(e)}")
         return False
 
+# === RESULT PROCESSING ===
+
+def _process_status_result(ui_components: Dict[str, Any], status_result: Dict[str, Any]):
+    """Process dan display status check results"""
+    service_ready = status_result.get('service_ready', False)
+    file_stats = status_result.get('file_statistics', {})
+    output_directory = status_result.get('output_directory', {})
+    configuration = status_result.get('configuration', {})
+
+    if output_directory.get('exists', False):
+        _log_to_ui(ui_components, f"📂 Output directory: {output_directory['path']}", "info")
+    else:
+        _log_to_ui(ui_components, "❌ Output directory tidak ditemukan", "error")
+    
+    # Log konfigurasi dengan format multi-baris
+    config_msgs = ["🎯 Konfigurasi Preprocessing:"]
+    
+    # Target splits
+    splits = ", ".join(configuration.get('target_splits', []))
+    config_msgs.append(f"📦 Split dataset: {splits}")
+    
+    # Normalization settings
+    norm = configuration.get('normalization', {})
+    if norm.get('enabled', False):
+        size = norm.get('target_size', [0, 0])
+        config_msgs.append(f"🖼️ Normalisasi: {size[0]}x{size[1]} (preserve aspect: {'✅' if norm.get('preserve_aspect_ratio') else '❌'})")
+        config_msgs.append(f"📊 Metode: {norm.get('method', 'N/A')}, Range pixel: {norm.get('pixel_range', [])}")
+    else:
+        config_msgs.append("🚫 Normalisasi: Dinonaktifkan")
+    
+    # Validation
+    config_msgs.append(f"🔍 Validasi: {'✅' if configuration.get('validation_enabled') else '❌'}")
+    
+    # Tampilkan semua konfigurasi
+    for msg in config_msgs:
+        _log_to_ui(ui_components, msg, "info")
+    
+    # Format results
+    total_raw = sum(stats.get('raw_images', 0) for stats in file_stats.values())
+    total_preprocessed = sum(stats.get('preprocessed_files', 0) for stats in file_stats.values())
+    service_msg = "✅ Siap" if service_ready else "⚠️ Belum siap"
+    
+    final_msg = f"Dataset: {total_raw:,} raw images | Preprocessed: {total_preprocessed:,} files | Service: {service_msg}"
+    
+    _complete_progress(ui_components, final_msg)
+    _log_to_ui(ui_components, final_msg, "success")
+    
+    # Log layer analysis jika ada
+    if 'layer_analysis' in file_stats:
+        layer_info = file_stats['layer_analysis']
+        main_objects = layer_info.get('l1_main', {}).get('objects', 0)
+        _log_to_ui(ui_components, f"🏦 Main banknotes detected: {main_objects:,} objects", "info")
+
+def _process_success_result(ui_components: Dict[str, Any], result: Dict[str, Any]):
+    """Process dan display success results"""
+    stats = result.get('stats', {})
+    processing_time = result.get('processing_time', 0)
+    
+    # Extract processing statistics
+    overview = stats.get('overview', {})
+    processed_count = overview.get('total_files', 0)
+    success_rate = overview.get('success_rate', '100%')
+    
+    success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files diproses dalam {processing_time:.1f}s (Success rate: {success_rate})"
+    
+    _complete_progress(ui_components, success_msg)
+    _log_to_ui(ui_components, success_msg, "success")
+    
+    # Log banknote analysis jika ada
+    if 'main_banknotes' in stats:
+        banknote_stats = stats['main_banknotes']
+        total_objects = banknote_stats.get('total_objects', 0)
+        _log_to_ui(ui_components, f"🏦 Main banknotes processed: {total_objects:,} objects", "info")
+
+def _process_cleanup_result(ui_components: Dict[str, Any], result: Dict[str, Any]):
+    """Process dan display cleanup results"""
+    stats = result.get('stats', {})
+    files_removed = stats.get('files_removed', 0)
+    splits_cleaned = stats.get('splits_cleaned', [])
+    
+    success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dihapus dari {len(splits_cleaned)} splits"
+    
+    _complete_progress(ui_components, success_msg)
+    _log_to_ui(ui_components, success_msg, "success")
+    
+    # Log detail per split jika ada
+    if 'split_stats' in stats:
+        for split, split_stat in stats['split_stats'].items():
+            removed = split_stat.get('files_removed', 0)
+            _log_to_ui(ui_components, f"  📁 {split}: {removed:,} files removed", "info")
+
 # === PROGRESS CALLBACK ===
 
 def _create_progress_callback(ui_components: Dict[str, Any]):
-    """Create progress callback untuk preprocessing API - hanya update progress tracker"""
+    """Create progress callback untuk preprocessing API"""
     def progress_callback(level: str, current: int, total: int, message: str):
         try:
             progress_tracker = ui_components.get('progress_tracker')
@@ -349,10 +366,8 @@ def _create_progress_callback(ui_components: Dict[str, Any]):
             elif level == 'current' and hasattr(progress_tracker, 'update_current'):
                 progress_tracker.update_current(progress_percent, message)
             elif level in ['step', 'batch'] and hasattr(progress_tracker, 'update_current'):
-                # Map step/batch ke current untuk dual progress tracker
                 progress_tracker.update_current(progress_percent, message)
             
-            # Tidak log ke UI untuk menghindari flooding
         except Exception:
             pass  # Silent fail untuk menghindari interrupt processing
     
@@ -365,7 +380,6 @@ def _show_preprocessing_confirmation(ui_components: Dict[str, Any]):
     try:
         from smartcash.ui.components.dialog import show_confirmation_dialog
         
-        # Tampilkan area konfirmasi
         _show_confirmation_area(ui_components)
         
         show_confirmation_dialog(
@@ -391,7 +405,6 @@ def _show_cleanup_confirmation(ui_components: Dict[str, Any]):
         config = _extract_config(ui_components)
         cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
         
-        # Target descriptions
         target_descriptions = {
             'preprocessed': '<strong>preprocessing files</strong> (pre_*.npy + pre_*.txt)',
             'samples': '<strong>sample images</strong> (sample_*.jpg)',
@@ -433,12 +446,13 @@ def _set_cleanup_confirmed(ui_components: Dict[str, Any]):
     _execute_cleanup_with_api(ui_components)
 
 def _handle_preprocessing_cancel(ui_components: Dict[str, Any]):
-    """Handle preprocessing cancellation"""
+    """Handle preprocessing cancellation dengan proper cleanup"""
     _clear_outputs(ui_components)
     _log_to_ui(ui_components, "🚫 Preprocessing dibatalkan oleh user", "info")
+    _enable_buttons(ui_components)  # Enable buttons after cancel
 
 def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
-    """Handle cleanup cancellation"""
+    """Handle cleanup cancellation dengan proper cleanup"""
     _clear_outputs(ui_components)
     _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
     _enable_buttons(ui_components)
@@ -461,114 +475,11 @@ def _is_confirmation_pending(ui_components: Dict[str, Any]) -> bool:
     except Exception:
         return False
 
-# === UTILITY FUNCTIONS ===
-
 def _extract_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract config dari UI components"""
+    """Extract config dari UI components dengan fallback"""
     try:
         from smartcash.ui.dataset.preprocessing.handlers.config_extractor import extract_preprocessing_config
         return extract_preprocessing_config(ui_components)
     except Exception as e:
         _log_to_ui(ui_components, f"⚠️ Error extracting config: {str(e)}", "warning")
         return {'data': {'dir': 'data'}, 'preprocessing': {'target_splits': ['train', 'valid']}}
-
-def _setup_progress(ui_components: Dict[str, Any], message: str):
-    """Setup progress tracker untuk operation"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        if hasattr(progress_tracker, 'show'):
-            progress_tracker.show()
-        if hasattr(progress_tracker, 'update_overall'):
-            progress_tracker.update_overall(0, message)
-
-def _complete_progress(ui_components: Dict[str, Any], message: str):
-    """Complete progress tracker dengan success message"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        if hasattr(progress_tracker, 'complete'):
-            progress_tracker.complete(message)
-        elif hasattr(progress_tracker, 'update_overall'):
-            progress_tracker.update_overall(100, message)
-
-def _error_progress(ui_components: Dict[str, Any], message: str):
-    """Set error state pada progress tracker"""
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        if hasattr(progress_tracker, 'error'):
-            progress_tracker.error(message)
-        elif hasattr(progress_tracker, 'update_overall'):
-            progress_tracker.update_overall(0, f"❌ {message}")
-
-def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info"):
-    """Log message ke UI dengan timestamp dan styling"""
-    try:
-        log_output = ui_components.get('log_output')
-        if not log_output:
-            return
-            
-        from IPython.display import display, HTML
-        import datetime
-        
-        # Color mapping untuk different levels
-        colors = {
-            'info': '#2196F3', 'success': '#4CAF50', 
-            'warning': '#FF9800', 'error': '#F44336'
-        }
-        color = colors.get(level, '#2196F3')
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        
-        # Clean message dari duplicate emoji
-        clean_msg = message.strip()
-        
-        html = f"""
-        <div style='margin: 2px 0; padding: 4px 8px; border-left: 3px solid {color}; 
-                    background-color: rgba(248,249,250,0.8); border-radius: 4px;'>
-            <span style='color: #666; font-size: 11px;'>[{timestamp}]</span>
-            <span style='color: {color}; margin-left: 4px;'>{clean_msg}</span>
-        </div>
-        """
-        
-        with log_output:
-            display(HTML(html))
-            
-    except Exception:
-        # Fallback ke print jika UI logging gagal
-        print(f"[{level.upper()}] {message}")
-
-def _hide_confirmation_area(ui_components: Dict[str, Any]):
-    """Hide confirmation area dengan visibility control"""
-    confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area and hasattr(confirmation_area, 'layout'):
-        confirmation_area.layout.visibility = 'hidden'
-        confirmation_area.layout.height = '0px'
-
-def _show_confirmation_area(ui_components: Dict[str, Any]):
-    """Show confirmation area"""
-    confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area and hasattr(confirmation_area, 'layout'):
-        confirmation_area.layout.visibility = 'visible'
-        confirmation_area.layout.height = 'auto'
-
-def _clear_outputs(ui_components: Dict[str, Any]):
-    """Clear outputs dengan hiding confirmation area"""
-    _hide_confirmation_area(ui_components)
-
-def _disable_buttons(ui_components: Dict[str, Any]):
-    """Disable operation buttons during processing"""
-    for btn_key in ['preprocess_button', 'check_button', 'cleanup_button']:
-        if button := ui_components.get(btn_key):
-            if hasattr(button, 'disabled'):
-                button.disabled = True
-
-def _enable_buttons(ui_components: Dict[str, Any]):
-    """Enable operation buttons after processing"""
-    for btn_key in ['preprocess_button', 'check_button', 'cleanup_button']:
-        if button := ui_components.get(btn_key):
-            if hasattr(button, 'disabled'):
-                button.disabled = False
-
-def _handle_error(ui_components: Dict[str, Any], error_msg: str):
-    """Handle error dengan logging dan cleanup"""
-    _log_to_ui(ui_components, error_msg, "error")
-    _error_progress(ui_components, error_msg)
-    _enable_buttons(ui_components)

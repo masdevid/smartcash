@@ -104,6 +104,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             padding='12px',
             border='1px solid #e0e0e0', 
             border_radius='8px',
+            height='auto',
             background_color='#f9f9f9'
         ))
         

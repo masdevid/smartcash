@@ -1,223 +1,261 @@
 """
-File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Enhanced UI components dengan dialog integration dan progress tracking
+File: smartcash/ui/setup/dependency/components/ui_components.py
+Deskripsi: UI components tanpa check/uncheck buttons integration
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
-def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create preprocessing UI dengan API integration dan dialog support"""
-    config = config or {}
-    
-    try:
-        # Import dengan error handling
-        from smartcash.ui.utils.header_utils import create_header 
-        from smartcash.ui.components.action_buttons import create_action_buttons
-        from smartcash.ui.components.status_panel import create_status_panel
-        from smartcash.ui.components.log_accordion import create_log_accordion
-        from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-        from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
-        from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_input_options
-        
-        # === CORE COMPONENTS ===
-        
-        # Header
-        header = create_header(
-            "🔧 Dataset Preprocessing", 
-            "Preprocessing dataset dengan YOLO normalization dan real-time progress",
-            "🚀"
-        )
-        
-        # Status panel
-        status_panel = create_status_panel(
-            "🚀 Siap memulai preprocessing dengan API baru", 
-            "info"
-        )
-        
-        # Input options
-        input_options = create_preprocessing_input_options(config)
-        
-        # Save/Reset buttons
-        save_reset_components = create_save_reset_buttons(
-            save_label="💾 Simpan",
-            reset_label="🔄 Reset", 
-            with_sync_info=True,
-            sync_message="Konfigurasi akan disinkronkan dengan API"
-        )
-        
-        # Action buttons
-        action_components = create_action_buttons(
-            primary_label="🚀 Mulai Preprocessing",
-            primary_icon="play",
-            secondary_buttons=[("🔍 Check Dataset", "search", "info")],
-            cleanup_enabled=True,
-            button_width='180px'
-        )
-        
-        # Progress tracker
-        progress_components = create_dual_progress_tracker(
-            operation="Dataset Preprocessing",
-            auto_hide=False
-        )
-        
-        # Log accordion
-        log_components = create_log_accordion(
-            module_name='preprocessing',
-            height='200px'
-        )
-        
-        # === DIALOG AREA ===
-        
-        # Confirmation/Dialog area untuk reusable dialogs
-        confirmation_area = widgets.Output(layout=widgets.Layout(
-            width='100%', 
-            min_height='50px', 
-            max_height='250px',
-            margin='10px 0',
-            padding='5px',
-            border='1px solid #e0e0e0',
-            border_radius='4px',
-            background_color='#fafafa',
-            overflow='auto'
-        ))
-        
-        # === LAYOUT SECTIONS ===
-        
-        # Config section dengan save/reset buttons
-        config_section = widgets.VBox([
-            widgets.Box([save_reset_components['container']], 
-                layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
-        ], layout=widgets.Layout(margin='8px 0'))
-        
-        # Action section dengan confirmation area
-        action_section = widgets.VBox([
-            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
-            action_components['container'],
-            widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Konfirmasi & Status:</strong></div>"),
-            confirmation_area  # NOW PROPERLY INCLUDED
-        ], layout=widgets.Layout(
-            width='100%', 
-            margin='10px 0', 
-            padding='12px',
-            border='1px solid #e0e0e0', 
-            border_radius='8px',
-            background_color='#f9f9f9'
-        ))
-        
-        # === MAIN UI ASSEMBLY ===
-        
-        ui = widgets.VBox([
-            header,
-            status_panel,
-            input_options,
-            config_section,
-            action_section,
-            progress_components['container'],
-            log_components['log_accordion']
-        ], layout=widgets.Layout(
-            width='100%',
-            max_width='1200px',
-            margin='0 auto',
-            padding='15px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            box_shadow='0 2px 4px rgba(0,0,0,0.05)'
-        ))
-        
-        # === COMPONENT EXTRACTION ===
-        
-        # Safe extraction dengan fallback
-        def safe_extract(obj, attr, fallback=None):
-            try:
-                return getattr(obj, attr, fallback)
-            except (AttributeError, TypeError):
-                return fallback
-        
-        # Build UI components dictionary
-        ui_components = {
-            # CRITICAL COMPONENTS (required by CommonInitializer)
-            'ui': ui,
-            'preprocess_button': action_components.get('download_button'),  # primary button
-            'check_button': action_components.get('check_button'),
-            'cleanup_button': action_components.get('cleanup_button'),
-            'save_button': save_reset_components.get('save_button'),
-            'reset_button': save_reset_components.get('reset_button'),
-            'log_output': log_components.get('log_output'),
-            'status_panel': status_panel,
-            
-            # UI SECTIONS
-            'header': header,
-            'input_options': input_options,
-            'config_section': config_section,
-            'action_section': action_section,
-            'confirmation_area': confirmation_area,  # Dialog area
-            'dialog_area': confirmation_area,        # Alias untuk compatibility
-            
-            # PROGRESS TRACKING
-            'progress_tracker': progress_components.get('tracker'),
-            'progress_container': progress_components.get('container'),
-            
-            # LOG COMPONENTS
-            'log_accordion': log_components.get('log_accordion'),
-            
-            # INPUT FORM COMPONENTS
-            'resolution_dropdown': safe_extract(input_options, 'resolution_dropdown'),
-            'normalization_dropdown': safe_extract(input_options, 'normalization_dropdown'),
-            'preserve_aspect_checkbox': safe_extract(input_options, 'preserve_aspect_checkbox'),
-            'target_splits_select': safe_extract(input_options, 'target_splits_select'),
-            'batch_size_input': safe_extract(input_options, 'batch_size_input'),
-            'validation_checkbox': safe_extract(input_options, 'validation_checkbox'),
-            'move_invalid_checkbox': safe_extract(input_options, 'move_invalid_checkbox'),
-            'invalid_dir_input': safe_extract(input_options, 'invalid_dir_input'),
-            'cleanup_target_dropdown': safe_extract(input_options, 'cleanup_target_dropdown'),
-            'backup_checkbox': safe_extract(input_options, 'backup_checkbox'),
-            
-            # METADATA
-            'module_name': 'preprocessing',
-            'ui_initialized': True,
-            'data_dir': config.get('data', {}).get('dir', 'data'),
-            'api_integration': True,
-            'dialog_support': True,
-            'progress_tracking': True
-        }
-        
-        return ui_components
-        
-    except Exception as e:
-        # Fallback UI jika terjadi error
-        error_msg = f"Error creating preprocessing UI: {str(e)}"
-        print(f"⚠️ {error_msg}")
-        
-        return _create_fallback_ui(error_msg)
+from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.utils.layout_utils import create_divider
+from smartcash.ui.components.action_buttons import create_action_buttons
+from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
+from smartcash.ui.components.status_panel import create_status_panel
+from smartcash.ui.components.log_accordion import create_log_accordion
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from .package_selector import create_package_selector_grid
 
-def _create_fallback_ui(error_msg: str) -> Dict[str, Any]:
-    """Create minimal fallback UI"""
-    error_widget = widgets.HTML(f"""
-        <div style='padding:20px;border:2px solid #dc3545;border-radius:8px;background:#f8d7da;color:#721c24;'>
-            <h4>⚠️ UI Creation Error</h4>
-            <p>{error_msg}</p>
-            <small>💡 Try restarting the cell atau check dependencies</small>
+def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create dependency installer UI tanpa check/uncheck buttons"""
+    
+    get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
+    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
+    
+    # Header
+    header = create_header(
+        f"{get_icon('download', '📦')} Dependency Installer", 
+        "Setup packages yang diperlukan untuk SmartCash"
+    )
+    
+    # Status panel
+    status_panel = create_status_panel("Pilih packages yang akan diinstall dan klik tombol install", "info")
+    
+    # Package selector grid
+    package_selector = create_package_selector_grid(config)
+    
+    # Custom packages input
+    custom_packages = widgets.Textarea(
+        placeholder='Package tambahan (satu per baris)\ncontoh: numpy>=1.21.0\nopencv-python>=4.5.0',
+        layout=widgets.Layout(
+            width='100%', 
+            height='90px', 
+            margin='8px 0',
+            border='1px solid #ddd',
+            border_radius='4px'
+        )
+    )
+    
+    custom_section = widgets.VBox([
+        widgets.HTML(f"""
+        <h4 style='color: {get_color('dark', '#333')}; margin: 12px 0 8px 0; font-size: 15px;'>
+            {get_icon('edit', '📝')} Custom Packages
+        </h4>
+        """),
+        custom_packages
+    ], layout=widgets.Layout(width='100%', margin='10px 0'))
+    
+    # Progress tracker dengan dual-level untuk tracking yang lebih jelas
+    progress_tracker = create_dual_progress_tracker(
+        operation="Dependency Installation",
+        auto_hide=True
+    )
+    
+    # Log components
+    log_components = create_log_accordion(
+        module_name="dependency",
+        height="200px",
+        width="100%"
+    )
+    
+    # Action buttons
+    action_buttons = create_action_buttons(
+        primary_label="Install Packages",
+        primary_icon="download", 
+        secondary_buttons=[("Analyze Status", "search", "info")],
+        cleanup_enabled=True,
+        button_width='140px'
+    )
+    
+    # Force update button labels
+    action_buttons['download_button'].description = "Install Packages"
+    action_buttons['download_button'].tooltip = "Install packages yang dipilih"
+    action_buttons['download_button'].icon = 'download'
+    action_buttons['download_button'].button_style = 'primary'
+    
+    action_buttons['check_button'].description = "Analyze Status"  
+    action_buttons['check_button'].tooltip = "Analyze status packages yang dipilih"
+    action_buttons['check_button'].icon = 'search'
+    action_buttons['check_button'].button_style = 'info'
+    
+    # Repurpose cleanup button untuk System Report
+    if action_buttons.get('cleanup_button'):
+        action_buttons['cleanup_button'].description = "System Report"
+        action_buttons['cleanup_button'].tooltip = "Generate comprehensive system and package report"
+        action_buttons['cleanup_button'].icon = 'clipboard'
+        action_buttons['cleanup_button'].button_style = ''
+    
+    # Auto-analyze checkbox
+    auto_analyze_checkbox = widgets.Checkbox(
+        value=config.get('auto_analyze', True) if config else True,
+        description="Auto-analyze setelah render",
+        tooltip="Otomatis analisis packages setelah UI dimuat",
+        layout=widgets.Layout(width='auto', margin='8px 0'),
+        style={'description_width': 'initial'}
+    )
+    
+    # Save & reset buttons
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan", reset_label="Reset",
+        save_tooltip="Simpan konfigurasi packages",
+        reset_tooltip="Reset pilihan ke default",
+        button_width='100px'
+    )
+    
+    # Log accordion (gunakan yang sudah dibuat sebelumnya)
+    # Catatan: log_components sudah dibuat sebelumnya, tidak perlu dibuat lagi
+    
+    # Help content
+    help_content = """
+    <div style="padding: 10px; background: #ffffff; line-height: 1.5;">
+        <p style="margin: 8px 0; font-size: 13px; color: #495057;">
+            Dependency installer untuk setup packages yang dibutuhkan SmartCash secara otomatis.
+        </p>
+        <div style="margin: 12px 0;">
+            <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Action Buttons:</strong>
+            <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
+                <li style="margin: 3px 0;"><strong>Install Packages:</strong> Install packages yang dipilih (auto-skip yang sudah terinstall)</li>
+                <li style="margin: 3px 0;"><strong>Analyze Status:</strong> Analisis status packages yang dipilih</li>
+                <li style="margin: 3px 0;"><strong>System Report:</strong> Generate laporan lengkap sistem dan semua packages</li>
+            </ul>
         </div>
+        <div style="margin: 12px 0;">
+            <strong style="color: #495057; font-size: 13px; display: block; margin-bottom: 6px;">Package Categories:</strong>
+            <ul style="margin: 6px 0; padding-left: 20px; color: #495057; font-size: 12px;">
+                <li style="margin: 3px 0;"><strong>Core Requirements:</strong> Package inti SmartCash (IPython, widgets, YAML)</li>
+                <li style="margin: 3px 0;"><strong>ML/AI Libraries:</strong> PyTorch, YOLOv5, computer vision frameworks</li>
+                <li style="margin: 3px 0;"><strong>Data Processing:</strong> Pandas, NumPy, OpenCV, Matplotlib</li>
+            </ul>
+        </div>
+        <div style="margin-top: 12px; padding: 8px; background: #e7f3ff; border-radius: 4px; font-size: 12px; border-left: 3px solid #007bff;">
+            <strong>💡 Tips:</strong> Package yang sudah terinstall akan dilewati otomatis saat install.
+        </div>
+    </div>
+    """
+    
+    help_panel = widgets.Accordion([widgets.HTML(value=help_content)])
+    help_panel.set_title(0, "💡 Info Installation")
+    help_panel.selected_index = None
+    
+    # Section headers
+    packages_header = widgets.HTML(f"""
+    <h4 style='color: {get_color('dark', '#333')}; margin: 18px 0 8px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('primary', '#007bff')}; padding-bottom: 6px;'>
+        {get_icon('config', '⚙️')} Pilih Packages untuk Installation
+    </h4>
+    <p style='color: {get_color('muted', '#666')}; margin: 5px 0 10px 0; font-size: 12px; font-style: italic;'>
+        ⭐ = Essential packages (direkomendasikan)
+    </p>
     """)
     
-    log_output = widgets.Output()
-    confirmation_area = widgets.Output()
+    action_header = widgets.HTML(f"""
+    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
+               border-bottom: 2px solid {get_color('success', '#28a745')}; padding-bottom: 6px;'>
+        {get_icon('play', '▶️')} Actions
+    </h4>
+    """)
     
-    return {
-        'ui': widgets.VBox([error_widget]),
-        'status_panel': widgets.HTML(f"<div style='color:#dc3545;'>❌ {error_msg}</div>"),
-        'log_output': log_output,
-        'log_accordion': widgets.Accordion(children=[log_output]),
-        'confirmation_area': confirmation_area,
-        'dialog_area': confirmation_area,
-        'progress_tracker': None,
-        'preprocess_button': widgets.Button(description="Error", disabled=True),
-        'check_button': widgets.Button(description="Error", disabled=True), 
-        'cleanup_button': widgets.Button(description="Error", disabled=True),
-        'save_button': widgets.Button(description="Error", disabled=True),
-        'reset_button': widgets.Button(description="Error", disabled=True),
-        'module_name': 'preprocessing',
-        'ui_initialized': False,
-        'error': error_msg
+    # Main UI assembly tanpa check/uncheck buttons
+    ui = widgets.VBox([
+        header, 
+        status_panel, 
+        packages_header,
+        package_selector['container'],
+        custom_section, 
+        widgets.HBox([auto_analyze_checkbox], layout=widgets.Layout(justify_content='flex-start', margin='5px 0')),
+        save_reset_buttons['container'],
+        action_header, 
+        widgets.HBox([action_buttons['container']], layout=widgets.Layout(justify_content='center', margin='10px 0')),
+        progress_tracker.container, 
+        log_components['log_accordion'], 
+        create_divider(margin="15px 0", color="#f0f0f0"), 
+        help_panel
+    ], layout=widgets.Layout(
+        width='100%', 
+        max_width='100%',
+        padding='10px', 
+        margin='0',
+        overflow='hidden',
+        box_sizing='border-box'
+    ))
+    
+    # Compile components tanpa check/uncheck integration
+    ui_components = {
+        # Main UI
+        'ui': ui, 
+        'header': header, 
+        'status_panel': status_panel,
+        
+        # Package selector
+        'package_selector': package_selector,
+        'custom_packages': custom_packages,
+        'auto_analyze_checkbox': auto_analyze_checkbox,
+        
+        # Action buttons
+        'action_buttons': action_buttons,
+        'install_button': action_buttons['download_button'],        
+        'analyze_button': action_buttons['check_button'],           
+        'check_button': action_buttons.get('cleanup_button'),       
+        
+        # Save/reset buttons
+        'save_reset_buttons': save_reset_buttons,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_button': save_reset_buttons['reset_button'],
+        
+        # Progress components dengan API yang benar
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.container,
+        'show_for_operation': progress_tracker.show,
+        'update_overall': progress_tracker.update_overall,  # API yang benar untuk level 1
+        'update_current': progress_tracker.update_current,  # API yang benar untuk level 2
+        'update_step_progress': progress_tracker.update_step_progress if hasattr(progress_tracker, 'update_step_progress') else None,  # API untuk level 3 dengan fallback
+        'complete_operation': progress_tracker.complete,
+        'error_operation': progress_tracker.error,
+        'reset_all': progress_tracker.reset,
+        
+        # Backward compatibility untuk kode lama
+        'update_progress': lambda type='overall', progress=0, message='', color=None: (
+            progress_tracker.update_overall(progress, message, color) if type == 'overall' or type == 'level1' else
+            progress_tracker.update_current(progress, message, color) if type == 'step' or type == 'level2' else
+            progress_tracker.update_step_progress(progress, message, color) if hasattr(progress_tracker, 'update_step_progress') else
+            progress_tracker.update_current(progress, message, color)
+        ),
+        
+        # Log components
+        'log_components': log_components,
+        'log_accordion': log_components['log_accordion'],
+        'log_output': log_components['log_output'],
+        'status': log_components['log_output'],
+        
+        # UI info
+        'help_panel': help_panel,
+        'module_name': 'dependency'
     }
+    
+    # Add package checkboxes dari selector
+    if 'checkboxes' in package_selector:
+        ui_components.update(package_selector['checkboxes'])
+    
+    # Validate critical components
+    critical_buttons = ['install_button', 'analyze_button', 'check_button', 'save_button', 'reset_button']
+    for comp_name in critical_buttons:
+        if ui_components.get(comp_name) is None:
+            ui_components[comp_name] = widgets.Button(
+                description=comp_name.replace('_', ' ').title(),
+                button_style='primary' if 'install' in comp_name else '',
+                disabled=True,
+                tooltip=f"Component {comp_name} tidak tersedia",
+                layout=widgets.Layout(width='auto', max_width='150px')
+            )
+    
+    return ui_components

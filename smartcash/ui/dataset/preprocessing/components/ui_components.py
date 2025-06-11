@@ -95,7 +95,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
             action_components['container'],
             widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Konfirmasi & Status:</strong></div>"),
-            confirmation_area
+            confirmation_area  # NOW PROPERLY INCLUDED
         ], layout=widgets.Layout(
             width='100%', 
             margin='10px 0', 

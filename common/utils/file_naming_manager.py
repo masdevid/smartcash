@@ -20,11 +20,9 @@ class FileNamingInfo:
     source_type: str = 'raw'  # raw, augmented, preprocessed
     
     def get_filename(self, extension: str = None) -> str:
-        """Generate filename dengan format: rp_{nominal}_{uuid}_{original_sequence}"""
-        base_name = Path(self.original_name).stem
+        """Generate filename dengan format: rp_{nominal}_{uuid}"""
         ext = extension or Path(self.original_name).suffix
-        sequence = self._extract_sequence_from_original()
-        return f"rp_{self.nominal}_{self.uuid}_{sequence:03d}{ext}"
+        return f"rp_{self.nominal}_{self.uuid}{ext}"
     
     def _extract_sequence_from_original(self) -> int:
         """Extract sequence number dari original filename dengan one-liner regex"""
@@ -111,12 +109,12 @@ class FileNamingManager:
     
     def parse_existing_filename(self, filename: str) -> Optional[Dict[str, str]]:
         """Parse existing filename dengan format rp_{nominal}_{uuid}_{sequence}"""
-        pattern = r'^rp_(\d{6})_([0-9a-f-]{36})_(\d{3})'
+        pattern = r'^rp_(\d{6})_([0-9a-f-]{36})'
         match = re.match(pattern, Path(filename).stem)
         
         if match:
             return {
-                'nominal': match.group(1), 'uuid': match.group(2), 'sequence': match.group(3),
+                'nominal': match.group(1), 'uuid': match.group(2),
                 'description': self.NOMINAL_TO_DESCRIPTION.get(match.group(1), 'Unknown')
             }
         return None
@@ -178,5 +176,5 @@ def validate_rupiah_filename(filename: str) -> bool:
 # Convenience functions untuk common operations
 get_nominal_from_class = lambda class_id: FileNamingManager.CLASS_TO_NOMINAL.get(int(class_id) if isinstance(class_id, str) and class_id.isdigit() else class_id, '000000')
 get_description_from_nominal = lambda nominal: FileNamingManager.NOMINAL_TO_DESCRIPTION.get(nominal, 'Unknown')
-is_valid_rp_format = lambda filename: bool(re.match(r'^rp_\d{6}_[0-9a-f-]{36}_\d{3}', Path(filename).stem))
-extract_uuid_from_filename = lambda filename: (match.group(2) if (match := re.match(r'^rp_\d{6}_([0-9a-f-]{36})_\d{3}', Path(filename).stem)) else None)
+is_valid_rp_format = lambda filename: bool(re.match(r'^rp_\d{6}_[0-9a-f-]{36}', Path(filename).stem))
+extract_uuid_from_filename = lambda filename: (match.group(2) if (match := re.match(r'^rp_\d{6}_([0-9a-f-]{36})', Path(filename).stem)) else None)

@@ -17,10 +17,10 @@ class FilenameValidator:
         self.config = config or {}
         self.logger = get_logger(__name__)
         
-        # Research filename pattern: rp_001000_uuid_001.jpg
-        self.raw_pattern = re.compile(r'rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)')
-        self.preprocessed_pattern = re.compile(r'pre_rp_(\d{6})_([a-f0-9-]{36})_(\d+)_(\d+)\.(\w+)')
-        self.augmented_pattern = re.compile(r'aug_rp_(\d{6})_([a-f0-9-]{36})_(\d+)_(\d+)\.(\w+)')
+        # Research filename pattern: rp_001000_uuid.jpg
+        self.raw_pattern = re.compile(r'rp_(\d{6})_([a-f0-9-]{36})\.(\w+)')
+        self.preprocessed_pattern = re.compile(r'pre_rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)')
+        self.augmented_pattern = re.compile(r'aug_rp_(\d{6})_([a-f0-9-]{36})_(\d+)\.(\w+)')
         
         # Denomination mapping untuk auto-detection
         self.denomination_patterns = [
@@ -77,14 +77,6 @@ class FilenameValidator:
                     new_name = validation['suggested_name']
                     new_path = file_path.parent / new_name
                     
-                    # Avoid conflicts
-                    counter = 1
-                    while new_path.exists():
-                        stem, ext = new_name.rsplit('.', 1)
-                        new_name = f"{stem}_{counter:03d}.{ext}"
-                        new_path = file_path.parent / new_name
-                        counter += 1
-                    
                     # Rename file
                     file_path.rename(new_path)
                     rename_map[str(file_path)] = str(new_path)
@@ -114,7 +106,7 @@ class FilenameValidator:
             return {
                 'nominal': nominal,
                 'uuid': uuid_str,
-                'sequence': int(sequence),
+                # 'sequence': int(sequence),
                 'extension': extension
             }
         elif pattern_name in ['preprocessed', 'augmented']:
@@ -122,7 +114,7 @@ class FilenameValidator:
             return {
                 'nominal': nominal,
                 'uuid': uuid_str,
-                'sequence': int(sequence),
+                # 'sequence': int(sequence),
                 'variance': int(variance),
                 'extension': extension
             }
@@ -143,7 +135,7 @@ class FilenameValidator:
         # Default sequence
         sequence = 1
         
-        return f"rp_{nominal}_{uuid_str}_{sequence:03d}.{extension}"
+        return f"rp_{nominal}_{uuid_str}.{extension}"
     
     def _detect_nominal(self, filename: str) -> str:
         """💰 Detect denomination dari filename"""

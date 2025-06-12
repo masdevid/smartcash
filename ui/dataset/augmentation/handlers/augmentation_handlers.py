@@ -3,6 +3,7 @@ File: smartcash/ui/dataset/augmentation/handlers/augmentation_handlers.py
 Deskripsi: Complete handlers dengan dialog integration dan live preview handler
 """
 
+import os
 from typing import Dict, Any, Callable, List
 from smartcash.common.logger import get_logger
 
@@ -22,7 +23,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str,
     return ui_components
 
 def _setup_operation_handlers_with_dialog(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup operation handlers dengan dialog confirmation menggunakan smartcash.ui.components.dialog"""
+    """Setup operation handlers dengan dialog confirmation"""
     
     def augment_handler(btn=None):
         from smartcash.ui.dataset.augmentation.utils.ui_utils import clear_ui_outputs, validate_form_inputs
@@ -75,9 +76,7 @@ def _setup_preview_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
         
         try:
             # Update status
-            preview_status = ui_components.get('preview_status')
-            if preview_status:
-                preview_status.value = "<div style='text-align: center; color: #007bff; font-size: 12px;'>🔄 Generating preview...</div>"
+            _update_preview_status(ui_components, 'generating', 'Generating preview...')
             
             # Extract config untuk preview
             from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
@@ -88,8 +87,7 @@ def _setup_preview_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             
         except Exception as e:
             log_to_ui(ui_components, f"❌ Error generating preview: {str(e)}", "error")
-            if preview_status:
-                preview_status.value = "<div style='text-align: center; color: #dc3545; font-size: 12px;'>❌ Preview error</div>"
+            _update_preview_status(ui_components, 'error', 'Preview error')
     
     # Bind preview handler
     generate_button = ui_components.get('generate_button')
@@ -97,9 +95,9 @@ def _setup_preview_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
         generate_button.on_click(preview_handler)
 
 def _show_augmentation_confirmation_dialog(ui_components: Dict[str, Any]):
-    """Show augmentation confirmation menggunakan smartcash.ui.components.dialog"""
+    """Show augmentation confirmation dengan enhanced summary"""
     try:
-        from smartcash.ui.components.dialog import show_confirmation_dialog
+        from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_confirmation_in_area
         
         # Extract config untuk summary
         from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
@@ -124,12 +122,12 @@ def _show_augmentation_confirmation_dialog(ui_components: Dict[str, Any]):
         message += "📊 Real-time progress overall + current<br>"
         message += "🎯 YOLO normalization menggunakan preprocessor API</p>"
         
-        show_confirmation_dialog(
+        show_confirmation_in_area(
             ui_components,
             title="🚀 Konfirmasi Augmentasi Pipeline",
             message=message,
-            on_confirm=lambda: _execute_backend_operation(ui_components, 'augmentation_pipeline'),
-            on_cancel=lambda: _handle_augmentation_cancel(ui_components),
+            on_confirm=lambda b: _execute_backend_operation(ui_components, 'augmentation_pipeline'),
+            on_cancel=lambda b: _handle_augmentation_cancel(ui_components),
             confirm_text="🚀 Mulai Augmentasi",
             cancel_text="❌ Batal"
         )
@@ -140,9 +138,9 @@ def _show_augmentation_confirmation_dialog(ui_components: Dict[str, Any]):
         _execute_backend_operation(ui_components, 'augmentation_pipeline')
 
 def _show_cleanup_confirmation_dialog(ui_components: Dict[str, Any]):
-    """Show cleanup confirmation menggunakan smartcash.ui.components.dialog"""
+    """Show cleanup confirmation dengan target info"""
     try:
-        from smartcash.ui.components.dialog import show_confirmation_dialog
+        from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_confirmation_in_area
         from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
         
         config = extract_augmentation_config(ui_components)
@@ -167,12 +165,12 @@ def _show_cleanup_confirmation_dialog(ui_components: Dict[str, Any]):
             )
         )
         
-        show_confirmation_dialog(
+        show_confirmation_in_area(
             ui_components,
             title="⚠️ Konfirmasi Cleanup Dataset",
             message=message,
-            on_confirm=lambda: _execute_backend_operation(ui_components, 'cleanup'),
-            on_cancel=lambda: _handle_cleanup_cancel(ui_components),
+            on_confirm=lambda b: _execute_backend_operation(ui_components, 'cleanup'),
+            on_cancel=lambda b: _handle_cleanup_cancel(ui_components),
             confirm_text="🗑️ Ya, Hapus",
             cancel_text="❌ Batal",
             danger_mode=True
@@ -184,7 +182,7 @@ def _show_cleanup_confirmation_dialog(ui_components: Dict[str, Any]):
         _execute_backend_operation(ui_components, 'cleanup')
 
 def _execute_backend_operation(ui_components: Dict[str, Any], operation_type: str):
-    """Execute backend operation dengan proper error handling"""
+    """Execute backend operation dengan fixed service creation"""
     from smartcash.ui.dataset.augmentation.utils.button_manager import with_button_management
     
     @with_button_management
@@ -198,7 +196,7 @@ def _execute_backend_operation(ui_components: Dict[str, Any], operation_type: st
             from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
             
             ui_config = extract_augmentation_config(ui_components)
-            service = create_augmentation_service(ui_config, progress_tracker)
+            service = create_augmentation_service(ui_config, progress_tracker)  # Fixed: Pass progress_tracker
             
             if progress_tracker:
                 progress_tracker.show()
@@ -242,108 +240,91 @@ def _execute_backend_operation(ui_components: Dict[str, Any], operation_type: st
     _backend_operation(ui_components)
 
 def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Generate preview image ke /data/aug_preview.jpg"""
+    """Generate preview image dengan fixed service creation dan auto-loading"""
     try:
         from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
-        import os
         
-        # Cek dan mount Google Drive jika diperlukan
-        try:
-            from google.colab import drive
-            drive.mount('/content/drive')
-            drive_mounted = True
-        except (ImportError, Exception) as e:
-            drive_mounted = False
-        
-        # Tentukan path preview
-        if drive_mounted and os.path.exists('/content/drive'):
-            # Gunakan Google Drive jika tersedia
-            preview_dir = '/content/drive/MyDrive/data'
-        else:
-            # Fallback ke direktori lokal
-            preview_dir = os.path.join(os.getcwd(), 'data')
-            
-        preview_path = os.path.join(preview_dir, 'aug_preview.jpg')
-        
-        # Pastikan direktori preview ada
-        try:
-            os.makedirs(os.path.dirname(preview_path), exist_ok=True)
-        except Exception as e:
-            log_to_ui(ui_components, f"❌ Gagal membuat direktori: {str(e)}", "error")
-            raise
-        
-        # Create preview menggunakan backend service
+        # Create service dengan correct arguments
         from smartcash.dataset.augmentor.service import create_augmentation_service
+        service = create_augmentation_service(config)  # Fixed: Only config argument
         
-        try:
-            # Dapatkan service dari tuple yang dikembalikan
-            service, preview_path, success = create_augmentation_service(config)
-            
-            if not success or not service:
-                error_msg = "Gagal membuat service augmentasi"
-                log_to_ui(ui_components, f"❌ {error_msg}", "error")
-                raise Exception(error_msg)
-                
-            # Set progress tracker jika ada
-            if hasattr(service, 'set_progress_tracker') and 'progress_tracker' in ui_components:
-                service.set_progress_tracker(ui_components['progress_tracker'])
-            
-            # Panggil create_live_preview untuk generate preview
-            preview_result = service.create_live_preview(
-                target_split=config.get('augmentation', {}).get('target_split', 'train')
-            )
-            
-            # Periksa status dari preview_result
-            if not preview_result.get('status'):
-                error_msg = preview_result.get('message', 'Gagal membuat preview')
-                log_to_ui(ui_components, f"❌ {error_msg}", "error")
-                raise Exception(error_msg)
-                
-            # Update preview_path dengan path dari hasil generate
-            preview_path = preview_result.get('preview_path', preview_path)
-                
-        except Exception as e:
-            error_msg = f"Gagal membuat preview: {str(e)}"
-            log_to_ui(ui_components, f"❌ {error_msg}", "error")
-            raise Exception(error_msg)
+        # Create preview
+        preview_result = service.create_live_preview(
+            target_split=config.get('augmentation', {}).get('target_split', 'train')
+        )
         
-        # Periksa hasil preview
-        if not preview_result or preview_result.get('status') != 'success':
+        if preview_result.get('status') != 'success':
             error_msg = preview_result.get('message', 'Gagal membuat preview')
             log_to_ui(ui_components, f"❌ {error_msg}", "error")
-            raise Exception(error_msg)
+            _update_preview_status(ui_components, "error", "Preview failed")
+            return
             
-        # Dapatkan path preview dari hasil
-        result_preview_path = preview_result.get('preview_path')
-        if not result_preview_path or not os.path.exists(result_preview_path):
-            error_msg = f"File preview tidak ditemukan di: {result_preview_path}"
+        # Get preview path
+        preview_path = preview_result.get('preview_path')
+        if not preview_path or not os.path.exists(preview_path):
+            error_msg = f"File preview tidak ditemukan: {preview_path}"
             log_to_ui(ui_components, f"❌ {error_msg}", "error")
-            raise Exception(error_msg)
-            
-        # Copy file preview ke lokasi yang ditentukan
-        import shutil
-        shutil.copy2(result_preview_path, preview_path)
+            _update_preview_status(ui_components, "error", "Preview file not found")
+            return
         
-        # Load dan display image
-        with open(preview_path, 'rb') as f:
-            image_data = f.read()
-        
-        preview_image = ui_components.get('preview_image')
-        if preview_image:
-            preview_image.value = image_data
-        
-        preview_status = ui_components.get('preview_status')
-        if preview_status:
-            preview_status.value = "<div style='text-align: center; color: #28a745; font-size: 12px;'>✅ Preview generated</div>"
-        
-        log_to_ui(ui_components, "✅ Preview berhasil di-generate", "success")
+        # Load dan display image dengan enhanced error handling
+        if _load_preview_to_widget(ui_components, preview_path):
+            log_to_ui(ui_components, "✅ Preview berhasil di-generate dan dimuat", "success")
+            _update_preview_status(ui_components, "success", "Preview loaded")
+        else:
+            log_to_ui(ui_components, "⚠️ Preview dibuat tapi gagal dimuat ke widget", "warning")
+            _update_preview_status(ui_components, "warning", "Preview created but not loaded")
         
     except Exception as e:
         log_to_ui(ui_components, f"❌ Error generating preview: {str(e)}", "error")
+        _update_preview_status(ui_components, "error", "Preview generation failed")
+
+def _load_preview_to_widget(ui_components: Dict[str, Any], preview_path: str) -> bool:
+    """Load preview image ke widget dengan enhanced error handling"""
+    try:
+        # Pastikan file exists dan readable
+        if not os.path.exists(preview_path):
+            return False
         
-        preview_status = ui_components.get('preview_status')
-        if preview_status:
-            preview_status.value = "<div style='text-align: center; color: #dc3545; font-size: 12px;'>❌ Preview failed</div>"
+        # Check file size
+        file_size = os.path.getsize(preview_path)
+        if file_size == 0:
+            return False
+        
+        # Read image data
+        with open(preview_path, 'rb') as f:
+            image_data = f.read()
+        
+        # Validate image data
+        if len(image_data) == 0:
+            return False
+        
+        # Update preview widget
+        preview_image = ui_components.get('preview_image')
+        if preview_image and hasattr(preview_image, 'value'):
+            preview_image.value = image_data
+            return True
+        
+        return False
+        
+    except Exception:
+        return False
+
+def _update_preview_status(ui_components: Dict[str, Any], status: str, message: str):
+    """Update preview status dengan consistent styling"""
+    preview_status = ui_components.get('preview_status')
+    if not preview_status:
+        return
+    
+    style = 'color: {};' if status else ''
+    emoji = 'ℹ️' if status == 'info' else '✅' if status == 'success' else '❌' if status == 'error' else '⚠️'
+    
+    preview_status.value = f"""
+    <div style='{style} text-align: center; font-size: 12px; margin: 4px 0; 
+                font-family: monospace; padding: 2px;'>
+        {emoji} {message}
+    </div>
+    """
 
 def _handle_pipeline_result(ui_components: Dict[str, Any], result: Dict[str, Any]):
     """Handle pipeline result dengan enhanced feedback"""
@@ -417,11 +398,15 @@ def _handle_cleanup_result(ui_components: Dict[str, Any], result: Dict[str, Any]
 def _handle_augmentation_cancel(ui_components: Dict[str, Any]):
     """Handle augmentation cancellation"""
     from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
+    clear_confirmation_area(ui_components)
     log_to_ui(ui_components, "🚫 Augmentasi dibatalkan oleh user", "info")
 
 def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
     """Handle cleanup cancellation"""
     from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+    from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
+    clear_confirmation_area(ui_components)
     log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
 
 def _bind_handlers_safe(ui_components: Dict[str, Any], handlers: Dict[str, Callable]):

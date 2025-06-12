@@ -176,11 +176,10 @@ class AugmentationService:
             variance_count = status.get(f'{split}_variance_count', 0)
             
             # Status icons
-            raw_icon, aug_icon, prep_icon = {
-                'available': "✅",
-                'not_found': "❌",
-                'unknown': "⚠️"
-            }.get((status.get(f'{split}_raw_status'), status.get(f'{split}_aug_status'), status.get(f'{split}_prep_status')), "⚠️")
+            status_icons = {'available': "✅", 'not_found': "❌", 'unknown': "⚠️", 'empty': "📭", 'missing': "❌"}
+            raw_icon = status_icons.get(raw_status, "⚠️")
+            aug_icon = status_icons.get(aug_status, "⚠️")
+            prep_icon = status_icons.get(prep_status, "⚠️")
             
             self.logger.info(f"  📂 {split.upper()}:")
             self.logger.info(f"    {raw_icon} Raw: {raw_imgs} images ({raw_status})")
@@ -461,31 +460,18 @@ class AugmentationService:
             self.logger.info(f"📋 API: {norm_summary.get('configuration', {}).get('api_source', 'N/A')} normalization")
 
 
-def create_augmentation_service(config: Dict[str, Any]) -> Tuple[Any, str, bool]:
-    """Buat service dan kembalikan (service, preview_path, success)"""
-    try:
-        service = AugmentationService(config)
-        preview_path = service.create_live_preview()
-        return service, preview_path, True
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"Error creating service: {str(e)}")
-        return None, "", False
+def create_augmentation_service(config: Dict[str, Any], progress_tracker=None) -> AugmentationService:
+    """🏭 Fixed factory dengan consistent signature"""
+    return AugmentationService(config, progress_tracker)
 
 def run_augmentation_pipeline(config: Dict[str, Any], target_split: str = "train", 
                             progress_tracker=None, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
     """One-liner untuk run pipeline"""
-    service = create_augmentation_service(config)
-    if service[2]:
-        return service[0].run_augmentation_pipeline(target_split, progress_callback)
-    else:
-        return {'status': 'error', 'message': 'Failed to create service'}
+    service = create_augmentation_service(config, progress_tracker)
+    return service.run_augmentation_pipeline(target_split, progress_callback)
 
 def get_augmentation_samples(config: Dict[str, Any], target_split: str = "train", 
                            max_samples: int = 5, progress_tracker=None) -> Dict[str, Any]:
     """One-liner untuk get sampling data"""
-    service = create_augmentation_service(config)
-    if service[2]:
-        return service[0].get_sampling(target_split, max_samples)
-    else:
-        return {'status': 'error', 'message': 'Failed to create service'}
+    service = create_augmentation_service(config, progress_tracker)
+    return service.get_sampling(target_split, max_samples)

@@ -287,16 +287,25 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
             # Set progress tracker jika ada
             if hasattr(service, 'set_progress_tracker') and 'progress_tracker' in ui_components:
                 service.set_progress_tracker(ui_components['progress_tracker'])
+            
+            # Panggil create_live_preview untuk generate preview
+            preview_result = service.create_live_preview(
+                target_split=config.get('augmentation', {}).get('target_split', 'train')
+            )
+            
+            # Periksa status dari preview_result
+            if not preview_result.get('status'):
+                error_msg = preview_result.get('message', 'Gagal membuat preview')
+                log_to_ui(ui_components, f"❌ {error_msg}", "error")
+                raise Exception(error_msg)
+                
+            # Update preview_path dengan path dari hasil generate
+            preview_path = preview_result.get('preview_path', preview_path)
                 
         except Exception as e:
-            error_msg = f"Gagal menginisialisasi service: {str(e)}"
+            error_msg = f"Gagal membuat preview: {str(e)}"
             log_to_ui(ui_components, f"❌ {error_msg}", "error")
             raise Exception(error_msg)
-        
-        # Panggil create_live_preview untuk generate preview
-        preview_result = service.create_live_preview(
-            target_split=config.get('augmentation', {}).get('target_split', 'train')
-        )
         
         # Periksa hasil preview
         if not preview_result or preview_result.get('status') != 'success':

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/basic_opts_widget.py
-Deskripsi: Basic options widget yang dioptimasi dengan fungsi styling terkonsolidasi
+Deskripsi: Basic options widget dengan cleanup options integration dan responsive styling
 """
 
 import ipywidgets as widgets
@@ -10,7 +10,7 @@ from smartcash.ui.dataset.augmentation.utils.style_utils import (
 )
 
 def create_basic_options_widget() -> Dict[str, Any]:
-    """Create basic options dengan styling terkonsolidasi"""
+    """Create basic options dengan cleanup integration dan responsive styling"""
     
     # Create widgets dengan overflow-safe styling
     widgets_dict = {
@@ -38,9 +38,14 @@ def create_basic_options_widget() -> Dict[str, Any]:
             value='train', description='Target Split:', disabled=False,
             style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
-        'output_prefix': widgets.Text(
-            value='aug', placeholder='Prefix untuk file hasil augmentasi',
-            description='Output Prefix:', disabled=False,
+        # CHANGED: cleanup_target menggantikan output_prefix
+        'cleanup_target': widgets.Dropdown(
+            options=[
+                ('🧹 Augmented - Hapus file augmented saja', 'augmented'),
+                ('🖼️ Samples - Hapus sample preview saja', 'samples'),
+                ('🗑️ Both - Hapus augmented + samples', 'both')
+            ],
+            value='both', description='Cleanup Target:', disabled=False,
             style={'description_width': '110px'}, layout=widgets.Layout(width='100%', max_width='100%')
         ),
         'balance_classes': widgets.Checkbox(
@@ -49,13 +54,13 @@ def create_basic_options_widget() -> Dict[str, Any]:
         )
     }
     
-    # Create info content menggunakan fungsi terkonsolidasi
+    # Create info content dengan cleanup guidance
     info_content = create_info_content([
         ('Parameter Guidance', ''),
         ('Variasi', '2-5 optimal untuk research'),
         ('Target Count', '500-1000 efektif'),
         ('Intensitas', '0.7 optimal, 0.3-0.5 conservative'),
-        ('Target Split', 'Train primary untuk augmentasi')
+        ('Cleanup', 'Both = comprehensive cleanup')
     ], theme='basic')
     
     # Create container dengan flex layout
@@ -77,7 +82,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
                 'target_count': (100, 2000),
                 'intensity': (0.1, 1.0)
             },
-            'required': ['num_variations', 'target_count', 'intensity', 'target_split', 'output_prefix'],
+            'required': ['num_variations', 'target_count', 'intensity', 'target_split', 'cleanup_target'],
             'backend_compatible': True
         },
         'backend_mapping': {
@@ -85,7 +90,7 @@ def create_basic_options_widget() -> Dict[str, Any]:
             'target_count': 'augmentation.target_count',
             'intensity': 'augmentation.intensity',
             'target_split': 'augmentation.target_split',
-            'output_prefix': 'augmentation.output_prefix',
+            'cleanup_target': 'cleanup.default_target',
             'balance_classes': 'augmentation.balance_classes'
         }
     }

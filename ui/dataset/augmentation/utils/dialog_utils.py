@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/dialog_utils.py
-Deskripsi: Dialog utilities yang menggunakan confirmation area dengan fallback ke ipywidgets dialog
+Deskripsi: Dialog utilities dengan deprecation notice dan fallback ke smartcash.ui.components.dialog
 """
 
 from typing import Dict, Any, Callable, Optional
@@ -11,18 +11,100 @@ def show_confirmation_in_area(ui_components: Dict[str, Any], title: str, message
                              on_confirm: Callable = None, on_cancel: Callable = None,
                              confirm_text: str = "Ya", cancel_text: str = "Batal",
                              danger_mode: bool = False) -> bool:
-    """Show confirmation dialog di confirmation area dengan inline buttons"""
+    """DEPRECATED: Use smartcash.ui.components.dialog.show_confirmation_dialog instead"""
+    
+    # Try modern dialog first
+    try:
+        from smartcash.ui.components.dialog import show_confirmation_dialog
+        
+        show_confirmation_dialog(
+            ui_components,
+            title=title,
+            message=message,
+            on_confirm=on_confirm,
+            on_cancel=on_cancel,
+            confirm_text=confirm_text,
+            cancel_text=cancel_text,
+            danger_mode=danger_mode
+        )
+        return True
+        
+    except ImportError:
+        # Fallback ke legacy implementation
+        return _show_legacy_confirmation_in_area(
+            ui_components, title, message, on_confirm, on_cancel, 
+            confirm_text, cancel_text, danger_mode
+        )
+
+def show_info_in_area(ui_components: Dict[str, Any], title: str, message: str, 
+                     on_close: Callable = None, close_text: str = "OK") -> bool:
+    """DEPRECATED: Use smartcash.ui.components.dialog.show_info_dialog instead"""
+    
+    # Try modern dialog first
+    try:
+        from smartcash.ui.components.dialog import show_info_dialog
+        
+        show_info_dialog(
+            ui_components,
+            title=title,
+            message=message,
+            on_close=on_close,
+            close_text=close_text
+        )
+        return True
+        
+    except ImportError:
+        # Fallback ke legacy implementation
+        return _show_legacy_info_in_area(ui_components, title, message, on_close, close_text)
+
+def show_warning_in_area(ui_components: Dict[str, Any], title: str, message: str,
+                        on_close: Callable = None, close_text: str = "Mengerti") -> bool:
+    """DEPRECATED: Use smartcash.ui.components.dialog.show_warning_dialog instead"""
+    
+    # Try modern dialog first
+    try:
+        from smartcash.ui.components.dialog import show_warning_dialog
+        
+        show_warning_dialog(
+            ui_components,
+            title=title,
+            message=message,
+            on_close=on_close,
+            close_text=close_text
+        )
+        return True
+        
+    except ImportError:
+        # Fallback ke legacy implementation
+        return _show_legacy_warning_in_area(ui_components, title, message, on_close, close_text)
+
+def clear_confirmation_area(ui_components: Dict[str, Any]) -> bool:
+    """Clear confirmation area - compatible dengan legacy dan modern"""
+    confirmation_area = ui_components.get('confirmation_area')
+    
+    if confirmation_area and hasattr(confirmation_area, 'clear_output'):
+        confirmation_area.clear_output()
+        return True
+    
+    return False
+
+# ===== LEGACY IMPLEMENTATIONS (FALLBACK) =====
+
+def _show_legacy_confirmation_in_area(ui_components: Dict[str, Any], title: str, message: str, 
+                                     on_confirm: Callable, on_cancel: Callable,
+                                     confirm_text: str, cancel_text: str, danger_mode: bool) -> bool:
+    """Legacy confirmation dialog implementation"""
     confirmation_area = ui_components.get('confirmation_area')
     
     if not confirmation_area or not hasattr(confirmation_area, 'clear_output'):
-        # Fallback ke standard dialog jika confirmation area tidak tersedia
-        return _show_fallback_confirmation(title, message, on_confirm, on_cancel, confirm_text, cancel_text, danger_mode)
+        _log_to_ui_safe(ui_components, f"⚠️ {title}: {message}", "warning")
+        return False
     
     # Clear existing content
     confirmation_area.clear_output()
     
     # Create confirmation UI
-    confirmation_ui = _create_confirmation_ui(
+    confirmation_ui = _create_legacy_confirmation_ui(
         title, message, on_confirm, on_cancel, 
         confirm_text, cancel_text, danger_mode, confirmation_area
     )
@@ -33,9 +115,9 @@ def show_confirmation_in_area(ui_components: Dict[str, Any], title: str, message
     
     return True
 
-def show_info_in_area(ui_components: Dict[str, Any], title: str, message: str, 
-                     on_close: Callable = None, close_text: str = "OK") -> bool:
-    """Show info message di confirmation area"""
+def _show_legacy_info_in_area(ui_components: Dict[str, Any], title: str, message: str, 
+                             on_close: Callable, close_text: str) -> bool:
+    """Legacy info dialog implementation"""
     confirmation_area = ui_components.get('confirmation_area')
     
     if not confirmation_area or not hasattr(confirmation_area, 'clear_output'):
@@ -46,7 +128,7 @@ def show_info_in_area(ui_components: Dict[str, Any], title: str, message: str,
     confirmation_area.clear_output()
     
     # Create info UI
-    info_ui = _create_info_ui(title, message, on_close, close_text, confirmation_area)
+    info_ui = _create_legacy_info_ui(title, message, on_close, close_text, confirmation_area)
     
     # Display di confirmation area
     with confirmation_area:
@@ -54,9 +136,9 @@ def show_info_in_area(ui_components: Dict[str, Any], title: str, message: str,
     
     return True
 
-def show_warning_in_area(ui_components: Dict[str, Any], title: str, message: str,
-                        on_close: Callable = None, close_text: str = "Mengerti") -> bool:
-    """Show warning message di confirmation area"""
+def _show_legacy_warning_in_area(ui_components: Dict[str, Any], title: str, message: str,
+                                on_close: Callable, close_text: str) -> bool:
+    """Legacy warning dialog implementation"""
     confirmation_area = ui_components.get('confirmation_area')
     
     if not confirmation_area or not hasattr(confirmation_area, 'clear_output'):
@@ -67,7 +149,7 @@ def show_warning_in_area(ui_components: Dict[str, Any], title: str, message: str
     confirmation_area.clear_output()
     
     # Create warning UI
-    warning_ui = _create_warning_ui(title, message, on_close, close_text, confirmation_area)
+    warning_ui = _create_legacy_warning_ui(title, message, on_close, close_text, confirmation_area)
     
     # Display di confirmation area
     with confirmation_area:
@@ -75,20 +157,10 @@ def show_warning_in_area(ui_components: Dict[str, Any], title: str, message: str
     
     return True
 
-def clear_confirmation_area(ui_components: Dict[str, Any]) -> bool:
-    """Clear confirmation area"""
-    confirmation_area = ui_components.get('confirmation_area')
-    
-    if confirmation_area and hasattr(confirmation_area, 'clear_output'):
-        confirmation_area.clear_output()
-        return True
-    
-    return False
-
-def _create_confirmation_ui(title: str, message: str, on_confirm: Callable, on_cancel: Callable,
-                           confirm_text: str, cancel_text: str, danger_mode: bool, 
-                           confirmation_area) -> widgets.Widget:
-    """Create confirmation UI dengan inline buttons"""
+def _create_legacy_confirmation_ui(title: str, message: str, on_confirm: Callable, on_cancel: Callable,
+                                  confirm_text: str, cancel_text: str, danger_mode: bool, 
+                                  confirmation_area) -> widgets.Widget:
+    """Create legacy confirmation UI dengan inline buttons"""
     
     # Style berdasarkan danger mode
     if danger_mode:
@@ -137,7 +209,7 @@ def _create_confirmation_ui(title: str, message: str, on_confirm: Callable, on_c
         confirmation_area.clear_output()
         if on_confirm and callable(on_confirm):
             try:
-                on_confirm(button)
+                on_confirm()
             except Exception:
                 pass
     
@@ -145,7 +217,7 @@ def _create_confirmation_ui(title: str, message: str, on_confirm: Callable, on_c
         confirmation_area.clear_output()
         if on_cancel and callable(on_cancel):
             try:
-                on_cancel(button)
+                on_cancel()
             except Exception:
                 pass
     
@@ -171,9 +243,9 @@ def _create_confirmation_ui(title: str, message: str, on_confirm: Callable, on_c
     
     return container
 
-def _create_info_ui(title: str, message: str, on_close: Callable, close_text: str,
-                   confirmation_area) -> widgets.Widget:
-    """Create info UI dengan close button"""
+def _create_legacy_info_ui(title: str, message: str, on_close: Callable, close_text: str,
+                          confirmation_area) -> widgets.Widget:
+    """Create legacy info UI dengan close button"""
     
     # Header
     header = widgets.HTML(f"""
@@ -203,7 +275,7 @@ def _create_info_ui(title: str, message: str, on_close: Callable, close_text: st
         confirmation_area.clear_output()
         if on_close and callable(on_close):
             try:
-                on_close(button)
+                on_close()
             except Exception:
                 pass
     
@@ -228,9 +300,9 @@ def _create_info_ui(title: str, message: str, on_close: Callable, close_text: st
     
     return container
 
-def _create_warning_ui(title: str, message: str, on_close: Callable, close_text: str,
-                      confirmation_area) -> widgets.Widget:
-    """Create warning UI dengan close button"""
+def _create_legacy_warning_ui(title: str, message: str, on_close: Callable, close_text: str,
+                             confirmation_area) -> widgets.Widget:
+    """Create legacy warning UI dengan close button"""
     
     # Header
     header = widgets.HTML(f"""
@@ -260,7 +332,7 @@ def _create_warning_ui(title: str, message: str, on_close: Callable, close_text:
         confirmation_area.clear_output()
         if on_close and callable(on_close):
             try:
-                on_close(button)
+                on_close()
             except Exception:
                 pass
     
@@ -285,22 +357,6 @@ def _create_warning_ui(title: str, message: str, on_close: Callable, close_text:
     
     return container
 
-def _show_fallback_confirmation(title: str, message: str, on_confirm: Callable, on_cancel: Callable,
-                               confirm_text: str, cancel_text: str, danger_mode: bool) -> bool:
-    """Fallback confirmation menggunakan standard dialog"""
-    try:
-        from smartcash.ui.components.dialogs import show_confirmation, show_destructive_confirmation
-        
-        if danger_mode:
-            show_destructive_confirmation(title, message, "item", on_confirm, on_cancel)
-        else:
-            show_confirmation(title, message, on_confirm, on_cancel)
-        
-        return True
-    except Exception:
-        print(f"{'⚠️' if danger_mode else '❓'} {title}: {message}")
-        return False
-
 def _log_to_ui_safe(ui_components: Dict[str, Any], message: str, level: str):
     """Safe logging ke UI components"""
     try:
@@ -309,8 +365,44 @@ def _log_to_ui_safe(ui_components: Dict[str, Any], message: str, level: str):
     except Exception:
         print(f"[{level.upper()}] {message}")
 
-# Convenience functions
-confirm_in_area = lambda ui_components, title, msg, on_yes=None, on_no=None: show_confirmation_in_area(ui_components, title, msg, on_yes, on_no)
-info_in_area = lambda ui_components, title, msg, on_close=None: show_info_in_area(ui_components, title, msg, on_close)
-warn_in_area = lambda ui_components, title, msg, on_close=None: show_warning_in_area(ui_components, title, msg, on_close)
-clear_area = lambda ui_components: clear_confirmation_area(ui_components)
+# ===== DEPRECATION NOTICE FUNCTIONS =====
+
+def show_deprecation_notice():
+    """Show deprecation notice untuk dialog_utils"""
+    print("""
+⚠️  DEPRECATION NOTICE: smartcash.ui.dataset.augmentation.utils.dialog_utils
+
+This module is deprecated and will be removed in future versions.
+Please use smartcash.ui.components.dialog instead:
+
+OLD:
+from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_confirmation_in_area
+show_confirmation_in_area(ui_components, title, message, on_confirm, on_cancel)
+
+NEW:
+from smartcash.ui.components.dialog import show_confirmation_dialog
+show_confirmation_dialog(ui_components, title, message, on_confirm, on_cancel)
+
+The new dialog system provides:
+✅ Better integration dengan UI components
+✅ Consistent styling across modules  
+✅ Enhanced error handling
+✅ Modern dialog patterns
+    """)
+
+# Convenience functions dengan deprecation warning
+def confirm_in_area(ui_components: Dict[str, Any], title: str, msg: str, on_yes: Callable = None, on_no: Callable = None) -> bool:
+    """DEPRECATED: Use smartcash.ui.components.dialog.show_confirmation_dialog"""
+    return show_confirmation_in_area(ui_components, title, msg, on_yes, on_no)
+
+def info_in_area(ui_components: Dict[str, Any], title: str, msg: str, on_close: Callable = None) -> bool:
+    """DEPRECATED: Use smartcash.ui.components.dialog.show_info_dialog"""
+    return show_info_in_area(ui_components, title, msg, on_close)
+
+def warn_in_area(ui_components: Dict[str, Any], title: str, msg: str, on_close: Callable = None) -> bool:
+    """DEPRECATED: Use smartcash.ui.components.dialog.show_warning_dialog"""
+    return show_warning_in_area(ui_components, title, msg, on_close)
+
+def clear_area(ui_components: Dict[str, Any]) -> bool:
+    """Clear confirmation area - still supported"""
+    return clear_confirmation_area(ui_components)

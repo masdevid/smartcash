@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/augmentor/core/normalizer.py
-Deskripsi: Enhanced normalizer dengan auto directory creation dan improved summary
+Deskripsi: Normalizer menggunakan standalone preprocessor API tanpa fallback
 """
 
 import cv2
@@ -14,7 +14,7 @@ from smartcash.common.logger import get_logger
 from smartcash.dataset.augmentor.utils.config_validator import validate_augmentation_config, get_default_augmentation_config
 
 class NormalizationEngine:
-    """🔧 Enhanced engine dengan auto directory creation dan improved summary"""
+    """🔧 Normalizer menggunakan standalone preprocessor API"""
     
     def __init__(self, config: Dict[str, Any] = None, progress_bridge=None):
         self.logger = get_logger(__name__)
@@ -24,21 +24,29 @@ class NormalizationEngine:
             self.config = validate_augmentation_config(config)
         
         self.norm_config = self.config.get('preprocessing', {}).get('normalization', {})
-        self.target_size = tuple(self.norm_config.get('target_size', [640, 640]))
         self.method = self.norm_config.get('method', 'minmax')
         self.progress = progress_bridge
         self.file_scanner = FileScanner()
         
+        # Import normalization dari preprocessor API
+        self._setup_preprocessor_api()
+        
+    def _setup_preprocessor_api(self):
+        """Setup preprocessor API untuk consistency"""
+        from smartcash.dataset.preprocessor.api.normalization_api import normalize_for_yolo
+        self.normalize_for_yolo = normalize_for_yolo
+        self.logger.info("📋 Using standalone normalization dari preprocessor API")
+    
     def normalize_augmented_files(self, aug_path: str, output_path: str, 
                                 progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """🎯 Enhanced normalize dengan auto directory setup dan improved summary"""
+        """🎯 Normalize menggunakan preprocessor API"""
         try:
             self._report_progress("overall", 0, 4, "Setup directory dan scan files", progress_callback)
             
-            # Phase 0: Auto-create directories (NEW)
+            # Phase 0: Auto-create directories
             self._ensure_preprocessed_directories(output_path)
             
-            # Phase 1: Scan files
+            # Phase 1: Scan augmented files
             aug_files = self.file_scanner.scan_augmented_files(aug_path)
             if not aug_files:
                 return {
@@ -54,10 +62,10 @@ class NormalizationEngine:
             
             self._report_progress("overall", 1, 4, f"Normalizing {len(aug_files)} files", progress_callback)
             
-            # Phase 2: Normalization
+            # Phase 2: Normalization dengan preprocessor API
             result = self._execute_normalization(aug_files, output_path, progress_callback)
             
-            # Phase 3: Enhanced summary (NEW)
+            # Phase 3: Enhanced summary
             if result.get('status') == 'success':
                 enhanced_summary = self._create_summary(result, aug_files, output_path)
                 result.update(enhanced_summary)
@@ -72,14 +80,10 @@ class NormalizationEngine:
             return {'status': 'error', 'message': error_msg, 'total_normalized': 0}
     
     def _ensure_preprocessed_directories(self, output_path: str):
-        """🏗️ NEW: Auto-create preprocessed directories"""
+        """🏗️ Auto-create preprocessed directories"""
         output_dir = Path(output_path)
         
-        # Directories yang perlu dibuat
-        directories = [
-            output_dir / 'images',
-            output_dir / 'labels'
-        ]
+        directories = [output_dir / 'images', output_dir / 'labels']
         
         created_dirs = []
         for dir_path in directories:
@@ -90,60 +94,9 @@ class NormalizationEngine:
         if created_dirs:
             self.logger.info(f"📁 Created preprocessed directories: {', '.join([d.split('/')[-1] for d in created_dirs])}")
     
-    def _create_summary(self, result: Dict[str, Any], source_files: List[str], output_path: str) -> Dict[str, Any]:
-        """📊 NEW: Create detailed summary untuk UI logging"""
-        total_normalized = result.get('total_normalized', 0)
-        processed_files = result.get('processed_files', 0)
-        
-        # Calculate rates
-        success_rate = (total_normalized / len(source_files)) * 100 if source_files else 0
-        
-        # Enhanced summary
-        summary = {
-            'summary': {
-                'input': {
-                    'augmented_files': len(source_files),
-                    'processed_files': processed_files
-                },
-                'output': {
-                    'total_normalized': total_normalized,
-                    'success_rate': f"{success_rate:.1f}%",
-                    'npy_files_created': total_normalized,
-                    'labels_copied': total_normalized
-                },
-                'configuration': {
-                    'method': self.method,
-                    'target_size': f"{self.target_size[0]}x{self.target_size[1]}",
-                    'output_format': 'float32 .npy'
-                },
-                'directories': {
-                    'output_path': output_path,
-                    'images_dir': f"{output_path}/images",
-                    'labels_dir': f"{output_path}/labels"
-                }
-            }
-        }
-        
-        # Log enhanced summary
-        self._log_detailed_summary(summary['summary'])
-        
-        return summary
-    
-    def _log_detailed_summary(self, summary: Dict[str, Any]):
-        """📋 NEW: Log detailed summary untuk UI"""
-        input_info = summary['input']
-        output_info = summary['output']
-        config_info = summary['configuration']
-        
-        self.logger.success(f"✅ Normalisasi berhasil!")
-        self.logger.info(f"📊 Input: {input_info['processed_files']} augmented files processed")
-        self.logger.info(f"🎯 Output: {output_info['total_normalized']} .npy files ({output_info['success_rate']} success)")
-        self.logger.info(f"⚙️ Config: {config_info['method']} @ {config_info['target_size']} → {config_info['output_format']}")
-        self.logger.info(f"📁 Saved to: {summary['directories']['output_path']}")
-    
     def _execute_normalization(self, files: List[str], output_path: str, 
                              progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """Execute normalization dengan enhanced progress tracking"""
+        """Execute normalization menggunakan preprocessor API"""
         total_files = len(files)
         processed_files = 0
         normalized_count = 0
@@ -181,15 +134,16 @@ class NormalizationEngine:
         }
     
     def _normalize_single_file(self, file_path: str, output_path: str) -> Dict[str, Any]:
-        """Normalize single file dengan detailed tracking"""
+        """Normalize single file menggunakan preprocessor API"""
         try:
-            # Load dan resize
+            # Load image
             image = cv2.imread(file_path)
             if image is None:
                 return {'status': 'error', 'file': file_path, 'error': 'Tidak dapat membaca gambar'}
             
-            resized_image = cv2.resize(image, self.target_size, interpolation=cv2.INTER_LANCZOS4)
-            normalized_image = self._apply_normalization_method(resized_image)
+            # Normalisasi menggunakan preprocessor API
+            preset = self._map_method_to_preset(self.method)
+            normalized_image, metadata = self.normalize_for_yolo(image, preset)
             
             input_name = Path(file_path).stem
             
@@ -205,28 +159,15 @@ class NormalizationEngine:
         except Exception as e:
             return {'status': 'error', 'file': file_path, 'error': str(e)}
     
-    def _apply_normalization_method(self, image: np.ndarray) -> np.ndarray:
-        """Apply normalization untuk training"""
-        normalized = image.astype(np.float32)
-        
-        if self.method == 'minmax':
-            normalized = normalized / 255.0
-        elif self.method == 'standard':
-            mean = normalized.mean()
-            std = normalized.std()
-            if std > 0:
-                normalized = (normalized - mean) / std
-        elif self.method == 'imagenet':
-            normalized = normalized / 255.0
-            mean = np.array([0.485, 0.456, 0.406])
-            std = np.array([0.229, 0.224, 0.225])
-            normalized = (normalized - mean) / std
-        elif self.method == 'none':
-            pass
-        else:
-            normalized = normalized / 255.0
-            
-        return normalized
+    def _map_method_to_preset(self, method: str) -> str:
+        """Map normalization method ke preprocessor preset"""
+        method_to_preset = {
+            'minmax': 'yolov5s',      # Default YOLO preset
+            'standard': 'yolov5m',    # Medium preset
+            'imagenet': 'yolov5l',    # Large preset untuk ImageNet stats
+            'none': 'default'         # No normalization
+        }
+        return method_to_preset.get(method, 'yolov5s')
     
     def _copy_corresponding_label(self, source_image_path: str, output_path: str, filename: str):
         """Copy label file ke preprocessed/labels"""
@@ -244,6 +185,59 @@ class NormalizationEngine:
                 
         except Exception as e:
             self.logger.warning(f"⚠️ Error copying label untuk {filename}: {str(e)}")
+    
+    def _create_summary(self, result: Dict[str, Any], source_files: List[str], output_path: str) -> Dict[str, Any]:
+        """📊 Create detailed summary dengan preprocessor API info"""
+        total_normalized = result.get('total_normalized', 0)
+        processed_files = result.get('processed_files', 0)
+        
+        # Calculate rates
+        success_rate = (total_normalized / len(source_files)) * 100 if source_files else 0
+        
+        # Enhanced summary
+        summary = {
+            'summary': {
+                'input': {
+                    'augmented_files': len(source_files),
+                    'processed_files': processed_files
+                },
+                'output': {
+                    'total_normalized': total_normalized,
+                    'success_rate': f"{success_rate:.1f}%",
+                    'npy_files_created': total_normalized,
+                    'labels_copied': total_normalized
+                },
+                'configuration': {
+                    'method': self.method,
+                    'preset': self._map_method_to_preset(self.method),
+                    'api_source': 'preprocessor',
+                    'output_format': 'float32 .npy'
+                },
+                'directories': {
+                    'output_path': output_path,
+                    'images_dir': f"{output_path}/images",
+                    'labels_dir': f"{output_path}/labels"
+                }
+            }
+        }
+        
+        # Log enhanced summary
+        self._log_detailed_summary(summary['summary'])
+        
+        return summary
+    
+    def _log_detailed_summary(self, summary: Dict[str, Any]):
+        """📋 Log detailed summary dengan preprocessor API info"""
+        input_info = summary['input']
+        output_info = summary['output']
+        config_info = summary['configuration']
+        
+        self.logger.success(f"✅ Normalisasi berhasil!")
+        self.logger.info(f"📊 Input: {input_info['processed_files']} augmented files processed")
+        self.logger.info(f"🎯 Output: {output_info['total_normalized']} .npy files ({output_info['success_rate']} success)")
+        self.logger.info(f"⚙️ Config: {config_info['method']} via {config_info['api_source']} → {config_info['output_format']}")
+        self.logger.info(f"🔧 Preset: {config_info['preset']} (preprocessor compatible)")
+        self.logger.info(f"📁 Saved to: {summary['directories']['output_path']}")
     
     def _report_progress(self, level: str, current: int, total: int, message: str, callback: Optional[Callable]):
         """Report progress dengan enhanced messaging"""

@@ -1,13 +1,13 @@
 """
 File: smartcash/dataset/augmentor/core/pipeline_factory.py
-Deskripsi: Factory untuk augmentation pipelines dengan default types (lighting, position, combined)
+Deskripsi: Factory untuk augmentation pipelines dengan config structure yang diusulkan
 """
 
 import albumentations as A
 from typing import Dict, Any, Callable
 
 class PipelineFactory:
-    """🏭 Factory untuk augmentation pipelines dengan default research types"""
+    """🏭 Factory untuk augmentation pipelines dengan proposed config structure"""
     
     DEFAULT_TYPES = ['lighting', 'position', 'combined']
     
@@ -21,22 +21,75 @@ class PipelineFactory:
             self.config = validate_augmentation_config(config)
         
         self.aug_config = self.config.get('augmentation', {})
-        
-        # Load parameters dari config
-        self.parameters = self.aug_config.get('parameters', {})
     
     def create_pipeline(self, aug_type: str = None, intensity: float = None) -> A.Compose:
         """Create pipeline dengan config defaults"""
-        # Use config defaults jika tidak disediakan
         aug_type = aug_type or self.aug_config.get('types', ['combined'])[0]
         intensity = intensity if intensity is not None else self.aug_config.get('intensity', 0.7)
         
         # Validate intensity
         intensity = max(0.0, min(1.0, intensity))
         
-        # Get pipeline builder
+        # Use custom pipeline untuk combined type
+        if aug_type == 'combined':
+            return self.create_custom_pipeline(self.aug_config)
+        
+        # Get pipeline builder untuk other types
         builder = self._get_pipeline_builder(aug_type)
         return builder(intensity)
+    
+    def create_custom_pipeline(self, aug_config: Dict[str, Any]) -> A.Compose:
+        """🎯 Create pipeline dengan config structure yang diusulkan"""
+        # Extract dari combined section (struktur yang diusulkan)
+        combined_config = aug_config.get('combined', {})
+        
+        horizontal_flip = combined_config.get('horizontal_flip', 0.5)
+        rotation_limit = combined_config.get('rotation_limit', 12)
+        scale_limit = combined_config.get('scale_limit', 0.04)
+        translate_limit = combined_config.get('translate_limit', 0.08)
+        brightness_limit = combined_config.get('brightness_limit', 0.2)
+        contrast_limit = combined_config.get('contrast_limit', 0.15)
+        hsv_hue = combined_config.get('hsv_hue', 10)
+        hsv_saturation = combined_config.get('hsv_saturation', 15)
+        
+        return A.Compose([
+            # Position variations
+            A.HorizontalFlip(p=horizontal_flip),
+            A.Rotate(limit=rotation_limit, p=0.7),
+            A.Affine(
+                translate_percent={
+                    'x': (-translate_limit, translate_limit),
+                    'y': (-translate_limit, translate_limit)
+                },
+                scale=(1 - scale_limit, 1 + scale_limit),
+                rotate=(-rotation_limit, rotation_limit),
+                p=0.6
+            ),
+            A.Perspective(scale=(0.02, 0.06), p=0.3),
+            
+            # Lighting variations
+            A.RandomBrightnessContrast(
+                brightness_limit=brightness_limit,
+                contrast_limit=contrast_limit,
+                p=0.7
+            ),
+            A.RandomGamma(gamma_limit=(85, 115), p=0.5),
+            
+            # HSV variations
+            A.HueSaturationValue(
+                hue_shift_limit=hsv_hue,
+                sat_shift_limit=hsv_saturation,
+                val_shift_limit=10,
+                p=0.6
+            ),
+            
+            A.RandomShadow(
+                shadow_roi=(0, 0.5, 1, 1),
+                num_shadows_limit=(1, 1),
+                shadow_dimension=4,
+                p=0.2
+            )
+        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
     
     def get_available_types(self) -> list:
         """Get available pipeline types"""
@@ -56,13 +109,26 @@ class PipelineFactory:
     
     def _build_lighting_pipeline(self, intensity: float) -> A.Compose:
         """🌟 Pipeline variasi pencahayaan"""
+        lighting_config = self.aug_config.get('lighting', {})
+        
+        brightness_limit = lighting_config.get('brightness_limit', 0.2) * intensity
+        contrast_limit = lighting_config.get('contrast_limit', 0.15) * intensity
+        hsv_hue = lighting_config.get('hsv_hue', 10)
+        hsv_saturation = lighting_config.get('hsv_saturation', 15)
+        
         return A.Compose([
             A.RandomBrightnessContrast(
-                brightness_limit=0.25 * intensity,
-                contrast_limit=0.2 * intensity,
+                brightness_limit=brightness_limit,
+                contrast_limit=contrast_limit,
                 p=0.8
             ),
             A.RandomGamma(gamma_limit=(80, 120), p=0.6),
+            A.HueSaturationValue(
+                hue_shift_limit=hsv_hue,
+                sat_shift_limit=hsv_saturation,
+                val_shift_limit=10,
+                p=0.6
+            ),
             A.CLAHE(clip_limit=2.0 * intensity, tile_grid_size=(8, 8), p=0.4),
             A.RandomShadow(
                 shadow_roi=(0, 0.5, 1, 1),
@@ -74,23 +140,30 @@ class PipelineFactory:
     
     def _build_position_pipeline(self, intensity: float) -> A.Compose:
         """📍 Pipeline variasi posisi"""
+        position_config = self.aug_config.get('position', {})
+        
+        horizontal_flip = position_config.get('horizontal_flip', 0.5)
+        rotation_limit = position_config.get('rotation_limit', 12) * intensity
+        translate_limit = position_config.get('translate_limit', 0.08) * intensity
+        scale_limit = position_config.get('scale_limit', 0.04) * intensity
+        
         return A.Compose([
-            A.HorizontalFlip(p=0.5),
-            A.Rotate(limit=int(15 * intensity), p=0.8),
+            A.HorizontalFlip(p=horizontal_flip),
+            A.Rotate(limit=int(rotation_limit), p=0.8),
             A.Affine(
                 translate_percent={
-                    'x': (-0.1 * intensity, 0.1 * intensity),
-                    'y': (-0.1 * intensity, 0.1 * intensity)
+                    'x': (-translate_limit, translate_limit),
+                    'y': (-translate_limit, translate_limit)
                 },
-                scale=(1 - 0.05 * intensity, 1 + 0.05 * intensity),
-                rotate=(-12 * intensity, 12 * intensity),
+                scale=(1 - scale_limit, 1 + scale_limit),
+                rotate=(-rotation_limit, rotation_limit),
                 p=0.7
             ),
             A.Perspective(scale=(0.02 * intensity, 0.08 * intensity), p=0.4)
         ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
     
     def _build_combined_pipeline(self, intensity: float) -> A.Compose:
-        """🎯 Pipeline kombinasi (default untuk research)"""
+        """🎯 Pipeline kombinasi (fallback untuk legacy)"""
         return A.Compose([
             # Position variations
             A.HorizontalFlip(p=0.5),

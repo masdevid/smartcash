@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/ui_utils.py
-Deskripsi: Enhanced UI utilities dengan backend integration dan comprehensive form handling
+Deskripsi: Updated UI utilities dengan HSV support dan enhanced validation
 """
 
 from typing import Dict, Any, List
@@ -40,7 +40,7 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
             
     except Exception:
         pass
-        
+
 def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
     """Log ke accordion output dengan styling"""
     try:
@@ -51,7 +51,7 @@ def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = '
             # Expand accordion jika error atau warning
             if level in ['error', 'warning']:
                 if hasattr(accordion, 'selected_index'):
-                    accordion.selected_index = 0  # Expand log accordion
+                    accordion.selected_index = 0
             
             # Log ke output widget
             color_map = {
@@ -79,11 +79,6 @@ def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = '
     # Fallback ke log_to_ui
     log_to_ui(ui_components, message, level)
     return False
-    
-    # Fallback print dengan emoji
-    emoji_map = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'debug': '🔍'}
-    emoji = emoji_map.get(level, 'ℹ️')
-    print(f"{emoji} {message}")
 
 def get_widget_value_safe(ui_components: Dict[str, Any], key: str, default: Any = None) -> Any:
     """Enhanced safe widget value extraction dengan backend compatibility"""
@@ -127,14 +122,14 @@ def extract_augmentation_types(ui_components: Dict[str, Any]) -> List[str]:
     return ['combined']
 
 def validate_form_inputs(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Enhanced form validation dengan backend compatibility check"""
+    """Enhanced form validation dengan HSV parameters dan cleanup target"""
     validation_result = {'valid': True, 'errors': [], 'warnings': [], 'backend_compatible': True}
     
     # Basic validation rules dengan enhanced ranges
     validations = [
         ('num_variations', lambda x: 1 <= x <= 10, "Jumlah variasi harus antara 1-10"),
         ('target_count', lambda x: 100 <= x <= 2000, "Target count harus antara 100-2000"),
-        ('output_prefix', lambda x: x and len(x.strip()) > 0 and x.isalnum(), "Output prefix harus alphanumeric dan tidak kosong"),
+        ('cleanup_target', lambda x: x in ['augmented', 'samples', 'both'], "Cleanup target harus valid"),
         ('augmentation_types', lambda x: x and len(x) > 0, "Pilih minimal 1 jenis augmentasi"),
         ('target_split', lambda x: x in ['train', 'valid', 'test'], "Target split harus train, valid, atau test")
     ]
@@ -151,10 +146,10 @@ def validate_form_inputs(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             validation_result['backend_compatible'] = False
             validation_result['errors'].append(f"❌ Error validating {key}")
     
-    # Advanced parameter validation
+    # Advanced parameter validation dengan HSV
     _validate_position_parameters(ui_components, validation_result)
-    _validate_lighting_parameters(ui_components, validation_result)
-    _validate_normalization_parameters(ui_components, validation_result)
+    _validate_lighting_parameters_with_hsv(ui_components, validation_result)
+    _validate_cleanup_parameters(ui_components, validation_result)
     
     # Backend compatibility check
     if validation_result['valid']:
@@ -178,27 +173,36 @@ def _validate_position_parameters(ui_components: Dict[str, Any], validation_resu
     if translate > 0.15 or scale > 0.15:
         validation_result['warnings'].append("⚠️ Translate/Scale >15% mungkin mengubah proporsi terlalu drastis")
 
-def _validate_lighting_parameters(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
-    """Validate lighting parameters dengan realistic ranges"""
+def _validate_lighting_parameters_with_hsv(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Validate lighting parameters dengan HSV support"""
     brightness = get_widget_value_safe(ui_components, 'brightness', 0.2)
     contrast = get_widget_value_safe(ui_components, 'contrast', 0.15)
+    hsv_h = get_widget_value_safe(ui_components, 'hsv_h', 10)
+    hsv_s = get_widget_value_safe(ui_components, 'hsv_s', 15)
     
     if brightness > 0.3 or contrast > 0.3:
         validation_result['warnings'].append("⚠️ Brightness/Contrast >30% mungkin menghasilkan gambar tidak realistis")
     
     if brightness < 0.05 and contrast < 0.05:
         validation_result['warnings'].append("⚠️ Variasi pencahayaan sangat rendah - augmentasi mungkin tidak efektif")
+    
+    # HSV validation
+    if hsv_h > 25:
+        validation_result['warnings'].append("⚠️ HSV Hue >25 mungkin mengubah warna terlalu drastis")
+    
+    if hsv_s > 40:
+        validation_result['warnings'].append("⚠️ HSV Saturation >40 mungkin menghasilkan warna tidak natural")
 
-def _validate_normalization_parameters(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
-    """Validate normalization parameters"""
-    norm_method = get_widget_value_safe(ui_components, 'norm_method', 'minmax')
-    denormalize = get_widget_value_safe(ui_components, 'denormalize', False)
+def _validate_cleanup_parameters(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Validate cleanup parameters"""
+    cleanup_target = get_widget_value_safe(ui_components, 'cleanup_target', 'both')
+    target_split = get_widget_value_safe(ui_components, 'target_split', 'train')
     
-    if norm_method == 'none':
-        validation_result['warnings'].append("⚠️ No normalization - pastikan kompatibilitas dengan model")
+    if cleanup_target == 'both':
+        validation_result['warnings'].append("⚠️ Cleanup 'both' akan menghapus semua file augmented dan samples")
     
-    if norm_method == 'imagenet' and denormalize:
-        validation_result['warnings'].append("⚠️ ImageNet normalization dengan denormalize mungkin tidak optimal")
+    if target_split == 'test' and cleanup_target in ['augmented', 'both']:
+        validation_result['warnings'].append("⚠️ Cleanup pada test split tidak direkomendasikan")
 
 def _check_backend_compatibility(ui_components: Dict[str, Any], validation_result: Dict[str, Any]):
     """Check backend service compatibility"""
@@ -223,7 +227,7 @@ def update_button_states(ui_components: Dict[str, Any], state: str = 'ready'):
     }
     
     config = button_configs.get(state, button_configs['ready'])
-    button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
+    button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button', 'generate_button']
     
     for key in button_keys:
         button = ui_components.get(key)
@@ -324,16 +328,18 @@ def handle_ui_error(ui_components: Dict[str, Any], error_message: str, show_in_c
     log_to_ui(ui_components, error_message, 'error')
 
 def create_config_summary_html(config: Dict[str, Any]) -> str:
-    """Enhanced config summary dengan backend integration info"""
+    """Enhanced config summary dengan HSV dan cleanup target"""
     aug_config = config.get('augmentation', {})
+    cleanup_config = config.get('cleanup', {})
     backend_config = config.get('backend', {})
     
     summary_items = [
-        f"🎯 Variations: {aug_config.get('num_variations', 3)}",
+        f"🎯 Variations: {aug_config.get('num_variations', 2)}",
         f"📊 Target Count: {aug_config.get('target_count', 500)}",
         f"🔄 Types: {', '.join(aug_config.get('types', ['combined']))}",
         f"📂 Split: {aug_config.get('target_split', 'train')}",
         f"⚖️ Balance Classes: {'Yes' if aug_config.get('balance_classes', True) else 'No'}",
+        f"🧹 Cleanup: {cleanup_config.get('default_target', 'both')}",
         f"🔧 Backend: {'Enabled' if backend_config.get('service_enabled', True) else 'Disabled'}"
     ]
     
@@ -358,7 +364,39 @@ def show_config_summary(ui_components: Dict[str, Any], config: Dict[str, Any]):
     else:
         log_to_ui(ui_components, "Config summary ready - check form values", 'info')
 
-# Enhanced one-liner utilities
+def update_preview_status(ui_components: Dict[str, Any], status: str, message: str):
+    """Update preview status dengan styling"""
+    preview_status = ui_components.get('preview_status')
+    if preview_status:
+        status_colors = {'generating': '#007bff', 'success': '#28a745', 'error': '#dc3545', 'info': '#17a2b8'}
+        emoji_map = {'generating': '🔄', 'success': '✅', 'error': '❌', 'info': 'ℹ️'}
+        color = status_colors.get(status, '#666')
+        emoji = emoji_map.get(status, 'ℹ️')
+        preview_status.value = f"<div style='text-align: center; color: {color}; font-size: 12px; margin: 4px 0;'>{emoji} {message}</div>"
+
+def load_preview_image(ui_components: Dict[str, Any], image_path: str = '/data/aug_preview.jpg'):
+    """Load preview image dari file path"""
+    try:
+        import os
+        
+        if os.path.exists(image_path):
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            
+            preview_image = ui_components.get('preview_image')
+            if preview_image and hasattr(preview_image, 'value'):
+                preview_image.value = image_data
+                update_preview_status(ui_components, 'success', 'Preview loaded')
+                return True
+        else:
+            update_preview_status(ui_components, 'error', 'Preview file not found')
+            return False
+            
+    except Exception as e:
+        update_preview_status(ui_components, 'error', f'Load error: {str(e)}')
+        return False
+
+# Enhanced one-liner utilities dengan HSV dan preview support
 safe_get_value = lambda ui_components, key, default=None: get_widget_value_safe(ui_components, key, default)
 safe_log = lambda ui_components, msg, level='info': log_to_ui(ui_components, msg, level)
 clear_outputs = lambda ui_components: clear_ui_outputs(ui_components)
@@ -366,6 +404,8 @@ update_buttons = lambda ui_components, state: update_button_states(ui_components
 show_error = lambda ui_components, msg: handle_ui_error(ui_components, msg)
 validate_form = lambda ui_components: validate_form_inputs(ui_components)
 extract_types = lambda ui_components: extract_augmentation_types(ui_components)
+update_preview = lambda ui_components, status, msg: update_preview_status(ui_components, status, msg)
+load_preview = lambda ui_components, path='/data/aug_preview.jpg': load_preview_image(ui_components, path)
 
 # Enhanced progress utilities dengan backend integration
 show_progress_safe = lambda ui_components, operation: _safe_progress_operation(ui_components, 'show', operation)
@@ -377,20 +417,25 @@ def _safe_progress_operation(ui_components: Dict[str, Any], operation: str, *arg
     """Safe progress operation dengan logging"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker and hasattr(progress_tracker, operation):
-            method = getattr(progress_tracker, operation)
-            if operation == 'show':
-                method()
-            elif operation == 'update':
-                if len(args) >= 3:  # level, pct, msg
-                    level, pct, msg = args[0], args[1], args[2]
-                    if level == 'overall':
-                        progress_tracker.update_overall(pct, msg)
-                    elif level == 'step':
-                        progress_tracker.update_step(pct, msg)
-                    elif level == 'current':
-                        progress_tracker.update_current(pct, msg)
-            elif operation in ['complete', 'error']:
+        if not progress_tracker:
+            return
+        
+        # Calculate percentage
+        if operation == 'show':
+            if hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
+        elif operation == 'update':
+            if len(args) >= 3:  # level, pct, msg
+                level, pct, msg = args[0], args[1], args[2]
+                if level == 'overall' and hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(pct, msg)
+                elif level == 'step' and hasattr(progress_tracker, 'update_step'):
+                    progress_tracker.update_step(pct, msg)
+                elif level == 'current' and hasattr(progress_tracker, 'update_current'):
+                    progress_tracker.update_current(pct, msg)
+        elif operation in ['complete', 'error']:
+            method = getattr(progress_tracker, operation, None)
+            if method:
                 method(args[0] if args else '')
         
         # Log operation

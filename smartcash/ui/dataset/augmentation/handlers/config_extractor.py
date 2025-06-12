@@ -1,15 +1,12 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_extractor.py
-Deskripsi: Fixed config extractor dengan backend structure dan proper validation
+Deskripsi: Updated config extractor dengan cleanup target integration
 """
 
 from typing import Dict, Any
 
 def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract config dengan backend structure dan comprehensive validation
-    Base dari defaults + form values untuk service compatibility
-    """
+    """Extract config dengan cleanup target dan backend structure"""
     from smartcash.ui.dataset.augmentation.handlers.defaults import get_default_augmentation_config
     
     # Base structure dari defaults (DRY)
@@ -18,14 +15,16 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     # Helper untuk safe form value extraction
     get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
     
-    # Basic options extraction
+    # Basic options extraction dengan cleanup target
     aug_config = config['augmentation']
     aug_config['num_variations'] = get_value('num_variations', 2)
     aug_config['target_count'] = get_value('target_count', 500)
     aug_config['intensity'] = get_value('intensity', 0.7)
-    aug_config['output_prefix'] = get_value('output_prefix', 'aug')
     aug_config['balance_classes'] = get_value('balance_classes', True)
     aug_config['target_split'] = get_value('target_split', 'train')
+    
+    # CHANGED: Cleanup target menggantikan output_prefix
+    config['cleanup']['default_target'] = get_value('cleanup_target', 'both')
     
     # Augmentation types dengan validation
     aug_types = get_value('augmentation_types', ['combined'])
@@ -41,6 +40,8 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     # Lighting parameters  
     aug_config['lighting']['brightness_limit'] = get_value('brightness', 0.2)
     aug_config['lighting']['contrast_limit'] = get_value('contrast', 0.15)
+    aug_config['lighting']['hsv_hue'] = get_value('hsv_h', 10)
+    aug_config['lighting']['hsv_saturation'] = get_value('hsv_s', 15)
     
     # Combined parameters (sync dengan position dan lighting)
     combined = aug_config['combined']
@@ -50,16 +51,13 @@ def extract_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]
     combined['scale_limit'] = aug_config['position']['scale_limit']
     combined['brightness_limit'] = aug_config['lighting']['brightness_limit']
     combined['contrast_limit'] = aug_config['lighting']['contrast_limit']
+    combined['hsv_hue'] = aug_config['lighting']['hsv_hue']
+    combined['hsv_saturation'] = aug_config['lighting']['hsv_saturation']
     
     # Apply intensity scaling to all parameters
     intensity = aug_config['intensity']
     if intensity != 1.0:
         _apply_intensity_scaling(aug_config, intensity)
-    
-    # Preprocessing/Normalization
-    preprocessing = config['preprocessing']['normalization']
-    preprocessing['method'] = get_value('norm_method', 'minmax')
-    preprocessing['denormalize'] = get_value('denormalize', False)
     
     # CRITICAL FIX: Ensure backend structure exists
     config['backend'] = {
@@ -87,6 +85,8 @@ def _apply_intensity_scaling(aug_config: Dict[str, Any], intensity: float) -> No
     lighting = aug_config['lighting']
     lighting['brightness_limit'] = lighting['brightness_limit'] * intensity
     lighting['contrast_limit'] = lighting['contrast_limit'] * intensity
+    lighting['hsv_hue'] = int(lighting['hsv_hue'] * intensity)
+    lighting['hsv_saturation'] = int(lighting['hsv_saturation'] * intensity)
     
     # Scale combined parameters
     combined = aug_config['combined']
@@ -96,6 +96,8 @@ def _apply_intensity_scaling(aug_config: Dict[str, Any], intensity: float) -> No
     combined['scale_limit'] = combined['scale_limit'] * intensity
     combined['brightness_limit'] = combined['brightness_limit'] * intensity
     combined['contrast_limit'] = combined['contrast_limit'] * intensity
+    combined['hsv_hue'] = int(combined['hsv_hue'] * intensity)
+    combined['hsv_saturation'] = int(combined['hsv_saturation'] * intensity)
 
 def _validate_extracted_config(config: Dict[str, Any]) -> bool:
     """Validate extracted config untuk backend compatibility"""

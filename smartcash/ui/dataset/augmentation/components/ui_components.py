@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/ui_components.py
-Deskripsi: Fixed UI components dengan confirmation area yang benar dan layout yang diperbaiki
+Deskripsi: Updated UI components dengan live preview integration dan cleanup target
 """
 
 from IPython.display import display, HTML
@@ -13,7 +13,7 @@ from smartcash.ui.dataset.augmentation.utils.style_utils import (
 )
 
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Main UI dengan confirmation area yang benar dan layout yang diperbaiki"""
+    """Main UI dengan live preview integration dan cleanup target update"""
     
     try:
         from smartcash.ui.utils.header_utils import create_header
@@ -27,15 +27,15 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         # Header dan status panel
         header = create_header(
             f"{ICONS.get('augmentation', '🔄')} Dataset Augmentation", 
-            "Pipeline augmentasi dengan backend integration dan progress tracking"
+            "Pipeline augmentasi dengan live preview dan backend integration"
         )
         status_panel = create_status_panel("✅ Pipeline augmentasi siap", "success")
         
-        # Widget groups dengan styling terkonsolidasi
+        # Widget groups dengan live preview integration
         basic_options = _create_basic_options_group()
         advanced_options = _create_advanced_options_group()
         augmentation_types = _create_augmentation_types_group()
-        normalization_options = _create_normalization_options_group()
+        live_preview = _create_live_preview_group()  # CHANGED: Menggantikan normalization
         
         # Progress tracker dan buttons
         progress_tracker = create_dual_progress_tracker("Augmentation Pipeline", auto_hide=True)
@@ -47,12 +47,10 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             primary_label="🚀 Jalankan Augmentasi", primary_icon="play",
             secondary_buttons=[("🔍 Cek Data", "search", "info")],
             cleanup_enabled=True, 
-            cleanup_label="🧹 Bersihkan Data",
-            cleanup_tooltip='Hapus file hasil augmentasi',
             button_width="220px"
         )
         
-        # CRITICAL FIX: Confirmation area yang benar
+        # Confirmation area untuk dialog integration
         confirmation_area = widgets.Output(layout=widgets.Layout(
             width='100%', 
             min_height='50px',
@@ -68,7 +66,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         # Log accordion
         log_components = create_log_accordion('augmentation', '250px')
         
-        # 2x2 Grid dengan overflow fix
+        # 2x2 Grid dengan live preview
         row1 = widgets.HBox([
             styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic', '47%'),
             styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced', '47%')
@@ -81,7 +79,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         
         row2 = widgets.HBox([
             styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types', '47%'),
-            styled_container(normalization_options['container'], "📊 Normalisasi", 'normalization', '47%')
+            styled_container(live_preview['container'], "🎬 Live Preview", 'normalization', '47%')  # CHANGED
         ], layout=widgets.Layout(
             width='100%', max_width='100%', display='flex',
             flex_flow='row wrap', justify_content='space-between',
@@ -89,11 +87,10 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             overflow='hidden', box_sizing='border-box'
         ))
         
-        # CRITICAL FIX: Action section dengan confirmation area yang benar
+        # Action section dengan confirmation area
         action_section = widgets.VBox([
             _create_section_header("🚀 Pipeline Operations", "#667eea"),
             action_buttons['container'],
-            # CONFIRMATION AREA DI SINI - antara action buttons dan progress
             widgets.HTML("<div style='margin: 5px 0;'><strong>📋 Status & Konfirmasi:</strong></div>"),
             confirmation_area
         ], layout=widgets.Layout(
@@ -111,31 +108,31 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
                 layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
         ])
         
-        # CRITICAL FIX: Main UI assembly dengan urutan yang benar
+        # Main UI assembly dengan urutan yang benar
         ui = widgets.VBox([
             header, 
             status_panel, 
             row1, 
             row2, 
             config_section,
-            action_section,  # Action section dengan confirmation area
-            progress_tracker.container,  # Progress tracker setelah confirmation
-            log_components['log_accordion']  # Log accordion terakhir
+            action_section,
+            progress_tracker.container,
+            log_components['log_accordion']
         ], layout=widgets.Layout(
             width='100%', max_width='100%', display='flex',
             flex_flow='column', align_items='stretch'
         ))
         
-        # Component mapping
+        # Component mapping dengan live preview integration
         return {
             'ui': ui, 
             'header': header, 
             'status_panel': status_panel,
-            'confirmation_area': confirmation_area,  # CRITICAL: Properly mapped
+            'confirmation_area': confirmation_area,
             **basic_options['widgets'], 
             **advanced_options['widgets'],
             **augmentation_types['widgets'], 
-            **normalization_options['widgets'],
+            **live_preview['widgets'],  # CHANGED: Live preview widgets
             'augment_button': action_buttons['download_button'],
             'check_button': action_buttons['check_button'],
             'cleanup_button': action_buttons.get('cleanup_button'),
@@ -165,7 +162,7 @@ def _create_section_header(title: str, color: str) -> widgets.HTML:
     """)
 
 def _create_basic_options_group() -> Dict[str, Any]:
-    """Basic options group dengan fallback handling"""
+    """Basic options group dengan cleanup target integration"""
     try:
         from smartcash.ui.dataset.augmentation.components.basic_opts_widget import create_basic_options_widget
         return create_basic_options_widget()
@@ -173,7 +170,7 @@ def _create_basic_options_group() -> Dict[str, Any]:
         return _create_fallback_basic_options()
 
 def _create_advanced_options_group() -> Dict[str, Any]:
-    """Advanced options group dengan fallback handling"""
+    """Advanced options group dengan HSV parameters"""
     try:
         from smartcash.ui.dataset.augmentation.components.advanced_opts_widget import create_advanced_options_widget
         return create_advanced_options_widget()
@@ -181,24 +178,24 @@ def _create_advanced_options_group() -> Dict[str, Any]:
         return _create_fallback_advanced_options()
 
 def _create_augmentation_types_group() -> Dict[str, Any]:
-    """Augmentation types group dengan fallback handling"""
+    """Augmentation types group"""
     try:
         from smartcash.ui.dataset.augmentation.components.augtypes_opts_widget import create_augmentation_types_widget
         return create_augmentation_types_widget()
     except ImportError:
         return _create_fallback_types_options()
 
-def _create_normalization_options_group() -> Dict[str, Any]:
-    """Normalization options group dengan fallback handling"""
+def _create_live_preview_group() -> Dict[str, Any]:
+    """Live preview group - NEW"""
     try:
-        from smartcash.ui.dataset.augmentation.components.normalization_opts_widget import create_normalization_options_widget
-        return create_normalization_options_widget()
+        from smartcash.ui.dataset.augmentation.components.live_preview_widget import create_live_preview_widget
+        return create_live_preview_widget()
     except ImportError:
-        return _create_fallback_normalization_options()
+        return _create_fallback_live_preview()
 
-# Fallback implementations dengan consistent styling
+# Fallback implementations
 def _create_fallback_basic_options() -> Dict[str, Any]:
-    """Fallback basic options dengan consistent styling"""
+    """Fallback basic options dengan cleanup target"""
     from smartcash.ui.dataset.augmentation.utils.style_utils import style_widget, flex_layout
     
     widgets_dict = {
@@ -215,8 +212,9 @@ def _create_fallback_basic_options() -> Dict[str, Any]:
             options=[('Train', 'train'), ('Valid', 'valid'), ('Test', 'test')],
             value='train', description='Target Split:'
         ), '80px'),
-        'output_prefix': style_widget(widgets.Text(
-            value='aug', description='Prefix:'
+        'cleanup_target': style_widget(widgets.Dropdown(
+            options=[('Both', 'both'), ('Augmented', 'augmented'), ('Samples', 'samples')],
+            value='both', description='Cleanup:'
         ), '80px'),
         'balance_classes': widgets.Checkbox(
             value=True, description='Balance Classes',
@@ -230,7 +228,7 @@ def _create_fallback_basic_options() -> Dict[str, Any]:
     return {'container': container, 'widgets': widgets_dict}
 
 def _create_fallback_advanced_options() -> Dict[str, Any]:
-    """Fallback advanced options dengan tabbed layout"""
+    """Fallback advanced options dengan HSV parameters"""
     from smartcash.ui.dataset.augmentation.utils.style_utils import style_widget, flex_layout
     
     # Position widgets
@@ -249,13 +247,19 @@ def _create_fallback_advanced_options() -> Dict[str, Any]:
         ), '60px')
     }
     
-    # Lighting widgets
+    # Lighting widgets dengan HSV
     light_widgets = {
         'brightness': style_widget(widgets.FloatSlider(
             value=0.2, min=0.0, max=0.4, description='Bright:', readout=True
         ), '60px'),
         'contrast': style_widget(widgets.FloatSlider(
             value=0.15, min=0.0, max=0.4, description='Contrast:', readout=True
+        ), '60px'),
+        'hsv_h': style_widget(widgets.IntSlider(
+            value=10, min=0, max=30, description='HSV H:', readout=True
+        ), '60px'),
+        'hsv_s': style_widget(widgets.IntSlider(
+            value=15, min=0, max=50, description='HSV S:', readout=True
         ), '60px')
     }
     
@@ -273,7 +277,7 @@ def _create_fallback_advanced_options() -> Dict[str, Any]:
     return {'container': tabs, 'widgets': all_widgets}
 
 def _create_fallback_types_options() -> Dict[str, Any]:
-    """Fallback augmentation types dengan consistent styling"""
+    """Fallback augmentation types"""
     widgets_dict = {
         'augmentation_types': widgets.SelectMultiple(
             options=[
@@ -290,36 +294,43 @@ def _create_fallback_types_options() -> Dict[str, Any]:
     container = widgets.VBox([widgets_dict['augmentation_types']])
     return {'container': container, 'widgets': widgets_dict}
 
-def _create_fallback_normalization_options() -> Dict[str, Any]:
-    """Fallback normalization options dengan consistent styling"""
-    from smartcash.ui.dataset.augmentation.utils.style_utils import style_widget, flex_layout
+def _create_fallback_live_preview() -> Dict[str, Any]:
+    """Fallback live preview"""
+    preview_image = widgets.Image(
+        value=b'', format='jpg',
+        layout=widgets.Layout(width='200px', height='200px', border='1px solid #ddd')
+    )
+    
+    generate_button = widgets.Button(
+        description='🎯 Generate Preview',
+        button_style='info',
+        layout=widgets.Layout(width='180px', height='32px')
+    )
+    
+    preview_status = widgets.HTML(
+        value="<div style='text-align: center; color: #666; font-size: 12px;'>Preview: /data/aug_preview.jpg</div>"
+    )
+    
+    container = widgets.VBox([
+        widgets.HTML("<h6>🎬 Live Preview</h6>"),
+        preview_image,
+        preview_status,
+        generate_button
+    ])
     
     widgets_dict = {
-        'norm_method': style_widget(widgets.Dropdown(
-            options=[
-                ('MinMax [0,1] - YOLO Recommended', 'minmax'),
-                ('Standard (Z-score)', 'standard'),
-                ('ImageNet Normalization', 'imagenet'),
-                ('No Normalization', 'none')
-            ],
-            value='minmax', description='Method:'
-        ), '80px'),
-        'denormalize': widgets.Checkbox(
-            value=False, description='Denormalize (save as uint8)',
-            layout=widgets.Layout(margin='8px 0')
-        )
+        'preview_image': preview_image,
+        'generate_button': generate_button,
+        'preview_status': preview_status
     }
-    
-    container = widgets.VBox(list(widgets_dict.values()))
-    flex_layout(container)
     
     return {'container': container, 'widgets': widgets_dict}
 
 def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
-    """Minimal fallback UI dengan consistent styling"""
+    """Minimal fallback UI"""
     error_widget = widgets.HTML(f"""
     <div style="padding: 20px; background: #f8d7da; border: 1px solid #dc3545; 
-                border_radius: 8px; color: #721c24; margin: 10px 0;">
+                border-radius: 8px; color: #721c24; margin: 10px 0;">
         <h4>⚠️ Augmentation UI Error</h4>
         <p><strong>Error:</strong> {error_message}</p>
         <p>💡 Restart cell atau check imports</p>
@@ -345,12 +356,14 @@ def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
         'reset_button': fallback_button, 
         'log_output': log_output, 
         'status': log_output,
-        'confirmation_area': confirmation_area,  # CRITICAL: Always present
+        'confirmation_area': confirmation_area,
         'progress_tracker': None, 
         'error': error_message,
-        'norm_method': widgets.Dropdown(options=[('minmax', 'minmax')], value='minmax'),
-        'denormalize': widgets.Checkbox(value=False),
         'intensity': widgets.FloatSlider(value=0.7, min=0.1, max=1.0),
         'target_split': widgets.Dropdown(options=[('train', 'train')], value='train'),
-        'augmentation_initialized': True
+        'cleanup_target': widgets.Dropdown(options=[('both', 'both')], value='both'),
+        'augmentation_initialized': True,
+        'preview_image': widgets.Image(value=b''),
+        'generate_button': fallback_button,
+        'preview_status': widgets.HTML(value="Preview unavailable")
     }

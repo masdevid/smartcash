@@ -9,9 +9,8 @@ data:
 augmentation:
   # Basic form fields
   num_variations: 2          # IntSlider
-  target_count: 500          # IntSlider  
+  target_count: 200          # IntSlider  
   intensity: 0.7             # FloatSlider
-  output_prefix: 'aug'       # Text
   balance_classes: true      # Checkbox
   target_split: 'train'      # Dropdown
   types: ['combined']        # SelectMultiple
@@ -27,6 +26,8 @@ augmentation:
   lighting:
     brightness_limit: 0.2    # brightness slider
     contrast_limit: 0.15     # contrast slider
+    hsv_hue: 10
+    hsv_saturation: 15
   
   # Combined params (sync dengan position + lighting)
   combined:
@@ -36,6 +37,8 @@ augmentation:
     scale_limit: 0.04
     brightness_limit: 0.2
     contrast_limit: 0.15
+    hsv_hue: 10
+    hsv_saturation: 15
 
 # Normalization form fields
 preprocessing:
@@ -53,6 +56,9 @@ backend:
   timeout_seconds: 300
   retry_count: 3
   validation_enabled: true
+
+cleanup:
+  default_target: 'both'     # Dropdown: 'augmented', 'samples', 'both'
 
 # Backend essentials only
 balancing:

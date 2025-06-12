@@ -1,26 +1,26 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/config_handlers.py
-Deskripsi: Optimized config handlers dengan simplified logic dan consolidated operations
+Deskripsi: Updated config handlers dengan HSV support dan cleanup target validation
 """
 
 from typing import Dict, Any
 
 def handle_save_config(ui_components: Dict[str, Any]):
-    """Handle save config dengan optimized validation dan confirmation"""
+    """Handle save config dengan HSV validation dan cleanup target confirmation"""
     from smartcash.ui.dataset.augmentation.utils.ui_utils import validate_form_inputs, clear_ui_outputs
     from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
     
     clear_ui_outputs(ui_components)
     clear_confirmation_area(ui_components)
     
-    # Form validation
+    # Enhanced form validation dengan HSV dan cleanup
     validation = validate_form_inputs(ui_components)
     if not validation['valid']:
         _show_validation_errors_in_area(ui_components, validation)
         return
     
-    # Show config summary confirmation
-    _show_config_summary_confirmation(ui_components)
+    # Show enhanced config summary confirmation
+    _show_enhanced_config_summary_confirmation(ui_components)
 
 def handle_reset_config(ui_components: Dict[str, Any]):
     """Handle reset config langsung tanpa confirmation"""
@@ -61,26 +61,58 @@ def _execute_config_operation(ui_components: Dict[str, Any], operation_type: str
         from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
         log_to_ui(ui_components, f"❌ Error {operation_type} config: {str(e)}", "error")
 
-def _show_config_summary_confirmation(ui_components: Dict[str, Any]):
-    """Show config summary dengan save confirmation"""
+def _show_enhanced_config_summary_confirmation(ui_components: Dict[str, Any]):
+    """Show enhanced config summary dengan HSV dan cleanup target"""
     from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_confirmation_in_area
     from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
     
     # Extract current config
     current_config = extract_augmentation_config(ui_components)
     aug_config = current_config.get('augmentation', {})
+    cleanup_config = current_config.get('cleanup', {})
     
-    # Create summary
-    summary_items = [
+    # Create enhanced summary dengan HSV
+    basic_items = [
         f"🎯 Variations: {aug_config.get('num_variations', 3)}",
         f"📊 Target Count: {aug_config.get('target_count', 500)}",
         f"🔄 Types: {', '.join(aug_config.get('types', ['combined']))}",
         f"📂 Split: {aug_config.get('target_split', 'train')}",
-        f"⚖️ Balance Classes: {'Yes' if aug_config.get('balance_classes', True) else 'No'}",
         f"🎚️ Intensity: {aug_config.get('intensity', 0.7)}"
     ]
     
-    message = "Simpan konfigurasi dengan pengaturan berikut?\n\n" + "\n".join(summary_items)
+    # HSV parameters
+    lighting_config = aug_config.get('lighting', {})
+    hsv_items = [
+        f"💡 Brightness: {lighting_config.get('brightness_limit', 0.2)}",
+        f"🌈 HSV Hue: {lighting_config.get('hsv_hue', 10)}",
+        f"🎨 HSV Saturation: {lighting_config.get('hsv_saturation', 15)}"
+    ]
+    
+    # Cleanup target
+    cleanup_items = [
+        f"🧹 Cleanup Target: {cleanup_config.get('default_target', 'both')}"
+    ]
+    
+    message = """
+    Simpan konfigurasi dengan pengaturan berikut?
+
+    <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0;">
+        <strong> Basic Settings:</strong><br>
+        {}
+    </div>
+    <div style="background: #fff3cd; padding: 8px; border-radius: 4px; margin: 8px 0;">
+        <strong> Lighting & HSV:</strong><br>
+        {}
+    </div>
+    <div style="background: #d1ecf1; padding: 8px; border-radius: 4px; margin: 8px 0;">
+        <strong> Cleanup Settings:</strong><br>
+        {}
+    </div>
+    """.format(
+        ' • '.join(basic_items),
+        ' • '.join(hsv_items),
+        ' • '.join(cleanup_items)
+    )
     
     def on_confirm_save(btn):
         from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
@@ -104,12 +136,39 @@ def _show_config_summary_confirmation(ui_components: Dict[str, Any]):
     )
 
 def _show_validation_errors_in_area(ui_components: Dict[str, Any], validation: Dict[str, Any]):
-    """Show validation errors di confirmation area"""
+    """Show enhanced validation errors dengan HSV dan cleanup warnings"""
     from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_warning_in_area
     
-    error_messages = validation.get('errors', []) + validation.get('warnings', [])
-    message = "Form validation menemukan masalah:\n\n" + "\n".join(error_messages)
-    message += "\n\nSilakan perbaiki input form sebelum menyimpan."
+    error_messages = validation.get('errors', [])
+    warning_messages = validation.get('warnings', [])
+    
+    # Categorize HSV dan cleanup warnings
+    hsv_warnings = [w for w in warning_messages if 'HSV' in w]
+    cleanup_warnings = [w for w in warning_messages if 'Cleanup' in w or 'cleanup' in w]
+    other_warnings = [w for w in warning_messages if w not in hsv_warnings and w not in cleanup_warnings]
+    
+    message_parts = []
+    
+    if error_messages:
+        message_parts.append("<strong style='color: #dc3545;'>❌ Errors:</strong>")
+        message_parts.extend([f"<div style='margin-left: 15px; color: #dc3545;'>{error}</div>" for error in error_messages])
+    
+    if hsv_warnings:
+        message_parts.append("<strong style='color: #ffc107;'>🎨 HSV Warnings:</strong>")
+        message_parts.extend([f"<div style='margin-left: 15px; color: #ffc107;'>{warning}</div>" for warning in hsv_warnings])
+    
+    if cleanup_warnings:
+        message_parts.append("<strong style='color: #17a2b8;'>🧹 Cleanup Warnings:</strong>")
+        message_parts.extend([f"<div style='margin-left: 15px; color: #17a2b8;'>{warning}</div>" for warning in cleanup_warnings])
+    
+    if other_warnings:
+        message_parts.append("<strong style='color: #ffc107;'>⚠️ Other Warnings:</strong>")
+        message_parts.extend([f"<div style='margin-left: 15px; color: #ffc107;'>{warning}</div>" for warning in other_warnings])
+    
+    message = "<br>".join(message_parts) + """
+    <div style='margin-top: 10px; color: #666;'>
+    💡 Silakan perbaiki input form sebelum menyimpan.
+    </div>"""
     
     show_warning_in_area(
         ui_components,
@@ -119,82 +178,18 @@ def _show_validation_errors_in_area(ui_components: Dict[str, Any], validation: D
     )
 
 def _show_config_success(ui_components: Dict[str, Any], operation_type: str):
-    """Show config operation success di confirmation area"""
+    """Show config operation success dengan enhanced feedback"""
     from smartcash.ui.dataset.augmentation.utils.dialog_utils import show_info_in_area
     
     if operation_type == 'save':
         title = "Save Config Berhasil"
-        message = "✅ Konfigurasi berhasil disimpan!\n\nKonfigurasi telah disimpan ke file dan UI telah direfresh dengan nilai terbaru."
+        message = "✅ Konfigurasi berhasil disimpan!"
     elif operation_type == 'reset':
-        title = "Reset Config Berhasil"  
-        message = "✅ Konfigurasi berhasil direset!\n\nSemua pengaturan telah dikembalikan ke nilai default dan UI telah diperbarui."
-    else:
-        title = "Config Operation Berhasil"
-        message = f"✅ {operation_type.title()} config berhasil!"
+        title = "Reset Config Berhasil"
+        message = "✅ Konfigurasi berhasil direset!"
     
     show_info_in_area(
         ui_components,
         title=title,
-        message=message,
-        on_close=lambda btn: None
+        message=message
     )
-
-# Utility functions untuk compatibility
-def validate_and_save_config(ui_components: Dict[str, Any]) -> bool:
-    """Validate dan save config - return success status"""
-    from smartcash.ui.dataset.augmentation.utils.ui_utils import validate_form_inputs
-    
-    validation = validate_form_inputs(ui_components)
-    if not validation['valid']:
-        return False
-    
-    try:
-        config_handler = ui_components.get('config_handler')
-        if not config_handler:
-            return False
-        
-        if hasattr(config_handler, 'set_ui_components'):
-            config_handler.set_ui_components(ui_components)
-        
-        return config_handler.save_config(ui_components)
-    except Exception:
-        return False
-
-def reset_config_silent(ui_components: Dict[str, Any]) -> bool:
-    """Reset config tanpa UI feedback - return success status"""
-    try:
-        config_handler = ui_components.get('config_handler')
-        if not config_handler:
-            return False
-        
-        if hasattr(config_handler, 'set_ui_components'):
-            config_handler.set_ui_components(ui_components)
-        
-        return config_handler.reset_config(ui_components)
-    except Exception:
-        return False
-
-def get_current_config_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Get current config summary untuk display"""
-    try:
-        from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config
-        
-        config = extract_augmentation_config(ui_components)
-        aug_config = config.get('augmentation', {})
-        
-        return {
-            'num_variations': aug_config.get('num_variations', 2),
-            'target_count': aug_config.get('target_count', 500),
-            'intensity': aug_config.get('intensity', 0.7),
-            'types': aug_config.get('types', ['combined']),
-            'target_split': aug_config.get('target_split', 'train'),
-            'balance_classes': aug_config.get('balance_classes', True),
-            'normalization_method': config.get('preprocessing', {}).get('normalization', {}).get('method', 'minmax')
-        }
-    except Exception:
-        return {}
-
-# One-liner utilities
-safe_save = lambda ui_components: validate_and_save_config(ui_components)
-safe_reset = lambda ui_components: reset_config_silent(ui_components)
-get_summary = lambda ui_components: get_current_config_summary(ui_components)

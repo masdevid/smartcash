@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/button_manager.py
-Deskripsi: Enhanced button manager dengan comprehensive state management dan backend integration
+Deskripsi: Enhanced button manager dengan preview button support dan comprehensive state management
 """
 
 from typing import Dict, Any, Callable
@@ -8,7 +8,7 @@ import functools
 
 def disable_all_buttons(ui_components: Dict[str, Any]):
     """Disable semua operation buttons dengan state preservation"""
-    button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
+    button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button', 'generate_button']
     
     for key in button_keys:
         button = ui_components.get(key)
@@ -20,7 +20,7 @@ def disable_all_buttons(ui_components: Dict[str, Any]):
 
 def enable_all_buttons(ui_components: Dict[str, Any]):
     """Enable semua operation buttons dengan state restoration"""
-    button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
+    button_keys = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button', 'generate_button']
     
     for key in button_keys:
         button = ui_components.get(key)
@@ -41,8 +41,9 @@ def set_button_processing_state(ui_components: Dict[str, Any], button_key: str, 
             button._original_description = button.description
             button._original_style = getattr(button, 'button_style', 'primary')
         
-        # Set processing state
-        button.description = f"{button._original_description} (Processing...)"
+        # Set processing state dengan context-aware text
+        processing_text = _get_processing_text(button_key)
+        button.description = f"{button._original_description} {processing_text}"
         button.button_style = 'warning'
         button.disabled = True
     else:
@@ -51,6 +52,18 @@ def set_button_processing_state(ui_components: Dict[str, Any], button_key: str, 
             button.description = button._original_description
             button.button_style = button._original_style
         button.disabled = False
+
+def _get_processing_text(button_key: str) -> str:
+    """Get context-aware processing text untuk berbagai button types"""
+    processing_texts = {
+        'augment_button': '🔄',
+        'check_button': '🔍',
+        'cleanup_button': '🧹',
+        'save_button': '💾',
+        'reset_button': '🔄',
+        'generate_button': '🎯'
+    }
+    return processing_texts.get(button_key, '🔄')
 
 def update_button_states_batch(ui_components: Dict[str, Any], button_states: Dict[str, Dict[str, Any]]):
     """Update multiple buttons dengan batch operation"""
@@ -68,7 +81,7 @@ def update_button_states_batch(ui_components: Dict[str, Any], button_states: Dic
                     pass  # Silent fail untuk read-only properties
 
 def with_button_management(operation_func: Callable) -> Callable:
-    """Enhanced decorator dengan comprehensive button management dan error handling"""
+    """Enhanced decorator dengan comprehensive button management dan preview support"""
     @functools.wraps(operation_func)
     def wrapper(ui_components: Dict[str, Any], *args, **kwargs):
         # Notify backend tentang operation start
@@ -108,11 +121,11 @@ def with_button_management(operation_func: Callable) -> Callable:
     return wrapper
 
 def create_button_state_manager(ui_components: Dict[str, Any]) -> 'ButtonStateManager':
-    """Factory untuk button state manager"""
+    """Factory untuk button state manager dengan preview support"""
     return ButtonStateManager(ui_components)
 
 class ButtonStateManager:
-    """Advanced button state manager dengan operation tracking"""
+    """Advanced button state manager dengan operation tracking dan preview support"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -122,7 +135,7 @@ class ButtonStateManager:
     def push_operation(self, operation_name: str, affected_buttons: list = None):
         """Push operation ke stack dengan button state preservation"""
         if affected_buttons is None:
-            affected_buttons = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button']
+            affected_buttons = ['augment_button', 'check_button', 'cleanup_button', 'save_button', 'reset_button', 'generate_button']
         
         # Save current states
         current_states = {}
@@ -173,6 +186,18 @@ class ButtonStateManager:
     def is_operation_active(self) -> bool:
         """Check apakah ada operation yang sedang berjalan"""
         return len(self.operation_stack) > 0
+    
+    def set_preview_generating(self, generating: bool = True):
+        """Set preview generation state"""
+        generate_button = self.ui_components.get('generate_button')
+        if generate_button:
+            if generating:
+                set_button_processing_state(self.ui_components, 'generate_button', True)
+                # Update preview status
+                from smartcash.ui.dataset.augmentation.utils.ui_utils import update_preview_status
+                update_preview_status(self.ui_components, 'generating', 'Generating preview...')
+            else:
+                set_button_processing_state(self.ui_components, 'generate_button', False)
 
 def _notify_backend_operation_start(ui_components: Dict[str, Any], operation_name: str):
     """Notify backend tentang operation start"""
@@ -221,8 +246,9 @@ def _has_other_active_operations(ui_components: Dict[str, Any]) -> bool:
     except Exception:
         return False
 
-# Convenience functions
+# Convenience functions dengan preview support
 disable_buttons = lambda ui_components: disable_all_buttons(ui_components)
 enable_buttons = lambda ui_components: enable_all_buttons(ui_components)
 set_processing = lambda ui_components, button_key: set_button_processing_state(ui_components, button_key, True)
 clear_processing = lambda ui_components, button_key: set_button_processing_state(ui_components, button_key, False)
+set_preview_generating = lambda ui_components, generating=True: create_button_state_manager(ui_components).set_preview_generating(generating)

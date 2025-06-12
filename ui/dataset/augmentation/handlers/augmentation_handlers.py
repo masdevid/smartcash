@@ -247,12 +247,30 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
         from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
         import os
         
-        # Definisikan path preview di Google Drive
-        preview_dir = '/content/drive/data'
+        # Cek dan mount Google Drive jika diperlukan
+        try:
+            from google.colab import drive
+            drive.mount('/content/drive')
+            drive_mounted = True
+        except (ImportError, Exception) as e:
+            drive_mounted = False
+        
+        # Tentukan path preview
+        if drive_mounted and os.path.exists('/content/drive'):
+            # Gunakan Google Drive jika tersedia
+            preview_dir = '/content/drive/MyDrive/data'
+        else:
+            # Fallback ke direktori lokal
+            preview_dir = os.path.join(os.getcwd(), 'data')
+            
         preview_path = os.path.join(preview_dir, 'aug_preview.jpg')
         
         # Pastikan direktori preview ada
-        os.makedirs(preview_dir, exist_ok=True)
+        try:
+            os.makedirs(os.path.dirname(preview_path), exist_ok=True)
+        except Exception as e:
+            log_to_ui(ui_components, f"❌ Gagal membuat direktori: {str(e)}", "error")
+            raise
         
         # Create preview menggunakan backend service
         from smartcash.dataset.augmentor.service import create_augmentation_service

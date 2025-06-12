@@ -10,7 +10,12 @@ def handle_save_config(ui_components: Dict[str, Any]):
     from smartcash.ui.dataset.augmentation.utils.ui_utils import validate_form_inputs, clear_ui_outputs
     from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
     
-    clear_ui_outputs(ui_components)
+    # Kirimkan dictionary ui_components yang berisi semua widget
+    clear_ui_outputs({
+        'log_output': ui_components.log_output,
+        'status': ui_components.status,
+        'confirmation_area': ui_components.confirmation_area
+    })
     clear_confirmation_area(ui_components)
     
     # Enhanced form validation dengan HSV dan cleanup
@@ -27,7 +32,12 @@ def handle_reset_config(ui_components: Dict[str, Any]):
     from smartcash.ui.dataset.augmentation.utils.ui_utils import clear_ui_outputs
     from smartcash.ui.dataset.augmentation.utils.dialog_utils import clear_confirmation_area
     
-    clear_ui_outputs(ui_components)
+    # Kirimkan dictionary ui_components yang berisi semua widget
+    clear_ui_outputs({
+        'log_output': ui_components.log_output,
+        'status': ui_components.status,
+        'confirmation_area': ui_components.confirmation_area
+    })
     clear_confirmation_area(ui_components)
     
     # Execute reset langsung

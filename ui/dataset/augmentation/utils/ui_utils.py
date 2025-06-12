@@ -3,8 +3,10 @@ File: smartcash/ui/dataset/augmentation/utils/ui_utils.py
 Deskripsi: Updated UI utilities dengan HSV support dan enhanced validation
 """
 
-from typing import Dict, Any, List
-from IPython.display import display, HTML
+from typing import Dict, Any, Union
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+import logging
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
     """Enhanced logging dengan fallback chain"""

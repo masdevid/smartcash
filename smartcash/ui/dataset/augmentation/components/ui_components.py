@@ -54,7 +54,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         confirmation_area = widgets.Output(layout=widgets.Layout(
             width='100%', 
             min_height='50px',
-            max_height='200px', 
+            max_height='800px', 
             margin='10px 0',
             padding='5px',
             border='1px solid #e0e0e0',

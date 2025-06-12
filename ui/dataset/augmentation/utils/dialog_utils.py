@@ -7,13 +7,6 @@ import ipywidgets as widgets
 from IPython.display import display, HTML
 from typing import Dict, Any, Callable, Optional
 
-_DIALOG_TYPE_CONFIGS = {
-    'info': {'icon': 'ℹ️', 'bg_color': '#d1ecf1', 'border_color': '#17a2b8', 'text_color': '#0c5460'},
-    'success': {'icon': '✅', 'bg_color': '#d4edda', 'border_color': '#28a745', 'text_color': '#155724'},
-    'warning': {'icon': '⚠️', 'bg_color': '#fff3cd', 'border_color': '#ffc107', 'text_color': '#856404'},
-    'error': {'icon': '❌', 'bg_color': '#f8d7da', 'border_color': '#dc3545', 'text_color': '#721c24'}
-}
-
 def show_confirmation_in_area(
     ui_components: Dict[str, Any],
     title: str,
@@ -42,7 +35,8 @@ def show_confirmation_in_area(
         _fallback_console_dialog(title, message, confirm_text, cancel_text)
         return
     
-    # Set dialog visibility flag
+    # Show confirmation area dan set dialog visibility flag
+    show_confirmation_area(ui_components)
     ui_components['_dialog_visible'] = True
     
     # Clear area first
@@ -68,7 +62,8 @@ def show_confirmation_in_area(
     # Enhanced callback wrappers dengan visibility management
     def _enhanced_confirm_handler(btn):
         try:
-            clear_confirmation_area(ui_components)
+            hide_confirmation_area(ui_components)  # Hide area first
+            ui_components['_dialog_visible'] = False  # Reset flag
             if on_confirm:
                 on_confirm(btn)
         except Exception as e:
@@ -76,7 +71,8 @@ def show_confirmation_in_area(
     
     def _enhanced_cancel_handler(btn):
         try:
-            clear_confirmation_area(ui_components)
+            hide_confirmation_area(ui_components)  # Hide area first
+            ui_components['_dialog_visible'] = False  # Reset flag
             if on_cancel:
                 on_cancel(btn)
         except Exception as e:
@@ -136,7 +132,8 @@ def show_info_in_area(
         _fallback_console_info(title, message, dialog_type)
         return
     
-    # Set dialog visibility flag
+    # Show confirmation area dan set dialog visibility flag
+    show_confirmation_area(ui_components)
     ui_components['_dialog_visible'] = True
     
     # Clear area first
@@ -155,7 +152,8 @@ def show_info_in_area(
     # Enhanced close callback
     def _enhanced_close_handler(btn):
         try:
-            clear_confirmation_area(ui_components)
+            hide_confirmation_area(ui_components)  # Hide area first
+            ui_components['_dialog_visible'] = False  # Reset flag
             if on_close:
                 on_close(btn)
         except Exception as e:
@@ -212,8 +210,27 @@ def clear_confirmation_area(ui_components: Dict[str, Any]) -> None:
     if confirmation_area and hasattr(confirmation_area, 'clear_output'):
         confirmation_area.clear_output(wait=True)
     
+    # Hide confirmation area setelah clear
+    hide_confirmation_area(ui_components)
+    
     # Reset dialog visibility flag
     ui_components['_dialog_visible'] = False
+
+def hide_confirmation_area(ui_components: Dict[str, Any]) -> None:
+    """Hide confirmation area dengan visibility control"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'hidden'
+        confirmation_area.layout.height = '0px'
+        confirmation_area.layout.margin = '0px'
+
+def show_confirmation_area(ui_components: Dict[str, Any]) -> None:
+    """Show confirmation area dengan restore layout"""
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area and hasattr(confirmation_area, 'layout'):
+        confirmation_area.layout.visibility = 'visible'
+        confirmation_area.layout.height = 'auto'
+        confirmation_area.layout.margin = '10px 0'
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
     """
@@ -257,10 +274,35 @@ def _get_button_style(danger_mode: bool = False) -> Dict[str, str]:
     else:
         return {'confirm': 'primary', 'cancel': ''}
 
-
 def _get_dialog_type_config(dialog_type: str) -> Dict[str, str]:
     """Get configuration untuk berbagai dialog types."""
-    return _DIALOG_TYPE_CONFIGS.get(dialog_type, _DIALOG_TYPE_CONFIGS['info'])
+    configs = {
+        'info': {
+            'icon': 'ℹ️',
+            'bg_color': '#d1ecf1',
+            'border_color': '#17a2b8',
+            'text_color': '#0c5460'
+        },
+        'success': {
+            'icon': '✅',
+            'bg_color': '#d4edda',
+            'border_color': '#28a745',
+            'text_color': '#155724'
+        },
+        'warning': {
+            'icon': '⚠️',
+            'bg_color': '#fff3cd',
+            'border_color': '#ffc107',
+            'text_color': '#856404'
+        },
+        'error': {
+            'icon': '❌',
+            'bg_color': '#f8d7da',
+            'border_color': '#dc3545',
+            'text_color': '#721c24'
+        }
+    }
+    return configs.get(dialog_type, configs['info'])
 
 def _handle_callback_error(ui_components: Dict[str, Any], error_message: str) -> None:
     """Handle callback errors dengan logging."""

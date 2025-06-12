@@ -69,7 +69,7 @@ def _setup_config_handlers_optimized(ui_components: Dict[str, Any], config: Dict
     _bind_handlers_safe(ui_components, config_handlers)
 
 def _setup_preview_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup live preview handler untuk generate button"""
+    """Setup live preview handler untuk generate button dengan initial check"""
     
     def preview_handler(btn=None):
         from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
@@ -93,6 +93,9 @@ def _setup_preview_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
     generate_button = ui_components.get('generate_button')
     if generate_button and hasattr(generate_button, 'on_click'):
         generate_button.on_click(preview_handler)
+    
+    # Check dan load existing preview saat initialization
+    _check_and_load_existing_preview(ui_components, config)
 
 def _show_augmentation_confirmation_dialog(ui_components: Dict[str, Any]):
     """Show augmentation confirmation dengan enhanced summary"""
@@ -279,6 +282,39 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
         log_to_ui(ui_components, f"❌ Error generating preview: {str(e)}", "error")
         _update_preview_status(ui_components, "error", "Preview generation failed")
 
+def _check_and_load_existing_preview(ui_components: Dict[str, Any], config: Dict[str, Any]):
+    """Check dan load existing preview image saat UI initialization"""
+    try:
+        # Determine preview path - try multiple locations
+        data_dir = config.get('data', {}).get('dir', 'data')
+        preview_paths = [
+            f"{data_dir}/aug_preview.jpg",
+            "/data/aug_preview.jpg",
+            "/content/data/aug_preview.jpg",
+            "/content/drive/MyDrive/data/aug_preview.jpg"
+        ]
+        
+        existing_path = None
+        for path in preview_paths:
+            if os.path.exists(path) and os.path.getsize(path) > 0:
+                existing_path = path
+                break
+        
+        if existing_path:
+            # Load existing preview
+            if _load_preview_to_widget(ui_components, existing_path):
+                _update_preview_status(ui_components, 'info', f'Loaded existing preview')
+                from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
+                log_to_ui(ui_components, f"📸 Loaded existing preview dari {existing_path}", "info")
+            else:
+                _update_preview_status(ui_components, 'warning', 'Preview file found but failed to load')
+        else:
+            # No existing preview
+            _update_preview_status(ui_components, 'info', 'No preview available - click Generate')
+            
+    except Exception as e:
+        _update_preview_status(ui_components, 'warning', 'Could not check for existing preview')
+
 def _load_preview_to_widget(ui_components: Dict[str, Any], preview_path: str) -> bool:
     """Load preview image ke widget dengan enhanced error handling"""
     try:
@@ -309,22 +345,20 @@ def _load_preview_to_widget(ui_components: Dict[str, Any], preview_path: str) ->
         
     except Exception:
         return False
-
+        
 def _update_preview_status(ui_components: Dict[str, Any], status: str, message: str):
     """Update preview status dengan consistent styling"""
     preview_status = ui_components.get('preview_status')
     if not preview_status:
         return
     
-    style = 'color: {};' if status else ''
-    emoji = 'ℹ️' if status == 'info' else '✅' if status == 'success' else '❌' if status == 'error' else '⚠️'
+    style = 'color: #666; font-size: 12px; margin: 4px 0; font-family: monospace; padding: 2px;'
+    emoji_map = {'generating': '🔄', 'success': '✅', 'error': '❌', 'warning': '⚠️', 'info': 'ℹ️'}
+    color_map = {'generating': '#007bff', 'success': '#28a745', 'error': '#dc3545', 'warning': '#ffc107', 'info': '#17a2b8'}
     
-    preview_status.value = f"""
-    <div style='{style} text-align: center; font-size: 12px; margin: 4px 0; 
-                font-family: monospace; padding: 2px;'>
-        {emoji} {message}
-    </div>
-    """
+    color = color_map.get(status, '#666')
+    emoji = emoji_map.get(status, 'ℹ️')
+    preview_status.value = f"<div style='{style} color: {color};'>{emoji} {message}</div>"
 
 def _handle_pipeline_result(ui_components: Dict[str, Any], result: Dict[str, Any]):
     """Handle pipeline result dengan enhanced feedback"""

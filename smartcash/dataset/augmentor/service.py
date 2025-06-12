@@ -176,9 +176,11 @@ class AugmentationService:
             variance_count = status.get(f'{split}_variance_count', 0)
             
             # Status icons
-            raw_icon = "✅" if raw_status == 'available' else "❌" if raw_status == 'not_found' else "⚠️"
-            aug_icon = "✅" if aug_status == 'available' else "❌" if aug_status == 'not_found' else "⚠️"
-            prep_icon = "✅" if prep_status == 'available' else "❌" if prep_status == 'not_found' else "⚠️"
+            raw_icon, aug_icon, prep_icon = {
+                'available': "✅",
+                'not_found': "❌",
+                'unknown': "⚠️"
+            }.get((status.get(f'{split}_raw_status'), status.get(f'{split}_aug_status'), status.get(f'{split}_prep_status')), "⚠️")
             
             self.logger.info(f"  📂 {split.upper()}:")
             self.logger.info(f"    {raw_icon} Raw: {raw_imgs} images ({raw_status})")

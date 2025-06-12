@@ -252,8 +252,7 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
         service = create_augmentation_service(config)
         
         # Generate preview (service akan save ke /data/aug_preview.jpg)
-        preview_result = service.generate_preview_sample(
-            output_path='/data/aug_preview.jpg',
+        preview_result = service.create_live_preview(
             target_split=config['augmentation']['target_split']
         )
         

@@ -4,7 +4,7 @@ Deskripsi: Augmentation service dengan FileNamingManager, preprocessor API, dan 
 """
 
 import time
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Tuple
 from pathlib import Path
 
 from smartcash.dataset.augmentor.core.engine import AugmentationEngine
@@ -461,18 +461,31 @@ class AugmentationService:
             self.logger.info(f"📋 API: {norm_summary.get('configuration', {}).get('api_source', 'N/A')} normalization")
 
 
-def create_augmentation_service(config: Dict[str, Any], progress_tracker=None) -> AugmentationService:
-    """Factory untuk create augmentation service"""
-    return AugmentationService(config, progress_tracker)
+def create_augmentation_service(config: Dict[str, Any]) -> Tuple[Any, str, bool]:
+    """Buat service dan kembalikan (service, preview_path, success)"""
+    try:
+        service = AugmentationService(config)
+        preview_path = service.create_live_preview()
+        return service, preview_path, True
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error creating service: {str(e)}")
+        return None, "", False
 
 def run_augmentation_pipeline(config: Dict[str, Any], target_split: str = "train", 
                             progress_tracker=None, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
     """One-liner untuk run pipeline"""
-    service = create_augmentation_service(config, progress_tracker)
-    return service.run_augmentation_pipeline(target_split, progress_callback)
+    service = create_augmentation_service(config)
+    if service[2]:
+        return service[0].run_augmentation_pipeline(target_split, progress_callback)
+    else:
+        return {'status': 'error', 'message': 'Failed to create service'}
 
 def get_augmentation_samples(config: Dict[str, Any], target_split: str = "train", 
                            max_samples: int = 5, progress_tracker=None) -> Dict[str, Any]:
     """One-liner untuk get sampling data"""
-    service = create_augmentation_service(config, progress_tracker)
-    return service.get_sampling(target_split, max_samples)
+    service = create_augmentation_service(config)
+    if service[2]:
+        return service[0].get_sampling(target_split, max_samples)
+    else:
+        return {'status': 'error', 'message': 'Failed to create service'}

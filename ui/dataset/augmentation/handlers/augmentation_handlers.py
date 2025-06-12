@@ -247,42 +247,45 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
         from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
         import os
         
+        # Pastikan direktori preview ada
+        preview_path = '/data/aug_preview.jpg'
+        os.makedirs(os.path.dirname(preview_path), exist_ok=True)
+        
         # Create preview menggunakan backend service
         from smartcash.dataset.augmentor.service import create_augmentation_service
-        service = create_augmentation_service(config)
+        result = create_augmentation_service(config)
         
-        # Generate preview (service akan save ke /data/aug_preview.jpg)
-        preview_result = service.create_live_preview(
-            target_split=config['augmentation']['target_split']
-        )
-        
-        if preview_result.get('status') == 'success':
-            # Wait 1 second sebelum load dan display image (agar preview tidak terlihat langsung)
-            import time
-            time.sleep(1)
-            
-            # Load dan display image
-            preview_path = '/data/aug_preview.jpg'
-            if os.path.exists(preview_path):
-                with open(preview_path, 'rb') as f:
-                    image_data = f.read()
-                
-                preview_image = ui_components.get('preview_image')
-                if preview_image:
-                    preview_image.value = image_data
-                
-                preview_status = ui_components.get('preview_status')
-                if preview_status:
-                    preview_status.value = "<div style='text-align: center; color: #28a745; font-size: 12px;'>✅ Preview generated</div>"
-                
-                log_to_ui(ui_components, "✅ Preview berhasil di-generate", "success")
-            else:
-                error_msg = "Preview file tidak ditemukan"
-                raise Exception(error_msg)
-        else:
-            error_msg = preview_result.get('message', 'Preview generation failed')
+        # Periksa apakah hasil valid (3 nilai)
+        if not isinstance(result, tuple) or len(result) != 3:
+            error_msg = f"Format hasil tidak valid: {type(result)}, panjang {len(result) if isinstance(result, tuple) else 'bukan tuple'}"
+            log_to_ui(ui_components, error_msg, "error")
             raise Exception(error_msg)
             
+        service, preview_path, success = result
+        
+        # Periksa hasil preview
+        if not os.path.exists(preview_path):
+            error_msg = f"Preview file tidak ditemukan di {preview_path}"
+            log_to_ui(ui_components, error_msg, "error")
+            raise Exception(error_msg)
+        
+        # Wait 1 second sebelum load dan display image (agar preview tidak terlihat langsung)
+        import time
+        time.sleep(1)
+        
+        # Load dan display image
+        with open(preview_path, 'rb') as f:
+            image_data = f.read()
+        
+        preview_image = ui_components.get('preview_image')
+        if preview_image:
+            preview_image.value = image_data
+        
+        preview_status = ui_components.get('preview_status')
+        if preview_status:
+            preview_status.value = "<div style='text-align: center; color: #28a745; font-size: 12px;'>✅ Preview generated</div>"
+        
+        log_to_ui(ui_components, "✅ Preview berhasil di-generate", "success")
     except Exception as e:
         from smartcash.ui.dataset.augmentation.utils.ui_utils import log_to_ui
         log_to_ui(ui_components, f"❌ Error generating preview: {str(e)}", "error")

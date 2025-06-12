@@ -40,7 +40,7 @@ def create_live_preview_widget() -> Dict[str, Any]:
     # Status text untuk preview
     preview_status = widgets.HTML(
         value="<div style='text-align: center; color: #666; font-size: 12px; margin: 4px 0;'>Preview: /data/aug_preview.jpg</div>",
-        layout=widgets.Layout(width='100%', margin='4px 0')
+        layout=widgets.Layout(width='100%', margin='4px auto')
     )
     
     # Info content untuk preview

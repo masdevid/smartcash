@@ -256,7 +256,11 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
             target_split=config['augmentation']['target_split']
         )
         
-        if preview_result.get('success', False):
+        if preview_result.get('status') == 'success':
+            # Wait 1 second sebelum load dan display image (agar preview tidak terlihat langsung)
+            import time
+            time.sleep(1)
+            
             # Load dan display image
             preview_path = '/data/aug_preview.jpg'
             if os.path.exists(preview_path):
@@ -273,7 +277,8 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
                 
                 log_to_ui(ui_components, "✅ Preview berhasil di-generate", "success")
             else:
-                raise FileNotFoundError("Preview file tidak ditemukan")
+                error_msg = "Preview file tidak ditemukan"
+                raise Exception(error_msg)
         else:
             error_msg = preview_result.get('message', 'Preview generation failed')
             raise Exception(error_msg)

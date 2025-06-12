@@ -274,7 +274,24 @@ def _generate_preview_image(ui_components: Dict[str, Any], config: Dict[str, Any
         
         # Create preview menggunakan backend service
         from smartcash.dataset.augmentor.service import create_augmentation_service
-        service = create_augmentation_service(config)
+        
+        try:
+            # Dapatkan service dari tuple yang dikembalikan
+            service, preview_path, success = create_augmentation_service(config)
+            
+            if not success or not service:
+                error_msg = "Gagal membuat service augmentasi"
+                log_to_ui(ui_components, f"❌ {error_msg}", "error")
+                raise Exception(error_msg)
+                
+            # Set progress tracker jika ada
+            if hasattr(service, 'set_progress_tracker') and 'progress_tracker' in ui_components:
+                service.set_progress_tracker(ui_components['progress_tracker'])
+                
+        except Exception as e:
+            error_msg = f"Gagal menginisialisasi service: {str(e)}"
+            log_to_ui(ui_components, f"❌ {error_msg}", "error")
+            raise Exception(error_msg)
         
         # Panggil create_live_preview untuk generate preview
         preview_result = service.create_live_preview(

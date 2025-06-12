@@ -3,7 +3,7 @@ File: smartcash/ui/dataset/augmentation/handlers/augmentation_handlers.py
 Deskripsi: Complete handlers dengan dialog integration dan live preview handler
 """
 
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, List
 from smartcash.common.logger import get_logger
 
 def setup_augmentation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:

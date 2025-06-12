@@ -356,13 +356,13 @@ def _update_preview_status(ui_components: Dict[str, Any], status: str, message: 
     if not preview_status:
         return
     
-    style = 'color: #666; font-size: 12px; margin: 4px 0; font-family: monospace; padding: 2px;'
+    style = 'color: #666; font-size: 12px; text-align: center; margin: 2px 0; font-family: monospace; padding: 2px;'
     emoji_map = {'generating': '🔄', 'success': '✅', 'error': '❌', 'warning': '⚠️', 'info': 'ℹ️'}
     color_map = {'generating': '#007bff', 'success': '#28a745', 'error': '#dc3545', 'warning': '#ffc107', 'info': '#17a2b8'}
     
     color = color_map.get(status, '#666')
     emoji = emoji_map.get(status, 'ℹ️')
-    preview_status.value = f"<div style='{style} color: {color};'>{emoji} {message}</div>"
+    preview_status.value = f"<div style='{style} color: {color}; margin: 0 auto;'>{emoji} {message}</div>"
 
 def _handle_pipeline_result(ui_components: Dict[str, Any], result: Dict[str, Any]):
     """Handle pipeline result dengan enhanced feedback"""

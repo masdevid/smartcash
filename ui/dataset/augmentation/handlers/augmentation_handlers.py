@@ -58,12 +58,16 @@ def _setup_operation_handlers_with_dialog(ui_components: Dict[str, Any], config:
     _bind_handlers_safe(ui_components, handlers)
 
 def _setup_config_handlers_optimized(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup config handlers dengan save validation dan reset langsung"""
+    """Setup config handlers dengan proper function binding"""
     from smartcash.ui.dataset.augmentation.utils.config_handlers import handle_save_config, handle_reset_config
     
+    # Create handler functions yang return proper event handlers
+    save_handler = handle_save_config(ui_components)
+    reset_handler = handle_reset_config(ui_components)
+    
     config_handlers = {
-        'save_button': handle_save_config,
-        'reset_button': handle_reset_config
+        'save_button': save_handler,
+        'reset_button': reset_handler
     }
     
     _bind_handlers_safe(ui_components, config_handlers)
@@ -345,7 +349,7 @@ def _load_preview_to_widget(ui_components: Dict[str, Any], preview_path: str) ->
         
     except Exception:
         return False
-        
+
 def _update_preview_status(ui_components: Dict[str, Any], status: str, message: str):
     """Update preview status dengan consistent styling"""
     preview_status = ui_components.get('preview_status')

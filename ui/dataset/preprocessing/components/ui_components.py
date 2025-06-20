@@ -74,7 +74,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         confirmation_area = widgets.Output(layout=widgets.Layout(
             width='100%', 
             min_height='0px', 
-            max_height='250px',
+            max_height='800px',
             margin='10px 0',
             padding='5px',
             border='1px solid #e0e0e0',

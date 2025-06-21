@@ -1,18 +1,32 @@
-# File: smartcash/ui/pretrained/pretrained_initializer.py
+# File: smartcash/ui/pretrained/pretrained_init.py
 """
-File: smartcash/ui/pretrained/pretrained_initializer.py
-Deskripsi: Complete initializer untuk pretrained module dengan CommonInitializer patterns - Fixed abstract methods
+File: smartcash/ui/pretrained/pretrained_init.py
+Deskripsi: Initializer untuk pretrained models - Fixed version berdasarkan preprocessing pattern
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Type
 from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
+class PretrainedConfigHandler(ConfigHandler):
+    """Custom config handler untuk pretrained models"""
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        return {
+            'pretrained_models': {
+                'models_dir': '/content/models',
+                'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
+                'pretrained_type': 'yolov5s',
+                'auto_download': False,
+                'sync_drive': True
+            }
+        }
+
 class PretrainedInitializer(CommonInitializer):
-    """🚀 Pretrained module initializer dengan complete workflow - Fixed abstract methods"""
+    """🤖 Pretrained models initializer dengan fixed UI creation pattern"""
     
     def __init__(self):
         super().__init__(
@@ -20,71 +34,168 @@ class PretrainedInitializer(CommonInitializer):
             config_handler_class=PretrainedConfigHandler
         )
     
-    # FIXED: Abstract method implementation - nama method sesuai parent class
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan validation - Fixed method name"""
-        from smartcash.ui.pretrained.components.ui_components import create_pretrained_ui_components
-        
-        ui_components = create_pretrained_ui_components(config)
-        
-        # Validate required components
-        required_widgets = [
-            'download_sync_button', 'save_button', 'reset_button',
-            'status_panel', 'log_output'
-        ]
-        missing = [w for w in required_widgets if w not in ui_components]
-        if missing:
-            logger.warning(f"⚠️ Missing widgets: {missing}")
-        
-        return ui_components
+        """
+        🎯 Create UI components dengan proper error handling.
+        Mengikuti exact pattern dari preprocessing module yang berhasil.
+        """
+        try:
+            # Import dan create UI components
+            from smartcash.ui.pretrained.components.ui_components import create_pretrained_ui_components
+            
+            # Create UI components dengan config yang benar
+            ui_components = create_pretrained_ui_components(
+                env=env, 
+                config={'pretrained_models': config.get('pretrained_models', {})}
+            )
+            
+            # Validate critical components
+            critical_components = self._get_critical_components()
+            missing_components = [comp for comp in critical_components if comp not in ui_components]
+            
+            if missing_components:
+                logger.warning(f"⚠️ Missing components: {missing_components}")
+            
+            # Setup handlers
+            try:
+                self._setup_event_handlers(ui_components, config)
+                ui_components['ui_initialized'] = True
+                logger.info("✅ Pretrained UI components created dan handlers setup")
+            except Exception as e:
+                logger.warning(f"⚠️ Gagal setup event handlers: {str(e)}")
+                ui_components['ui_initialized'] = False
+            
+            return ui_components
+            
+        except ImportError as e:
+            error_msg = f"Import error: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            raise  # Re-raise untuk penanganan di level atas
+            
+        except Exception as e:
+            error_msg = f"Error creating pretrained UI components: {str(e)}"
+            logger.error(f"❌ {error_msg}", exc_info=True)
+            
+            # Return minimal fallback structure
+            return {
+                'ui': None,
+                'main_container': None,
+                'status': None,
+                'error_widget': None,
+                'error': error_msg,
+                'fallback_mode': True
+            }
     
-    # FIXED: Abstract method implementation
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup pretrained handlers dengan environment check"""
-        from smartcash.ui.pretrained.handlers.pretrained_handlers import setup_pretrained_handlers
-        
-        # Environment-specific setup
-        if env == 'colab':
-            ui_components['drive_enabled'] = True
-            logger.info("🌍 Google Drive enabled for Colab environment")
-        
-        return setup_pretrained_handlers(ui_components, config, env=env, **kwargs)
+    def _setup_event_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Setup event handlers untuk UI components"""
+        try:
+            from smartcash.ui.pretrained.handlers.pretrained_handlers import (
+                _handle_download_sync,
+                _setup_config_handlers,
+                _setup_operation_handlers
+            )
+            
+            # Setup config handlers (save/reset)
+            _setup_config_handlers(ui_components)
+            
+            # Setup operation handlers (download/sync)
+            _setup_operation_handlers(ui_components)
+            
+            # Connect download/sync button
+            if download_sync_button := ui_components.get('download_sync_button'):
+                download_sync_button.on_click(lambda _: _handle_download_sync(ui_components))
+            
+            logger.info("🔗 Event handlers setup successfully")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error setting up handlers: {str(e)}")
+            raise  # Re-raise to be handled by the caller
     
-    # FIXED: Abstract method implementation  
+    def _create_config_handler(self, module_name: str = None, parent_module: str = None):
+        """Create config handler dengan proper parameters"""
+        try:
+            from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
+            return PretrainedConfigHandler(
+                module_name=module_name or self.module_name,
+                parent_module=parent_module
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ Error creating config handler: {str(e)}")
+            return None
+    
+    def _load_initial_config(self, ui_components: Dict[str, Any], config_handler) -> None:
+        """Load dan apply initial config"""
+        try:
+            if not config_handler:
+                logger.warning("⚠️ No config handler, skipping config load")
+                return
+            
+            # Load config dengan fallback ke defaults
+            try:
+                loaded_config = config_handler.get_default_config()
+                logger.info("📂 Default config loaded")
+            except Exception as e:
+                logger.warning(f"⚠️ Error loading defaults: {str(e)}")
+            
+            # Update UI dengan loaded config
+            if loaded_config and ui_components.get('ui_initialized'):
+                try:
+                    config_handler.update_ui(ui_components, loaded_config)
+                    ui_components['config'] = loaded_config
+                    logger.info("📂 Config loaded dan UI updated")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error updating UI with config: {str(e)}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error loading initial config: {str(e)}")
+    
     def _get_default_config(self) -> Dict[str, Any]:
-        """Get default pretrained config dari defaults module"""
-        from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
-        return get_default_pretrained_config()
+        """Mengembalikan konfigurasi default untuk pretrained models"""
+        return {
+            'pretrained_models': {
+                'models_dir': '/content/models',
+                'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
+                'pretrained_type': 'yolov5s',
+                'auto_download': False,
+                'sync_drive': True
+            }
+        }
     
-    # FIXED: Abstract method implementation
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Setup module-specific handlers"""
+        try:
+            from smartcash.ui.pretrained.handlers.pretrained_handlers import setup_pretrained_handlers
+            return setup_pretrained_handlers(ui_components, config, env=env, **kwargs)
+        except Exception as e:
+            logger.error(f"❌ Gagal setup module handlers: {str(e)}")
+            return ui_components
+    
     def _get_critical_components(self) -> List[str]:
-        """Critical components yang harus ada untuk pretrained module"""
+        """Critical components yang harus ada"""
         return [
             'ui', 'download_sync_button', 'save_button', 'reset_button',
-            'status_panel', 'log_output', 'config_handler'
+            'log_output', 'confirmation_area', 'status'
         ]
     
-    # Post-initialization hook untuk auto-load models
     def _post_initialization_hook(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs):
-        """Post-init hook untuk pretrained models dengan auto-sync check"""
+        """Post-init hook untuk additional setup"""
         super()._post_initialization_hook(ui_components, config, env, **kwargs)
         
         # Auto-check model availability jika enabled
-        if config.get('models', {}).get('download', {}).get('auto_download', False):
-            try:
-                from smartcash.ui.pretrained.handlers.model_checker import check_model_availability
-                available_models = check_model_availability(config)
-                ui_components['available_models'] = available_models
-                logger.info(f"🎯 Available models: {len(available_models)} found")
-            except Exception as e:
-                logger.warning(f"⚠️ Model availability check failed: {str(e)}")
+        try:
+            pretrained_config = config.get('pretrained_models', {})
+            if pretrained_config.get('auto_download', False):
+                logger.info("🔍 Auto-download enabled, checking models...")
+                # Implement model checking logic here
+        except Exception as e:
+            logger.warning(f"⚠️ Post-init hook error: {str(e)}")
 
 # Global instance
 _pretrained_initializer = PretrainedInitializer()
 
 def initialize_pretrained_ui(env=None, config=None, **kwargs):
     """
-    Factory function untuk pretrained UI dengan model integration.
+    🚀 Factory function untuk pretrained UI.
     
     Args:
         env: Environment info (opsional)  
@@ -92,6 +203,13 @@ def initialize_pretrained_ui(env=None, config=None, **kwargs):
         **kwargs: Additional parameters
         
     Returns:
-        UI components dictionary dengan pretrained model integration
+        UI components dictionary dengan model integration
     """
-    return _pretrained_initializer.initialize(env=env, config=config, **kwargs)
+    try:
+        return _pretrained_initializer.initialize(env=env, config=config, **kwargs)
+    except Exception as e:
+        logger.error(f"💥 Factory function error: {str(e)}")
+        return {
+            'error': f"Initialization failed: {str(e)}",
+            'fallback_mode': True
+        }

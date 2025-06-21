@@ -13,8 +13,18 @@ from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """🔧 Setup handlers dengan complete workflow patterns"""
+def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env: str = None, **kwargs) -> Dict[str, Any]:
+    """🔧 Setup handlers dengan complete workflow patterns
+    
+    Args:
+        ui_components: Dictionary berisi UI components
+        config: Konfigurasi pretrained models
+        env: Environment (e.g., 'colab', 'local')
+        **kwargs: Additional parameters
+        
+    Returns:
+        Dictionary UI components yang sudah di-update dengan handlers
+    """
     try:
         # Initialize handlers dan services
         config_handler = PretrainedConfigHandler()

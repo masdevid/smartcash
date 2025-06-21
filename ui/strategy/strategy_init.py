@@ -120,7 +120,7 @@ class StrategyInitializer(ConfigCellInitializer):
             logger.error(error_msg, exc_info=True)
             from smartcash.ui.utils.fallback_utils import FallbackConfig
             return create_fallback_ui(
-                error_msg=error_msg,
+                message=error_msg,  # Changed from error_msg to message
                 exc_info=sys.exc_info(),
                 config=FallbackConfig(
                     title="⚠️ Error Strategy Configuration",

@@ -11,8 +11,14 @@ import traceback
 
 logger = get_logger(__name__)
 
-def create_pretrained_ui_components(config: Optional[Dict] = None) -> Dict:
-    """🎯 Create pretrained UI menggunakan shared reusable components"""
+def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **kwargs) -> Dict:
+    """🎯 Create pretrained UI menggunakan shared reusable components
+    
+    Args:
+        env: Environment configuration (optional)
+        config: Configuration dictionary (optional)
+        **kwargs: Additional keyword arguments
+    """
     try:
         # Handle None config
         config = config or {}

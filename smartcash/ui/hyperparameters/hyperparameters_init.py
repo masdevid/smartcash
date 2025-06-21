@@ -29,14 +29,28 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
             # Buat form components
             form_components = create_hyperparameters_form(config)
             
+            # Pastikan komponen yang diperlukan ada di form_components
+            required_form_components = [
+                'epochs_slider', 'batch_size_slider', 'learning_rate_slider',
+                'optimizer_dropdown', 'weight_decay_slider', 'scheduler_dropdown',
+                'warmup_epochs_slider', 'box_loss_gain_slider', 'cls_loss_gain_slider',
+                'obj_loss_gain_slider', 'early_stopping_checkbox', 'patience_slider',
+                'save_best_checkbox', 'checkpoint_metric_dropdown', 'summary_cards',
+                'status_panel', 'button_container'
+            ]
+            
+            for comp in required_form_components:
+                if comp not in form_components:
+                    raise ValueError(f"Komponen form '{comp}' tidak ditemukan")
+            
             # Buat layout dengan form components
             layout_components = create_hyperparameters_layout(form_components)
             
-            # Pastikan komponen yang diperlukan ada
-            required_components = ['save_button', 'reset_button', 'form']
-            for comp in required_components:
+            # Pastikan komponen yang diperlukan ada di layout_components
+            required_layout_components = ['form', 'save_button', 'reset_button']
+            for comp in required_layout_components:
                 if comp not in layout_components:
-                    raise ValueError(f"Komponen '{comp}' tidak ditemukan dalam layout_components")
+                    raise ValueError(f"Komponen layout '{comp}' tidak ditemukan")
             
             # Pastikan form adalah widget yang valid
             if not isinstance(layout_components['form'], widgets.Widget):

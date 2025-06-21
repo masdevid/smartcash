@@ -149,21 +149,33 @@ class StrategyInitializer(ConfigCellInitializer):
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components untuk strategy config"""
         try:
+            from .components.ui_form import create_strategy_form
+            from .components.ui_layout import create_strategy_layout, update_summary_card
+            
             # Buat form components
             form_components = create_strategy_form(config)
             
-            # Pastikan tombol save dan reset ada
-            if 'save_button' not in form_components or 'reset_button' not in form_components:
-                raise ValueError("Form components harus menyertakan 'save_button' dan 'reset_button'")
+            # Pastikan komponen yang diperlukan ada di form_components
+            required_form_components = [
+                'val_frequency_slider', 'iou_thres_slider', 'conf_thres_slider',
+                'max_detections_slider', 'experiment_name_text', 'checkpoint_dir_text',
+                'log_metrics_slider', 'visualize_batch_slider', 'gradient_clipping_slider',
+                'layer_mode_dropdown', 'tensorboard_checkbox', 'multi_scale_checkbox',
+                'img_size_min_slider', 'img_size_max_slider', 'save_button', 'reset_button'
+            ]
+            
+            for comp in required_form_components:
+                if comp not in form_components:
+                    raise ValueError(f"Komponen form '{comp}' tidak ditemukan")
             
             # Buat layout dengan form components
             layout_components = create_strategy_layout(form_components)
             
-            # Pastikan komponen yang diperlukan ada
-            required_components = ['save_button', 'reset_button', 'main_container', 'summary_card']
-            for comp in required_components:
+            # Pastikan komponen yang diperlukan ada di layout_components
+            required_layout_components = ['main_container', 'save_button', 'reset_button', 'summary_card']
+            for comp in required_layout_components:
                 if comp not in layout_components:
-                    raise ValueError(f"Komponen '{comp}' tidak ditemukan dalam layout_components")
+                    raise ValueError(f"Komponen layout '{comp}' tidak ditemukan")
             
             # Update summary card dengan config terbaru
             update_summary_card(

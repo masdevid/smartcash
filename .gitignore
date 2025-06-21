@@ -41,7 +41,6 @@ weights/
 *.pkl
 *.npz
 backup_*/
-*.sh
 hub/
 .cursor/
 # Notebooks

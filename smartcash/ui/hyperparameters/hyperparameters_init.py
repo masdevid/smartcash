@@ -25,10 +25,19 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
             # Create form components
             form_components = create_hyperparameters_form(config)
             
+            # Pastikan tombol save dan reset ada
+            if 'save_button' not in form_components or 'reset_button' not in form_components:
+                raise ValueError("Form components harus menyertakan 'save_button' dan 'reset_button'")
+                
             # Create layout dengan form components
             layout_components = create_hyperparameters_layout(form_components)
             
-            return layout_components
+            # Return minimal yang dibutuhkan untuk save/reset
+            return {
+                'save_button': form_components['save_button'],
+                'reset_button': form_components['reset_button'],
+                'form': form_components.get('form', None)
+            }
             
         except Exception as e:
             error_msg = f"Gagal membuat UI hyperparameters: {str(e)}"

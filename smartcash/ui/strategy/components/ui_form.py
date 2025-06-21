@@ -11,45 +11,120 @@ from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create form widgets khusus strategy parameters"""
     
-    # Extract strategy configs dengan safe defaults
+    # Extract config sections dengan safe defaults
+    training = config.get('training', {})
     validation = config.get('validation', {})
-    utils = config.get('training_utils', {})
-    multi_scale = config.get('multi_scale', {})
-    model = config.get('model', {})
+    optimizer = training.get('optimizer', {}) if isinstance(training.get('optimizer'), dict) else {}
+    scheduler = training.get('scheduler', {}) if isinstance(training.get('scheduler'), dict) else {}
+    loss = training.get('loss', {})
     
     # Generate dynamic experiment name dengan fallback
-    model_type = model.get('model_type', 'efficient_optimized')
-    layer_mode = utils.get('layer_mode', 'single')
+    model_type = config.get('model_type', 'efficient_optimized')
+    layer_mode = config.get('layer_mode', 'single')
     default_experiment = f"{model_type}_{layer_mode}"
     
-    # Widget creators dengan responsive layout - one-liner factories dengan overflow fix
-    int_slider = lambda val, min_val, max_val, desc: widgets.IntSlider(value=val, min=min_val, max=max_val, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'))
-    float_slider = lambda val, min_val, max_val, desc, step=0.001: widgets.FloatSlider(value=val, min=min_val, max=max_val, step=step, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'), readout_format='.3f')
-    checkbox = lambda val, desc: widgets.Checkbox(value=val, description=desc, style={'description_width': 'initial'}, layout=widgets.Layout(width='auto', max_width='100%', overflow='hidden'))
-    text_input = lambda val, desc: widgets.Text(value=val, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='auto', max_width='100%', overflow='hidden'))
-    dropdown = lambda val, opts, desc: widgets.Dropdown(value=val, options=opts, description=desc, style={'description_width': '100px'}, layout=widgets.Layout(width='auto', max_width='100%', overflow='hidden'))
-    
-    # Strategy-specific form components dengan one-liner mapping
+    # Widget creators dengan responsive layout
+    def create_slider(value, min_val, max_val, desc, step=None, float_type=False):
+        if float_type:
+            return widgets.FloatSlider(
+                value=value, min=min_val, max=max_val, step=step or 0.001,
+                description=desc, style={'description_width': '120px'},
+                layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden'),
+                readout_format='.3f'
+            )
+        return widgets.IntSlider(
+            value=value, min=min_val, max=max_val, step=step or 1,
+            description=desc, style={'description_width': '120px'},
+            layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden')
+        )
+
+    def create_dropdown(value, options, desc):
+        return widgets.Dropdown(
+            value=value,
+            options=options,
+            description=desc,
+            style={'description_width': '120px'},
+            layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden')
+        )
+
+    def create_checkbox(value, desc):
+        return widgets.Checkbox(
+            value=value,
+            description=desc,
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', max_width='100%', overflow='hidden')
+        )
+
+    # Form components
     form_components = {
-        # Validation strategy widgets
-        'val_frequency_slider': int_slider(validation.get('frequency', 1), 1, 10, 'Val Frequency:'),
-        'iou_thres_slider': float_slider(validation.get('iou_thres', 0.6), 0.1, 0.9, 'IoU Threshold:', 0.05),
-        'conf_thres_slider': float_slider(validation.get('conf_thres', 0.001), 0.0001, 0.01, 'Conf Threshold:', 0.0001),
-        'max_detections_slider': int_slider(validation.get('max_detections', 300), 50, 1000, 'Max Detections:'),
+        # Basic training parameters
+        'batch_size_slider': create_slider(
+            training.get('batch_size', 16),
+            1, 64, 'Batch Size:'
+        ),
+        'epochs_slider': create_slider(
+            training.get('epochs', 100),
+            1, 300, 'Epochs:'
+        ),
+        'learning_rate_slider': create_slider(
+            training.get('learning_rate', 0.01),
+            0.0001, 0.1, 'Learning Rate:', 0.0001, True
+        ),
         
-        # Training utilities widgets
-        'experiment_name_text': text_input(utils.get('experiment_name', default_experiment), 'Experiment:'),
-        'checkpoint_dir_text': text_input(utils.get('checkpoint_dir', '/content/runs/train/checkpoints'), 'Checkpoint Dir:'),
-        'tensorboard_checkbox': checkbox(utils.get('tensorboard', True), 'TensorBoard'),
-        'log_metrics_slider': int_slider(utils.get('log_metrics_every', 10), 1, 50, 'Log Every:'),
-        'visualize_batch_slider': int_slider(utils.get('visualize_batch_every', 100), 10, 500, 'Visualize Every:'),
-        'gradient_clipping_slider': float_slider(utils.get('gradient_clipping', 1.0), 0.1, 5.0, 'Grad Clipping:', 0.1),
-        'layer_mode_dropdown': dropdown(utils.get('layer_mode', 'single'), ['single', 'multilayer'], 'Layer Mode:'),
+        # Validation parameters
+        'val_interval_slider': create_slider(
+            training.get('val_interval', 1),
+            1, 10, 'Val Interval:'
+        ),
+        'iou_thres_slider': create_slider(
+            validation.get('iou_thres', 0.6),
+            0.1, 0.9, 'IoU Threshold:', 0.05, True
+        ),
+        'conf_thres_slider': create_slider(
+            validation.get('conf_thres', 0.001),
+            0.0001, 0.1, 'Conf Threshold:', 0.0001, True
+        ),
         
-        # Multi-scale training widgets
-        'multi_scale_checkbox': checkbox(multi_scale.get('enabled', True), 'Multi-scale'),
-        'img_size_min_slider': int_slider(multi_scale.get('img_size_min', 320), 256, 512, 'Min Size:'),
-        'img_size_max_slider': int_slider(multi_scale.get('img_size_max', 640), 512, 1024, 'Max Size:')
+        # Optimizer and scheduler
+        'optimizer_dropdown': create_dropdown(
+            training.get('optimizer', 'SGD'),
+            ['SGD', 'Adam', 'AdamW'],
+            'Optimizer:'
+        ),
+        'scheduler_dropdown': create_dropdown(
+            training.get('scheduler', 'cosine'),
+            ['cosine', 'step', 'plateau'],
+            'Scheduler:'
+        ),
+        
+        # Experiment name
+        'experiment_name_text': widgets.Text(
+            value=config.get('experiment_name', default_experiment),
+            description='Experiment:',
+            style={'description_width': '120px'},
+            layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden')
+        ),
+        
+        # Advanced options
+        'advanced_options': create_checkbox(False, 'Show Advanced Options'),
+        
+        # Advanced parameters (initially hidden)
+        'weight_decay_slider': create_slider(
+            optimizer.get('weight_decay', 0.0005),
+            0.0, 0.01, 'Weight Decay:', 0.0001, True
+        ),
+        'momentum_slider': create_slider(
+            optimizer.get('momentum', 0.937),
+            0.0, 0.99, 'Momentum:', 0.01, True
+        ),
+        'warmup_epochs_slider': create_slider(
+            scheduler.get('warmup_epochs', 3),
+            0, 10, 'Warmup Epochs:'
+        ),
+        'mixed_precision_checkbox': create_checkbox(
+            training.get('mixed_precision', True),
+            'Mixed Precision'
+        )
     }
     
     # Create form layout dengan grid system

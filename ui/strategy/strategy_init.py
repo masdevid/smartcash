@@ -147,35 +147,50 @@ class StrategyInitializer(ConfigCellInitializer):
             return super().initialize(env=env, config=self.config_handler.get_default_config(), **kwargs)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components untuk strategy configuration dengan reusable components"""
+        """Buat UI components untuk strategy config"""
         try:
-            # Create form components menggunakan config yang sudah di-cascade
+            # Buat form components
             form_components = create_strategy_form(config)
             
-            # Create layout dengan form components
-            ui_components = create_strategy_layout(form_components)
+            # Pastikan tombol save dan reset ada
+            if 'save_button' not in form_components or 'reset_button' not in form_components:
+                raise ValueError("Form components harus menyertakan 'save_button' dan 'reset_button'")
             
-            # Setup summary card update handler
-            if 'summary_card' in ui_components and 'strategy_type' in form_components:
-                form_components['strategy_type'].observe(
-                    lambda change: update_summary_card(ui_components['summary_card'], change.new, config),
-                    names='value'
+            # Buat layout dengan form components
+            layout_components = create_strategy_layout(form_components, config)
+            
+            # Update summary card dengan config terbaru
+            if 'summary_card' in layout_components and 'form' in layout_components:
+                update_summary_card(
+                    layout_components['summary_card'],
+                    config,
+                    form_components
                 )
             
-            return ui_components
+            # Return minimal yang dibutuhkan untuk save/reset
+            return {
+                'save_button': form_components['save_button'],
+                'reset_button': form_components['reset_button'],
+                'form': form_components.get('form', None),
+                'summary_card': layout_components.get('summary_card', None)
+            }
             
         except Exception as e:
-            error_msg = f"Gagal membuat UI untuk konfigurasi strategy: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            from smartcash.ui.utils.fallback_utils import FallbackConfig
+            error_msg = f"Gagal membuat UI strategy: {str(e)}"
+            logger.exception(error_msg, exc_info=True)
+            
+            # Dapatkan traceback lengkap
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            tb_text = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)) if exc_tb else ""
+            
             return create_fallback_ui(
                 error_message=error_msg,
                 exc_info=sys.exc_info(),
-                config=FallbackConfig(
-                    title="⚠️ Error Strategy Configuration",
-                    module_name='strategy',
-                    traceback=traceback.format_exc()
-                )
+                config={
+                    'title': "⚠️ Error Strategy Configuration",
+                    'module_name': 'strategy',
+                    'traceback': tb_text
+                }
             )
     
     def _setup_summary_update_callback(self, ui_components: Dict[str, Any]) -> None:

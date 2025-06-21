@@ -32,18 +32,7 @@ class BackboneInitializer(ConfigCellInitializer):
             return create_backbone_layout(form_components)
             
         except Exception as e:
-            error_msg = f"Gagal membuat UI untuk konfigurasi backbone: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            from smartcash.ui.utils.fallback_utils import FallbackConfig
-            return create_fallback_ui(
-                error_message=error_msg,
-                exc_info=sys.exc_info(),
-                config=FallbackConfig(
-                    title="⚠️ Error Backbone Configuration",
-                    module_name=MODULE_NAME,
-                    traceback=traceback.format_exc()
-                )
-            )
+            return self.handle_ui_exception(e, context="UI backbone configuration")
     
     def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> None:
         """Setup custom handlers untuk backbone selection changes"""

@@ -35,21 +35,7 @@ class SplitConfigInitializer(ConfigCellInitializer):
             return ui_components
             
         except Exception as e:
-            error_msg = f"Gagal membuat UI untuk konfigurasi split dataset: {str(e)}"
-            from smartcash.common.logger import get_logger
-            logger = get_logger(__name__)
-            logger.exception(error_msg)
-            
-            from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
-            return create_fallback_ui(
-                error_message=error_msg,
-                exc_info=sys.exc_info(),
-                config=FallbackConfig(
-                    title="⚠️ Error Split Dataset Configuration",
-                    module_name='split_dataset',
-                    traceback=traceback.format_exc()
-                )
-            )
+            return self.handle_ui_exception(e, context="UI split dataset configuration")
 
 
 class SplitConfigHandler(ConfigHandler):

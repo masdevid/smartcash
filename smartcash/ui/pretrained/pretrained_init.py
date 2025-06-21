@@ -23,9 +23,9 @@ class PretrainedInitializer(CommonInitializer):
     # FIXED: Abstract method implementation - nama method sesuai parent class
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components dengan validation - Fixed method name"""
-        from smartcash.ui.pretrained.components.ui_components import create_pretrained_ui
+        from smartcash.ui.pretrained.components.ui_components import create_pretrained_ui_components
         
-        ui_components = create_pretrained_ui(config)
+        ui_components = create_pretrained_ui_components(config)
         
         # Validate required components
         required_widgets = [

@@ -114,8 +114,8 @@ temp/
 
 # Specific Project Directories
 
-
 pretrained/
+!smartcash/ui/pretrained
 
 # Config Files
 *.yaml

@@ -27,41 +27,83 @@ class StrategyInitializer(ConfigCellInitializer):
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
         self.config_manager = get_config_manager()
     
+    def _normalize_config_structure(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalisasi struktur konfigurasi untuk kompatibilitas"""
+        if not isinstance(config, dict):
+            return {'training': {}, 'validation': {}}
+            
+        # Normalisasi struktur training
+        training = config.get('training', {})
+        
+        # Jika ada hyperparameters di root, pindahkan ke dalam training
+        for key in ['optimizer', 'scheduler', 'loss', 'early_stopping', 'checkpoint']:
+            if key in config and key not in training:
+                training[key] = config[key]
+                
+        # Normalisasi optimizer
+        if 'optimizer' in training and isinstance(training['optimizer'], dict):
+            opt = training['optimizer']
+            if 'type' in opt and 'optimizer' not in training:
+                training['optimizer'] = opt['type']
+                
+        # Normalisasi scheduler
+        if 'scheduler' in training and isinstance(training['scheduler'], dict):
+            sched = training['scheduler']
+            if 'type' in sched and 'scheduler' not in training:
+                training['scheduler'] = sched['type']
+                
+        # Pastikan ada section yang diperlukan
+        config['training'] = training
+        if 'validation' not in config:
+            config['validation'] = {}
+            
+        return config
+            
     def _load_cascading_config(self) -> Dict[str, Any]:
         """Load config dengan cascading inheritance sesuai urutan yang benar"""
-        config_manager = self.config_manager
-        
-        # Urutan inheritance: base -> preprocessing -> augmentation -> model -> backbone -> hyperparameters -> training
-        inheritance_chain = [
-            'base_config',
-            'preprocessing_config', 
-            'augmentation_config',
-            'model_config',
-            'backbone_config',
-            'hyperparameters_config',
-            'training_config'
-        ]
-        
-        # Merge configs dalam urutan inheritance
-        merged_config = {}
-        for config_name in inheritance_chain:
-            try:
-                config = config_manager.get_config(config_name)
-                if config:
-                    # Remove _base_ untuk mencegah recursive inheritance
-                    config.pop('_base_', None)
-                    # Deep merge configs
-                    merged_config = self._deep_merge_configs(merged_config, config)
-                    self.logger.debug(f"🔗 Merged {config_name}")
-            except Exception as e:
-                self.logger.warning(f"⚠️ Error loading {config_name}: {str(e)}")
-        
-        # Fallback ke defaults jika tidak ada config
-        if not merged_config:
-            merged_config = self.config_handler.get_default_config()
-            self.logger.info("🔄 Using default config")
-        
-        return merged_config
+        try:
+            # Urutan inheritance: base -> preprocessing -> augmentation -> model -> backbone -> hyperparameters -> training
+            inheritance_chain = [
+                'base_config',
+                'preprocessing_config', 
+                'augmentation_config',
+                'model_config',
+                'backbone_config',
+                'hyperparameters_config',
+                'training_config'
+            ]
+            
+            # Merge configs dalam urutan inheritance
+            merged_config = {}
+            for config_name in inheritance_chain:
+                try:
+                    config = self.config_manager.get_config(config_name)
+                    if config and isinstance(config, dict):
+                        # Remove _base_ untuk mencegah recursive inheritance
+                        config.pop('_base_', None)
+                        # Deep merge configs
+                        merged_config = self._deep_merge_configs(merged_config, config)
+                except Exception:
+                    continue  # Skip config yang error
+            
+            # Normalisasi struktur konfigurasi
+            merged_config = self._normalize_config_structure(merged_config)
+            
+            # Fallback ke defaults jika tidak ada config
+            if not merged_config or 'training' not in merged_config:
+                default_config = self.config_handler.get_default_config()
+                if not default_config:
+                    default_config = {}
+                
+                # Pastikan minimal ada konfigurasi dasar yang valid
+                default_config = self._normalize_config_structure(default_config)
+                return default_config
+            
+            return merged_config
+            
+        except Exception:
+            # Kembalikan config kosong yang valid
+            return self._normalize_config_structure({})
     
     def _deep_merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Deep merge dua config dictionaries"""
@@ -78,17 +120,24 @@ class StrategyInitializer(ConfigCellInitializer):
     def initialize(self, env=None, config=None, **kwargs) -> Any:
         """Override initialize untuk cascading config loading"""
         try:
-            # Load cascading config jika config tidak disediakan atau minimal
+            # Load atau merge config
             if not config:
                 final_config = self._load_cascading_config()
-                self.logger.info("🔗 Loaded cascading inheritance config")
             else:
-                # Merge provided config dengan cascading config
                 base_config = self._load_cascading_config()
                 final_config = self._deep_merge_configs(base_config, config)
-                self.logger.info("🔗 Merged provided config dengan cascading inheritance")
             
-            # Call parent initialize dengan merged config
+            # Pastikan config memiliki struktur minimal yang diperlukan
+            if not isinstance(final_config, dict):
+                final_config = {}
+                
+            # Pastikan section penting ada
+            if 'training' not in final_config:
+                final_config['training'] = {}
+            if 'validation' not in final_config:
+                final_config['validation'] = {}
+            
+            # Call parent initialize dengan config yang sudah divalidasi
             return super().initialize(env=env, config=final_config, **kwargs)
             
         except Exception as e:

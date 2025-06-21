@@ -52,19 +52,82 @@ def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
         'img_size_max_slider': int_slider(multi_scale.get('img_size_max', 640), 512, 1024, 'Max Size:')
     }
     
-    # Add save/reset buttons dan status panel
-    save_reset_buttons = create_save_reset_buttons(
+    # Create form layout dengan grid system
+    form_items = [
+        # Basic settings
+        widgets.HTML('<h4>Training Configuration</h4>'),
+        widgets.HBox([
+            form_components['batch_size_slider'],
+            form_components['epochs_slider'],
+            form_components['learning_rate_slider']
+        ]),
+        
+        # Validation settings
+        widgets.HTML('<h4>Validation</h4>'),
+        widgets.HBox([
+            form_components['val_interval_slider'],
+            form_components['iou_thres_slider'],
+            form_components['conf_thres_slider']
+        ]),
+        
+        # Optimizer and scheduler
+        widgets.HTML('<h4>Optimization</h4>'),
+        widgets.HBox([
+            form_components['optimizer_dropdown'],
+            form_components['scheduler_dropdown']
+        ]),
+        
+        # Advanced options toggle
+        widgets.HBox([form_components['advanced_options']]),
+        
+        # Advanced settings (initially hidden)
+        widgets.VBox([
+            widgets.HTML('<h5>Advanced Options</h5>'),
+            widgets.HBox([
+                form_components['weight_decay_slider'],
+                form_components['momentum_slider']
+            ]),
+            widgets.HBox([
+                form_components['warmup_epochs_slider'],
+                form_components['mixed_precision_checkbox']
+            ])
+        ], layout=widgets.Layout(
+            border='1px solid #e0e0e0',
+            padding='10px',
+            margin='10px 0',
+            width='100%',
+            display='none'  # Initially hidden
+        ), id='advanced_options_container')
+    ]
+    
+    # Toggle advanced options container
+    def on_advanced_change(change):
+        container = next(c for c in form_items if getattr(c, 'id', None) == 'advanced_options_container')
+        container.layout.display = 'block' if change['new'] else 'none'
+    
+    form_components['advanced_options'].observe(on_advanced_change, 'value')
+    
+    # Create form dengan accordion untuk better organization
+    accordion = widgets.Accordion(children=[widgets.VBox(form_items, layout=widgets.Layout(width='100%'))])
+    accordion.set_title(0, 'Training Configuration')
+    accordion.selected_index = 0  # Expand by default
+    
+    # Add save/reset buttons
+    buttons = create_save_reset_buttons(
         save_tooltip="Simpan konfigurasi strategi training",
         reset_tooltip="Reset ke nilai default"
     )
     
-    # Merge components dengan save/reset buttons
-    form_components.update({
-        'save_button': save_reset_buttons['save_button'],
-        'reset_button': save_reset_buttons['reset_button'],
-        'button_container': save_reset_buttons['container'],
-        'status_panel': widgets.Output(layout=widgets.Layout(width='100%', min_height='60px'))
-    })
+    # Create final form layout
+    form_layout = widgets.VBox([
+        accordion,
+        buttons
+    ], layout=widgets.Layout(width='100%', max_width='800px'))
+    
+    # Add form layout to components
+    form_components['form'] = form_layout
+    form_components['save_button'] = buttons.children[0]
+    form_components['reset_button'] = buttons.children[1]
     
     return form_components
 

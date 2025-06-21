@@ -82,20 +82,23 @@ class ConfigCellInitializer(ABC):
             ui_components = self._create_config_ui(config, env, **kwargs)
             
             if not self._validate_ui(ui_components):
-                return self._create_fallback_ui("Komponen yang diperlukan tidak ditemukan")
+                fallback = self._create_fallback_ui("Komponen yang diperlukan tidak ditemukan")
+                return fallback.get('ui', fallback)
             
             # Add config handler dan setup handlers
             ui_components['config_handler'] = self.config_handler
             self._setup_handlers_with_config_handler(ui_components, config)
             
             show_status_safe(f"{self.module_name.capitalize()} siap digunakan", "success", ui_components)
+            
+            # Kembalikan main_container jika ada, jika tidak kembalikan ui_components
             return ui_components.get('main_container', ui_components)
             
         except Exception as e:
             error_msg = f"❌ Gagal menginisialisasi {self.module_name}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            result = self._create_fallback_ui(error_msg, exc_info=sys.exc_info())
-            return display(result["ui"])
+            fallback = self._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+            return fallback.get('ui', fallback)
     
     def _setup_handlers_with_config_handler(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Setup handlers dengan optimized button state management"""

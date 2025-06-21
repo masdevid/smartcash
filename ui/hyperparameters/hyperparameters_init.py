@@ -25,23 +25,27 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
             # Create form components
             form_components = create_hyperparameters_form(config)
             
-            # Pastikan tombol save dan reset ada
-            if 'save_button' not in form_components or 'reset_button' not in form_components:
-                raise ValueError("Form components harus menyertakan 'save_button' dan 'reset_button'")
-                
-            # Create layout dengan form components
-            layout_components = create_hyperparameters_layout(form_components)
+            # Pastikan komponen yang diperlukan ada
+            required_components = ['save_button', 'reset_button', 'form']
+            for comp in required_components:
+                if comp not in form_components:
+                    raise ValueError(f"Komponen '{comp}' tidak ditemukan dalam form_components")
             
-            # Pastikan form layout ada
-            if 'form' not in form_components and 'form' in layout_components:
-                form_components['form'] = layout_components['form']
+            # Pastikan form adalah widget yang valid
+            if not isinstance(form_components['form'], widgets.Widget):
+                raise ValueError("Form harus berupa instance widgets.Widget yang valid")
             
-            # Return semua komponen yang diperlukan
+            # Buat container utama
+            container = widgets.VBox([
+                form_components['form']
+            ], layout=widgets.Layout(width='100%'))
+            
+            # Return komponen yang diperlukan
             return {
+                'form': container,
                 'save_button': form_components['save_button'],
                 'reset_button': form_components['reset_button'],
-                'form': form_components.get('form', None),
-                **layout_components  # Sertakan semua komponen layout
+                'container': container
             }
             
         except Exception as e:

@@ -80,15 +80,47 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
         save_reset_buttons['reset_button']
     ], layout=widgets.Layout(justify_content='flex-end', margin='10px 0'))
     
-    # Combine all widgets dengan one-liner spread
+    # Buat form layout dengan section cards
+    training_section = widgets.VBox([
+        _create_section_header("⚙️ Training Parameters"),
+        widgets.VBox(list(training_widgets.values()))
+    ], layout=widgets.Layout(margin='0 0 16px 0'))
+    
+    optimizer_section = widgets.VBox([
+        _create_section_header("📈 Optimizer"),
+        widgets.VBox(list(optimizer_widgets.values()))
+    ], layout=widgets.Layout(margin='0 0 16px 0'))
+    
+    scheduler_section = widgets.VBox([
+        _create_section_header("📊 Scheduler"),
+        widgets.VBox(list(scheduler_widgets.values()))
+    ], layout=widgets.Layout(margin='0 0 16px 0'))
+    
+    loss_section = widgets.VBox([
+        _create_section_header("📉 Loss"),
+        widgets.VBox(list(loss_widgets.values()))
+    ], layout=widgets.Layout(margin='0 0 16px 0'))
+    
+    # Gabungkan semua section
+    form_layout = widgets.VBox([
+        training_section,
+        optimizer_section,
+        scheduler_section,
+        loss_section,
+        status_panel,
+        button_container
+    ], layout=widgets.Layout(width='100%'))
+    
+    # Return komponen yang diperlukan
     return {
-        **training_widgets, **optimizer_widgets, **scheduler_widgets, 
-        **loss_widgets, **control_widgets,
-        'summary_cards': summary_cards,
+        'form': form_layout,
         'save_button': save_reset_buttons['save_button'],
         'reset_button': save_reset_buttons['reset_button'],
-        'button_container': button_container,
-        'status_panel': status_panel
+        'status_panel': status_panel,
+        'summary_cards': summary_cards,
+        # Sertakan juga semua widget untuk akses nanti
+        **training_widgets, **optimizer_widgets, 
+        **scheduler_widgets, **loss_widgets, **control_widgets
     }
 
 

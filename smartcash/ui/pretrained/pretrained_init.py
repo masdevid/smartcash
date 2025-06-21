@@ -4,6 +4,8 @@ File: smartcash/ui/pretrained/pretrained_init.py
 Deskripsi: Initializer untuk pretrained models - Fixed version berdasarkan preprocessing pattern
 """
 
+import logging
+import sys
 from typing import Dict, Any, List, Optional
 
 from smartcash.ui.initializers.common_initializer import CommonInitializer
@@ -213,8 +215,18 @@ def initialize_pretrained_ui(env=None, config=None, **kwargs):
         Dictionary berisi komponen UI yang diinisialisasi
     """
     try:
-        return _pretrained_initializer.initialize(env=env, config=config, **kwargs)
+        result = _pretrained_initializer.initialize(env=env, config=config, **kwargs)
+        # Tampilkan UI jika tersedia
+        if result and 'ui' in result and result['ui'] is not None:
+            from IPython.display import display
+            display(result['ui'])
+        return result
     except Exception as e:
         error_msg = f"Gagal menginisialisasi UI pretrained: {str(e)}"
         logger.exception(error_msg)
-        return _pretrained_initializer._create_fallback_ui(error_msg)
+        fallback_ui = _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+        # Tampilkan fallback UI
+        if fallback_ui and 'ui' in fallback_ui and fallback_ui['ui'] is not None:
+            from IPython.display import display
+            display(fallback_ui['ui'])
+        return fallback_ui

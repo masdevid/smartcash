@@ -183,12 +183,17 @@ class CommonInitializer(ABC):
         Returns:
             Dictionary berisi komponen UI fallback
         """
-        from smartcash.ui.utils.fallback_utils import create_init_fallback_ui
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
         
-        return create_init_fallback_ui(
-            error_msg=error_msg,
+        return create_fallback_ui(
+            message=error_msg,
             module_name=self.module_name,
-            exc_info=exc_info
+            exc_info=exc_info,
+            config=FallbackConfig(
+                title=f"⚠️ Error in {self.module_name}",
+                module_name=self.module_name,
+                traceback=traceback.format_exc() if exc_info else ""
+            )
         )
     
     def _add_logger_to_components(self, ui_components: Dict[str, Any], logger_bridge) -> None:

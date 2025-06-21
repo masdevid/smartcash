@@ -16,6 +16,11 @@ from .dependency import (
 )
 
 __all__ = [
+    # Environment config exports
+    'initialize_env_config_ui',
+    'initialize_environment_config_ui',
+    
+    # Dependency management exports
     'initialize_dependency_ui',
     'get_dependency_config', 
     'validate_dependency_setup',

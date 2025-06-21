@@ -84,7 +84,11 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
                 icon='download',
                 layout=widgets.Layout(width='200px', height='35px')
             )
-            action_buttons = create_action_buttons([download_sync_button])
+            action_buttons = create_action_buttons(
+                primary_label="Download & Sync Models",
+                primary_icon="download",
+                button_width='200px'
+            )
             
             # 6. 💾 Save/Reset Buttons - shared component
             save_reset_buttons = create_save_reset_buttons()

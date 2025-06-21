@@ -4,26 +4,13 @@ File: smartcash/ui/pretrained/pretrained_init.py
 Deskripsi: Initializer untuk pretrained models - Fixed version berdasarkan preprocessing pattern
 """
 
-from typing import Dict, Any, List, Optional, Type
+from typing import Dict, Any, List, Optional
+
 from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
-
-class PretrainedConfigHandler(ConfigHandler):
-    """Custom config handler untuk pretrained models"""
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        return {
-            'pretrained_models': {
-                'models_dir': '/content/models',
-                'drive_models_dir': '/content/drive/MyDrive/SmartCash/models',
-                'pretrained_type': 'yolov5s',
-                'auto_download': False,
-                'sync_drive': True
-            }
-        }
 
 class PretrainedInitializer(CommonInitializer):
     """🤖 Pretrained models initializer dengan fixed UI creation pattern"""

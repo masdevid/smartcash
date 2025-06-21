@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained/handlers/config_handler.py
-Deskripsi: Config handler untuk pretrained module dengan inheritance pattern
+Deskripsi: Config handler untuk pretrained module dengan inheritance pattern yang diperbaiki
 """
 
 from typing import Dict, Any
@@ -9,9 +9,22 @@ from smartcash.ui.handlers.config_handlers import BaseConfigHandler
 class PretrainedConfigHandler(BaseConfigHandler):
     """Config handler untuk pretrained dengan standardized pattern"""
     
-    def __init__(self, config_name: str = 'pretrained_config'):
-        super().__init__(config_name)
-        self.logger.info("🔧 PretrainedConfigHandler initialized")
+    def __init__(self, module_name: str = 'pretrained', parent_module: str = None):
+        """
+        🔧 Inisialisasi PretrainedConfigHandler dengan parameter yang benar
+        
+        Args:
+            module_name: Nama module (default: 'pretrained')  
+            parent_module: Parent module jika ada (opsional)
+        """
+        # ✅ FIX: Gunakan parameter yang sesuai dengan BaseConfigHandler
+        super().__init__(
+            module_name=module_name,
+            extract_fn=None,  # Akan menggunakan method extract_config dari class ini
+            update_fn=None,   # Akan menggunakan method update_ui dari class ini
+            parent_module=parent_module
+        )
+        self.logger.info(f"🔧 PretrainedConfigHandler initialized untuk module: {module_name}")
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract config dari UI components dengan optimized mapping"""
@@ -78,5 +91,9 @@ class PretrainedConfigHandler(BaseConfigHandler):
     
     def get_default_config(self) -> Dict[str, Any]:
         """Default config mapping dari defaults.py untuk consistency"""
-        from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
-        return get_default_pretrained_config()
+        try:
+            from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
+            return get_default_pretrained_config()
+        except Exception as e:
+            self.logger.error(f"❌ Error loading defaults: {str(e)}")
+            

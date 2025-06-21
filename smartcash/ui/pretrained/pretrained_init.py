@@ -56,7 +56,7 @@ class PretrainedInitializer(CommonInitializer):
                 ui_components['ui_initialized'] = True
             except Exception as e:
                 error_msg = f"Gagal menyiapkan event handlers: {str(e)}"
-                logger.exception(error_msg)
+                logger.exception(error_msg, exc_info=True)
                 ui_components['ui_initialized'] = False
                 ui_components['error'] = error_msg
             
@@ -64,8 +64,11 @@ class PretrainedInitializer(CommonInitializer):
             
         except Exception as e:
             error_msg = f"Gagal membuat komponen UI pretrained: {str(e)}"
-            logger.exception(error_msg)
-            return self._create_fallback_ui(error_msg)
+            logger.exception(error_msg, exc_info=True)
+            return self._create_fallback_ui(
+                error_msg,
+                exc_info=sys.exc_info()
+            )
     
     def _setup_event_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Setup event handlers untuk UI components"""
@@ -200,13 +203,19 @@ def initialize_pretrained_ui(env=None, config=None, **kwargs):
     """
     try:
         result = _pretrained_initializer.initialize(env=env, config=config, **kwargs)
-        # Kembalikan UI components tanpa display() untuk menghindari duplikasi
-        return result.get('ui', result)
+        # Pastikan kita hanya mengembalikan UI components
+        if isinstance(result, dict) and 'ui' in result:
+            return result['ui']
+        return result
     except Exception as e:
         error_msg = f"Gagal menginisialisasi UI pretrained: {str(e)}"
-        logger.exception(error_msg)
-        # Kembalikan fallback UI
-        return _pretrained_initializer._create_fallback_ui(
-            error_msg, 
+        logger.exception(error_msg, exc_info=True)
+        
+        # Buat fallback UI dengan traceback lengkap
+        fallback_ui = _pretrained_initializer._create_fallback_ui(
+            error_msg,
             exc_info=sys.exc_info()
         )
+        
+        # Kembalikan hanya UI-nya, bukan dictionary lengkap
+        return fallback_ui.get('ui', fallback_ui)

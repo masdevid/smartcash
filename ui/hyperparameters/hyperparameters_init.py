@@ -34,7 +34,11 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
             error_msg = f"Gagal membuat UI hyperparameters: {str(e)}"
             from smartcash.common.logger import get_logger
             logger = get_logger(__name__)
-            logger.exception(error_msg)
+            logger.exception(error_msg, exc_info=True)
+            
+            # Dapatkan traceback dari sys.exc_info()
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            tb_text = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)) if exc_tb else ""
             
             from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
             return create_fallback_ui(
@@ -43,7 +47,7 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
                 config=FallbackConfig(
                     title="⚠️ Error Hyperparameters Configuration",
                     module_name='hyperparameters',
-                    traceback=traceback.format_exc()
+                    traceback=tb_text
                 )
             )
     

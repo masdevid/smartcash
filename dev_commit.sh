@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Check if commit message is provided
-if [ $# -eq  ]; then
+if [ $# -eq 0 ]; then
     echo "Error: Please provide a commit message"
     echo "Usage: $0 \"Your commit message\""
     exit 1

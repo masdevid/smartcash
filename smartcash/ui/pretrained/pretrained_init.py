@@ -1,19 +1,18 @@
 # File: smartcash/ui/pretrained/pretrained_initializer.py
 """
 File: smartcash/ui/pretrained/pretrained_initializer.py
-Deskripsi: Complete initializer untuk pretrained module dengan CommonInitializer patterns
+Deskripsi: Complete initializer untuk pretrained module dengan CommonInitializer patterns - Fixed abstract methods
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.pretrained.handlers.pretrained_handlers import setup_pretrained_handlers
 from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
 class PretrainedInitializer(CommonInitializer):
-    """🚀 Pretrained module initializer dengan complete workflow"""
+    """🚀 Pretrained module initializer dengan complete workflow - Fixed abstract methods"""
     
     def __init__(self):
         super().__init__(
@@ -22,8 +21,9 @@ class PretrainedInitializer(CommonInitializer):
             config_handler_class=PretrainedConfigHandler
         )
     
-    def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan validation"""
+    # FIXED: Abstract method implementation - nama method sesuai parent class
+    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Create UI components dengan validation - Fixed method name"""
         from smartcash.ui.pretrained.components.ui_components import create_pretrained_ui
         
         ui_components = create_pretrained_ui(config)
@@ -39,112 +39,60 @@ class PretrainedInitializer(CommonInitializer):
         
         return ui_components
     
+    # FIXED: Abstract method implementation
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan environment check"""
+        """Setup pretrained handlers dengan environment check"""
+        from smartcash.ui.pretrained.handlers.pretrained_handlers import setup_pretrained_handlers
+        
         # Environment-specific setup
         if env == 'colab':
             ui_components['drive_enabled'] = True
-            logger.info("🔧 Colab environment detected - drive sync enabled")
+            logger.info("🌍 Google Drive enabled for Colab environment")
         
-        return setup_pretrained_handlers(ui_components, config)
+        return setup_pretrained_handlers(ui_components, config, env=env, **kwargs)
     
+    # FIXED: Abstract method implementation  
+    def _get_default_config(self) -> Dict[str, Any]:
+        """Get default pretrained config dari defaults module"""
+        from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
+        return get_default_pretrained_config()
+    
+    # FIXED: Abstract method implementation
+    def _get_critical_components(self) -> List[str]:
+        """Critical components yang harus ada untuk pretrained module"""
+        return [
+            'ui', 'download_sync_button', 'save_button', 'reset_button',
+            'status_panel', 'log_output', 'config_handler'
+        ]
+    
+    # Post-initialization hook untuk auto-load models
     def _post_initialization_hook(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs):
-        """Post-init dengan auto-load config"""
-        try:
-            # Auto-load config ke UI
-            config_handler = ui_components.get('config_handler')
-            if config_handler and config:
-                config_handler.update_ui(ui_components, config)
-                self._log_post_init(ui_components, "✅ Config loaded", "success")
-            
-            # Setup auto-save callbacks
-            self._setup_auto_save_callbacks(ui_components)
-            
-            # Initial status
-            self._log_post_init(ui_components, "🎯 Pretrained models ready", "info")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Post-init warning: {str(e)}")
-    
-    def _setup_auto_save_callbacks(self, ui_components: Dict[str, Any]):
-        """Setup auto-save untuk form changes"""
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler or not hasattr(config_handler, 'config_mapping'):
-                return
-            
-            def auto_save_callback(change=None):
-                """Auto-save ketika ada perubahan"""
-                try:
-                    if hasattr(config_handler, 'set_ui_components'):
-                        config_handler.set_ui_components(ui_components)
-                    # Auto-save bisa diimplementasi di sini
-                except Exception as e:
-                    logger.debug(f"Auto-save error: {str(e)}")
-            
-            # Attach callbacks ke widgets
-            for widget_key in config_handler.config_mapping.values():
-                if widget := ui_components.get(widget_key):
-                    if hasattr(widget, 'observe'):
-                        widget.observe(auto_save_callback, names='value')
-                        
-        except Exception as e:
-            logger.debug(f"Auto-save setup error: {str(e)}")
-    
-    def _log_post_init(self, ui_components: Dict[str, Any], message: str, level: str = "info"):
-        """Helper untuk post-init logging"""
-        if status_panel := ui_components.get('status_panel'):
-            status_panel.value = message
+        """Post-init hook untuk pretrained models dengan auto-sync check"""
+        super()._post_initialization_hook(ui_components, config, env, **kwargs)
         
-        if log_output := ui_components.get('log_output'):
-            with log_output:
-                emoji_map = {"success": "✅", "error": "❌", "warning": "⚠️", "info": "ℹ️"}
-                print(f"{emoji_map.get(level, 'ℹ️')} {message}")
+        # Auto-check model availability jika enabled
+        if config.get('models', {}).get('download', {}).get('auto_download', False):
+            try:
+                from smartcash.ui.pretrained.handlers.model_checker import check_model_availability
+                available_models = check_model_availability(config)
+                ui_components['available_models'] = available_models
+                logger.info(f"🎯 Available models: {len(available_models)} found")
+            except Exception as e:
+                logger.warning(f"⚠️ Model availability check failed: {str(e)}")
 
-# Entry point function
-def initialize_pretrained_ui(config: Optional[Dict[str, Any]] = None, env: Optional[str] = None) -> Any:
+# Global instance
+_pretrained_initializer = PretrainedInitializer()
+
+def initialize_pretrained_ui(env=None, config=None, **kwargs):
     """
-    🚀 Entry point untuk pretrained module initialization
+    Factory function untuk pretrained UI dengan model integration.
     
     Args:
-        config: Optional config dictionary
-        env: Environment type ('colab', 'local', etc.)
+        env: Environment info (opsional)  
+        config: Initial config (opsional)
+        **kwargs: Additional parameters
         
     Returns:
-        UI widget atau container
+        UI components dictionary dengan pretrained model integration
     """
-    try:
-        initializer = PretrainedInitializer()
-        return initializer.initialize(config=config, env=env)
-        
-    except Exception as e:
-        logger.error(f"❌ Error initialize pretrained UI: {str(e)}")
-        # Fallback UI
-        import ipywidgets as widgets
-        return widgets.HTML(f"<div style='color: red;'>❌ Error: {str(e)}</div>")
-
-# Convenience functions
-def create_pretrained_ui_quick(pretrained_type: str = 'yolov5s', models_dir: str = '/content/models') -> Any:
-    """🔧 Quick setup dengan basic config"""
-    quick_config = {
-        'pretrained_models': {
-            'pretrained_type': pretrained_type,
-            'models_dir': models_dir,
-            'auto_download': True,
-            'sync_drive': False
-        }
-    }
-    return initialize_pretrained_ui(config=quick_config)
-
-def create_pretrained_ui_colab(drive_sync: bool = True) -> Any:
-    """☁️ Colab-optimized setup"""
-    colab_config = {
-        'pretrained_models': {
-            'models_dir': '/content/models',
-            'drive_models_dir': '/content/drive/MyDrive/smartcash/models',
-            'pretrained_type': 'yolov5s',
-            'auto_download': True,
-            'sync_drive': drive_sync
-        }
-    }
-    return initialize_pretrained_ui(config=colab_config, env='colab')
+    return _pretrained_initializer.initialize(env=env, config=config, **kwargs)

@@ -121,8 +121,17 @@ class PretrainedInitializer(CommonInitializer):
             try:
                 loaded_config = config_handler.get_default_config()
                 logger.info("📂 Default config loaded")
+                
+                # Ensure pretrained_type is a string, not a list
+                if 'pretrained_models' in loaded_config and 'pretrained_type' in loaded_config['pretrained_models']:
+                    pretrained_type = loaded_config['pretrained_models']['pretrained_type']
+                    if isinstance(pretrained_type, (list, tuple)) and len(pretrained_type) > 0:
+                        loaded_config['pretrained_models']['pretrained_type'] = str(pretrained_type[0])
+                        logger.debug(f"Converted pretrained_type from list to string: {loaded_config['pretrained_models']['pretrained_type']}")
+                    
             except Exception as e:
                 logger.warning(f"⚠️ Error loading defaults: {str(e)}")
+                loaded_config = self._get_default_config()
             
             # Update UI dengan loaded config
             if loaded_config and ui_components.get('ui_initialized'):
@@ -134,7 +143,8 @@ class PretrainedInitializer(CommonInitializer):
                     logger.warning(f"⚠️ Error updating UI with config: {str(e)}")
             
         except Exception as e:
-            logger.warning(f"⚠️ Error loading initial config: {str(e)}")
+            logger.error(f"❌ Error loading initial config: {str(e)}", exc_info=True)
+            raise
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Mengembalikan konfigurasi default untuk pretrained models"""

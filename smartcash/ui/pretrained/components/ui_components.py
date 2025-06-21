@@ -228,7 +228,7 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
     )
 
 def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
-    """📝 Create input form widgets untuk pretrained configuration
+    """📝 Create input form widgets dengan safe config validation
     
     Args:
         pretrained_config: Konfigurasi pretrained models dari config
@@ -236,58 +236,132 @@ def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[
     Returns:
         Dictionary berisi widget input forms
     """
+    
+    def safe_get_string(config: Dict, key: str, default: str) -> str:
+        """Safely extract string value from config"""
+        try:
+            value = config.get(key, default)
+            if value is None:
+                return default
+            if isinstance(value, (list, tuple)):
+                return str(value[0]) if value else default
+            return str(value).strip() or default
+        except Exception:
+            return default
+    
+    def safe_get_bool(config: Dict, key: str, default: bool) -> bool:
+        """Safely extract boolean value from config"""
+        try:
+            value = config.get(key, default)
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return value.lower() in ('true', '1', 't', 'y', 'yes', 'on')
+            if isinstance(value, (int, float)):
+                return bool(value)
+            return default
+        except Exception:
+            return default
+    
+    def safe_get_valid_model_type(config: Dict, key: str, default: str) -> str:
+        """Safely extract and validate model type"""
+        valid_types = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+        try:
+            value = safe_get_string(config, key, default)
+            return value if value in valid_types else default
+        except Exception:
+            return default
+    
     try:
-        # Safe defaults
-        models_dir = pretrained_config.get('models_dir', '/content/models')
-        drive_models_dir = pretrained_config.get('drive_models_dir', '/content/drive/MyDrive/SmartCash/models')
-        pretrained_type = pretrained_config.get('pretrained_type', 'yolov5s')
-        auto_download = pretrained_config.get('auto_download', False)
-        sync_drive = pretrained_config.get('sync_drive', True)
+        # Ensure config is dict
+        if not isinstance(pretrained_config, dict):
+            pretrained_config = {}
         
-        return {
-            'models_dir_text': widgets.Text(
+        # Safe value extraction dengan validation
+        models_dir = safe_get_string(pretrained_config, 'models_dir', '/content/models')
+        drive_models_dir = safe_get_string(pretrained_config, 'drive_models_dir', '/content/drive/MyDrive/SmartCash/models')
+        pretrained_type = safe_get_valid_model_type(pretrained_config, 'pretrained_type', 'yolov5s')
+        auto_download = safe_get_bool(pretrained_config, 'auto_download', False)
+        sync_drive = safe_get_bool(pretrained_config, 'sync_drive', True)
+        
+        logger.debug(f"✅ Safe config values - Type: {pretrained_type}, Auto: {auto_download}, Sync: {sync_drive}")
+        
+        # Create widgets dengan validated values
+        widgets_dict = {}
+        
+        try:
+            widgets_dict['models_dir_text'] = widgets.Text(
                 value=models_dir,
                 description='📁 Models Dir:',
                 style={'description_width': '120px'},
                 layout=widgets.Layout(width='500px')
-            ),
-            'drive_models_dir_text': widgets.Text(
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create models_dir widget: {e}")
+            widgets_dict['models_dir_text'] = widgets.Text(value=models_dir, description='Models Dir:')
+        
+        try:
+            widgets_dict['drive_models_dir_text'] = widgets.Text(
                 value=drive_models_dir,
                 description='☁️ Drive Models:',
                 style={'description_width': '120px'},
                 layout=widgets.Layout(width='500px')
-            ),
-            'pretrained_type_dropdown': widgets.Dropdown(
-                options=[
-                    ('YOLOv5s (Ringan)', 'yolov5s'),
-                    ('YOLOv5m (Medium)', 'yolov5m'),
-                    ('YOLOv5l (Besar)', 'yolov5l'),
-                    ('YOLOv5x (Extra Besar)', 'yolov5x')
-                ],
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create drive_models_dir widget: {e}")
+            widgets_dict['drive_models_dir_text'] = widgets.Text(value=drive_models_dir, description='Drive Dir:')
+        
+        try:
+            model_options = [
+                ('YOLOv5s (Ringan)', 'yolov5s'),
+                ('YOLOv5m (Medium)', 'yolov5m'),
+                ('YOLOv5l (Besar)', 'yolov5l'),
+                ('YOLOv5x (Extra Besar)', 'yolov5x')
+            ]
+            widgets_dict['pretrained_type_dropdown'] = widgets.Dropdown(
+                options=model_options,
                 value=pretrained_type,
                 description='🎯 Model Type:',
                 style={'description_width': '120px'},
                 layout=widgets.Layout(width='300px')
-            ),
-            'auto_download_checkbox': widgets.Checkbox(
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create dropdown widget: {e}")
+            widgets_dict['pretrained_type_dropdown'] = widgets.Dropdown(
+                options=[('YOLOv5s', 'yolov5s')],
+                value='yolov5s',
+                description='Type:'
+            )
+        
+        try:
+            widgets_dict['auto_download_checkbox'] = widgets.Checkbox(
                 value=auto_download,
                 description='🔄 Auto Download',
                 style={'description_width': '120px'}
-            ),
-            'sync_drive_checkbox': widgets.Checkbox(
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create auto_download widget: {e}")
+            widgets_dict['auto_download_checkbox'] = widgets.Checkbox(value=False, description='Auto Download')
+        
+        try:
+            widgets_dict['sync_drive_checkbox'] = widgets.Checkbox(
                 value=sync_drive,
                 description='☁️ Sync ke Drive',
                 style={'description_width': '120px'}
             )
-        }
+        except Exception as e:
+            logger.warning(f"Failed to create sync_drive widget: {e}")
+            widgets_dict['sync_drive_checkbox'] = widgets.Checkbox(value=True, description='Sync Drive')
+        
+        return widgets_dict
         
     except Exception as e:
         logger.error(f"❌ Error creating input options: {str(e)}")
-        # Return minimal fallback
+        # Return minimal safe fallback
         return {
             'models_dir_text': widgets.Text(value='/content/models', description='Models Dir:'),
             'drive_models_dir_text': widgets.Text(value='/content/drive/MyDrive/SmartCash/models', description='Drive Dir:'),
-            'pretrained_type_dropdown': widgets.Dropdown(options=[('YOLOv5s', 'yolov5s')], description='Type:'),
+            'pretrained_type_dropdown': widgets.Dropdown(options=[('YOLOv5s', 'yolov5s')], value='yolov5s', description='Type:'),
             'auto_download_checkbox': widgets.Checkbox(value=False, description='Auto Download'),
             'sync_drive_checkbox': widgets.Checkbox(value=True, description='Sync Drive')
         }

@@ -1,3 +1,0 @@
-"""
-Utilities untuk strategy module
-"""

@@ -1,124 +1,91 @@
-# File: smartcash/ui/hyperparameters/hyperparameters_init.py
-# Deskripsi: Main initializer untuk hyperparameters config cell - menggunakan fallback_utils
+"""
+File: smartcash/ui/hyperparameters/hyperparameters_init.py
+Deskripsi: Initializer untuk hyperparameters configuration menggunakan hyperparameters_config.yaml
+"""
 
+import traceback
+import sys
 from typing import Dict, Any, Optional
-import ipywidgets as widgets
+
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
-from smartcash.ui.utils.fallback_utils import try_operation_safe, create_fallback_ui, FallbackConfig
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
+MODULE_NAME = 'hyperparameters'
+MODULE_CONFIG = f"{MODULE_NAME}_config"
 
 
-class HyperparametersConfigInitializer(ConfigCellInitializer):
-    """Config cell initializer untuk hyperparameters dengan inheritance dari config_cell_initializer"""
+class HyperparametersInitializer(ConfigCellInitializer):
+    """Config cell initializer untuk hyperparameters configuration"""
     
-    def __init__(self, module_name='hyperparameters', config_filename='hyperparameters_config', 
+    def __init__(self, module_name: str = MODULE_NAME, config_filename: str = MODULE_CONFIG, 
                  config_handler_class=None, parent_module: Optional[str] = None):
-        # Import handler di dalam __init__ untuk menghindari circular import
         if config_handler_class is None:
-            from smartcash.ui.hyperparameters.handlers.config_handler import HyperparametersConfigHandler
+            from .handlers.config_handler import HyperparametersConfigHandler
             config_handler_class = HyperparametersConfigHandler
             
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Buat UI components untuk hyperparameters config dengan form dan layout"""
-        return try_operation_safe(
-            operation=lambda: self._create_ui_components(config, env, **kwargs),
-            fallback_value=create_fallback_ui(
-                error_message="Failed to create hyperparameters UI",
-                module_name=self.module_name,
-                config=FallbackConfig(
-                    title=f"⚠️ Error in {self.module_name}",
-                    module_name=self.module_name
-                )
-            ),
-            logger=logger,
-            operation_name="creating hyperparameters UI components"
-        )
-    
-    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Internal logic untuk membuat UI components"""
-        # Import components di dalam method untuk menghindari circular import
-        from smartcash.ui.hyperparameters.components.ui_form import create_hyperparameters_form
-        from smartcash.ui.hyperparameters.components.ui_layout import create_hyperparameters_layout
-        
-        # Pastikan config memiliki struktur yang benar
-        if not isinstance(config, dict):
-            config = {}
+        """Buat UI components untuk hyperparameters configuration"""
+        try:
+            from .components.ui_form import create_hyperparameters_form
+            from .components.ui_layout import create_hyperparameters_layout
             
-        # Inisialisasi section yang diperlukan
-        required_sections = ['training', 'optimizer', 'scheduler', 'loss', 'early_stopping', 'checkpoint']
-        for section in required_sections:
-            if section not in config:
-                config[section] = {}
-        
-        # Buat form widgets
-        form_widgets = create_hyperparameters_form(config)
-        
-        # Buat layout UI
-        ui_layout = create_hyperparameters_layout(form_widgets)
-        
-        # Return widgets dan layout
-        return {
-            'widgets': form_widgets,
-            'layout': ui_layout,
-            'config': config
-        }
-
-
-def initialize_hyperparameters_config():
-    """Initialize hyperparameters configuration cell 🎯"""
-    return try_operation_safe(
-        operation=lambda: _initialize_hyperparameters_config(),
-        fallback_value=create_fallback_ui(
-            error_message="Failed to initialize hyperparameters config",
-            module_name='hyperparameters',
-            config=FallbackConfig(
-                title="⚠️ Error in hyperparameters",
-                module_name='hyperparameters'
-            )
-        ),
-        logger=logger,
-        operation_name="initializing hyperparameters configuration"
-    )
-
-
-def _initialize_hyperparameters_config():
-    """Internal logic untuk initialize hyperparameters config"""
-    logger.info("🚀 Initializing hyperparameters configuration...")
+            # Pastikan config memiliki struktur yang benar
+            if not isinstance(config, dict):
+                config = {}
+                
+            # Buat form components
+            form_components = create_hyperparameters_form(config)
+            
+            # Buat layout dengan form components
+            return create_hyperparameters_layout(form_components)
+            
+        except Exception as e:
+            return self.handle_ui_exception(e, context="UI hyperparameters configuration")
     
-    # Buat initializer
-    initializer = HyperparametersConfigInitializer()
-    
-    # Initialize config cell
-    result = initializer.initialize()
-    
-    if result and result.get('success'):
-        logger.info("✅ Hyperparameters configuration initialized successfully")
-        return result
-    else:
-        raise Exception("Failed to initialize hyperparameters configuration")
+    def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
+                             env=None, **kwargs) -> None:
+        """Setup custom handlers untuk hyperparameters changes"""
+        try:
+            # Add any custom handlers for hyperparameters here
+            pass
+        except Exception as e:
+            logger.warning(f"Gagal setup custom handlers: {str(e)}")
 
 
-def create_hyperparameters_config_cell():
-    """Create hyperparameters config cell untuk direct usage 📋"""
-    return try_operation_safe(
-        operation=lambda: create_config_cell(
-            module_name='hyperparameters',
-            title='⚙️ Hyperparameters Configuration',
-            description='Configure training hyperparameters untuk SmartCash model',
-            initializer_class=HyperparametersConfigInitializer
-        ),
-        fallback_value=create_fallback_ui(
-            error_message="Failed to create hyperparameters config cell",
-            module_name='hyperparameters',
-            config=FallbackConfig(
-                title="⚠️ Error in hyperparameters",
-                module_name='hyperparameters'
-            )
-        ),
-        logger=logger,
-        operation_name="creating hyperparameters config cell"
-    )
+def initialize_hyperparameters_config(env=None, config=None, parent_callbacks=None, **kwargs) -> Any:
+    """
+    Factory function untuk hyperparameters config cell dengan parent integration.
+    
+    Args:
+        env: Environment manager instance
+        config: Override config values
+        parent_callbacks: Dict callbacks untuk parent modules
+        **kwargs: Additional arguments
+        
+    Returns:
+        UI components dengan config
+    """
+    try:
+        # Inisialisasi dengan config handler
+        initializer = HyperparametersInitializer()
+        
+        # Buat config cell
+        return create_config_cell(
+            initializer=initializer,
+            env=env,
+            config=config,
+            parent_callbacks=parent_callbacks,
+            **kwargs
+        )
+    except Exception as e:
+        logger.error(f"Gagal menginisialisasi hyperparameters config: {str(e)}")
+        logger.debug(traceback.format_exc())
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui
+        return create_fallback_ui(
+            title="Gagal Memuat Konfigurasi Hyperparameters",
+            error=str(e),
+            help_text="Silakan periksa log untuk detail lebih lanjut."
+        )

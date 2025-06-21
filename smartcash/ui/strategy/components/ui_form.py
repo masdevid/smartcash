@@ -3,13 +3,16 @@ File: smartcash/ui/strategy/components/ui_form.py
 Deskripsi: Form widgets untuk strategy (non-hyperparameters) dengan one-liner optimizations
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import ipywidgets as widgets
-from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-
 
 def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create form widgets khusus strategy parameters"""
+    if widgets is None:
+        return {}
+        
+    # Lazy import to prevent circular imports
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
     
     # Extract config sections dengan safe defaults
     training = config.get('training', {})
@@ -217,20 +220,208 @@ def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
         'container': container
     }
 
+    # Define helper functions for widget creation
+    def create_dropdown(value, options, desc):
+        return widgets.Dropdown(
+            value=value,
+            options=options,
+            description=desc,
+            style={'description_width': '120px'},
+            layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden')
+        )
 
-def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str] = None) -> widgets.HTML:
+    def create_checkbox(value, desc):
+        return widgets.Checkbox(
+            value=value,
+            description=desc,
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='auto', max_width='100%', overflow='hidden')
+        )
+
+    # Form components
+    form_components = {
+        # Basic training parameters
+        'batch_size_slider': create_slider(
+            training.get('batch_size', 16),
+            1, 64, 'Batch Size:'
+        ),
+        'epochs_slider': create_slider(
+            training.get('epochs', 100),
+            1, 300, 'Epochs:'
+        ),
+        'learning_rate_slider': create_slider(
+            training.get('learning_rate', 0.01),
+            0.0001, 0.1, 'Learning Rate:', 0.0001, True
+        ),
+        
+        # Validation parameters
+        'val_interval_slider': create_slider(
+            training.get('val_interval', 1),
+            1, 10, 'Val Interval:'
+        ),
+        'iou_thres_slider': create_slider(
+            validation.get('iou_thres', 0.6),
+            0.1, 0.9, 'IoU Threshold:', 0.05, True
+        ),
+        'conf_thres_slider': create_slider(
+            validation.get('conf_thres', 0.001),
+            0.0001, 0.1, 'Conf Threshold:', 0.0001, True
+        ),
+        
+        # Optimizer and scheduler
+        'optimizer_dropdown': create_dropdown(
+            training.get('optimizer', 'SGD'),
+            ['SGD', 'Adam', 'AdamW'],
+            'Optimizer:'
+        ),
+        'scheduler_dropdown': create_dropdown(
+            training.get('scheduler', {}).get('type', 'cosine') if isinstance(training.get('scheduler'), dict) 
+            else training.get('scheduler', 'cosine'),
+            ['cosine', 'step', 'plateau'],
+            'Scheduler:'
+        ),
+        
+        # Experiment name
+        'experiment_name_text': widgets.Text(
+            value=config.get('experiment_name', default_experiment),
+            description='Experiment:',
+            style={'description_width': '120px'},
+            layout=widgets.Layout(width='100%', max_width='100%', overflow='hidden')
+        ),
+        
+        # Advanced options
+        'advanced_options': create_checkbox(False, 'Show Advanced Options'),
+        
+        # Advanced parameters (initially hidden)
+        'weight_decay_slider': create_slider(
+            optimizer.get('weight_decay', 0.0005),
+            0.0, 0.01, 'Weight Decay:', 0.0001, True
+        ),
+        'momentum_slider': create_slider(
+            optimizer.get('momentum', 0.937),
+            0.0, 0.99, 'Momentum:', 0.01, True
+        ),
+        'warmup_epochs_slider': create_slider(
+            scheduler.get('warmup_epochs', 3),
+            0, 10, 'Warmup Epochs:'
+        ),
+        'mixed_precision_checkbox': create_checkbox(
+            training.get('mixed_precision', True),
+            'Mixed Precision'
+        )
+    }
+
+    # Create form layout with grid system
+    form_items = [
+        # Basic settings
+        widgets.HTML('<h4>Training Configuration</h4>'),
+        widgets.HBox([
+            form_components['batch_size_slider'],
+            form_components['epochs_slider'],
+            form_components['learning_rate_slider']
+        ]),
+        
+        # Validation settings
+        widgets.HTML('<h4>Validation</h4>'),
+        widgets.HBox([
+            form_components['val_interval_slider'],
+            form_components['iou_thres_slider'],
+            form_components['conf_thres_slider']
+        ]),
+        
+        # Optimizer and scheduler
+        widgets.HTML('<h4>Optimization</h4>'),
+        widgets.HBox([
+            form_components['optimizer_dropdown'],
+            form_components['scheduler_dropdown']
+        ]),
+        
+        # Advanced options toggle
+        widgets.HBox([form_components['advanced_options']]),
+        
+        # Advanced settings (initially hidden)
+        widgets.VBox([
+            widgets.HTML('<h5>Advanced Options</h5>'),
+            widgets.HBox([
+                form_components['weight_decay_slider'],
+                form_components['momentum_slider']
+            ]),
+            widgets.HBox([
+                form_components['warmup_epochs_slider'],
+                form_components['mixed_precision_checkbox']
+            ])
+        ], layout=widgets.Layout(
+            border='1px solid #e0e0e0',
+            padding='10px',
+            margin='10px 0',
+            width='100%',
+            display='none'  # Initially hidden
+        ), id='advanced_options_container')
+    ]
+
+    # Toggle advanced options container
+    def on_advanced_change(change):
+        container = next(c for c in form_items if getattr(c, 'id', None) == 'advanced_options_container')
+        container.layout.display = 'block' if change['new'] else 'none'
+
+    form_components['advanced_options'].observe(on_advanced_change, 'value')
+
+    # Create form with accordion for better organization
+    accordion = widgets.Accordion(children=[widgets.VBox(form_items, layout=widgets.Layout(width='100%'))])
+    accordion.set_title(0, 'Training Configuration')
+    accordion.selected_index = 0  # Expand by default
+
+    # Add save/reset buttons
+    buttons = create_save_reset_buttons(
+        save_tooltip="Simpan konfigurasi strategi training",
+        reset_tooltip="Reset ke nilai default"
+    )
+
+    # Create final form layout
+    form_layout = widgets.VBox([
+        accordion,
+        buttons
+    ], layout=widgets.Layout(width='100%', max_width='800px'))
+
+    # Save button references
+    save_button = buttons.children[0]
+    reset_button = buttons.children[1]
+
+    # Create container for the form
+    container = widgets.VBox([
+        form_layout
+    ], layout=widgets.Layout(width='100%'))
+
+    return {
+        'form': container,
+        'save_button': save_button,
+        'reset_button': reset_button,
+        'container': container
+    }
+
+
+def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str] = None):
     """Create comprehensive summary card dengan timestamp support - FIXED signature"""
-    # Extract all config sections dengan safe defaults
-    training = config.get('training', {})
-    scheduler = config.get('scheduler', {})
-    validation = config.get('validation', {})
-    loss = config.get('loss', {})
-    utils = config.get('training_utils', {})
-    multi_scale = config.get('multi_scale', {})
-    early_stopping = config.get('early_stopping', {})
-    save_best = config.get('save_best', {}) 
-    # Timestamp display dengan conditional formatting
-    timestamp_display = f" | 📅 {last_saved}" if last_saved else ""
+    if 'widgets' not in globals() or widgets is None:
+        try:
+            return widgets.HTML("<div>ipywidgets not available</div>")
+        except NameError:
+            return None
+            
+    try:
+        training = config.get('training', {})
+        scheduler = config.get('scheduler', {})
+        validation = config.get('validation', {})
+        loss = config.get('loss', {})
+        utils = config.get('training_utils', {})
+        multi_scale = config.get('multi_scale', {})
+        early_stopping = config.get('early_stopping', {})
+        save_best = config.get('save_best', {}) 
+        # Timestamp display with conditional formatting
+        timestamp_display = f" | 📅 {last_saved}" if last_saved else ""
+    except Exception as e:
+        logger.error(f"Error creating config summary: {str(e)}")
+        return widgets.HTML(f"<div>Error creating config summary: {str(e)}</div>")
 
     # One-liner untuk safe value extraction dengan fallback
     get_val = lambda section, key, default: section.get(key, default)

@@ -1,39 +1,40 @@
 """
 File: smartcash/ui/strategy/strategy_init.py
-Deskripsi: Main initializer untuk strategy config cell dengan cascading inheritance support
+Deskripsi: Initializer untuk strategy configuration dengan cascading config inheritance
 """
 
 import traceback
 import sys
-from typing import Dict, Any, Optional
-from unittest.mock import MagicMock
-import ipywidgets as widgets
+from typing import Dict, Any, Optional, List
+
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
-from smartcash.ui.strategy.handlers.config_handler import StrategyConfigHandler
-from smartcash.ui.strategy.components.ui_form import create_strategy_form
-from smartcash.ui.strategy.components.ui_layout import create_strategy_layout, update_summary_card
-from smartcash.ui.utils.fallback_utils import show_status_safe, create_fallback_ui
-from smartcash.common.config.manager import get_config_manager
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
+MODULE_NAME = 'strategy'
+MODULE_CONFIG = f"{MODULE_NAME}_config"
 
 
 class StrategyInitializer(ConfigCellInitializer):
-    """Strategy config cell initializer dengan cascading inheritance support"""
+    """Config cell initializer untuk strategy configuration dengan cascading inheritance"""
     
-    def __init__(self, module_name='strategy', config_filename='training_config', 
+    def __init__(self, module_name: str = MODULE_NAME, config_filename: str = MODULE_CONFIG,
                  config_handler_class=None, parent_module: Optional[str] = None):
         if config_handler_class is None:
+            from .handlers.config_handler import StrategyConfigHandler
             config_handler_class = StrategyConfigHandler
+            
         super().__init__(module_name, config_filename, config_handler_class, parent_module)
-        self.config_manager = get_config_manager()
+        self._inheritance_chain = [
+            'base_config', 'preprocessing_config', 'augmentation_config',
+            'model_config', 'backbone_config', 'hyperparameters_config', 'training_config'
+        ]
     
     def _normalize_config_structure(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Normalisasi struktur konfigurasi untuk kompatibilitas"""
         if not isinstance(config, dict):
             return {'training': {}, 'validation': {}}
-            
+        
         # Normalisasi struktur training
         training = config.get('training', {})
         
@@ -54,88 +55,39 @@ class StrategyInitializer(ConfigCellInitializer):
             if 'type' in sched and 'scheduler' not in training:
                 training['scheduler'] = sched['type']
                 
-        # Pastikan ada section yang diperlukan
+        # Pastikan training ada di config
         config['training'] = training
-        if 'validation' not in config:
-            config['validation'] = {}
-            
+        
         return config
-            
-    def _load_cascading_config(self) -> Dict[str, Any]:
-        """Load config dengan cascading inheritance sesuai urutan yang benar"""
+    
+    def _load_cascading_config(self, env=None) -> Dict[str, Any]:
+        """Load config dengan cascading inheritance"""
         try:
-            # Urutan inheritance: base -> preprocessing -> augmentation -> model -> backbone -> hyperparameters -> training
-            inheritance_chain = [
-                'base_config',
-                'preprocessing_config', 
-                'augmentation_config',
-                'model_config',
-                'backbone_config',
-                'hyperparameters_config',
-                'training_config'
-            ]
-            
-            # Merge configs dalam urutan inheritance
-            merged_config = {}
-            for config_name in inheritance_chain:
+            config = {}
+            for config_name in self._inheritance_chain:
                 try:
-                    config = self.config_manager.get_config(config_name)
-                    if config and isinstance(config, dict):
-                        # Remove _base_ untuk mencegah recursive inheritance
-                        config.pop('_base_', None)
-                        # Deep merge configs
-                        merged_config = self._deep_merge_configs(merged_config, config)
-                except Exception:
-                    continue  # Skip config yang error
+                    if cfg := self.config_manager.get_config(config_name):
+                        cfg.pop('_base_', None)  # Hapus inheritance loops
+                        self._deep_merge_inplace(config, cfg)
+                        logger.debug(f"Merged config: {config_name}")
+                except Exception as e:
+                    logger.warning(f"Skip {config_name}: {str(e)}")
             
-            # Normalisasi struktur konfigurasi
-            merged_config = self._normalize_config_structure(merged_config)
+            return self._normalize_config_structure(config or self.config_handler.get_default_config())
             
-            # Fallback ke defaults jika tidak ada config
-            if not merged_config or 'training' not in merged_config:
-                default_config = self.config_handler.get_default_config()
-                if not default_config:
-                    default_config = {}
-                
-                # Pastikan minimal ada konfigurasi dasar yang valid
-                default_config = self._normalize_config_structure(default_config)
-                return default_config
-            
-            return merged_config
-            
-        except Exception:
-            # Kembalikan config kosong yang valid
+        except Exception as e:
+            logger.error(f"Gagal load cascading config: {str(e)}")
+            logger.debug(traceback.format_exc())
             return self._normalize_config_structure({})
     
-    def _deep_merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Deep merge dua config dictionaries"""
-        result = base.copy()
-        
+    def _deep_merge_inplace(self, base: Dict[str, Any], override: Dict[str, Any]) -> None:
+        """In-place deep merge untuk performance optimization"""
         for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._deep_merge_configs(result[key], value)
+            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                self._deep_merge_inplace(base[key], value)
             else:
-                result[key] = value
-        
-        return result
+                base[key] = value
     
-    def _create_strategy_ui(self, config, env=None, **kwargs):
-        """Membuat UI strategy dengan konfigurasi yang diberikan"""
-        # Panggil initialize_strategy_config jika tersedia
-        current_module = sys.modules[__name__]
-        if hasattr(current_module, 'initialize_strategy_config'):
-            strategy_ui = current_module.initialize_strategy_config(env=env, config=config, **kwargs)
-            
-            # Pastikan UI yang dikembalikan memiliki method get_ui()
-            if not hasattr(strategy_ui, 'get_ui'):
-                if hasattr(strategy_ui, 'main_container'):
-                    strategy_ui.get_ui = lambda: strategy_ui.main_container
-                elif isinstance(strategy_ui, dict) and 'main_container' in strategy_ui:
-                    strategy_ui.get_ui = lambda: strategy_ui['main_container']
-                else:
-                    strategy_ui.get_ui = lambda: strategy_ui
-            
-            return strategy_ui
         return None
     
     def initialize(self, env=None, config=None, **kwargs) -> Any:
@@ -317,34 +269,35 @@ class StrategyInitializer(ConfigCellInitializer):
 
 def initialize_strategy_config(env=None, config=None, parent_callbacks=None, **kwargs):
     """
-    Factory function untuk strategy config cell dengan cascading inheritance
+    Factory function untuk strategy config cell
     
     Args:
         env: Environment manager instance
-        config: Override config values (akan di-merge dengan cascading config)
+        config: Override config values
         parent_callbacks: Callbacks untuk parent modules
         **kwargs: Additional arguments
         
     Returns:
-        UI components dengan config yang sudah di-cascade
+        UI components dengan config
     """
-    # Jika config tidak disediakan atau minimal, biarkan initializer load cascading config
-    if not config:
-        config = None  # Let initializer handle cascading loading
-    
-    return create_config_cell(
-        StrategyInitializer, 
-        'strategy', 
-        'training_config', 
-        env=env, 
-        config=config, 
-        config_handler_class=StrategyConfigHandler,
-        parent_callbacks=parent_callbacks,
-        **kwargs
-    )
-
-
-# Convenience function untuk direct initialization tanpa parent
-def create_strategy_ui(config=None, **kwargs):
-    """Create strategy UI secara langsung tanpa parent dependency"""
-    return initialize_strategy_config(config=config, **kwargs)
+    try:
+        # Inisialisasi dengan config handler
+        initializer = StrategyInitializer()
+        
+        # Buat config cell
+        return create_config_cell(
+            initializer=initializer,
+            env=env,
+            config=config,
+            parent_callbacks=parent_callbacks,
+            **kwargs
+        )
+    except Exception as e:
+        logger.error(f"Gagal menginisialisasi strategy config: {str(e)}")
+        logger.debug(traceback.format_exc())
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui
+        return create_fallback_ui(
+            title="Gagal Memuat Konfigurasi Strategy",
+            error=str(e),
+            help_text="Silakan periksa log untuk detail lebih lanjut."
+        )

@@ -1,54 +1,89 @@
 """
 File: smartcash/ui/strategy/handlers/config_handler.py
-Deskripsi: Optimized config handler untuk strategy dengan cascading inheritance dan auto-refresh
+Deskripsi: Config handler untuk strategy dengan cascading inheritance
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.strategy.handlers.defaults import get_default_strategy_config
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class StrategyConfigHandler(ConfigHandler):
-    """Optimized strategy config handler dengan efficient cascading inheritance"""
+    """Config handler untuk strategy dengan cascading inheritance"""
     
-    def __init__(self, module_name: str, parent_module: str = None):
-        super().__init__(module_name, parent_module)
-        self._inheritance_chain = [
-            'base_config', 'preprocessing_config', 'augmentation_config',
-            'model_config', 'backbone_config', 'hyperparameters_config', 'training_config'
-        ]
+    def __init__(self, module_name: str = 'strategy', 
+                 config_filename: str = 'strategy_config.yaml',
+                 parent_module: Optional[str] = None):
+        super().__init__(module_name, config_filename, parent_module)
+        self.config_type = 'strategy'
     
-    def load_config(self, config_name: str = None, use_base_config: bool = True) -> Dict[str, Any]:
-        """Load config dengan optimized cascading inheritance"""
-        return self._load_cascading_inheritance()
+    def get_default_config(self) -> Dict[str, Any]:
+        """Dapatkan default configuration"""
+        return {
+            'training': {
+                'enabled': True,
+                'batch_size': 16,
+                'epochs': 100,
+                'optimizer': 'AdamW',
+                'learning_rate': 0.001,
+            },
+            'validation': {
+                'enabled': True,
+                'val_split': 0.2
+            }
+        }
     
-    def _load_cascading_inheritance(self) -> Dict[str, Any]:
-        """Optimized cascading inheritance dengan efficient merge"""
-        merged_config = {}
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validasi konfigurasi strategy"""
+        return self._validate_config_structure(config)
+    
+    def _validate_config_structure(self, config: Dict[str, Any]) -> bool:
+        """Validasi struktur konfigurasi"""
+        if not isinstance(config, dict):
+            logger.warning("Config harus berupa dictionary")
+            return False
+            
+        # Validasi section yang diperlukan
+        required_sections = ['training', 'validation']
+        for section in required_sections:
+            if section not in config:
+                logger.warning(f"Section '{section}' tidak ditemukan dalam konfigurasi")
+                return False
         
-        # One-liner untuk load dan merge configs
-        [self._safe_merge_config(merged_config, config_name) 
-         for config_name in self._inheritance_chain]
+        # Validasi parameter training
+        training = config.get('training', {})
+        if not isinstance(training, dict):
+            logger.warning("Section 'training' harus berupa dictionary")
+            return False
+            
+        # Validasi parameter validation
+        validation = config.get('validation', {})
+        if not isinstance(validation, dict):
+            logger.warning("Section 'validation' harus berupa dictionary")
+            return False
+            
+        return True
+    
+    def merge_with_model_config(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge strategy config dengan model config"""
+        if not isinstance(model_config, dict):
+            return self.config
+            
+        merged_config = self.config.copy()
         
-        return merged_config or self.get_default_config()
-    
-    def _safe_merge_config(self, merged_config: Dict[str, Any], config_name: str) -> None:
-        """Safe merge single config dengan error handling"""
-        try:
-            if config := self.config_manager.get_config(config_name):
-                config.pop('_base_', None)  # Remove inheritance loops
-                self._deep_merge_inplace(merged_config, config)
-                self.logger.debug(f"🔗 Merged {config_name}")
-        except Exception as e:
-            self.logger.warning(f"⚠️ Skip {config_name}: {str(e)}")
-    
-    def _deep_merge_inplace(self, base: Dict[str, Any], override: Dict[str, Any]) -> None:
-        """In-place deep merge untuk performance optimization"""
-        for key, value in override.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                self._deep_merge_inplace(base[key], value)
-            else:
-                base[key] = value
+        # Merge training parameters
+        if 'training' in model_config:
+            training = model_config['training']
+            if isinstance(training, dict):
+                merged_config['training'].update({
+                    'batch_size': training.get('batch_size', merged_config['training']['batch_size']),
+                    'epochs': training.get('epochs', merged_config['training']['epochs']),
+                    'learning_rate': training.get('learning_rate', merged_config['training']['learning_rate'])
+                })
+        
+        return merged_config
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Optimized config extraction dengan efficient mapping"""
@@ -128,8 +163,11 @@ class StrategyConfigHandler(ConfigHandler):
         return f"{model_type}_{layer_mode}"
     
     def get_default_config(self) -> Dict[str, Any]:
-        """Get optimized default config"""
-        return get_default_strategy_config()
+        """Get default config dengan optimasi caching"""
+        if self._default_config is None:
+            from .defaults import get_default_strategy_config
+            self._default_config = get_default_strategy_config()
+        return self._default_config
     
     def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Auto-refresh summary dengan optimized timestamp handling"""

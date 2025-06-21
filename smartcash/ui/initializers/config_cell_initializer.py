@@ -6,6 +6,7 @@ Deskripsi: Optimized ConfigCellInitializer dengan fixed save/reset status update
 from typing import Dict, Any, Optional, Callable, Type
 from abc import ABC, abstractmethod
 import ipywidgets as widgets
+import sys
 from IPython.display import display
 
 from smartcash.common.config.manager import get_config_manager
@@ -44,6 +45,24 @@ class ConfigCellInitializer(ABC):
         
         return BaseConfigHandler(self.module_name, extract_fn, update_fn, self.parent_module)
     
+    def _create_fallback_ui(self, error_msg: str, exc_info=None) -> Dict[str, Any]:
+        """Membuat fallback UI dengan error handling yang sederhana
+        
+        Args:
+            error_msg: Pesan error yang akan ditampilkan
+            exc_info: Optional exception info tuple (type, value, traceback)
+            
+        Returns:
+            Dictionary berisi komponen UI fallback
+        """
+        from smartcash.ui.utils.fallback_utils import create_init_fallback_ui
+        
+        return create_init_fallback_ui(
+            error_msg=error_msg,
+            module_name=self.module_name,
+            exc_info=exc_info
+        )
+    
     def initialize(self, env=None, config=None, **kwargs) -> Any:
         """Optimized initialization dengan proper error handling"""
         try:
@@ -56,7 +75,7 @@ class ConfigCellInitializer(ABC):
             ui_components = self._create_config_ui(config, env, **kwargs)
             
             if not self._validate_ui(ui_components):
-                return create_error_ui("Required components missing", self.module_name)
+                return self._create_fallback_ui("Komponen yang diperlukan tidak ditemukan")
             
             # Add config handler dan setup handlers
             ui_components['config_handler'] = self.config_handler
@@ -66,8 +85,9 @@ class ConfigCellInitializer(ABC):
             return ui_components.get('main_container', ui_components)
             
         except Exception as e:
-            self.logger.error(f"❌ Error inisialisasi {self.module_name}: {str(e)}")
-            return create_error_ui(f"Error: {str(e)}", self.module_name)
+            error_msg = f"❌ Gagal menginisialisasi {self.module_name}: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return self._create_fallback_ui(error_msg, exc_info=sys.exc_info())
     
     def _setup_handlers_with_config_handler(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Setup handlers dengan optimized button state management"""

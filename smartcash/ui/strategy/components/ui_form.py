@@ -200,11 +200,21 @@ def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
         buttons
     ], layout=widgets.Layout(width='100%', max_width='800px'))
     
-    # Return only the required components
+    # Simpan referensi ke tombol
+    save_button = buttons.children[0]
+    reset_button = buttons.children[1]
+    
+    # Buat container untuk form
+    container = widgets.VBox([
+        form_layout
+    ], layout=widgets.Layout(width='100%'))
+    
+    # Return components yang diperlukan
     return {
-        'form': form_layout,
-        'save_button': buttons.children[0],
-        'reset_button': buttons.children[1]
+        'form': container,
+        'save_button': save_button,
+        'reset_button': reset_button,
+        'container': container
     }
 
 

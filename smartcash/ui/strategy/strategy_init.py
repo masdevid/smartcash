@@ -183,14 +183,17 @@ class StrategyInitializer(ConfigCellInitializer):
             exc_type, exc_value, exc_tb = sys.exc_info()
             tb_text = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)) if exc_tb else ""
             
+            from smartcash.ui.utils.fallback_utils import FallbackConfig
+            
             return create_fallback_ui(
                 error_message=error_msg,
                 exc_info=sys.exc_info(),
-                config={
-                    'title': "⚠️ Error Strategy Configuration",
-                    'module_name': 'strategy',
-                    'traceback': tb_text
-                }
+                config=FallbackConfig(
+                    title="⚠️ Error Strategy Configuration",
+                    module_name='strategy',
+                    traceback=tb_text,
+                    message=error_msg
+                )
             )
     
     def _setup_summary_update_callback(self, ui_components: Dict[str, Any]) -> None:

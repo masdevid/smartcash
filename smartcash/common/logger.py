@@ -150,23 +150,38 @@ class SmartCashLogger:
         console_handler.setFormatter(UnifiedFormatter())
         self.logger.addHandler(console_handler)
     
-    def log(self, level: LogLevel, message: str) -> None:
-        """Log pesan dengan level dan format terpadu."""
+    def log(self, level: LogLevel, message: str, exc_info=None) -> None:
+        """Log pesan dengan level dan format terpadu.
+        
+        Args:
+            level: Level log
+            message: Pesan yang akan dicatat
+            exc_info: Optional exception info tuple (type, value, traceback)
+        """
         # Log via Python logger dengan prefix untuk SUCCESS
         std_level = self.LEVEL_MAPPING[level]
         log_message = f"SUCCESS: {message}" if level == LogLevel.SUCCESS else message
-        self.logger.log(std_level, log_message)
+        
+        # Gunakan exc_info jika disediakan
+        if exc_info is not None:
+            self.logger.log(std_level, log_message, exc_info=exc_info)
+        else:
+            self.logger.log(std_level, log_message)
         
         # Panggil callbacks dengan format terpadu
         for callback in self._callbacks:
             try:
-                callback(level, message)
+                callback(level, message, exc_info=exc_info)
             except Exception as e:
                 # Error dalam callback tidak boleh mengganggu logging utama
                 sys.stderr.write(f"Logger callback error: {str(e)}\n")
     
-    def add_callback(self, callback: Callable[[LogLevel, str], None]) -> None:
-        """Tambahkan callback untuk event log."""
+    def add_callback(self, callback: Callable[[LogLevel, str, Optional[tuple]], None]) -> None:
+        """Tambahkan callback untuk event log.
+        
+        Args:
+            callback: Fungsi callback dengan signature (level: LogLevel, message: str, exc_info: Optional[tuple]) -> None
+        """
         if callback not in self._callbacks:
             self._callbacks.append(callback)
     
@@ -200,9 +215,14 @@ class SmartCashLogger:
         """Log pesan warning."""
         self.log(LogLevel.WARNING, message)
     
-    def error(self, message: str) -> None:
-        """Log pesan error."""
-        self.log(LogLevel.ERROR, message)
+    def error(self, message: str, exc_info=None) -> None:
+        """Log pesan error.
+        
+        Args:
+            message: Pesan error
+            exc_info: Optional exception info tuple (type, value, traceback)
+        """
+        self.log(LogLevel.ERROR, message, exc_info=exc_info)
     
     def critical(self, message: str) -> None:
         """Log pesan critical."""

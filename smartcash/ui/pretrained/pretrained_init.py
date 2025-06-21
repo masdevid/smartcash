@@ -182,7 +182,7 @@ class PretrainedInitializer(CommonInitializer):
             logger.warning(f"Post-init hook error: {str(e)}")
 
     def _create_fallback_ui(self, error_msg: str, exc_info=None) -> Dict[str, Any]:
-        """Return fallback UI menggunakan implementasi standar dari fallback_utils
+        """Return fallback UI dengan error handling yang sederhana
         
         Args:
             error_msg: Pesan error yang akan ditampilkan
@@ -191,14 +191,47 @@ class PretrainedInitializer(CommonInitializer):
         Returns:
             Dictionary berisi komponen UI fallback
         """
-        from smartcash.ui.utils.fallback_utils import create_standard_fallback_ui
+        import ipywidgets as widgets
+        from IPython.display import display, HTML
         
-        return create_standard_fallback_ui(
-            error_msg=error_msg,
-            module_name='pretrained_models',
-            exc_info=exc_info,
-            retry_callback=self.initialize
+        # Buat widget error
+        error_widget = widgets.HTML(
+            f"""
+            <div style="
+                padding: 15px;
+                margin: 10px 0;
+                border: 1px solid #f5c6cb;
+                border-radius: 4px;
+                background-color: #f8d7da;
+                color: #721c24;
+            ">
+                <h4 style="margin-top: 0; color: #721c24;">⚠️ Error</h4>
+                <p style="margin-bottom: 0;">{error_msg}</p>
+            </div>
+            """
         )
+        
+        # Tampilkan traceback jika ada
+        if exc_info:
+            import traceback
+            tb_widget = widgets.Output()
+            with tb_widget:
+                traceback.print_exception(*exc_info)
+            
+            # Gabungkan widget error dengan traceback
+            container = widgets.VBox([error_widget, tb_widget])
+        else:
+            container = error_widget
+        
+        # Tampilkan widget
+        display(container)
+        
+        return {
+            'ui': container,
+            'error': error_msg,
+            'status': widgets.HTML(f'<div style="color: #721c24;">{error_msg}</div>'),
+            'fallback_mode': True
+        }
 
 # Global instance
 _pretrained_initializer = PretrainedInitializer()

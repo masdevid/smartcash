@@ -101,7 +101,7 @@ class StrategyInitializer(ConfigCellInitializer):
         """Create UI components untuk strategy configuration dengan reusable components"""
         try:
             # Create form components menggunakan config yang sudah di-cascade
-            form_components = create_strategy_form(config, self.config_manager)
+            form_components = create_strategy_form(config)
             
             # Create layout dengan form components
             ui_components = create_strategy_layout(form_components)
@@ -120,7 +120,7 @@ class StrategyInitializer(ConfigCellInitializer):
             logger.error(error_msg, exc_info=True)
             from smartcash.ui.utils.fallback_utils import FallbackConfig
             return create_fallback_ui(
-                message=error_msg,  # Changed from error_msg to message
+                error_message=error_msg,
                 exc_info=sys.exc_info(),
                 config=FallbackConfig(
                     title="⚠️ Error Strategy Configuration",

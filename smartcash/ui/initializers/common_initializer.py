@@ -194,10 +194,6 @@ class CommonInitializer(ABC):
                 traceback=traceback.format_exc() if exc_info else ""
             )
         )
-        
-        # Tampilkan UI dan kembalikan result
-        from IPython.display import display
-        display(result['ui'])
         return result 
     
     def _add_logger_to_components(self, ui_components: Dict[str, Any], logger_bridge) -> None:

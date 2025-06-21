@@ -83,12 +83,11 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
     # Return components untuk akses dari handler
     return {
         'main_container': main_container,
-        'button_container': button_container,
+        'button_container': form_components['button_container'],
         'training_section': training_section,
         'optimizer_section': optimizer_section,
         'loss_section': loss_section,
         'control_section': control_section,
         'summary_section': summary_section,
-        'action_section': action_section,
-        **form_components  # Spread all form components
+        'action_section': action_section
     }

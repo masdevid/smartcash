@@ -200,10 +200,13 @@ def initialize_pretrained_ui(env=None, config=None, **kwargs):
     """
     try:
         result = _pretrained_initializer.initialize(env=env, config=config, **kwargs)
-        # Kembalikan result langsung, biarkan Jupyter yang menangani tampilan
+        # Pastikan UI ditampilkan dengan benar
+        display(result.get('ui', result))
         return result
     except Exception as e:
         error_msg = f"Gagal menginisialisasi UI pretrained: {str(e)}"
         logger.exception(error_msg)
-        # Kembalikan fallback UI, biarkan Jupyter yang menangani tampilan
-        return _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+        # Buat dan tampilkan fallback UI
+        fallback_ui = _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+        display(fallback_ui.get('ui', fallback_ui))
+        return fallback_ui

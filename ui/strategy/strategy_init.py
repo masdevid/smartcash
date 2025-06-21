@@ -157,22 +157,28 @@ class StrategyInitializer(ConfigCellInitializer):
                 raise ValueError("Form components harus menyertakan 'save_button' dan 'reset_button'")
             
             # Buat layout dengan form components
-            layout_components = create_strategy_layout(form_components, config)
+            layout_components = create_strategy_layout(form_components)
+            
+            # Pastikan komponen yang diperlukan ada
+            required_components = ['save_button', 'reset_button', 'main_container', 'summary_card']
+            for comp in required_components:
+                if comp not in layout_components:
+                    raise ValueError(f"Komponen '{comp}' tidak ditemukan dalam layout_components")
             
             # Update summary card dengan config terbaru
-            if 'summary_card' in layout_components and 'form' in layout_components:
-                update_summary_card(
-                    layout_components['summary_card'],
-                    config,
-                    form_components
-                )
+            update_summary_card(
+                layout_components,
+                config,
+                form_components
+            )
             
-            # Return minimal yang dibutuhkan untuk save/reset
+            # Return komponen yang diperlukan
             return {
-                'save_button': form_components['save_button'],
-                'reset_button': form_components['reset_button'],
-                'form': form_components.get('form', None),
-                'summary_card': layout_components.get('summary_card', None)
+                'form': layout_components['main_container'],
+                'save_button': layout_components['save_button'],
+                'reset_button': layout_components['reset_button'],
+                'summary_card': layout_components['summary_card'],
+                'container': layout_components['main_container']
             }
             
         except Exception as e:

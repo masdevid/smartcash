@@ -23,30 +23,31 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components untuk hyperparameters config dengan form dan layout"""
         try:
-            # Create form components
+            from .components.ui_form import create_hyperparameters_form
+            from .components.ui_layout import create_hyperparameters_layout
+            
+            # Buat form components
             form_components = create_hyperparameters_form(config)
+            
+            # Buat layout dengan form components
+            layout_components = create_hyperparameters_layout(form_components)
             
             # Pastikan komponen yang diperlukan ada
             required_components = ['save_button', 'reset_button', 'form']
             for comp in required_components:
-                if comp not in form_components:
-                    raise ValueError(f"Komponen '{comp}' tidak ditemukan dalam form_components")
+                if comp not in layout_components:
+                    raise ValueError(f"Komponen '{comp}' tidak ditemukan dalam layout_components")
             
             # Pastikan form adalah widget yang valid
-            if not isinstance(form_components['form'], widgets.Widget):
+            if not isinstance(layout_components['form'], widgets.Widget):
                 raise ValueError("Form harus berupa instance widgets.Widget yang valid")
-            
-            # Buat container utama
-            container = widgets.VBox([
-                form_components['form']
-            ], layout=widgets.Layout(width='100%'))
             
             # Return komponen yang diperlukan
             return {
-                'form': container,
-                'save_button': form_components['save_button'],
-                'reset_button': form_components['reset_button'],
-                'container': container
+                'form': layout_components['form'],
+                'save_button': layout_components['save_button'],
+                'reset_button': layout_components['reset_button'],
+                'container': layout_components['form']
             }
             
         except Exception as e:

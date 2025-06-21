@@ -194,16 +194,59 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         
         return _create_fallback_ui(error_msg)
 
-def _create_fallback_ui(error_msg: str) -> Dict[str, Any]:
-    """Create minimal fallback UI"""
-    error_widget = widgets.HTML(f"""
-        <div style='padding:20px;border:2px solid #dc3545;border-radius:8px;background:#f8d7da;color:#721c24;'>
-            <h4>⚠️ UI Creation Error</h4>
-            <p>{error_msg}</p>
-            <small>💡 Try restarting the cell atau check dependencies</small>
-        </div>
-    """)
+def _create_fallback_ui(error_msg: str, exc_info=None, show_traceback=True, retry_callback=None) -> Dict[str, Any]:
+    """Create fallback UI with proper error handling
     
+    Args:
+        error_msg: Pesan error yang akan ditampilkan
+        exc_info: Optional exception info tuple (type, value, traceback)
+        show_traceback: Apakah menampilkan traceback
+        retry_callback: Optional callback function untuk tombol retry
+        
+    Returns:
+        Dictionary berisi komponen UI fallback
+    """
+    from smartcash.ui.utils.fallback_utils import FallbackConfig, create_fallback_ui
+    
+    # Format traceback jika ada
+    tb_msg = ""
+    if exc_info and show_traceback:
+        import traceback
+        try:
+            tb_msg = "".join(traceback.format_exception(*exc_info))
+        except Exception as e:
+            tb_msg = f"Error getting traceback: {str(e)}"
+    
+    # Create fallback configuration
+    config = FallbackConfig(
+        title="⚠️ Error in Preprocessing",
+        message=error_msg,
+        traceback=tb_msg,
+        module_name='preprocessing',
+        show_traceback=show_traceback,
+        show_retry=retry_callback is not None,
+        retry_callback=retry_callback,
+        container_style={
+            'border': '1px solid #f5c6cb',
+            'border_radius': '8px',
+            'padding': '15px',
+            'margin': '10px 0',
+            'background': '#f8d7da',
+            'color': '#721c24'
+        }
+    )
+    
+    # Create fallback UI widget
+    error_widget = create_fallback_ui(
+        error_message=config.message,
+        title=config.title,
+        show_traceback=config.show_traceback,
+        show_retry=config.show_retry,
+        retry_callback=config.retry_callback,
+        container_style=config.container_style
+    )
+    
+    # Create minimal UI components
     log_output = widgets.Output()
     confirmation_area = widgets.Output()
     

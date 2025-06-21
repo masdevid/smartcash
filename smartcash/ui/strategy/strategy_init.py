@@ -3,13 +3,18 @@ File: smartcash/ui/strategy/strategy_init.py
 Deskripsi: Main initializer untuk strategy config cell dengan cascading inheritance support
 """
 
+import traceback
+import sys
 from typing import Dict, Any, Optional
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
 from smartcash.ui.strategy.handlers.config_handler import StrategyConfigHandler
 from smartcash.ui.strategy.components.ui_form import create_strategy_form
 from smartcash.ui.strategy.components.ui_layout import create_strategy_layout, update_summary_card
-from smartcash.ui.utils.fallback_utils import show_status_safe
+from smartcash.ui.utils.fallback_utils import show_status_safe, create_fallback_ui
 from smartcash.common.config.manager import get_config_manager
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class StrategyInitializer(ConfigCellInitializer):
@@ -87,37 +92,38 @@ class StrategyInitializer(ConfigCellInitializer):
             return super().initialize(env=env, config=final_config, **kwargs)
             
         except Exception as e:
-            self.logger.error(f"❌ Error in strategy initialize: {str(e)}")
+            error_msg = f"❌ Error in strategy initialize: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             # Fallback ke parent initialize dengan default config
             return super().initialize(env=env, config=self.config_handler.get_default_config(), **kwargs)
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Create UI components untuk strategy configuration dengan reusable components"""
         try:
-            # Load cascading config untuk memastikan defaults yang benar
-            if not config or len(config) < 5:
-                config = self._load_cascading_config()
+            # Create form components menggunakan config yang sudah di-cascade
+            form_components = create_strategy_form(config, self.config_manager)
             
-            # Create form components dengan merged config
-            form_components = create_strategy_form(config)
-            
-            # Create layout
+            # Create layout dengan form components
             ui_components = create_strategy_layout(form_components)
             
-            # Update summary card dengan config yang sudah merged
-            update_summary_card(ui_components, config)
-            
-            # Setup callback untuk update summary saat config berubah
-            self._setup_summary_update_callback(ui_components)
+            # Setup summary card update handler
+            if 'summary_card' in ui_components and 'strategy_type' in form_components:
+                form_components['strategy_type'].observe(
+                    lambda change: update_summary_card(ui_components['summary_card'], change.new, config),
+                    names='value'
+                )
             
             return ui_components
+            
         except Exception as e:
-            self.logger.error(f"❌ Error creating training strategy UI: {str(e)}")
-            # Fallback ke default config
-            default_config = self.config_handler.get_default_config()
-            form_components = create_strategy_form(default_config)
-            ui_components = create_strategy_layout(form_components)
-            update_summary_card(ui_components, default_config)
-            return ui_components
+            error_msg = f"Gagal membuat UI untuk konfigurasi strategy: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return create_fallback_ui(
+                title="⚠️ Error Strategy Configuration",
+                message=error_msg,
+                traceback=traceback.format_exc(),
+                module_name='strategy'
+            )
     
     def _setup_summary_update_callback(self, ui_components: Dict[str, Any]) -> None:
         """Setup callback untuk update summary card otomatis"""

@@ -3,8 +3,13 @@ File: smartcash/ui/backbone/backbone_init.py
 Deskripsi: Initializer untuk backbone configuration menggunakan backbone_config.yaml dengan pewarisan config_cell_initializer
 """
 
+import traceback
+import sys
 from typing import Dict, Any, Optional
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
 MODULE_NAME = 'backbone'
 MODULE_CONFIG = MODULE_NAME+"_config"
 class BackboneInitializer(ConfigCellInitializer):
@@ -15,14 +20,26 @@ class BackboneInitializer(ConfigCellInitializer):
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components untuk backbone configuration dengan reusable components"""
-        from .components.ui_form import create_backbone_form
-        from .components.ui_layout import create_backbone_layout
-        
-        # Create form components menggunakan backbone_config.yaml
-        form_components = create_backbone_form(config)
-        
-        # Create layout dengan form components
-        return create_backbone_layout(form_components)
+        try:
+            from .components.ui_form import create_backbone_form
+            from .components.ui_layout import create_backbone_layout
+            from ..utils.fallback_utils import create_fallback_ui
+            
+            # Create form components menggunakan backbone_config.yaml
+            form_components = create_backbone_form(config)
+            
+            # Create layout dengan form components
+            return create_backbone_layout(form_components)
+            
+        except Exception as e:
+            error_msg = f"Gagal membuat UI untuk konfigurasi backbone: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return create_fallback_ui(
+                title="⚠️ Error Backbone Configuration",
+                message=error_msg,
+                traceback=traceback.format_exc(),
+                module_name=MODULE_NAME
+            )
     
     def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> None:
         """Setup custom handlers untuk backbone selection changes"""

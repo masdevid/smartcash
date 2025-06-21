@@ -326,25 +326,93 @@ def _create_fallback_live_preview() -> Dict[str, Any]:
     
     return {'container': container, 'widgets': widgets_dict}
 
-def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
-    """Minimal fallback UI"""
-    error_widget = widgets.HTML(f"""
-    <div style="padding: 20px; background: #f8d7da; border: 1px solid #dc3545; 
-                border-radius: 8px; color: #721c24; margin: 10px 0;">
-        <h4>⚠️ Augmentation UI Error</h4>
-        <p><strong>Error:</strong> {error_message}</p>
-        <p>💡 Restart cell atau check imports</p>
-    </div>
-    """)
+def _create_fallback_ui(
+    error_message: str, 
+    exc_info=None, 
+    show_traceback=True, 
+    retry_callback=None
+) -> Dict[str, Any]:
+    """Create fallback UI with proper error handling for augmentation module
     
-    fallback_button = widgets.Button(description="🔄 Retry", button_style='primary')
+    Args:
+        error_message: Pesan error yang akan ditampilkan
+        exc_info: Optional exception info tuple (type, value, traceback)
+        show_traceback: Apakah menampilkan traceback
+        retry_callback: Optional callback function untuk tombol retry
+        
+    Returns:
+        Dictionary berisi komponen UI fallback untuk modul augmentation
+    """
+    from smartcash.ui.utils.fallback_utils import FallbackConfig, create_fallback_ui
+    
+    # Format traceback jika ada
+    tb_msg = ""
+    if exc_info and show_traceback:
+        import traceback
+        try:
+            tb_msg = "".join(traceback.format_exception(*exc_info))
+        except Exception as e:
+            tb_msg = f"Error getting traceback: {str(e)}"
+    
+    # Create fallback configuration
+    config = FallbackConfig(
+        title="⚠️ Error in Augmentation",
+        message=error_message,
+        traceback=tb_msg,
+        module_name='augmentation',
+        show_traceback=show_traceback,
+        show_retry=retry_callback is not None,
+        retry_callback=retry_callback,
+        container_style={
+            'border': '1px solid #f5c6cb',
+            'border_radius': '8px',
+            'padding': '15px',
+            'margin': '10px 0',
+            'background': '#f8d7da',
+            'color': '#721c24'
+        }
+    )
+    
+    # Create fallback UI widget
+    error_widget = create_fallback_ui(
+        error_message=config.message,
+        title=config.title,
+        show_traceback=config.show_traceback,
+        show_retry=config.show_retry,
+        retry_callback=config.retry_callback,
+        container_style=config.container_style
+    )
+    
+    # Create minimal UI components
+    fallback_button = widgets.Button(
+        description="🔄 Retry" if retry_callback else "Error", 
+        button_style='primary',
+        disabled=retry_callback is None
+    )
+    
+    if retry_callback:
+        def on_retry_clicked(b):
+            retry_callback()
+        fallback_button.on_click(on_retry_clicked)
+    
     log_output = widgets.Output()
     confirmation_area = widgets.Output(layout=widgets.Layout(
-        width='100%', min_height='50px', border='1px solid #ddd'
+        width='100%', 
+        min_height='50px', 
+        border='1px solid #ddd',
+        margin='10px 0'
     ))
     
-    ui = widgets.VBox([error_widget, fallback_button, confirmation_area, log_output], 
-                     layout=widgets.Layout(display='flex', flex_flow='column', align_items='stretch'))
+    # Create UI layout
+    ui = widgets.VBox(
+        [error_widget, fallback_button, confirmation_area, log_output], 
+        layout=widgets.Layout(
+            display='flex', 
+            flex_flow='column', 
+            align_items='stretch',
+            width='100%'
+        )
+    )
     
     # Return minimal required components
     return {
@@ -352,7 +420,7 @@ def _create_fallback_ui(error_message: str) -> Dict[str, Any]:
         'augment_button': fallback_button, 
         'check_button': fallback_button,
         'cleanup_button': fallback_button, 
-        'save_button': fallback_button, 
+        'save_button': fallback_button,
         'reset_button': fallback_button, 
         'log_output': log_output, 
         'status': log_output,

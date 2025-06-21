@@ -179,16 +179,24 @@ class PretrainedInitializer(CommonInitializer):
         except Exception as e:
             logger.warning(f"Post-init hook error: {str(e)}")
 
-    def _create_fallback_ui(self, error_msg: str) -> Dict[str, Any]:
-        """Return minimal fallback structure"""
-        return {
-            'ui': None,
-            'main_container': None,
-            'status': None,
-            'error_widget': None,
-            'error': error_msg,
-            'fallback_mode': True
-        }
+    def _create_fallback_ui(self, error_msg: str, exc_info=None) -> Dict[str, Any]:
+        """Return fallback UI menggunakan implementasi standar dari fallback_utils
+        
+        Args:
+            error_msg: Pesan error yang akan ditampilkan
+            exc_info: Optional exception info tuple (type, value, traceback)
+            
+        Returns:
+            Dictionary berisi komponen UI fallback
+        """
+        from smartcash.ui.utils.fallback_utils import create_standard_fallback_ui
+        
+        return create_standard_fallback_ui(
+            error_msg=error_msg,
+            module_name='pretrained_models',
+            exc_info=exc_info,
+            retry_callback=self.initialize
+        )
 
 # Global instance
 _pretrained_initializer = PretrainedInitializer()

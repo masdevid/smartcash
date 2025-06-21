@@ -1,12 +1,38 @@
 """
 File: smartcash/ui/utils/fallback_utils.py
-Deskripsi: Merged fallback utilities dengan compatibility untuk existing imports
+Deskripsi: Centralized fallback utilities with traceback support for UI components
 """
 
 import ipywidgets as widgets
 import importlib
-from typing import Dict, Any, Optional, Callable
+import traceback
+import sys
+from typing import Dict, Any, Optional, Callable, Tuple, Union, List
 from IPython.display import display, HTML
+from dataclasses import dataclass
+
+@dataclass
+class FallbackConfig:
+    """Configuration for fallback UI components"""
+    title: str = "⚠️ Error"
+    message: str = "An error occurred"
+    traceback: str = ""
+    module_name: str = ""
+    show_traceback: bool = True
+    show_retry: bool = False
+    retry_callback: Optional[Callable] = None
+    container_style: Dict[str, str] = None
+    
+    def __post_init__(self):
+        if self.container_style is None:
+            self.container_style = {
+                'border': '1px solid #f5c6cb',
+                'border_radius': '8px',
+                'padding': '10px',
+                'margin': '10px 0',
+                'background': '#f8d7da',
+                'color': '#721c24'
+            }
 
 
 def import_with_fallback(module_path: str, fallback_value: Any = None) -> Any:
@@ -56,34 +82,107 @@ def create_status_message(message: str, title: str = 'Status', status_type: str 
     """
 
 
-def create_fallback_ui(error_message: str, module_name: str = "module", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+def create_fallback_ui(
+    error_message: str, 
+    module_name: str = "module", 
+    ui_components: Dict[str, Any] = None,
+    exc_info: Optional[Tuple] = None,
+    config: Optional[FallbackConfig] = None
+) -> Dict[str, Any]:
     """Create fallback UI dengan existing alert template compatibility"""
-    ui_components = ui_components or {}
+    logger = get_safe_logger('fallback_ui')
     
-    # Create status widget jika belum ada
-    if 'status' not in ui_components:
-        ui_components['status'] = widgets.Output(layout=widgets.Layout(
-            width='100%', border='1px solid #ddd', min_height='100px', padding='10px'))
+    # Initialize config with defaults if not provided
+    if config is None:
+        config = FallbackConfig()
     
-    # Create main UI container
-    if 'ui' not in ui_components:
-        header = widgets.HTML(f"<h3>⚠️ {module_name.title()} (Fallback Mode)</h3>")
-        ui_components['ui'] = widgets.VBox([
-            header, 
-            ui_components['status']
-        ], layout=widgets.Layout(width='100%', padding='10px'))
+    # Update config with provided values
+    config.message = error_message or config.message
+    config.module_name = module_name or config.module_name
     
-    # Show error message
-    show_status_safe(f"🚨 {error_message}", 'error', ui_components)
+    # Get traceback if not provided but exception info is available
+    if exc_info and not config.traceback:
+        try:
+            config.traceback = ''.join(traceback.format_exception(*exc_info))
+        except:
+            config.traceback = "Failed to generate traceback"
     
-    # Compatibility keys
-    ui_components.update({
-        'main_container': ui_components['ui'],
-        'error_widget': ui_components['status'],
-        'error': error_message
-    })
+    logger.error(f"Creating fallback UI for {config.module_name}: {config.message}")
     
-    return ui_components
+    # Create error details section
+    error_details = [
+        f"<strong>Module:</strong> {config.module_name}",
+        f"<strong>Error:</strong> {config.message}"
+    ]
+    
+    if config.show_traceback and config.traceback:
+        error_details.extend([
+            "<hr style='margin: 10px 0; border: 0; border-top: 1px solid #f5c6cb;'>",
+            "<strong>Details:</strong>",
+            f"<pre style='background: rgba(0,0,0,0.05); padding: 10px; border-radius: 4px; overflow-x: auto;'>{config.traceback}</pre>"
+        ])
+    
+    # Create action buttons
+    buttons = []
+    if config.show_retry and config.retry_callback:
+        retry_button = widgets.Button(
+            description="🔄 Retry",
+            button_style='warning',
+            layout=widgets.Layout(width='100px')
+        )
+        retry_button.on_click(lambda _: config.retry_callback())
+        buttons.append(retry_button)
+    
+    # Prepare error details HTML
+    error_details_html = "<br>".join(error_details)
+    
+    # Create the error widget
+    error_widget = widgets.VBox(
+        [
+            widgets.HTML(
+                f"""
+                <div style="padding: 10px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 10px 0; color: #721c24;">
+                        {config.title}
+                    </h4>
+                    <div style="margin-bottom: 10px;">
+                        {error_details_html}
+                    </div>
+                </div>
+                """
+            ),
+            widgets.HBox(buttons) if buttons else widgets.HTML("")
+        ],
+        layout=widgets.Layout(
+            **config.container_style,
+            width='100%',
+            margin='10px 0'
+        )
+    )
+    
+    # Update status panel if available
+    if ui_components and 'status' in ui_components:
+        try:
+            with ui_components['status']:
+                display(HTML(
+                    f"<div style='color: #721c24;'>"
+                    f"<strong>Error in {config.module_name}:</strong> {config.message}"
+                    f"</div>"
+                ))
+        except Exception as e:
+            logger.error(f"Failed to update status panel: {str(e)}")
+    
+    return {
+        'ui': error_widget,
+        'error': config.message,
+        'status': widgets.HTML(f"<div style='color: #721c24;'>{config.message}</div>"),
+        'fallback_mode': True,
+        'error_details': {
+            'module': config.module_name,
+            'message': config.message,
+            'traceback': config.traceback if config.show_traceback else None
+        }
+    }
 
 
 def create_error_ui(error_message: str, module_name: str = "module") -> widgets.HTML:
@@ -110,9 +209,15 @@ def show_status_safe(message: str, status_type: str = 'info', ui_components: Dic
         print(f"{icons.get(status_type, 'ℹ️')} {message}")
 
 
-def try_operation_safe(operation: Callable, fallback_value: Any = None, 
-                      logger=None, operation_name: str = "operasi",
-                      on_error: Callable[[Exception], Any] = None) -> Any:
+def try_operation_safe(
+    operation: Callable, 
+    fallback_value: Any = None, 
+    logger = None,
+    operation_name: str = "operation",
+    on_error: Callable[[Exception], Any] = None,
+    exc_info: bool = False,
+    **fallback_kwargs
+) -> Any:
     """Execute operation dengan safe error handling
     
     Args:
@@ -121,24 +226,28 @@ def try_operation_safe(operation: Callable, fallback_value: Any = None,
         logger: Logger untuk mencatat log
         operation_name: Nama operasi untuk keperluan logging
         on_error: Callback yang akan dipanggil jika terjadi error
+        exc_info: Flag untuk menampilkan info exception
         
     Returns:
         Hasil operasi atau fallback_value jika terjadi error
     """
     try:
         result = operation()
-        if logger and result: 
+        if logger:
             logger.info(f"✅ {operation_name.capitalize()} berhasil")
         return result
     except Exception as e:
-        if logger: 
-            logger.warning(f"⚠️ Error saat {operation_name}: {str(e)}")
-        if callable(on_error):
-            try:
-                return on_error(e)
-            except Exception as callback_error:
-                if logger:
-                    logger.error(f"⚠️ Error dalam callback on_error: {str(callback_error)}")
+        error_msg = f"Gagal {operation_name}: {str(e)}"
+        if logger:
+            logger.error(error_msg, exc_info=True)
+        
+        if exc_info:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            fallback_kwargs['exc_info'] = (exc_type, exc_value, exc_traceback)
+        
+        if on_error:
+            return on_error(e, **fallback_kwargs)
+            
         return fallback_value
 
 
@@ -201,13 +310,67 @@ def safe_operation(operation_func, fallback_value=None, error_handler=None):
     try:
         return operation_func()
     except Exception as e:
+        error_msg = f"Gagal {operation_func.__name__}: {str(e)}"
         if error_handler:
             try:
-                error_handler(e)
+                return error_handler(e)
             except Exception:
                 pass  # Silent fail pada error handler
         return fallback_value
 
+
+def create_standard_fallback_ui(
+    error_msg: str,
+    module_name: str,
+    exc_info: Optional[Tuple] = None,
+    retry_callback: Optional[Callable] = None,
+    ui_components: Optional[Dict[str, Any]] = None,
+    fallback_fields: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Buat fallback UI standar yang konsisten di seluruh modul
+    
+    Args:
+        error_msg: Pesan error yang akan ditampilkan
+        module_name: Nama modul untuk logging
+        exc_info: Optional exception info tuple (type, value, traceback)
+        retry_callback: Fungsi yang akan dipanggil saat tombol retry ditekan
+        ui_components: Komponen UI yang ada (opsional)
+        fallback_fields: Field tambahan untuk return value
+        
+    Returns:
+        Dictionary berisi komponen UI fallback
+    """
+    # Konfigurasi default
+    default_fields = {
+        'ui': None,
+        'main_container': None,
+        'status': None,
+        'fallback_mode': True
+    }
+    
+    # Gabungkan dengan field tambahan jika ada
+    if fallback_fields:
+        default_fields.update(fallback_fields)
+    
+    # Buat fallback UI
+    fallback_ui = create_fallback_ui(
+        error_message=error_msg,
+        module_name=module_name,
+        ui_components=ui_components,
+        exc_info=exc_info,
+        config=FallbackConfig(
+            title=f"⚠️ Error in {module_name}",
+            message=error_msg,
+            show_retry=retry_callback is not None,
+            retry_callback=retry_callback
+        )
+    )
+    
+    # Update dengan field tambahan
+    if isinstance(fallback_ui, dict):
+        fallback_ui.update(default_fields)
+    
+    return fallback_ui
 
 # One-liner utilities untuk common patterns
 safe_import = lambda path, default=None: import_with_fallback(path, default)

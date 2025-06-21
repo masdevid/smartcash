@@ -4,182 +4,172 @@ File: smartcash/ui/pretrained/components/ui_components.py
 Deskripsi: UI components untuk pretrained models menggunakan reusable shared components dari ui/components/
 """
 
-import ipywidgets as widgets
-from typing import Dict, Any, Optional, Tuple
-from smartcash.common.logger import get_logger
-import traceback
+# Standard library imports
 import sys
-from IPython.display import display, HTML
-from ipywidgets import Layout, Output
+import traceback
+from typing import Dict, Any, Optional, Tuple, Callable
+
+# Third-party imports
+import ipywidgets as widgets
+
+# SmartCash imports
+from smartcash.common.logger import get_logger
+from smartcash.ui.components.header import create_header
+from smartcash.ui.components.status_panel import create_status_panel
+from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
+from smartcash.ui.components.action_buttons import create_action_buttons
+from smartcash.ui.components.log_accordion import create_log_accordion
+from smartcash.ui.components.dialog import (
+    show_confirmation_dialog,
+    show_info_dialog,
+    clear_dialog_area,
+    is_dialog_visible
+)
+from smartcash.ui.utils.fallback_utils import (
+    create_fallback_ui as _create_fallback_ui,
+    FallbackConfig,
+    try_operation_safe
+)
 
 logger = get_logger(__name__)
 
 def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **kwargs) -> Dict:
-    """🎯 Create pretrained UI menggunakan shared reusable components
+    """🎯 Create pretrained UI menggunakan shared reusable components dengan error handling yang lebih baik
     
     Args:
         env: Environment configuration (optional)
         config: Configuration dictionary (optional)
         **kwargs: Additional keyword arguments
             - exc_info: Optional exception info tuple (type, value, traceback)
+            - module_name: Nama modul untuk logging
+            
+    Returns:
+        Dictionary berisi komponen UI atau fallback UI jika terjadi error
     """
-    try:
-        # Handle None config
-        config = config or {}
-            
-        # Ensure config is a dictionary
-        if not isinstance(config, dict):
-            config = {}
-            
-        # Ensure pretrained_models exists and is a dictionary
-        if 'pretrained_models' not in config:
-            config['pretrained_models'] = {}
-            
-        if not isinstance(config['pretrained_models'], dict):
-            config['pretrained_models'] = {}
-        
-        # Get pretrained_config with type safety
-        pretrained_config = config.get('pretrained_models', {})
-        
-        # Import shared reusable components with error handling
+    module_name = kwargs.get('module_name', 'pretrained_ui')
+    logger = get_logger(module_name)
+    
+    def _create_ui() -> Dict:
+        """Fungsi pembantu untuk membuat UI dengan error handling"""
         try:
-            from smartcash.ui.utils.header_utils import create_header
-            from smartcash.ui.components.status_panel import create_status_panel
-            from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
-            from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-            from smartcash.ui.components.log_accordion import create_log_accordion
-            from smartcash.ui.components.action_buttons import create_action_buttons
-        except ImportError as e:
-            error_msg = f"Gagal mengimpor komponen UI yang diperlukan: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
-            return _create_fallback_ui(error_msg, sys.exc_info())
-        
-        # 1. 📊 Header - shared component
-        header = create_header(
-            "🤖 Pretrained Models Manager",
-            "Download dan sync pretrained models untuk YOLOv5 + EfficientNet-B4",
-            "🚀"
-        )
-        
-        # 2. 📋 Status Panel - shared component
-        status_panel = create_status_panel(
-            "🔄 Ready untuk setup pretrained models",
-            "info"
-        )
-        
-        # 3. 📈 Progress Tracker - shared component
-        progress_tracker = create_dual_progress_tracker(
-            operation="Pretrained Models Setup",
-            auto_hide=True
-        )
-        
-        # 4. 🔧 Input Options (module-specific minimal)
-        try:
+            # Handle None config
+            config = config or {}
+                
+            # Ensure config is a dictionary
+            if not isinstance(config, dict):
+                config = {}
+                
+            # Ensure pretrained_models exists and is a dictionary
+            if 'pretrained_models' not in config:
+                config['pretrained_models'] = {}
+                
+            if not isinstance(config['pretrained_models'], dict):
+                config['pretrained_models'] = {}
+            
+            # Get pretrained_config with type safety
+            pretrained_config = config.get('pretrained_models', {})
+            
+            # Create input options
             input_options = _create_pretrained_input_options(pretrained_config)
             
-            # 5. 🎯 Action Buttons - shared component
-            download_sync_button = widgets.Button(
-                description="📥 Download & Sync Models",
-                button_style='primary',
-                icon='download',
-                layout=widgets.Layout(width='200px', height='35px')
-            )
-            action_buttons = create_action_buttons(
-                primary_label="Download & Sync Models",
-                primary_icon="download",
-                button_width='200px'
-            )
+            # Create UI components
+            ui_components = {
+                'header': create_header(
+                    title="Pretrained Models",
+                    subtitle="Pilih dan konfigurasi model yang telah dilatih sebelumnya",
+                    icon='model'
+                ),
+                'status': create_status_panel(
+                    message="Siap digunakan",
+                    status="success"
+                ),
+                'progress': create_dual_progress_tracker(
+                    operation="Downloading Model",
+                    primary_label="Download",
+                    secondary_label="Extraction"
+                ),
+                'action_buttons': create_action_buttons({
+                    'primary': {
+                        'label': 'Download & Sync',
+                        'icon': 'download',
+                        'style': 'primary'
+                    },
+                    'secondary': {
+                        'label': 'Refresh',
+                        'icon': 'refresh'
+                    }
+                }),
+                'log_output': create_log_accordion(
+                    module_name='pretrained_models',
+                    height='200px',
+                    width='100%'
+                ),
+                # Dialog handlers
+                'show_confirmation_dialog': lambda **kwargs: show_confirmation_dialog(
+                    ui_components=ui_components,
+                    **{
+                        'title': 'Konfirmasi',
+                        'message': 'Apakah Anda yakin?',
+                        'confirm_text': 'Ya',
+                        'cancel_text': 'Batal',
+                        **kwargs
+                    }
+                ),
+                'show_info_dialog': lambda **kwargs: show_info_dialog(
+                    ui_components=ui_components,
+                    **{
+                        'title': 'Informasi',
+                        'message': '',
+                        'close_text': 'Tutup',
+                        'dialog_type': 'info',
+                        **kwargs
+                    }
+                ),
+                # Error dialog menggunakan show_info_dialog dengan type error
+                'show_error_dialog': lambda **kwargs: show_info_dialog(
+                    ui_components=ui_components,
+                    **{
+                        'title': 'Error',
+                        'message': 'Terjadi kesalahan',
+                        'close_text': 'Tutup',
+                        'dialog_type': 'error',
+                        **{k: v for k, v in kwargs.items() if k != 'dialog_type'}
+                    }
+                ),
+                # Fungsi untuk membersihkan dialog
+                'clear_dialog_area': lambda: clear_dialog_area(ui_components),
+                # Fungsi untuk mengecek visibilitas dialog
+                'is_dialog_visible': lambda: is_dialog_visible(ui_components),
+                'input_options': input_options,
+                'module_name': 'pretrained_models',
+                'config': config,
+                'ui_initialized': True
+            }
             
-            # 6. 💾 Save/Reset Buttons - shared component
-            save_reset_buttons = create_save_reset_buttons()
+            return ui_components
             
-            # 7. 📝 Log Output - shared component
-            log_output = widgets.Output(
-                layout=widgets.Layout(
-                    width='100%',
-                    min_height='100px',
-                    max_height='300px',
-                    border='1px solid #ddd',
-                    padding='10px'
-                )
-            )
-            log_accordion = create_log_accordion(
-                log_output=log_output,
-                title="📋 Pretrained Setup Logs",
-                selected_index=None
-            )
         except Exception as e:
-            error_msg = f"Gagal membuat komponen UI: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
-            return _create_fallback_ui(error_msg, sys.exc_info())
-        
-        # 8. 💬 Dialog Area (minimal)
-        confirmation_area = widgets.Output(layout=widgets.Layout(
-            border='1px solid #ddd',
-            padding='10px',
-            margin='10px 0',
-            display='none'
-        ))
-        
-        # 9. 📦 Main Container Assembly
-        main_container = widgets.VBox([
-            header,
-            status_panel,
-            progress_tracker,
-            input_options['container'],
-            action_buttons,
-            save_reset_buttons['container'],
-            log_accordion,
-            confirmation_area
-        ], layout=widgets.Layout(padding='10px', width='100%'))
-        
-        # 10. 🔧 Return Complete UI Components
-        ui_components = {
-            # Core UI
-            'ui': main_container,
-            'main_container': main_container,
-            
-            # Shared components
-            'header': header,
-            'status_panel': status_panel,
-            'progress_tracker': progress_tracker,
-            'log_output': log_output,
-            'log_accordion': log_accordion,
-            'confirmation_area': confirmation_area,
-            'dialog_area': confirmation_area,
-            
-            # Action buttons
-            'download_sync_button': download_sync_button,
-            'action_buttons': action_buttons,
-            
-            # Save/Reset (from shared component)
-            'save_button': save_reset_buttons['save_button'],
-            'reset_button': save_reset_buttons['reset_button'],
-            'save_reset_buttons': save_reset_buttons,
-            
-            # Input widgets (module-specific)
-            'models_dir_input': input_options.get('models_dir_input'),
-            'drive_models_dir_input': input_options.get('drive_models_dir_input'),
-            'pretrained_type_dropdown': input_options.get('pretrained_type_dropdown'),
-            'auto_download_checkbox': input_options.get('auto_download_checkbox'),
-            'sync_drive_checkbox': input_options.get('sync_drive_checkbox'),
-            'input_options': input_options,
-            
-            # Metadata
-            'module_name': 'pretrained_models',
-            'config': config,
-            'ui_initialized': True,
-            'api_integration': True,
-            'dialog_support': True,
-            'progress_tracking': True
-        }
-        
-        return ui_components
-        
-    except Exception as e:
-        error_msg = f"Gagal membuat UI components untuk pretrained_models: {str(e)}\n{traceback.format_exc()}"
-        logger.error(error_msg)
-        return _create_fallback_ui(error_msg, sys.exc_info())
+            error_msg = f"Gagal membuat komponen UI: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return _create_fallback_ui(
+                error_msg=error_msg,
+                exc_info=sys.exc_info(),
+                module_name=module_name
+            )
+    
+    # Gunakan try_operation_safe untuk error handling yang lebih baik
+    return try_operation_safe(
+        operation=_create_ui,
+        fallback_value={},
+        logger=logger,
+        operation_name="create_pretrained_ui_components",
+        exc_info=True,
+        on_error=lambda e, **kwargs: _create_fallback_ui(
+            error_msg=f"Gagal membuat UI components: {str(e)}",
+            exc_info=kwargs.get('exc_info'),
+            module_name=module_name
+        )
+    )
 
 def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[str, Any]:
     """Create minimal input options khusus pretrained (module-specific minimal UI)"""
@@ -342,70 +332,76 @@ def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[
             'container': widgets.HTML(f"<div style='color: red;'>Input options error: {str(e)}\n\n{error_trace}</div>")
         }
 
-def _create_fallback_ui(error_msg: str, exc_info: tuple = None) -> Dict[str, Any]:
-    """Create fallback UI with detailed error information
+def _create_fallback_ui(
+    error_msg: str, 
+    exc_info: Optional[Tuple[type, BaseException, Any]] = None,
+    module_name: str = "pretrained_ui",
+    show_traceback: bool = True,
+    retry_callback: Optional[Callable] = None
+) -> Dict[str, Any]:
+    """Create fallback UI with detailed error information and traceback
     
     Args:
         error_msg: Error message to display
         exc_info: Optional exception info tuple (type, value, traceback)
+        module_name: Name of the module where the error occurred
+        show_traceback: Whether to show the full traceback
+        retry_callback: Optional callback function for retry button
+        
+    Returns:
+        Dictionary containing the fallback UI components
     """
-    import traceback
-    import html
-    import sys
+    logger = get_logger(module_name)
     
-    # Format the error message and traceback
-    error_type = "Error"
-    error_traceback = ""
-    
+    # Log the error with traceback
     if exc_info:
-        ex_type, ex_value, ex_traceback = exc_info
-        error_type = ex_type.__name__
-        error_traceback = "".join(traceback.format_exception(ex_type, ex_value, ex_traceback))
+        logger.error(f"Error in {module_name}: {error_msg}", exc_info=exc_info)
+    else:
+        logger.error(f"Error in {module_name}: {error_msg}")
     
-    # Escape HTML special characters
-    safe_error_msg = html.escape(str(error_msg))
-    safe_traceback = html.escape(error_traceback) if error_traceback else "No traceback available"
+    # Format traceback if available
+    tb_msg = ""
+    if exc_info and show_traceback:
+        try:
+            tb_msg = "".join(traceback.format_exception(*exc_info))
+        except Exception as e:
+            tb_msg = f"Error getting traceback: {str(e)}"
     
-    # Create collapsible error details
-    error_widget = widgets.HTML(f"""
-        <div style='padding:20px;border:2px solid #dc3545;border-radius:8px;background:#f8d7da;color:#721c24;'>
-            <h4 style='margin-top:0;'>⚠️ Pretrained UI Creation Error: {error_type}</h4>
-            <p><strong>Error:</strong> {safe_error_msg}</p>
-            
-            <details style='margin-top:10px;'>
-                <summary style='cursor:pointer;color:#007bff;font-weight:bold;'>
-                    Show error details
-                </summary>
-                <div style='margin-top:10px;padding:10px;background:rgba(0,0,0,0.05);border-radius:4px;'>
-                    <pre style='white-space:pre-wrap;margin:0;overflow:auto;'>{safe_traceback}</pre>
-                </div>
-            </details>
-            
-            <div style='margin-top:15px;padding:10px;background:rgba(0,0,0,0.03);border-radius:4px;'>
-                <p style='margin:5px 0;'>💡 <strong>Tips:</strong></p>
-                <ul style='margin:5px 0 0 20px;padding:0;'>
-                    <li>Restart the kernel and try again</li>
-                    <li>Check if all required dependencies are installed</li>
-                    <li>Verify the configuration values</li>
-                    <li>Check the logs for more details</li>
-                </ul>
-            </div>
-        </div>
-    """)
+    # Create fallback configuration
+    config = FallbackConfig(
+        title=f"⚠️ Error in {module_name}",
+        message=error_msg,
+        traceback=tb_msg,
+        module_name=module_name,
+        show_traceback=show_traceback,
+        show_retry=retry_callback is not None,
+        retry_callback=retry_callback,
+        container_style={
+            'border': '1px solid #f5c6cb',
+            'border_radius': '8px',
+            'padding': '15px',
+            'margin': '10px 0',
+            'background': '#f8d7da',
+            'color': '#721c24'
+        }
+    )
     
-    return {
-        'ui': widgets.VBox([error_widget]),
-        'main_container': widgets.VBox([error_widget]),
-        'status': widgets.HTML(f"<div style='color:#dc3545;'>❌ {error_msg}</div>"),
-        'log_output': widgets.Output(),
-        'confirmation_area': widgets.Output(),
-        'dialog_area': widgets.Output(),
-        'download_sync_button': widgets.Button(description="Error", disabled=True),
-        'save_button': widgets.Button(description="Error", disabled=True),
-        'reset_button': widgets.Button(description="Error", disabled=True),
-        'progress_tracker': None,
-        'module_name': 'pretrained_models',
-        'ui_initialized': False,
-        'error': error_msg,
-        'fallback_mode': True
-    }
+    # Create help tips
+    help_tips = [
+        "Restart the kernel and try again",
+        "Check if all required dependencies are installed",
+        "Verify your configuration settings",
+        "Check the logs for more details"
+    ]
+    
+    # Add help tips to the message
+    if show_traceback:
+        config.message += "\n\nTroubleshooting tips:\n" + "\n".join(f"• {tip}" for tip in help_tips)
+    
+    # Create and return the fallback UI
+    return _create_fallback_ui(
+        error_message=config.message,
+        module_name=module_name,
+        exc_info=exc_info,
+        config=config
+    )

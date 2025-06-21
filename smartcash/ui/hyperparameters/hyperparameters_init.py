@@ -4,7 +4,7 @@
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
-from smartcash.ui.utils.fallback_utils import try_operation_safe, handle_ui_exception
+from smartcash.ui.utils.fallback_utils import try_operation_safe, create_fallback_ui, FallbackConfig
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,10 +26,13 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
         """Buat UI components untuk hyperparameters config dengan form dan layout"""
         return try_operation_safe(
             operation=lambda: self._create_ui_components(config, env, **kwargs),
-            fallback_value=handle_ui_exception(
-                error=Exception("Failed to create hyperparameters UI"),
+            fallback_value=create_fallback_ui(
+                error_message="Failed to create hyperparameters UI",
                 module_name=self.module_name,
-                logger=logger
+                config=FallbackConfig(
+                    title=f"⚠️ Error in {self.module_name}",
+                    module_name=self.module_name
+                )
             ),
             logger=logger,
             operation_name="creating hyperparameters UI components"
@@ -69,10 +72,13 @@ def initialize_hyperparameters_config():
     """Initialize hyperparameters configuration cell 🎯"""
     return try_operation_safe(
         operation=lambda: _initialize_hyperparameters_config(),
-        fallback_value=handle_ui_exception(
-            error=Exception("Failed to initialize hyperparameters config"),
+        fallback_value=create_fallback_ui(
+            error_message="Failed to initialize hyperparameters config",
             module_name='hyperparameters',
-            logger=logger
+            config=FallbackConfig(
+                title="⚠️ Error in hyperparameters",
+                module_name='hyperparameters'
+            )
         ),
         logger=logger,
         operation_name="initializing hyperparameters configuration"
@@ -105,10 +111,13 @@ def create_hyperparameters_config_cell():
             description='Configure training hyperparameters untuk SmartCash model',
             initializer_class=HyperparametersConfigInitializer
         ),
-        fallback_value=handle_ui_exception(
-            error=Exception("Failed to create hyperparameters config cell"),
+        fallback_value=create_fallback_ui(
+            error_message="Failed to create hyperparameters config cell",
             module_name='hyperparameters',
-            logger=logger
+            config=FallbackConfig(
+                title="⚠️ Error in hyperparameters",
+                module_name='hyperparameters'
+            )
         ),
         logger=logger,
         operation_name="creating hyperparameters config cell"

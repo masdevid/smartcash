@@ -1,55 +1,59 @@
 """
 File: smartcash/ui/pretrained/components/ui_components.py
-Deskripsi: UI components untuk pretrained module dengan correct imports
+Deskripsi: UI components untuk pretrained module mengikuti pattern preprocessing UI
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-def create_pretrained_main_ui(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create main UI untuk pretrained module dengan existing component imports"""
+def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create pretrained UI mengikuti pattern preprocessing UI"""
+    config = config or {}
+    
     try:
-        # Correct imports dari existing components
-        from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
-        from smartcash.ui.components.status_panel import create_status_panel
+        # Import dengan error handling sesuai preprocessing pattern
+        from smartcash.ui.utils.header_utils import create_header 
         from smartcash.ui.components.action_buttons import create_action_buttons
+        from smartcash.ui.components.status_panel import create_status_panel
+        from smartcash.ui.components.log_accordion import create_log_accordion
+        from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+        from smartcash.ui.components.progress_tracker import create_dual_progress_tracker
+        from smartcash.ui.pretrained.components.input_options import create_pretrained_input_options
         
-        # Extract config values
-        pretrained_config = config.get('pretrained_models', {})
-        models_config = pretrained_config.get('models', {})
-        yolov5_config = models_config.get('yolov5s', {})
-        efficientnet_config = models_config.get('efficientnet_b4', {})
+        # === CORE COMPONENTS ===
         
-        # Header
-        header = widgets.HTML(
-            value="<h3>🔽 <b>Setup Pretrained Models</b></h3>",
-            layout=widgets.Layout(margin='0 0 15px 0')
+        # Header dengan pattern yang sama seperti preprocessing
+        header = create_header(
+            "🔽 Pretrained Models Setup", 
+            "Download dan sync YOLOv5 + EfficientNet-B4 pretrained models",
+            "🚀"
         )
         
-        # Model URL inputs
-        yolov5_url_input = widgets.Text(
-            value=yolov5_config.get('url', 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt'),
-            placeholder='YOLOv5s model URL dari Ultralytics',
-            description='YOLOv5s URL:',
-            layout=widgets.Layout(width='100%', margin='5px 0'),
-            style={'description_width': '120px'}
+        # Status panel dengan initial message yang sama
+        status_panel = create_status_panel(
+            "🚀 Siap memulai setup pretrained models", 
+            "info"
         )
         
-        efficientnet_url_input = widgets.Text(
-            value=efficientnet_config.get('url', 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin'),
-            placeholder='EfficientNet-B4 model URL dari TIMM',
-            description='EfficientNet URL:',
-            layout=widgets.Layout(width='100%', margin='5px 0'),
-            style={'description_width': '120px'}
+        # Input options (akan dibuat sesuai kebutuhan pretrained)
+        input_options = create_pretrained_input_options(config)
+        
+        # Save/Reset buttons dengan pattern yang sama
+        save_reset_components = create_save_reset_buttons(
+            save_label="💾 Simpan",
+            reset_label="🔄 Reset", 
+            with_sync_info=True,
+            sync_message="Konfigurasi akan disinkronkan dengan Drive"
         )
         
-        # Input form container
-        input_form = widgets.VBox([
-            widgets.HTML("<p><b>📝 Model URLs Configuration:</b></p>"),
-            yolov5_url_input,
-            efficientnet_url_input,
-            widgets.HTML("<p><small>💡 Models akan disimpan di: <code>/data/pretrained</code></small></p>")
-        ], layout=widgets.Layout(margin='10px 0'))
+        # Action buttons untuk download/sync
+        action_components = create_action_buttons(
+            primary_label="🔽 Check, Download & Sync Models",
+            primary_icon="download",
+            secondary_buttons=[],
+            cleanup_enabled=False,
+            button_width='280px'
+        )
         
         # Progress tracker
         progress_tracker = create_dual_progress_tracker(
@@ -57,82 +61,134 @@ def create_pretrained_main_ui(config: Dict[str, Any]) -> Dict[str, Any]:
             auto_hide=True
         )
         
-        # Action buttons (using existing create_action_buttons)
-        action_buttons = create_action_buttons(
-            primary_label="🔽 Check, Download & Sync Models",
-            primary_icon="download",
-            secondary_buttons=[],  # No secondary button
-            cleanup_enabled=False,  # No cleanup needed
-            button_width='250px'
-        )
-        download_sync_button = action_buttons['download_button']
-        
-        # Status panel
-        status_panel = create_status_panel()
-        
-        # Log output
-        log_output = widgets.Output(
-            layout=widgets.Layout(
-                height='200px',
-                border='1px solid #ddd',
-                padding='10px',
-                margin='10px 0'
-            )
+        # Log accordion
+        log_components = create_log_accordion(
+            title="📝 Download & Sync Logs",
+            auto_scroll=True,
+            max_height='200px'
         )
         
-        # Simple confirmation area (no complex dialog needed)
+        # === LAYOUT ASSEMBLY ===
+        
+        # Configuration section
+        config_section = widgets.VBox([
+            input_options.get('main_container', widgets.HTML("Input options loading...")),
+            save_reset_components.get('container', widgets.HTML("Save/Reset loading..."))
+        ], layout=widgets.Layout(width='100%', margin='10px 0'))
+        
+        # Action section 
+        action_section = widgets.VBox([
+            action_components.get('main_container', widgets.HTML("Action buttons loading...")),
+            progress_tracker.get('container', widgets.HTML("Progress loading..."))
+        ], layout=widgets.Layout(width='100%', margin='10px 0'))
+        
+        # Confirmation area (sama seperti preprocessing)
         confirmation_area = widgets.Output(
             layout=widgets.Layout(
                 width='100%',
-                min_height='0px',
                 margin='10px 0',
-                padding='5px',
-                border='1px solid #e0e0e0',
-                border_radius='4px',
-                visibility='hidden'
+                border='1px solid #ddd',
+                padding='10px'
             )
         )
         
-        # Main layout
-        main_layout = widgets.VBox([
-            header,
-            input_form,
-            action_buttons['container'],
-            progress_tracker.container,
-            status_panel,
-            log_output,
-            confirmation_area
-        ], layout=widgets.Layout(
-            padding='20px',
-            border='1px solid #e1e4e8',
-            border_radius='6px',
-            background_color='#f6f8fa'
-        ))
+        # Progress container
+        progress_container = widgets.VBox([
+            progress_tracker.get('container', widgets.HTML(""))
+        ], layout=widgets.Layout(width='100%'))
         
-        return {
-            'ui': main_layout,
-            'yolov5_url_input': yolov5_url_input,
-            'efficientnet_url_input': efficientnet_url_input,
-            'input_form': input_form,
-            'download_sync_button': download_sync_button,
-            'progress_tracker': progress_tracker,
-            'progress_container': progress_tracker.container,
+        # Main UI container
+        main_ui = widgets.VBox([
+            header,
+            status_panel,
+            config_section,
+            action_section,
+            log_components.get('container', widgets.HTML("Log loading...")),
+            confirmation_area
+        ], layout=widgets.Layout(width='100%', padding='15px'))
+        
+        # === RETURN COMPONENTS ===
+        
+        # Helper function sama seperti preprocessing
+        def safe_extract(source_dict: Dict[str, Any], key: str, default=None):
+            """Safely extract dari nested dict"""
+            return source_dict.get(key, default) if source_dict else default
+        
+        ui_components = {
+            # MAIN UI
+            'ui': main_ui,
+            
+            # CORE BUTTONS
+            'download_sync_button': action_components.get('primary_button'), # Renamed untuk pretrained
+            'save_button': save_reset_components.get('save_button'),
+            'reset_button': save_reset_components.get('reset_button'),
+            'log_output': log_components.get('log_output'),
             'status_panel': status_panel,
-            'log_output': log_output,
-            'confirmation_area': confirmation_area,
+            
+            # UI SECTIONS
             'header': header,
-            'main_layout': main_layout
+            'input_options': input_options,
+            'config_section': config_section,
+            'action_section': action_section,
+            'confirmation_area': confirmation_area,
+            'dialog_area': confirmation_area,  # Alias
+            
+            # PROGRESS TRACKING
+            'progress_tracker': progress_tracker,
+            'progress_container': progress_container,
+            
+            # LOG COMPONENTS
+            'log_accordion': log_components.get('log_accordion'),
+            
+            # INPUT FORM COMPONENTS (pretrained specific)
+            'yolov5_url_input': safe_extract(input_options, 'yolov5_url_input'),
+            'efficientnet_url_input': safe_extract(input_options, 'efficientnet_url_input'),
+            'models_dir_input': safe_extract(input_options, 'models_dir_input'),
+            'drive_models_dir_input': safe_extract(input_options, 'drive_models_dir_input'),
+            
+            # METADATA
+            'module_name': 'pretrained',
+            'ui_initialized': True,
+            'models_dir': config.get('pretrained_models', {}).get('models_dir', '/content/models'),
+            'api_integration': True,
+            'dialog_support': True,
+            'progress_tracking': True
         }
+        
+        return ui_components
         
     except Exception as e:
-        # Fallback minimal UI
-        error_ui = widgets.VBox([
-            widgets.HTML(f"<h3>❌ Error creating UI: {str(e)}</h3>"),
-            widgets.HTML("<p>Please check imports and try again.</p>")
-        ])
+        # Fallback UI sama seperti preprocessing
+        error_msg = f"Error creating pretrained UI: {str(e)}"
+        print(f"⚠️ {error_msg}")
         
-        return {
-            'ui': error_ui,
-            'error': True,
-            'error_message': str(e)
-        }
+        return _create_fallback_ui(error_msg)
+
+def _create_fallback_ui(error_msg: str) -> Dict[str, Any]:
+    """Create minimal fallback UI sama seperti preprocessing"""
+    error_widget = widgets.HTML(f"""
+        <div style='padding:20px;border:2px solid #dc3545;border-radius:8px;background:#f8d7da;color:#721c24;'>
+            <h4>⚠️ UI Creation Error</h4>
+            <p>{error_msg}</p>
+            <small>💡 Try restarting the cell atau check dependencies</small>
+        </div>
+    """)
+    
+    log_output = widgets.Output()
+    confirmation_area = widgets.Output()
+    
+    return {
+        'ui': widgets.VBox([error_widget]),
+        'status_panel': widgets.HTML(f"<div style='color:#dc3545;'>❌ {error_msg}</div>"),
+        'log_output': log_output,
+        'log_accordion': widgets.Accordion(children=[log_output]),
+        'confirmation_area': confirmation_area,
+        'dialog_area': confirmation_area,
+        'progress_tracker': None,
+        'download_sync_button': widgets.Button(description="Error", disabled=True),
+        'save_button': widgets.Button(description="Error", disabled=True),
+        'reset_button': widgets.Button(description="Error", disabled=True),
+        'module_name': 'pretrained',
+        'ui_initialized': False,
+        'error': error_msg
+    }

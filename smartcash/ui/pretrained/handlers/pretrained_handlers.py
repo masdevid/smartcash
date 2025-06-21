@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/pretrained/handlers/pretrained_handlers.py
-Deskripsi: Event handlers untuk pretrained module dengan progress integration
+Deskripsi: Event handlers untuk pretrained module dengan progress integration - Fixed status panel update
 """
 
 import os
@@ -59,33 +59,32 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
                     models_dir = pretrained_config.get('models_dir', '/data/pretrained')
                     models_config = pretrained_config.get('models', {})
                     
-                    # Create models directory
+                    # Create models directory if not exists
                     os.makedirs(models_dir, exist_ok=True)
                     logger.info(f"📁 Models directory: {models_dir}")
                     
                     # Step 1: Check existing models
                     progress_tracker.update_overall(20, "🔍 Checking existing models...")
                     check_results = {}
+                    download_results = {}
+                    
                     for model_key, model_info in models_config.items():
-                        model_path = os.path.join(models_dir, model_info['filename'])
-                        exists = model_checker.check_model_exists(model_path)
-                        check_results[model_key] = {
-                            'exists': exists,
-                            'path': model_path,
-                            'info': model_info
-                        }
-                        logger.info(f"✅ {model_info['name']}: {'Found' if exists else 'Not found'}")
+                        logger.info(f"🔍 Checking {model_info['name']}...")
+                        result = model_checker.check_model(
+                            model_info['url'],
+                            models_dir,
+                            model_info.get('filename', f"{model_key}.pt"),
+                            model_info.get('min_size_mb', 1)
+                        )
+                        check_results[model_key] = result
+                        logger.info(f"📊 {model_info['name']}: {'✅ Ready' if result['available'] else '❌ Need download'}")
                     
                     # Step 2: Download missing models
-                    progress_tracker.update_overall(40, "⬇️ Downloading missing models...")
-                    download_results = {}
+                    progress_tracker.update_overall(50, "⬇️ Downloading missing models...")
                     for model_key, result in check_results.items():
-                        if not result['exists']:
-                            model_info = result['info']
-                            logger.info(f"📥 Downloading {model_info['name']}...")
-                            
-                            # Update progress per model
-                            progress_tracker.update_current(0, f"Downloading {model_info['name']}...")
+                        if not result['available']:
+                            model_info = models_config[model_key]
+                            logger.info(f"⬇️ Downloading {model_info['name']}...")
                             
                             download_success = model_downloader.download_model(
                                 model_info['url'],
@@ -117,19 +116,17 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
                     # Final results
                     progress_tracker.update_overall(100, "✅ Setup completed!")
                     
-                    # Update status
+                    # ✅ FIX: Update status panel menggunakan helper function
                     total_models = len(models_config)
                     successful_downloads = sum(1 for success in download_results.values() if success)
                     
                     if successful_downloads == total_models:
                         status_message = f"✅ All {total_models} models ready"
-                        if status_panel:
-                            status_panel.update_status(status_message, 'success')
+                        _update_status_panel_safe(status_panel, status_message, 'success')
                         progress_tracker.complete("All pretrained models ready for training!")
                     else:
                         status_message = f"⚠️ {successful_downloads}/{total_models} models ready"
-                        if status_panel:
-                            status_panel.update_status(status_message, 'warning')
+                        _update_status_panel_safe(status_panel, status_message, 'warning')
                         progress_tracker.complete(f"Setup completed with {total_models - successful_downloads} issues")
                     
                     logger.info(f"🎯 Final status: {status_message}")
@@ -139,8 +136,7 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
                 logger.error(f"❌ {error_msg}")
                 if progress_tracker:
                     progress_tracker.error(error_msg)
-                if status_panel:
-                    status_panel.update_status(error_msg, 'error')
+                _update_status_panel_safe(status_panel, error_msg, 'error')
         
         # Attach event handler
         if download_sync_button:
@@ -159,3 +155,62 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
     except Exception as e:
         logger.error(f"❌ Error setting up handlers: {str(e)}")
         return {}
+
+
+def _update_status_panel_safe(status_panel, message: str, status_type: str = 'info') -> None:
+    """
+    🔧 Helper function untuk update status panel dengan safe error handling
+    
+    Args:
+        status_panel: Widget HTML status panel
+        message: Pesan status
+        status_type: Tipe status ('info', 'success', 'warning', 'error')
+    """
+    if not status_panel:
+        logger.warning(f"⚠️ Status panel not found, logging: {message}")
+        return
+    
+    try:
+        # Import dan gunakan helper function yang sama dengan preprocessing UI
+        from smartcash.ui.utils.alert_utils import update_status_panel
+        update_status_panel(status_panel, message, status_type)
+        
+    except ImportError:
+        # Fallback: manual update HTML value
+        _manual_status_panel_update(status_panel, message, status_type)
+    except Exception as e:
+        logger.warning(f"⚠️ Error updating status panel: {str(e)}")
+        _manual_status_panel_update(status_panel, message, status_type)
+
+
+def _manual_status_panel_update(status_panel, message: str, status_type: str) -> None:
+    """Manual status panel update jika helper function tidak tersedia"""
+    try:
+        # Status type color mapping
+        colors = {
+            'info': {'bg': '#d1ecf1', 'text': '#0c5460', 'icon': 'ℹ️'},
+            'success': {'bg': '#d4edda', 'text': '#155724', 'icon': '✅'},
+            'warning': {'bg': '#fff3cd', 'text': '#856404', 'icon': '⚠️'},
+            'error': {'bg': '#f8d7da', 'text': '#721c24', 'icon': '❌'}
+        }
+        
+        style_info = colors.get(status_type, colors['info'])
+        
+        # Update HTML value directly
+        status_panel.value = f"""
+        <div style="
+            padding: 10px;
+            background-color: {style_info['bg']};
+            color: {style_info['text']};
+            border-radius: 4px;
+            margin: 5px 0;
+            border-left: 4px solid {style_info['text']};
+        ">
+            <p style="margin: 5px 0">{style_info['icon']} {message}</p>
+        </div>"""
+        
+    except Exception as e:
+        logger.error(f"❌ Error manual status update: {str(e)}")
+        # Last resort: simple text update
+        if hasattr(status_panel, 'value'):
+            status_panel.value = f"<p>{message}</p>"

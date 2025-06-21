@@ -61,6 +61,26 @@ class PretrainedConfigHandler(BaseConfigHandler):
             self.logger.error(f"❌ Error extracting config: {str(e)}")
             return self.get_default_config()
     
+    def _get_widget_value(self, ui_components: Dict[str, Any], key: str, default=None):
+        """Helper untuk extract widget value dengan safe handling"""
+        try:
+            widget = ui_components.get(key)
+            if widget and hasattr(widget, 'value'):
+                return widget.value
+            return default
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error getting {key}: {str(e)}")
+            return default
+    
+    def _set_widget_value(self, ui_components: Dict[str, Any], key: str, value):
+        """Helper untuk set widget value dengan safe handling"""
+        try:
+            widget = ui_components.get(key)
+            if widget and hasattr(widget, 'value'):
+                widget.value = value
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error setting {key}: {str(e)}")
+    
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
         """Update UI dengan config values"""
         try:
@@ -96,4 +116,26 @@ class PretrainedConfigHandler(BaseConfigHandler):
             return get_default_pretrained_config()
         except Exception as e:
             self.logger.error(f"❌ Error loading defaults: {str(e)}")
-            
+            # Fallback config jika defaults.py tidak tersedia
+            return {
+                'pretrained_models': {
+                    'models_dir': '/data/pretrained',
+                    'drive_models_dir': '/content/drive/MyDrive/SmartCash/pretrained',
+                    'models': {
+                        'yolov5s': {
+                            'name': 'YOLOv5s',
+                            'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
+                            'filename': 'yolov5s.pt',
+                            'min_size_mb': 10,
+                            'description': 'Object detection backbone'
+                        },
+                        'efficientnet_b4': {
+                            'name': 'EfficientNet-B4',
+                            'url': 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin',
+                            'filename': 'efficientnet_b4_huggingface.bin',
+                            'min_size_mb': 60,
+                            'description': 'Feature extraction backbone'
+                        }
+                    }
+                }
+            }

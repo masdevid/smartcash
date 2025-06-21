@@ -163,9 +163,14 @@ def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[
             style={'description_width': '120px'}
         )
         
+        # Ensure pretrained_type is a string, not a list
+        pretrained_type = pretrained_config.get('pretrained_type', 'yolov5s')
+        if isinstance(pretrained_type, (list, tuple)) and len(pretrained_type) > 0:
+            pretrained_type = pretrained_type[0]  # Take first item if it's a list
+            
         pretrained_type_dropdown = widgets.Dropdown(
             options=['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x'],
-            value=pretrained_config.get('pretrained_type', 'yolov5s'),
+            value=str(pretrained_type),
             description='Model Type:',
             style={'description_width': '120px'}
         )

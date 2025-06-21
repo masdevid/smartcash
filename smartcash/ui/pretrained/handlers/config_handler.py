@@ -25,10 +25,16 @@ class PretrainedConfigHandler(ConfigHandler):
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """🔍 Extract dengan fallback ke defaults"""
         defaults = get_default_pretrained_config()['pretrained_models']
-        return {'pretrained_models': {
-            config_key: getattr(ui_components.get(widget_key), 'value', defaults[config_key])
-            for config_key, widget_key in self.config_mapping.items()
-        }}
+        config = {}
+        
+        for config_key, widget_key in self.config_mapping.items():
+            value = getattr(ui_components.get(widget_key), 'value', defaults.get(config_key, ''))
+            # Ensure pretrained_type is a string, not a list
+            if config_key == 'pretrained_type' and isinstance(value, (list, tuple)) and len(value) > 0:
+                value = value[0]
+            config[config_key] = str(value) if value is not None else ''
+            
+        return {'pretrained_models': config}
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """📝 Update dengan safe access"""

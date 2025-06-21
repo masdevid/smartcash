@@ -3,6 +3,7 @@ File: smartcash/ui/utils/fallback_utils.py
 Deskripsi: Centralized fallback utilities with traceback support for UI components
 """
 
+import html
 import ipywidgets as widgets
 import importlib
 import traceback
@@ -39,7 +40,10 @@ def import_with_fallback(module_path: str, fallback_value: Any = None) -> Any:
     """Import modul dengan fallback - one-liner style"""
     try:
         parts = module_path.split('.')
-        return getattr(importlib.import_module('.'.join(parts[:-1])), parts[-1]) if '.' in module_path else importlib.import_module(module_path)
+        if '.' in module_path:
+            module = importlib.import_module('.'.join(parts[:-1]))
+            return getattr(module, parts[-1])
+        return importlib.import_module(module_path)
     except (ImportError, AttributeError):
         return fallback_value
 
@@ -67,6 +71,7 @@ class FallbackLogger:
             import traceback
             traceback.print_exc()
 
+
 def get_safe_logger(module_name: str = None) -> Any:
     """Get logger dengan fallback jika tidak tersedia"""
     logger = import_with_fallback('smartcash.common.logger.get_logger', lambda x=None: FallbackLogger(x))(module_name)
@@ -78,8 +83,10 @@ def get_safe_logger(module_name: str = None) -> Any:
 
 def get_safe_status_widget(ui_components: Dict[str, Any]) -> Any:
     """Get widget output status dengan fallback pattern"""
-    return next((ui_components[key] for key in ['status', 'output', 'log_output'] 
-                if key in ui_components and hasattr(ui_components[key], 'clear_output')), None)
+    for key in ['status', 'output', 'log_output']:
+        if key in ui_components and hasattr(ui_components[key], 'clear_output'):
+            return ui_components[key]
+    return None
 
 
 def create_status_message(message: str, title: str = 'Status', status_type: str = 'info', show_icon: bool = True) -> str:
@@ -103,7 +110,7 @@ def create_status_message(message: str, title: str = 'Status', status_type: str 
     <div style="padding:8px 12px; background-color:{style['bg_color']}; 
                color:{style['text_color']}; border-radius:4px; margin:5px 0;
                border-left:4px solid {style['text_color']};">
-        <h4 style="margin:0 0 5px 0; color:{style['text_color']};">{title}</h4>
+        <h4 style="margin:0 0 5px 0; color:{style['text_color']};">{icon} {title}</h4>
         <p style="margin:3px 0">{message}</p>
     </div>
     """
@@ -116,99 +123,148 @@ def create_fallback_ui(
     exc_info: Optional[Tuple] = None,
     config: Optional[FallbackConfig] = None
 ) -> Dict[str, Any]:
-    """Create fallback UI dengan existing alert template compatibility"""
+    """Create fallback UI dengan existing alert compatibility"""
     logger = get_safe_logger('fallback_ui')
     
-    # Initialize config with defaults if not provided
-    if config is None:
-        config = FallbackConfig()
+    try:
+        # Initialize config with defaults if not provided
+        if config is None:
+            config = FallbackConfig()
+        
+        # Update config with provided values
+        config.message = str(error_message) or config.message
+        config.module_name = str(module_name) or config.module_name
+        
+        # Get traceback if not provided but exception info is available
+        if exc_info and not config.traceback:
+            try:
+                if exc_info[0] is not None and exc_info[1] is not None:
+                    config.traceback = ''.join(traceback.format_exception(*exc_info))
+                else:
+                    config.traceback = "No exception information available"
+            except Exception as tb_error:
+                config.traceback = f"Failed to generate traceback: {str(tb_error)}"
+        
+        logger.error(f"Creating fallback UI for {config.module_name}: {config.message}")
+        if config.traceback:
+            logger.error(f"Traceback:\n{config.traceback}")
+        
+        # Create error details section
+        error_details = [
+            f"<div style='margin-bottom: 10px;'><strong>Module:</strong> {html.escape(config.module_name)}</div>",
+            f"<div style='margin-bottom: 10px;'><strong>Error:</strong> {html.escape(str(config.message))}</div>"
+        ]
+        
+        if config.show_traceback and config.traceback:
+            error_details.extend([
+                "<hr style='margin: 10px 0; border: 0; border-top: 1px solid #f5c6cb;'>",
+                "<div style='margin-bottom: 5px;'><strong>Error Details:</strong></div>",
+                f"<pre style='background: rgba(0,0,0,0.05); padding: 10px; border-radius: 4px; overflow-x: auto; margin: 0; white-space: pre-wrap;'>"
+                f"{html.escape(config.traceback) if isinstance(config.traceback, str) else str(config.traceback)}"
+                "</pre>"
+            ])
     
-    # Update config with provided values
-    config.message = error_message or config.message
-    config.module_name = module_name or config.module_name
-    
-    # Get traceback if not provided but exception info is available
-    if exc_info and not config.traceback:
+        # Create action buttons
+        buttons = []
+        if config.show_retry and config.retry_callback:
+            try:
+                retry_button = widgets.Button(
+                    description="🔄 Retry",
+                    button_style='warning',
+                    layout=widgets.Layout(width='100px')
+                )
+                retry_button.on_click(lambda _: config.retry_callback())
+                buttons.append(retry_button)
+            except Exception as btn_error:
+                logger.error(f"Failed to create retry button: {str(btn_error)}")
+        
+        # Prepare error details HTML
+        error_details_html = "".join(error_details)
+        
+        # Create the error widget
         try:
-            config.traceback = ''.join(traceback.format_exception(*exc_info))
-        except:
-            config.traceback = "Failed to generate traceback"
-    
-    logger.error(f"Creating fallback UI for {config.module_name}: {config.message}")
-    
-    # Create error details section
-    error_details = [
-        f"<strong>Module:</strong> {config.module_name}",
-        f"<strong>Error:</strong> {config.message}"
-    ]
-    
-    if config.show_traceback and config.traceback:
-        error_details.extend([
-            "<hr style='margin: 10px 0; border: 0; border-top: 1px solid #f5c6cb;'>",
-            "<strong>Details:</strong>",
-            f"<pre style='background: rgba(0,0,0,0.05); padding: 10px; border-radius: 4px; overflow-x: auto;'>{config.traceback}</pre>"
-        ])
-    
-    # Create action buttons
-    buttons = []
-    if config.show_retry and config.retry_callback:
-        retry_button = widgets.Button(
-            description="🔄 Retry",
-            button_style='warning',
-            layout=widgets.Layout(width='100px')
-        )
-        retry_button.on_click(lambda _: config.retry_callback())
-        buttons.append(retry_button)
-    
-    # Prepare error details HTML
-    error_details_html = "<br>".join(error_details)
-    
-    # Create the error widget
-    error_widget = widgets.VBox(
-        [
-            widgets.HTML(
-                f"""
-                <div style="padding: 10px; border-radius: 4px;">
-                    <h4 style="margin: 0 0 10px 0; color: #721c24;">
-                        {config.title}
-                    </h4>
-                    <div style="margin-bottom: 10px;">
-                        {error_details_html}
-                    </div>
-                </div>
-                """
-            ),
-            widgets.HBox(buttons) if buttons else widgets.HTML("")
-        ],
-        layout=widgets.Layout(
-            width='100%',
-            **{k: v for k, v in config.container_style.items() if k != 'margin'}
-        )
-    )
-    
-    # Update status panel if available
-    if ui_components and 'status' in ui_components:
+            error_widget = widgets.VBox(
+                [
+                    widgets.HTML(
+                        f"""
+                        <div style="padding: 15px; border-radius: 4px; {config.container_style.get('border', '')};
+                            background: {config.container_style.get('background', '#f8d7da')};
+                            color: {config.container_style.get('color', '#721c24')};">
+                            <h4 style="margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.1);">
+                                {config.title}
+                            </h4>
+                            <div style="font-family: monospace;">
+                                {error_details_html}
+                            </div>
+                        </div>
+                        """
+                    ),
+                    widgets.HBox(buttons) if buttons else widgets.HTML("")
+                ],
+                layout=widgets.Layout(
+                    width='100%',
+                    **{k: v for k, v in config.container_style.items() if k != 'margin'}
+                )
+            )
+        except Exception as widget_error:
+            logger.error(f"Failed to create error widget: {str(widget_error)}")
+            # Create a minimal fallback widget
+            error_widget = widgets.HTML(
+                f"<div style='padding: 10px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px;'>"
+                f"<strong>Error in {html.escape(config.module_name)}:</strong> {html.escape(str(config.message))}"
+                "</div>"
+            )
+        
+        # Update status panel if available
+        status_widget = None
+        if ui_components:
+            try:
+                if 'status' in ui_components:
+                    with ui_components['status']:
+                        display(HTML(
+                            f"<div style='color: #721c24; font-family: monospace; white-space: pre;'>"
+                            f"<strong>Error in {html.escape(config.module_name)}:</strong> {html.escape(str(config.message))}"
+                            f"</div>"
+                        ))
+            except Exception as status_error:
+                logger.error(f"Failed to update status panel: {str(status_error)}")
+        
+        # Create status widget for the return value
         try:
-            with ui_components['status']:
-                display(HTML(
-                    f"<div style='color: #721c24;'>"
-                    f"<strong>Error in {config.module_name}:</strong> {config.message}"
-                    f"</div>"
-                ))
-        except Exception as e:
-            logger.error(f"Failed to update status panel: {str(e)}")
-    
-    return {
-        'ui': error_widget,
-        'error': config.message,
-        'status': widgets.HTML(f"<div style='color: #721c24;'>{config.message}</div>"),
-        'fallback_mode': True,
-        'error_details': {
-            'module': config.module_name,
-            'message': config.message,
-            'traceback': config.traceback if config.show_traceback else None
+            status_widget = widgets.HTML(
+                f"<div style='color: #721c24; font-family: monospace; white-space: pre;'>"
+                f"{html.escape(str(config.message))}"
+                "</div>"
+            )
+        except Exception:
+            status_widget = widgets.HTML("<div>Error occurred</div>")
+        
+        return {
+            'ui': error_widget,
+            'error': str(config.message),
+            'status': status_widget,
+            'fallback_mode': True,
+            'error_details': {
+                'module': str(config.module_name),
+                'message': str(config.message),
+                'traceback': str(config.traceback) if config.show_traceback and config.traceback else None
+            }
         }
-    }
+        
+    except Exception as ui_error:
+        logger.error(f"Critical error in create_fallback_ui: {str(ui_error)}\n{traceback.format_exc()}")
+        # Return minimal fallback UI
+        return {
+            'ui': widgets.HTML(f"<div style='padding:10px;color:red'>Error: {html.escape(str(ui_error))}</div>"),
+            'error': str(ui_error),
+            'status': widgets.HTML(f"<div>Error: {html.escape(str(ui_error))}</div>"),
+            'fallback_mode': True,
+            'error_details': {
+                'module': 'fallback_ui',
+                'message': f'Failed to create fallback UI: {str(ui_error)}',
+                'traceback': traceback.format_exc()
+            }
+        }
 
 
 def create_error_ui(error_message: str, module_name: str = "module") -> widgets.HTML:

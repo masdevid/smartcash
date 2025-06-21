@@ -17,7 +17,6 @@ class PretrainedInitializer(CommonInitializer):
     def __init__(self):
         super().__init__(
             module_name='pretrained_models',
-            config_filename='pretrained_config.yaml',
             config_handler_class=PretrainedConfigHandler
         )
     

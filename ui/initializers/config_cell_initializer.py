@@ -9,6 +9,7 @@ from unittest import result
 import ipywidgets as widgets
 import sys
 from IPython.display import display
+import traceback
 
 from smartcash.common.config.manager import get_config_manager
 from smartcash.common.logger import get_logger
@@ -56,12 +57,17 @@ class ConfigCellInitializer(ABC):
         Returns:
             Dictionary berisi komponen UI fallback
         """
-        from smartcash.ui.utils.fallback_utils import create_init_fallback_ui
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
         
-        return create_init_fallback_ui(
-            error_msg=error_msg,
+        return create_fallback_ui(
+            error_message=error_msg,
             module_name=self.module_name,
-            exc_info=exc_info
+            exc_info=exc_info,
+            config=FallbackConfig(
+                title=f"⚠️ Error in {self.module_name}",
+                module_name=self.module_name,
+                traceback=traceback.format_exc() if exc_info else ""
+            )
         )
     
     def initialize(self, env=None, config=None, **kwargs) -> Any:

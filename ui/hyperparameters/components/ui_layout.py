@@ -80,15 +80,6 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         border_radius='8px', background_color='#fafbfc'
     ))
     
-    # Add button container to the layout
-    button_container = widgets.HBox([
-        form_components['save_button'],
-        form_components['reset_button']
-    ], layout=widgets.Layout(justify_content='flex-end', margin='10px 0'))
-    
-    # Add button container to the main container
-    main_container.children = list(main_container.children) + [button_container]
-    
     # Return components untuk akses dari handler
     return {
         'main_container': main_container,

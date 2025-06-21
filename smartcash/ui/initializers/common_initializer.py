@@ -184,9 +184,8 @@ class CommonInitializer(ABC):
             Dictionary berisi komponen UI fallback
         """
         from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
-        
-        return create_fallback_ui(
-            message=error_msg,
+        result = create_fallback_ui(
+            error_message=error_msg,
             module_name=self.module_name,
             exc_info=exc_info,
             config=FallbackConfig(
@@ -195,6 +194,11 @@ class CommonInitializer(ABC):
                 traceback=traceback.format_exc() if exc_info else ""
             )
         )
+        
+        # Tampilkan UI dan kembalikan result
+        from IPython.display import display
+        display(result['ui'])
+        return result 
     
     def _add_logger_to_components(self, ui_components: Dict[str, Any], logger_bridge) -> None:
         """Tambahkan logger ke UI components dengan timestamp"""

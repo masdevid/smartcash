@@ -74,12 +74,20 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
     save_reset_buttons = create_save_reset_buttons()
     status_panel = create_status_panel()
     
+    # Create button container
+    button_container = widgets.HBox([
+        save_reset_buttons['save_button'],
+        save_reset_buttons['reset_button']
+    ], layout=widgets.Layout(justify_content='flex-end', margin='10px 0'))
+    
     # Combine all widgets dengan one-liner spread
     return {
         **training_widgets, **optimizer_widgets, **scheduler_widgets, 
         **loss_widgets, **control_widgets,
         'summary_cards': summary_cards,
-        'save_reset_buttons': save_reset_buttons,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_button': save_reset_buttons['reset_button'],
+        'button_container': button_container,
         'status_panel': status_panel
     }
 

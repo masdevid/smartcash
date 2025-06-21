@@ -170,9 +170,61 @@ class CommonInitializer(ABC):
     
     @abstractmethod
     def _get_critical_components(self) -> List[str]:
-        pass
+        """Daftar nama komponen kritis yang harus ada"""
+        return []
+        
+    def _create_fallback_ui(self, error_msg: str, exc_info=None) -> Dict[str, Any]:
+        """Membuat fallback UI dengan error handling yang sederhana
+        
+        Args:
+            error_msg: Pesan error yang akan ditampilkan
+            exc_info: Optional exception info tuple (type, value, traceback)
+            
+        Returns:
+            Dictionary berisi komponen UI fallback
+        """
+        import ipywidgets as widgets
+        from IPython.display import display, HTML
+        
+        # Buat widget error
+        error_widget = widgets.HTML(
+            f"""
+            <div style="
+                padding: 15px;
+                margin: 10px 0;
+                border: 1px solid #f5c6cb;
+                border-radius: 4px;
+                background-color: #f8d7da;
+                color: #721c24;
+            ">
+                <h4 style="margin-top: 0; color: #721c24;">⚠️ Error in {self.module_name}</h4>
+                <p style="margin-bottom: 0;">{error_msg}</p>
+            </div>
+            """
+        )
+        
+        # Tampilkan traceback jika ada
+        if exc_info:
+            import traceback
+            tb_widget = widgets.Output()
+            with tb_widget:
+                traceback.print_exception(*exc_info)
+            
+            # Gabungkan widget error dengan traceback
+            container = widgets.VBox([error_widget, tb_widget])
+        else:
+            container = error_widget
+        
+        # Tampilkan widget
+        display(container)
+        
+        return {
+            'ui': container,
+            'error': error_msg,
+            'status': widgets.HTML(f'<div style="color: #721c24;">{error_msg}</div>'),
+            'fallback_mode': True
+        }
     
-    # Helper methods dengan one-liner style
     def _add_logger_to_components(self, ui_components: Dict[str, Any], logger_bridge) -> None:
         """Tambahkan logger ke UI components dengan timestamp"""
         ui_components.update({

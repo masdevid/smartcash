@@ -181,57 +181,8 @@ class PretrainedInitializer(CommonInitializer):
         except Exception as e:
             logger.warning(f"Post-init hook error: {str(e)}")
 
-    def _create_fallback_ui(self, error_msg: str, exc_info=None) -> Dict[str, Any]:
-        """Return fallback UI dengan error handling yang sederhana
-        
-        Args:
-            error_msg: Pesan error yang akan ditampilkan
-            exc_info: Optional exception info tuple (type, value, traceback)
-            
-        Returns:
-            Dictionary berisi komponen UI fallback
-        """
-        import ipywidgets as widgets
-        from IPython.display import display, HTML
-        
-        # Buat widget error
-        error_widget = widgets.HTML(
-            f"""
-            <div style="
-                padding: 15px;
-                margin: 10px 0;
-                border: 1px solid #f5c6cb;
-                border-radius: 4px;
-                background-color: #f8d7da;
-                color: #721c24;
-            ">
-                <h4 style="margin-top: 0; color: #721c24;">⚠️ Error</h4>
-                <p style="margin-bottom: 0;">{error_msg}</p>
-            </div>
-            """
-        )
-        
-        # Tampilkan traceback jika ada
-        if exc_info:
-            import traceback
-            tb_widget = widgets.Output()
-            with tb_widget:
-                traceback.print_exception(*exc_info)
-            
-            # Gabungkan widget error dengan traceback
-            container = widgets.VBox([error_widget, tb_widget])
-        else:
-            container = error_widget
-        
-        # Tampilkan widget
-        display(container)
-        
-        return {
-            'ui': container,
-            'error': error_msg,
-            'status': widgets.HTML(f'<div style="color: #721c24;">{error_msg}</div>'),
-            'fallback_mode': True
-        }
+    # Method _create_fallback_ui sudah dipindahkan ke CommonInitializer
+    # untuk memastikan konsistensi di semua modul
 
 # Global instance
 _pretrained_initializer = PretrainedInitializer()
@@ -257,9 +208,5 @@ def initialize_pretrained_ui(env=None, config=None, **kwargs):
     except Exception as e:
         error_msg = f"Gagal menginisialisasi UI pretrained: {str(e)}"
         logger.exception(error_msg)
-        fallback_ui = _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())
-        # Tampilkan fallback UI
-        if fallback_ui and 'ui' in fallback_ui and fallback_ui['ui'] is not None:
-            from IPython.display import display
-            display(fallback_ui['ui'])
-        return fallback_ui
+        # _create_fallback_ui sudah menangani penampilan UI
+        return _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())

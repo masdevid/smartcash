@@ -92,7 +92,8 @@ def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
             'Optimizer:'
         ),
         'scheduler_dropdown': create_dropdown(
-            training.get('scheduler', 'cosine'),
+            training.get('scheduler', {}).get('type', 'cosine') if isinstance(training.get('scheduler'), dict) 
+            else training.get('scheduler', 'cosine'),
             ['cosine', 'step', 'plateau'],
             'Scheduler:'
         ),

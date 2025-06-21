@@ -9,18 +9,6 @@ from .constants import (
     REQUIRED_FOLDERS, CONFIG_TEMPLATES, ESSENTIAL_CONFIGS,
     PROGRESS_RANGES, STATUS_MESSAGES, PROGRESS_MESSAGES
 )
-
-__all__ = [
-    'create_env_config_component',
-    'initialize_env_config_ui',
-    'initialize_environment_config_ui',
-    'REQUIRED_FOLDERS', 
-    'CONFIG_TEMPLATES', 
-    'ESSENTIAL_CONFIGS',
-    'PROGRESS_RANGES', 
-    'STATUS_MESSAGES', 
-    'PROGRESS_MESSAGES'
-]
 from .utils import (
     update_progress_safe, hide_progress_safe, show_progress_safe,
     complete_progress_safe, error_progress_safe, reset_progress_safe,
@@ -29,12 +17,29 @@ from .utils import (
 
 # Main exports
 __all__ = [
+    # Component exports
     'create_env_config_component',
-    'REQUIRED_FOLDERS', 'CONFIG_TEMPLATES', 'ESSENTIAL_CONFIGS',
-    'STATUS_MESSAGES', 'PROGRESS_MESSAGES',
-    'update_progress_safe', 'hide_progress_safe', 'show_progress_safe',
-    'complete_progress_safe', 'error_progress_safe', 'reset_progress_safe',
-    'is_colab_environment', 'test_drive_readiness', 'validate_setup_integrity'
+    'initialize_env_config_ui',
+    'initialize_environment_config_ui',
+    
+    # Constants
+    'REQUIRED_FOLDERS',
+    'CONFIG_TEMPLATES',
+    'ESSENTIAL_CONFIGS',
+    'PROGRESS_RANGES',
+    'STATUS_MESSAGES',
+    'PROGRESS_MESSAGES',
+    
+    # Utils
+    'update_progress_safe',
+    'hide_progress_safe',
+    'show_progress_safe',
+    'complete_progress_safe',
+    'error_progress_safe',
+    'reset_progress_safe',
+    'is_colab_environment',
+    'test_drive_readiness',
+    'validate_setup_integrity'
 ]
 
 # Version info

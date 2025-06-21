@@ -91,26 +91,38 @@ class ConfigCellInitializer(ABC):
     def initialize(self, env=None, config=None, **kwargs) -> Any:
         """Optimized initialization dengan proper error handling"""
         try:
+            self.logger.debug(f"Memulai inisialisasi {self.module_name}...")
             suppress_all_outputs()
             
             # Load config menggunakan ConfigHandler
-            config = config or self.config_handler.load_config(self.config_filename)
+            self.logger.debug(f"Mencoba load config untuk {self.config_filename}...")
+            if config is None:
+                self.logger.debug("Config tidak disediakan, memuat dari config handler...")
+                config = self.config_handler.load_config(self.config_filename)
+                self.logger.debug(f"Config berhasil dimuat: {config is not None}")
+            else:
+                self.logger.debug("Menggunakan config yang disediakan")
             
             # Create UI components
+            self.logger.debug("Membuat komponen UI...")
             ui_components = self._create_config_ui(config, env, **kwargs)
             
             if not self._validate_ui(ui_components):
+                self.logger.warning("Validasi UI gagal, membuat fallback UI...")
                 fallback = self._create_fallback_ui("Komponen yang diperlukan tidak ditemukan")
                 return fallback.get('ui', fallback)
             
             # Add config handler dan setup handlers
+            self.logger.debug("Menyiapkan handler...")
             ui_components['config_handler'] = self.config_handler
             self._setup_handlers_with_config_handler(ui_components, config)
             
             show_status_safe(f"{self.module_name.capitalize()} siap digunakan", "success", ui_components)
             
             # Kembalikan main_container jika ada, jika tidak kembalikan ui_components
-            return ui_components.get('main_container', ui_components)
+            result = ui_components.get('main_container', ui_components)
+            self.logger.debug("Inisialisasi selesai")
+            return result
             
         except Exception as e:
             error_msg = f"❌ Gagal menginisialisasi {self.module_name}: {str(e)}"

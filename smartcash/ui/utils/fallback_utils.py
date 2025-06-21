@@ -345,70 +345,11 @@ def safe_operation(operation_func, fallback_value=None, error_handler=None):
         return fallback_value
 
 
-def create_init_fallback_ui(
-    error_msg: str,
-    module_name: str,
-    exc_info: Optional[Tuple] = None,
-    ui_components: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """Buat fallback UI yang konsisten untuk initializer
-    
-    Args:
-        error_msg: Pesan error yang akan ditampilkan
-        module_name: Nama modul untuk ditampilkan
-        exc_info: Optional exception info tuple (type, value, traceback)
-        ui_components: Komponen UI yang ada (opsional)
-        
-    Returns:
-        Dictionary berisi komponen UI fallback
-    """
-    import ipywidgets as widgets
-    from IPython.display import display
-    
-    # Buat widget error
-    error_widget = widgets.HTML(
-        f"""
-        <div style="
-            padding: 15px;
-            margin: 10px 0;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-            background-color: #f8d7da;
-            color: #721c24;
-        ">
-            <h4 style="margin-top: 0; color: #721c24;">⚠️ Error in {module_name}</h4>
-            <p style="margin-bottom: 0;">{error_msg}</p>
-        </div>
-        """
-    )
-    
-    # Tampilkan traceback jika ada
-    if exc_info:
-        import traceback
-        tb_widget = widgets.Output()
-        with tb_widget:
-            traceback.print_exception(*exc_info)
-        
-        # Gabungkan widget error dengan traceback
-        container = widgets.VBox([error_widget, tb_widget])
-    else:
-        container = error_widget
-    
-    # Kembalikan widget tanpa menampilkannya langsung
-    # Biarkan caller yang menangani penampilan widget
-    return {
-        'ui': container,
-        'error': error_msg,
-        'status': widgets.HTML(f'<div style="color: #721c24;">{error_msg}</div>'),
-        'fallback_mode': True
-    }
-
 # One-liner utilities untuk common patterns
 safe_import = lambda path, default=None: import_with_fallback(path, default)
 safe_getattr = lambda obj, attr, default=None: getattr(obj, attr, default) if obj else default
 safe_call = lambda func, *args, default=None, **kwargs: try_operation_safe(lambda: func(*args, **kwargs), default)
 safe_display = lambda widget: display(widget) if widget else None
-safe_update = lambda widget, attr, value: try_operation_safe(lambda: setattr(widget, attr, value), silent_fail=True)
 create_info_message = lambda msg: create_status_message(msg, status_type='info')
 create_success_message = lambda msg: create_status_message(msg, status_type='success')
 create_error_message = lambda msg: create_status_message(msg, status_type='error')

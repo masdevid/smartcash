@@ -184,17 +184,26 @@ class CommonInitializer(ABC):
             Dictionary berisi komponen UI fallback
         """
         from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
-        result = create_fallback_ui(
-            error_message=error_msg,
+        import traceback
+        
+        # Dapatkan traceback jika tersedia
+        tb_str = ""
+        if exc_info and len(exc_info) > 2:
+            tb_str = ''.join(traceback.format_exception(*exc_info))
+            
+        # Buat config untuk fallback UI
+        fallback_config = FallbackConfig(
+            title=f"⚠️ Error in {self.module_name}",
             module_name=self.module_name,
-            exc_info=exc_info,
-            config=FallbackConfig(
-                title=f"⚠️ Error in {self.module_name}",
-                module_name=self.module_name,
-                traceback=traceback.format_exc() if exc_info else ""
-            )
+            traceback=tb_str
         )
-        return result 
+        
+        # Buat dan kembalikan fallback UI
+        return create_fallback_ui(
+            error_message=error_msg,
+            exc_info=exc_info,
+            config=fallback_config
+        )
     
     def _add_logger_to_components(self, ui_components: Dict[str, Any], logger_bridge) -> None:
         """Tambahkan logger ke UI components dengan timestamp"""

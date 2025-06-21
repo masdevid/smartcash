@@ -3,6 +3,8 @@ File: smartcash/ui/dataset/split/split_init.py
 Deskripsi: Config cell untuk split dataset dengan arsitektur yang diperbaharui menggunakan ConfigCellInitializer
 """
 
+import sys
+import traceback
 from typing import Dict, Any, Optional
 from IPython.display import display
 
@@ -18,18 +20,36 @@ class SplitConfigInitializer(ConfigCellInitializer):
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components untuk split config"""
-        from smartcash.ui.dataset.split.components.ui_form import create_split_form
-        from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
-        from smartcash.ui.dataset.split.handlers.slider_handlers import setup_slider_handlers
-        
-        form_components = create_split_form(config)
-        layout_components = create_split_layout(form_components)
-        ui_components = {**form_components, **layout_components}
-        
-        # Setup custom slider handlers
-        setup_slider_handlers(ui_components)
-        
-        return ui_components
+        try:
+            from smartcash.ui.dataset.split.components.ui_form import create_split_form
+            from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
+            from smartcash.ui.dataset.split.handlers.slider_handlers import setup_slider_handlers
+            
+            form_components = create_split_form(config)
+            layout_components = create_split_layout(form_components)
+            ui_components = {**form_components, **layout_components}
+            
+            # Setup custom slider handlers
+            setup_slider_handlers(ui_components)
+            
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"Gagal membuat UI untuk konfigurasi split dataset: {str(e)}"
+            from smartcash.common.logger import get_logger
+            logger = get_logger(__name__)
+            logger.exception(error_msg)
+            
+            from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
+            return create_fallback_ui(
+                error_message=error_msg,
+                exc_info=sys.exc_info(),
+                config=FallbackConfig(
+                    title="⚠️ Error Split Dataset Configuration",
+                    module_name='split_dataset',
+                    traceback=traceback.format_exc()
+                )
+            )
 
 
 class SplitConfigHandler(ConfigHandler):

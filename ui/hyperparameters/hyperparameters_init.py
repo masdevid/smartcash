@@ -3,6 +3,8 @@ File: smartcash/ui/hyperparameters/hyperparameters_init.py
 Deskripsi: Main initializer untuk hyperparameters config cell dengan clean pattern dan config inheritance
 """
 
+import sys
+import traceback
 from typing import Dict, Any, Optional
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
 from smartcash.ui.hyperparameters.handlers.config_handler import HyperparametersConfigHandler
@@ -19,13 +21,31 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
     
     def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Buat UI components untuk hyperparameters config dengan form dan layout"""
-        # Create form components
-        form_components = create_hyperparameters_form(config)
-        
-        # Create layout dengan form components
-        layout_components = create_hyperparameters_layout(form_components)
-        
-        return layout_components
+        try:
+            # Create form components
+            form_components = create_hyperparameters_form(config)
+            
+            # Create layout dengan form components
+            layout_components = create_hyperparameters_layout(form_components)
+            
+            return layout_components
+            
+        except Exception as e:
+            error_msg = f"Gagal membuat UI hyperparameters: {str(e)}"
+            from smartcash.common.logger import get_logger
+            logger = get_logger(__name__)
+            logger.exception(error_msg)
+            
+            from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
+            return create_fallback_ui(
+                error_message=error_msg,
+                exc_info=sys.exc_info(),
+                config=FallbackConfig(
+                    title="⚠️ Error Hyperparameters Configuration",
+                    module_name='hyperparameters',
+                    traceback=traceback.format_exc()
+                )
+            )
     
     def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Setup custom handlers untuk hyperparameters jika diperlukan"""

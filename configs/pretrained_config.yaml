@@ -33,12 +33,6 @@ pretrained_models:
       input_size: [640, 640]        # Added: input resolution
       output_channels: [56, 160, 448]  # Added: raw channels (akan di-adapt ke [128, 256, 512])
 
-# Override cache dari base_config (updated path)
-cache:
-  dir: '.cache/smartcash/pretrained'  # Updated: specific cache untuk pretrained
-  auto_cleanup: true
-  max_size_gb: 2  # Added: cache size limit
-
 # Progress step definitions (enhanced untuk better UX)
 progress:
   steps:

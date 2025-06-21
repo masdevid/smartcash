@@ -5,15 +5,30 @@ Deskripsi: UI components untuk pretrained models menggunakan reusable shared com
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from smartcash.common.logger import get_logger
+import traceback
 
 logger = get_logger(__name__)
 
-def create_pretrained_ui_components(env=None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+def create_pretrained_ui_components(config: Optional[Dict] = None) -> Dict:
     """🎯 Create pretrained UI menggunakan shared reusable components"""
     try:
+        # Handle None config
         config = config or {}
+            
+        # Ensure config is a dictionary
+        if not isinstance(config, dict):
+            config = {}
+            
+        # Ensure pretrained_models exists and is a dictionary
+        if 'pretrained_models' not in config:
+            config['pretrained_models'] = {}
+            
+        if not isinstance(config['pretrained_models'], dict):
+            config['pretrained_models'] = {}
+        
+        # Get pretrained_config with type safety
         pretrained_config = config.get('pretrained_models', {})
         
         # Import shared reusable components
@@ -135,20 +150,69 @@ def create_pretrained_ui_components(env=None, config: Dict[str, Any] = None) -> 
             'progress_tracking': True
         }
         
-        logger.info("✅ Pretrained UI created using shared reusable components")
         return ui_components
         
-    except Exception as e:
-        error_msg = f"Error creating pretrained UI: {str(e)}"
-        logger.error(f"❌ {error_msg}")
-        return _create_fallback_ui(error_msg)
+    except Exception:
+        return _create_fallback_ui("Error creating pretrained UI")
 
 def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[str, Any]:
     """Create minimal input options khusus pretrained (module-specific minimal UI)"""
+    # Ensure pretrained_config is a dictionary
+    if not isinstance(pretrained_config, dict):
+        pretrained_config = {}  # Ensure it's a dict to prevent attribute errors
+    
+    def safe_get_config_value(config: Dict[str, Any], key: str, default: Any) -> Any:
+        """Safely get value from config with type checking"""
+        if not isinstance(config, dict):
+            return default
+        return config.get(key, default)
+    
+    def safe_convert_to_string(value: Any, default: str = 'yolov5s', context: str = '') -> str:
+        """
+        Safely convert any value to string, handling lists, tuples, and other types
+        
+        Args:
+            value: The value to convert
+            default: Default value if conversion fails
+            context: Optional context for error messages (unused in this version)
+            
+        Returns:
+            str: The converted string or default value
+        """
+        try:
+            if value is None:
+                return default
+                
+            if isinstance(value, (list, tuple)):
+                if not value:
+                    return default
+                for item in value:
+                    if item is not None:
+                        return safe_convert_to_string(item, default, context)
+                return default
+            
+            result = str(value).strip()
+            return result if result else default
+            
+        except Exception:
+            return default
+    
+    def safe_bool(value: Any, default: bool = False) -> bool:
+        """Safely convert any value to boolean"""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 't', 'y', 'yes')
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return default
+    
     try:
-        # Simple form fields tanpa over-engineering
+        models_dir = safe_convert_to_string(safe_get_config_value(pretrained_config, 'models_dir', '/content/models'))
+        drive_models_dir = safe_convert_to_string(safe_get_config_value(pretrained_config, 'drive_models_dir', '/content/drive/MyDrive/SmartCash/models'))
+        
         models_dir_input = widgets.Text(
-            value=pretrained_config.get('models_dir', '/content/models'),
+            value=models_dir,
             description='Models Dir:',
             placeholder='Path untuk menyimpan models',
             layout=widgets.Layout(width='100%'),
@@ -156,33 +220,53 @@ def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[
         )
         
         drive_models_dir_input = widgets.Text(
-            value=pretrained_config.get('drive_models_dir', '/content/drive/MyDrive/SmartCash/models'),
+            value=drive_models_dir,
             description='Drive Dir:',
             placeholder='Path Google Drive untuk sync',
             layout=widgets.Layout(width='100%'),
             style={'description_width': '120px'}
         )
         
-        # Ensure pretrained_type is a string, not a list
-        pretrained_type = pretrained_config.get('pretrained_type', 'yolov5s')
-        if isinstance(pretrained_type, (list, tuple)) and len(pretrained_type) > 0:
-            pretrained_type = pretrained_type[0]  # Take first item if it's a list
-            
+        allowed_models = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+        default_model = 'yolov5s'
+        final_model = default_model
+        
+        raw_pretrained_type = safe_get_config_value(pretrained_config, 'pretrained_type', default_model)
+        pretrained_type = safe_convert_to_string(raw_pretrained_type, default=default_model)
+        
+        if pretrained_type.lower() in [m.lower() for m in allowed_models]:
+            final_model = pretrained_type
+        
+        # Final model selection is complete
+        
         pretrained_type_dropdown = widgets.Dropdown(
-            options=['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x'],
-            value=str(pretrained_type),
+            options=allowed_models,
+            value=final_model,
             description='Model Type:',
-            style={'description_width': '120px'}
+            style={'description_width': '120px'},
+            disabled=False
         )
         
+        def on_model_type_change(change):
+            if change['type'] == 'change' and change['name'] == 'value':
+                new_value = change['new']
+                if new_value in allowed_models:
+                    pretrained_config['pretrained_type'] = new_value
+        
+        pretrained_type_dropdown.observe(on_model_type_change)
+        
+        auto_download = safe_bool(pretrained_config.get('auto_download'), False)
+        sync_drive = safe_bool(pretrained_config.get('sync_drive'), True)
+        
+        
         auto_download_checkbox = widgets.Checkbox(
-            value=pretrained_config.get('auto_download', False),
+            value=auto_download,
             description='Auto Download',
             tooltip='Download otomatis jika model tidak ditemukan'
         )
         
         sync_drive_checkbox = widgets.Checkbox(
-            value=pretrained_config.get('sync_drive', True),
+            value=sync_drive,
             description='Sync to Drive',
             tooltip='Sinkronisasi dengan Google Drive'
         )
@@ -214,9 +298,22 @@ def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[
         }
         
     except Exception as e:
-        logger.error(f"❌ Error creating input options: {str(e)}")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"❌ ❌ Error creating input options: {str(e)}")
+        logger.error(f"[DEBUG] Error details: {error_trace}")
+        
+        # Try to get more context about the error
+        if hasattr(e, '__traceback__'):
+            tb = e.__traceback__
+            while tb.tb_next:
+                tb = tb.tb_next
+            frame = tb.tb_frame
+            logger.error(f"[DEBUG] Error in {frame.f_code.co_filename} at line {frame.f_lineno}")
+            logger.error(f"[DEBUG] Local variables: {frame.f_locals}")
+        
         return {
-            'container': widgets.HTML(f"<div style='color: red;'>Input options error: {str(e)}</div>")
+            'container': widgets.HTML(f"<div style='color: red;'>Input options error: {str(e)}\n\n{error_trace}</div>")
         }
 
 def _create_fallback_ui(error_msg: str) -> Dict[str, Any]:

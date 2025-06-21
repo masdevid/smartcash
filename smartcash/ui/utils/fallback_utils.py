@@ -44,9 +44,36 @@ def import_with_fallback(module_path: str, fallback_value: Any = None) -> Any:
         return fallback_value
 
 
+class FallbackLogger:
+    """Fallback logger yang menyediakan method standar logging"""
+    def __init__(self, name=None):
+        self.name = name or 'fallback'
+        
+    def debug(self, msg, *args, **kwargs):
+        print(f"[DEBUG] {msg}")
+        
+    def info(self, msg, *args, **kwargs):
+        print(f"[INFO] {msg}")
+        
+    def warning(self, msg, *args, **kwargs):
+        print(f"[WARNING] {msg}")
+        
+    def error(self, msg, *args, **kwargs):
+        print(f"[ERROR] {msg}")
+        
+    def exception(self, msg, *args, **kwargs):
+        print(f"[EXCEPTION] {msg}")
+        if 'exc_info' in kwargs and kwargs['exc_info']:
+            import traceback
+            traceback.print_exc()
+
 def get_safe_logger(module_name: str = None) -> Any:
     """Get logger dengan fallback jika tidak tersedia"""
-    return import_with_fallback('smartcash.common.logger.get_logger', lambda x=None: None)(module_name)
+    logger = import_with_fallback('smartcash.common.logger.get_logger', lambda x=None: FallbackLogger(x))(module_name)
+    if not hasattr(logger, 'exception'):
+        # Jika logger tidak memiliki method exception, gunakan method error
+        logger.exception = logger.error
+    return logger
 
 
 def get_safe_status_widget(ui_components: Dict[str, Any]) -> Any:
@@ -154,9 +181,8 @@ def create_fallback_ui(
             widgets.HBox(buttons) if buttons else widgets.HTML("")
         ],
         layout=widgets.Layout(
-            **config.container_style,
             width='100%',
-            margin='10px 0'
+            **{k: v for k, v in config.container_style.items() if k != 'margin'}
         )
     )
     

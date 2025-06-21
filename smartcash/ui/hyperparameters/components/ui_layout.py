@@ -1,101 +1,143 @@
 """
 File: smartcash/ui/hyperparameters/components/ui_layout.py
-Deskripsi: Layout arrangement untuk hyperparameters dengan grid responsif simplified
+Deskripsi: Layout arrangement untuk hyperparameters dengan pola backbone
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import ipywidgets as widgets
-from smartcash.ui.hyperparameters.utils.form_helpers import create_section_card, create_responsive_grid_layout
+from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.utils.layout_utils import (
+    create_responsive_container,
+    create_responsive_two_column
+)
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
-def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Create layout dengan section cards simplified sesuai parameter yang ada"""
+def create_hyperparameters_layout(components: Dict[str, Any]) -> Dict[str, Any]:
+    """Create layout untuk hyperparameters dengan pola backbone
     
-    # Training parameters section - essentials only
-    training_section = create_section_card(
-        "📊 Parameter Training", [
-            form_components['epochs_slider'],
-            form_components['batch_size_slider'],
-            form_components['learning_rate_slider'],
-            form_components['image_size_slider']
-        ], '#2196f3'
-    )
+    Args:
+        components: Dictionary berisi komponen UI yang sudah dibuat
+        
+    Returns:
+        Dictionary berisi layout dan komponen UI
+    """
+    try:
+        # Buat header
+        header = create_header(
+            title="⚙️ Konfigurasi Hyperparameters",
+            description="Atur parameter pelatihan untuk model deteksi mata uang",
+            icon="⚙️"
+        )
+        
+        # Buat section untuk setiap grup parameter
+        training_section = _create_training_section(components)
+        optimizer_section = _create_optimizer_section(components)
+        scheduler_section = _create_scheduler_section(components)
+        loss_section = _create_loss_section(components)
+        early_stopping_section = _create_early_stopping_section(components)
+        
+        # Gabungkan semua section
+        main_content = widgets.VBox([
+            training_section,
+            widgets.HTML("<hr style='margin: 15px 0; border: 1px dashed #ddd;'>"),
+            optimizer_section,
+            scheduler_section,
+            loss_section,
+            early_stopping_section
+        ], layout=widgets.Layout(width='100%'))
+        
+        # Buat container utama
+        main_container = widgets.VBox([
+            header,
+            components.get('status_panel', widgets.HTML('')),
+            widgets.HTML("<hr style='margin: 15px 0; border: 1px dashed #ddd;'>"),
+            main_content,
+            widgets.HTML("<hr style='margin: 15px 0; border: 1px dashed #ddd;'>"),
+            components.get('save_reset_container', widgets.HBox())
+        ], layout=widgets.Layout(width='100%'))
+        
+        return {
+            'main_container': main_container,
+            'ui': main_container,
+            'header': header,
+            'main_content': main_content,
+            **components
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating hyperparameters layout: {e}")
+        raise
+
+
+def _create_training_section(components: Dict[str, Any]) -> widgets.Widget:
+    """Buat section untuk parameter training"""
+    training_widgets = [
+        components.get('epochs'),
+        components.get('batch_size'),
+        components.get('learning_rate'),
+        components.get('image_size')
+    ]
     
-    # Optimizer & scheduler section - essentials only
-    optimizer_section = create_section_card(
-        "⚙️ Optimizer & Scheduler", [
-            form_components['optimizer_dropdown'],
-            form_components['weight_decay_slider'],
-            widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
-            form_components['scheduler_dropdown'],
-            form_components['warmup_epochs_slider']
-        ], '#9c27b0'
-    )
+    return create_responsive_container([
+        widgets.HTML("<h4 style='color: #2c3e50; margin: 0 0 10px 0;'>📊 Parameter Training</h4>"),
+        *[w for w in training_widgets if w is not None]
+    ], padding='10px', style={'border-left': '4px solid #2196f3'})
+
+
+def _create_optimizer_section(components: Dict[str, Any]) -> widgets.Widget:
+    """Buat section untuk optimizer"""
+    optimizer_widgets = [
+        components.get('optimizer_type'),
+        components.get('weight_decay'),
+        components.get('momentum')
+    ]
     
-    # Loss parameters section
-    loss_section = create_section_card(
-        "🎯 Loss Weights", [
-            form_components['box_loss_gain_slider'],
-            form_components['cls_loss_gain_slider'],
-            form_components['obj_loss_gain_slider']
-        ], '#ff9800'
-    )
+    return create_responsive_container([
+        widgets.HTML("<h4 style='color: #2c3e50; margin: 10px 0;'>⚡ Optimizer</h4>"),
+        *[w for w in optimizer_widgets if w is not None]
+    ], padding='10px', style={'border-left': '4px solid #9c27b0'})
+
+
+def _create_scheduler_section(components: Dict[str, Any]) -> widgets.Widget:
+    """Buat section untuk scheduler"""
+    scheduler_widgets = [
+        components.get('scheduler_type'),
+        components.get('warmup_epochs'),
+        components.get('min_lr')
+    ]
     
-    # Control & checkpoint section
-    control_section = create_section_card(
-        "🛑 Control & Checkpoint", [
-            form_components['early_stopping_checkbox'],
-            form_components['patience_slider'],
-            widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
-            form_components['save_best_checkbox'],
-            form_components['checkpoint_metric_dropdown']
-        ], '#4caf50'
-    )
+    return create_responsive_container([
+        widgets.HTML("<h4 style='color: #2c3e50; margin: 10px 0;'>📈 Scheduler</h4>"),
+        *[w for w in scheduler_widgets if w is not None]
+    ], padding='10px', style={'border-left': '4px solid #4caf50'})
+
+
+def _create_loss_section(components: Dict[str, Any]) -> widgets.Widget:
+    """Buat section untuk loss weights"""
+    loss_widgets = [
+        components.get('box_loss_gain'),
+        components.get('cls_loss_gain'),
+        components.get('obj_loss_gain')
+    ]
     
-    # Create responsive grid layout dengan 2x2 grid
-    params_grid = create_responsive_grid_layout([training_section, optimizer_section])
-    advanced_grid = create_responsive_grid_layout([loss_section, control_section])
+    return create_responsive_container([
+        widgets.HTML("<h4 style='color: #2c3e50; margin: 10px 0;'>🎯 Loss Weights</h4>"),
+        *[w for w in loss_widgets if w is not None]
+    ], padding='10px', style={'border-left': '4px solid #ff9800'})
+
+
+def _create_early_stopping_section(components: Dict[str, Any]) -> widgets.Widget:
+    """Buat section untuk early stopping"""
+    early_stop_widgets = [
+        components.get('early_stopping_enabled'),
+        components.get('patience'),
+        components.get('min_delta')
+    ]
     
-    # Summary cards section
-    summary_section = widgets.VBox([
-        widgets.HTML("<h6 style='margin: 8px 0; color: #495057;'>📋 Ringkasan Konfigurasi</h6>"),
-        form_components['summary_cards']
-    ], layout=widgets.Layout(margin='16px 0 8px 0'))
-    
-    # Status dan action buttons
-    action_section = widgets.VBox([
-        form_components['status_panel'],
-        form_components['button_container']
-    ], layout=widgets.Layout(margin='8px 0'))
-    
-    # Main container dengan proper spacing
-    main_layout = widgets.VBox([
-        widgets.HTML("<h4 style='margin: 8px 0; color: #333; border-bottom: 2px solid #2196f3; padding-bottom: 4px;'>🎛️ Konfigurasi Hyperparameters</h4>"),
-        params_grid,
-        advanced_grid,
-        summary_section,
-        action_section
-    ], layout=widgets.Layout(width='100%', padding='12px'))
-    
-    # Dapatkan tombol dari form_components atau buat baru
-    if 'save_button' in form_components and 'reset_button' in form_components:
-        save_button = form_components['save_button']
-        reset_button = form_components['reset_button']
-    else:
-        from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-        buttons = create_save_reset_buttons()
-        save_button = buttons.children[0]
-        reset_button = buttons.children[1]
-    
-    # Gabungkan semuanya
-    form_layout = widgets.VBox([
-        main_layout,
-        widgets.HBox([save_button, reset_button], 
-                   layout=widgets.Layout(justify_content='flex-end', margin='10px 0'))
-    ])
-    
-    return {
-        'form': form_layout,
-        'save_button': save_button,
-        'reset_button': reset_button
-    }
+    return create_responsive_container([
+        widgets.HTML("<h4 style='color: #2c3e50; margin: 10px 0;'>⏱️ Early Stopping</h4>"),
+        *[w for w in early_stop_widgets if w is not None]
+    ], padding='10px', style={'border-left': '4px solid #f44336'})

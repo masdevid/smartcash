@@ -4,245 +4,192 @@
 # Deskripsi: UI form components untuk hyperparameters configuration
 
 import ipywidgets as widgets
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, List, Tuple, Optional, Callable
 from smartcash.ui.hyperparameters.handlers.defaults import get_hyperparameters_ui_config
 from smartcash.common.logger import get_logger
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from smartcash.ui.components.status_panel import create_status_panel
 
 logger = get_logger(__name__)
 
 
+def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create form components untuk hyperparameters configuration"""
+    try:
+        ui_config = get_hyperparameters_ui_config()
+        components = {}
+        
+        # Create form fields
+        for section in ui_config['form_sections']:
+            for field_name in section['fields']:
+                if field_name in ui_config['field_configs']:
+                    field_config = ui_config['field_configs'][field_name]
+                    components[field_name] = _create_field_widget(field_name, field_config, config)
+        
+        # Add save and reset buttons
+        save_reset_buttons = create_save_reset_buttons(
+            on_save_click=lambda b: _on_save_click(b, components, status_panel),
+            on_reset_click=lambda b: _on_reset_click(b, components, config, status_panel),
+            with_sync_info=False
+        )
+        
+        # Add status panel
+        status_panel = create_status_panel("Siap mengkonfigurasi hyperparameters", "info")
+        
+        # Merge all components
+        components.update({
+            'save_button': save_reset_buttons['save_button'],
+            'reset_button': save_reset_buttons['reset_button'],
+            'save_reset_container': save_reset_buttons['container'],
+            'status_panel': status_panel
+        })
+        
+        return components
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating hyperparameters form: {e}")
+        raise
+
+
+def _create_field_widget(field_name: str, field_config: Dict[str, Any], config: Dict[str, Any]) -> widgets.Widget:
+    """Create individual form field widget"""
+    value = _get_field_value(field_name, config)
+    
+    if field_config['type'] == 'IntSlider':
+        return widgets.IntSlider(
+            value=value,
+            min=field_config['min'],
+            max=field_config['max'],
+            step=field_config['step'],
+            description=_format_field_name(field_name),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+    elif field_config['type'] == 'FloatSlider':
+        return widgets.FloatSlider(
+            value=value,
+            min=field_config['min'],
+            max=field_config['max'],
+            step=field_config['step'],
+            description=_format_field_name(field_name),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+    elif field_config['type'] == 'Dropdown':
+        return widgets.Dropdown(
+            value=value,
+            options=field_config['options'],
+            description=_format_field_name(field_name),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+    elif field_config['type'] == 'Checkbox':
+        return widgets.Checkbox(
+            value=value,
+            description=_format_field_name(field_name),
+            style={'description_width': '150px'},
+            layout=widgets.Layout(width='100%')
+        )
+    else:
+        return widgets.HTML(f"Unsupported widget type: {field_config['type']}")
+
+
+def _get_field_value(field_name: str, config: Dict[str, Any]) -> Any:
+    """Get field value from config with proper path resolution"""
+    field_map = {
+        'epochs': ['training', 'epochs'],
+        'batch_size': ['training', 'batch_size'],
+        'learning_rate': ['training', 'learning_rate'],
+        'image_size': ['training', 'image_size'],
+        'optimizer_type': ['optimizer', 'type'],
+        'weight_decay': ['optimizer', 'weight_decay'],
+        'momentum': ['optimizer', 'momentum'],
+        'scheduler_type': ['scheduler', 'type'],
+        'warmup_epochs': ['scheduler', 'warmup_epochs'],
+        'min_lr': ['scheduler', 'min_lr'],
+        'box_loss_gain': ['loss', 'box_loss_gain'],
+        'cls_loss_gain': ['loss', 'cls_loss_gain'],
+        'obj_loss_gain': ['loss', 'obj_loss_gain'],
+        'early_stopping_enabled': ['early_stopping', 'enabled'],
+        'patience': ['early_stopping', 'patience'],
+        'min_delta': ['early_stopping', 'min_delta']
+    }
+    
+    path = field_map.get(field_name, [])
+    value = config
+    for key in path:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return None
+    return value
+
+
+def _format_field_name(field_name: str) -> str:
+    """Format field name for display"""
+    field_labels = {
+        'epochs': 'Epochs',
+        'batch_size': 'Batch Size',
+        'learning_rate': 'Learning Rate',
+        'image_size': 'Image Size',
+        'optimizer_type': 'Optimizer',
+        'weight_decay': 'Weight Decay',
+        'momentum': 'Momentum',
+        'scheduler_type': 'Scheduler',
+        'warmup_epochs': 'Warmup Epochs',
+        'min_lr': 'Min LR',
+        'box_loss_gain': 'Box Loss',
+        'cls_loss_gain': 'Class Loss',
+        'obj_loss_gain': 'Object Loss',
+        'early_stopping_enabled': 'Enable Early Stop',
+        'patience': 'Patience',
+        'min_delta': 'Min Delta'
+    }
+    return field_labels.get(field_name, field_name.replace('_', ' ').title())
+
+
+def _on_save_click(button: widgets.Button, components: Dict[str, Any], status_panel: widgets.HTML) -> None:
+    """Handle save button click"""
+    try:
+        # Update status panel
+        status_panel.value = "<div class='alert alert-success'>Menyimpan konfigurasi...</div>"
+        # Actual save logic will be handled by the parent component
+    except Exception as e:
+        status_panel.value = f"<div class='alert alert-danger'>Gagal menyimpan: {str(e)}</div>"
+
+
+def _on_reset_click(button: widgets.Button, components: Dict[str, Any], 
+                    default_config: Dict[str, Any], status_panel: widgets.HTML) -> None:
+    """Handle reset button click"""
+    try:
+        # Reset all fields to default values
+        for field_name, widget in components.items():
+            if hasattr(widget, 'value') and not isinstance(widget, (widgets.Button, widgets.HTML)):
+                widget.value = _get_field_value(field_name, default_config)
+        status_panel.value = "<div class='alert alert-info'>Konfigurasi direset ke nilai default</div>"
+    except Exception as e:
+        status_panel.value = f"<div class='alert alert-danger'>Gagal mereset: {str(e)}</div>"
+    
 class HyperparametersForm:
-    """Form UI untuk konfigurasi hyperparameters 📝"""
+    """Form UI untuk konfigurasi hyperparameters (legacy compatibility)"""
     
     def __init__(self, config: Dict[str, Any], on_change: Optional[Callable] = None):
         self.config = config
         self.on_change = on_change or (lambda: None)
-        self.ui_config = get_hyperparameters_ui_config()
-        self.widgets = {}
-        self._create_form()
+        self.components = create_hyperparameters_form(config)
+        self._setup_widget_handlers()
     
-    def _create_form(self) -> None:
-        """Buat form widgets berdasarkan konfigurasi 🏗️"""
-        try:
-            self.widgets['sections'] = []
-            
-            for section_config in self.ui_config['form_sections']:
-                section_widget = self._create_section(section_config)
-                self.widgets['sections'].append(section_widget)
-                
-            # Create main form container
-            self.widgets['form'] = widgets.VBox(
-                children=self.widgets['sections'],
-                layout=widgets.Layout(
-                    width='100%',
-                    gap='15px',
-                    padding='10px'
-                )
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ Error creating hyperparameters form: {e}")
-            self.widgets['form'] = widgets.HTML("⚠️ Error creating form")
-    
-    def _create_section(self, section_config: Dict[str, Any]) -> widgets.Widget:
-        """Buat section widget dengan accordion layout 📋"""
-        section_widgets = []
-        
-        for field_name in section_config['fields']:
-            field_widget = self._create_field_widget(field_name)
-            if field_widget:
-                section_widgets.append(field_widget)
-        
-        section_box = widgets.VBox(
-            children=section_widgets,
-            layout=widgets.Layout(gap='8px', padding='10px')
-        )
-        
-        accordion = widgets.Accordion(
-            children=[section_box],
-            titles=[section_config['title']],
-            selected_index=0
-        )
-        
-        return accordion
-    
-    def _create_field_widget(self, field_name: str) -> Optional[widgets.Widget]:
-        """Buat widget untuk field tertentu ⚙️"""
-        try:
-            if field_name not in self.ui_config['field_configs']:
-                return None
-                
-            field_config = self.ui_config['field_configs'][field_name]
-            current_value = self._get_field_value(field_name)
-            
-            # Create widget based on type
-            if field_config['type'] == 'IntSlider':
-                widget = widgets.IntSlider(
-                    value=current_value,
-                    min=field_config['min'],
-                    max=field_config['max'],
-                    step=field_config['step'],
-                    description=self._format_field_name(field_name),
-                    style={'description_width': '150px'}
-                )
-            elif field_config['type'] == 'FloatSlider':
-                widget = widgets.FloatSlider(
-                    value=current_value,
-                    min=field_config['min'],
-                    max=field_config['max'],
-                    step=field_config['step'],
-                    description=self._format_field_name(field_name),
-                    style={'description_width': '150px'}
-                )
-            elif field_config['type'] == 'FloatLogSlider':
-                widget = widgets.FloatLogSlider(
-                    value=current_value,
-                    min=field_config['min'],
-                    max=field_config['max'],
-                    step=field_config['step'],
-                    description=self._format_field_name(field_name),
-                    style={'description_width': '150px'}
-                )
-            elif field_config['type'] == 'Dropdown':
-                widget = widgets.Dropdown(
-                    value=current_value,
-                    options=field_config['options'],
-                    description=self._format_field_name(field_name),
-                    style={'description_width': '150px'}
-                )
-            elif field_config['type'] == 'Checkbox':
-                widget = widgets.Checkbox(
-                    value=current_value,
-                    description=self._format_field_name(field_name),
-                    style={'description_width': '150px'}
-                )
-            else:
-                return None
-            
-            # Bind change handler
-            widget.observe(self._on_widget_change, names='value')
-            self.widgets[field_name] = widget
-            
-            return widget
-            
-        except Exception as e:
-            logger.error(f"❌ Error creating field widget {field_name}: {e}")
-            return None
-    
-    def _get_field_value(self, field_name: str) -> Any:
-        """Ambil nilai field dari config 📊"""
-        # Map field names to config paths
-        field_map = {
-            'epochs': 'training.epochs',
-            'batch_size': 'training.batch_size', 
-            'learning_rate': 'training.learning_rate',
-            'image_size': 'training.image_size',
-            'optimizer_type': 'optimizer.type',
-            'weight_decay': 'optimizer.weight_decay',
-            'momentum': 'optimizer.momentum',
-            'scheduler_type': 'scheduler.type',
-            'warmup_epochs': 'scheduler.warmup_epochs',
-            'min_lr': 'scheduler.min_lr',
-            'box_loss_gain': 'loss.box_loss_gain',
-            'cls_loss_gain': 'loss.cls_loss_gain',
-            'obj_loss_gain': 'loss.obj_loss_gain',
-            'early_stopping_enabled': 'early_stopping.enabled',
-            'patience': 'early_stopping.patience',
-            'min_delta': 'early_stopping.min_delta'
-        }
-        
-        if field_name not in field_map:
-            return None
-            
-        path = field_map[field_name].split('.')
-        value = self.config
-        
-        for key in path:
-            if isinstance(value, dict) and key in value:
-                value = value[key]
-            else:
-                return None
-        
-        return value
-    
-    def _format_field_name(self, field_name: str) -> str:
-        """Format field name untuk display 💫"""
-        # Format field names untuk UI yang lebih readable
-        field_labels = {
-            'epochs': 'Epochs',
-            'batch_size': 'Batch Size',
-            'learning_rate': 'Learning Rate',
-            'image_size': 'Image Size',
-            'optimizer_type': 'Optimizer',
-            'weight_decay': 'Weight Decay',
-            'momentum': 'Momentum',
-            'scheduler_type': 'Scheduler',
-            'warmup_epochs': 'Warmup Epochs',
-            'min_lr': 'Min LR',
-            'box_loss_gain': 'Box Loss',
-            'cls_loss_gain': 'Class Loss',
-            'obj_loss_gain': 'Object Loss',
-            'early_stopping_enabled': 'Enable Early Stop',
-            'patience': 'Patience',
-            'min_delta': 'Min Delta'
-        }
-        
-        return field_labels.get(field_name, field_name.replace('_', ' ').title())
-    
-    def _on_widget_change(self, change) -> None:
-        """Handle perubahan widget value 🔄"""
-        try:
-            # Update config berdasarkan widget change
-            self._update_config_from_widgets()
-            
-            # Trigger change callback
-            self.on_change()
-            
-        except Exception as e:
-            logger.error(f"❌ Error handling widget change: {e}")
-    
-    def _update_config_from_widgets(self) -> None:
-        """Update config dari nilai widgets ⚡"""
-        # Reverse mapping dari _get_field_value
-        field_map = {
-            'epochs': ['training', 'epochs'],
-            'batch_size': ['training', 'batch_size'],
-            'learning_rate': ['training', 'learning_rate'],
-            'image_size': ['training', 'image_size'],
-            'optimizer_type': ['optimizer', 'type'],
-            'weight_decay': ['optimizer', 'weight_decay'],
-            'momentum': ['optimizer', 'momentum'],
-            'scheduler_type': ['scheduler', 'type'],
-            'warmup_epochs': ['scheduler', 'warmup_epochs'],
-            'min_lr': ['scheduler', 'min_lr'],
-            'box_loss_gain': ['loss', 'box_loss_gain'],
-            'cls_loss_gain': ['loss', 'cls_loss_gain'],
-            'obj_loss_gain': ['loss', 'obj_loss_gain'],
-            'early_stopping_enabled': ['early_stopping', 'enabled'],
-            'patience': ['early_stopping', 'patience'],
-            'min_delta': ['early_stopping', 'min_delta']
-        }
-        
-        for field_name, widget in self.widgets.items():
-            if (field_name in field_map and hasattr(widget, 'value')):
-                path = field_map[field_name]
-                self._set_nested_value(self.config, path, widget.value)
-    
-    def _set_nested_value(self, config: Dict[str, Any], path: list, value: Any) -> None:
-        """Set nilai nested dalam config dict 🎯"""
-        current = config
-        for key in path[:-1]:
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        current[path[-1]] = value
+    def _setup_widget_handlers(self) -> None:
+        """Setup change handlers for all widgets"""
+        for widget in self.components.values():
+            if hasattr(widget, 'observe'):
+                widget.observe(lambda _: self.on_change(), names='value')
     
     def get_widget(self) -> widgets.Widget:
-        """Ambil main form widget 📦"""
-        return self.widgets.get('form', widgets.HTML("⚠️ Form not created"))
+        """Get main form widget"""
+        return self.components.get('form', widgets.HTML("⚠️ Form not created"))
     
     def get_config(self) -> Dict[str, Any]:
-        """Ambil current config dari form 📋"""
-        self._update_config_from_widgets()
-        return self.config
+        """Get current config from form"""
+        return self.config  # Config is updated in real-time by the parent component
 

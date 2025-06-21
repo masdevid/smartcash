@@ -1,7 +1,7 @@
 # File: smartcash/ui/pretrained/handlers/config_handler.py
 """
 File: smartcash/ui/pretrained/handlers/config_handler.py  
-Deskripsi: Config handler untuk pretrained module dengan ConfigHandler inheritance
+Deskripsi: Config handler untuk pretrained module dengan ConfigHandler inheritance - Fixed constructor
 """
 
 from typing import Dict, Any
@@ -9,10 +9,11 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
 
 class PretrainedConfigHandler(ConfigHandler):
-    """🔧 Config handler untuk pretrained module dengan ConfigHandler inheritance"""
+    """🔧 Config handler untuk pretrained module dengan ConfigHandler inheritance - Fixed constructor"""
     
-    def __init__(self):
-        super().__init__('pretrained_models', None)
+    def __init__(self, module_name: str = 'pretrained_models', parent_module: str = None):
+        """Fixed constructor untuk accept parameters dari CommonInitializer"""
+        super().__init__(module_name, parent_module)
         self.config_mapping = {
             'models_dir': 'models_dir_input',
             'drive_models_dir': 'drive_models_dir_input', 

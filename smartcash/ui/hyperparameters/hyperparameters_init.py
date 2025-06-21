@@ -44,7 +44,6 @@ class HyperparametersInitializer(ConfigCellInitializer):
             
         except Exception as e:
             return self.handle_ui_exception(e, context="UI hyperparameters configuration")
->>>>>>> fix/circular-imports
     
     def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
                              env=None, **kwargs) -> None:

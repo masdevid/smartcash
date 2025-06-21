@@ -69,25 +69,33 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
     ], layout=widgets.Layout(margin='8px 0'))
     
     # Main container dengan proper spacing
-    main_container = widgets.VBox([
+    main_layout = widgets.VBox([
         widgets.HTML("<h4 style='margin: 8px 0; color: #333; border-bottom: 2px solid #2196f3; padding-bottom: 4px;'>🎛️ Konfigurasi Hyperparameters</h4>"),
         params_grid,
         advanced_grid,
         summary_section,
         action_section
-    ], layout=widgets.Layout(
-        width='100%', padding='12px', border='1px solid #dee2e6',
-        border_radius='8px', background_color='#fafbfc'
-    ))
+    ], layout=widgets.Layout(width='100%', padding='12px'))
     
-    # Return components untuk akses dari handler
+    # Dapatkan tombol dari form_components atau buat baru
+    if 'save_button' in form_components and 'reset_button' in form_components:
+        save_button = form_components['save_button']
+        reset_button = form_components['reset_button']
+    else:
+        from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+        buttons = create_save_reset_buttons()
+        save_button = buttons.children[0]
+        reset_button = buttons.children[1]
+    
+    # Gabungkan semuanya
+    form_layout = widgets.VBox([
+        main_layout,
+        widgets.HBox([save_button, reset_button], 
+                   layout=widgets.Layout(justify_content='flex-end', margin='10px 0'))
+    ])
+    
     return {
-        'main_container': main_container,
-        'button_container': form_components['button_container'],
-        'training_section': training_section,
-        'optimizer_section': optimizer_section,
-        'loss_section': loss_section,
-        'control_section': control_section,
-        'summary_section': summary_section,
-        'action_section': action_section
+        'form': form_layout,
+        'save_button': save_button,
+        'reset_button': reset_button
     }

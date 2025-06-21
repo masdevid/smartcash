@@ -32,11 +32,16 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
             # Create layout dengan form components
             layout_components = create_hyperparameters_layout(form_components)
             
-            # Return minimal yang dibutuhkan untuk save/reset
+            # Pastikan form layout ada
+            if 'form' not in form_components and 'form' in layout_components:
+                form_components['form'] = layout_components['form']
+            
+            # Return semua komponen yang diperlukan
             return {
                 'save_button': form_components['save_button'],
                 'reset_button': form_components['reset_button'],
-                'form': form_components.get('form', None)
+                'form': form_components.get('form', None),
+                **layout_components  # Sertakan semua komponen layout
             }
             
         except Exception as e:

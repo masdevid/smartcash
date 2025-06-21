@@ -167,15 +167,12 @@ class StrategyInitializer(ConfigCellInitializer):
                     form_components
                 )
             
-            # Return dalam format yang konsisten dengan hyperparameters
+            # Return minimal yang dibutuhkan untuk save/reset
             return {
                 'save_button': form_components['save_button'],
                 'reset_button': form_components['reset_button'],
                 'form': form_components.get('form', None),
-                'config_handler': self.config_handler,
-                'module_name': self.module_name,
-                'config': config,
-                'parent_module': self.parent_module
+                'summary_card': layout_components.get('summary_card', None)
             }
             
         except Exception as e:

@@ -394,9 +394,8 @@ def create_init_fallback_ui(
     else:
         container = error_widget
     
-    # Tampilkan widget
-    display(container)
-    
+    # Kembalikan widget tanpa menampilkannya langsung
+    # Biarkan caller yang menangani penampilan widget
     return {
         'ui': container,
         'error': error_msg,

@@ -37,13 +37,13 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Optimizer essentials - hanya yang digunakan backend
     optimizer_widgets = {
-        'optimizer_dropdown': create_dropdown_widget(get_optimizer_options(), optimizer.get('type', 'SGD'), 'Optimizer:'),
+        'optimizer_dropdown': create_dropdown_widget(optimizer.get('type', 'SGD'), get_optimizer_options(), 'Optimizer:'),
         'weight_decay_slider': create_slider_widget(optimizer.get('weight_decay', 0.0005), 0.0, 0.01, 0.0001, 'Weight Decay:', '.4f'),
     }
     
     # Scheduler essentials
     scheduler_widgets = {
-        'scheduler_dropdown': create_dropdown_widget(get_scheduler_options(), scheduler.get('type', 'cosine'), 'Scheduler:'),
+        'scheduler_dropdown': create_dropdown_widget(scheduler.get('type', 'cosine'), get_scheduler_options(), 'Scheduler:'),
         'warmup_epochs_slider': create_int_slider_widget(scheduler.get('warmup_epochs', 3), 0, 10, 'Warmup Epochs:'),
     }
     
@@ -59,7 +59,7 @@ def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
         'early_stopping_checkbox': create_checkbox_widget(early_stopping.get('enabled', True), 'Enable Early Stopping'),
         'patience_slider': create_int_slider_widget(early_stopping.get('patience', 15), 5, 50, 'Patience (epochs):'),
         'save_best_checkbox': create_checkbox_widget(checkpoint.get('save_best', True), 'Save Best Model'),
-        'checkpoint_metric_dropdown': create_dropdown_widget(get_checkpoint_metric_options(), checkpoint.get('metric', 'mAP_0.5'), 'Best Model Metric:'),
+        'checkpoint_metric_dropdown': create_dropdown_widget(checkpoint.get('metric', 'mAP_0.5'), get_checkpoint_metric_options(), 'Best Model Metric:'),
     }
     
     # Create summary cards widget untuk overview

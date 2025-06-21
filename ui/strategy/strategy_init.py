@@ -118,11 +118,15 @@ class StrategyInitializer(ConfigCellInitializer):
         except Exception as e:
             error_msg = f"Gagal membuat UI untuk konfigurasi strategy: {str(e)}"
             logger.error(error_msg, exc_info=True)
+            from smartcash.ui.utils.fallback_utils import FallbackConfig
             return create_fallback_ui(
-                title="⚠️ Error Strategy Configuration",
-                message=error_msg,
-                traceback=traceback.format_exc(),
-                module_name='strategy'
+                error_msg=error_msg,
+                exc_info=sys.exc_info(),
+                config=FallbackConfig(
+                    title="⚠️ Error Strategy Configuration",
+                    module_name='strategy',
+                    traceback=traceback.format_exc()
+                )
             )
     
     def _setup_summary_update_callback(self, ui_components: Dict[str, Any]) -> None:

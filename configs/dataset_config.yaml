@@ -1,0 +1,105 @@
+# File: configs/dataset_config.yaml
+# Author: Alfrida Sabar (Enhanced dengan UUID support dan research features)
+# Deskripsi: Konfigurasi dataset yang sering diubah dengan UUID file naming dan research scenarios
+
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
+
+# ========================================
+# PRIMARY CONFIGURATION - Sering Diubah
+# ========================================
+
+# Enhanced data configuration - CRITICAL SETTINGS
+data:
+  # Dataset source configuration - SERING DIUBAH
+  source: 'roboflow'             # 'roboflow' atau 'local'
+  
+  # Roboflow configuration - UTAMA untuk download
+  roboflow:
+    api_key: ''                  # WAJIB DIISI - API key Roboflow
+    workspace: 'smartcash-wo2us' # Workspace name - bisa diubah
+    project: 'rupiah-emisi-2022' # Project name - bisa diubah
+    version: '3'                 # Version number - sering diubah
+    output_format: 'yolov5pytorch'
+    
+  # Split ratios - SERING DISESUAIKAN untuk research
+  split_ratios:
+    train: 0.7                   # Training split - sesuaikan kebutuhan
+    valid: 0.15                  # Validation split - sesuaikan kebutuhan  
+    test: 0.15                   # Test split - sesuaikan kebutuhan
+    
+  # UUID file naming - KONFIGURASI UTAMA
+  file_naming:
+    uuid_format: true            # TOGGLE: Enable/disable UUID format
+    naming_strategy: 'research_uuid' # Strategy: 'research_uuid', 'simple', 'legacy'
+    preserve_original: false     # TOGGLE: Keep original filenames
+
+# ========================================
+# UUID RENAMING - Konfigurasi Utama
+# ========================================
+
+# UUID renaming settings - KRITIS untuk research consistency
+uuid_renaming:
+  enabled: true                  # MASTER TOGGLE: Enable UUID renaming
+  backup_before_rename: false     # SAFETY: Backup sebelum rename
+  batch_size: 1000              # PERFORMANCE: Files per batch
+  parallel_workers: 4           # PERFORMANCE: Parallel workers
+  validate_consistency: true     # QUALITY: Validate after rename
+  
+  # Class priority untuk nominal extraction - SESUAIKAN jika perlu
+  layer_priority:
+    banknote: 10                 # Layer 1 priority (highest)
+    nominal: 9                   # Layer 2 priority  
+    security: 1                  # Layer 3 priority (lowest)
+
+# ========================================
+# VALIDATION & QUALITY - Konfigurasi QA
+# ========================================
+
+# Enhanced validation - DISESUAIKAN untuk quality standards
+validation:
+  enabled: true                  # MASTER TOGGLE: Enable validation
+  fix_issues: true              # AUTO-FIX: Automatically fix issues
+  move_invalid: true            # CLEANUP: Move invalid files
+  invalid_dir: 'data/invalid'   # PATH: Invalid files directory
+  
+  # UUID-specific validation - RESEARCH CRITICAL
+  check_uuid_consistency: true   # CHECK: UUID consistency antar pairs
+  validate_nominal_mapping: true # CHECK: Nominal mapping accuracy
+  validate_research_format: true # CHECK: Research filename format
+  
+  # Quality thresholds - SESUAIKAN standards
+  quality_thresholds:
+    min_image_size: [224, 224]   # Minimum image resolution
+    max_file_size_mb: 10         # Maximum file size
+    min_bbox_area: 0.001         # Minimum bounding box area
+    max_bbox_count: 50           # Maximum bbox per image
+
+# ========================================
+# BACKUP & EXPORT - Data Management
+# ========================================
+
+# Dataset backup - SAFETY settings
+dataset_backup:
+  enabled: false                  # TOGGLE: Enable backups
+  backup_before_operations: false # SAFETY: Backup before major ops
+  keep_versions: 1              # RETENTION: Number of backups to keep
+  compress_backups: true        # STORAGE: Compress for space
+  backup_scenarios: true        # RESEARCH: Backup scenario data
+
+# Export configuration - OUTPUT formats
+export:
+  enabled: true                  # TOGGLE: Enable export
+  formats:
+    - 'yolo'                    # YOLO format untuk training
+    - 'research_csv'            # CSV untuk analysis
+    - 'uuid_mapping'            # UUID mapping untuk tracking
+  include_metadata: true        # METADATA: Include file metadata
+  export_statistics: true       # STATS: Export dataset statistics
+
+# Cache configuration - PERFORMANCE optimization
+cache:
+  enabled: true                 # TOGGLE: Enable caching
+  uuid_cache_enabled: true      # CACHE: UUID mappings untuk speed
+  cache_statistics: true        # CACHE: Dataset statistics
+  ttl_hours: 48                # RETENTION: Cache retention time

@@ -1,0 +1,114 @@
+# File: smartcash/configs/analysis_config.yaml
+# Deskripsi: Konfigurasi analysis dan reporting untuk model evaluation results
+
+analysis:
+  # Currency analysis configuration
+  currency:
+    primary_layer: 'banknote'          # Layer utama untuk deteksi denominasi
+    confidence_boost_layer: 'nominal'   # Layer untuk confidence boosting
+    validation_layer: 'security'       # Layer untuk validasi objek valid money
+    denomination_classes: [0, 1, 2, 3, 4, 5, 6]  # 7 denominasi utama
+    confidence_threshold: 0.3
+    iou_threshold: 0.5
+    
+  # Layer analysis configuration  
+  layers:
+    banknote:
+      classes: [0, 1, 2, 3, 4, 5, 6]
+      display_names: ['Rp1K', 'Rp2K', 'Rp5K', 'Rp10K', 'Rp20K', 'Rp50K', 'Rp100K']
+      layer_weight: 1.0
+    nominal:
+      classes: [7, 8, 9, 10, 11, 12, 13]  
+      display_names: ['Nom1K', 'Nom2K', 'Nom5K', 'Nom10K', 'Nom20K', 'Nom50K', 'Nom100K']
+      layer_weight: 0.8
+    security:
+      classes: [14, 15, 16]
+      display_names: ['Security1', 'Security2', 'Security3']
+      layer_weight: 0.5
+      
+  # Class analysis configuration
+  classes:
+    per_class_metrics: ['precision', 'recall', 'f1_score', 'ap']
+    confusion_matrix: true
+    class_balance_analysis: true
+    detection_distribution: true
+
+# Visualization configuration
+visualization:
+  # Chart settings
+  charts:
+    figure_size: [12, 8]
+    dpi: 150
+    style: 'seaborn-v0_8'
+    color_palette: 'Set2'
+    font_size: 12
+    
+  # Confusion matrix settings
+  confusion_matrix:
+    normalize: 'true'  # 'true', 'pred', 'all', None
+    cmap: 'Blues'
+    figsize: [10, 8]
+    annot: true
+    fmt: '.2f'
+    
+  # Performance plots
+  plots:
+    pr_curve: true
+    roc_curve: true  
+    confidence_histogram: true
+    detection_distribution: true
+    timing_analysis: true
+
+# Reporting configuration
+reporting:
+  # Output formats
+  formats:
+    markdown: true
+    json: true
+    csv: true
+    html: false
+    
+  # Report sections
+  sections:
+    executive_summary: true
+    methodology: true
+    results_overview: true
+    currency_analysis: true
+    layer_analysis: true
+    class_analysis: true
+    backbone_comparison: true
+    scenario_comparison: true
+    recommendations: true
+    technical_details: true
+    
+  # Export settings
+  export:
+    include_visualizations: true
+    compress_results: false
+    timestamp_files: true
+    
+# Data processing
+processing:
+  # Results aggregation
+  aggregation:
+    confidence_bins: [0.1, 0.3, 0.5, 0.7, 0.9]
+    iou_thresholds: [0.5, 0.75, 0.9]
+    size_categories: ['small', 'medium', 'large']
+    
+  # Statistical analysis
+  statistics:
+    significance_level: 0.05
+    bootstrap_samples: 1000
+    confidence_interval: 0.95
+
+# Performance optimization
+performance:
+  # Parallel processing
+  num_workers: 4
+  batch_size: 32
+  use_cache: true
+  cache_duration: 3600  # seconds
+  
+  # Memory management
+  max_memory_gb: 8.0
+  clear_cache_after: true

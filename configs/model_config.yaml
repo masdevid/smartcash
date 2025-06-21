@@ -1,0 +1,82 @@
+# File: smartcash/configs/model_config.yaml
+# Deskripsi: Konfigurasi model essential untuk domain model SmartCash
+
+# Model Architecture Configuration
+model:
+  # Backbone options: 'cspdarknet' | 'efficientnet_b4'
+  backbone: 'efficientnet_b4'  # default: efficientnet_b4, baseline: cspdarknet
+  model_name: 'smartcash_yolov5'
+  
+  # Feature Optimization (configurable)
+  feature_optimization:
+    enabled: false  # default: False
+    use_attention: false
+    use_fpn: true
+    use_pan: true
+  
+  # Detection layers configuration
+  detection_layers: ['banknote']  # main layer for currency detection
+  layer_mode: 'single'  # single | multilayer
+  
+  # Model parameters
+  num_classes: 7  # 7 denominations for banknote layer
+  img_size: 640
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+
+# Data Configuration
+data:
+  # Pretrained model paths
+  pretrained_dir: '/data/pretrained'
+  
+  # Dataset paths
+  dataset_dir: '/data/preprocessed'
+  splits:
+    train: 'train'
+    valid: 'valid' 
+    test: 'test'
+  
+  # Data loading
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+
+# Training Configuration
+training:
+  epochs: 100
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  
+  # Early stopping
+  early_stopping: true
+  patience: 10
+  
+  # Optimizer & Scheduler
+  optimizer: 'adam'  # adam | sgd
+  scheduler: 'cosine'  # cosine | step | plateau
+  
+  # Validation
+  val_interval: 1  # validate every N epochs
+  save_best: true
+  save_interval: 10  # save checkpoint every N epochs
+
+# Checkpoint Configuration
+checkpoint:
+  save_dir: '/data/checkpoints'
+  format: 'best_{model_name}_{backbone}_{layer_mode}_{date}.pt'
+  max_checkpoints: 5  # keep last N checkpoints
+  auto_cleanup: true
+
+# Device Configuration
+device:
+  auto_detect: true  # auto detect CUDA
+  preferred: 'cuda'  # cuda | cpu
+  mixed_precision: true  # use AMP for faster training
+
+# Logging Configuration
+logging:
+  level: 'INFO'  # DEBUG | INFO | WARNING | ERROR
+  progress_tracking: true
+  metrics_tracking: true
+  save_logs: true
+  log_dir: '/data/logs'

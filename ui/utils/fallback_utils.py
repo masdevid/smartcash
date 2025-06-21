@@ -378,18 +378,30 @@ def create_standard_fallback_ui(
     if fallback_fields:
         default_fields.update(fallback_fields)
     
+    # Buat konfigurasi fallback
+    config = FallbackConfig(
+        title=f"⚠️ Error in {module_name}",
+        message=error_msg,
+        show_traceback=True,  # Pastikan traceback selalu ditampilkan
+        show_retry=retry_callback is not None,
+        retry_callback=retry_callback
+    )
+    
+    # Jika ada exc_info, pastikan traceback-nya tersimpan
+    if exc_info and not config.traceback:
+        try:
+            import traceback as tb
+            config.traceback = ''.join(tb.format_exception(*exc_info))
+        except:
+            config.traceback = "Failed to generate traceback"
+    
     # Buat fallback UI
     fallback_ui = create_fallback_ui(
         error_message=error_msg,
         module_name=module_name,
         ui_components=ui_components,
         exc_info=exc_info,
-        config=FallbackConfig(
-            title=f"⚠️ Error in {module_name}",
-            message=error_msg,
-            show_retry=retry_callback is not None,
-            retry_callback=retry_callback
-        )
+        config=config
     )
     
     # Update dengan field tambahan

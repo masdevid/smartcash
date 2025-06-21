@@ -1,153 +1,187 @@
-"""
-File: smartcash/ui/hyperparameters/handlers/config_handler.py
-Deskripsi: Config handler untuk hyperparameters dengan field mapping essentials
-"""
+# File: smartcash/ui/hyperparameters/handlers/config_handler.py
+# Deskripsi: Handler untuk konfigurasi hyperparameters - menggunakan fallback_utils
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import os
 from smartcash.ui.handlers.config_handlers import BaseConfigHandler
 from smartcash.ui.hyperparameters.handlers.defaults import get_default_hyperparameters_config
+from smartcash.ui.utils.fallback_utils import try_operation_safe
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class HyperparametersConfigHandler(BaseConfigHandler):
-    """Config handler untuk hyperparameters dengan field mapping essentials backend"""
+    """Handler untuk konfigurasi hyperparameters dengan inheritance dari BaseConfigHandler 🎯"""
     
-    def __init__(self, config_filename: str = 'hyperparameters_config', module_name: str = 'hyperparameters'):
-        super().__init__(config_filename, module_name)
-    
-    def update_ui_from_config(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI components dari config dengan field mapping yang simplified 🔄"""
-        
-        # Extract config sections
-        training = config.get('training', {})
-        optimizer = config.get('optimizer', {})
-        scheduler = config.get('scheduler', {})
-        loss = config.get('loss', {})
-        early_stopping = config.get('early_stopping', {})
-        checkpoint = config.get('checkpoint', {})
-        
-        # Helper untuk set widget value
-        set_val = lambda key, val: setattr(ui_components.get(key, type('obj', (object,), {})()), 'value', val)
-        
-        # Field mappings essentials - hanya yang ada di UI
-        field_mappings = [
-            # Training essentials
-            ('epochs_slider', training, 'epochs', 100),
-            ('batch_size_slider', training, 'batch_size', 16),
-            ('learning_rate_slider', training, 'learning_rate', 0.01),
-            ('image_size_slider', training, 'image_size', 640),
-            
-            # Optimizer essentials
-            ('optimizer_dropdown', optimizer, 'type', 'SGD'),
-            ('weight_decay_slider', optimizer, 'weight_decay', 0.0005),
-            
-            # Scheduler essentials
-            ('scheduler_dropdown', scheduler, 'type', 'cosine'),
-            ('warmup_epochs_slider', scheduler, 'warmup_epochs', 3),
-            
-            # Loss essentials
-            ('box_loss_gain_slider', loss, 'box_loss_gain', 0.05),
-            ('cls_loss_gain_slider', loss, 'cls_loss_gain', 0.5),
-            ('obj_loss_gain_slider', loss, 'obj_loss_gain', 1.0),
-            
-            # Control essentials
-            ('early_stopping_checkbox', early_stopping, 'enabled', True),
-            ('patience_slider', early_stopping, 'patience', 15),
-            ('save_best_checkbox', checkpoint, 'save_best', True),
-            ('checkpoint_metric_dropdown', checkpoint, 'metric', 'mAP_0.5')
-        ]
-        
-        # Apply updates dengan one-liner
-        [set_val(component_key, source_config.get(config_key, default_value)) 
-         for component_key, source_config, config_key, default_value in field_mappings]
-        
-        # Update summary cards jika ada
-        self._update_summary_cards(ui_components, config)
-    
-    def update_config_from_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-        """Update config dari UI components dengan field mapping essentials 🔄"""
-        
-        # Helper untuk get widget value
-        get_val = lambda key: getattr(ui_components.get(key, type('obj', (object,), {'value': None})()), 'value', None)
-        
-        # Update config sections
-        config.setdefault('training', {}).update({
-            'epochs': get_val('epochs_slider'),
-            'batch_size': get_val('batch_size_slider'),
-            'learning_rate': get_val('learning_rate_slider'),
-            'image_size': get_val('image_size_slider')
-        })
-        
-        config.setdefault('optimizer', {}).update({
-            'type': get_val('optimizer_dropdown'),
-            'weight_decay': get_val('weight_decay_slider')
-        })
-        
-        config.setdefault('scheduler', {}).update({
-            'type': get_val('scheduler_dropdown'),
-            'warmup_epochs': get_val('warmup_epochs_slider')
-        })
-        
-        config.setdefault('loss', {}).update({
-            'box_loss_gain': get_val('box_loss_gain_slider'),
-            'cls_loss_gain': get_val('cls_loss_gain_slider'),
-            'obj_loss_gain': get_val('obj_loss_gain_slider')
-        })
-        
-        config.setdefault('early_stopping', {}).update({
-            'enabled': get_val('early_stopping_checkbox'),
-            'patience': get_val('patience_slider')
-        })
-        
-        config.setdefault('checkpoint', {}).update({
-            'save_best': get_val('save_best_checkbox'),
-            'metric': get_val('checkpoint_metric_dropdown')
-        })
-        
-        return config
+    def __init__(self, module_name: str = 'hyperparameters', config_filename: str = 'hyperparameters_config.yaml'):
+        super().__init__(module_name, config_filename)
+        self.config_type = 'hyperparameters'
     
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default hyperparameters configuration"""
+        """Ambil default configuration untuk hyperparameters ⚙️"""
         return get_default_hyperparameters_config()
     
-    def _update_summary_cards(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update summary cards dengan config terbaru"""
-        if 'summary_cards' not in ui_components:
-            return
-            
-        training = config.get('training', {})
-        optimizer = config.get('optimizer', {})
-        loss = config.get('loss', {})
-        early_stopping = config.get('early_stopping', {})
-        checkpoint = config.get('checkpoint', {})
-        
-        summary_data = {
-            'Training': f"Epochs: {training.get('epochs', 100)}, Batch: {training.get('batch_size', 16)}, LR: {training.get('learning_rate', 0.01):.4f}",
-            'Optimizer': f"{optimizer.get('type', 'SGD')} (decay: {optimizer.get('weight_decay', 0.0005):.4f})",
-            'Loss': f"Box: {loss.get('box_loss_gain', 0.05):.2f}, Cls: {loss.get('cls_loss_gain', 0.5):.1f}, Obj: {loss.get('obj_loss_gain', 1.0):.1f}",
-            'Control': f"Early Stop: {'On' if early_stopping.get('enabled', True) else 'Off'}, Save Best: {'On' if checkpoint.get('save_best', True) else 'Off'}"
-        }
-        
-        # Update summary cards content
-        ui_components['summary_cards'].children = tuple([
-            self._create_summary_card(title, content) 
-            for title, content in summary_data.items()
-        ])
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validasi konfigurasi hyperparameters ✅"""
+        return try_operation_safe(
+            operation=lambda: self._validate_config_structure(config),
+            fallback_value=False,
+            logger=logger,
+            operation_name="validating hyperparameters config"
+        )
     
-    def _create_summary_card(self, title: str, content: str) -> Any:
-        """Create summary card widget"""
-        from ipywidgets import HTML
-        return HTML(f"""
-            <div style='background: #f8f9fa; border: 1px solid #dee2e6; 
-                        border-radius: 6px; padding: 8px; margin: 2px;'>
-                <strong style='color: #495057;'>{title}:</strong><br>
-                <span style='color: #6c757d; font-size: 0.9em;'>{content}</span>
-            </div>
-        """)
-
-
-# Removed field mappings yang tidak digunakan:
-# - mixed_precision_checkbox
-# - gradient_accumulation_slider  
-# - gradient_clipping_slider
-# - momentum_slider
-# - min_delta_slider
+    def _validate_config_structure(self, config: Dict[str, Any]) -> bool:
+        """Internal validation logic"""
+        required_sections = ['training', 'optimizer', 'scheduler', 'loss', 'early_stopping', 'checkpoint']
+        
+        for section in required_sections:
+            if section not in config:
+                logger.warning(f"⚠️ Missing section '{section}' in hyperparameters config")
+                return False
+        
+        # Validasi training parameters
+        training = config.get('training', {})
+        if not self._validate_training_params(training):
+            return False
+        
+        # Validasi optimizer parameters
+        optimizer = config.get('optimizer', {})
+        if not self._validate_optimizer_params(optimizer):
+            return False
+        
+        logger.info("✅ Hyperparameters config validation passed")
+        return True
+    
+    def _validate_training_params(self, training: Dict[str, Any]) -> bool:
+        """Validasi parameter training 🎯"""
+        try:
+            epochs = training.get('epochs', 100)
+            if not isinstance(epochs, int) or epochs < 1:
+                logger.error("❌ Invalid epochs value")
+                return False
+            
+            batch_size = training.get('batch_size', 16)
+            if not isinstance(batch_size, int) or batch_size < 1:
+                logger.error("❌ Invalid batch_size value")
+                return False
+            
+            learning_rate = training.get('learning_rate', 0.01)
+            if not isinstance(learning_rate, (int, float)) or learning_rate <= 0:
+                logger.error("❌ Invalid learning_rate value")
+                return False
+            
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error validating training params: {e}")
+            return False
+    
+    def _validate_optimizer_params(self, optimizer: Dict[str, Any]) -> bool:
+        """Validasi parameter optimizer ⚙️"""
+        try:
+            name = optimizer.get('name', 'AdamW')
+            if name not in ['AdamW', 'SGD', 'Adam']:
+                logger.error(f"❌ Unsupported optimizer: {name}")
+                return False
+            
+            weight_decay = optimizer.get('weight_decay', 0.0001)
+            if not isinstance(weight_decay, (int, float)) or weight_decay < 0:
+                logger.error("❌ Invalid weight_decay value")
+                return False
+            
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error validating optimizer params: {e}")
+            return False
+    
+    def merge_with_model_config(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge hyperparameters config dengan model config 🔗"""
+        return try_operation_safe(
+            operation=lambda: self._merge_configs(model_config),
+            fallback_value=self.config,
+            logger=logger,
+            operation_name="merging hyperparameters with model config"
+        )
+    
+    def _merge_configs(self, model_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Internal merge logic"""
+        merged_config = self.config.copy()
+        
+        # Merge training parameters dari model config
+        if 'training' in model_config:
+            model_training = model_config['training']
+            merged_config['training'].update({
+                'epochs': model_training.get('epochs', merged_config['training']['epochs']),
+                'batch_size': model_training.get('batch_size', merged_config['training']['batch_size']),
+                'learning_rate': model_training.get('learning_rate', merged_config['training']['learning_rate'])
+            })
+        
+        # Merge optimizer parameters
+        if 'training' in model_config and 'optimizer' in model_config['training']:
+            optimizer_name = model_config['training']['optimizer']
+            merged_config['optimizer']['name'] = optimizer_name
+        
+        # Merge scheduler parameters
+        if 'training' in model_config and 'scheduler' in model_config['training']:
+            scheduler_name = model_config['training']['scheduler']
+            merged_config['scheduler']['name'] = scheduler_name
+        
+        logger.info("✅ Successfully merged hyperparameters with model config")
+        return merged_config
+    
+    def extract_training_params(self) -> Dict[str, Any]:
+        """Extract parameter training untuk backend model 🎯"""
+        try:
+            training_params = {
+                'epochs': self.config['training']['epochs'],
+                'batch_size': self.config['training']['batch_size'],
+                'learning_rate': self.config['training']['learning_rate'],
+                'image_size': self.config['training']['image_size'],
+                'weight_decay': self.config['optimizer']['weight_decay'],
+                'optimizer': self.config['optimizer']['name'],
+                'scheduler': self.config['scheduler']['name'],
+                'early_stopping': self.config['early_stopping']['enabled'],
+                'patience': self.config['early_stopping']['patience']
+            }
+            
+            logger.info("✅ Training parameters extracted successfully")
+            return training_params
+            
+        except Exception as e:
+            logger.error(f"❌ Error extracting training params: {e}")
+            return {}
+    
+    def update_from_widgets(self, widgets_dict: Dict[str, Any]) -> bool:
+        """Update config dari widget values 🔄"""
+        return try_operation_safe(
+            operation=lambda: self._update_config_from_widgets(widgets_dict),
+            fallback_value=False,
+            logger=logger,
+            operation_name="updating config from widgets"
+        )
+    
+    def _update_config_from_widgets(self, widgets_dict: Dict[str, Any]) -> bool:
+        """Internal update logic"""
+        # Update training parameters
+        widget_mappings = [
+            ('epochs_slider', 'training', 'epochs'),
+            ('batch_size_slider', 'training', 'batch_size'),
+            ('learning_rate_slider', 'training', 'learning_rate'),
+            ('image_size_slider', 'training', 'image_size'),
+            ('optimizer_dropdown', 'optimizer', 'name'),
+            ('weight_decay_slider', 'optimizer', 'weight_decay'),
+            ('momentum_slider', 'optimizer', 'momentum'),
+            ('scheduler_dropdown', 'scheduler', 'name'),
+            ('warmup_epochs_slider', 'scheduler', 'warmup_epochs'),
+            ('early_stopping_checkbox', 'early_stopping', 'enabled'),
+            ('patience_slider', 'early_stopping', 'patience')
+        ]
+        
+        for widget_key, section, param in widget_mappings:
+            if widget_key in widgets_dict:
+                if section not in self.config:
+                    self.config[section] = {}
+                self.config[section][param] = widgets_dict[widget_key].value
+        
+        logger.info("✅ Config updated from widgets successfully")
+        return True

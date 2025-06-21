@@ -87,3 +87,15 @@ def create_section_card(title: str, widgets_list: List, color: str = '#2196f3') 
         padding='8px', border='1px solid #dee2e6', border_radius='6px',
         background_color='#fafafa', margin='4px 0'
     ))
+
+
+def create_responsive_grid_layout(cards: List[widgets.Widget]) -> widgets.HBox:
+    """Create responsive grid layout untuk cards dengan flexbox"""
+    return widgets.HBox(
+        cards,
+        layout=widgets.Layout(
+            width='100%', display='flex', flex_flow='row wrap',
+            justify_content='space-between', align_items='stretch',
+            gap='10px', overflow='hidden'
+        )
+    )

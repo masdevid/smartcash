@@ -1,115 +1,93 @@
 """
 File: smartcash/ui/hyperparameters/components/ui_layout.py
-Deskripsi: Layout arrangement untuk hyperparameters dengan grid responsif dan tidak ada horizontal scrollbar
+Deskripsi: Layout arrangement untuk hyperparameters dengan grid responsif simplified
 """
 
 from typing import Dict, Any
 import ipywidgets as widgets
-from smartcash.ui.utils.header_utils import create_header
-from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.hyperparameters.utils.form_helpers import create_section_card, create_responsive_grid_layout
 
 
 def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Create layout dengan section cards dan responsive grid untuk mencegah horizontal scrollbar"""
+    """Create layout dengan section cards simplified sesuai parameter yang ada"""
     
-    # Training parameters section
+    # Training parameters section - essentials only
     training_section = create_section_card(
         "📊 Parameter Training", [
             form_components['epochs_slider'],
             form_components['batch_size_slider'],
             form_components['learning_rate_slider'],
-            form_components['image_size_slider'],
-            form_components['mixed_precision_checkbox']
+            form_components['image_size_slider']
         ], '#2196f3'
     )
     
-    # Optimizer & scheduler section
+    # Optimizer & scheduler section - essentials only
     optimizer_section = create_section_card(
         "⚙️ Optimizer & Scheduler", [
             form_components['optimizer_dropdown'],
             form_components['weight_decay_slider'],
-            form_components['momentum_slider'],
             widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
             form_components['scheduler_dropdown'],
             form_components['warmup_epochs_slider']
         ], '#9c27b0'
     )
     
-    # Advanced parameters section
-    advanced_section = create_section_card(
-        "🔧 Parameter Lanjutan", [
-            widgets.HTML("<b style='color: #666; font-size: 12px;'>LOSS WEIGHTS</b>"),
+    # Loss parameters section
+    loss_section = create_section_card(
+        "🎯 Loss Weights", [
             form_components['box_loss_gain_slider'],
             form_components['cls_loss_gain_slider'],
-            form_components['obj_loss_gain_slider'],
-            widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
-            widgets.HTML("<b style='color: #666; font-size: 12px;'>TRAINING CONTROL</b>"),
-            form_components['gradient_accumulation_slider'],
-            form_components['gradient_clipping_slider']
+            form_components['obj_loss_gain_slider']
         ], '#ff9800'
     )
     
     # Control & checkpoint section
     control_section = create_section_card(
-        "🛑 Early Stopping & Checkpoint", [
+        "🛑 Control & Checkpoint", [
             form_components['early_stopping_checkbox'],
             form_components['patience_slider'],
-            form_components['min_delta_slider'],
             widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
             form_components['save_best_checkbox'],
             form_components['checkpoint_metric_dropdown']
         ], '#4caf50'
     )
     
-    # Create responsive grid layout dengan max 2 columns untuk parameter cards
-    params_grid = widgets.HBox([
-        training_section,
-        optimizer_section
-    ], layout=widgets.Layout(
-        width='100%', display='flex', flex_flow='row wrap',
-        justify_content='space-between', align_items='stretch',
-        gap='10px', overflow='hidden'
-    ))
+    # Create responsive grid layout dengan 2x2 grid
+    params_grid = create_responsive_grid_layout([training_section, optimizer_section])
+    advanced_grid = create_responsive_grid_layout([loss_section, control_section])
     
-    advanced_grid = widgets.HBox([
-        advanced_section,
-        control_section
-    ], layout=widgets.Layout(
-        width='100%', display='flex', flex_flow='row wrap',
-        justify_content='space-between', align_items='stretch',
-        gap='10px', overflow='hidden'
-    ))
+    # Summary cards section
+    summary_section = widgets.VBox([
+        widgets.HTML("<h6 style='margin: 8px 0; color: #495057;'>📋 Ringkasan Konfigurasi</h6>"),
+        form_components['summary_cards']
+    ], layout=widgets.Layout(margin='16px 0 8px 0'))
     
-    # Header component
-    header = create_header(
-        title="Konfigurasi Hyperparameter",
-        description="Pengaturan parameter pelatihan untuk optimasi model deteksi mata uang",
-        icon=ICONS.get('settings', '⚙️')
-    )
-    
-    # Main container dengan layout yang tidak overflow
-    main_container = widgets.VBox([
-        header,
+    # Status dan action buttons
+    action_section = widgets.VBox([
         form_components['status_panel'],
-        form_components['summary_cards'],
+        form_components['button_container']
+    ], layout=widgets.Layout(margin='8px 0'))
+    
+    # Main container dengan proper spacing
+    main_container = widgets.VBox([
+        widgets.HTML("<h4 style='margin: 8px 0; color: #333; border-bottom: 2px solid #2196f3; padding-bottom: 4px;'>🎛️ Konfigurasi Hyperparameters</h4>"),
         params_grid,
         advanced_grid,
-        form_components['button_container']
+        summary_section,
+        action_section
     ], layout=widgets.Layout(
-        width='100%', max_width='100%', padding='10px',
-        overflow='hidden'
+        width='100%', padding='12px', border='1px solid #dee2e6',
+        border_radius='8px', background_color='#fafbfc'
     ))
     
-    # Return components dengan required keys untuk ConfigCellInitializer
+    # Return components untuk akses dari handler
     return {
         'main_container': main_container,
-        'save_button': form_components['save_button'],
-        'reset_button': form_components['reset_button'],
-        'status_panel': form_components['status_panel'],
-        'summary_cards': form_components['summary_cards'],
-        'header': header,
-        'params_grid': params_grid,
-        'advanced_grid': advanced_grid,
-        **form_components  # Include all form components
+        'training_section': training_section,
+        'optimizer_section': optimizer_section,
+        'loss_section': loss_section,
+        'control_section': control_section,
+        'summary_section': summary_section,
+        'action_section': action_section,
+        **form_components  # Spread all form components
     }

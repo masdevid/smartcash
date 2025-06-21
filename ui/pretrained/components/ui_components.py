@@ -5,9 +5,12 @@ Deskripsi: UI components untuk pretrained models menggunakan reusable shared com
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from smartcash.common.logger import get_logger
 import traceback
+import sys
+from IPython.display import display, HTML
+from ipywidgets import Layout, Output
 
 logger = get_logger(__name__)
 
@@ -20,7 +23,6 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         **kwargs: Additional keyword arguments
             - exc_info: Optional exception info tuple (type, value, traceback)
     """
-    exc_info = kwargs.pop('exc_info', None)
     try:
         # Handle None config
         config = config or {}
@@ -39,13 +41,18 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         # Get pretrained_config with type safety
         pretrained_config = config.get('pretrained_models', {})
         
-        # Import shared reusable components
-        from smartcash.ui.utils.header_utils import create_header
-        from smartcash.ui.components.status_panel import create_status_panel
-        from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
-        from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-        from smartcash.ui.components.log_accordion import create_log_accordion
-        from smartcash.ui.components.action_buttons import create_action_buttons
+        # Import shared reusable components with error handling
+        try:
+            from smartcash.ui.utils.header_utils import create_header
+            from smartcash.ui.components.status_panel import create_status_panel
+            from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
+            from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+            from smartcash.ui.components.log_accordion import create_log_accordion
+            from smartcash.ui.components.action_buttons import create_action_buttons
+        except ImportError as e:
+            error_msg = f"Gagal mengimpor komponen UI yang diperlukan: {str(e)}\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            return _create_fallback_ui(error_msg, sys.exc_info())
         
         # 1. 📊 Header - shared component
         header = create_header(
@@ -67,35 +74,40 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         )
         
         # 4. 🔧 Input Options (module-specific minimal)
-        input_options = _create_pretrained_input_options(pretrained_config)
-        
-        # 5. 🎯 Action Buttons - shared component
-        download_sync_button = widgets.Button(
-            description="📥 Download & Sync Models",
-            button_style='primary',
-            icon='download',
-            layout=widgets.Layout(width='200px', height='35px')
-        )
-        action_buttons = create_action_buttons([download_sync_button])
-        
-        # 6. 💾 Save/Reset Buttons - shared component
-        save_reset_buttons = create_save_reset_buttons()
-        
-        # 7. 📝 Log Output - shared component
-        log_output = widgets.Output(
-            layout=widgets.Layout(
-                width='100%',
-                min_height='100px',
-                max_height='300px',
-                border='1px solid #ddd',
-                padding='10px'
+        try:
+            input_options = _create_pretrained_input_options(pretrained_config)
+            
+            # 5. 🎯 Action Buttons - shared component
+            download_sync_button = widgets.Button(
+                description="📥 Download & Sync Models",
+                button_style='primary',
+                icon='download',
+                layout=widgets.Layout(width='200px', height='35px')
             )
-        )
-        log_accordion = create_log_accordion(
-            log_output=log_output,
-            title="📋 Pretrained Setup Logs",
-            selected_index=None
-        )
+            action_buttons = create_action_buttons([download_sync_button])
+            
+            # 6. 💾 Save/Reset Buttons - shared component
+            save_reset_buttons = create_save_reset_buttons()
+            
+            # 7. 📝 Log Output - shared component
+            log_output = widgets.Output(
+                layout=widgets.Layout(
+                    width='100%',
+                    min_height='100px',
+                    max_height='300px',
+                    border='1px solid #ddd',
+                    padding='10px'
+                )
+            )
+            log_accordion = create_log_accordion(
+                log_output=log_output,
+                title="📋 Pretrained Setup Logs",
+                selected_index=None
+            )
+        except Exception as e:
+            error_msg = f"Gagal membuat komponen UI: {str(e)}\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            return _create_fallback_ui(error_msg, sys.exc_info())
         
         # 8. 💬 Dialog Area (minimal)
         confirmation_area = widgets.Output(layout=widgets.Layout(
@@ -161,12 +173,9 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         return ui_components
         
     except Exception as e:
-        import sys
-        logger.error("❌ Error creating pretrained UI", exc_info=True)
-        return _create_fallback_ui(
-            f"Error creating pretrained UI: {str(e)}",
-            exc_info=sys.exc_info()
-        )
+        error_msg = f"Gagal membuat UI components untuk pretrained_models: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        return _create_fallback_ui(error_msg, sys.exc_info())
 
 def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[str, Any]:
     """Create minimal input options khusus pretrained (module-specific minimal UI)"""

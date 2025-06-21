@@ -24,24 +24,74 @@ class PretrainedConfigHandler(ConfigHandler):
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """🔍 Extract dengan fallback ke defaults"""
+        from smartcash.common.logger import get_logger
+        logger = get_logger(__name__)
+        
         defaults = get_default_pretrained_config()['pretrained_models']
         config = {}
         
+        logger.debug(f"Extracting config from UI components. Available keys: {list(ui_components.keys())}")
+        
         for config_key, widget_key in self.config_mapping.items():
-            value = getattr(ui_components.get(widget_key), 'value', defaults.get(config_key, ''))
-            # Ensure pretrained_type is a string, not a list
-            if config_key == 'pretrained_type' and isinstance(value, (list, tuple)) and len(value) > 0:
-                value = value[0]
-            config[config_key] = str(value) if value is not None else ''
-            
+            try:
+                widget = ui_components.get(widget_key)
+                if widget is None:
+                    logger.warning(f"Widget {widget_key} not found in UI components")
+                    value = defaults.get(config_key, '')
+                else:
+                    value = getattr(widget, 'value', defaults.get(config_key, ''))
+                
+                logger.debug(f"Processing {config_key} (widget: {widget_key}), value: {value}, type: {type(value)}")
+                
+                # Ensure value is a string, not a list
+                if isinstance(value, (list, tuple)) and len(value) > 0:
+                    logger.debug(f"Converting list to string for {config_key}: {value}")
+                    value = str(value[0]) if value[0] is not None else ''
+                else:
+                    value = str(value) if value is not None else ''
+                    
+                config[config_key] = value
+                
+            except Exception as e:
+                logger.error(f"Error processing {config_key} ({widget_key}): {str(e)}", exc_info=True)
+                config[config_key] = str(defaults.get(config_key, ''))
+        
+        logger.debug(f"Final config: {config}")
         return {'pretrained_models': config}
     
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """📝 Update dengan safe access"""
+        from smartcash.common.logger import get_logger
+        logger = get_logger(__name__)
+        
         pretrained_config = config.get('pretrained_models', {})
-        [setattr(ui_components[widget_key], 'value', pretrained_config.get(config_key))
-         for config_key, widget_key in self.config_mapping.items()
-         if widget_key in ui_components and hasattr(ui_components[widget_key], 'value')]
+        logger.debug(f"Updating UI with config: {pretrained_config}")
+        
+        for config_key, widget_key in self.config_mapping.items():
+            try:
+                if widget_key not in ui_components:
+                    logger.warning(f"Widget {widget_key} not found in UI components")
+                    continue
+                    
+                widget = ui_components[widget_key]
+                if not hasattr(widget, 'value'):
+                    logger.warning(f"Widget {widget_key} has no 'value' attribute")
+                    continue
+                    
+                value = pretrained_config.get(config_key)
+                logger.debug(f"Setting {widget_key} ({config_key}) to: {value}, type: {type(value)}")
+                
+                # Handle list values
+                if isinstance(value, (list, tuple)) and len(value) > 0:
+                    value = value[0]  # Take first item if it's a list
+                    logger.debug(f"Converted list to single value: {value}")
+                
+                # Ensure we don't set None values
+                if value is not None:
+                    widget.value = value
+                    
+            except Exception as e:
+                logger.error(f"Error updating {widget_key} ({config_key}): {str(e)}", exc_info=True)
     
     def get_default_config(self) -> Dict[str, Any]:
         """📋 Delegate ke defaults.py"""

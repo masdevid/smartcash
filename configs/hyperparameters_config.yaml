@@ -1,45 +1,62 @@
 # File: configs/hyperparameters_config.yaml
-# Author: Alfrida Sabar (Direvisi)
-# Deskripsi: Konfigurasi hyperparameter untuk optimasi dan training model
+# Deskripsi: Konfigurasi hyperparameter essentials untuk backend model training
 
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Override parameter training dari base_config
+# Parameter training utama yang digunakan backend
 training:
-  epochs: 100  # Override dari base_config (30)
-  lr: 0.01  # Override dari base_config (0.001)
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.01
+  image_size: 640
 
-# Parameter penjadwalan (parameter baru)
+# Parameter optimizer essentials
+optimizer:
+  type: 'SGD'
+  weight_decay: 0.0005
+  momentum: 0.937  # Default SGD, tidak di UI
+
+# Parameter scheduler
 scheduler:
   type: 'cosine'
   warmup_epochs: 3
-  warmup_momentum: 0.8
-  warmup_bias_lr: 0.1
+  warmup_momentum: 0.8  # Backend default
+  warmup_bias_lr: 0.1   # Backend default
 
-# Parameter regularisasi (parameter baru)
-regularization:
-  augment: true
-  dropout: 0.0
-
-# Parameter loss (parameter baru)
+# Parameter loss weights
 loss:
   box_loss_gain: 0.05
   cls_loss_gain: 0.5
   obj_loss_gain: 1.0
 
-# Parameter anchor (parameter baru)
+# Early stopping configuration
+early_stopping:
+  enabled: true
+  patience: 15
+  min_delta: 0.001  # Backend default
+
+# Checkpoint configuration
+checkpoint:
+  save_best: true
+  metric: 'mAP_0.5'
+
+# Backend defaults yang tidak perlu di UI
+regularization:
+  dropout: 0.0
+  
 anchor:
   anchor_t: 4.0
   fl_gamma: 0.0
 
-# Override parameter early stopping
-early_stopping:
-  enabled: true  # Parameter baru
-  patience: 15  # Override dari base_config (10)
-  min_delta: 0.001  # Parameter baru
+# Config metadata
+config_version: '2.0'
+description: 'Simplified hyperparameter config untuk backend model'
+module_name: 'hyperparameters'
 
-# Parameter save best model (parameter baru)
-save_best:
-  enabled: true
-  metric: 'mAP_0.5'
+# Removed unused parameters:
+# - mixed_precision (tidak digunakan backend)
+# - gradient_accumulation (tidak di backend config)
+# - gradient_clipping (overlap dengan strategy)
+# - augment parameter (ada di augmentation config)
+# - multi-scale parameters (ada di strategy config)

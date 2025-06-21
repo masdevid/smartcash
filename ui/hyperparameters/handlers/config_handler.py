@@ -1,76 +1,23 @@
 """
 File: smartcash/ui/hyperparameters/handlers/config_handler.py
-Deskripsi: Config handler untuk hyperparameters dengan extract/update yang clean dan summary cards
+Deskripsi: Config handler untuk hyperparameters dengan field mapping essentials
 """
 
 from typing import Dict, Any
-import datetime
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.handlers.config_handlers import BaseConfigHandler
 from smartcash.ui.hyperparameters.handlers.defaults import get_default_hyperparameters_config
 
 
-class HyperparametersConfigHandler(ConfigHandler):
-    """Config handler untuk hyperparameters dengan summary cards dan clean operations"""
+class HyperparametersConfigHandler(BaseConfigHandler):
+    """Config handler untuk hyperparameters dengan field mapping essentials backend"""
     
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dari UI components dengan one-liner style"""
-        
-        # One-liner safe getter
-        get_val = lambda key, default: getattr(ui_components.get(key), 'value', default) if key in ui_components and hasattr(ui_components.get(key), 'value') else default
-        
-        return {
-            '_base_': 'base_config.yaml',
-            
-            'training': {
-                'epochs': get_val('epochs_slider', 100),
-                'batch_size': get_val('batch_size_slider', 16),
-                'learning_rate': get_val('learning_rate_slider', 0.01),
-                'image_size': get_val('image_size_slider', 640),
-                'mixed_precision': get_val('mixed_precision_checkbox', True),
-                'gradient_accumulation': get_val('gradient_accumulation_slider', 1),
-                'gradient_clipping': get_val('gradient_clipping_slider', 1.0)
-            },
-            
-            'optimizer': {
-                'type': get_val('optimizer_dropdown', 'SGD'),
-                'weight_decay': get_val('weight_decay_slider', 0.0005),
-                'momentum': get_val('momentum_slider', 0.937)
-            },
-            
-            'scheduler': {
-                'type': get_val('scheduler_dropdown', 'cosine'),
-                'warmup_epochs': get_val('warmup_epochs_slider', 3)
-            },
-            
-            'loss': {
-                'box_loss_gain': get_val('box_loss_gain_slider', 0.05),
-                'cls_loss_gain': get_val('cls_loss_gain_slider', 0.5),
-                'obj_loss_gain': get_val('obj_loss_gain_slider', 1.0)
-            },
-            
-            'early_stopping': {
-                'enabled': get_val('early_stopping_checkbox', True),
-                'patience': get_val('patience_slider', 15),
-                'min_delta': get_val('min_delta_slider', 0.001)
-            },
-            
-            'checkpoint': {
-                'save_best': get_val('save_best_checkbox', True),
-                'metric': get_val('checkpoint_metric_dropdown', 'mAP_0.5')
-            },
-            
-            'config_version': '1.0',
-            'updated_at': datetime.datetime.now().isoformat(),
-            'module_name': 'hyperparameters'
-        }
+    def __init__(self, config_filename: str = 'hyperparameters_config', module_name: str = 'hyperparameters'):
+        super().__init__(config_filename, module_name)
     
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI components dari config dengan one-liner assignments"""
+    def update_ui_from_config(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI components dari config dengan field mapping yang simplified 🔄"""
         
-        # One-liner safe setter
-        set_val = lambda key, value: setattr(ui_components[key], 'value', value) if key in ui_components and hasattr(ui_components[key], 'value') else None
-        
-        # Extract nested configs dengan fallbacks
+        # Extract config sections
         training = config.get('training', {})
         optimizer = config.get('optimizer', {})
         scheduler = config.get('scheduler', {})
@@ -78,26 +25,33 @@ class HyperparametersConfigHandler(ConfigHandler):
         early_stopping = config.get('early_stopping', {})
         checkpoint = config.get('checkpoint', {})
         
-        # Update UI dengan batch assignments
+        # Helper untuk set widget value
+        set_val = lambda key, val: setattr(ui_components.get(key, type('obj', (object,), {})()), 'value', val)
+        
+        # Field mappings essentials - hanya yang ada di UI
         field_mappings = [
+            # Training essentials
             ('epochs_slider', training, 'epochs', 100),
             ('batch_size_slider', training, 'batch_size', 16),
             ('learning_rate_slider', training, 'learning_rate', 0.01),
             ('image_size_slider', training, 'image_size', 640),
-            ('mixed_precision_checkbox', training, 'mixed_precision', True),
-            ('gradient_accumulation_slider', training, 'gradient_accumulation', 1),
-            ('gradient_clipping_slider', training, 'gradient_clipping', 1.0),
+            
+            # Optimizer essentials
             ('optimizer_dropdown', optimizer, 'type', 'SGD'),
             ('weight_decay_slider', optimizer, 'weight_decay', 0.0005),
-            ('momentum_slider', optimizer, 'momentum', 0.937),
+            
+            # Scheduler essentials
             ('scheduler_dropdown', scheduler, 'type', 'cosine'),
             ('warmup_epochs_slider', scheduler, 'warmup_epochs', 3),
+            
+            # Loss essentials
             ('box_loss_gain_slider', loss, 'box_loss_gain', 0.05),
             ('cls_loss_gain_slider', loss, 'cls_loss_gain', 0.5),
             ('obj_loss_gain_slider', loss, 'obj_loss_gain', 1.0),
+            
+            # Control essentials
             ('early_stopping_checkbox', early_stopping, 'enabled', True),
             ('patience_slider', early_stopping, 'patience', 15),
-            ('min_delta_slider', early_stopping, 'min_delta', 0.001),
             ('save_best_checkbox', checkpoint, 'save_best', True),
             ('checkpoint_metric_dropdown', checkpoint, 'metric', 'mAP_0.5')
         ]
@@ -109,57 +63,91 @@ class HyperparametersConfigHandler(ConfigHandler):
         # Update summary cards jika ada
         self._update_summary_cards(ui_components, config)
     
+    def update_config_from_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Update config dari UI components dengan field mapping essentials 🔄"""
+        
+        # Helper untuk get widget value
+        get_val = lambda key: getattr(ui_components.get(key, type('obj', (object,), {'value': None})()), 'value', None)
+        
+        # Update config sections
+        config.setdefault('training', {}).update({
+            'epochs': get_val('epochs_slider'),
+            'batch_size': get_val('batch_size_slider'),
+            'learning_rate': get_val('learning_rate_slider'),
+            'image_size': get_val('image_size_slider')
+        })
+        
+        config.setdefault('optimizer', {}).update({
+            'type': get_val('optimizer_dropdown'),
+            'weight_decay': get_val('weight_decay_slider')
+        })
+        
+        config.setdefault('scheduler', {}).update({
+            'type': get_val('scheduler_dropdown'),
+            'warmup_epochs': get_val('warmup_epochs_slider')
+        })
+        
+        config.setdefault('loss', {}).update({
+            'box_loss_gain': get_val('box_loss_gain_slider'),
+            'cls_loss_gain': get_val('cls_loss_gain_slider'),
+            'obj_loss_gain': get_val('obj_loss_gain_slider')
+        })
+        
+        config.setdefault('early_stopping', {}).update({
+            'enabled': get_val('early_stopping_checkbox'),
+            'patience': get_val('patience_slider')
+        })
+        
+        config.setdefault('checkpoint', {}).update({
+            'save_best': get_val('save_best_checkbox'),
+            'metric': get_val('checkpoint_metric_dropdown')
+        })
+        
+        return config
+    
     def get_default_config(self) -> Dict[str, Any]:
         """Get default hyperparameters configuration"""
         return get_default_hyperparameters_config()
     
-    def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Override dengan hyperparameters-specific success message"""
-        self._update_status_panel(ui_components, "💾 Konfigurasi hyperparameter berhasil disimpan", "success")
-        self._update_summary_cards(ui_components, config)
-        self.logger.success("💾 Hyperparameters config berhasil disimpan")
-    
-    def after_reset_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Override dengan hyperparameters-specific reset message"""
-        self._update_status_panel(ui_components, "🔄 Konfigurasi hyperparameter berhasil direset", "success")
-        self._update_summary_cards(ui_components, config)
-        self.logger.success("🔄 Hyperparameters config berhasil direset")
-    
     def _update_summary_cards(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update summary cards dengan config hyperparameters yang tersimpan - always visible dengan 4 cards compact"""
+        """Update summary cards dengan config terbaru"""
         if 'summary_cards' not in ui_components:
             return
-        
+            
         training = config.get('training', {})
         optimizer = config.get('optimizer', {})
-        scheduler = config.get('scheduler', {})
+        loss = config.get('loss', {})
         early_stopping = config.get('early_stopping', {})
+        checkpoint = config.get('checkpoint', {})
         
-        summary_html = f"""
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0;">
-            <div style="background: #e3f2fd; padding: 8px; border-radius: 6px; border-left: 3px solid #2196f3;">
-                <h6 style="margin: 0 0 4px 0; color: #1976d2; font-size: 12px;">📊 Training</h6>
-                <p style="margin: 1px 0; font-size: 11px;">Epochs: <strong>{training.get('epochs', 100)}</strong></p>
-                <p style="margin: 1px 0; font-size: 11px;">Batch: <strong>{training.get('batch_size', 16)}</strong></p>
-                <p style="margin: 1px 0; font-size: 11px;">LR: <strong>{training.get('learning_rate', 0.01)}</strong></p>
-            </div>
-            <div style="background: #f3e5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #9c27b0;">
-                <h6 style="margin: 0 0 4px 0; color: #7b1fa2; font-size: 12px;">⚙️ Optimizer</h6>
-                <p style="margin: 1px 0; font-size: 11px;">Type: <strong>{optimizer.get('type', 'SGD')}</strong></p>
-                <p style="margin: 1px 0; font-size: 11px;">WD: <strong>{optimizer.get('weight_decay', 0.0005)}</strong></p>
-                <p style="margin: 1px 0; font-size: 11px;">Mom: <strong>{optimizer.get('momentum', 0.937)}</strong></p>
-            </div>
-            <div style="background: #e8f5e8; padding: 8px; border-radius: 6px; border-left: 3px solid #4caf50;">
-                <h6 style="margin: 0 0 4px 0; color: #388e3c; font-size: 12px;">📈 Scheduler</h6>
-                <p style="margin: 1px 0; font-size: 11px;">Type: <strong>{scheduler.get('type', 'cosine')}</strong></p>
-                <p style="margin: 1px 0; font-size: 11px;">Warmup: <strong>{scheduler.get('warmup_epochs', 3)}</strong></p>
-            </div>
-            <div style="background: #fff3e0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff9800;">
-                <h6 style="margin: 0 0 4px 0; color: #f57c00; font-size: 12px;">🛑 Early Stop</h6>
-                <p style="margin: 1px 0; font-size: 11px;">Enabled: <strong>{'Ya' if early_stopping.get('enabled', True) else 'Tidak'}</strong></p>
-                <p style="margin: 1px 0; font-size: 11px;">Patience: <strong>{early_stopping.get('patience', 15)}</strong></p>
-            </div>
-        </div>
-        """
+        summary_data = {
+            'Training': f"Epochs: {training.get('epochs', 100)}, Batch: {training.get('batch_size', 16)}, LR: {training.get('learning_rate', 0.01):.4f}",
+            'Optimizer': f"{optimizer.get('type', 'SGD')} (decay: {optimizer.get('weight_decay', 0.0005):.4f})",
+            'Loss': f"Box: {loss.get('box_loss_gain', 0.05):.2f}, Cls: {loss.get('cls_loss_gain', 0.5):.1f}, Obj: {loss.get('obj_loss_gain', 1.0):.1f}",
+            'Control': f"Early Stop: {'On' if early_stopping.get('enabled', True) else 'Off'}, Save Best: {'On' if checkpoint.get('save_best', True) else 'Off'}"
+        }
         
-        ui_components['summary_cards'].value = summary_html
+        # Update summary cards content
+        ui_components['summary_cards'].children = tuple([
+            self._create_summary_card(title, content) 
+            for title, content in summary_data.items()
+        ])
+    
+    def _create_summary_card(self, title: str, content: str) -> Any:
+        """Create summary card widget"""
+        from ipywidgets import HTML
+        return HTML(f"""
+            <div style='background: #f8f9fa; border: 1px solid #dee2e6; 
+                        border-radius: 6px; padding: 8px; margin: 2px;'>
+                <strong style='color: #495057;'>{title}:</strong><br>
+                <span style='color: #6c757d; font-size: 0.9em;'>{content}</span>
+            </div>
+        """)
+
+
+# Removed field mappings yang tidak digunakan:
+# - mixed_precision_checkbox
+# - gradient_accumulation_slider  
+# - gradient_clipping_slider
+# - momentum_slider
+# - min_delta_slider

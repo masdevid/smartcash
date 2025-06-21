@@ -121,7 +121,6 @@ temp/
 !config/*.yaml
 !smartcash/config/*.yaml
 !smartcash/configs/*.yaml
-
 # Model Metadata
 *.index
 backup/

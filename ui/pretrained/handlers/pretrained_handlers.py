@@ -49,11 +49,10 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
             }
         })
         
-        logger.info("✅ Pretrained handlers setup berhasil")
         return ui_components
         
     except Exception as e:
-        logger.error(f"❌ Error setup pretrained handlers: {str(e)}")
+        logger.error("Error setting up pretrained handlers", exc_info=True)
         return ui_components
 
 def _setup_config_handlers(ui_components: Dict[str, Any]):
@@ -210,16 +209,26 @@ def _handle_download_sync(ui_components: Dict[str, Any]) -> bool:
 # === UI Utility Functions ===
 
 def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info"):
-    """Log ke UI dengan emoji context"""
-    if status_panel := ui_components.get('status_panel'):
-        status_panel.value = message
+    """Log pesan ke UI dengan level yang sesuai
     
-    if log_output := ui_components.get('log_output'):
-        with log_output:
-            emoji_map = {"success": "✅", "error": "❌", "warning": "⚠️", "info": "ℹ️"}
-            print(f"{emoji_map.get(level, 'ℹ️')} {message}")
-    else:
-        print(f"📝 {message}")
+    Args:
+        ui_components: Dictionary UI components
+        message: Pesan yang akan ditampilkan
+        level: Level log (info, warning, error)
+    """
+    try:
+        if not ui_components or 'log_output' not in ui_components:
+            return
+            
+        with ui_components['log_output']:
+            if level == 'error':
+                print(f"❌ {message}")
+            elif level == 'warning':
+                print(f"⚠️ {message}")
+            else:
+                print(f"ℹ️ {message}")
+    except Exception:
+        logger.exception("Gagal menampilkan pesan ke UI")
 
 def _clear_outputs(ui_components: Dict[str, Any]):
     """Clear semua output widgets"""
@@ -229,12 +238,18 @@ def _clear_outputs(ui_components: Dict[str, Any]):
         status_panel.value = ""
 
 def _handle_error(ui_components: Dict[str, Any], error_message: str):
-    """Comprehensive error handling"""
-    _log_to_ui(ui_components, error_message, "error")
-    if status_panel := ui_components.get('status_panel'):
-        status_panel.value = error_message
-    _enable_buttons(ui_components)
-    _hide_confirmation_area(ui_components)
+    """Menangani error dan menampilkan pesan ke UI
+    
+    Args:
+        ui_components: Dictionary UI components
+        error_message: Pesan error yang akan ditampilkan
+    """
+    try:
+        logger.error(error_message)
+        _log_to_ui(ui_components, error_message, 'error')
+        _enable_buttons(ui_components)
+    except Exception:
+        logger.exception("Gagal menangani error")
 
 def _disable_buttons(ui_components: Dict[str, Any]):
     """Disable action buttons"""

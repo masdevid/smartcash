@@ -18,7 +18,9 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         env: Environment configuration (optional)
         config: Configuration dictionary (optional)
         **kwargs: Additional keyword arguments
+            - exc_info: Optional exception info tuple (type, value, traceback)
     """
+    exc_info = kwargs.pop('exc_info', None)
     try:
         # Handle None config
         config = config or {}
@@ -158,8 +160,13 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         
         return ui_components
         
-    except Exception:
-        return _create_fallback_ui("Error creating pretrained UI")
+    except Exception as e:
+        import sys
+        logger.error("❌ Error creating pretrained UI", exc_info=True)
+        return _create_fallback_ui(
+            f"Error creating pretrained UI: {str(e)}",
+            exc_info=sys.exc_info()
+        )
 
 def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[str, Any]:
     """Create minimal input options khusus pretrained (module-specific minimal UI)"""
@@ -322,13 +329,54 @@ def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[
             'container': widgets.HTML(f"<div style='color: red;'>Input options error: {str(e)}\n\n{error_trace}</div>")
         }
 
-def _create_fallback_ui(error_msg: str) -> Dict[str, Any]:
-    """Simple fallback UI tanpa over-engineering"""
+def _create_fallback_ui(error_msg: str, exc_info: tuple = None) -> Dict[str, Any]:
+    """Create fallback UI with detailed error information
+    
+    Args:
+        error_msg: Error message to display
+        exc_info: Optional exception info tuple (type, value, traceback)
+    """
+    import traceback
+    import html
+    import sys
+    
+    # Format the error message and traceback
+    error_type = "Error"
+    error_traceback = ""
+    
+    if exc_info:
+        ex_type, ex_value, ex_traceback = exc_info
+        error_type = ex_type.__name__
+        error_traceback = "".join(traceback.format_exception(ex_type, ex_value, ex_traceback))
+    
+    # Escape HTML special characters
+    safe_error_msg = html.escape(str(error_msg))
+    safe_traceback = html.escape(error_traceback) if error_traceback else "No traceback available"
+    
+    # Create collapsible error details
     error_widget = widgets.HTML(f"""
         <div style='padding:20px;border:2px solid #dc3545;border-radius:8px;background:#f8d7da;color:#721c24;'>
-            <h4>⚠️ Pretrained UI Creation Error</h4>
-            <p>{error_msg}</p>
-            <small>💡 Try restarting the cell atau check dependencies</small>
+            <h4 style='margin-top:0;'>⚠️ Pretrained UI Creation Error: {error_type}</h4>
+            <p><strong>Error:</strong> {safe_error_msg}</p>
+            
+            <details style='margin-top:10px;'>
+                <summary style='cursor:pointer;color:#007bff;font-weight:bold;'>
+                    Show error details
+                </summary>
+                <div style='margin-top:10px;padding:10px;background:rgba(0,0,0,0.05);border-radius:4px;'>
+                    <pre style='white-space:pre-wrap;margin:0;overflow:auto;'>{safe_traceback}</pre>
+                </div>
+            </details>
+            
+            <div style='margin-top:15px;padding:10px;background:rgba(0,0,0,0.03);border-radius:4px;'>
+                <p style='margin:5px 0;'>💡 <strong>Tips:</strong></p>
+                <ul style='margin:5px 0 0 20px;padding:0;'>
+                    <li>Restart the kernel and try again</li>
+                    <li>Check if all required dependencies are installed</li>
+                    <li>Verify the configuration values</li>
+                    <li>Check the logs for more details</li>
+                </ul>
+            </div>
         </div>
     """)
     

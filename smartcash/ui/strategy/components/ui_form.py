@@ -200,12 +200,12 @@ def create_strategy_form(config: Dict[str, Any]) -> Dict[str, Any]:
         buttons
     ], layout=widgets.Layout(width='100%', max_width='800px'))
     
-    # Add form layout to components
-    form_components['form'] = form_layout
-    form_components['save_button'] = buttons.children[0]
-    form_components['reset_button'] = buttons.children[1]
-    
-    return form_components
+    # Return only the required components
+    return {
+        'form': form_layout,
+        'save_button': buttons.children[0],
+        'reset_button': buttons.children[1]
+    }
 
 
 def create_config_summary_card(config: Dict[str, Any], last_saved: Optional[str] = None) -> widgets.HTML:

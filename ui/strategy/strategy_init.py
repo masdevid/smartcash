@@ -177,7 +177,7 @@ class StrategyInitializer(ConfigCellInitializer):
             
         except Exception as e:
             error_msg = f"Gagal membuat UI strategy: {str(e)}"
-            logger.exception(error_msg, exc_info=True)
+            logger.error(f"{error_msg}\n{traceback.format_exc()}")
             
             # Dapatkan traceback lengkap
             exc_type, exc_value, exc_tb = sys.exc_info()

@@ -151,9 +151,22 @@ class StrategyInitializer(ConfigCellInitializer):
         try:
             from .components.ui_form import create_strategy_form
             from .components.ui_layout import create_strategy_layout, update_summary_card
+            import ipywidgets as widgets
+            
+            # Debug: Log config yang diterima
+            self.logger.debug(f"Membuat UI strategy dengan config: {config}")
             
             # Buat form components
-            form_components = create_strategy_form(config)
+            try:
+                form_components = create_strategy_form(config)
+                self.logger.debug("Form components berhasil dibuat")
+            except Exception as e:
+                self.logger.error(f"Gagal membuat form components: {str(e)}\n{traceback.format_exc()}")
+                raise ValueError(f"Gagal membuat form components: {str(e)}") from e
+            
+            # Debug: Tampilkan semua kunci yang tersedia di form_components
+            available_components = list(form_components.keys())
+            self.logger.debug(f"Komponen yang tersedia di form_components: {available_components}")
             
             # Pastikan komponen yang diperlukan ada di form_components
             required_form_components = [
@@ -164,28 +177,58 @@ class StrategyInitializer(ConfigCellInitializer):
                 'img_size_min_slider', 'img_size_max_slider', 'save_button', 'reset_button'
             ]
             
-            for comp in required_form_components:
-                if comp not in form_components:
-                    raise ValueError(f"Komponen form '{comp}' tidak ditemukan")
+            missing_components = [comp for comp in required_form_components if comp not in form_components]
+            if missing_components:
+                error_msg = (
+                    f"Komponen form yang hilang: {missing_components}\n"
+                    f"Komponen yang tersedia: {available_components}"
+                )
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Buat layout dengan form components
-            layout_components = create_strategy_layout(form_components)
+            try:
+                layout_components = create_strategy_layout(form_components)
+                self.logger.debug("Layout components berhasil dibuat")
+            except Exception as e:
+                self.logger.error(f"Gagal membuat layout components: {str(e)}\n{traceback.format_exc()}")
+                raise ValueError(f"Gagal membuat layout components: {str(e)}") from e
+            
+            # Debug: Tampilkan semua kunci yang tersedia di layout_components
+            available_layout = list(layout_components.keys())
+            self.logger.debug(f"Komponen yang tersedia di layout_components: {available_layout}")
             
             # Pastikan komponen yang diperlukan ada di layout_components
             required_layout_components = ['main_container', 'save_button', 'reset_button', 'summary_card']
-            for comp in required_layout_components:
-                if comp not in layout_components:
-                    raise ValueError(f"Komponen layout '{comp}' tidak ditemukan")
+            missing_layout = [comp for comp in required_layout_components if comp not in layout_components]
+            if missing_layout:
+                error_msg = (
+                    f"Komponen layout yang hilang: {missing_layout}\n"
+                    f"Komponen yang tersedia: {available_layout}"
+                )
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            # Pastikan main_container adalah widget yang valid
+            if not isinstance(layout_components['main_container'], widgets.Widget):
+                error_msg = f"main_container harus berupa instance widgets.Widget, tapi mendapat: {type(layout_components['main_container'])}"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Update summary card dengan config terbaru
-            update_summary_card(
-                layout_components,
-                config,
-                form_components
-            )
+            try:
+                update_summary_card(
+                    layout_components,
+                    config,
+                    form_components
+                )
+                self.logger.debug("Summary card berhasil diupdate")
+            except Exception as e:
+                self.logger.error(f"Gagal mengupdate summary card: {str(e)}\n{traceback.format_exc()}")
+                # Lanjutkan meskipun update summary card gagal
             
             # Return komponen yang diperlukan
-            return {
+            result = {
                 'form': layout_components['main_container'],
                 'save_button': layout_components['save_button'],
                 'reset_button': layout_components['reset_button'],
@@ -193,7 +236,11 @@ class StrategyInitializer(ConfigCellInitializer):
                 'container': layout_components['main_container']
             }
             
+            self.logger.debug("UI components berhasil dibuat")
+            return result
+                
         except Exception as e:
+            self.logger.error(f"Error di _create_config_ui: {str(e)}\n{traceback.format_exc()}")
             return self.handle_ui_exception(e, context="UI strategy")
     
     def _setup_summary_update_callback(self, ui_components: Dict[str, Any]) -> None:

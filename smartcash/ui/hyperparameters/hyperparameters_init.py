@@ -25,9 +25,23 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
         try:
             from .components.ui_form import create_hyperparameters_form
             from .components.ui_layout import create_hyperparameters_layout
+            import traceback
+            import ipywidgets as widgets
+            
+            # Debug: Log config yang diterima
+            self.logger.debug(f"Membuat UI dengan config: {config}")
             
             # Buat form components
-            form_components = create_hyperparameters_form(config)
+            try:
+                form_components = create_hyperparameters_form(config)
+                self.logger.debug("Form components berhasil dibuat")
+            except Exception as e:
+                self.logger.error(f"Gagal membuat form components: {str(e)}\n{traceback.format_exc()}")
+                raise ValueError(f"Gagal membuat form components: {str(e)}") from e
+            
+            # Debug: Tampilkan semua kunci yang tersedia di form_components
+            available_components = list(form_components.keys())
+            self.logger.debug(f"Komponen yang tersedia di form_components: {available_components}")
             
             # Pastikan komponen yang diperlukan ada di form_components
             required_form_components = [
@@ -36,35 +50,60 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
                 'warmup_epochs_slider', 'box_loss_gain_slider', 'cls_loss_gain_slider',
                 'obj_loss_gain_slider', 'early_stopping_checkbox', 'patience_slider',
                 'save_best_checkbox', 'checkpoint_metric_dropdown', 'summary_cards',
-                'status_panel', 'button_container'
+                'status_panel', 'button_container', 'save_button', 'reset_button'
             ]
             
-            for comp in required_form_components:
-                if comp not in form_components:
-                    raise ValueError(f"Komponen form '{comp}' tidak ditemukan")
+            missing_components = [comp for comp in required_form_components if comp not in form_components]
+            if missing_components:
+                error_msg = (
+                    f"Komponen form yang hilang: {missing_components}\n"
+                    f"Komponen yang tersedia: {available_components}"
+                )
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Buat layout dengan form components
-            layout_components = create_hyperparameters_layout(form_components)
+            try:
+                layout_components = create_hyperparameters_layout(form_components)
+                self.logger.debug("Layout components berhasil dibuat")
+            except Exception as e:
+                self.logger.error(f"Gagal membuat layout components: {str(e)}\n{traceback.format_exc()}")
+                raise ValueError(f"Gagal membuat layout components: {str(e)}") from e
+            
+            # Debug: Tampilkan semua kunci yang tersedia di layout_components
+            available_layout = list(layout_components.keys())
+            self.logger.debug(f"Komponen yang tersedia di layout_components: {available_layout}")
             
             # Pastikan komponen yang diperlukan ada di layout_components
             required_layout_components = ['form', 'save_button', 'reset_button']
-            for comp in required_layout_components:
-                if comp not in layout_components:
-                    raise ValueError(f"Komponen layout '{comp}' tidak ditemukan")
+            missing_layout = [comp for comp in required_layout_components if comp not in layout_components]
+            if missing_layout:
+                error_msg = (
+                    f"Komponen layout yang hilang: {missing_layout}\n"
+                    f"Komponen yang tersedia: {available_layout}"
+                )
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Pastikan form adalah widget yang valid
             if not isinstance(layout_components['form'], widgets.Widget):
-                raise ValueError("Form harus berupa instance widgets.Widget yang valid")
+                error_msg = f"Form harus berupa instance widgets.Widget, tapi mendapat: {type(layout_components['form'])}"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Return komponen yang diperlukan
-            return {
+            result = {
                 'form': layout_components['form'],
                 'save_button': layout_components['save_button'],
                 'reset_button': layout_components['reset_button'],
                 'container': layout_components['form']
             }
             
+            self.logger.debug("UI components berhasil dibuat")
+            return result
+                
         except Exception as e:
+            self.logger.error(f"Error di _create_config_ui: {str(e)}\n{traceback.format_exc()}")
             return self.handle_ui_exception(e, context="UI hyperparameters")
     
     def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:

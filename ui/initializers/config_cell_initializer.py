@@ -70,6 +70,24 @@ class ConfigCellInitializer(ABC):
             )
         )
     
+    def handle_ui_exception(self, error: Exception, context: str = "UI") -> Dict[str, Any]:
+        """Menangani exception yang terjadi saat membuat UI
+        
+        Args:
+            error: Exception yang terjadi
+            context: Konteks error (default: "UI")
+            
+        Returns:
+            Dictionary berisi komponen UI fallback
+        """
+        error_msg = f"Gagal membuat {context} {self.module_name}: {str(error)}"
+        self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
+        
+        return self._create_fallback_ui(
+            error_msg=error_msg,
+            exc_info=sys.exc_info()
+        )
+    
     def initialize(self, env=None, config=None, **kwargs) -> Any:
         """Optimized initialization dengan proper error handling"""
         try:

@@ -6,10 +6,11 @@ Deskripsi: Main initializer untuk hyperparameters config cell dengan clean patte
 import sys
 import traceback
 from typing import Dict, Any, Optional
+import ipywidgets as widgets
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
 from smartcash.ui.hyperparameters.handlers.config_handler import HyperparametersConfigHandler
 from smartcash.ui.hyperparameters.components.ui_form import create_hyperparameters_form
-from smartcash.ui.hyperparameters.components.ui_layout import create_hyperparameters_layout
+from smartcash.common.logger import get_logger
 
 
 class HyperparametersConfigInitializer(ConfigCellInitializer):
@@ -49,25 +50,7 @@ class HyperparametersConfigInitializer(ConfigCellInitializer):
             }
             
         except Exception as e:
-            error_msg = f"Gagal membuat UI hyperparameters: {str(e)}"
-            from smartcash.common.logger import get_logger
-            logger = get_logger(__name__)
-            logger.exception(error_msg, exc_info=True)
-            
-            # Dapatkan traceback dari sys.exc_info()
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            tb_text = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)) if exc_tb else ""
-            
-            from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
-            return create_fallback_ui(
-                error_message=error_msg,
-                exc_info=sys.exc_info(),
-                config=FallbackConfig(
-                    title="⚠️ Error Hyperparameters Configuration",
-                    module_name='hyperparameters',
-                    traceback=tb_text
-                )
-            )
+            return self.handle_ui_exception(e, context="UI hyperparameters")
     
     def _setup_custom_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Setup custom handlers untuk hyperparameters jika diperlukan"""

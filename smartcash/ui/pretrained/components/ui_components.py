@@ -1,19 +1,18 @@
 # File: smartcash/ui/pretrained/components/ui_components.py
 """
 File: smartcash/ui/pretrained/components/ui_components.py
-Deskripsi: Complete UI Components untuk pretrained module dengan header integration
+Deskripsi: Complete UI Components untuk pretrained module dengan fixed API usage
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
 from typing import Dict, Any, Optional
-from smartcash.ui.components.progress_tracker.factory import create_progress_tracker
+from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
 from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.action_buttons import create_action_buttons
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.log_accordion import create_log_accordion
-from smartcash.ui.components.dialog.confirmation_dialog import create_confirmation_dialog
-from smartcash.ui.utils.header_utils import create_module_header
+from smartcash.ui.utils.header_utils import create_header
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,7 +26,7 @@ def safe_extract(obj: Optional[Dict], key: str, default=None):
 
 def create_pretrained_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    🏗️ Create complete pretrained UI components dengan header
+    🏗️ Create complete pretrained UI components dengan fixed API usage
     
     Args:
         config: Configuration dictionary
@@ -36,12 +35,10 @@ def create_pretrained_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary berisi semua UI components
     """
     try:
-        # 1. 📊 Progress Tracker
-        progress_tracker = create_progress_tracker(
-            tracker_id="pretrained_progress",
-            show_overall=True,
-            show_step=True,
-            show_current=False
+        # 1. 📊 Progress Tracker - Fixed API usage
+        progress_tracker = create_dual_progress_tracker(
+            operation="Pretrained Models Setup",
+            auto_hide=True
         )
         
         # 2. 📋 Status Panel
@@ -83,18 +80,25 @@ def create_pretrained_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
         save_button = save_reset_buttons['save_button']
         reset_button = save_reset_buttons['reset_button']
         
-        # 7. 💬 Dialog Areas
+        # 7. 💬 Dialog Area - Fixed API usage  
         confirmation_area = widgets.Output(
-            layout=widgets.Layout(width='100%', margin='10px 0')
+            layout=widgets.Layout(
+                width='100%', 
+                min_height='50px', 
+                max_height='200px',
+                margin='10px 0',
+                padding='5px',
+                border='1px solid #e0e0e0',
+                border_radius='4px',
+                background_color='#fafafa'
+            )
         )
-        
-        dialog_area = create_confirmation_dialog()
         
         # 8. 🎛️ Input Options
         input_options = _create_input_options(config)
         
         # 9. 📝 Module Header
-        header = create_module_header(
+        header = create_header(
             title="🤖 Pretrained Models Setup",
             description="Setup dan sinkronisasi pretrained models untuk YOLO detection",
             module_name="pretrained"
@@ -104,7 +108,7 @@ def create_pretrained_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
         main_container = widgets.VBox([
             header,
             status_panel,
-            progress_tracker.get('ui', widgets.HTML("Progress tracker tidak tersedia")),
+            progress_tracker['container'],  # Fixed: access container properly
             input_options.get('container', widgets.HTML("Input options tidak tersedia")),
             action_buttons,
             save_reset_buttons['container'],
@@ -115,51 +119,37 @@ def create_pretrained_ui_components(config: Dict[str, Any]) -> Dict[str, Any]:
             width='100%'
         ))
         
-        # 11. ✅ Complete Component Dictionary
+        # 11. 🔧 Return UI Components Dictionary
         ui_components = {
-            # Core UI Elements
             'ui': main_container,
-            'main_container': main_container,
             'header': header,
             'status_panel': status_panel,
-            
-            # Progress Tracking
-            'progress_tracker': progress_tracker,
-            'progress_ui': progress_tracker.get('ui'),
-            
-            # Logging
+            'progress_tracker': progress_tracker['tracker'],  # Fixed: access tracker properly
+            'progress_container': progress_tracker['container'],
             'log_output': log_output,
             'log_accordion': log_accordion,
-            
-            # Buttons
             'download_sync_button': download_sync_button,
+            'action_buttons': action_buttons,
             'save_button': save_button,
             'reset_button': reset_button,
-            'action_buttons': action_buttons,
+            'save_reset_buttons': save_reset_buttons,
+            'confirmation_area': confirmation_area,  # Fixed: proper dialog area
+            'input_options': input_options,
             
-            # Dialog & Confirmation
-            'confirmation_area': confirmation_area,
-            'dialog_area': dialog_area,
+            # Individual input widgets
+            'models_dir_input': input_options.get('models_dir_input'),
+            'drive_models_dir_input': input_options.get('drive_models_dir_input'),
+            'pretrained_type_dropdown': input_options.get('pretrained_type_dropdown'),
+            'auto_download_checkbox': input_options.get('auto_download_checkbox'),
+            'sync_drive_checkbox': input_options.get('sync_drive_checkbox'),
             
-            # Input Components
-            'models_dir_input': safe_extract(input_options, 'models_dir_input'),
-            'drive_models_dir_input': safe_extract(input_options, 'drive_models_dir_input'),
-            'pretrained_type_dropdown': safe_extract(input_options, 'pretrained_type_dropdown'),
-            'auto_download_checkbox': safe_extract(input_options, 'auto_download_checkbox'),
-            'sync_drive_checkbox': safe_extract(input_options, 'sync_drive_checkbox'),
-            'input_container': safe_extract(input_options, 'container'),
-            
-            # Metadata & Status
-            'module_name': 'pretrained',
-            'ui_initialized': True,
-            'models_dir': config.get('pretrained_models', {}).get('models_dir', '/content/models'),
-            'api_integration': True,
-            'dialog_support': True,
-            'progress_tracking': True,
-            'error': None
+            # Metadata
+            'module_name': 'pretrained_models',
+            'config': config,
+            'created_at': 'UI components created successfully'
         }
         
-        logger.info("✅ Complete pretrained UI components created dengan header")
+        logger.info("✅ Complete pretrained UI components created dengan fixed API")
         return ui_components
         
     except Exception as e:
@@ -207,31 +197,20 @@ def _create_input_options(config: Dict[str, Any]) -> Dict[str, Any]:
         # Sync drive checkbox
         sync_drive_checkbox = widgets.Checkbox(
             value=pretrained_config.get('sync_drive', False),
-            description='☁️ Sync to Drive',
+            description='☁️ Sync with Drive',
             style={'description_width': '120px'}
         )
         
-        # Header untuk config section
-        config_header = widgets.HTML(
-            value="<h4 style='margin:10px 0;color:#2c3e50;'>⚙️ Configuration</h4>"
-        )
-        
-        # Layout container dengan proper spacing
+        # Container untuk input options
         container = widgets.VBox([
-            config_header,
-            widgets.VBox([
-                models_dir_input,
-                drive_models_dir_input
-            ], layout=widgets.Layout(margin='10px 0')),
-            widgets.HBox([
-                pretrained_type_dropdown, 
-                auto_download_checkbox, 
-                sync_drive_checkbox
-            ], layout=widgets.Layout(margin='10px 0'))
+            widgets.HTML("<h4>📝 Configuration Options</h4>"),
+            models_dir_input,
+            drive_models_dir_input,
+            widgets.HBox([pretrained_type_dropdown, auto_download_checkbox, sync_drive_checkbox])
         ], layout=widgets.Layout(
-            border='1px solid #e1e8ed',
-            border_radius='8px',
-            padding='15px',
+            padding='10px',
+            border='1px solid #ddd',
+            border_radius='5px',
             margin='10px 0'
         ))
         
@@ -241,110 +220,33 @@ def _create_input_options(config: Dict[str, Any]) -> Dict[str, Any]:
             'drive_models_dir_input': drive_models_dir_input,
             'pretrained_type_dropdown': pretrained_type_dropdown,
             'auto_download_checkbox': auto_download_checkbox,
-            'sync_drive_checkbox': sync_drive_checkbox,
-            'config_header': config_header
+            'sync_drive_checkbox': sync_drive_checkbox
         }
         
     except Exception as e:
-        logger.warning(f"⚠️ Error creating input options: {str(e)}")
-        fallback_html = widgets.HTML(f"""
-            <div style='padding:15px;border:1px solid #f39c12;background:#fef9e7;border-radius:8px;'>
-                ⚠️ Input options error: {str(e)}
-            </div>
-        """)
-        return {'container': fallback_html}
+        logger.error(f"❌ Error creating input options: {str(e)}")
+        return {'container': widgets.HTML(f"Error: {str(e)}")}
 
 def _create_fallback_ui(error_msg: str) -> Dict[str, Any]:
-    """🚨 Create minimal fallback UI dengan header"""
-    try:
-        # Fallback header
-        fallback_header = widgets.HTML(f"""
-            <div style='padding:15px;background:#dc3545;color:white;border-radius:8px;margin-bottom:10px;'>
-                <h3 style='margin:0;'>⚠️ Pretrained Models Setup (Error Mode)</h3>
-                <p style='margin:5px 0 0 0;font-size:14px;'>UI initialization failed</p>
-            </div>
-        """)
-        
-        error_widget = widgets.HTML(f"""
-            <div style='padding:20px;border:2px solid #dc3545;border-radius:8px;background:#f8d7da;color:#721c24;'>
-                <h4>⚠️ UI Creation Error</h4>
-                <p>{error_msg}</p>
-                <small>💡 Coba restart cell atau check dependencies</small>
-            </div>
-        """)
-        
-        log_output = widgets.Output()
-        confirmation_area = widgets.Output()
-        
-        # Mock progress tracker
-        mock_progress_tracker = {
-            'ui': widgets.HTML("<div style='color:#dc3545;'>❌ Progress tracker tidak tersedia</div>"),
-            'show': lambda *args: None,
-            'update_overall': lambda *args: None,
-            'complete': lambda *args: None,
-            'error': lambda *args: None
-        }
-        
-        # Fallback main container
-        main_container = widgets.VBox([
-            fallback_header,
-            error_widget,
-            log_output
-        ])
-        
-        return {
-            # Core UI
-            'ui': main_container,
-            'main_container': main_container,
-            'header': fallback_header,
-            'status_panel': widgets.HTML(f"<div style='color:#dc3545;'>❌ {error_msg}</div>"),
-            
-            # Progress
-            'progress_tracker': mock_progress_tracker,
-            'progress_ui': mock_progress_tracker['ui'],
-            
-            # Logging
-            'log_output': log_output,
-            'log_accordion': widgets.Accordion(children=[log_output]),
-            
-            # Buttons - Disabled
-            'download_sync_button': widgets.Button(description="❌ Error", disabled=True),
-            'save_button': widgets.Button(description="❌ Error", disabled=True),
-            'reset_button': widgets.Button(description="❌ Error", disabled=True),
-            
-            # Dialog
-            'confirmation_area': confirmation_area,
-            'dialog_area': confirmation_area,
-            
-            # Input placeholders
-            'models_dir_input': None,
-            'drive_models_dir_input': None,
-            'pretrained_type_dropdown': None,
-            'auto_download_checkbox': None,
-            'sync_drive_checkbox': None,
-            'input_container': None,
-            
-            # Metadata
-            'module_name': 'pretrained',
-            'ui_initialized': False,
-            'error': error_msg
-        }
-        
-    except Exception as fallback_error:
-        # Ultimate fallback
-        ultimate_fallback = widgets.HTML(f"""
-            <div style='padding:20px;background:#dc3545;color:white;'>
-                <h3>💥 Critical UI Error</h3>
-                <p>Original: {error_msg}</p>
-                <p>Fallback: {str(fallback_error)}</p>
-            </div>
-        """)
-        
-        return {
-            'ui': ultimate_fallback,
-            'main_container': ultimate_fallback,
-            'header': ultimate_fallback,
-            'module_name': 'pretrained',
-            'ui_initialized': False,
-            'error': f"Critical: {error_msg} | {str(fallback_error)}"
-        }
+    """🚨 Create fallback UI jika main creation gagal"""
+    fallback_container = widgets.VBox([
+        widgets.HTML(f"<h3>❌ Error: Pretrained UI Components</h3>"),
+        widgets.HTML(f"<p>{error_msg}</p>"),
+        widgets.HTML("<p>Menggunakan fallback UI minimal.</p>")
+    ], layout=widgets.Layout(
+        padding='20px',
+        border='2px solid red',
+        border_radius='5px'
+    ))
+    
+    return {
+        'ui': fallback_container,
+        'status_panel': widgets.HTML("Error state"),
+        'log_output': widgets.Output(),
+        'download_sync_button': widgets.Button(description="Error", disabled=True),
+        'save_button': widgets.Button(description="Save", disabled=True),
+        'reset_button': widgets.Button(description="Reset", disabled=True),
+        'confirmation_area': widgets.Output(),
+        'error': True,
+        'error_message': error_msg
+    }

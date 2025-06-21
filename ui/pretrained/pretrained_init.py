@@ -209,4 +209,5 @@ def initialize_pretrained_ui(env=None, config=None, **kwargs):
         error_msg = f"Gagal menginisialisasi UI pretrained: {str(e)}"
         logger.exception(error_msg)
         # _create_fallback_ui sudah menangani penampilan UI
-        return _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+        result = _pretrained_initializer._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+        return display(result['ui'])

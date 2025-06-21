@@ -5,6 +5,7 @@ Deskripsi: Optimized ConfigCellInitializer dengan fixed save/reset status update
 
 from typing import Dict, Any, Optional, Callable, Type
 from abc import ABC, abstractmethod
+from unittest import result
 import ipywidgets as widgets
 import sys
 from IPython.display import display
@@ -87,7 +88,8 @@ class ConfigCellInitializer(ABC):
         except Exception as e:
             error_msg = f"❌ Gagal menginisialisasi {self.module_name}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            return self._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+            result = self._create_fallback_ui(error_msg, exc_info=sys.exc_info())
+            return display(result["ui"])
     
     def _setup_handlers_with_config_handler(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Setup handlers dengan optimized button state management"""

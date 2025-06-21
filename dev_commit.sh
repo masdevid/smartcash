@@ -8,6 +8,19 @@ if [ $# -eq 0 ]; then
 fi
 
 COMMIT_MSG="$1"
+cleanup_needed=0
+
+# Function to clean up
+cleanup() {
+    if [ $cleanup_needed -eq 1 ]; then
+        echo "Cleaning up..."
+        rm -rf ui model configs components dataset common 2>/dev/null
+    fi
+    exit $1
+}
+
+# Set up trap to ensure cleanup runs on exit
+trap 'cleanup $?' EXIT
 
 echo "Start copying files..."
 cp -r smartcash/model .
@@ -17,18 +30,26 @@ cp -r smartcash/ui .
 cp -r smartcash/dataset .
 cp -r smartcash/common .
 
-sleep 1
+# Mark that we need to clean up
+cleanup_needed=1
 
 echo "Committing changes..."
-git add .
-git commit -m "$COMMIT_MSG"
+if ! git add .; then
+    echo "Error: Failed to stage files"
+    exit 1
+fi
+
+if ! git commit -m "$COMMIT_MSG"; then
+    echo "Error: Commit failed"
+    exit 1
+fi
 
 echo "Pushing to remote..."
-git push origin migration
-
-sleep 3
-
-echo "Cleaning up..."
-rm -rf ui model configs components dataset common 2>/dev/null
-
-echo "Done!"
+if git push origin migration; then
+    echo "Push successful"
+    cleanup_needed=0  # Don't clean up if push was successful
+    cleanup 0
+else
+    echo "Error: Push failed. Local changes are still in the working directory."
+    exit 1
+fi

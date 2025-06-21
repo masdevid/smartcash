@@ -1,139 +1,248 @@
-# File: smartcash/ui/hyperparameters/components/ui_form.py
-# Deskripsi: Form components untuk hyperparameters - menggunakan fallback_utils
 
-from typing import Dict, Any
+
+# File: smartcash/ui/hyperparameters/components/ui_form.py
+# Deskripsi: UI form components untuk hyperparameters configuration
+
 import ipywidgets as widgets
-from smartcash.ui.hyperparameters.handlers.defaults import (
-    get_optimizer_options, get_scheduler_options, get_checkpoint_metric_options
-)
-from smartcash.ui.hyperparameters.utils.form_helpers import (
-    create_slider_widget, create_int_slider_widget, create_dropdown_widget, 
-    create_checkbox_widget, create_summary_cards_widget
-)
-from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-from smartcash.ui.components.status_panel import create_status_panel
-from smartcash.ui.utils.fallback_utils import try_operation_safe
+from typing import Dict, Any, Callable, Optional
+from smartcash.ui.hyperparameters.handlers.defaults import get_hyperparameters_ui_config
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def create_hyperparameters_form(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Buat form hyperparameters dengan parameter essentials backend saja 🎯"""
+class HyperparametersForm:
+    """Form UI untuk konfigurasi hyperparameters 📝"""
     
-    # Extract config dengan fallbacks
-    training = config.get('training', {})
-    optimizer = config.get('optimizer', {})
-    scheduler = config.get('scheduler', {})
-    loss = config.get('loss', {})
-    early_stopping = config.get('early_stopping', {})
-    checkpoint = config.get('checkpoint', {})
+    def __init__(self, config: Dict[str, Any], on_change: Optional[Callable] = None):
+        self.config = config
+        self.on_change = on_change or (lambda: None)
+        self.ui_config = get_hyperparameters_ui_config()
+        self.widgets = {}
+        self._create_form()
     
-    # Core training parameters yang digunakan backend
-    training_widgets = {
-        'epochs_slider': create_int_slider_widget(training.get('epochs', 100), 10, 300, 'Epochs:'),
-        'batch_size_slider': create_int_slider_widget(training.get('batch_size', 16), 4, 64, 'Batch Size:', 4),
-        'learning_rate_slider': create_slider_widget(training.get('learning_rate', 0.01), 0.0001, 0.1, 0.001, 'Learning Rate:', '.4f'),
-        'image_size_slider': create_int_slider_widget(training.get('image_size', 640), 320, 1280, 'Image Size:', 32),
-        'device_dropdown': create_dropdown_widget(training.get('device', 'auto'), ['auto', 'cuda', 'cpu'], 'Device:')
-    }
+    def _create_form(self) -> None:
+        """Buat form widgets berdasarkan konfigurasi 🏗️"""
+        try:
+            self.widgets['sections'] = []
+            
+            for section_config in self.ui_config['form_sections']:
+                section_widget = self._create_section(section_config)
+                self.widgets['sections'].append(section_widget)
+                
+            # Create main form container
+            self.widgets['form'] = widgets.VBox(
+                children=self.widgets['sections'],
+                layout=widgets.Layout(
+                    width='100%',
+                    gap='15px',
+                    padding='10px'
+                )
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Error creating hyperparameters form: {e}")
+            self.widgets['form'] = widgets.HTML("⚠️ Error creating form")
     
-    # Optimizer parameters
-    optimizer_widgets = {
-        'optimizer_dropdown': create_dropdown_widget(optimizer.get('name', 'AdamW'), get_optimizer_options(), 'Optimizer:'),
-        'weight_decay_slider': create_slider_widget(optimizer.get('weight_decay', 0.0001), 0, 0.01, 0.0001, 'Weight Decay:', '.4f'),
-        'momentum_slider': create_slider_widget(optimizer.get('momentum', 0.937), 0.5, 0.99, 0.01, 'Momentum:', '.3f')
-    }
+    def _create_section(self, section_config: Dict[str, Any]) -> widgets.Widget:
+        """Buat section widget dengan accordion layout 📋"""
+        section_widgets = []
+        
+        for field_name in section_config['fields']:
+            field_widget = self._create_field_widget(field_name)
+            if field_widget:
+                section_widgets.append(field_widget)
+        
+        section_box = widgets.VBox(
+            children=section_widgets,
+            layout=widgets.Layout(gap='8px', padding='10px')
+        )
+        
+        accordion = widgets.Accordion(
+            children=[section_box],
+            titles=[section_config['title']],
+            selected_index=0
+        )
+        
+        return accordion
     
-    # Scheduler parameters
-    scheduler_widgets = {
-        'scheduler_dropdown': create_dropdown_widget(scheduler.get('name', 'CosineAnnealingLR'), get_scheduler_options(), 'Scheduler:'),
-        'warmup_epochs_slider': create_int_slider_widget(scheduler.get('warmup_epochs', 3), 0, 20, 'Warmup Epochs:'),
-        'min_lr_slider': create_slider_widget(scheduler.get('min_lr', 1e-6), 1e-8, 1e-3, 1e-7, 'Min LR:', '.1e')
-    }
+    def _create_field_widget(self, field_name: str) -> Optional[widgets.Widget]:
+        """Buat widget untuk field tertentu ⚙️"""
+        try:
+            if field_name not in self.ui_config['field_configs']:
+                return None
+                
+            field_config = self.ui_config['field_configs'][field_name]
+            current_value = self._get_field_value(field_name)
+            
+            # Create widget based on type
+            if field_config['type'] == 'IntSlider':
+                widget = widgets.IntSlider(
+                    value=current_value,
+                    min=field_config['min'],
+                    max=field_config['max'],
+                    step=field_config['step'],
+                    description=self._format_field_name(field_name),
+                    style={'description_width': '150px'}
+                )
+            elif field_config['type'] == 'FloatSlider':
+                widget = widgets.FloatSlider(
+                    value=current_value,
+                    min=field_config['min'],
+                    max=field_config['max'],
+                    step=field_config['step'],
+                    description=self._format_field_name(field_name),
+                    style={'description_width': '150px'}
+                )
+            elif field_config['type'] == 'FloatLogSlider':
+                widget = widgets.FloatLogSlider(
+                    value=current_value,
+                    min=field_config['min'],
+                    max=field_config['max'],
+                    step=field_config['step'],
+                    description=self._format_field_name(field_name),
+                    style={'description_width': '150px'}
+                )
+            elif field_config['type'] == 'Dropdown':
+                widget = widgets.Dropdown(
+                    value=current_value,
+                    options=field_config['options'],
+                    description=self._format_field_name(field_name),
+                    style={'description_width': '150px'}
+                )
+            elif field_config['type'] == 'Checkbox':
+                widget = widgets.Checkbox(
+                    value=current_value,
+                    description=self._format_field_name(field_name),
+                    style={'description_width': '150px'}
+                )
+            else:
+                return None
+            
+            # Bind change handler
+            widget.observe(self._on_widget_change, names='value')
+            self.widgets[field_name] = widget
+            
+            return widget
+            
+        except Exception as e:
+            logger.error(f"❌ Error creating field widget {field_name}: {e}")
+            return None
     
-    # Loss function parameters
-    loss_widgets = {
-        'box_loss_gain_slider': create_slider_widget(loss.get('box_loss_gain', 0.05), 0.01, 0.2, 0.01, 'Box Loss Gain:', '.3f'),
-        'cls_loss_gain_slider': create_slider_widget(loss.get('cls_loss_gain', 0.5), 0.1, 2.0, 0.1, 'Cls Loss Gain:', '.2f'),
-        'obj_loss_gain_slider': create_slider_widget(loss.get('obj_loss_gain', 1.0), 0.1, 2.0, 0.1, 'Obj Loss Gain:', '.2f'),
-        'focal_loss_checkbox': create_checkbox_widget(loss.get('focal_loss', False), 'Use Focal Loss'),
-        'label_smoothing_slider': create_slider_widget(loss.get('label_smoothing', 0.0), 0.0, 0.2, 0.01, 'Label Smoothing:', '.3f')
-    }
+    def _get_field_value(self, field_name: str) -> Any:
+        """Ambil nilai field dari config 📊"""
+        # Map field names to config paths
+        field_map = {
+            'epochs': 'training.epochs',
+            'batch_size': 'training.batch_size', 
+            'learning_rate': 'training.learning_rate',
+            'image_size': 'training.image_size',
+            'optimizer_type': 'optimizer.type',
+            'weight_decay': 'optimizer.weight_decay',
+            'momentum': 'optimizer.momentum',
+            'scheduler_type': 'scheduler.type',
+            'warmup_epochs': 'scheduler.warmup_epochs',
+            'min_lr': 'scheduler.min_lr',
+            'box_loss_gain': 'loss.box_loss_gain',
+            'cls_loss_gain': 'loss.cls_loss_gain',
+            'obj_loss_gain': 'loss.obj_loss_gain',
+            'early_stopping_enabled': 'early_stopping.enabled',
+            'patience': 'early_stopping.patience',
+            'min_delta': 'early_stopping.min_delta'
+        }
+        
+        if field_name not in field_map:
+            return None
+            
+        path = field_map[field_name].split('.')
+        value = self.config
+        
+        for key in path:
+            if isinstance(value, dict) and key in value:
+                value = value[key]
+            else:
+                return None
+        
+        return value
     
-    # Early stopping parameters
-    early_stopping_widgets = {
-        'early_stopping_checkbox': create_checkbox_widget(early_stopping.get('enabled', True), 'Enable Early Stopping'),
-        'patience_slider': create_int_slider_widget(early_stopping.get('patience', 10), 3, 50, 'Patience:'),
-        'min_delta_slider': create_slider_widget(early_stopping.get('min_delta', 0.001), 0.0001, 0.01, 0.0001, 'Min Delta:', '.4f'),
-        'monitor_dropdown': create_dropdown_widget(early_stopping.get('monitor', 'val_loss'), 
-                                                  ['val_loss', 'val_mAP', 'val_precision', 'val_recall'], 'Monitor:')
-    }
+    def _format_field_name(self, field_name: str) -> str:
+        """Format field name untuk display 💫"""
+        # Format field names untuk UI yang lebih readable
+        field_labels = {
+            'epochs': 'Epochs',
+            'batch_size': 'Batch Size',
+            'learning_rate': 'Learning Rate',
+            'image_size': 'Image Size',
+            'optimizer_type': 'Optimizer',
+            'weight_decay': 'Weight Decay',
+            'momentum': 'Momentum',
+            'scheduler_type': 'Scheduler',
+            'warmup_epochs': 'Warmup Epochs',
+            'min_lr': 'Min LR',
+            'box_loss_gain': 'Box Loss',
+            'cls_loss_gain': 'Class Loss',
+            'obj_loss_gain': 'Object Loss',
+            'early_stopping_enabled': 'Enable Early Stop',
+            'patience': 'Patience',
+            'min_delta': 'Min Delta'
+        }
+        
+        return field_labels.get(field_name, field_name.replace('_', ' ').title())
     
-    # Checkpoint parameters
-    checkpoint_widgets = {
-        'save_best_checkbox': create_checkbox_widget(checkpoint.get('save_best', True), 'Save Best Model'),
-        'save_interval_slider': create_int_slider_widget(checkpoint.get('save_interval', 10), 1, 50, 'Save Interval:'),
-        'max_checkpoints_slider': create_int_slider_widget(checkpoint.get('max_checkpoints', 5), 1, 20, 'Max Checkpoints:'),
-        'metric_dropdown': create_dropdown_widget(checkpoint.get('metric', 'mAP'), get_checkpoint_metric_options(), 'Best Metric:')
-    }
+    def _on_widget_change(self, change) -> None:
+        """Handle perubahan widget value 🔄"""
+        try:
+            # Update config berdasarkan widget change
+            self._update_config_from_widgets()
+            
+            # Trigger change callback
+            self.on_change()
+            
+        except Exception as e:
+            logger.error(f"❌ Error handling widget change: {e}")
     
-    # Summary cards
-    summary_cards = create_summary_cards_widget(config)
+    def _update_config_from_widgets(self) -> None:
+        """Update config dari nilai widgets ⚡"""
+        # Reverse mapping dari _get_field_value
+        field_map = {
+            'epochs': ['training', 'epochs'],
+            'batch_size': ['training', 'batch_size'],
+            'learning_rate': ['training', 'learning_rate'],
+            'image_size': ['training', 'image_size'],
+            'optimizer_type': ['optimizer', 'type'],
+            'weight_decay': ['optimizer', 'weight_decay'],
+            'momentum': ['optimizer', 'momentum'],
+            'scheduler_type': ['scheduler', 'type'],
+            'warmup_epochs': ['scheduler', 'warmup_epochs'],
+            'min_lr': ['scheduler', 'min_lr'],
+            'box_loss_gain': ['loss', 'box_loss_gain'],
+            'cls_loss_gain': ['loss', 'cls_loss_gain'],
+            'obj_loss_gain': ['loss', 'obj_loss_gain'],
+            'early_stopping_enabled': ['early_stopping', 'enabled'],
+            'patience': ['early_stopping', 'patience'],
+            'min_delta': ['early_stopping', 'min_delta']
+        }
+        
+        for field_name, widget in self.widgets.items():
+            if (field_name in field_map and hasattr(widget, 'value')):
+                path = field_map[field_name]
+                self._set_nested_value(self.config, path, widget.value)
     
-    # Status panel dan save/reset buttons
-    status_panel = create_status_panel()
-    save_reset_buttons = create_save_reset_buttons()
+    def _set_nested_value(self, config: Dict[str, Any], path: list, value: Any) -> None:
+        """Set nilai nested dalam config dict 🎯"""
+        current = config
+        for key in path[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+        current[path[-1]] = value
     
-    # Gabung semua widgets
-    all_widgets = {
-        **training_widgets,
-        **optimizer_widgets,
-        **scheduler_widgets,
-        **loss_widgets,
-        **early_stopping_widgets,
-        **checkpoint_widgets,
-        'summary_cards': summary_cards,
-        'status_panel': status_panel,
-        'save_reset_buttons': save_reset_buttons
-    }
+    def get_widget(self) -> widgets.Widget:
+        """Ambil main form widget 📦"""
+        return self.widgets.get('form', widgets.HTML("⚠️ Form not created"))
     
-    logger.info("✅ Hyperparameters form created successfully")
-    return all_widgets
+    def get_config(self) -> Dict[str, Any]:
+        """Ambil current config dari form 📋"""
+        self._update_config_from_widgets()
+        return self.config
 
-
-def update_summary_cards(widgets_dict: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Update summary cards dengan nilai terbaru dari widgets 🔄"""
-    try_operation_safe(
-        operation=lambda: _update_summary_cards_content(widgets_dict, config),
-        fallback_value=None,
-        logger=logger,
-        operation_name="updating summary cards"
-    )
-
-
-def _update_summary_cards_content(widgets_dict: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Internal logic untuk update summary cards"""
-    # Update config dengan nilai dari widgets
-    training = config.get('training', {})
-    optimizer = config.get('optimizer', {})
-    scheduler = config.get('scheduler', {})
-    
-    widget_mappings = [
-        ('epochs_slider', training, 'epochs'),
-        ('batch_size_slider', training, 'batch_size'),
-        ('learning_rate_slider', training, 'learning_rate'),
-        ('optimizer_dropdown', optimizer, 'name'),
-        ('weight_decay_slider', optimizer, 'weight_decay'),
-        ('momentum_slider', optimizer, 'momentum'),
-        ('scheduler_dropdown', scheduler, 'name')
-    ]
-    
-    for widget_key, config_section, param in widget_mappings:
-        if widget_key in widgets_dict:
-            config_section[param] = widgets_dict[widget_key].value
-    
-    # Update summary cards
-    if 'summary_cards' in widgets_dict:
-        updated_config = {'training': training, 'optimizer': optimizer, 'scheduler': scheduler}
-        widgets_dict['summary_cards'].value = create_summary_cards_widget(updated_config).value

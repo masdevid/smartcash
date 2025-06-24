@@ -6,8 +6,13 @@ Deskripsi: Utility untuk tracking progress setup dengan state management yang le
 from typing import Dict, Any, Optional, List, Callable
 from enum import Enum, auto
 from dataclasses import dataclass
-from smartcash.ui.components.progress_tracker import ProgressTracker, ProgressConfig, ProgressBarConfig, ProgressLevel
-from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
+from IPython.display import display
+import ipywidgets as widgets
+
+# Import the progress tracker factory functions
+from smartcash.ui.components.progress_tracker.factory import (
+    create_dual_progress_tracker
+)
 
 class SetupStage(Enum):
     """Tahapan setup environment"""
@@ -45,59 +50,21 @@ class SetupProgressTracker:
         self._initialize_progress_tracker()
     
     def _initialize_progress_tracker(self) -> None:
-        """Initialize progress tracker component"""
-        from IPython.display import display
-        import ipywidgets as widgets
-        
+        """Initialize progress tracker component using the factory pattern"""
         if 'progress_tracker' not in self.ui_components:
-            # Create progress tracker config
-            config = ProgressConfig(
-                bars=[
-                    ProgressBarConfig(
-                        name="overall",
-                        label="Overall Progress",
-                        level=ProgressLevel.PRIMARY,
-                        visible=True,
-                        show_percentage=True,
-                        value=0,
-                        bar_style='info',
-                        orientation='horizontal',
-                        min=0,
-                        max=100,
-                        description='Overall:',
-                        description_width='initial'
-                    ),
-                    ProgressBarConfig(
-                        name="current",
-                        label="Current Task",
-                        level=ProgressLevel.SECONDARY,
-                        visible=True,
-                        show_percentage=True,
-                        value=0,
-                        bar_style='info',
-                        orientation='horizontal',
-                        min=0,
-                        max=100,
-                        description='Current:',
-                        description_width='initial'
-                    )
-                ]
+            # Create a dual progress tracker (overall + current task)
+            tracker = create_dual_progress_tracker(
+                operation="Environment Setup",
+                auto_hide=False,
+                show_step_info=True
             )
             
-            # Create and display the progress tracker
-            progress_tracker = ProgressTracker(config)
-            self.ui_components['progress_tracker'] = progress_tracker
-            
-            # Create a container for the progress tracker
-            progress_container = widgets.VBox([
-                widgets.HTML('<h3>Setup Progress</h3>'),
-                progress_tracker.widget
-            ])
+            # Store the tracker and its container in the UI components
+            self.ui_components['progress_tracker'] = tracker
+            self.ui_components['progress_container'] = tracker.container
             
             # Display the progress container
-            display(progress_container)
-            
-            # Ensure the progress container is visible in the UI
+            display(tracker.container)
             if 'progress_container' in self.ui_components:
                 self.ui_components['progress_container'].children = (progress_container,)
             else:
@@ -111,119 +78,116 @@ class SetupProgressTracker:
         if callback not in self.callbacks:
             self.callbacks.append(callback)
     
-    def start_stage(self, stage: SetupStage) -> None:
-        """Mulai tahapan baru"""
+    def update_stage(self, stage: SetupStage, message: str = "") -> None:
+        """Update to a new stage"""
         self.current_stage = stage
-        stage_data = self.stages[stage]
-        self._update_progress(stage_data.name, 0, f"🚀 Starting {stage_data.name.lower()}...")
-    
-    def update_stage_progress(self, progress: int, message: str = "") -> None:
-        """Update progress tahapan saat ini"""
-        if self.current_stage is None:
-            return
-            
-        stage_data = self.stages[self.current_stage]
-        stage_data.current = max(0, min(progress, 100))
+        stage_name = self.stages[stage].name
+        self.logger.info(f"Starting stage: {stage_name}")
+        self.update_progress(stage, 0, message)
         
-        # Hitung progress keseluruhan
-        total_weight = sum(stage.weight for stage in self.stages.values())
-        completed_weight = 0
-        
-        for stage, data in self.stages.items():
-            if stage == self.current_stage:
-                completed_weight += (data.weight * progress) / 100
-            elif stage.value < self.current_stage.value:
-                completed_weight += data.weight
-        
-        self.overall_progress = min(100, (completed_weight / total_weight) * 100)
-        
-        # Update UI
-        self._update_progress(
-            stage_data.name,
-            int(self.overall_progress),
-            message or f"{stage_data.name} in progress..."
-        )
+        # Update the progress tracker with the new stage
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
+            tracker.update_current(progress=0, message=stage_name)
     
     def complete_stage(self, message: str = "") -> None:
-        """Tandai tahapan saat ini selesai"""
-        if self.current_stage is None:
-            return
-            
-        stage_data = self.stages[self.current_stage]
-        stage_data.current = 100
+        """Mark current stage as complete"""
+        if self.current_stage is not None:
+            self.update_progress(self.current_stage, 100, message)
+    
+    def update_within_stage(self, progress: int, message: str = "") -> None:
+        """Update progress within the current stage"""
+        if self.current_stage is not None:
+            self.update_progress(self.current_stage, progress, message)
+    
+    def complete(self, message: str = "Setup completed successfully") -> None:
+        """Mark setup as complete"""
+        self.update_stage(SetupStage.COMPLETE, message)
+        self.complete_stage()
         
-        self._update_progress(
-            stage_data.name,
-            self.overall_progress,
-            message or f"✅ {stage_data.name} completed"
-        )
+        # Update the progress tracker with completion
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
+            tracker.complete(message=message)
     
     def error(self, message: str) -> None:
-        """Tandai error pada tahapan saat ini"""
-        if self.current_stage is not None:
-            stage_data = self.stages[self.current_stage]
-            self._update_progress(
-                stage_data.name,
-                self.overall_progress,
-                f"❌ Error: {message}",
-                is_error=True
-            )
+        """Mark setup as failed with an error"""
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
+            tracker.error(message=message)
     
-    def update_step(self, step_name: str, description: str = "") -> None:
-        """Update the current step with a description (compatibility method)"""
-        if self.current_stage is not None:
-            stage_data = self.stages[self.current_stage]
-            stage_data.name = step_name
-            self._update_progress(step_name, stage_data.current, description or step_name)
+    def hide(self) -> None:
+        """Hide the progress tracker"""
+        if 'progress_container' in self.ui_components:
+            self.ui_components['progress_container'].layout.visibility = 'hidden'
     
-    def _update_progress(self, stage_name: str, progress: int, message: str, is_error: bool = False) -> None:
-        """Update progress UI and trigger callbacks with proper error handling"""
-        from IPython.display import display
-        import ipywidgets as widgets
+    def show(self) -> None:
+        """Show the progress tracker"""
+        if 'progress_container' in self.ui_components:
+            self.ui_components['progress_container'].layout.visibility = 'visible'
+    
+    def update_progress(self, stage: SetupStage, progress: int, message: str = "") -> None:
+        """Update progress for a specific stage"""
+        if stage not in self.stages:
+            return
+            
+        # Update the stage progress
+        self.stages[stage].current = progress
         
-        try:
-            # Ensure progress is within bounds
-            progress = max(0, min(100, progress))
-            self.overall_progress = max(0, min(100, self.overall_progress))
+        # Calculate overall progress
+        total_weight = sum(s.weight for s in self.stages.values())
+        weighted_progress = sum(
+            (s.current / s.total) * s.weight 
+            for s in self.stages.values()
+        )
+        self.overall_progress = int((weighted_progress / total_weight) * 100)
+        
+        # Update UI using the factory-created tracker
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
             
-            # Update progress bars if tracker exists
-            if 'progress_tracker' in self.ui_components:
-                tracker = self.ui_components['progress_tracker']
-                
-                # Update overall progress
-                tracker.update_bar('overall', self.overall_progress, f"{int(self.overall_progress)}%")
-                
-                # Update current task progress
-                tracker.update_bar('current', progress, message)
-                
-                # Force UI update
-                if 'progress_container' in self.ui_components:
-                    display(self.ui_components['progress_container'])
+            # Update overall progress bar
+            tracker.update_overall(
+                progress=self.overall_progress,
+                message=f"Overall: {self.overall_progress}%"
+            )
             
-            # Update status panel if it exists
-            if 'status_panel' in self.ui_components:
-                status_type = 'error' if is_error else 'info'
-                update_status_panel(
-                    self.ui_components['status_panel'],
-                    message,
-                    status_type
-                )
-            
-            # Trigger callbacks
-            for callback in self.callbacks:
-                try:
-                    callback(stage_name, progress, message)
-                except Exception as e:
-                    print(f"⚠️ Error in progress callback: {e}")
+            # Update current task progress
+            tracker.update_current(
+                progress=progress,
+                message=f"{self.stages[stage].name}: {message}" if message else self.stages[stage].name
+            )
+        
+        # Call registered callbacks
+        for callback in self.callbacks:
+            try:
+                callback("overall", self.overall_progress, self.stages[stage].name)
+                callback("current", progress, message)
+            except Exception as e:
+                print(f"Error in progress callback: {e}")
             
             # Small delay to allow UI to update
             import time
             time.sleep(0.05)
-            
-        except Exception as e:
             print(f"⚠️ Error updating progress: {e}")
             print(f"Stage: {stage_name}, Progress: {progress}, Message: {message}")
 
 def track_setup_progress(ui_components: Dict[str, Any]) -> SetupProgressTracker:
-    """🎯 Create and initialize progress tracker instance"""
-    return SetupProgressTracker(ui_components)
+    """🎯 Create and initialize progress tracker instance
+    
+    Args:
+        ui_components: Dictionary to store UI components
+        
+    Returns:
+        Configured SetupProgressTracker instance
+    """
+    # Create and initialize the progress tracker
+    progress_tracker = SetupProgressTracker(ui_components)
+    
+    # Ensure the progress tracker is visible
+    progress_tracker.show()
+    
+    # Start with the initial stage
+    progress_tracker.update_stage(SetupStage.INIT, "Initializing setup...")
+    
+    return progress_tracker

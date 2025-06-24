@@ -55,14 +55,14 @@ def create_tips_panel(
             continue
             
         items_html = "\n".join(
-            f'<li style="margin: 8px 0;">{tip}</li>'
+            f'<li style="margin: 4px 0; line-height: 1.2;">{tip}</li>'
             for tip in col_tips
             if tip  # Skip empty tips
         )
         
         columns_html += f"""
-        <div style="flex: 1; min-width: 200px;">
-            <ul style="margin: 0; padding-left: 20px; color: {text_color};">
+        <div style="flex: 1; min-width: 180px;">
+            <ul style="margin: 0; padding-left: 16px; color: {text_color}; font-size: 12px;">
                 {items_html}
             </ul>
         </div>
@@ -72,25 +72,26 @@ def create_tips_panel(
     html = f"""
     <div style="
         background: linear-gradient(135deg, {gradient_start} 0%, {gradient_end} 100%);
-        padding: 20px;
-        border-radius: 12px;
-        border-left: 4px solid {border_color};
+        padding: 12px 16px;
+        border-radius: 8px;
+        border-left: 3px solid {border_color};
         margin: {margin};
     ">
         <h4 style="
-            margin-top: 0;
+            margin: 0 0 8px 0;
             color: {title_color};
             display: flex;
             align-items: center;
-            font-size: 16px;
+            font-size: 14px;
+            font-weight: 600;
         ">
             {title}
         </h4>
         <div style="
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            margin-top: 10px;
+            gap: 10px;
+            margin-top: 6px;
         ">
             {columns_html}
         </div>

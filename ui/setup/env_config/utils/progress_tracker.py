@@ -116,22 +116,40 @@ class SetupProgressTracker:
             self.update_progress(self.current_stage, 100, message)
     
     def update_within_stage(self, progress: int, message: str = "") -> None:
-        """Update progress within the current stage"""
-        if self.current_stage is not None:
-            self.update_progress(self.current_stage, progress, message)
-    
-    def update_step(self, step_name: str, description: str = "") -> None:
-        """Update the current step with a description (compatibility method)
+        """Update progress within the current stage
         
         Args:
-            step_name: Name of the current step
-            description: Optional description of the step
+            progress: Progress percentage (0-100)
+            message: Optional status message
         """
         if self.current_stage is not None:
-            # Update the current stage's name and progress
+            self.stages[self.current_stage].current = progress
+            self.update_progress(self.current_stage, progress, message)
+    
+    def update_step(self, step_name: str, progress: int = None, description: str = "") -> None:
+        """Update the current step with progress and description
+        
+        Args:
+            step_name: Name of the current step or progress percentage if progress is None
+            progress: Optional progress percentage (0-100)
+            description: Optional description of the step
+        """
+        if progress is None and step_name.isdigit():
+            # Handle case where step_name is actually the progress (for backward compatibility)
+            progress = int(step_name)
+            step_name = description or f"Progress: {progress}%"
+        
+        if self.current_stage is not None:
+            # If progress is provided, update the current stage's progress
+            if progress is not None:
+                self.stages[self.current_stage].current = progress
+                
+            # Get current stage data
             stage_data = self.stages[self.current_stage]
-            stage_name = f"{stage_data.name}: {step_name}"
-            self.logger.info(f"Step: {stage_name}")
+            
+            # Log the step update
+            self.logger.info(f"Step: {step_name} ({progress}%)" if progress is not None 
+                           else f"Step: {step_name}")
             
             # Update progress with the new step name and description
             self.update_progress(

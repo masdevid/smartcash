@@ -32,11 +32,11 @@ SOURCE_DIRECTORIES = [
 
 # Symlink mapping: source -> target
 SYMLINK_MAP = {
-    '/content/drive/MyDrive/SmartCash/data': '/content/smartcash/data',
-    '/content/drive/MyDrive/SmartCash/models': '/content/smartcash/models',
-    '/content/drive/MyDrive/SmartCash/configs': '/content/smartcash/configs',
-    '/content/drive/MyDrive/SmartCash/outputs': '/content/smartcash/outputs',
-    '/content/drive/MyDrive/SmartCash/logs': '/content/smartcash/logs'
+    '/content/drive/MyDrive/SmartCash/data': '/content/data',
+    '/content/drive/MyDrive/SmartCash/models': '/content/models',
+    '/content/drive/MyDrive/SmartCash/configs': '/content/configs',
+    '/content/drive/MyDrive/SmartCash/outputs': '/content/outputs',
+    '/content/drive/MyDrive/SmartCash/logs': '/content/logs'
 }
 
 # Progress steps

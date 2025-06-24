@@ -35,7 +35,7 @@ class EnvConfigInitializer:
         """Buat komponen UI dengan shared components"""
         from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui
         
-        ui_components = create_env_config_ui({})
+        ui_components = create_env_config_ui()
         
         # Validasi required components
         required = ['setup_button', 'status_panel', 'progress_bar', 'progress_text', 

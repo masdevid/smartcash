@@ -14,7 +14,7 @@ LoggerType = Callable[[str], None]
 def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """Initialize environment configuration UI dengan setup sederhana"""
     # Suppress all outputs during initialization
-    suppress_all_outputs()
+    # suppress_all_outputs()
     try:
         # 1. Create UI components first (without logging)
         ui_components = _create_ui_components()

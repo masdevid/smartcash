@@ -286,49 +286,58 @@ class SetupProgressTracker:
     
     def _update_overall_progress(self) -> None:
         """Calculate and update the overall progress"""
-        if not self.stages:
-            self.overall_progress = 0
-            return
+        try:
+            if not self.stages:
+                self.overall_progress = 0
+                return
+                
+            total_weight = sum(stage.weight for stage in self.stages.values())
+            if total_weight == 0:
+                self.overall_progress = 0
+                return
+                
+            weighted_sum = sum(
+                stage.weight * (stage.current / 100) 
+                for stage in self.stages.values()
+            )
+            self.overall_progress = min(100, int(weighted_sum / total_weight * 100))
             
-        total_weight = sum(stage.weight for stage in self.stages.values())
-        if total_weight == 0:
-            self.overall_progress = 0
-            return
+            # Update UI if we have a current stage
+            if self.current_stage is not None and 'progress_tracker' in self.ui_components:
+                tracker = self.ui_components['progress_tracker']
+                
+                # Update progress bar
+                tracker['bar'].value = self.overall_progress
+                tracker['bar'].description = f"{self.overall_progress}%"
+                
+                # Get current stage info
+                current_stage_name = self.stages[self.current_stage].name if self.current_stage in self.stages else "Initializing"
+                current_progress = self.stages[self.current_stage].current if self.current_stage in self.stages else 0
+                
+                # Update status text with current stage and progress
+                tracker['text'].value = f'''
+                    <div style="padding: 5px 0;">
+                        <div><strong>Current Task:</strong> {current_stage_name} ({current_progress}%)</div>
+                    </div>
+                '''
             
-        weighted_sum = sum(
-            stage.weight * (stage.current / 100) 
-            for stage in self.stages.values()
-        )
-        self.overall_progress = min(100, int(weighted_sum / total_weight * 100))
-        
-        # Update UI
-        if 'progress_tracker' in self.ui_components:
-            tracker = self.ui_components['progress_tracker']
-            
-            # Update progress bar
-            tracker['bar'].value = self.overall_progress
-            tracker['bar'].description = f"{self.overall_progress}%"
-            
-            # Update status text with current stage and message
-            stage_name = self.stages[stage].name
-            tracker['text'].value = f'''
-                <div style="padding: 5px 0;">
-                    <div><strong>Current Task:</strong> {stage_name}</div>
-                    <div style="color: #666; font-size: 0.9em;">{message}</div>
-                </div>
-            '''
-        
-        # Call registered callbacks
-        for callback in self.callbacks:
-            try:
-                callback("overall", self.overall_progress, self.stages[stage].name)
-                callback("current", progress, message)
-            except Exception as e:
-                print(f"Error in progress callback: {e}")
-            
-            # Small delay to allow UI to update
-            import time
-            time.sleep(0.05)
+            # Call registered callbacks
+            for callback in self.callbacks:
+                try:
+                    if self.current_stage is not None and self.current_stage in self.stages:
+                        callback("overall", self.overall_progress, self.stages[self.current_stage].name)
+                        callback("current", current_progress, "")
+                except Exception as e:
+                    self.logger.error(f"Error in progress callback: {e}")
+                    
+                # Small delay to allow UI to update
+                import time
+                time.sleep(0.05)
+                
+        except Exception as e:
+            self.logger.error(f"Error in _update_overall_progress: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
     
     def complete(self, message: str = "Setup completed successfully") -> None:
         """Mark setup as complete"""

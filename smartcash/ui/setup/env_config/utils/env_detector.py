@@ -16,7 +16,9 @@ def detect_environment_info() -> Dict[str, Any]:
         'is_colab': _is_google_colab(),
         'gpu_info': _get_gpu_info(),
         'drive_mounted': _is_drive_mounted(),
-        'runtime_type': _get_runtime_type()
+        'cpu_cores': _get_cpu_cores(),
+        'total_ram': _get_total_ram(),
+        'storage_info': _get_storage_info()
     }
 
 def _get_python_version() -> str:
@@ -49,6 +51,32 @@ def _get_gpu_info() -> str:
 def _is_drive_mounted() -> bool:
     """💾 Check if Google Drive is mounted"""
     return os.path.exists('/content/drive/MyDrive')
+
+def _get_cpu_cores() -> int:
+    """🖥️ Get number of CPU cores"""
+    import multiprocessing
+    return multiprocessing.cpu_count()
+
+def _get_total_ram() -> str:
+    """💾 Get total RAM in GB"""
+    try:
+        import psutil
+        ram_gb = round(psutil.virtual_memory().total / (1024**3), 1)
+        return f"{ram_gb} GB"
+    except:
+        return "N/A"
+
+def _get_storage_info() -> str:
+    """💽 Get storage information"""
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage("/")
+        total_gb = total // (2**30)
+        used_gb = used // (2**30)
+        free_gb = free // (2**30)
+        return f"{used_gb}GB / {total_gb}GB (Free: {free_gb}GB)"
+    except:
+        return "N/A"
 
 def _get_runtime_type() -> str:
     """⚡ Get runtime type information"""

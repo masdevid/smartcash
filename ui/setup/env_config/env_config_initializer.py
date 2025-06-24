@@ -20,11 +20,8 @@ def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets
         # 1. Create UI components
         ui_components = _create_ui_components()
         
-        # 2. Setup basic handlers
+        # 2. Setup basic handlers (includes initial status check)
         _setup_handlers(ui_components, config or {})
-        
-        # 3. Initial status check
-        _perform_initial_status_check(ui_components)
         
         return ui_components['ui']
         
@@ -43,17 +40,22 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
         from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
         
-        # Setup logger bridge
+        # Initialize handlers first with a temporary logger
+        temp_logger = _create_simple_logger()
+        setup_handler = SetupHandler(temp_logger)
+        status_checker = StatusChecker(temp_logger)
+        
+        # Store handlers for later use
+        ui_components['_setup_handler'] = setup_handler
+        ui_components['_status_checker'] = status_checker
+        
+        # Setup logger bridge after UI components are ready
         logger = create_ui_logger_bridge(ui_components, 'ENV_CONFIG')
         ui_components['logger'] = logger
         
-        # Initialize handlers
-        setup_handler = SetupHandler(logger)
-        status_checker = StatusChecker(logger)
-        
-        # Store handlers
-        ui_components['_setup_handler'] = setup_handler
-        ui_components['_status_checker'] = status_checker
+        # Update handlers with the new logger
+        setup_handler.logger = logger
+        status_checker.logger = logger
         
         # Setup button click handler
         def on_setup_click(button):
@@ -64,6 +66,9 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
                 logger.error(f"❌ Setup error: {str(e)}")
                 
         ui_components['setup_button'].on_click(on_setup_click)
+        
+        # Now that everything is set up, perform initial status check
+        _perform_initial_status_check(ui_components)
         
     except Exception as e:
         ui_components['logger'] = _create_simple_logger()

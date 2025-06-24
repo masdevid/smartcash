@@ -5,7 +5,23 @@ Deskripsi: Handler untuk membuat folder dan symlink yang diperlukan
 
 import os
 from typing import Dict, Any, List
-from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
+from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP, SOURCE_DIRECTORIES
+
+class FolderHandler:
+    """📁 Handler untuk folder dan symlink management"""
+    
+    def __init__(self, logger=None):
+        self.logger = logger or self._create_dummy_logger()
+        
+    def _create_dummy_logger(self):
+        """📝 Create dummy logger fallback"""
+        class DummyLogger:
+            def debug(self, msg): print(f"🔍 {msg}")
+            def info(self, msg): print(f"ℹ️ {msg}")
+            def success(self, msg): print(f"✅ {msg}")
+            def warning(self, msg): print(f"⚠️ {msg}")
+            def error(self, msg): print(f"❌ {msg}")
+        return DummyLogger()
 
 class FolderHandler:
     """📁 Handler untuk folder dan symlink management"""
@@ -17,11 +33,16 @@ class FolderHandler:
             'symlinks_count': 0,
             'folders_created': [],
             'symlinks_created': [],
+            'source_dirs_created': [],
             'errors': []
         }
         
         try:
-            # Create directories
+            # Create source directories in Google Drive first
+            source_dirs_created = self._create_source_directories()
+            result['source_dirs_created'] = source_dirs_created
+            
+            # Create local directories
             folders_created = self._create_directories()
             result['created_count'] = len(folders_created)
             result['folders_created'] = folders_created
@@ -36,16 +57,31 @@ class FolderHandler:
         
         return result
     
+    def _create_source_directories(self) -> List[str]:
+        """📂 Buat direktori sumber di Google Drive"""
+        created = []
+        
+        for folder_path in SOURCE_DIRECTORIES:
+            try:
+                os.makedirs(folder_path, exist_ok=True)
+                self.logger.success(f"Created source directory: {folder_path}")
+                created.append(folder_path)
+            except Exception as e:
+                self.logger.error(f"Failed to create source directory {folder_path}: {e}")
+                
+        return created
+        
     def _create_directories(self) -> List[str]:
-        """📂 Buat direktori yang diperlukan"""
+        """📂 Buat direktori lokal yang diperlukan"""
         created = []
         
         for folder_path in REQUIRED_FOLDERS:
             try:
                 os.makedirs(folder_path, exist_ok=True)
+                self.logger.success(f"Created directory: {folder_path}")
                 created.append(folder_path)
             except Exception as e:
-                print(f"⚠️ Failed to create {folder_path}: {e}")
+                self.logger.error(f"Failed to create directory {folder_path}: {e}")
                 
         return created
     
@@ -55,10 +91,27 @@ class FolderHandler:
         
         for source, target in SYMLINK_MAP.items():
             try:
-                if os.path.exists(source) and not os.path.exists(target):
-                    os.symlink(source, target)
-                    created.append(f"{source} -> {target}")
+                # Create parent directory for target if it doesn't exist
+                target_parent = os.path.dirname(target)
+                if not os.path.exists(target_parent):
+                    os.makedirs(target_parent, exist_ok=True)
+                
+                # Remove target if it exists (file or symlink)
+                if os.path.exists(target) or os.path.islink(target):
+                    if os.path.islink(target) or os.path.isfile(target):
+                        os.remove(target)
+                        self.logger.debug(f"Removed existing file/symlink: {target}")
+                    elif os.path.isdir(target):
+                        os.rmdir(target)  # Only remove if empty
+                        self.logger.debug(f"Removed empty directory: {target}")
+                
+                # Create symlink
+                os.symlink(source, target)
+                self.logger.success(f"Created symlink: {source} -> {target}")
+                created.append(f"{source} -> {target}")
+                
             except Exception as e:
-                print(f"⚠️ Failed to create symlink {source} -> {target}: {e}")
+                error_msg = f"Failed to create symlink {source} -> {target}: {str(e)}"
+                self.logger.error(error_msg)
                 
         return created

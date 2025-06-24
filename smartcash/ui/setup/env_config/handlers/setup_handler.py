@@ -18,7 +18,7 @@ class SetupHandler:
     def __init__(self, logger=None):
         self.logger = logger or self._create_dummy_logger()
         self.drive_handler = DriveHandler(logger)
-        self.folder_handler = FolderHandler()
+        self.folder_handler = FolderHandler(logger)
         self.config_handler = ConfigHandler()
     
     def run_full_setup(self, ui_components: Dict[str, Any]) -> bool:

@@ -21,11 +21,22 @@ REQUIRED_FOLDERS = [
     '/content/smartcash/logs'
 ]
 
+# Source directories that need to be created in Google Drive
+SOURCE_DIRECTORIES = [
+    '/content/drive/MyDrive/SmartCash/data',
+    '/content/drive/MyDrive/SmartCash/models',
+    '/content/drive/MyDrive/SmartCash/configs',
+    '/content/drive/MyDrive/SmartCash/outputs',
+    '/content/drive/MyDrive/SmartCash/logs'
+]
+
 # Symlink mapping: source -> target
 SYMLINK_MAP = {
     '/content/drive/MyDrive/SmartCash/data': '/content/smartcash/data',
     '/content/drive/MyDrive/SmartCash/models': '/content/smartcash/models',
-    '/content/drive/MyDrive/SmartCash/configs': '/content/smartcash/configs'
+    '/content/drive/MyDrive/SmartCash/configs': '/content/smartcash/configs',
+    '/content/drive/MyDrive/SmartCash/outputs': '/content/smartcash/outputs',
+    '/content/drive/MyDrive/SmartCash/logs': '/content/smartcash/logs'
 }
 
 # Progress steps

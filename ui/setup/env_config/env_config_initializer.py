@@ -20,22 +20,18 @@ def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets
         ui_components = _create_ui_components()
         
         # 2. Setup logger bridge first (before any logging)
-        logger_bridge = create_ui_logger_bridge(ui_components)
+        logger_bridge = _initialize_logger_bridge(ui_components)
         ui_components['_logger_bridge'] = logger_bridge
         
         # 3. Initialize status checker if not present
         if '_status_checker' not in ui_components:
             from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
-            ui_components['_status_checker'] = StatusChecker(logger=ui_components.get('_logger_bridge'))
+            ui_components['_status_checker'] = StatusChecker(logger=logger_bridge)
         
         # 4. Now setup handlers (this will do the initial status update)
         _setup_handlers(ui_components, config or {})
         
-        # 5. Mark UI as ready to flush buffered logs
-        if hasattr(logger_bridge, 'set_ui_ready'):
-            logger_bridge.set_ui_ready(True)
-            
-        # 6. Restore output after UI is ready
+        # 5. Restore output after UI is ready
         restore_stdout()
         
         # Return the container widget which holds the UI
@@ -73,7 +69,7 @@ def _update_status(ui_components: Dict[str, Any], message: str, status_type: str
         if not status_bar:
             return
         # Log the status update if logger bridge is available
-        logger_bridge = ui_components.get('logger_bridge')
+        logger_bridge = ui_components.get('_logger_bridge')
         if logger_bridge and hasattr(logger_bridge, status_type):
             try:
                 log_method = getattr(logger_bridge, status_type)
@@ -118,7 +114,7 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
             status_checker = StatusChecker(logger=logger_bridge)
             ui_components['_status_checker'] = status_checker
             
-        # 3. Setup initial status (will be buffered until UI is ready)
+        # 3. Setup initial status
         _update_status(ui_components, "Environment configuration ready", "info")
         
         # 4. Initialize other handlers
@@ -169,30 +165,7 @@ def _setup_event_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
         _update_status(ui_components, error_msg, "error")
         raise
 
-def _clear_buffered_logs(ui_components: Dict[str, Any]) -> None:
-    """Initialize and configure logging system with buffered logging support."""
-    # Import dependencies
-    from smartcash.ui.utils.buffered_logger import create_buffered_logger, BufferedLogger
-  
-
-    # Initialize buffered logger
-    buffered_logger = create_buffered_logger()
-    ui_components['_logger_bridge'] = buffered_logger
-
-    # Clear any existing logs using the utility method
-    if 'logger_bridge' in ui_components:
-        BufferedLogger.clear_logs(ui_components['logger_bridge'])
-
-    # Initialize logger bridge
-    logger_bridge = _initialize_logger_bridge(ui_components, buffered_logger)
-    
-    # Setup handlers
-    _setup_handlers(ui_components, logger_bridge)
-    
-    # Perform initial status check
-    _perform_initial_setup(ui_components, logger_bridge)
-
-def _create_fallback_logger(buffered_logger: Any, message: str = None, error: Exception = None) -> Any:
+def _create_fallback_logger(message: str = None, error: Exception = None) -> Any:
     """Create and configure a fallback logger with optional message and error handling."""
     from smartcash.ui.utils.simple_logger import create_simple_logger
     
@@ -204,37 +177,31 @@ def _create_fallback_logger(buffered_logger: Any, message: str = None, error: Ex
             logger.warning(f"⚠️ {message}")
     return logger
 
-def _initialize_logger_bridge(ui_components: Dict[str, Any], buffered_logger: Any) -> Any:
-    """Initialize and configure the logger bridge with buffered logging support."""
-    from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
-    
-    def _create_and_flush_logger(message: str = None, error: Exception = None) -> Any:
-        """Helper to create fallback logger and flush buffered logs."""
-        logger = _create_fallback_logger(buffered_logger, message, error)
-        buffered_logger.flush_to_ui_logger(logger)
-        return logger
-    
+def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
+    """Initialize and configure the logger bridge."""
     try:
-        # Setup log output widget
+        # Initialize standard logger bridge
+        logger_bridge = create_ui_logger_bridge(ui_components)
+        ui_components['_logger_bridge'] = logger_bridge
+        
+        # Setup log output widget if it exists
         _setup_log_output_widget(ui_components)
         
-        # Try to create UI logger bridge
-        if create_ui_logger_bridge is not None:
-            try:
-                logger_bridge = create_ui_logger_bridge(ui_components, 'env_config')
-                logger_bridge.set_ui_ready(True)
-                buffered_logger.flush_to_ui_logger(logger_bridge)
-                logger_bridge.info("✅ Logger bridge initialized successfully")
-                return logger_bridge
-            except Exception as e:
-                return _create_and_flush_logger("Failed to initialize UI logger", e)
+        # Log initialization
+        logger_bridge.info("🔌 Logger bridge initialized")
         
-        # Fallback to simple logger
-        return _create_and_flush_logger("Using fallback logger - UI components not available")
-
+        return logger_bridge
+        
     except Exception as e:
-        # Last resort fallback
-        return _create_and_flush_logger("Critical error initializing logger", e)
+        # Fallback to simple logger if initialization fails
+        error_msg = f"Failed to initialize logger bridge: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        
+        # Try to create a fallback logger
+        fallback_logger = _create_fallback_logger(error_msg, e)
+        ui_components['_logger_bridge'] = fallback_logger
+        
+        return fallback_logger
 
 def _setup_log_output_widget(ui_components: Dict[str, Any]) -> None:
     """Configure the log output widget in the UI components."""

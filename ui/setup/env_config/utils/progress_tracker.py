@@ -117,8 +117,7 @@ class SetupProgressTracker:
         
         # Update the progress tracker with the new stage
         if 'progress_tracker' in self.ui_components:
-            tracker = self.ui_components['progress_tracker']
-            tracker.update_current(progress=0, message=stage_name)
+            self.update_progress(stage, 0, message)
     
     def complete_stage(self, message: str = "") -> None:
         """Mark current stage as complete"""

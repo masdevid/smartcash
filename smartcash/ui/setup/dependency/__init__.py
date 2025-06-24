@@ -1,16 +1,14 @@
 """
-File: smartcash/ui/setup/dependency/__init__.py
-Deskripsi: Main dependency module exports dengan public API yang lengkap
+Dependency management module for SmartCash UI setup.
+
+This module provides the public API for managing Python package dependencies,
+including installation, verification, and status reporting.
 """
 
-from .dependency_initializer import (
-    initialize_dependency_ui,
-    get_dependency_config,
-    get_dependency_status,
-    cleanup_dependency_resources
-)
+# Core functionality
+from .dependency_initializer import initialize_dependency_ui, get_dependency_config
 
-# Import utility functions untuk backward compatibility
+# Package management utilities
 from .utils import (
     get_installed_packages_dict,
     check_package_installation_status,
@@ -22,23 +20,21 @@ from .utils import (
     generate_comprehensive_status_report
 )
 
-# Config dan status utilities
+# Configuration handling
 from .handlers.config_handler import DependencyConfigHandler
 from .handlers.defaults import get_default_dependency_config
 
-# Main public API
+# Public API
 __all__ = [
-    # Core initialization
+    # Core functionality
     'initialize_dependency_ui',
     'get_dependency_config',
-    'get_dependency_status',
-    'cleanup_dependency_resources',
     
-    # Config handling
+    # Configuration
     'DependencyConfigHandler',
     'get_default_dependency_config',
     
-    # Package utilities
+    # Package management
     'get_installed_packages_dict',
     'check_package_installation_status',
     'install_single_package',
@@ -53,6 +49,6 @@ __all__ = [
     'generate_comprehensive_status_report'
 ]
 
-# Version info
+# Package metadata
 __version__ = '1.0.0'
 __author__ = 'SmartCash Team'

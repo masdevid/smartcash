@@ -40,13 +40,17 @@ class UIFactory:
             button_container = widgets.VBox([setup_button], 
                 layout=widgets.Layout(align_items='center', margin='10px 0px'))
             
-            # Progress tracker - get widget dari shared component
-            progress_tracker_obj = create_single_progress_tracker()
-            progress_tracker = progress_tracker_obj.widget() if hasattr(progress_tracker_obj, 'widget') else progress_tracker_obj
+            # Progress tracker - ensure we get the widget instance
+            progress_tracker = create_single_progress_tracker()
+            if hasattr(progress_tracker, 'widget'):
+                progress_tracker = progress_tracker.widget
+            elif callable(getattr(progress_tracker, 'widget', None)):
+                progress_tracker = progress_tracker.widget()
             
-            # Log accordion - get widget dari shared component  
-            log_accordion_obj = create_log_accordion()
-            log_accordion = log_accordion_obj.get('widget', log_accordion_obj)
+            # Log accordion - ensure we get the widget instance
+            log_accordion = create_log_accordion()
+            if isinstance(log_accordion, dict):
+                log_accordion = log_accordion.get('widget', log_accordion)
             
             # Environment info panel - simple HTML widget
             env_info_panel = widgets.HTML(

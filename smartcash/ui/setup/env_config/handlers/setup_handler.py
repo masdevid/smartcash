@@ -211,40 +211,57 @@ class SetupHandler:
             summary_data['folders_created'] = len(verified_folders)
             summary_data['symlinks_created'] = len(verified_symlinks)
             
+            # Log verification results with more details
+            issues_found = []
+            
+            if missing_folders:
+                folder_issues = f"Missing folders: {', '.join(missing_folders)}"
+                self.logger.warning(folder_issues)
+                issues_found.append(folder_issues)
+                
+            if missing_symlinks:
+                symlink_issues = f"Missing symlinks: {', '.join(f'{s} → {t}' for s, t in missing_symlinks)}"
+                self.logger.warning(symlink_issues)
+                issues_found.append(symlink_issues)
+                
+            if not summary_data['drive_mounted']:
+                drive_issue = "Google Drive is not mounted"
+                self.logger.warning(drive_issue)
+                issues_found.append(drive_issue)
+            
             # Check if all required items exist
             all_verified = (
                 not missing_folders and
                 not missing_symlinks and
-                summary_data['drive_mounted'] and
-                (summary_data['configs_synced'] > 0 or not missing_symlinks)  # Config sync is optional if symlinks are okay
+                summary_data['drive_mounted']
             )
             
-            summary_data['success'] = all_verified
-            
-            # Log verification results
-            if missing_folders:
-                self.logger.warning(f"Missing folders: {', '.join(missing_folders)}")
-            if missing_symlinks:
-                self.logger.warning(f"Missing symlinks: {', '.join(f'{s} -> {t}' for s, t in missing_symlinks)}")
+            # Update status in summary data
+            summary_data['status'] = 'success' if all_verified else 'warning'
+            summary_data['issues'] = issues_found
             
             # Complete
             progress_tracker.update_step("Setup complete", 100)
             
+            # Prepare status message based on verification results
+            if all_verified:
+                status_msg = "✅ Environment setup completed successfully!"
+                self.logger.success("🎉 Environment setup completed successfully!")
+            else:
+                status_msg = "⚠️ Setup completed with some issues"
+                self.logger.warning("Setup completed with the following issues:")
+                for issue in issues_found:
+                    self.logger.warning(f"  • {issue}")
+            
             # Update the setup summary with detailed information
             if 'setup_summary' in ui_components:
                 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
-                status_msg = (
-                    "✅ Environment setup completed successfully!" if all_verified
-                    else "⚠️ Setup completed with some issues"
-                )
                 update_setup_summary(
                     ui_components['setup_summary'],
                     status_message=status_msg,
-                    status_type='success',
+                    status_type=summary_data['status'],
                     details=summary_data
                 )
-            
-            self.logger.success("🎉 Environment setup completed successfully!")
             
         except Exception as e:
             error_msg = f"❌ Setup workflow failed: {str(e)}"

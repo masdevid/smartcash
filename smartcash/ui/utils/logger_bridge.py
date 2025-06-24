@@ -110,102 +110,79 @@ class UILoggerBridge:
     def _log_to_ui(self, level: str, message: str) -> None:
         """Log ke UI dengan safe error handling."""
         try:
-            # Cari output widget
-            output_widget = self._get_output_widget()
-            if not output_widget:
-                # Debug: Print available keys for troubleshooting
-                available_keys = [k for k in self.ui_components.keys() if 'log' in k.lower() or 'output' in k.lower()]
-                print(f"[DEBUG] No output widget found. Available log-related keys: {available_keys}")
+            # Try to get the log output widget
+            log_output = self._get_log_output_widget()
+            if not log_output:
                 return
             
-            # Format message
-            import datetime
-            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-            
-            # Color mapping
-            colors = {
-                'debug': '#6c757d',
-                'info': '#007bff', 
-                'success': '#28a745',
-                'warning': '#ffc107',
-                'error': '#dc3545',
-                'critical': '#dc3545'
+            # Map log levels to match the LogLevel enum in log_accordion.py
+            level_mapping = {
+                'debug': 'debug',
+                'info': 'info',
+                'success': 'success',
+                'warning': 'warning',
+                'error': 'error',
+                'critical': 'critical'
             }
             
-            # Emoji mapping
-            emojis = {
-                'debug': '🔍',
-                'info': 'ℹ️',
-                'success': '✅', 
-                'warning': '⚠️',
-                'error': '❌',
-                'critical': '🔥'
-            }
+            # Get the mapped level, default to 'info' if not found
+            mapped_level = level_mapping.get(level.lower(), 'info')
             
-            color = colors.get(level, '#333333')
-            emoji = emojis.get(level, '📝')
-            
-            # Format HTML message
-            formatted_msg = f"""
-            <div style='margin: 2px 0; padding: 4px; word-wrap: break-word; 
-                        overflow-wrap: break-word; white-space: pre-wrap; max-width: 100%; 
-                        overflow: hidden;'>
-                <span style='color: #666; font-size: 12px;'>{timestamp}</span> 
-                <span style='color: {color}; font-weight: bold;'>{level.upper()}</span>
-                <span>{emoji} {message}</span>
-            </div>
-            """
-            
-            # Append to output with error handling
-            try:
-                current_content = getattr(output_widget, 'value', '')
-                # Limit the size of the log to prevent performance issues
-                max_length = 50000  # Keep last ~50KB of logs
-                if len(current_content) > max_length:
-                    current_content = current_content[-max_length:]
-                output_widget.value = current_content + formatted_msg
-                
-                # Ensure the widget is visible in the UI
-                if hasattr(output_widget, 'scroll_to_bottom'):
-                    output_widget.scroll_to_bottom()
-                
-            except Exception as e:
-                print(f"[ERROR] Failed to update log widget: {str(e)}")
-                # Try to log the error to console as fallback
-                print(f"[{timestamp}] [{level.upper()}] {message}")
+            # Append the log message
+            log_output.append_log(
+                message=message,
+                level=mapped_level,
+                namespace='env_config',
+                module='smartcash.ui.setup.env_config'
+            )
             
         except Exception as e:
             # Log the error to console if UI update fails
             print(f"[ERROR] Failed to log to UI: {str(e)}")
             print(f"[ERROR] Original message: [{level.upper()}] {message}")
     
+    def _get_log_output_widget(self):
+        """Get the log output widget from UI components."""
+        try:
+            # First try to get the log_output directly
+            if 'log_output' in self.ui_components:
+                log_output = self.ui_components['log_output']
+                if hasattr(log_output, 'append_log'):
+                    return log_output
+            
+            # Then try to get it from log_components if available
+            if 'log_components' in self.ui_components and isinstance(self.ui_components['log_components'], dict):
+                log_components = self.ui_components['log_components']
+                if 'log_output' in log_components and hasattr(log_components['log_output'], 'append_log'):
+                    return log_components['log_output']
+            
+            # Try to find any widget with 'log' in the key that has append_log method
+            for key, widget in self.ui_components.items():
+                if 'log' in key.lower() and hasattr(widget, 'append_log'):
+                    return widget
+            
+            # If we get here, log a debug message
+            print(f"[DEBUG] No log output widget found with append_log method. Available keys: {list(self.ui_components.keys())}")
+            return None
+            
+        except Exception as e:
+            print(f"[ERROR] Error getting log output widget: {str(e)}")
+            return None
+    
     def _get_output_widget(self):
-        """Get output widget dengan multiple fallback options."""
-        # Try various possible keys for the log widget
-        for key in ['log_output', 'output', 'log_widget', 'log_accordion']:
-            if key in self.ui_components:
-                widget = self.ui_components[key]
-                # If it's an accordion, try to get its output widget
-                if key == 'log_accordion' and hasattr(widget, 'children') and widget.children:
-                    # Look for an Output widget in the accordion's children
-                    for child in widget.children:
-                        if hasattr(child, 'value'):
-                            return child
-                # If it's a direct output widget
-                elif hasattr(widget, 'value'):
-                    return widget
+        """Get output widget with multiple fallback options."""
+        # Try to get the log output widget first
+        log_output = self._get_log_output_widget()
+        if log_output:
+            return log_output
         
-        # Try to find any widget with 'log' in the key that might be an output widget
+        # Fallback to finding any output widget with a value attribute
         for key, widget in self.ui_components.items():
-            if 'log' in key.lower() and hasattr(widget, 'value'):
+            if hasattr(widget, 'value'):
                 return widget
-                
-        # Last resort: check if there's a log_components dictionary with an output widget
-        if 'log_components' in self.ui_components and isinstance(self.ui_components['log_components'], dict):
-            for key, widget in self.ui_components['log_components'].items():
-                if hasattr(widget, 'value'):
-                    return widget
         
+        # If we get here, log a debug message
+        print(f"[DEBUG] No output widget found. Available keys: {list(self.ui_components.keys())}")
         return None
     
     def _setup_ui_callback(self):

@@ -107,14 +107,16 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         # Initialize the actual UI logger bridge
         logger_bridge = None
         
-        # Try to find the log output widget in various possible locations
-        log_widget = None
-        for key in ['log_output', 'log_accordion', 'log_components']:
-            if key in ui_components:
-                log_widget = ui_components[key]
-                break
+        # Ensure we have the log_components from the UI
+        if 'log_components' in ui_components and isinstance(ui_components['log_components'], dict):
+            log_components = ui_components['log_components']
+            # Make sure log_output is accessible directly from ui_components
+            if 'log_output' in log_components:
+                ui_components['log_output'] = log_components['log_output']
         
-        if create_ui_logger_bridge is not None and log_widget is not None:
+        # Try to find the log output widget in various possible locations
+        logger_bridge = None
+        if create_ui_logger_bridge is not None:
             try:
                 # Pass all UI components to the logger bridge
                 logger_bridge = create_ui_logger_bridge(

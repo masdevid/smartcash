@@ -134,31 +134,37 @@ class SetupProgressTracker:
             if not hasattr(self, 'stages') or self.current_stage not in self.stages:
                 self.logger.warning(f"Unknown stage: {self.current_stage}")
                 return
+            
+            # Get the current stage progress
+            stage_progress = self.stages.get(self.current_stage)
+            if stage_progress is None:
+                self.logger.warning(f"No progress data found for stage: {self.current_stage}")
+                return
                 
-            # Mark stage as complete (100% progress)
-            self.stages[self.current_stage].current = 100
-            
-            # Log completion
-            stage_name = self.stages[self.current_stage].name
-            self.logger.info(f"✅ Completed stage: {stage_name}")
-            
-            # Update UI with completion message
-            if message:
-                self._update_ui(message)
+            try:
+                # Update the current stage to 100%
+                stage_progress.current = 100
                 
-            # Trigger callbacks for stage completion
-            if hasattr(self, 'callbacks') and isinstance(self.callbacks, list):
-                for callback in self.callbacks:
-                    if callable(callback):
-                        try:
-                            callback("stage_complete", 100, stage_name)
-                        except Exception as e:
-                            self.logger.error(f"Error in stage complete callback: {e}")
+                # Update overall progress
+                self._update_overall_progress()
+                
+                # Log completion
+                if message:
+                    self.logger.info(f"✅ Completed stage {stage_progress.name}: {message}")
+                else:
+                    self.logger.info(f"✅ Completed stage {stage_progress.name}")
+                
+                # Update UI with completion message
+                self._update_ui(f"Completed: {stage_progress.name}")
+                
+            except Exception as e:
+                error_msg = f"Error updating stage completion: {str(e)}"
+                self.logger.error(error_msg)
+                if hasattr(self, 'logger'):
+                    import traceback
+                    self.logger.debug(traceback.format_exc())
             
-            # Update overall progress
-            self._update_overall_progress()
-            
-            # Clear current stage
+            # Clear current stage after updating
             self.current_stage = None
             
         except Exception as e:
@@ -167,6 +173,10 @@ class SetupProgressTracker:
             if hasattr(self, 'logger'):
                 import traceback
                 self.logger.debug(traceback.format_exc())
+            
+            # Ensure we don't leave the stage in an inconsistent state
+            if hasattr(self, 'current_stage'):
+                self.current_stage = None
     
     def update_within_stage(self, progress: int, message: str = "") -> None:
         """Update progress within the current stage
@@ -364,22 +374,41 @@ class SetupProgressTracker:
             
             # Process callbacks if available
             if hasattr(self, 'callbacks') and isinstance(self.callbacks, list):
-                for callback in self.callbacks:
+                # Create a copy of callbacks to avoid modification during iteration
+                callbacks = self.callbacks.copy()
+                for callback in callbacks:
                     if not callable(callback):
                         continue
                         
                     try:
                         # Only pass valid stage info if available
-                        if hasattr(self, 'current_stage') and self.current_stage is not None and hasattr(self, 'stages') and self.current_stage in self.stages:
+                        if (hasattr(self, 'current_stage') and 
+                            self.current_stage is not None and 
+                            hasattr(self, 'stages') and 
+                            self.current_stage in self.stages):
+                            
+                            # Call with overall progress
                             callback("overall", self.overall_progress, self.stages[self.current_stage].name)
-                            callback("current", current_progress, "")
+                            
+                            # Get current progress for the current stage
+                            current_stage_progress = 0
+                            if (hasattr(self, 'current_stage') and 
+                                self.current_stage is not None and 
+                                hasattr(self, 'stages') and 
+                                self.current_stage in self.stages):
+                                current_stage_progress = self.stages[self.current_stage].current
+                                
+                            # Call with current stage progress
+                            callback("current", current_stage_progress, "")
+                            
                     except Exception as e:
                         if hasattr(self, 'logger'):
                             self.logger.error(f"Error in progress callback: {e}")
+                        continue
                         
                     # Small delay to allow UI to update
                     import time
-                    time.sleep(0.05)
+                    time.sleep(0.01)  # Reduced delay for better responsiveness
                 
         except Exception as e:
             error_msg = f"Error in _update_overall_progress: {str(e)}"

@@ -80,20 +80,33 @@ class SetupHandler:
         from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
         
         # Load existing summary data if available to maintain state
-        summary_data = getattr(self, '_last_summary_data', {
-            'drive_mounted': False,
-            'mount_path': 'N/A',
-            'configs_synced': 0,
-            'symlinks_created': 0,
-            'folders_created': 0,
-            'required_folders': len(REQUIRED_FOLDERS),
-            'required_symlinks': len(SYMLINK_MAP),
-            'success': False,
-            'verified_folders': [],
-            'missing_folders': [],
-            'verified_symlinks': [],
-            'missing_symlinks': []
-        })
+        summary_data = getattr(self, '_last_summary_data', None)
+        
+        # Initialize with default values if summary_data is None or not a dictionary
+        if not isinstance(summary_data, dict):
+            summary_data = {
+                'drive_mounted': False,
+                'mount_path': 'N/A',
+                'configs_synced': 0,
+                'symlinks_created': 0,
+                'folders_created': 0,
+                'required_folders': len(REQUIRED_FOLDERS),
+                'required_symlinks': len(SYMLINK_MAP),
+                'status': 'pending',  # Use 'status' instead of 'success' for consistency
+                'verified_folders': [],
+                'missing_folders': [],
+                'verified_symlinks': [],
+                'missing_symlinks': []
+            }
+        
+        # Ensure all required keys exist in the dictionary
+        for key in ['drive_mounted', 'mount_path', 'configs_synced', 'symlinks_created', 
+                   'folders_created', 'status', 'verified_folders', 'missing_folders',
+                   'verified_symlinks', 'missing_symlinks']:
+            if key not in summary_data:
+                summary_data[key] = None if key == 'mount_path' else 0 if 'count' in key or 'created' in key else False
+        
+        # Store the initialized summary data
         self._last_summary_data = summary_data
         
         try:

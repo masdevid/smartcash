@@ -178,7 +178,7 @@ def _create_fallback_logger(message: str = None, error: Exception = None) -> Any
     return logger
 
 def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
-    """Initialize and configure the logger bridge."""
+    """Initialize and configure the logger bridge with duplicate prevention."""
     try:
         # First, ensure we have the log output widget
         if 'log_accordion' in ui_components and 'log_output' not in ui_components:
@@ -191,6 +191,10 @@ def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
         logger_bridge = create_ui_logger_bridge(ui_components)
         ui_components['_logger_bridge'] = logger_bridge
         
+        # Disable console logging in the logger bridge to prevent duplicates
+        if hasattr(logger_bridge, 'set_console_logging'):
+            logger_bridge.set_console_logging(False)
+        
         # Setup log output widget if it exists
         _setup_log_output_widget(ui_components)
         
@@ -198,9 +202,13 @@ def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
         if hasattr(logger_bridge, 'set_ui_ready'):
             logger_bridge.set_ui_ready(True)
         
-        # Log initialization
-        logger_bridge.info("🔌 Logger bridge initialized")
+        # Log initialization with a unique marker
+        logger_bridge.info("🔌 Logger bridge initialized - Ready to receive logs")
         
+        # Clear any buffered logs to prevent duplicates
+        if hasattr(logger_bridge, '_flush_log_buffer'):
+            logger_bridge._flush_log_buffer()
+            
         return logger_bridge
         
     except Exception as e:

@@ -55,7 +55,8 @@ class SetupHandler:
         """🔧 Execute setup steps dengan progress tracking"""
         from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
         
-        summary_data = {
+        # Load existing summary data if available to maintain state
+        summary_data = getattr(self, '_last_summary_data', {
             'drive_mounted': False,
             'mount_path': 'N/A',
             'configs_synced': 0,
@@ -63,45 +64,87 @@ class SetupHandler:
             'folders_created': 0,
             'required_folders': len(REQUIRED_FOLDERS),
             'required_symlinks': len(SYMLINK_MAP),
-            'success': False
-        }
+            'success': False,
+            'verified_folders': [],
+            'missing_folders': [],
+            'verified_symlinks': [],
+            'missing_symlinks': []
+        })
+        self._last_summary_data = summary_data
         
         try:
-            # Step 1: Mount Drive
-            self.logger.info("🔧 Step 1: Mounting Google Drive...")
-            progress_tracker.update_step("Mounting Google Drive", 0)
-            
-            drive_result = self.drive_handler.mount_drive()
-            
-            # Check if user cancelled the drive mount
-            if drive_result.get('cancelled', False):
-                self.logger.info("ℹ️ Drive mount was cancelled by user")
-                summary_data['success'] = False
-                summary_data['status_message'] = "Drive mount was cancelled"
-                summary_data['cancelled'] = True
-                return summary_data
+            # Step 1: Mount Drive (if not already mounted)
+            if not summary_data.get('drive_mounted', False):
+                self.logger.info("🔧 Step 1: Mounting Google Drive...")
+                progress_tracker.update_step("Mounting Google Drive", 0)
                 
-            summary_data['drive_mounted'] = drive_result.get('success', False)
-            summary_data['mount_path'] = drive_result.get('mount_path', 'N/A')
+                drive_result = self.drive_handler.mount_drive()
+                
+                # Check if user cancelled the drive mount
+                if drive_result.get('cancelled', False):
+                    self.logger.info("ℹ️ Drive mount was cancelled by user")
+                    summary_data['success'] = False
+                    summary_data['status_message'] = "Drive mount was cancelled"
+                    summary_data['cancelled'] = True
+                    return summary_data
+                    
+                summary_data['drive_mounted'] = drive_result.get('success', False)
+                summary_data['mount_path'] = drive_result.get('mount_path', 'N/A')
+            else:
+                self.logger.info("✅ Google Drive already mounted")
             
-            # Step 2: Create Folders
-            self.logger.info("📁 Step 2: Creating directories...")
-            progress_tracker.update_step("Creating directories", 25)
-            
-            folder_result = self.folder_handler.create_required_folders()
-            summary_data['folders_created'] = folder_result.get('created_count', 0)
-            summary_data['symlinks_created'] = folder_result.get('symlinks_count', 0)
-            
-            # Step 3: Sync Configurations
-            self.logger.info("⚙️ Step 3: Syncing configurations...")
-            progress_tracker.update_step("Syncing configurations", 50)
+            # Step 2: Create Folders (if not already created)
+            if summary_data.get('folders_created', 0) < len(REQUIRED_FOLDERS):
+                self.logger.info("📁 Step 2: Creating directories...")
+                progress_tracker.update_step("Creating directories", 25)
+                
+                folder_result = self.folder_handler.create_required_folders()
+                summary_data['folders_created'] = folder_result.get('created_count', 0)
+                summary_data['symlinks_created'] = folder_result.get('symlinks_count', 0)
+            else:
+                self.logger.info("✅ Directories already created")
             
             config_result = self.config_handler.sync_configurations()
             summary_data['configs_synced'] = config_result.get('synced_count', 0)
             
-            # Step 4: Verify Setup
-            self.logger.info("✅ Step 4: Verifying setup...")
-            progress_tracker.update_step("Verifying setup", 75)
+            # Step 3: Create missing symlinks
+            if 'missing_symlinks' in summary_data and summary_data['missing_symlinks']:
+                self.logger.info("🔗 Step 3: Creating missing symlinks...")
+                progress_tracker.update_step("Creating symlinks", 50)
+                
+                # Create missing symlinks
+                created_symlinks = []
+                for source, target in list(summary_data['missing_symlinks']):
+                    try:
+                        # Ensure parent directory exists
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        # Create symlink
+                        os.symlink(source, target, target_is_directory=True)
+                        created_symlinks.append((source, target))
+                        self.logger.success(f"Created symlink: {target} -> {source}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to create symlink {target} -> {source}: {str(e)}")
+                
+                # Update verified/missing symlinks
+                for symlink in created_symlinks:
+                    if symlink in summary_data['missing_symlinks']:
+                        summary_data['missing_symlinks'].remove(symlink)
+                        summary_data['verified_symlinks'].append(symlink)
+            
+            # Step 4: Sync Configurations (only if all symlinks are created)
+            if not summary_data.get('missing_symlinks', []):
+                self.logger.info("⚙️ Step 4: Syncing configurations...")
+                progress_tracker.update_step("Syncing configurations", 60)
+                
+                config_result = self.config_handler.sync_configurations()
+                summary_data['configs_synced'] = config_result.get('synced_count', 0)
+            else:
+                self.logger.warning("⚠️ Skipping config sync due to missing symlinks")
+                summary_data['configs_synced'] = 0
+            
+            # Step 5: Verify Setup
+            self.logger.info("✅ Step 5: Verifying setup...")
+            progress_tracker.update_step("Verifying setup", 80)
             
             # Verify all required folders exist
             verified_folders = []
@@ -136,7 +179,7 @@ class SetupHandler:
                 not missing_folders and
                 not missing_symlinks and
                 summary_data['drive_mounted'] and
-                summary_data['configs_synced'] > 0  # At least one config should be synced
+                (summary_data['configs_synced'] > 0 or not missing_symlinks)  # Config sync is optional if symlinks are okay
             )
             
             summary_data['success'] = all_verified

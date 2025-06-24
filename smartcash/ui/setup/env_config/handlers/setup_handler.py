@@ -122,11 +122,45 @@ class SetupHandler:
             update_status_panel(ui_components['status_panel'], "Setup gagal, silakan coba lagi", "danger")
     
     def _set_error_state(self, ui_components: Dict[str, Any], error_msg: str) -> None:
-        """❌ Set UI ke error state"""
-        ui_components['setup_button'].disabled = False
-        ui_components['setup_button'].description = "🔄 Retry Setup"
-        ui_components['setup_button'].button_style = 'warning'
-        update_status_panel(ui_components['status_panel'], f"Error: {error_msg}", "danger")
+        """Set error state in UI components"""
+        if 'setup_button' in ui_components:
+            ui_components['setup_button'].disabled = False
+            ui_components['setup_button'].description = "❌ Retry Setup"
+            ui_components['setup_button'].button_style = 'danger'
+        update_status_panel(ui_components.get('status_panel'), error_msg, "danger")
+        
+    def setup_button_handler(self, button, ui_components: Dict[str, Any]) -> None:
+        """Handle setup button click events
+        
+        Args:
+            button: The button widget that was clicked
+            ui_components: Dictionary containing UI components
+        """
+        try:
+            # Disable button during setup
+            button.disabled = True
+            button.description = "🔄 Setting up..."
+            button.button_style = 'info'
+            
+            # Run the setup process
+            setup_success = self.run_full_setup(ui_components)
+            
+            # Update button state based on result
+            if setup_success:
+                button.description = "✅ Setup Complete"
+                button.button_style = 'success'
+            else:
+                button.description = "❌ Setup Failed"
+                button.button_style = 'danger'
+                button.disabled = False  # Allow retry on failure
+        except Exception as e:
+            error_msg = f"Setup error: {str(e)}"
+            self.logger.error(error_msg)
+            if 'status_panel' in ui_components:
+                update_status_panel(ui_components['status_panel'], error_msg, "error")
+            button.description = "❌ Error - Click to Retry"
+            button.button_style = 'danger'
+            button.disabled = False  # Allow retry on error
     
     def _create_dummy_logger(self):
         """📝 Create dummy logger fallback"""

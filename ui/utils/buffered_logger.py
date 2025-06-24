@@ -50,6 +50,24 @@ class BufferedLogger:
     def clear_buffer(self) -> None:
         """Clear all buffered messages."""
         self.buffer = []
+        
+    @staticmethod
+    def clear_logs(logger: Any) -> bool:
+        """Clear logs from any logger instance if it has a clear_buffer method.
+        
+        Args:
+            logger: The logger instance to clear logs from
+            
+        Returns:
+            bool: True if logs were cleared, False otherwise
+        """
+        try:
+            if hasattr(logger, 'clear_buffer') and callable(logger.clear_buffer):
+                logger.clear_buffer()
+                return True
+            return False
+        except Exception:
+            return False
 
 
 def create_buffered_logger() -> BufferedLogger:

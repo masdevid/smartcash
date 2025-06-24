@@ -33,6 +33,34 @@ def _create_ui_components() -> Dict[str, Any]:
     from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui
     return create_env_config_ui()
 
+def _update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
+    """
+    Update status panel with proper error handling and fallback
+    
+    Args:
+        ui_components: Dictionary of UI components
+        message: Message to display
+        status_type: Type of status (info, success, warning, danger)
+    """
+    if 'status_panel' not in ui_components:
+        return
+        
+    try:
+        from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
+        update_status_panel(
+            status_widget=ui_components['status_panel'],
+            message=message,
+            status_type=status_type
+        )
+    except Exception as e:
+        # Fallback to direct assignment if update_status_panel fails
+        try:
+            ui_components['status_panel'].value = f"<div style='color: red;'>{message}</div>"
+            if '_logger_bridge' in ui_components:
+                ui_components['_logger_bridge'].error(f"Failed to update status panel: {str(e)}")
+        except:
+            pass  # If everything fails, just continue
+
 def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
     Setup handlers and logger bridge with proper initialization order
@@ -57,10 +85,15 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
             if 'log_output' not in ui_components:
                 raise ValueError("Log output widget not found in UI components")
                 
+            # Create a dictionary with the log output widget
+            logger_components = {
+                'log_output': ui_components['log_output']
+            }
+            
+            # Initialize the logger bridge with the correct parameters
             logger_bridge = create_ui_logger_bridge(
-                log_widget=ui_components['log_output'],
-                log_level='DEBUG',  # Capture all logs during setup
-                name='EnvConfigLogger'
+                ui_components=logger_components,
+                logger_name='EnvConfigLogger'
             )
             temp_logger.info("✅ Logger bridge initialized successfully")
         except Exception as e:
@@ -100,20 +133,8 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         except:
             pass  # If logging fails, we'll continue with the error handling
         
-        # Update UI to show error
-        if 'status_panel' in ui_components:
-            ui_components['status_panel'].value = f"""
-            <div style='
-                padding: 10px;
-                background: #ffebee;
-                border-left: 4px solid #f44336;
-                color: #b71c1c;
-                border-radius: 4px;
-                margin: 10px 0;
-            '>
-                <strong>Error:</strong> {error_msg}
-            </div>
-            """
+        # Update status panel with error
+        _update_status_panel(ui_components, f"Error: {error_msg}", "danger")
         
         # Try to perform status check even if there was an error
         try:
@@ -121,7 +142,8 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
                 ui_components['_logger_bridge'].info("🔍 Attempting status check after error...")
                 _perform_initial_status_check(ui_components)
         except Exception as status_error:
-            ui_components['_logger_bridge'].error(f"❌ Status check failed: {str(status_error)}")
+            if '_logger_bridge' in ui_components:
+                ui_components['_logger_bridge'].error(f"❌ Status check failed: {str(status_error)}")
 
 def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
     """
@@ -140,20 +162,8 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
         if not status_checker:
             raise ValueError("Status checker not initialized")
         
-        # Update UI to show loading state
-        if 'status_panel' in ui_components:
-            ui_components['status_panel'].value = """
-            <div style='
-                padding: 10px;
-                background: #e3f2fd;
-                border-left: 4px solid #2196f3;
-                color: #0d47a1;
-                border-radius: 4px;
-                margin: 10px 0;
-            '>
-                <strong>Status:</strong> Checking environment configuration...
-            </div>
-            """
+        # Update status panel to show loading state
+        _update_status_panel(ui_components, "Checking environment configuration...", "info")
         
         # Perform the status check
         status_result = status_checker.check_initial_status(ui_components)
@@ -188,20 +198,8 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
         error_msg = f"❌ Failed to perform initial status check: {str(e)}"
         logger.error(error_msg, exc_info=True)
         
-        # Update UI to show error
-        if 'status_panel' in ui_components:
-            ui_components['status_panel'].value = f"""
-            <div style='
-                padding: 10px;
-                background: #ffebee;
-                border-left: 4px solid #f44336;
-                color: #b71c1c;
-                border-radius: 4px;
-                margin: 10px 0;
-            '>
-                <strong>Error:</strong> {error_msg}
-            </div>
-            """
+        # Update status panel with error
+        _update_status_panel(ui_components, f"Error: {error_msg}", "danger")
         
         # Re-raise to allow caller to handle the error
         raise RuntimeError(error_msg) from e
@@ -209,10 +207,17 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
 def _create_simple_logger():
     """📝 Create simple fallback logger"""
     class SimpleLogger:
-        def info(self, msg): print(f"ℹ️ {msg}")
-        def warning(self, msg): print(f"⚠️ {msg}")
-        def error(self, msg): print(f"❌ {msg}")
-        def success(self, msg): print(f"✅ {msg}")
+        def info(self, msg, *args, **kwargs): print(f"ℹ️ {msg}")
+        def warning(self, msg, *args, **kwargs): print(f"⚠️ {msg}")
+        def error(self, msg, *args, **kwargs): 
+            exc_info = kwargs.get('exc_info')
+            if exc_info and exc_info != (None, None, None):
+                import traceback
+                print(f"❌ {msg}")
+                traceback.print_exception(*exc_info)
+            else:
+                print(f"❌ {msg}")
+        def success(self, msg, *args, **kwargs): print(f"✅ {msg}")
     return SimpleLogger()
 
 def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:

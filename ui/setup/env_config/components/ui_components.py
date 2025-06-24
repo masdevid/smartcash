@@ -100,7 +100,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         create_divider(),
         status_panel,
         create_divider(),
-        progress_tracker,
+        progress_tracker.container,
         create_divider(),
         log_accordion,
         create_divider(),

@@ -202,12 +202,37 @@ def create_log_accordion(
             traceback.print_exc()
     
     def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
-        """Create a styled log entry widget."""
+        """Create a styled log entry widget with local timezone support."""
         style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
         
-        # Format timestamp if needed
-        timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3] if show_timestamps else ''
-        timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>" if timestamp else ''
+        # Format timestamp in local timezone if needed
+        timestamp_html = ''
+        if show_timestamps and 'timestamp' in entry and entry['timestamp']:
+            try:
+                # Convert to local timezone
+                import pytz
+                from datetime import datetime
+                
+                # Get the timestamp (assume UTC if timezone-naive)
+                ts = entry['timestamp']
+                if ts.tzinfo is None:
+                    ts = pytz.utc.localize(ts)
+                
+                # Convert to local timezone
+                local_tz = pytz.timezone('Asia/Jakarta')  # Default to WIB
+                local_ts = ts.astimezone(local_tz)
+                
+                # Format with milliseconds and timezone
+                timestamp = local_ts.strftime('%H:%M:%S.%f')[:-3]  # HH:MM:SS.mmm
+                timezone_str = local_ts.strftime('%Z')  # Timezone abbreviation
+                
+                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp} {timezone_str}</span>"
+                
+            except Exception as e:
+                # Fallback to simple timestamp if any error occurs
+                timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3]
+                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>"
+                print(f"[WARNING] Failed to format local time: {str(e)}")
         
         # Get level icon if needed
         level_icon = style['icon'] if show_level_icons else ''

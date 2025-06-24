@@ -30,3 +30,4 @@ thop>=0.1.1
 # Integration and Utilities
 tensorboard>=2.19.0
 python-dotenv>=1.0.1
+pytz>=2023.3  # For timezone support

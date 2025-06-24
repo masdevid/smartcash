@@ -94,22 +94,33 @@ class FolderHandler:
                 if not os.path.exists(target_parent):
                     os.makedirs(target_parent, exist_ok=True)
                 
-                # Remove target if it exists (file or symlink)
+                # Check if target exists and handle it
                 if os.path.exists(target) or os.path.islink(target):
-                    if os.path.islink(target) or os.path.isfile(target):
+                    if os.path.islink(target):
                         os.remove(target)
-                        self.logger.debug(f"Removed existing file/symlink: {target}")
+                        self.logger.debug(f"Removed existing symlink: {target}")
+                    elif os.path.isfile(target):
+                        os.remove(target)
+                        self.logger.debug(f"Removed existing file: {target}")
                     elif os.path.isdir(target):
-                        os.rmdir(target)  # Only remove if empty
+                        # Skip if target is a non-empty directory
+                        if os.listdir(target):
+                            self.logger.warning(f"Skipping non-empty directory: {target}")
+                            continue
+                        os.rmdir(target)
                         self.logger.debug(f"Removed empty directory: {target}")
                 
-                # Create symlink
-                os.symlink(source, target)
-                self.logger.success(f"Created symlink: {source} -> {target}")
-                created.append(f"{source} -> {target}")
+                # Create symlink if it doesn't exist
+                if not os.path.lexists(target):
+                    os.symlink(source, target)
+                    self.logger.success(f"Created symlink: {source} -> {target}")
+                    created.append(f"{source} -> {target}")
+                else:
+                    self.logger.info(f"Symlink already exists: {source} -> {target}")
                 
             except Exception as e:
                 error_msg = f"Failed to create symlink {source} -> {target}: {str(e)}"
                 self.logger.error(error_msg)
+                raise  # Re-raise to handle in the calling function
                 
         return created

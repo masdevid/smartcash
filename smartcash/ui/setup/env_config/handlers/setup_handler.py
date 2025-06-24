@@ -92,11 +92,32 @@ class SetupHandler:
             progress_tracker.update_step("Setup complete", 100)
             summary_data['success'] = True
             
+            # Update the setup summary with detailed information
+            if 'setup_summary' in ui_components:
+                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+                update_setup_summary(
+                    ui_components['setup_summary'],
+                    status_message="✅ Environment setup completed successfully!",
+                    status_type='success',
+                    details=summary_data
+                )
+            
             self.logger.success("🎉 Environment setup completed successfully!")
             
         except Exception as e:
-            self.logger.error(f"❌ Setup workflow failed: {str(e)}")
+            error_msg = f"❌ Setup workflow failed: {str(e)}"
+            self.logger.error(error_msg)
             summary_data['success'] = False
+            
+            # Update the setup summary with error information
+            if 'setup_summary' in ui_components:
+                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+                update_setup_summary(
+                    ui_components['setup_summary'],
+                    status_message=error_msg,
+                    status_type='error',
+                    details=summary_data
+                )
             
         return summary_data
     

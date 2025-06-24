@@ -104,10 +104,19 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         if not logger_bridge:
             raise RuntimeError("Logger bridge not initialized")
             
-        # 2. Get the status checker
+        # 2. Initialize the setup handler
+        if '_setup_handler' not in ui_components:
+            from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
+            ui_components['_setup_handler'] = SetupHandler(logger=logger_bridge)
+            logger_bridge.info("✅ Setup handler initialized")
+            
+        # 3. Get the status checker
         status_checker = ui_components.get('_status_checker')
         if not status_checker:
-            raise RuntimeError("Status checker not initialized")
+            logger_bridge.warning("Status checker not found, initializing...")
+            from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
+            status_checker = StatusChecker(logger=logger_bridge)
+            ui_components['_status_checker'] = status_checker
             
         # 3. Setup initial status (will be buffered until UI is ready)
         _update_status(ui_components, "Environment configuration ready", "info")
@@ -143,29 +152,20 @@ def _setup_event_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
                 ui_components['_logger_bridge'].error("Setup handler not found in UI components")
             return
             
-        # Setup button click handler
-        def on_setup_button_clicked(button):
-            logger = ui_components.get('_logger_bridge')
-            if logger:
-                logger.info("🚀 Starting environment setup...")
-            try:
-                setup_handler.run_full_setup(ui_components)
-            except Exception as e:
-                error_msg = f"❌ Error during setup: {str(e)}"
-                if logger:
-                    logger.error(error_msg, exc_info=True)
-                _update_status(ui_components, error_msg, "error")
+        # Setup button click handler using the setup_handler's method
+        setup_button.on_click(
+            lambda b: setup_handler.setup_button_handler(b, ui_components)
+        )
         
-        # Attach click handler to button
-        setup_button.on_click(on_setup_button_clicked)
-        
-        if '_logger_bridge' in ui_components:
-            ui_components['_logger_bridge'].info("✅ Event handlers initialized successfully")
+        # Log successful handler setup
+        if (logger := ui_components.get('_logger_bridge')):
+            logger.info("✅ Setup button handler configured")
+            logger.info("✅ Event handlers initialized successfully")
             
     except Exception as e:
         error_msg = f"Error setting up event handlers: {str(e)}"
-        if '_logger_bridge' in ui_components:
-            ui_components['_logger_bridge'].error(error_msg, exc_info=True)
+        if (logger := ui_components.get('_logger_bridge')):
+            logger.error(error_msg, exc_info=True)
         _update_status(ui_components, error_msg, "error")
         raise
 

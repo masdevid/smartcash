@@ -1,65 +1,84 @@
 # File: smartcash/ui/setup/env_config/handlers/ui_logger_handler.py
-# Deskripsi: Handler untuk UI logging dengan accordion auto-open dan color coding
+# Deskripsi: Handler untuk UI logging dengan integrasi log_accordion yang tepat
 
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from smartcash.ui.utils.ui_logger_namespace import get_namespace_color, get_namespace_id
 
 class UILoggerHandler:
-    """🔧 Handler untuk UI logging system"""
+    """🔧 Handler untuk UI logging system dengan integrasi log_accordion"""
     
     def create_ui_logger(self, ui_components: Dict[str, Any]) -> 'UILogger':
-        """Create UI logger instance dengan auto-open accordion"""
+        """Create UI logger instance dengan log_accordion integration"""
         return UILogger(ui_components)
 
 class UILogger:
-    """🔧 Logger yang mengarahkan output ke UI log accordion"""
+    """🔧 Logger yang menggunakan log_accordion untuk output UI"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
-        self._ensure_accordion_open()
+        self.namespace = get_namespace_id(ui_components) or "ENV"
+        self._ensure_accordion_available()
         
-    def _ensure_accordion_open(self):
-        """Pastikan accordion log terbuka otomatis"""
+    def _ensure_accordion_available(self):
+        """Pastikan log_accordion tersedia dan terbuka"""
         if 'log_accordion' in self.ui_components:
             accordion = self.ui_components['log_accordion']
             if hasattr(accordion, 'selected_index'):
-                accordion.selected_index = 0  # Buka tab pertama
+                accordion.selected_index = 0  # Buka accordion
         
     def info(self, message: str) -> None:
-        """Log info message ke UI"""
-        self._append_to_log(message, 'info', '💡')
+        """Log info message menggunakan log_accordion"""
+        self._log_to_accordion(message, 'info', '💡')
         
     def warning(self, message: str) -> None:
-        """Log warning message ke UI"""
-        self._append_to_log(message, 'warning', '⚠️')
+        """Log warning message menggunakan log_accordion"""
+        self._log_to_accordion(message, 'warning', '⚠️')
         
     def error(self, message: str, exc_info=None) -> None:
-        """Log error message ke UI"""
-        self._append_to_log(message, 'error', '❌')
+        """Log error message menggunakan log_accordion"""
+        self._log_to_accordion(message, 'error', '❌')
         
     def success(self, message: str) -> None:
-        """Log success message ke UI"""
-        self._append_to_log(message, 'success', '✅')
+        """Log success message menggunakan log_accordion"""
+        self._log_to_accordion(message, 'success', '✅')
     
-    def _append_to_log(self, message: str, level: str, emoji: str):
-        """Append message ke log output dengan color coding"""
-        if 'log_output' not in self.ui_components:
+    def _log_to_accordion(self, message: str, level: str, emoji: str):
+        """Log message menggunakan log_accordion.append_log method"""
+        # Gunakan log_output dari log_accordion jika tersedia
+        log_output = self.ui_components.get('log_output')
+        
+        if log_output and hasattr(log_output, 'append_log'):
+            # Gunakan method append_log dari log_accordion
+            log_output.append_log(
+                message=f"{emoji} {message}",
+                level=level,
+                namespace=self.namespace,
+                module='env_config'
+            )
+        else:
+            # Fallback ke method lama jika log_accordion tidak tersedia
+            self._fallback_log(message, level, emoji)
+    
+    def _fallback_log(self, message: str, level: str, emoji: str):
+        """Fallback logging jika log_accordion tidak tersedia"""
+        log_output = self.ui_components.get('log_output')
+        if not log_output:
             return
             
-        log_output = self.ui_components['log_output']
         timestamp = time.strftime('%H:%M:%S')
+        color = get_namespace_color(self.namespace)
         
-        # Color mapping untuk berbagai level
-        colors = {
-            'info': '#2196F3',
-            'success': '#4CAF50', 
-            'warning': '#FF9800',
-            'error': '#F44336'
-        }
+        formatted_msg = f'''
+        <div style="margin: 2px 0; padding: 4px; word-wrap: break-word;">
+            <span style="color: #666; font-size: 12px;">{timestamp}</span> 
+            <span style="color: {color};">[{self.namespace}]</span>
+            <span style="color: {color};">{level.upper()}</span>
+            {emoji} {message}
+        </div>
+        '''
         
-        color = colors.get(level, '#333333')
-        formatted_msg = f'<span style="color: {color};">[{timestamp}] {emoji} {message}</span><br>'
-        
-        # Append ke existing content
-        current_content = getattr(log_output, 'value', '')
-        log_output.value = current_content + formatted_msg
+        # Append ke log_output jika ada
+        if hasattr(log_output, 'value'):
+            current_content = getattr(log_output, 'value', '')
+            log_output.value = current_content + formatted_msg

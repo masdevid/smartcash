@@ -21,7 +21,7 @@ class SetupHandler:
         self.env_handler = EnvironmentHandler(logger)
         self.drive_handler = DriveHandler(logger)
         self.folder_handler = FolderHandler(logger)
-        self.config_handler = ConfigHandler(logger)
+        self.config_handler = ConfigHandler()
     
     def run_full_setup(self, ui_components: Dict[str, Any]) -> bool:
         """🔄 Run full environment setup dengan progress tracking"""
@@ -80,7 +80,8 @@ class SetupHandler:
     def _ensure_drive_connection(self) -> bool:
         """Ensure Google Drive is connected"""
         try:
-            return self.drive_handler.ensure_drive_mounted(self.logger)
+            mount_result = self.drive_handler.mount_drive()
+            return mount_result.get('success', False)
         except Exception as e:
             self.logger.error(f"❌ Drive connection failed: {str(e)}")
             return False
@@ -88,7 +89,8 @@ class SetupHandler:
     def _create_folder_structure(self) -> bool:
         """Create required folder structure"""
         try:
-            return self.folder_handler.create_smartcash_structure(self.logger)
+            self.folder_handler.create_folder_structures(self.logger)
+            return True
         except Exception as e:
             self.logger.error(f"❌ Folder creation failed: {str(e)}")
             return False
@@ -96,7 +98,8 @@ class SetupHandler:
     def _copy_config_templates(self) -> bool:
         """Copy configuration templates"""
         try:
-            return self.config_handler.copy_config_templates(self.logger)
+            self.config_handler.setup_configurations(self.logger)
+            return True
         except Exception as e:
             self.logger.error(f"❌ Config copy failed: {str(e)}")
             return False

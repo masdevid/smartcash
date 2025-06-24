@@ -21,6 +21,7 @@ class SetupHandler:
         self.drive_handler = DriveHandler(logger)
         self.folder_handler = FolderHandler(logger)
         self.config_handler = ConfigHandler()
+        self._last_summary_data = None  # Store the last summary data
     
     def run_full_setup(self, ui_components: Dict[str, Any], clear_logs: bool = True) -> Dict[str, Any]:
         """🔄 Jalankan full setup workflow dengan progress tracking
@@ -45,11 +46,23 @@ class SetupHandler:
             # Check if setup was cancelled
             if summary_data.get('cancelled', False):
                 return summary_data
+            
+            # Store the summary data for future reference
+            self._last_summary_data = summary_data
                 
             # Only update the summary if we have new data
             if 'setup_summary' in ui_components:
                 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
-                update_setup_summary(ui_components['setup_summary'], summary_data)
+                status_msg = (
+                    "✅ Environment setup completed successfully!" if summary_data.get('status') == 'success'
+                    else "⚠️ Setup completed with some issues"
+                )
+                update_setup_summary(
+                    ui_components['setup_summary'],
+                    status_message=status_msg,
+                    status_type='success' if summary_data.get('status') == 'success' else 'warning',
+                    details=summary_data
+                )
             
             # Set completion state
             self._set_completion_state(ui_components, summary_data)
@@ -57,9 +70,10 @@ class SetupHandler:
             return summary_data
             
         except Exception as e:
-            self.logger.error(f"❌ Setup failed: {str(e)}")
-            self._set_error_state(ui_components, str(e))
-            return False
+            error_msg = f"❌ Setup failed: {str(e)}"
+            self.logger.error(error_msg)
+            self._set_error_state(ui_components, error_msg)
+            return {'status': 'error', 'message': error_msg}
     
     def _execute_setup_workflow(self, ui_components: Dict[str, Any], progress_tracker) -> Dict[str, Any]:
         """🔧 Execute setup steps dengan progress tracking"""
@@ -256,7 +270,7 @@ class SetupHandler:
             if 'status_panel' in ui_components:
                 update_status_panel(ui_components['status_panel'],
                                  "ℹ️ Setup was cancelled", "info")
-        elif summary_data.get('success', False):
+        elif summary_data.get('status') == 'success':
             # Handle successful completion
             ui_components['setup_button'].disabled = False
             ui_components['setup_button'].button_style = 'success'
@@ -269,8 +283,11 @@ class SetupHandler:
             # Handle failure case
             ui_components['setup_button'].disabled = False
             ui_components['setup_button'].description = "🔄 Retry Setup"
-            ui_components['setup_button'].button_style = 'danger'
-            update_status_panel(ui_components['status_panel'], "Setup gagal, silakan coba lagi", "danger")
+            ui_components['setup_button'].button_style = 'warning'  # Changed from 'danger' to 'warning'
+            
+            # Get error message from summary_data if available
+            error_msg = summary_data.get('message', 'Setup failed, please try again')
+            update_status_panel(ui_components['status_panel'], error_msg, "warning")
     
     def _set_error_state(self, ui_components: Dict[str, Any], error_msg: str) -> None:
         """Set error state in UI components"""
@@ -304,7 +321,7 @@ class SetupHandler:
             setup_result = self.run_full_setup(ui_components, clear_logs=clear_logs)
             
             # Update button state based on result
-            if setup_result is True or (hasattr(setup_result, 'get') and setup_result.get('success', False)):
+            if setup_result is True or (hasattr(setup_result, 'get') and setup_result.get('status') == 'success'):
                 button.description = "✅ Setup Complete"
                 button.button_style = 'success'
             elif hasattr(setup_result, 'get') and setup_result.get('cancelled', False):
@@ -317,6 +334,17 @@ class SetupHandler:
                 button.description = "🔄 Retry Setup"  # Changed from "Setup Failed" to "Retry Setup"
                 button.button_style = 'warning'  # Changed from 'danger' to 'warning' for retry
                 button.disabled = False  # Allow retry on failure
+                
+                # Update summary with error details if available
+                if hasattr(setup_result, 'get') and 'message' in setup_result:
+                    if 'setup_summary' in ui_components:
+                        from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+                        update_setup_summary(
+                            ui_components['setup_summary'],
+                            status_message=setup_result['message'],
+                            status_type='error',
+                            details=self._last_summary_data or {}
+                        )
         except Exception as e:
             error_msg = f"Setup error: {str(e)}"
             self.logger.error(error_msg)

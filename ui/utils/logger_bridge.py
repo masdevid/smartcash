@@ -113,6 +113,9 @@ class UILoggerBridge:
             # Cari output widget
             output_widget = self._get_output_widget()
             if not output_widget:
+                # Debug: Print available keys for troubleshooting
+                available_keys = [k for k in self.ui_components.keys() if 'log' in k.lower() or 'output' in k.lower()]
+                print(f"[DEBUG] No output widget found. Available log-related keys: {available_keys}")
                 return
             
             # Format message
@@ -153,30 +156,55 @@ class UILoggerBridge:
             </div>
             """
             
-            # Append to output
-            current_content = getattr(output_widget, 'value', '')
-            output_widget.value = current_content + formatted_msg
+            # Append to output with error handling
+            try:
+                current_content = getattr(output_widget, 'value', '')
+                # Limit the size of the log to prevent performance issues
+                max_length = 50000  # Keep last ~50KB of logs
+                if len(current_content) > max_length:
+                    current_content = current_content[-max_length:]
+                output_widget.value = current_content + formatted_msg
+                
+                # Ensure the widget is visible in the UI
+                if hasattr(output_widget, 'scroll_to_bottom'):
+                    output_widget.scroll_to_bottom()
+                
+            except Exception as e:
+                print(f"[ERROR] Failed to update log widget: {str(e)}")
+                # Try to log the error to console as fallback
+                print(f"[{timestamp}] [{level.upper()}] {message}")
             
-        except Exception:
-            # Silent fail untuk UI update
-            pass
+        except Exception as e:
+            # Log the error to console if UI update fails
+            print(f"[ERROR] Failed to log to UI: {str(e)}")
+            print(f"[ERROR] Original message: [{level.upper()}] {message}")
     
     def _get_output_widget(self):
         """Get output widget dengan multiple fallback options."""
-        # Try berbagai kemungkinan key
-        for key in ['log_output', 'output', 'log_widget']:
+        # Try various possible keys for the log widget
+        for key in ['log_output', 'output', 'log_widget', 'log_accordion']:
             if key in self.ui_components:
                 widget = self.ui_components[key]
-                if hasattr(widget, 'value'):
+                # If it's an accordion, try to get its output widget
+                if key == 'log_accordion' and hasattr(widget, 'children') and widget.children:
+                    # Look for an Output widget in the accordion's children
+                    for child in widget.children:
+                        if hasattr(child, 'value'):
+                            return child
+                # If it's a direct output widget
+                elif hasattr(widget, 'value'):
                     return widget
         
-        # Try accordion children
-        if 'log_accordion' in self.ui_components:
-            accordion = self.ui_components['log_accordion']
-            if hasattr(accordion, 'children') and accordion.children:
-                first_child = accordion.children[0]
-                if hasattr(first_child, 'value'):
-                    return first_child
+        # Try to find any widget with 'log' in the key that might be an output widget
+        for key, widget in self.ui_components.items():
+            if 'log' in key.lower() and hasattr(widget, 'value'):
+                return widget
+                
+        # Last resort: check if there's a log_components dictionary with an output widget
+        if 'log_components' in self.ui_components and isinstance(self.ui_components['log_components'], dict):
+            for key, widget in self.ui_components['log_components'].items():
+                if hasattr(widget, 'value'):
+                    return widget
         
         return None
     

@@ -105,18 +105,40 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
     
     try:
         # Initialize the actual UI logger bridge
-        if create_ui_logger_bridge is not None and 'log_output' in ui_components:
-            logger_bridge = create_ui_logger_bridge(
-                ui_components={'log_output': ui_components['log_output']},
-                logger_name='EnvConfigLogger'
-            )
-            # Flush buffered logs to the UI logger
-            buffered_logger.flush_to_ui_logger(logger_bridge)
-            # Replace the buffered logger with the real one
-            ui_components['_logger_bridge'] = logger_bridge
-            logger_bridge.info("✅ Logger bridge initialized successfully")
+        logger_bridge = None
+        
+        # Try to find the log output widget in various possible locations
+        log_widget = None
+        for key in ['log_output', 'log_accordion', 'log_components']:
+            if key in ui_components:
+                log_widget = ui_components[key]
+                break
+        
+        if create_ui_logger_bridge is not None and log_widget is not None:
+            try:
+                # Pass all UI components to the logger bridge
+                logger_bridge = create_ui_logger_bridge(
+                    ui_components=ui_components,
+                    logger_name='EnvConfigLogger'
+                )
+                # Flush buffered logs to the UI logger
+                buffered_logger.flush_to_ui_logger(logger_bridge)
+                logger_bridge.info("✅ Logger bridge initialized successfully")
+            except Exception as e:
+                # Fallback to simple logger if UI logger initialization fails
+                logger_bridge = create_simple_logger('EnvConfigLogger')
+                logger_bridge.error(f"❌ Failed to initialize UI logger bridge: {str(e)}")
+                # Flush any buffered logs to the simple logger
+                buffered_logger.flush_to_ui_logger(logger_bridge)
         else:
-            raise ValueError("UI logger bridge not available or log output widget not found")
+            # Fallback to simple logger if UI components are not available
+            logger_bridge = create_simple_logger('EnvConfigLogger')
+            logger_bridge.warning("UI logger bridge or log output widget not available, using fallback logger")
+            # Flush any buffered logs to the simple logger
+            buffered_logger.flush_to_ui_logger(logger_bridge)
+        
+        # Store the logger bridge in ui_components
+        ui_components['_logger_bridge'] = logger_bridge
     except Exception as e:
         # Fall back to simple logger if UI logger initialization fails
         simple_logger = create_simple_logger('EnvConfigLogger')
@@ -147,12 +169,25 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
             logger_bridge.error(f"❌ Failed to initialize handlers: {str(e)}", exc_info=True)
             raise
         
-        # 4. Store components for later use
+        # 4. Connect setup button click handler
+        def on_setup_button_clicked(button):
+            try:
+                logger_bridge.info("🚀 Starting environment setup...")
+                setup_handler.run_full_setup(ui_components)
+            except Exception as e:
+                error_msg = f"❌ Error during setup: {str(e)}"
+                logger_bridge.error(error_msg, exc_info=True)
+                _update_status_panel(ui_components, error_msg, "danger")
+        
+        # Store components for later use
         ui_components.update({
             '_setup_handler': setup_handler,
             '_status_checker': status_checker,
             '_logger_bridge': logger_bridge
         })
+        
+        # Connect the button click handler
+        ui_components['setup_button'].on_click(on_setup_button_clicked)
         
         # 5. Perform initial status check with error handling
         _perform_initial_status_check(ui_components)

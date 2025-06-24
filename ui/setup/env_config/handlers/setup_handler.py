@@ -26,7 +26,7 @@ class SetupHandler:
         logger.info("🔍 Memeriksa status environment saat ini...")
         
         # Check environment status
-        env_status = self.status_handler.check_environment_status()
+        env_status = self.status_handler.get_comprehensive_status()
         
         # Update status panel
         self._update_status_panel(ui_components, env_status)

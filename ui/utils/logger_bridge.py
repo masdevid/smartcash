@@ -33,12 +33,29 @@ except ImportError:
         return logger
 
 class UILoggerBridge:
-    """🔧 Fixed bridge untuk SmartCashLogger compatibility"""
+    """🔧 Fixed bridge untuk SmartCashLogger compatibility with buffering support"""
     
     def __init__(self, ui_components: Dict[str, Any], logger_name: str = "ui_bridge"):
         self.ui_components = ui_components
         self.logger = get_logger(logger_name)
+        self._ui_ready = False
+        self._log_buffer = []
         self._setup_ui_callback()
+        
+    def set_ui_ready(self, is_ready: bool = True):
+        """Mark the UI as ready to receive logs."""
+        self._ui_ready = is_ready
+        if is_ready and self._log_buffer:
+            self._flush_log_buffer()
+            
+    def _flush_log_buffer(self):
+        """Flush any buffered logs to the UI."""
+        if not self._log_buffer:
+            return
+            
+        for level, message, exc_info in self._log_buffer:
+            self._log_to_ui(level, message, exc_info)
+        self._log_buffer.clear()
     
     def debug(self, message: str) -> None:
         """Log pesan debug."""
@@ -107,19 +124,27 @@ class UILoggerBridge:
         # Update UI
         self._log_to_ui(level, message)
     
-    def _log_to_ui(self, level: str, message: str) -> None:
-        """Log ke UI dengan safe error handling."""
+    def _log_to_ui(self, level: str, message: str, exc_info=None) -> None:
+        """Log pesan ke UI dengan error handling dan buffering."""
         try:
-            # Try to get the log output widget
+            # Buffer the log if UI is not ready
+            if not self._ui_ready:
+                self._log_buffer.append((level, message, exc_info))
+                return
+                
+            # Cek apakah komponen UI sudah siap
+            if not self.ui_components or 'log_output' not in self.ui_components:
+                self._log_buffer.append((level, message, exc_info))
+                return
+                
+            # Dapatkan widget output log
             log_output = self._get_log_output_widget()
             if not log_output or not hasattr(log_output, 'append_log'):
-                print(f"[DEBUG] Log output widget not found or missing append_log method")
+                self._log_buffer.append((level, message, exc_info))
                 return
             
-            # Import LogLevel enum from log_accordion
+            # Mapping level ke LogLevel enum
             from smartcash.ui.components.log_accordion import LogLevel
-            
-            # Map log levels to LogLevel enum
             level_mapping = {
                 'debug': LogLevel.DEBUG,
                 'info': LogLevel.INFO,
@@ -129,23 +154,25 @@ class UILoggerBridge:
                 'critical': LogLevel.CRITICAL
             }
             
-            # Get the mapped level, default to INFO if not found
             log_level = level_mapping.get(level.lower(), LogLevel.INFO)
             
-            # Get the current timestamp
-            from datetime import datetime
-            timestamp = datetime.now()
-            
-            # Call append_log with the correct LogLevel enum
+            # Panggil append_log dengan parameter yang benar
             log_output.append_log(
                 message=message,
                 level=log_level,
-                namespace='env_config',
-                module='smartcash.ui.setup.env_config',
-                timestamp=timestamp
+                timestamp=None  # Timestamp akan di-generate otomatis
             )
             
-        except ImportError as e:
+            # If there's an exception, log it as a separate error
+            if exc_info and isinstance(exc_info, BaseException):
+                import traceback
+                error_trace = ''.join(traceback.format_exception(type(exc_info), exc_info, exc_info.__traceback__))
+                log_output.append_log(
+                    message=f"Exception details:\n{error_trace}",
+                    level=LogLevel.ERROR,
+                    timestamp=None
+                )
+            
             print(f"[ERROR] Failed to import LogLevel: {str(e)}")
             import traceback
             traceback.print_exc()

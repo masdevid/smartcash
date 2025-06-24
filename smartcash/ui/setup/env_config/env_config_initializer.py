@@ -118,11 +118,13 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         logger_bridge = None
         if create_ui_logger_bridge is not None:
             try:
-                # Pass all UI components to the logger bridge
-                logger_bridge = create_ui_logger_bridge(
-                    ui_components=ui_components,
-                    logger_name='EnvConfigLogger'
-                )
+                # Pass all UI components
+                logger_bridge = create_ui_logger_bridge(ui_components, 'env_config')
+                ui_components['_logger_bridge'] = logger_bridge
+                
+                # Mark UI as ready to receive logs
+                logger_bridge.set_ui_ready(True)
+                
                 # Flush buffered logs to the UI logger
                 buffered_logger.flush_to_ui_logger(logger_bridge)
                 logger_bridge.info("✅ Logger bridge initialized successfully")

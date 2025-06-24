@@ -34,6 +34,7 @@ class SetupHandler:
         Returns:
             Dict containing setup results and status
         """
+        progress_tracker = None
         try:
             # Initialize progress tracking with logger
             progress_tracker = track_setup_progress(ui_components, logger=self.logger)
@@ -68,13 +69,23 @@ class SetupHandler:
             # Set completion state
             self._set_completion_state(ui_components, summary_data)
             
-            return summary_data
+            # Ensure we return a dictionary, not the progress tracker
+            return summary_data if isinstance(summary_data, dict) else {'status': 'success'}
             
         except Exception as e:
             error_msg = f"❌ Setup failed: {str(e)}"
             self.logger.error(error_msg)
+            if progress_tracker and hasattr(progress_tracker, 'error'):
+                progress_tracker.error(error_msg)
             self._set_error_state(ui_components, error_msg)
             return {'status': 'error', 'message': error_msg}
+        finally:
+            # Clean up the progress tracker
+            if progress_tracker and hasattr(progress_tracker, 'complete'):
+                try:
+                    progress_tracker.complete("Setup completed")
+                except Exception as e:
+                    self.logger.error(f"Error completing progress tracker: {str(e)}")
     
     def _execute_setup_workflow(self, ui_components: Dict[str, Any], progress_tracker) -> Dict[str, Any]:
         """🔧 Execute setup steps dengan progress tracking"""

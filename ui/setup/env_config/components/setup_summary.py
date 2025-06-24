@@ -233,13 +233,24 @@ def _format_summary_content(
                     ">{status_message}</div>
                     
                     {details_html}
+                    
+                    <!-- Symlinks and Folders Info -->
+                    <div style="margin-top: 12px; display: flex; gap: 15px; flex-wrap: wrap;">
+                        <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #9c27b0; flex: 1; min-width: 150px;">
+                            <h5 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">🔗 Symlinks</h5>
+                            <p style="margin: 0; font-size: 14px;">
+                                <strong>{details.get('symlinks_created', 0)}</strong> created
+                            </p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #4caf50; flex: 1; min-width: 150px;">
+                            <h5 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">📁 Folders</h5>
+                            <p style="margin: 0; font-size: 14px;">
+                                <strong>{details.get('folders_created', 0)}</strong> created
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                <p style="margin: 0; font-size: 14px;"><strong>{symlinks_created}</strong> symlinks</p>
-            </div>
-            
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #9c27b0;">
-                <h5 style="margin: 0 0 8px 0; color: #333;">📁 Folders Created</h5>
-                <p style="margin: 0; font-size: 14px;"><strong>{folders_created}</strong> directories</p>
             </div>
         </div>
     </div>

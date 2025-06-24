@@ -69,38 +69,41 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         ui_components: Dictionary of UI components to update
         config: Configuration dictionary for the environment setup
     """
-    # Create a simple logger first for initial setup
-    temp_logger = _create_simple_logger()
-    
+    # Initialize logger bridge first to capture all logs
     try:
-        temp_logger.info("🔧 Initializing environment configuration handlers...")
+        if 'log_output' not in ui_components:
+            raise ValueError("Log output widget not found in UI components")
+            
+        # Initialize the logger bridge with the correct parameters
+        logger_bridge = create_ui_logger_bridge(
+            ui_components={'log_output': ui_components['log_output']},
+            logger_name='EnvConfigLogger'
+        )
         
-        # 1. Import required modules
-        from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+        # Store logger bridge in ui_components for later use
+        ui_components['_logger_bridge'] = logger_bridge
+        
+        # Now that we have the logger bridge, use it for all logging
+        logger_bridge.info("🔧 Initializing environment configuration handlers...")
+        
+        # Import required modules after logger is set up
         from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
         from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
         
-        # 2. Initialize the logger bridge early to capture all logs
-        try:
-            if 'log_output' not in ui_components:
-                raise ValueError("Log output widget not found in UI components")
-                
-            # Create a dictionary with the log output widget
-            logger_components = {
-                'log_output': ui_components['log_output']
-            }
-            
-            # Initialize the logger bridge with the correct parameters
-            logger_bridge = create_ui_logger_bridge(
-                ui_components=logger_components,
-                logger_name='EnvConfigLogger'
-            )
-            temp_logger.info("✅ Logger bridge initialized successfully")
-        except Exception as e:
-            temp_logger.error(f"❌ Failed to initialize logger bridge: {str(e)}")
-            logger_bridge = temp_logger  # Fall back to simple logger
+        logger_bridge.info("✅ Logger bridge initialized successfully")
         
-        # 3. Initialize handlers with the logger bridge
+    except Exception as e:
+        # Fallback to simple logger if logger bridge initialization fails
+        temp_logger = _create_simple_logger()
+        temp_logger.error(f"❌ Failed to initialize logger bridge: {str(e)}")
+        ui_components['_logger_bridge'] = temp_logger
+        logger_bridge = temp_logger  # Fall back to simple logger
+    
+    # 2. Initialize handlers with the logger bridge
+    try:
+        # Import required modules
+        from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
+        from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
         try:
             setup_handler = SetupHandler(logger_bridge)
             status_checker = StatusChecker(logger_bridge)

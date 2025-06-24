@@ -42,8 +42,8 @@ class UIFactory:
             
             # Create dual progress tracker for better progress visualization
             progress_tracker = create_dual_progress_tracker(
-                primary_label='Overall Progress',
-                secondary_label='Current Operation'
+                operation='Environment Setup',
+                auto_hide=True
             )
             
             # Get the widget from the tracker

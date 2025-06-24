@@ -41,25 +41,29 @@ class DependencyInitializer(CommonInitializer):
         ]
         
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create and map UI components for dependency management."""
+        """Create and map UI components for dependency management.
+        
+        Note: Component mapping is handled in create_dependency_main_ui
+        """
         try:
             from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
             
+            # Create and get pre-mapped UI components
             components = create_dependency_main_ui(config=config or {})
-            mapped = {
-                **components,
-                'logger': components.get('logger') or get_logger("smartcash.ui.setup.dependency")
-            }
+            
+            # Ensure logger is set
+            components['logger'] = components.get('logger') or get_logger("smartcash.ui.setup.dependency")
             
             # Verify required components
-            if missing := [k for k in self._get_critical_components() if not mapped.get(k)]:
+            if missing := [k for k in self._get_critical_components() if not components.get(k)]:
                 self.logger.error(f"Missing components: {missing}")
                 
-            return mapped
+            return components
             
         except Exception as e:
-            self.logger.error(f"UI creation failed: {e}", exc_info=True)
-            raise
+            error_msg = f"UI creation failed: {str(e)}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg) from e
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
                              env=None, **kwargs) -> Dict[str, Any]:

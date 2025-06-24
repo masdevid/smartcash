@@ -55,24 +55,34 @@ class FallbackLogger:
         
     def debug(self, msg, *args, **kwargs):
         print(f"[DEBUG] {msg}")
+        if kwargs.get('exc_info'):
+            self._log_exception()
         
     def info(self, msg, *args, **kwargs):
         print(f"[INFO] {msg}")
+        if kwargs.get('exc_info'):
+            self._log_exception()
         
     def warning(self, msg, *args, **kwargs):
         print(f"[WARNING] {msg}")
+        if kwargs.get('exc_info'):
+            self._log_exception()
         
     def error(self, msg, *args, **kwargs):
         print(f"[ERROR] {msg}")
         if kwargs.get('exc_info'):
-            import traceback
-            traceback.print_exc()
-        
+            self._log_exception()
+    
     def exception(self, msg, *args, **kwargs):
         print(f"[EXCEPTION] {msg}")
-        if 'exc_info' in kwargs and kwargs['exc_info']:
-            import traceback
-            traceback.print_exc()
+        self._log_exception()
+    
+    def _log_exception(self):
+        """Internal method to log exception with traceback"""
+        import traceback, sys
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        if exc_type is not None:
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stderr)
 
 
 def get_safe_logger(module_name: str = None) -> Any:
@@ -324,7 +334,14 @@ def try_operation_safe(
     except Exception as e:
         error_msg = f"Gagal {operation_name}: {str(e)}"
         if logger:
-            logger.error(error_msg, exc_info=True)
+            # Check if logger supports exc_info
+            if hasattr(logger, 'exception'):
+                logger.exception(error_msg)  # This automatically includes traceback
+            else:
+                # For loggers that don't support exc_info
+                logger.error(error_msg)
+                import traceback
+                logger.error(traceback.format_exc())
         
         if exc_info:
             exc_type, exc_value, exc_traceback = sys.exc_info()

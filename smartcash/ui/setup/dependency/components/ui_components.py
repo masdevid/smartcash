@@ -130,23 +130,43 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             box_sizing='border-box'
         ))
         
-        # Return components
-        return {
+        # Return components with all required keys
+        components = {
+            # Core UI components
             'ui': main_ui,
             'header': header,
             'status_panel': status_panel,
-            'package_selector': package_selector['widget'],
+            'package_selector': package_selector.get('widget'),
             'custom_packages': custom_packages,
-            'install_button': action_buttons['download_button'],
-            'analyze_button': action_buttons['check_button'],
-            'check_button': action_buttons['check_button'],
-            'system_report_button': action_buttons['cleanup_button'],
-            'save_button': save_reset_buttons['save_button'],
-            'reset_button': save_reset_buttons['reset_button'],
+            
+            # Action buttons
+            'install_button': action_buttons.get('download_button'),
+            'analyze_button': action_buttons.get('check_button'),
+            'check_button': action_buttons.get('check_button'),  # Duplicate of analyze_button for backward compatibility
+            'system_report_button': action_buttons.get('cleanup_button'),
+            
+            # Form controls
+            'save_button': save_reset_buttons.get('save_button'),
+            'reset_button': save_reset_buttons.get('reset_button'),
+            
+            # Progress and logging
             'progress_tracker': progress_tracker,
-            'log_accordion': log_accordion['widget'],
-            'log_output': log_accordion['output']
+            'log_accordion': log_accordion.get('widget'),
+            'log_output': log_accordion.get('output'),
+            
+            # Additional components for reference
+            'action_buttons': action_buttons,
+            'save_reset_buttons': save_reset_buttons,
+            'package_selector_widget': package_selector  # Keep full selector for advanced usage
         }
+        
+        # Log any missing critical components
+        missing = [k for k, v in components.items() if v is None and k not in ['logger']]
+        if missing:
+            import logging
+            logging.warning(f"Missing optional components: {missing}")
+            
+        return components
         
     except Exception as e:
         # Simple error UI tanpa nested fallbacks

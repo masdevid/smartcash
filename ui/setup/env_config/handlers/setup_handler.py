@@ -111,11 +111,13 @@ class SetupHandler:
         success = summary_data.get('success', False)
         
         if success:
+            ui_components['setup_button'].disabled = True
             ui_components['setup_button'].description = "✅ Setup Complete"
             ui_components['setup_button'].button_style = 'success'
             update_status_panel(ui_components['status_panel'], "Setup berhasil diselesaikan!", "success")
         else:
-            ui_components['setup_button'].description = "❌ Setup Failed"
+            ui_components['setup_button'].disabled = False
+            ui_components['setup_button'].description = "🔄 Retry Setup"
             ui_components['setup_button'].button_style = 'danger'
             update_status_panel(ui_components['status_panel'], "Setup gagal, silakan coba lagi", "danger")
     

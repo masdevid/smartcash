@@ -1,157 +1,127 @@
-# File: smartcash/ui/setup/dependency/utils/ui_state_utils.py
-# Deskripsi: UI state management utilities tanpa circular import
+"""
+File: smartcash/ui/setup/dependency/utils/ui_state_utils.py  
+Deskripsi: UI state management utilities dengan complete function set
+"""
 
 import functools
 from typing import Dict, Any, Optional, Callable, List
+from enum import Enum
 
-def clear_ui_outputs(ui_components: Dict[str, Any], output_keys: Optional[list] = None):
-    """Clear multiple UI outputs dengan one-liner pattern"""
-    output_keys = output_keys or ['log_output', 'status', 'confirmation_area']
-    [widget.clear_output(wait=True) for key in output_keys 
-     if (widget := ui_components.get(key)) and hasattr(widget, 'clear_output')]
-
-def update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str = "info"):
-    """Update status panel dengan consolidated approach - one-liner"""
-    ui_components.get('status_panel') and (
-        lambda panel: __import__('smartcash.ui.components', fromlist=['update_status_panel']).update_status_panel(panel, message, status_type)
-    )(ui_components['status_panel'])
-
-def log_to_ui_safe(ui_components: Dict[str, Any], message: str, level: str = "info"):
-    """Safe logging ke UI output dengan error handling - one-liner"""
-    log_output = ui_components.get('log_output')
-    log_output and hasattr(log_output, 'append_stdout') and (
-        setattr(log_output, '_content', getattr(log_output, '_content', []) + 
-               [{"name": "stdout", "output_type": "stream", "text": f"[{level.upper()}] {message}\n"}]) or
-        None
-    )
-
-def reset_ui_logger(ui_components: Dict[str, Any]):
-    """Reset UI logger output untuk clear previous logs - one-liner"""
-    log_output = ui_components.get('log_output')
-    log_output and hasattr(log_output, 'clear_output') and log_output.clear_output(wait=True)
-
-class ProgressSteps:
-    """Progress step constants untuk konsistensi"""
+class ProgressSteps(Enum):
+    """Progress steps enumeration"""
     INIT = "init"
     ANALYSIS = "analysis" 
     INSTALLATION = "installation"
     COMPLETE = "complete"
-    ERROR = "error"
 
-def update_progress_step(ui_components: Dict[str, Any], progress_type: str, value: int, 
-                         message: str = "", color: str = None):
-    """Update progress dengan API progress tracker baru dan safe error handling"""
-    try:
-        # Gunakan fungsi update_progress dari ui_components jika tersedia
-        update_progress = ui_components.get('update_progress')
-        if update_progress and callable(update_progress):
-            update_progress(progress_type, value, message, color)
-            return
-        
-        # Fallback ke progress_tracker langsung
-        progress_tracker = ui_components.get('progress_tracker')
-        if progress_tracker:
-            if progress_type == 'overall' or progress_type == 'level1':
-                hasattr(progress_tracker, 'update_overall') and progress_tracker.update_overall(value, message)
-            elif progress_type == 'step' or progress_type == 'level2':
-                hasattr(progress_tracker, 'update_step') and progress_tracker.update_step(value, message)
-                
-    except Exception as e:
-        log_to_ui_safe(ui_components, f"⚠️ Progress update error: {str(e)}", "warning")
+def create_operation_context(ui_components: Dict[str, Any], operation_name: str) -> Dict[str, Any]:
+    """Create operation context untuk tracking"""
+    return {
+        'operation_name': operation_name,
+        'ui_components': ui_components,
+        'start_time': __import__('time').time()
+    }
 
-def show_progress_tracker_safe(ui_components: Dict[str, Any], operation: str = "", steps: List[str] = None):
-    """Safely show progress tracker dengan error handling"""
+def update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str = "info"):
+    """Update status panel dengan message"""
+    try:
+        from smartcash.ui.components import update_status_panel as ui_update_status
+        status_panel = ui_components.get('status_panel')
+        if status_panel:
+            ui_update_status(status_panel, message, status_type)
+    except:
+        pass
+
+def log_to_ui_safe(ui_components: Dict[str, Any], message: str, level: str = "info"):
+    """Safe logging ke UI output"""
+    try:
+        logger = ui_components.get('logger')
+        if logger:
+            getattr(logger, level, logger.info)(message)
+    except:
+        pass
+
+def update_progress_step(ui_components: Dict[str, Any], progress_type: str, value: int, message: str = "", color: str = None):
+    """Update progress step dengan safe handling"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        progress_tracker and hasattr(progress_tracker, 'show') and progress_tracker.show(
-            operation=operation or "🔄 Memproses...",
-            steps=steps or ["Mempersiapkan", "Memproses", "Menyelesaikan"]
-        )
-    except Exception as e:
-        log_to_ui_safe(ui_components, f"⚠️ Progress tracker show error: {str(e)}", "warning")
+        if progress_tracker and hasattr(progress_tracker, 'update'):
+            progress_tracker.update(progress_type, value, message)
+    except:
+        pass
+
+def show_progress_tracker_safe(ui_components: Dict[str, Any], operation_name: str):
+    """Safely show progress tracker"""
+    try:
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'show'):
+            progress_tracker.show(operation=operation_name)
+    except:
+        pass
 
 def reset_progress_tracker_safe(ui_components: Dict[str, Any]):
-    """Safely reset progress tracker dengan error handling"""
+    """Safely reset progress tracker"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
-        progress_tracker and hasattr(progress_tracker, 'reset') and progress_tracker.reset()
-    except Exception as e:
-        log_to_ui_safe(ui_components, f"⚠️ Progress tracker reset error: {str(e)}", "warning")
-
-def create_operation_context(ui_components: Dict[str, Any], operation_name: str):
-    """Create operation context untuk tracking operasi dengan progress"""
-    
-    class OperationContext:
-        def __init__(self, ui_components: Dict[str, Any], operation_name: str):
-            self.ui_components = ui_components
-            self.operation_name = operation_name
-            
-        def __enter__(self):
-            log_to_ui_safe(self.ui_components, f"🚀 Memulai {self.operation_name}...", "info")
-            show_progress_tracker_safe(self.ui_components, f"🔄 {self.operation_name}")
-            return self
-            
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            if exc_type is None:
-                complete_operation_with_message(self.ui_components, f"✅ {self.operation_name} berhasil")
-            else:
-                error_operation_with_message(self.ui_components, f"❌ {self.operation_name} gagal: {str(exc_val)}")
-            reset_progress_tracker_safe(self.ui_components)
-    
-    return OperationContext(ui_components, operation_name)
+        if progress_tracker and hasattr(progress_tracker, 'reset'):
+            progress_tracker.reset()
+    except:
+        pass
 
 def complete_operation_with_message(ui_components: Dict[str, Any], message: str):
     """Complete operation dengan success message"""
-    update_progress_step(ui_components, 'overall', 100, message, 'green')
-    log_to_ui_safe(ui_components, message, "success")
-    update_status_panel(ui_components, message, "success")
+    try:
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'complete'):
+            progress_tracker.complete(message)
+        update_status_panel(ui_components, message, "success")
+    except:
+        pass
 
 def error_operation_with_message(ui_components: Dict[str, Any], message: str):
-    """Complete operation dengan error message"""
-    update_progress_step(ui_components, 'overall', 100, message, 'red')
-    log_to_ui_safe(ui_components, message, "error")
-    update_status_panel(ui_components, message, "error")
+    """Error operation dengan error message"""
+    try:
+        progress_tracker = ui_components.get('progress_tracker')
+        if progress_tracker and hasattr(progress_tracker, 'error'):
+            progress_tracker.error(message)
+        update_status_panel(ui_components, message, "error")
+    except:
+        pass
 
-def with_button_context(ui_components: Dict[str, Any], operation: str = "operation"):
-    """Decorator untuk menangani state tombol secara otomatis"""
+def update_package_status_by_name(ui_components: Dict[str, Any], package_name: str, status: str):
+    """Update package status by name"""
+    try:
+        # Import locally to avoid circular dependency
+        from smartcash.ui.setup.dependency.utils.package_selector_utils import update_package_status
+        package_selector = ui_components.get('package_selector')
+        if package_selector:
+            update_package_status(package_selector, package_name, status == 'installed')
+    except:
+        pass
+
+def batch_update_package_status(ui_components: Dict[str, Any], status_mapping: Dict[str, str]):
+    """Batch update package status"""
+    for package_name, status in status_mapping.items():
+        update_package_status_by_name(ui_components, package_name, status)
+
+def with_button_context(ui_components: Dict[str, Any], button_key: str):
+    """Decorator untuk disable/enable button during operation"""
     def decorator(func: Callable):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Daftar tombol yang akan di-disable
-            buttons = [ui_components.get(btn) for btn in 
-                      ['install_button', 'analyze_button', 'save_button', 'reset_button', 'cleanup_button']
-                      if ui_components.get(btn)]
+            button = ui_components.get(button_key)
+            original_disabled = getattr(button, 'disabled', False) if button else False
             
-            # Nonaktifkan semua tombol
-            for btn in buttons:
-                hasattr(btn, 'disabled') and setattr(btn, 'disabled', True)
+            # Disable button
+            if button and hasattr(button, 'disabled'):
+                button.disabled = True
             
             try:
-                result = func(*args, **kwargs)
-                return result
-            except Exception as e:
-                log_to_ui_safe(ui_components, f"⚠️ Error in {operation}: {str(e)}", "error")
-                raise
+                return func(*args, **kwargs)
             finally:
-                # Aktifkan kembali semua tombol
-                for btn in buttons:
-                    hasattr(btn, 'disabled') and setattr(btn, 'disabled', False)
+                # Re-enable button
+                if button and hasattr(button, 'disabled'):
+                    button.disabled = original_disabled
         
         return wrapper
     return decorator
-
-def create_progress_tracker(ui_components: Dict[str, Any]) -> Callable:
-    """Create progress tracking function dengan closure - one-liner factory"""
-    def progress_tracker_wrapper(progress_type, value, message="", color=None):
-        update_progress_step(ui_components, progress_type, value, message, color)
-    return progress_tracker_wrapper
-
-def create_logger_bridge(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
-    """Create logger bridge untuk kompatibilitas dengan logger interface"""
-    return {
-        'info': lambda msg: log_to_ui_safe(ui_components, f"ℹ️ {msg}", "info"),
-        'warning': lambda msg: log_to_ui_safe(ui_components, f"⚠️ {msg}", "warning"),
-        'error': lambda msg: log_to_ui_safe(ui_components, f"❌ {msg}", "error"),
-        'success': lambda msg: log_to_ui_safe(ui_components, f"✅ {msg}", "success"),
-        'debug': lambda msg: log_to_ui_safe(ui_components, f"🔍 {msg}", "debug")
-    }

@@ -39,7 +39,7 @@ class EnvConfigInitializer:
         
         # Validasi required components
         required = ['setup_button', 'status_panel', 'progress_bar', 'progress_text', 
-                   'log_accordion', 'summary_panel_left', 'summary_panel_right']
+                   'log_accordion', 'left_summary_panel', 'right_colab_panel']
         missing = [w for w in required if w not in ui_components]
         if missing:
             raise ValueError(f"Missing UI components: {', '.join(missing)}")
@@ -96,8 +96,8 @@ class EnvConfigInitializer:
             'progress_bar': widgets.IntProgress(value=0, max=100),
             'progress_text': widgets.HTML("❌ Failed to initialize"),
             'log_accordion': widgets.Accordion([widgets.Output()]),
-            'summary_panel_left': widgets.HTML(""),
-            'summary_panel_right': widgets.HTML("")
+            'left_summary_panel': widgets.HTML(""),
+            'right_colab_panel': widgets.HTML("")
         }
 
 

@@ -145,13 +145,14 @@ def create_log_accordion(
         ns = entry.get('namespace') or entry.get('module')
         ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
         
+        # Create the HTML with proper formatting
         html = f"""
         <div style='
             padding: 6px 12px;
             margin: 2px 0;
             border-radius: 6px;
-            background: {bg};
-            color: {color};
+            background: {bg_color};
+            color: {text_color};
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 13px;
             line-height: 1.4;
@@ -164,8 +165,8 @@ def create_log_accordion(
             </div>
         </div>
         """.format(
-            bg=style['bg'],
-            color=style['color'],
+            bg_color=style['bg'],
+            text_color=style['color'],
             level_icon=level_icon,
             ns_display=ns_display,
             message=entry['message'],

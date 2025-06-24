@@ -287,10 +287,11 @@ class SetupProgressTracker:
     def _update_overall_progress(self) -> None:
         """Calculate and update the overall progress"""
         try:
-            if not self.stages:
+            if not hasattr(self, 'stages') or not self.stages:
                 self.overall_progress = 0
                 return
                 
+            # Calculate total weight and weighted sum
             total_weight = sum(stage.weight for stage in self.stages.values())
             if total_weight == 0:
                 self.overall_progress = 0
@@ -303,41 +304,57 @@ class SetupProgressTracker:
             self.overall_progress = min(100, int(weighted_sum / total_weight * 100))
             
             # Update UI if we have a current stage
-            if self.current_stage is not None and 'progress_tracker' in self.ui_components:
-                tracker = self.ui_components['progress_tracker']
-                
-                # Update progress bar
-                tracker['bar'].value = self.overall_progress
-                tracker['bar'].description = f"{self.overall_progress}%"
-                
-                # Get current stage info
-                current_stage_name = self.stages[self.current_stage].name if self.current_stage in self.stages else "Initializing"
-                current_progress = self.stages[self.current_stage].current if self.current_stage in self.stages else 0
-                
-                # Update status text with current stage and progress
-                tracker['text'].value = f'''
-                    <div style="padding: 5px 0;">
-                        <div><strong>Current Task:</strong> {current_stage_name} ({current_progress}%)</div>
-                    </div>
-                '''
-            
-            # Call registered callbacks
-            for callback in self.callbacks:
+            if hasattr(self, 'current_stage') and self.current_stage is not None and 'progress_tracker' in self.ui_components:
                 try:
-                    if self.current_stage is not None and self.current_stage in self.stages:
-                        callback("overall", self.overall_progress, self.stages[self.current_stage].name)
-                        callback("current", current_progress, "")
-                except Exception as e:
-                    self.logger.error(f"Error in progress callback: {e}")
+                    tracker = self.ui_components.get('progress_tracker')
+                    if not tracker:
+                        return
+                        
+                    # Update progress bar
+                    if 'bar' in tracker:
+                        tracker['bar'].value = self.overall_progress
+                        tracker['bar'].description = f"{self.overall_progress}%"
                     
-                # Small delay to allow UI to update
-                import time
-                time.sleep(0.05)
+                    # Get current stage info
+                    current_stage_name = "Initializing"
+                    current_progress = 0
+                    
+                    if hasattr(self, 'current_stage') and self.current_stage in self.stages:
+                        current_stage_name = self.stages[self.current_stage].name
+                        current_progress = self.stages[self.current_stage].current
+                    
+                    # Update status text with current stage and progress
+                    if 'text' in tracker:
+                        tracker['text'].value = f'''
+                            <div style="padding: 5px 0;">
+                                <div><strong>Current Task:</strong> {current_stage_name} ({current_progress}%)</div>
+                            </div>
+                        '''
+                except Exception as e:
+                    self.logger.error(f"Error updating UI: {str(e)}")
+            
+            # Safely handle callbacks
+            if hasattr(self, 'callbacks') and isinstance(self.callbacks, list):
+                for callback in self.callbacks:
+                    try:
+                        if callable(callback):
+                            if hasattr(self, 'current_stage') and self.current_stage is not None and self.current_stage in self.stages:
+                                callback("overall", self.overall_progress, self.stages[self.current_stage].name)
+                                callback("current", current_progress, "")
+                    except Exception as e:
+                        self.logger.error(f"Error in progress callback: {e}")
+                        
+                    # Small delay to allow UI to update
+                    import time
+                    time.sleep(0.05)
                 
         except Exception as e:
-            self.logger.error(f"Error in _update_overall_progress: {str(e)}")
-            import traceback
-            self.logger.debug(traceback.format_exc())
+            if hasattr(self, 'logger'):
+                self.logger.error(f"Error in _update_overall_progress: {str(e)}")
+                import traceback
+                self.logger.debug(traceback.format_exc())
+            else:
+                print(f"Error in _update_overall_progress: {str(e)}")
     
     def complete(self, message: str = "Setup completed successfully") -> None:
         """Mark setup as complete"""

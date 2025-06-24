@@ -240,33 +240,49 @@ class SetupProgressTracker:
                 tracker['text'].value = f'<div style="padding: 5px 0;">{message}</div>'
     
     def update_progress(self, stage: SetupStage, progress: int, message: str = "") -> None:
-        """Update progress for a specific stage"""
-        if stage not in self.stages:
-            self.logger.warning(f"Unknown stage: {stage}")
-            return
+        """Update progress for a specific stage
+        
+        Args:
+            stage: The stage to update
+            progress: Progress percentage (0-100)
+            message: Optional status message
+        """
+        try:
+            if not isinstance(stage, SetupStage):
+                self.logger.error(f"Invalid stage type: {type(stage).__name__}. Expected SetupStage enum.")
+                return
+                
+            if stage not in self.stages:
+                self.logger.warning(f"Unknown stage: {stage}")
+                return
+                
+            # Get the stage progress object
+            stage_progress = self.stages[stage]
             
-        # Get the stage progress object
-        stage_progress = self.stages[stage]
-        
-        # Update the stage progress
-        stage_progress.current = min(100, max(0, progress))  # Ensure progress is between 0-100
-        
-        # Calculate overall progress
-        self._update_overall_progress()
-        
-        # Update UI
-        self._update_ui(message)
-        
-        # Log the update
-        stage_name = stage.name.replace('_', ' ').title()
-        self.logger.debug(f"Progress update - Stage: {stage_name}, Progress: {progress}%, Message: {message}")
-        
-        # Trigger callbacks
-        for callback in self.callbacks:
-            try:
-                callback(stage_name, progress, message)
-            except Exception as e:
-                self.logger.error(f"Error in progress callback: {e}")
+            # Update the stage progress (ensure it's between 0-100)
+            stage_progress.current = min(100, max(0, int(progress)))
+            
+            # Calculate overall progress
+            self._update_overall_progress()
+            
+            # Update UI
+            self._update_ui(message)
+            
+            # Log the update
+            stage_name = stage.name.replace('_', ' ').title()
+            self.logger.debug(f"Progress update - Stage: {stage_name}, Progress: {progress}%, Message: {message}")
+            
+            # Trigger callbacks
+            for callback in self.callbacks:
+                try:
+                    callback(stage_name, progress, message)
+                except Exception as e:
+                    self.logger.error(f"Error in progress callback: {e}")
+                    
+        except Exception as e:
+            self.logger.error(f"Error in update_progress: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
     
     def _update_overall_progress(self) -> None:
         """Calculate and update the overall progress"""

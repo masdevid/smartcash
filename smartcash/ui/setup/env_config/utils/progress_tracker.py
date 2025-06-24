@@ -23,6 +23,9 @@ class SetupStage(Enum):
     ENV_SETUP = auto()
     COMPLETE = auto()
 
+# Ensure the enum is available for import
+__all__ = ['SetupStage', 'SetupProgressTracker', 'track_setup_progress']
+
 @dataclass
 class StageProgress:
     """Data kemajuan untuk setiap tahapan"""

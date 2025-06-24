@@ -6,6 +6,7 @@ Deskripsi: UI components yang diperbaiki untuk menampilkan status environment de
 import ipywidgets as widgets
 from IPython.display import display, HTML
 from typing import Dict, Any, Optional
+from smartcash.ui.components import create_header, create_log_accordion
 
 def create_environment_summary_panel() -> widgets.VBox:
     """🌍 Environment summary panel dengan status yang akurat"""
@@ -144,7 +145,6 @@ def create_setup_control_panel() -> widgets.VBox:
 
 def create_env_config_ui() -> Dict[str, Any]:
     """🎛️ Create complete environment configuration UI menggunakan shared components"""
-    
     # Header menggunakan shared component
     header = create_header(
         title="Environment Configuration", 

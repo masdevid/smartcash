@@ -11,6 +11,7 @@ from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
 from smartcash.ui.setup.env_config.utils.ui_updater import update_progress_bar, update_status_panel
 from smartcash.ui.setup.env_config.utils.progress_tracker import track_setup_progress, SetupStage
+from enum import Enum
 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
 
 class SetupHandler:
@@ -287,11 +288,11 @@ class SetupHandler:
             
             # Mark all stages as complete if successful
             if summary_data['status']:
-                for stage in SetupStage:
-                    if stage != SetupStage.COMPLETE:
+                for stage_enum in SetupStage:
+                    if stage_enum != SetupStage.COMPLETE:
                         progress_tracker.complete_stage()
                 progress_tracker.update_stage(SetupStage.COMPLETE)
-                progress_tracker.complete(" All setup steps completed successfully")
+                progress_tracker.complete("✅ All setup steps completed successfully")
             
             # Log final summary
             self.logger.info("\n📋 Setup Summary:" + "\n" + "="*50)

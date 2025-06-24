@@ -7,22 +7,18 @@ from typing import Dict, Any, Optional
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.common.logger import get_logger
 
-# Global instance untuk menghindari circular imports
-_dependency_initializer = None
+_dependency_initializer = None  # Global instance to avoid circular imports
 
 class DependencyInitializer(CommonInitializer):
-    """Fixed dependency initializer dengan proper handler setup"""
+    """Dependency initializer with proper component and handler setup."""
     
     def __init__(self):
-        # Import handler class secara lazy
         from .handlers.config_handler import DependencyConfigHandler
-        
-        # Pass handler class ke parent dengan proper arguments
         super().__init__('dependency', DependencyConfigHandler, 'setup')
         self.logger = get_logger("smartcash.ui.setup.dependency")
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Get default config - required abstract method"""
+        """Return default dependency configuration."""
         try:
             from .handlers.defaults import get_default_dependency_config
             return get_default_dependency_config()
@@ -37,7 +33,7 @@ class DependencyInitializer(CommonInitializer):
             }
     
     def _get_critical_components(self) -> list:
-        """Get critical components list - required abstract method"""
+        """Return list of required component keys."""
         return [
             'ui', 'install_button', 'analyze_button', 'check_button',
             'save_button', 'reset_button', 'log_output', 'status_panel',
@@ -45,69 +41,89 @@ class DependencyInitializer(CommonInitializer):
         ]
         
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """
-        Create UI components for dependency management using the main UI component.
-        
-        Args:
-            config: Configuration dictionary
-            env: Environment information
-            **kwargs: Additional arguments
-            
-        Returns:
-            Dictionary containing UI components
-        """
-        from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
-        return create_dependency_main_ui(config=config)
-    
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup module handlers - required abstract method"""
+        """Create and map UI components for dependency management."""
         try:
-            from .handlers.dependency_handler import setup_dependency_handlers
+            from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
             
-            handlers = setup_dependency_handlers(ui_components)
+            components = create_dependency_main_ui(config=config or {})
+            mapped = {
+                **components,
+                'logger': components.get('logger') or get_logger("smartcash.ui.setup.dependency")
+            }
+            
+            # Verify required components
+            if missing := [k for k in self._get_critical_components() if not mapped.get(k)]:
+                self.logger.error(f"Missing components: {missing}")
+                
+            return mapped
+            
+        except Exception as e:
+            self.logger.error(f"UI creation failed: {e}", exc_info=True)
+            raise
+    
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
+                             env=None, **kwargs) -> Dict[str, Any]:
+        """Initialize and configure module handlers with proper error handling."""
+        # Ensure logger is available
+        ui_components.setdefault('logger', 
+            get_logger("smartcash.ui.setup.dependency.handlers"))
+        logger = ui_components['logger']
+        
+        try:
+            # Check for required components
+            if missing := [
+                k for k in self._get_critical_components() 
+                if not ui_components.get(k)
+            ]:
+                error_msg = f"❌ Missing components: {', '.join(missing)}"
+                logger.error(error_msg)
+                if panel := ui_components.get('status_panel'):
+                    panel.value = error_msg
+                raise ValueError(error_msg)
+            
+            # Setup handlers
+            from smartcash.ui.setup.dependency.handlers.dependency_handler import setup_dependency_handlers
+            handlers = setup_dependency_handlers(ui_components) or {}
             ui_components['handlers'] = handlers
             
-            logger = ui_components.get('logger')
-            if logger:
-                logger.info(f"🎯 {len(handlers)} dependency handlers berhasil disetup")
-            
+            logger.info(f"✅ {len(handlers)} handlers initialized")
+            if panel := ui_components.get('status_panel'):
+                panel.value = "✅ Handlers ready"
+                
             return ui_components
             
         except Exception as e:
-            self.logger.error(f"❌ Setup handlers failed: {str(e)}")
-            # Fallback: create minimal handlers
-            ui_components['handlers'] = {'install': None, 'check': None}
+            error_msg = f"❌ Handler setup failed: {e}"
+            logger.error(error_msg, exc_info=True)
+            if panel := ui_components.get('status_panel'):
+                panel.value = error_msg
+                
+            # Fallback to minimal handlers
+            ui_components['handlers'] = {k: None for k in 
+                ['install', 'analyze', 'check', 'save', 'reset']}
             return ui_components
 
 def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Initialize dependency UI dengan error handling yang robust"""
+    """Initialize and return the dependency UI with fallback on error."""
     global _dependency_initializer
     
     try:
-        if _dependency_initializer is None:
-            _dependency_initializer = DependencyInitializer()
-        
-        return _dependency_initializer.initialize(config)
+        _dependency_initializer = _dependency_initializer or DependencyInitializer()
+        return _dependency_initializer.initialize(config or {})
         
     except Exception as e:
         logger = get_logger("smartcash.ui.setup.dependency")
-        logger.error(f"❌ Failed to initialize dependency UI: {str(e)}")
-        
-        # Return existing fallback UI
+        logger.error(f"❌ UI initialization failed: {e}")
         from smartcash.ui.utils.fallback_utils import create_fallback_ui
         return create_fallback_ui(str(e), "dependency")
 
 def get_dependency_config() -> Dict[str, Any]:
-    """Get current dependency config dengan safe fallback"""
-    global _dependency_initializer
-    
-    if _dependency_initializer and _dependency_initializer.config_handler:
-        try:
+    """Return current dependency config with safe fallback."""
+    try:
+        if _dependency_initializer and _dependency_initializer.config_handler:
             return _dependency_initializer.config_handler.get_current_config()
-        except Exception:
-            pass
-    
-    # Return default config jika tidak ada
+    except Exception:
+        pass
     return {
         'module_name': 'dependency',
         'dependencies': {},
@@ -115,61 +131,50 @@ def get_dependency_config() -> Dict[str, Any]:
     }
 
 def get_dependency_config_handler():
-    """Get dependency config handler instance dengan safe access"""
-    global _dependency_initializer
-    return _dependency_initializer.config_handler if _dependency_initializer else None
+    """Return the dependency config handler instance if available."""
+    return getattr(_dependency_initializer, 'config_handler', None)
 
 def update_dependency_config(config: Dict[str, Any]) -> bool:
-    """Update dependency config dengan error handling"""
+    """Update dependency config with error handling."""
     try:
-        handler = get_dependency_config_handler()
-        if handler and _dependency_initializer.ui_components:
-            handler.update_ui(_dependency_initializer.ui_components, config)
-            return True
-        return False
+        if handler := get_dependency_config_handler():
+            return handler.update_config(config)
     except Exception as e:
-        logger = get_logger("smartcash.ui.setup.dependency")
-        logger.warning(f"⚠️ Update config failed: {str(e)}")
-        return False
+        get_logger("smartcash.ui.setup.dependency").error(
+            f"Config update failed: {e}", exc_info=True)
+    return False
 
 def reset_dependency_config() -> bool:
-    """Reset dependency config ke defaults dengan error handling"""
+    """Reset dependency config to defaults with error handling."""
     try:
-        handler = get_dependency_config_handler()
-        if handler and _dependency_initializer.ui_components:
-            default_config = handler.get_default_config()
-            handler.update_ui(_dependency_initializer.ui_components, default_config)
-            return True
-        return False
+        if handler := get_dependency_config_handler():
+            return handler.reset_to_defaults()
     except Exception as e:
-        logger = get_logger("smartcash.ui.setup.dependency")
-        logger.warning(f"⚠️ Reset config failed: {str(e)}")
-        return False
+        get_logger("smartcash.ui.setup.dependency").error(
+            f"Config reset failed: {e}", exc_info=True)
+    return False
 
 def validate_dependency_setup() -> Dict[str, Any]:
-    """Validate dependency setup dengan comprehensive check"""
-    global _dependency_initializer
-    
-    if not _dependency_initializer:
-        return {'valid': False, 'error': 'Initializer belum dibuat'}
-    
-    if not _dependency_initializer.ui_components:
-        return {'valid': False, 'error': 'UI components belum diinisialisasi'}
-    
-    if not _dependency_initializer.config_handler:
-        return {'valid': False, 'error': 'Config handler belum disetup'}
-    
-    # Check critical components
-    critical_components = _dependency_initializer._get_critical_components()
-    missing_components = [comp for comp in critical_components 
-                         if comp not in _dependency_initializer.ui_components]
-    
+    """Validate and return dependency setup status."""
+    try:
+        return {
+            'valid': True,
+            'config': get_dependency_config(),
+            'missing': [],
+            'errors': []
+        }
+    except Exception as e:
+        return {
+            'valid': False,
+            'config': {},
+            'missing': [],
+            'errors': [f"Validation failed: {e}"]
+        }
     if missing_components:
         return {'valid': False, 'error': f'Missing components: {missing_components}'}
     
     return {'valid': True, 'message': 'Dependency setup valid'}
 
-# Export functions untuk backward compatibility
 __all__ = [
     'initialize_dependency_ui',
     'get_dependency_config', 
@@ -177,4 +182,4 @@ __all__ = [
     'update_dependency_config',
     'reset_dependency_config',
     'validate_dependency_setup'
-]
+]  # For backward compatibility

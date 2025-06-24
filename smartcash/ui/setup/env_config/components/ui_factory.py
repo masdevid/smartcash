@@ -16,7 +16,7 @@ class UIFactory:
                 create_header,
                 create_status_panel, 
                 create_log_accordion,
-                create_single_progress_tracker,
+                create_dual_progress_tracker,
                 create_divider
             )
             
@@ -40,20 +40,19 @@ class UIFactory:
             button_container = widgets.VBox([setup_button], 
                 layout=widgets.Layout(align_items='center', margin='10px 0px'))
             
-            # Progress tracker - store both the instance and its widget
-            progress_tracker_obj = create_single_progress_tracker()
-            progress_tracker = progress_tracker_obj
+            # Create dual progress tracker for better progress visualization
+            progress_tracker = create_dual_progress_tracker(
+                primary_label='Overall Progress',
+                secondary_label='Current Operation'
+            )
             
-            # Get the widget from the tracker if it exists
-            if hasattr(progress_tracker_obj, 'widget'):
-                if callable(progress_tracker_obj.widget):
-                    progress_tracker = progress_tracker_obj.widget()
-                else:
-                    progress_tracker = progress_tracker_obj.widget
-            
-            # If we still don't have a widget, use the object itself
-            if not isinstance(progress_tracker, widgets.Widget):
-                progress_tracker = progress_tracker_obj  # Fallback to the original object
+            # Get the widget from the tracker
+            if hasattr(progress_tracker, 'widget'):
+                progress_widget = progress_tracker.widget
+                if callable(progress_widget):
+                    progress_widget = progress_widget()
+            else:
+                progress_widget = progress_tracker
             
             # Log accordion - ensure we get the widget instance
             log_accordion = create_log_accordion()
@@ -95,7 +94,7 @@ class UIFactory:
                 create_divider(),
                 button_container,
                 status_panel,
-                progress_tracker,  # Shared component sudah return widget
+                progress_widget,  # Use the extracted widget
                 log_accordion     # Shared component sudah return widget
             ], layout=widgets.Layout(
                 width='100%',
@@ -113,8 +112,8 @@ class UIFactory:
                 'setup_button': setup_button,
                 'button_container': button_container,
                 'status_panel': status_panel,
-                'progress_tracker': progress_tracker_obj,  # Original object for methods
-                'progress_widget': progress_tracker,       # Widget for display
+                'progress_tracker': progress_tracker,      # Tracker object with methods
+                'progress_widget': progress_widget,        # Widget for display
                 'log_accordion': log_accordion_obj,        # Original object for methods  
                 'log_widget': log_accordion,               # Widget for display
                 # Metadata

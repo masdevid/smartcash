@@ -183,8 +183,18 @@ class EnvironmentConfigOrchestrator:
                 return False
                 
             progress_tracker = self.ui_components['progress_tracker']
-            progress_tracker.reset()
-            progress_tracker.visible = True
+            
+            # Reset and show the progress tracker
+            if hasattr(progress_tracker, 'reset'):
+                progress_tracker.reset()
+            
+            # Show the progress widget if it has a show method
+            if hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
+            
+            # Show the widget in the UI
+            if 'progress_widget' in self.ui_components and hasattr(self.ui_components['progress_widget'], 'layout'):
+                self.ui_components['progress_widget'].layout.visibility = 'visible'
             
             # Update UI status
             if 'status_message' in self.ui_components:
@@ -296,21 +306,23 @@ class EnvironmentConfigOrchestrator:
     def _update_progress(self, message: str, progress: int, is_error: bool = False, is_warning: bool = False):
         """Update progress bar and log message with appropriate formatting"""
         try:
-            # Update progress bar if available
+            # Update progress tracker if available
             if 'progress_tracker' in self.ui_components and progress >= 0:
                 progress_tracker = self.ui_components['progress_tracker']
-                progress_tracker.value = progress
-                progress_tracker.description = f"{progress}% - {message}"
                 
-                # Update progress bar color based on status
-                if is_error:
-                    progress_tracker.bar_style = 'danger'
-                elif is_warning:
-                    progress_tracker.bar_style = 'warning'
-                elif progress >= 100:
-                    progress_tracker.bar_style = 'success'
-                else:
-                    progress_tracker.bar_style = 'info'
+                # Update the main progress bar
+                if hasattr(progress_tracker, 'update_overall'):
+                    progress_tracker.update_overall(progress, message)
+                
+                # Update the operation progress bar
+                if hasattr(progress_tracker, 'update_step'):
+                    progress_tracker.update_step(progress, message)
+                
+                # Handle error/warning states
+                if is_error and hasattr(progress_tracker, 'error_operation'):
+                    progress_tracker.error_operation(message)
+                elif progress >= 100 and hasattr(progress_tracker, 'complete_operation'):
+                    progress_tracker.complete_operation(message)
             
             # Log the message with appropriate level
             if self.logger:
@@ -320,12 +332,6 @@ class EnvironmentConfigOrchestrator:
                     self.logger.warning(message)
                 else:
                     self.logger.info(message)
-                    
-            # Force UI update
-            if hasattr(self, '_last_progress') and self._last_progress == progress:
-                # Small adjustment to force UI update
-                self.ui_components['progress_tracker'].value = progress - 0.1
-                self.ui_components['progress_tracker'].value = progress
             
             self._last_progress = progress
             

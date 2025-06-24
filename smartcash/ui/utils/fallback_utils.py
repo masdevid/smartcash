@@ -54,7 +54,7 @@ class FallbackLogger:
         self.name = name or 'fallback'
         
     def debug(self, msg, *args, **kwargs):
-        print(f"[DEBUG] {msg}")
+        # Debug messages are intentionally silenced
         if kwargs.get('exc_info'):
             self._log_exception()
         

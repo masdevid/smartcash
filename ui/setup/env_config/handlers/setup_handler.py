@@ -33,6 +33,10 @@ class SetupHandler:
             # Execute setup workflow
             summary_data = self._execute_setup_workflow(ui_components, progress_tracker)
             
+            # Check if setup was cancelled
+            if summary_data.get('cancelled', False):
+                return summary_data
+                
             # Update final summary
             update_setup_summary(ui_components['setup_summary'], summary_data)
             
@@ -63,6 +67,15 @@ class SetupHandler:
             progress_tracker.update_step("Mounting Google Drive", 0)
             
             drive_result = self.drive_handler.mount_drive()
+            
+            # Check if user cancelled the drive mount
+            if drive_result.get('cancelled', False):
+                self.logger.info("ℹ️ Drive mount was cancelled by user")
+                summary_data['success'] = False
+                summary_data['status_message'] = "Drive mount was cancelled"
+                summary_data['cancelled'] = True
+                return summary_data
+                
             summary_data['drive_mounted'] = drive_result.get('success', False)
             summary_data['mount_path'] = drive_result.get('mount_path', 'N/A')
             
@@ -129,14 +142,29 @@ class SetupHandler:
     
     def _set_completion_state(self, ui_components: Dict[str, Any], summary_data: Dict[str, Any]) -> None:
         """✅ Set UI ke completion state"""
-        success = summary_data.get('success', False)
-        
-        if success:
-            ui_components['setup_button'].disabled = True
-            ui_components['setup_button'].description = "✅ Setup Complete"
+        if 'setup_button' not in ui_components:
+            return
+            
+        if summary_data.get('cancelled', False):
+            # Handle cancellation case
+            ui_components['setup_button'].disabled = False
+            ui_components['setup_button'].button_style = ''
+            ui_components['setup_button'].description = "▶️ Setup Environment"
+            
+            if 'status_panel' in ui_components:
+                update_status_panel(ui_components['status_panel'],
+                                 "ℹ️ Setup was cancelled", "info")
+        elif summary_data.get('success', False):
+            # Handle successful completion
+            ui_components['setup_button'].disabled = False
             ui_components['setup_button'].button_style = 'success'
-            update_status_panel(ui_components['status_panel'], "Setup berhasil diselesaikan!", "success")
+            ui_components['setup_button'].description = "✅ Setup Complete"
+            
+            if 'status_panel' in ui_components:
+                update_status_panel(ui_components['status_panel'],
+                                 "✅ Environment setup completed successfully!", "success")
         else:
+            # Handle failure case
             ui_components['setup_button'].disabled = False
             ui_components['setup_button'].description = "🔄 Retry Setup"
             ui_components['setup_button'].button_style = 'danger'
@@ -164,12 +192,18 @@ class SetupHandler:
             button.button_style = 'info'
             
             # Run the setup process
-            setup_success = self.run_full_setup(ui_components)
+            setup_result = self.run_full_setup(ui_components)
             
             # Update button state based on result
-            if setup_success:
+            if setup_result is True:
                 button.description = "✅ Setup Complete"
                 button.button_style = 'success'
+            elif hasattr(setup_result, 'get') and setup_result.get('cancelled', False):
+                # Handle cancellation case
+                button.description = "▶️ Setup Environment"  # Reset to initial state
+                button.button_style = ''  # Reset style
+                button.disabled = False  # Re-enable the button
+                return  # Exit early for cancellation
             else:
                 button.description = "❌ Setup Failed"
                 button.button_style = 'danger'

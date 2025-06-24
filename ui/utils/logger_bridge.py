@@ -379,17 +379,13 @@ class UILoggerBridge:
     def _get_log_output_widget(self):
         """Get the log output widget from UI components."""
         try:
-            # Debug: Print available keys for troubleshooting
-            available_keys = list(self.ui_components.keys())
-            print(f"[DEBUG] Available UI component keys: {available_keys}")
-            
             # 1. First try to get log_components
             if 'log_components' in self.ui_components and self.ui_components['log_components'] is not None:
                 log_components = self.ui_components['log_components']
                 if isinstance(log_components, dict) and 'log_output' in log_components:
                     log_output = log_components['log_output']
                     if hasattr(log_output, 'append_log'):
-                        print("[DEBUG] Found log_output in log_components")
+                        # log_output found in log_components
                         return log_output
             
             # 2. Try to get log_output directly
@@ -411,21 +407,17 @@ class UILoggerBridge:
             # 4. Try to find any widget with 'log' in the key that has append_log method
             for key, widget in self.ui_components.items():
                 if 'log' in key.lower() and hasattr(widget, 'append_log'):
-                    print(f"[DEBUG] Found log widget with key: {key}")
+                    # Found log widget with key
                     return widget
                 
                 # If it's a container, check its children
                 if hasattr(widget, 'children'):
                     for child in widget.children:
                         if hasattr(child, 'append_log'):
-                            print(f"[DEBUG] Found log widget in children of {key}")
+                            # Found log widget in children
                             return child
             
-            # 5. If we get here, log a debug message with more details
-            print("[DEBUG] No suitable log output widget found. Checking widget types...")
-            for key, widget in self.ui_components.items():
-                print(f"[DEBUG] Widget {key}: {type(widget).__name__}, methods: {[m for m in dir(widget) if not m.startswith('_')]}")
-            
+            # 5. If we get here, no suitable log widget was found
             return None
             
         except Exception as e:
@@ -447,7 +439,7 @@ class UILoggerBridge:
                 return widget
         
         # If we get here, log a debug message
-        print(f"[DEBUG] No output widget found. Available keys: {list(self.ui_components.keys())}")
+        # No output widget found
         return None
     
     def _setup_ui_callback(self):

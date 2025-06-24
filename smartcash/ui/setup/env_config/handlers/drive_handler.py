@@ -28,20 +28,35 @@ class DriveHandler:
             # Attempt to mount
             self.logger.info("🔗 Mounting Google Drive...")
             
-            # Import and mount
-            from google.colab import drive
-            drive.mount(self.mount_path, force_remount=False)
-            
-            # Verify mount
-            if self._is_drive_mounted():
-                self.logger.success(f"✅ Drive mounted successfully at {self.mount_path}")
-                return {
-                    'success': True,
-                    'mount_path': self.mount_path,
-                    'already_mounted': False
-                }
-            else:
-                raise Exception("Mount verification failed")
+            try:
+                # Import and mount
+                from google.colab import drive
+                drive.mount(self.mount_path, force_remount=False)
+                
+                # Verify mount
+                if self._is_drive_mounted():
+                    self.logger.success(f"✅ Drive mounted successfully at {self.mount_path}")
+                    return {
+                        'success': True,
+                        'mount_path': self.mount_path,
+                        'already_mounted': False
+                    }
+                else:
+                    raise Exception("Mount verification failed")
+                    
+            except Exception as mount_error:
+                # Check if the error is due to user cancellation
+                error_msg = str(mount_error).lower()
+                if 'cancelled' in error_msg or 'cancel' in error_msg or 'user' in error_msg:
+                    self.logger.info("ℹ️ Google Drive mount was cancelled by user")
+                    return {
+                        'success': False,
+                        'mount_path': 'N/A',
+                        'cancelled': True,
+                        'reason': 'User cancelled the operation'
+                    }
+                # Re-raise if it's a different error
+                raise
                 
         except ImportError:
             self.logger.warning("⚠️ Not running in Google Colab, skipping drive mount")

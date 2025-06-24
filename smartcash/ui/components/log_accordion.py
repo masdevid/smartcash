@@ -51,7 +51,7 @@ def create_log_accordion(
     Returns:
         Dictionary containing 'log_output' and 'log_accordion' widgets
     """
-    # Create a container for log messages
+    # Create a container for log messages with a custom class for JavaScript targeting
     log_container = widgets.VBox(
         layout=widgets.Layout(
             width='100%',
@@ -67,6 +67,8 @@ def create_log_accordion(
             overflow='hidden'
         )
     )
+    # Add a custom class for JavaScript targeting
+    log_container.add_class('smartcash-log-container')
     
     # Create a container to hold all log entries
     entries_container = widgets.VBox(
@@ -141,6 +143,46 @@ def create_log_accordion(
             import traceback
             traceback.print_exc()
     
+    def _scroll_to_bottom():
+        """Scroll the log container to the bottom using JavaScript."""
+        from IPython.display import display, Javascript
+        display(Javascript(
+            """
+            (function() {
+                // Try multiple selectors to find the log container
+                const selectors = [
+                    '.smartcash-log-container',
+                    '.jp-OutputArea-output',
+                    '.output_scroll',
+                    '.output_subarea',
+                    '.output'
+                ];
+                
+                let logContainer = null;
+                for (const selector of selectors) {
+                    const elements = document.querySelectorAll(selector);
+                    if (elements.length > 0) {
+                        // Find the most likely container with scrolling
+                        for (const el of elements) {
+                            if (el.scrollHeight > el.clientHeight) {
+                                logContainer = el;
+                                break;
+                            }
+                        }
+                        if (logContainer) break;
+                        // If no scrolling container found, use the first match
+                        logContainer = elements[0];
+                        break;
+                    }
+                }
+                
+                if (logContainer) {
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
+            })();
+            """
+        ))
+    
     def _update_log_display():
         """Update the log container with current entries."""
         try:
@@ -149,18 +191,13 @@ def create_log_accordion(
             
             # Auto-scroll to bottom if enabled
             if auto_scroll:
-                def scroll_to_bottom():
-                    log_container.scroll_to_bottom()
-                
                 # Use a small delay to ensure the widget is rendered
                 import threading
-                timer = threading.Timer(0.1, scroll_to_bottom)
+                timer = threading.Timer(0.1, _scroll_to_bottom)
                 timer.start()
                 
         except Exception as e:
             print(f"[ERROR] Failed to update log display: {str(e)}")
-            import traceback
-            traceback.print_exc()
             import traceback
             traceback.print_exc()
     

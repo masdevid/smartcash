@@ -61,7 +61,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # 5. Log Accordion
     log_accordion = create_log_accordion(
         module_name="Setup Environment",
-        height="100px",
+        height="150px",
         width="100%",
         max_logs=1000,
         show_timestamps=True,

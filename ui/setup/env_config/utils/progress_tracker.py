@@ -120,6 +120,26 @@ class SetupProgressTracker:
         if self.current_stage is not None:
             self.update_progress(self.current_stage, progress, message)
     
+    def update_step(self, step_name: str, description: str = "") -> None:
+        """Update the current step with a description (compatibility method)
+        
+        Args:
+            step_name: Name of the current step
+            description: Optional description of the step
+        """
+        if self.current_stage is not None:
+            # Update the current stage's name and progress
+            stage_data = self.stages[self.current_stage]
+            stage_name = f"{stage_data.name}: {step_name}"
+            self.logger.info(f"Step: {stage_name}")
+            
+            # Update progress with the new step name and description
+            self.update_progress(
+                self.current_stage, 
+                stage_data.current, 
+                description or step_name
+            )
+    
     def complete(self, message: str = "Setup completed successfully") -> None:
         """Mark setup as complete"""
         self.update_stage(SetupStage.COMPLETE, message)

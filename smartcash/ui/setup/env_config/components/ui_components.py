@@ -9,7 +9,7 @@ from smartcash.ui.components import (
     create_header, create_status_panel,
     create_log_accordion, create_divider
 )
-from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
+from smartcash.ui.setup.env_config.utils.progress_tracker import track_setup_progress
 from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary
 from smartcash.ui.setup.env_config.components.env_info_panel import create_env_info_panel
 from smartcash.ui.setup.env_config.components.tips_panel import create_tips_requirements
@@ -53,10 +53,8 @@ def create_env_config_ui() -> Dict[str, Any]:
     status_panel = create_status_panel("Siap untuk setup environment", "info")
     
     # 4. Progress Tracker
-    progress_tracker = create_dual_progress_tracker(
-        operation="Setup Environment",
-        auto_hide=False
-    )
+    ui_components = {}
+    progress_tracker = track_setup_progress(ui_components)
     
     # 5. Log Accordion
     log_accordion = create_log_accordion(
@@ -99,10 +97,8 @@ def create_env_config_ui() -> Dict[str, Any]:
     main_container = widgets.VBox([
         header,
         status_panel,
-        create_divider(),
         setup_button_container,
-        create_divider(),
-        progress_tracker.container,
+        progress_tracker.ui_components['progress_tracker']['container'],
         log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),
         setup_summary,

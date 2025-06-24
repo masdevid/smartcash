@@ -66,9 +66,11 @@ def create_env_config_ui() -> Dict[str, Any]:
         max_logs=1000,
         show_timestamps=True,
         show_level_icons=True,
-        auto_scroll=True,
-        default_open=True  # Make accordion open by default
+        auto_scroll=True
     )
+    # Expand the accordion by default
+    if 'log_accordion' in log_accordion and hasattr(log_accordion['log_accordion'], 'selected_index'):
+        log_accordion['log_accordion'].selected_index = 0  # Expand first accordion item
     
     # 6. Setup Summary
     setup_summary = create_setup_summary()

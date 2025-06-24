@@ -16,14 +16,23 @@ def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets
     # Suppress all outputs during initialization
     suppress_all_outputs()
     try:
-        # 1. Create UI components
+        # 1. Create UI components first (without logging)
         ui_components = _create_ui_components()
-        # 2. Setup basic handlers (includes initial status check)
+        
+        # 2. Setup logger bridge first (before any logging)
+        logger_bridge = create_ui_logger_bridge(ui_components)
+        ui_components['_logger_bridge'] = logger_bridge
+        
+        # 3. Now setup handlers (this will do the initial status update)
         _setup_handlers(ui_components, config or {})
-        # 3. Restore output after UI is ready
+        
+        # 4. Mark UI as ready to flush buffered logs
+        if hasattr(logger_bridge, 'set_ui_ready'):
+            logger_bridge.set_ui_ready(True)
+            
+        # 5. Restore output after UI is ready
         restore_stdout()
-        # 4. Clear any buffered logs from the logger bridge
-        _clear_buffered_logs(ui_components)
+        
         return ui_components['ui']
     except Exception as e:
         restore_stdout()  # Ensure output is restored even on error
@@ -73,18 +82,22 @@ def _update_status(ui_components: Dict[str, Any], message: str, status_type: str
                 print(f"[ERROR] Failed to log error: {str(log_err)}")
 
 def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Set up handlers and logger bridge with proper initialization order."""
+    """Set up handlers with proper initialization order."""
     try:
-        # 1. Setup logger bridge with buffering
-        logger_bridge = create_ui_logger_bridge(ui_components)
-        ui_components['logger_bridge'] = logger_bridge
+        # 1. Get the logger bridge that was already created
+        logger_bridge = ui_components.get('_logger_bridge')
+        if not logger_bridge:
+            raise RuntimeError("Logger bridge not initialized")
+            
         # 2. Setup initial status (will be buffered until UI is ready)
         _update_status(ui_components, "Environment configuration ready", "info")
-        # 3. Mark UI as ready to flush buffered logs
-        if hasattr(logger_bridge, 'set_ui_ready'):
-            logger_bridge.set_ui_ready(True)
-        # 4. Initialize other handlers
+        
+        # 3. Initialize other handlers
         _setup_event_handlers(ui_components, config)
+        
+        # 4. Perform initial status check
+        _perform_initial_status_check(ui_components)
+        
     except Exception as e:
         error_msg = f"Error setting up handlers: {str(e)}"
         _update_status(ui_components, error_msg, "error")
@@ -214,14 +227,13 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
     try:
         logger.info("🔍 Starting initial environment status check...")
         # Update status to show we're checking
-        from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
-        update_status_panel(ui_components['status_bar'], "Checking environment configuration...", "info")
+        _update_status(ui_components, "Checking environment configuration...", "info")
         # Get the status checker instance
         status_checker = ui_components.get('_status_checker')
         if not status_checker:
             raise ValueError("Status checker not initialized")
         # Update status panel to show loading state
-        update_status_panel(ui_components['status_bar'], "Checking environment configuration...", "info")
+        _update_status(ui_components, "Checking environment configuration...", "info")
         # Perform the status check
         status_result = status_checker.check_initial_status(ui_components)
         # Process the result
@@ -250,8 +262,7 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
         error_msg = f"❌ Failed to perform initial status check: {str(e)}"
         logger.error(error_msg, exc_info=True)
         # Update status panel with error
-        from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
-        update_status_panel(ui_components['status_bar'], f"Error: {error_msg}", "danger")
+        _update_status(ui_components, f"Error: {error_msg}", "danger")
         # Re-raise to allow caller to handle the error
         raise RuntimeError(error_msg) from e
 

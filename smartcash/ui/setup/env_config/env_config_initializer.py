@@ -180,12 +180,23 @@ def _create_fallback_logger(message: str = None, error: Exception = None) -> Any
 def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
     """Initialize and configure the logger bridge."""
     try:
+        # First, ensure we have the log output widget
+        if 'log_accordion' in ui_components and 'log_output' not in ui_components:
+            # If we have the accordion but not the output, extract it
+            log_accordion = ui_components['log_accordion']
+            if hasattr(log_accordion, 'log_output'):
+                ui_components['log_output'] = log_accordion.log_output
+                
         # Initialize standard logger bridge
         logger_bridge = create_ui_logger_bridge(ui_components)
         ui_components['_logger_bridge'] = logger_bridge
         
         # Setup log output widget if it exists
         _setup_log_output_widget(ui_components)
+        
+        # Mark UI as ready to receive logs
+        if hasattr(logger_bridge, 'set_ui_ready'):
+            logger_bridge.set_ui_ready(True)
         
         # Log initialization
         logger_bridge.info("🔌 Logger bridge initialized")
@@ -198,17 +209,27 @@ def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
         print(f"[ERROR] {error_msg}")
         
         # Try to create a fallback logger
-        fallback_logger = _create_fallback_logger(error_msg, e)
-        ui_components['_logger_bridge'] = fallback_logger
-        
-        return fallback_logger
+        return _create_fallback_logger(error_msg, e)
 
 def _setup_log_output_widget(ui_components: Dict[str, Any]) -> None:
     """Configure the log output widget in the UI components."""
-    if 'log_components' in ui_components and isinstance(ui_components['log_components'], dict):
-        log_components = ui_components['log_components']
-        if 'log_output' in log_components:
-            ui_components['log_output'] = log_components['log_output']
+    try:
+        # Check if we have a log output widget
+        if 'log_output' not in ui_components and 'log_accordion' in ui_components:
+            # If log_output is not directly available, try to get it from log_accordion
+            log_accordion = ui_components['log_accordion']
+            if hasattr(log_accordion, 'get'):
+                ui_components['log_output'] = log_accordion
+            elif hasattr(log_accordion, 'log_output'):
+                ui_components['log_output'] = log_accordion.log_output
+        
+        # If we have a logger bridge, ensure it's connected to the log output
+        logger_bridge = ui_components.get('_logger_bridge')
+        if logger_bridge and hasattr(logger_bridge, 'set_ui_ready'):
+            logger_bridge.set_ui_ready(True)
+            
+    except Exception as e:
+        print(f"[WARNING] Failed to setup log output widget: {str(e)}")
 
 def _perform_initial_setup(ui_components: Dict[str, Any], logger_bridge) -> None:
     """Initialize handlers and perform initial status check with the provided logger bridge."""

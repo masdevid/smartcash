@@ -61,7 +61,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # 5. Log Accordion
     log_accordion = create_log_accordion(
         module_name="Setup Environment",
-        height="300px",
+        height="100px",
         width="100%",
         max_logs=1000,
         show_timestamps=True,
@@ -99,15 +99,11 @@ def create_env_config_ui() -> Dict[str, Any]:
         setup_button_container,
         create_divider(),
         status_panel,
-        create_divider(),
         progress_tracker.container,
-        create_divider(),
         log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),
         setup_summary,
-        create_divider(),
         env_info_panel,
-        create_divider(),
         tips_requirements
     ], layout=widgets.Layout(
         width='100%',

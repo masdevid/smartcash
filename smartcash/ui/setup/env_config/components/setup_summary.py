@@ -60,17 +60,19 @@ def update_setup_summary(
         if details is None:
             details = {}
             
-        # Add status message to details if not present
-        if 'status_message' not in details:
-            details['status_message'] = status_message
+        # Create a copy of details to avoid modifying the original
+        summary_details = details.copy()
+        
+        # Set the status message (this will be displayed in the status area)
+        summary_details['status_message'] = status_message
             
         # Ensure we have the mount path if drive is mounted
-        if details.get('drive_mounted') and 'mount_path' not in details:
-            if 'drive_mount_path' in details and details['drive_mount_path']:
-                details['mount_path'] = details['drive_mount_path']
-            
-        content = _format_summary_content(details)
-        summary_widget.value = content
+        if summary_details.get('drive_mounted') and 'mount_path' not in summary_details:
+            if 'drive_mount_path' in summary_details and summary_details['drive_mount_path']:
+                summary_details['mount_path'] = summary_details['drive_mount_path']
+        
+        # Generate the content with the updated details
+        content = _format_summary_content(summary_details)
     except Exception as e:
         error_html = """
         <div style='color: #f44336; padding: 10px; background: #ffebee; border-radius: 4px;'>

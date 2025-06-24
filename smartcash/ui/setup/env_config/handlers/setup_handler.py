@@ -22,8 +22,16 @@ class SetupHandler:
         self.folder_handler = FolderHandler(logger)
         self.config_handler = ConfigHandler()
     
-    def run_full_setup(self, ui_components: Dict[str, Any]) -> bool:
-        """🔄 Jalankan full setup workflow dengan progress tracking"""
+    def run_full_setup(self, ui_components: Dict[str, Any], clear_logs: bool = True) -> Dict[str, Any]:
+        """🔄 Jalankan full setup workflow dengan progress tracking
+        
+        Args:
+            ui_components: Dictionary containing UI components
+            clear_logs: Whether to clear logs before starting (default: True)
+            
+        Returns:
+            Dict containing setup results and status
+        """
         try:
             # Initialize progress tracking
             progress_tracker = track_setup_progress(ui_components)
@@ -38,13 +46,15 @@ class SetupHandler:
             if summary_data.get('cancelled', False):
                 return summary_data
                 
-            # Update final summary
-            update_setup_summary(ui_components['setup_summary'], summary_data)
+            # Only update the summary if we have new data
+            if 'setup_summary' in ui_components:
+                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+                update_setup_summary(ui_components['setup_summary'], summary_data)
             
             # Set completion state
             self._set_completion_state(ui_components, summary_data)
             
-            return summary_data.get('success', False)
+            return summary_data
             
         except Exception as e:
             self.logger.error(f"❌ Setup failed: {str(e)}")
@@ -270,16 +280,17 @@ class SetupHandler:
             ui_components['setup_button'].button_style = 'danger'
         update_status_panel(ui_components.get('status_panel'), error_msg, "danger")
         
-    def setup_button_handler(self, button, ui_components: Dict[str, Any]) -> None:
+    def setup_button_handler(self, button, ui_components: Dict[str, Any], clear_logs: bool = True) -> None:
         """Handle setup button click events
         
         Args:
             button: The button widget that was clicked
             ui_components: Dictionary containing UI components
+            clear_logs: Whether to clear the log accordion before starting
         """
         try:
-            # Clear log accordion if it exists
-            if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'children'):
+            # Only clear logs if explicitly requested (not on retry)
+            if clear_logs and 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'children'):
                 log_output = ui_components['log_accordion'].children[0]
                 if hasattr(log_output, 'clear_output'):
                     log_output.clear_output()
@@ -289,11 +300,11 @@ class SetupHandler:
             button.description = "🔄 Setting up..."
             button.button_style = 'info'
             
-            # Run the setup process
-            setup_result = self.run_full_setup(ui_components)
+            # Run the setup process with clear_logs parameter
+            setup_result = self.run_full_setup(ui_components, clear_logs=clear_logs)
             
             # Update button state based on result
-            if setup_result is True:
+            if setup_result is True or (hasattr(setup_result, 'get') and setup_result.get('success', False)):
                 button.description = "✅ Setup Complete"
                 button.button_style = 'success'
             elif hasattr(setup_result, 'get') and setup_result.get('cancelled', False):
@@ -303,8 +314,8 @@ class SetupHandler:
                 button.disabled = False  # Re-enable the button
                 return  # Exit early for cancellation
             else:
-                button.description = "❌ Setup Failed"
-                button.button_style = 'danger'
+                button.description = "🔄 Retry Setup"  # Changed from "Setup Failed" to "Retry Setup"
+                button.button_style = 'warning'  # Changed from 'danger' to 'warning' for retry
                 button.disabled = False  # Allow retry on failure
         except Exception as e:
             error_msg = f"Setup error: {str(e)}"

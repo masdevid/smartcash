@@ -125,10 +125,48 @@ class SetupProgressTracker:
         Args:
             message: Optional completion message
         """
-        if self.current_stage is not None:
-            self.update_progress(self.current_stage, 100, message)
-        else:
-            self.logger.warning("No current stage to complete")
+        try:
+            if not hasattr(self, 'current_stage') or self.current_stage is None:
+                self.logger.warning("No active stage to complete")
+                return
+                
+            # Ensure the stage is in our stages dictionary
+            if not hasattr(self, 'stages') or self.current_stage not in self.stages:
+                self.logger.warning(f"Unknown stage: {self.current_stage}")
+                return
+                
+            # Mark stage as complete (100% progress)
+            self.stages[self.current_stage].current = 100
+            
+            # Log completion
+            stage_name = self.stages[self.current_stage].name
+            self.logger.info(f"✅ Completed stage: {stage_name}")
+            
+            # Update UI with completion message
+            if message:
+                self._update_ui(message)
+                
+            # Trigger callbacks for stage completion
+            if hasattr(self, 'callbacks') and isinstance(self.callbacks, list):
+                for callback in self.callbacks:
+                    if callable(callback):
+                        try:
+                            callback("stage_complete", 100, stage_name)
+                        except Exception as e:
+                            self.logger.error(f"Error in stage complete callback: {e}")
+            
+            # Update overall progress
+            self._update_overall_progress()
+            
+            # Clear current stage
+            self.current_stage = None
+            
+        except Exception as e:
+            error_msg = f"Error in complete_stage: {str(e)}"
+            self.logger.error(error_msg)
+            if hasattr(self, 'logger'):
+                import traceback
+                self.logger.debug(traceback.format_exc())
     
     def update_within_stage(self, progress: int, message: str = "") -> None:
         """Update progress within the current stage

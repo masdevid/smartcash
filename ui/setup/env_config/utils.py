@@ -334,6 +334,29 @@ def get_progress_message(key: str) -> str:
     """💬 Get localized progress message"""
     return PROGRESS_MESSAGES.get(key, f"Progress: {key}")
 
+# === SYSTEM INFO UTILS ===
+def get_system_summary_minimal() -> Dict[str, str]:
+    """📊 Get minimal system summary"""
+    try:
+        import platform
+        import psutil
+        
+        return {
+            'python_version': platform.python_version(),
+            'system': platform.system(),
+            'memory_gb': f"{psutil.virtual_memory().total // (1024**3)}GB",
+            'drive_status': 'Ready' if test_drive_readiness() else 'Not Ready',
+            'environment': 'Colab' if is_colab_environment() else 'Local'
+        }
+    except Exception:
+        return {
+            'python_version': 'Unknown',
+            'system': 'Unknown', 
+            'memory_gb': 'Unknown',
+            'drive_status': 'Unknown',
+            'environment': 'Colab' if is_colab_environment() else 'Local'
+        }
+
 # === ONE-LINER CONVENIENCE FUNCTIONS ===
 is_drive_ready = lambda: test_drive_readiness()
 get_smartcash_dir = lambda: Path(SMARTCASH_DRIVE_PATH)

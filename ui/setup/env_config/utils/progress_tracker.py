@@ -109,15 +109,59 @@ class SetupProgressTracker:
             self.callbacks.append(callback)
     
     def update_stage(self, stage: SetupStage, message: str = "") -> None:
-        """Update to a new stage"""
-        self.current_stage = stage
-        stage_name = self.stages[stage].name
-        self.logger.info(f"Starting stage: {stage_name}")
-        self.update_progress(stage, 0, message)
+        """Update to a new stage
         
-        # Update the progress tracker with the new stage
-        if 'progress_tracker' in self.ui_components:
-            self.update_progress(stage, 0, message)
+        Args:
+            stage: The stage to update to
+            message: Optional message to display
+        """
+        try:
+            self.logger.debug(f"[DEBUG] update_stage called with stage: {stage}, message: {message}")
+            
+            # Validate stage type
+            if not isinstance(stage, SetupStage):
+                error_msg = f"Invalid stage type: {type(stage).__name__}. Expected SetupStage enum."
+                self.logger.error(error_msg)
+                return
+                
+            # Store previous stage for completion
+            previous_stage = self.current_stage
+            
+            # Set new stage
+            self.current_stage = stage
+            self.logger.debug(f"[DEBUG] Current stage updated to: {self.current_stage}")
+            
+            # Get stage name safely
+            stage_info = self.stages.get(stage)
+            if not stage_info:
+                self.logger.error(f"Stage {stage} not found in stages configuration")
+                return
+                
+            stage_name = stage_info.name
+            self.logger.info(f"🔄 Starting stage: {stage_name}")
+            
+            # Complete previous stage if different
+            if previous_stage and previous_stage != stage:
+                self.logger.debug(f"[DEBUG] Completing previous stage: {previous_stage}")
+                try:
+                    self.complete_stage(f"Moving to {stage_name}")
+                except Exception as e:
+                    self.logger.error(f"Error completing previous stage: {e}")
+            
+            # Update progress for the new stage
+            self.update_within_stage(0, f"Starting: {stage_name}")
+            
+            # Update UI
+            self._update_ui(f"Starting: {stage_name}")
+            
+            # Log the stage transition
+            self.logger.info(f"✅ Transitioned to stage: {stage_name}")
+            
+        except Exception as e:
+            error_msg = f"Error in update_stage: {str(e)}"
+            self.logger.error(error_msg)
+            import traceback
+            self.logger.debug(traceback.format_exc())
     
     def complete_stage(self, message: str = "") -> None:
         """Mark current stage as complete
@@ -296,53 +340,99 @@ class SetupProgressTracker:
             message: Optional status message
         """
         try:
+            # Validate stage type
             if not isinstance(stage, SetupStage):
                 self.logger.error(f"Invalid stage type: {type(stage).__name__}. Expected SetupStage enum.")
                 return
                 
-            if stage not in self.stages:
-                self.logger.warning(f"Unknown stage: {stage}")
+            # Validate progress value
+            progress = max(0, min(100, int(progress)))
+            
+            # Ensure stages dictionary exists
+            if not hasattr(self, 'stages') or not isinstance(self.stages, dict):
+                self.logger.error("Stages dictionary not properly initialized")
                 return
                 
-            # Get the stage progress object
-            stage_progress = self.stages[stage]
+            # Get stage info
+            stage_info = self.stages.get(stage)
+            if not stage_info:
+                self.logger.warning(f"Stage {stage} not found in stages configuration")
+                return
+                
+            # Update stage progress
+            stage_info.current = progress
             
-            # Update the stage progress (ensure it's between 0-100)
-            stage_progress.current = min(100, max(0, int(progress)))
-            
-            # Calculate overall progress
+            # Update overall progress
             self._update_overall_progress()
             
             # Update UI
             self._update_ui(message)
             
             # Log the update
-            stage_name = stage.name.replace('_', ' ').title()
-            self.logger.debug(f"Progress update - Stage: {stage_name}, Progress: {progress}%, Message: {message}")
+            self.logger.debug(f"Progress update - Stage: {stage_info.name}, Progress: {progress}%")
             
-            # Trigger callbacks
-            for callback in self.callbacks:
-                try:
-                    callback(stage_name, progress, message)
-                except Exception as e:
-                    self.logger.error(f"Error in progress callback: {e}")
-                    
         except Exception as e:
-            self.logger.error(f"Error in update_progress: {str(e)}")
+            error_msg = f"Error in update_progress: {str(e)}"
+            self.logger.error(error_msg)
             import traceback
             self.logger.debug(traceback.format_exc())
     
     def _update_overall_progress(self) -> None:
-        """Calculate and update the overall progress"""
+        """Calculate and update the overall progress based on all stages"""
         try:
-            # Initialize default values
-            current_progress = 0
-            current_stage_name = "Initializing"
+            if not hasattr(self, 'stages') or not self.stages:
+                self.overall_progress = 0
+                return
+                
+            total_weight = sum(stage.weight for stage in self.stages.keys() if stage != SetupStage.COMPLETE)
+            if total_weight <= 0:
+                self.overall_progress = 0
+                return
+                
+            # Calculate weighted progress
+            weighted_progress = 0
+            for stage, stage_info in self.stages.items():
+                if stage == SetupStage.COMPLETE:
+                    continue
+                    
+                # Get progress for this stage (0-100)
+                stage_progress = min(100, max(0, stage_info.current))
+                
+                # Add weighted contribution to overall progress
+                weighted_progress += (stage_progress * stage_info.weight) / total_weight
+                
+            # Update overall progress (0-100)
+            self.overall_progress = min(100, max(0, int(weighted_progress)))
             
-            # Get current stage info if available
-            if hasattr(self, 'current_stage') and self.current_stage is not None and hasattr(self, 'stages') and self.current_stage in self.stages:
-                current_stage_name = self.stages[self.current_stage].name
-                current_progress = self.stages[self.current_stage].current
+            # Update UI if needed
+            if hasattr(self, 'ui_components') and 'progress_tracker' in self.ui_components:
+                tracker = self.ui_components['progress_tracker']
+                if 'bar' in tracker and hasattr(tracker['bar'], 'value'):
+                    tracker['bar'].value = self.overall_progress
+                    
+            # Log the update
+            current_stage_name = ""
+            if hasattr(self, 'current_stage') and self.current_stage is not None:
+                stage_info = self.stages.get(self.current_stage)
+                if stage_info:
+                    current_stage_name = stage_info.name
+            
+            self.logger.debug(f"Overall progress: {self.overall_progress}%, Current stage: {current_stage_name}")
+                    
+        except Exception as e:
+            error_msg = f"Error in _update_overall_progress: {str(e)}"
+            if hasattr(self, 'logger'):
+                self.logger.error(error_msg)
+                import traceback
+                self.logger.debug(traceback.format_exc())
+            else:
+                print(error_msg)
+                # Get current stage info if available for debugging
+                if hasattr(self, 'current_stage') and self.current_stage is not None:
+                    stage_info = self.stages.get(self.current_stage)
+                    if stage_info:
+                        current_stage_name = stage_info.name
+                        current_progress = stage_info.current
             
             # Calculate overall progress if stages are available
             if hasattr(self, 'stages') and self.stages:

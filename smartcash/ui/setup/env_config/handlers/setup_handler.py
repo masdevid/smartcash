@@ -9,12 +9,8 @@ from typing import Dict, Any
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
 from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.setup.env_config.utils import (
-    update_progress_bar,
-    update_status_panel,
-    track_setup_progress,
-    SetupStage
-)
+from smartcash.ui.setup.env_config.utils.ui_updater import update_progress_bar, update_status_panel
+from smartcash.ui.setup.env_config.utils.progress_tracker import track_setup_progress, SetupStage
 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
 
 class SetupHandler:

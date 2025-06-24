@@ -22,7 +22,9 @@ initialize_environment_config_ui()
 ├─────────────────────────────────────┤
 │ Log Accordion                       │
 ├─────────────────────────────────────┤
-│ Environment Summary                 │
+│ Setup Summary                       │
+├─────────────────────────────────────┤
+│ Environment & Colab Info Panel      │
 ├─────────────────────────────────────┤
 │ Tips & Requirements (2 kolom)       │
 └─────────────────────────────────────┘

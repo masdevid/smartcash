@@ -1,45 +1,34 @@
-# File: smartcash/ui/setup/env_config/handlers/config_handler.py  
-# Deskripsi: Handler untuk configuration management
+"""
+File: smartcash/ui/setup/env_config/handlers/config_handler.py
+Deskripsi: Handler untuk sinkronisasi konfigurasi menggunakan ConfigManager
+"""
 
-import os
-import shutil
-from smartcash.common.config.manager import get_config_manager
+from typing import Dict, Any
+from smartcash.common.config.manager import ConfigManager
 
 class ConfigHandler:
-    """📋 Handler untuk configuration setup"""
+    """⚙️ Handler untuk config synchronization"""
     
     def __init__(self):
-        self.config_manager = get_config_manager()
+        self.config_manager = ConfigManager()
     
-    def setup_configurations(self, logger=None):
-        """Setup file konfigurasi dengan sync manager"""
+    def sync_configurations(self) -> Dict[str, Any]:
+        """🔄 Sinkronisasi konfigurasi dengan ConfigManager"""
         try:
-            repo_config_path = "/content/smartcash/configs"
-            drive_config_path = "/content/drive/MyDrive/SmartCash/configs"
+            # Gunakan ConfigManager untuk sync
+            sync_result = self.config_manager.sync_configs_from_drive()
             
-            if os.path.exists(repo_config_path) and os.path.exists("/content/drive/MyDrive/SmartCash"):
-                if not os.path.exists(drive_config_path):
-                    shutil.copytree(repo_config_path, drive_config_path)
-                    if logger:
-                        logger.success("📋 Konfigurasi berhasil disalin ke Drive")
-                else:
-                    if logger:
-                        logger.info("📋 Konfigurasi sudah ada di Drive")
-                
-                # Verifikasi dengan config manager
-                self._verify_configs_with_manager(logger)
+            return {
+                'synced_count': sync_result.get('synced_count', 0),
+                'configs_synced': sync_result.get('configs_synced', []),
+                'success': sync_result.get('success', False),
+                'errors': sync_result.get('errors', [])
+            }
             
         except Exception as e:
-            if logger:
-                logger.warning(f"⚠️ Warning setup configs: {str(e)}")
-    
-    def _verify_configs_with_manager(self, logger=None):
-        """Verifikasi config dengan config manager"""
-        try:
-            # Use existing config manager sync method
-            self.config_manager.sync_configs_to_drive()
-            if logger:
-                logger.success("✅ Config manager verified")
-        except Exception as e:
-            if logger:
-                logger.warning(f"⚠️ Config manager sync warning: {str(e)}")
+            return {
+                'synced_count': 0,
+                'configs_synced': [],
+                'success': False,
+                'errors': [str(e)]
+            }

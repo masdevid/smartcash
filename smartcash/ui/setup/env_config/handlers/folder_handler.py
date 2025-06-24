@@ -1,61 +1,64 @@
-# File: smartcash/ui/setup/env_config/handlers/folder_handler.py
-# Deskripsi: Handler untuk folder creation dan management
+"""
+File: smartcash/ui/setup/env_config/handlers/folder_handler.py
+Deskripsi: Handler untuk membuat folder dan symlink yang diperlukan
+"""
 
-from pathlib import Path
-from typing import Dict, List
-from smartcash.common.constants.paths import get_paths_for_environment
+import os
+from typing import Dict, Any, List
+from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
 
 class FolderHandler:
-    """📁 Handler untuk folder operations"""
+    """📁 Handler untuk folder dan symlink management"""
     
-    # Struktur folder data yang diperlukan
-    DATA_FOLDERS = [
-        'data', 'data/pretrained', 'data/train', 'data/train/images', 'data/train/labels',
-        'data/valid', 'data/valid/images', 'data/valid/labels', 'data/test', 'data/test/images', 
-        'data/test/labels', 'data/download', 'data/backup', 'data/augmented', 'data/augmented/images',
-        'data/augmented/labels', 'data/preprocessed', 'data/preprocessed/images', 'data/preprocessed/labels',
-        'data/invalid', 'data/visualizations'
-    ]
+    def create_required_folders(self) -> Dict[str, Any]:
+        """🏗️ Buat semua folder dan symlink yang diperlukan"""
+        result = {
+            'created_count': 0,
+            'symlinks_count': 0,
+            'folders_created': [],
+            'symlinks_created': [],
+            'errors': []
+        }
+        
+        try:
+            # Create directories
+            folders_created = self._create_directories()
+            result['created_count'] = len(folders_created)
+            result['folders_created'] = folders_created
+            
+            # Create symlinks
+            symlinks_created = self._create_symlinks()
+            result['symlinks_count'] = len(symlinks_created)
+            result['symlinks_created'] = symlinks_created
+            
+        except Exception as e:
+            result['errors'].append(str(e))
+        
+        return result
     
-    SYSTEM_FOLDERS = ['configs', 'logs', 'models', 'exports', 'output', 'runs']
-    
-    def create_folder_structures(self, logger=None):
-        """Buat struktur folder lengkap di Drive dan lokal"""
-        paths = get_paths_for_environment(is_colab=True, is_drive_mounted=True)
+    def _create_directories(self) -> List[str]:
+        """📂 Buat direktori yang diperlukan"""
+        created = []
         
-        # Create folders di Drive
-        drive_base = "/content/drive/MyDrive/SmartCash"
-        if logger:
-            logger.info("📁 Membuat folder di Google Drive...")
-        drive_results = self._create_folder_structure(drive_base, logger)
-        
-        # Create folders di lokal
-        local_base = "/content"
-        if logger:
-            logger.info("📁 Membuat folder di storage lokal...")
-        local_results = self._create_folder_structure(local_base, logger)
-        
-        # Log summary
-        if logger:
-            total_folders = len(drive_results) + len(local_results)
-            success_count = sum(drive_results.values()) + sum(local_results.values())
-            logger.success(f"📁 Berhasil membuat {success_count}/{total_folders} folder")
-    
-    def _create_folder_structure(self, base_path: str, logger=None) -> Dict[str, bool]:
-        """Buat struktur folder lengkap di path tertentu"""
-        results = {}
-        all_folders = self.DATA_FOLDERS + self.SYSTEM_FOLDERS
-        
-        for folder in all_folders:
-            folder_path = Path(base_path) / folder
+        for folder_path in REQUIRED_FOLDERS:
             try:
-                folder_path.mkdir(parents=True, exist_ok=True)
-                results[folder] = True
-                if logger:
-                    logger.info(f"📁 Folder dibuat: {folder}")
+                os.makedirs(folder_path, exist_ok=True)
+                created.append(folder_path)
             except Exception as e:
-                results[folder] = False
-                if logger:
-                    logger.error(f"❌ Gagal membuat folder {folder}: {str(e)}")
+                print(f"⚠️ Failed to create {folder_path}: {e}")
+                
+        return created
+    
+    def _create_symlinks(self) -> List[str]:
+        """🔗 Buat symlink yang diperlukan"""
+        created = []
         
-        return results
+        for source, target in SYMLINK_MAP.items():
+            try:
+                if os.path.exists(source) and not os.path.exists(target):
+                    os.symlink(source, target)
+                    created.append(f"{source} -> {target}")
+            except Exception as e:
+                print(f"⚠️ Failed to create symlink {source} -> {target}: {e}")
+                
+        return created

@@ -1,65 +1,209 @@
 """
-File: smartcash/ui/components/log_accordion.py
-Deskripsi: Fixed log accordion tanpa scroll_to_bottom yang tidak tersedia
+Modern Log Accordion Component
+
+A flexible, modern log display component with smooth scrolling and rich formatting.
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
-from IPython.display import display
-from smartcash.ui.utils.constants import ICONS, COLORS
-import datetime
+from typing import Dict, Any, Optional, List, Tuple
+from IPython.display import display, HTML
+from datetime import datetime
+from enum import Enum
 
-def create_log_accordion(module_name: str = 'process', height: str = '200px', width: str = '100%', 
-                        output_widget: Optional[widgets.Output] = None) -> Dict[str, widgets.Widget]:
-    """Membuat komponen log accordion dengan FIXED overflow issues."""
-    output_widget = output_widget or widgets.Output(layout=widgets.Layout(
-        max_height=height, 
-        width='98%',
-        overflow='auto', 
-        border='1px solid #ddd', 
-        padding='8px',
-        box_sizing='border-box',
-        margin='0 auto',
-        word_wrap='break-word'
-    ))
-    
-    def append_log(message: str, level: str = 'info', namespace: str = None, module: str = None) -> None:
-        """Menambahkan log dengan format yang rapi dan FIXED overflow."""
-        level_to_color = {'debug': '#6c757d', 'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 'error': '#dc3545', 'critical': '#dc3545'}
-        now = datetime.datetime.now().strftime("%H:%M:%S")
-        prefix = f"<span style='color: #6610f2;'>[{(namespace or module or '').split('.')[-1]}]</span> " if namespace or module else ""
-        level_color = level_to_color.get(level, '#007bff')
-        level_display = f"<span style='color: {level_color};'>{level.upper()}</span>"
-        
-        # FIXED: Add proper text wrapping and overflow handling
-        formatted_message = f"""
-        <div style='margin: 2px 0; padding: 4px; word-wrap: break-word; overflow-wrap: break-word; 
-                    white-space: pre-wrap; max-width: 100%; overflow: hidden;'>
-            <span style='color: #666; font-size: 12px;'>{now}</span> 
-            {level_display} 
-            {prefix}
-            <span style='word-wrap: break-word; overflow-wrap: break-word;'>{message}</span>
-        </div>"""
-        
-        with output_widget: 
-            display(widgets.HTML(formatted_message))
-    
-    setattr(output_widget, 'append_log', append_log)
-    log_accordion = widgets.Accordion(children=[output_widget], layout=widgets.Layout(
-        width=width,
-        max_width="100%",
-        margin='10px 0',
-        overflow='hidden',
-        box_sizing='border-box',
-    ))
-    log_accordion.set_title(0, f"{ICONS.get('log', '📋')} Log {module_name.capitalize()}")
-    log_accordion.selected_index = 0
-    return {'log_output': output_widget, 'log_accordion': log_accordion}
+class LogLevel(Enum):
+    DEBUG = 'debug'
+    INFO = 'info'
+    SUCCESS = 'success'
+    WARNING = 'warning'
+    ERROR = 'error'
+    CRITICAL = 'critical'
 
-def update_log(ui_components: Dict[str, Any], message: str, expand: bool = False, clear: bool = False) -> None:
-    """Update log dengan one-liner style."""
-    if 'log_output' not in ui_components: return
-    with ui_components['log_output']:
-        clear and __import__('IPython.display', fromlist=['clear_output']).clear_output(wait=True)
-        display(widgets.HTML(f"<p>{message}</p>"))
-    expand and 'log_accordion' in ui_components and setattr(ui_components['log_accordion'], 'selected_index', 0)
+LOG_LEVEL_STYLES = {
+    LogLevel.DEBUG: {'color': '#6c757d', 'bg': '#f8f9fa', 'icon': '🔍'},
+    LogLevel.INFO: {'color': '#0d6efd', 'bg': '#e7f1ff', 'icon': 'ℹ️'},
+    LogLevel.SUCCESS: {'color': '#198754', 'bg': '#e7f8f0', 'icon': '✅'},
+    LogLevel.WARNING: {'color': '#ffc107', 'bg': '#fff8e6', 'icon': '⚠️'},
+    LogLevel.ERROR: {'color': '#dc3545', 'bg': '#fdf0f2', 'icon': '❌'},
+    LogLevel.CRITICAL: {'color': '#ffffff', 'bg': '#dc3545', 'icon': '🔥'}
+}
+
+def create_log_accordion(
+    module_name: str = 'Process',
+    height: str = '300px',
+    width: str = '100%',
+    max_logs: int = 1000,
+    show_timestamps: bool = True,
+    show_level_icons: bool = True,
+    auto_scroll: bool = True
+) -> Dict[str, widgets.Widget]:
+    """
+    Create a modern log accordion with rich formatting and smooth scrolling.
+    
+    Args:
+        module_name: Name to display in the accordion header
+        height: Height of the log container
+        width: Width of the component
+        max_logs: Maximum number of log entries to keep in memory
+        show_timestamps: Whether to show timestamps
+        show_level_icons: Whether to show level icons
+        auto_scroll: Whether to automatically scroll to bottom on new messages
+        
+    Returns:
+        Dictionary containing 'log_output' and 'log_accordion' widgets
+    """
+    # Create a container for log messages
+    log_container = widgets.Box(
+        layout=widgets.Layout(
+            width='100%',
+            height=height,
+            overflow_y='auto',
+            padding='10px',
+            border='1px solid #e9ecef',
+            border_radius='8px',
+            margin='5px 0',
+            display='flex',
+            flex_direction='column-reverse',
+            gap='4px'
+        )
+    )
+    
+    # Store logs in memory
+    log_entries: List[Dict[str, Any]] = []
+    
+    def append_log(
+        message: str,
+        level: LogLevel = LogLevel.INFO,
+        namespace: str = None,
+        module: str = None,
+        timestamp: datetime = None
+    ) -> None:
+        """
+        Append a log message to the container.
+        
+        Args:
+            message: The log message
+            level: Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL)
+            namespace: Optional namespace for categorization
+            module: Optional module name
+            timestamp: Optional custom timestamp
+        """
+        nonlocal log_entries
+        
+        # Create log entry
+        entry = {
+            'id': len(log_entries) + 1,
+            'timestamp': timestamp or datetime.now(),
+            'level': level,
+            'namespace': namespace,
+            'module': module,
+            'message': str(message)
+        }
+        
+        # Add to log entries and maintain max size
+        log_entries.append(entry)
+        if len(log_entries) > max_logs:
+            log_entries.pop(0)
+        
+        # Update the display
+        _update_log_display()
+    
+    def _update_log_display():
+        """Update the log container with current entries."""
+        with log_container:
+            log_container.children = [_create_log_entry(entry) for entry in log_entries]
+    
+    def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
+        """Create a styled log entry widget."""
+        style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
+        
+        timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3] if show_timestamps else ''
+        level_icon = style['icon'] if show_level_icons else ''
+        
+        # Create namespace/module prefix if available
+        ns = entry.get('namespace') or entry.get('module')
+        ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
+        
+        html = f"""
+        <div style='
+            padding: 6px 12px;
+            margin: 2px 0;
+            border-radius: 6px;
+            background: {bg};
+            color: {color};
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            transition: all 0.2s ease;
+        '>
+            <div style='display: flex; align-items: flex-start; gap: 8px;'>
+                {level_icon}
+                <span style='flex: 1;'>{ns_display}{message}</span>
+                {f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>" if timestamp else ''}
+            </div>
+        </div>
+        """.format(
+            bg=style['bg'],
+            color=style['color'],
+            level_icon=level_icon,
+            ns_display=ns_display,
+            message=entry['message'],
+            timestamp=timestamp
+        )
+        
+        return widgets.HTML(html)
+    
+    # Add methods to the container for external use
+    log_container.append_log = append_log
+    log_container.clear_logs = lambda: log_entries.clear() or _update_log_display()
+    
+    # Create the accordion
+    accordion = widgets.Accordion(
+        children=[log_container],
+        layout=widgets.Layout(width=width, margin='10px 0')
+    )
+    accordion.set_title(0, f"📋 {module_name} Logs")
+    
+    return {
+        'log_output': log_container,
+        'log_accordion': accordion
+    }
+
+def update_log(
+    ui_components: Dict[str, Any],
+    message: str,
+    level: LogLevel = LogLevel.INFO,
+    namespace: str = None,
+    module: str = None,
+    expand: bool = False,
+    clear: bool = False
+) -> None:
+    """
+    Update log with a single method call.
+    
+    Args:
+        ui_components: Dictionary containing 'log_output' and 'log_accordion'
+        message: The log message
+        level: Log level (default: INFO)
+        namespace: Optional namespace
+        module: Optional module name
+        expand: Whether to expand the accordion
+        clear: Whether to clear previous logs
+    """
+    if 'log_output' not in ui_components:
+        return
+    
+    log_output = ui_components['log_output']
+    
+    if clear and hasattr(log_output, 'clear_logs'):
+        log_output.clear_logs()
+    
+    if hasattr(log_output, 'append_log'):
+        log_output.append_log(
+            message=message,
+            level=level,
+            namespace=namespace,
+            module=module
+        )
+    
+    if expand and 'log_accordion' in ui_components:
+        ui_components['log_accordion'].selected_index = 0

@@ -1,154 +1,114 @@
-# File: smartcash/ui/setup/env_config/components/ui_components.py
-# Deskripsi: Komponen UI untuk environment configuration - HANYA header dan logger menggunakan shared components
+"""
+File: smartcash/ui/setup/env_config/components/ui_components.py
+Deskripsi: Komponen UI untuk environment configuration dengan layout lengkap
+"""
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
-from smartcash.ui.components.header import create_header
-from smartcash.ui.components.log_accordion import create_log_accordion
-from smartcash.ui.components.tips_panel import create_tips_panel
+from typing import Dict, Any
+from smartcash.ui.components import (
+    create_header, create_action_buttons, create_status_panel,
+    create_log_accordion, create_dual_progress_tracker, create_divider,
+    create_responsive_container, create_responsive_two_column
+)
+from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary
+from smartcash.ui.setup.env_config.components.env_info_panel import create_env_info_panel
+from smartcash.ui.setup.env_config.components.tips_requirements import create_tips_requirements
 
 def create_env_config_ui() -> Dict[str, Any]:
-    """🎛️ Create complete environment configuration UI - HANYA header dan logger diubah"""
+    """
+    🎨 Buat komponen UI untuk environment configuration
     
-    # FIXED: Gunakan shared header component
+    Returns:
+        Dictionary berisi semua komponen UI
+    """
+    # 1. Header
     header = create_header(
-        title="Environment Configuration",
-        description="Setup lingkungan SmartCash untuk deteksi mata uang YOLOv5 + EfficientNet-B4",
-        icon="🔧"
+        "🔧 Environment Setup",
+        "Konfigurasi lingkungan untuk SmartCash YOLOv5-EfficientNet",
+        "🚀"
     )
     
-    # Setup button dengan styling - TIDAK DIUBAH
+    # 2. Setup Button (Centered)
     setup_button = widgets.Button(
-        description="🚀 Setup Environment",
+        description="▶️ Setup Environment",
         button_style='primary',
-        layout=widgets.Layout(width='220px', height='45px')
-    )
-    
-    # Status panel untuk summary environment - TIDAK DIUBAH
-    status_panel = widgets.HTML(
-        value="<p style='color: #007bff; padding: 10px;'>🔍 Memeriksa status environment...</p>",
         layout=widgets.Layout(
-            margin='10px 0',
-            padding='10px',
-            border='1px solid #e9ecef',
-            border_radius='8px'
+            width='200px',
+            height='45px',
+            margin='15px 0',
+            border_radius='4px'
         )
     )
     
-    # Progress components - TIDAK DIUBAH
-    progress_bar = widgets.IntProgress(
-        value=0, min=0, max=100,
-        layout=widgets.Layout(width='100%', margin='5px 0')
-    )
-    
-    progress_text = widgets.HTML(
-        value="<span style='color: #6c757d; font-size: 14px;'>Siap untuk setup environment</span>",
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    # FIXED: Gunakan shared log_accordion component
-    log_components = create_log_accordion(
-        module_name='Environment Config',
-        height='250px',
-        width='100%'
-    )
-    log_output = log_components['log_output']
-    log_accordion = log_components['log_accordion']
-    
-    # Dual column summary panels - TIDAK DIUBAH
-    left_summary_panel = widgets.HTML(
-        value="""
-        <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 16px;">
-            🖥️ Environment Information
-        </h4>
-        <div style="color: #555; font-size: 13px; line-height: 1.4;">
-            <div style="margin: 8px 0;"><strong>Platform:</strong> <span id="platform-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>Python:</strong> <span id="python-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>PyTorch:</strong> <span id="torch-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>CUDA:</strong> <span id="cuda-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>Memory:</strong> <span id="memory-info">Memuat...</span></div>
-        </div>
-        """,
+    setup_button_container = widgets.HBox(
+        [setup_button],
         layout=widgets.Layout(
-            width='48%', 
-            padding='15px', 
-            border='1px solid #e9ecef', 
-            border_radius='8px', 
-            margin='10px 1% 10px 0'
+            justify_content='center',
+            align_items='center',
+            width='100%'
         )
     )
     
-    right_colab_panel = widgets.HTML(
-        value="""
-        <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 16px;">
-            ☁️ Google Colab Information
-        </h4>
-        <div style="color: #555; font-size: 13px; line-height: 1.4;">
-            <div style="margin: 8px 0;"><strong>Runtime:</strong> <span id="runtime-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>GPU:</strong> <span id="gpu-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>Drive:</strong> <span id="drive-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>Storage:</strong> <span id="storage-info">Memuat...</span></div>
-            <div style="margin: 8px 0;"><strong>Session:</strong> <span id="session-info">Memuat...</span></div>
-        </div>
-        """,
-        layout=widgets.Layout(
-            width='48%', 
-            padding='15px', 
-            border='1px solid #e9ecef', 
-            border_radius='8px', 
-            margin='10px 0 10px 1%'
-        )
+    # 3. Status Panel
+    status_panel = create_status_panel("Siap untuk setup environment", "info")
+    
+    # 4. Progress Tracker
+    progress_tracker = create_dual_progress_tracker(
+        current_label="Tahap Saat Ini:",
+        total_label="Progress Total:",
+        description="Status Setup:"
     )
     
-    dual_column_summary = widgets.HBox([
-        left_summary_panel, 
-        right_colab_panel
-    ], layout=widgets.Layout(width='100%', margin='20px 0'))
+    # 5. Log Accordion
+    log_accordion = create_log_accordion("📋 Log Setup Environment")
     
-    # Tips panel using shared component
-    tips_panel = create_tips_panel(
-        title="💡 Tips & Requirements",
-        tips=[
-            ["Pastikan Google Drive memiliki ruang minimal 12GB"],
-            ["Setup akan membuat folder struktur data lengkap"],
-            ["Proses setup memerlukan waktu 1-2 menit"],
-            ["Koneksi internet stabil diperlukan"]
-        ],
-        columns=2,
-        margin='20px 0'
-    )
+    # 6. Setup Summary
+    setup_summary = create_setup_summary()
     
-    # Main layout - TIDAK DIUBAH
-    main_layout = widgets.VBox([
-        header,
-        widgets.HBox([setup_button], layout=widgets.Layout(justify_content='center', margin='15px 0')),
-        status_panel,
-        progress_bar,
-        progress_text,
-        log_accordion,
-        dual_column_summary,
-        tips_panel
-    ], layout=widgets.Layout(width='100%', padding='20px'))
+    # 7. Environment & Colab Info Panel
+    env_info_panel = create_env_info_panel()
     
-    # UI components dictionary - TIDAK DIUBAH
-    components = {
-        'ui': main_layout,
+    # 8. Tips & Requirements (2 kolom)
+    tips_requirements = create_tips_requirements()
+    
+    # Assemble main UI
+    ui_components = {
+        'header': header,
         'setup_button': setup_button,
+        'setup_button_container': setup_button_container,
         'status_panel': status_panel,
-        'progress_bar': progress_bar,
-        'progress_text': progress_text,
+        'progress_tracker': progress_tracker,
         'log_accordion': log_accordion,
-        'log_output': log_output,
-        'left_summary_panel': left_summary_panel,
-        'right_colab_panel': right_colab_panel,
-        'dual_column_summary': dual_column_summary,
-        'tips_panel': tips_panel
+        'log_output': log_accordion,  # Alias untuk kompatibilitas
+        'setup_summary': setup_summary,
+        'env_info_panel': env_info_panel,
+        'tips_requirements': tips_requirements
     }
     
-    return components
-
-def setup_ui_logger_bridge(ui_components: Dict[str, Any], namespace: str = "ENV") -> Any:
-    """🔧 Setup logger bridge untuk UI components - TIDAK DIUBAH"""
-    from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
-    logger_bridge = create_ui_logger_bridge(ui_components, f"smartcash.ui.setup.env_config.{namespace}")
-    return logger_bridge
+    # Create main container
+    main_container = widgets.VBox([
+        header,
+        create_divider(),
+        setup_button_container,
+        create_divider(),
+        status_panel,
+        create_divider(),
+        progress_tracker,
+        create_divider(),
+        log_accordion,
+        create_divider(),
+        setup_summary,
+        create_divider(),
+        env_info_panel,
+        create_divider(),
+        tips_requirements
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='15px',
+        border='1px solid #ddd',
+        border_radius='8px'
+    ))
+    
+    ui_components['ui'] = main_container
+    
+    return ui_components

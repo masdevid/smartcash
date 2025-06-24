@@ -1,20 +1,22 @@
 """
 File: smartcash/ui/initializers/common_initializer.py
-Deskripsi: Base initializer dengan error handling yang diperbaiki dan abstract method yang jelas
+Deskripsi: Base initializer dengan import yang diperbaiki dan proper error handling
 """
 
 import datetime
 import traceback
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Type, List
-from smartcash.common.logging import get_logger
-from smartcash.common.utils import try_operation_safe, suppress_all_outputs
+
+# Import yang diperbaiki - menggunakan structure yang konsisten
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.logging_utils import suppress_all_outputs
+from smartcash.ui.utils.fallback_utils import try_operation_safe, show_status_safe, create_fallback_ui
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.ui_utils import show_status_safe, create_fallback_ui
 
 
 class CommonInitializer(ABC):
-    """Base class untuk semua initializer dengan proper abstract methods dan error handling"""
+    """Base class untuk semua initializer dengan proper abstract methods dan error handling yang diperbaiki"""
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None, 
                  parent_module: Optional[str] = None):
@@ -23,7 +25,7 @@ class CommonInitializer(ABC):
         self.parent_module = parent_module
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
-        # Logger setup yang disederhanakan
+        # Logger setup dengan namespace yang benar
         self.logger_namespace = f"smartcash.ui.{self.full_module_name}"
         self.logger = get_logger(self.logger_namespace)
         self.config_handler_class = config_handler_class
@@ -39,24 +41,47 @@ class CommonInitializer(ABC):
             # Create config handler
             config_handler = self._create_config_handler()
             
-            # Load merged config
-            merged_config = config or config_handler.load_config()
+            # Load merged config menggunakan try_operation_safe
+            merged_config_result = try_operation_safe(
+                lambda: config or config_handler.load_config(),
+                f"Loading config untuk {self.module_name}",
+                self.logger
+            )
+            
+            if not merged_config_result.success:
+                merged_config = self._get_default_config()
+                self.logger.warning(f"⚠️ Menggunakan default config untuk {self.module_name}")
+            else:
+                merged_config = merged_config_result.data
+            
             self.logger.debug(f"📄 Config loaded: {merged_config is not None}")
             
             # Create UI components - WAJIB diimplementasi oleh subclass
-            ui_components = self._create_ui_components(merged_config, env, **kwargs)
+            ui_result = try_operation_safe(
+                lambda: self._create_ui_components(merged_config, env, **kwargs),
+                f"Creating UI components untuk {self.module_name}",
+                self.logger
+            )
             
-            if not ui_components or not isinstance(ui_components, dict):
-                error_msg = f"❌ {self.module_name}: _create_ui_components mengembalikan nilai invalid"
+            if not ui_result.success or not ui_result.data:
+                error_msg = f"❌ {self.module_name}: Gagal membuat UI components"
                 self.logger.error(error_msg)
                 return create_fallback_ui(error_msg, self.module_name)
+            
+            ui_components = ui_result.data
             
             # Add config handler dan logger bridge
             ui_components['config_handler'] = config_handler
             self._add_logger_bridge(ui_components)
             
-            # Setup module handlers
-            result_components = self._setup_module_handlers(ui_components, merged_config, env, **kwargs)
+            # Setup module handlers menggunakan try_operation_safe
+            handlers_result = try_operation_safe(
+                lambda: self._setup_module_handlers(ui_components, merged_config, env, **kwargs),
+                f"Setting up handlers untuk {self.module_name}",
+                self.logger
+            )
+            
+            result_components = handlers_result.data if handlers_result.success else ui_components
             
             # Validation
             if not self._validate_critical_components(result_components):
@@ -68,10 +93,14 @@ class CommonInitializer(ABC):
             self._finalize_setup(result_components, merged_config)
             
             # Post-initialization hook
-            self._post_initialization_hook(result_components, merged_config, env, **kwargs)
+            try_operation_safe(
+                lambda: self._post_initialization_hook(result_components, merged_config, env, **kwargs),
+                f"Post initialization untuk {self.module_name}",
+                self.logger
+            )
             
             show_status_safe(f"✅ {self.module_name} berhasil diinisialisasi", "success", result_components)
-            self.logger.success(f"🎉 {self.module_name} initialization selesai")
+            self.logger.info(f"🎉 {self.module_name} initialization selesai")
             
             return self._get_return_value(result_components)
             
@@ -87,48 +116,41 @@ class CommonInitializer(ABC):
         Buat komponen UI untuk module ini.
         
         Args:
-            config: Konfigurasi yang sudah dimuat
-            env: Environment info (misal: 'colab')
+            config: Konfigurasi yang sudah di-load/merge
+            env: Environment info
             **kwargs: Parameter tambahan
             
         Returns:
-            Dict berisi komponen UI yang diperlukan
-            
-        Raises:
-            NotImplementedError: Jika tidak diimplementasi
+            Dict berisi UI components yang diperlukan
         """
-        raise NotImplementedError(f"{self.__class__.__name__} harus mengimplementasi _create_ui_components")
-    
-    @abstractmethod
-    def _get_critical_components(self) -> List[str]:
-        """
-        Mengembalikan list nama komponen yang kritis untuk module ini.
-        
-        Returns:
-            List komponen yang harus ada (misal: ['main_button', 'status_panel'])
-        """
-        raise NotImplementedError(f"{self.__class__.__name__} harus mengimplementasi _get_critical_components")
+        pass
     
     @abstractmethod
     def _get_default_config(self) -> Dict[str, Any]:
         """
-        Mengembalikan konfigurasi default untuk module ini.
+        Return default configuration untuk module ini.
         HARUS menggunakan function dari handlers/defaults.py
         
-        Example implementation:
-            from .handlers.defaults import get_default_module_config
-            return get_default_module_config()
+        Returns:
+            Dict berisi default configuration
+        """
+        pass
+    
+    @abstractmethod
+    def _get_critical_components(self) -> List[str]:
+        """
+        Return list komponen kritis yang harus ada setelah initialization.
         
         Returns:
-            Dict berisi konfigurasi default
+            List nama komponen kritis
         """
-        raise NotImplementedError(f"{self.__class__.__name__} harus mengimplementasi _get_default_config")
+        pass
     
-    # OPTIONAL METHOD - bisa di-override jika diperlukan
+    # OPTIONAL METHODS - bisa di-override oleh subclass
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
-                             env=None, **kwargs) -> Dict[str, Any]:
+                              env=None, **kwargs) -> Dict[str, Any]:
         """
-        Setup handlers spesifik untuk module ini.
+        Setup handlers untuk module ini.
         Default implementation mengembalikan ui_components tanpa perubahan.
         
         Args:
@@ -150,6 +172,22 @@ class CommonInitializer(ABC):
         """
         pass
     
+    def _get_return_value(self, ui_components: Dict[str, Any]) -> Any:
+        """
+        Determine nilai return dari initialize().
+        Default implementation mengembalikan UI container atau fallback.
+        """
+        if 'ui' in ui_components:
+            return ui_components['ui']
+        elif 'container' in ui_components:
+            return ui_components['container']
+        else:
+            # Return first widget-like object
+            for key, value in ui_components.items():
+                if hasattr(value, 'layout') or hasattr(value, 'children'):
+                    return value
+            return None
+    
     # PRIVATE METHODS - untuk internal use
     def _create_config_handler(self) -> ConfigHandler:
         """Create config handler dengan proper error handling"""
@@ -169,8 +207,11 @@ class CommonInitializer(ABC):
             from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
             logger_bridge = create_ui_logger_bridge(ui_components, self.logger_namespace)
             ui_components['logger_bridge'] = logger_bridge
+            ui_components['logger'] = self.logger
         except Exception as e:
             self.logger.warning(f"⚠️ Error creating logger bridge: {str(e)}")
+            # Fallback: set logger saja
+            ui_components['logger'] = self.logger
     
     def _validate_critical_components(self, ui_components: Dict[str, Any]) -> bool:
         """Validate bahwa komponen kritis ada"""
@@ -194,60 +235,3 @@ class CommonInitializer(ABC):
             'module_name': self.module_name,
             'config': config
         })
-    
-    def _get_return_value(self, ui_components: Dict[str, Any]) -> Any:
-        """Get return value - bisa di-override untuk custom return"""
-        return ui_components.get('main_container', ui_components)
-    
-    # UTILITY METHODS
-    def get_module_status(self) -> Dict[str, Any]:
-        """Get status modul ini"""
-        return {
-            'module_name': self.module_name,
-            'parent_module': self.parent_module,
-            'initialized': True,
-            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-
-
-# FACTORY FUNCTIONS
-def create_common_initializer(module_name: str, 
-                            ui_components_func: callable,
-                            critical_components: List[str],
-                            default_config: Dict[str, Any],
-                            config_handler_class: Type[ConfigHandler] = None,
-                            setup_handlers_func: callable = None) -> Type[CommonInitializer]:
-    """
-    Factory untuk membuat CommonInitializer subclass secara dynamic.
-    
-    Args:
-        module_name: Nama module
-        ui_components_func: Function untuk create UI components
-        critical_components: List komponen kritis
-        default_config: Konfigurasi default
-        config_handler_class: Class config handler (optional)
-        setup_handlers_func: Function untuk setup handlers (optional)
-    
-    Returns:
-        CommonInitializer subclass yang siap digunakan
-    """
-    class DynamicInitializer(CommonInitializer):
-        def __init__(self, parent_module: Optional[str] = None):
-            super().__init__(module_name, config_handler_class, parent_module)
-        
-        def _create_ui_components(self, config, env=None, **kwargs):
-            return ui_components_func(config, env, **kwargs)
-        
-        def _get_critical_components(self):
-            return critical_components
-        
-        def _get_default_config(self):
-            return default_config
-        
-        def _setup_module_handlers(self, ui_components, config, env=None, **kwargs):
-            if setup_handlers_func:
-                return setup_handlers_func(ui_components, config, env, **kwargs)
-            return super()._setup_module_handlers(ui_components, config, env, **kwargs)
-    
-    DynamicInitializer.__name__ = f"{module_name.capitalize()}Initializer"
-    return DynamicInitializer

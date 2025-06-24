@@ -114,11 +114,26 @@ class StatusChecker:
         """📝 Generate status message based on environment"""
         if env_info.get('is_colab'):
             if env_info.get('drive_mounted'):
-                return "Ready - Colab dengan Drive mounted"
+                mount_path = self._get_mount_path()
+                if mount_path:
+                    return f"Ready - Colab with Drive mounted at {mount_path}"
+                return "Ready - Colab with Drive mounted (path not available)"
             else:
-                return "Ready - Colab environment (Drive belum mounted)"
+                return "Ready - Colab environment (Drive not mounted)"
         else:
             return "Ready - Local environment"
+            
+    def _get_mount_path(self) -> Optional[str]:
+        """Get the mounted drive path if available"""
+        mount_paths = [
+            '/content/drive/MyDrive',
+            '/content/gdrive/MyDrive',
+            '/content/drive/My Drive'
+        ]
+        for path in mount_paths:
+            if os.path.exists(path) and os.path.isdir(path):
+                return path
+        return None
     
     def _determine_status_type(self, env_info: Dict[str, Any]) -> str:
         """🎯 Determine status type for styling"""

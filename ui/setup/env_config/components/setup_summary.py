@@ -64,6 +64,11 @@ def update_setup_summary(
         if 'status_message' not in details:
             details['status_message'] = status_message
             
+        # Ensure we have the mount path if drive is mounted
+        if details.get('drive_mounted') and 'mount_path' not in details:
+            if 'drive_mount_path' in details and details['drive_mount_path']:
+                details['mount_path'] = details['drive_mount_path']
+            
         content = _format_summary_content(details)
         summary_widget.value = content
     except Exception as e:

@@ -15,7 +15,8 @@ def detect_environment_info() -> Dict[str, Any]:
         'platform': _get_platform_info(),
         'is_colab': _is_google_colab(),
         'gpu_info': _get_gpu_info(),
-        'drive_mounted': _is_drive_mounted(),
+        'drive_mounted': _is_drive_mounted()[0],
+        'drive_mount_path': _is_drive_mounted()[1],
         'cpu_cores': _get_cpu_cores(),
         'total_ram': _get_total_ram(),
         'storage_info': _get_storage_info()
@@ -48,9 +49,22 @@ def _get_gpu_info() -> str:
     except ImportError:
         return "PyTorch not installed"
 
-def _is_drive_mounted() -> bool:
-    """💾 Check if Google Drive is mounted"""
-    return os.path.exists('/content/drive/MyDrive')
+def _is_drive_mounted() -> tuple[bool, str]:
+    """💾 Check if Google Drive is mounted and return the mount path if available
+    
+    Returns:
+        tuple: (is_mounted, mount_path) where mount_path is the path where drive is mounted,
+              or an empty string if not mounted
+    """
+    mount_paths = [
+        '/content/drive/MyDrive',
+        '/content/gdrive/MyDrive',
+        '/content/drive/My Drive'
+    ]
+    for path in mount_paths:
+        if os.path.exists(path) and os.path.isdir(path):
+            return True, path
+    return False, ''
 
 def _get_cpu_cores() -> int:
     """🖥️ Get number of CPU cores"""

@@ -94,17 +94,24 @@ def _create_simple_logger():
         def success(self, msg): print(f"✅ {msg}")
     return SimpleLogger()
 
-def _create_error_fallback(error_message: str) -> widgets.VBox:
-    """❌ Create error fallback UI"""
-    error_widget = widgets.HTML(
-        value=f"""
-        <div style="background: #ffebee; border: 1px solid #f44336; border-radius: 4px; padding: 15px; margin: 10px 0;">
-            <h3 style="color: #d32f2f; margin-top: 0;">❌ Environment Setup Error</h3>
-            <p><strong>Error:</strong> {error_message}</p>
-            <p><em>Silakan coba refresh cell atau periksa dependencies.</em></p>
-        </div>
-        """,
-        layout=widgets.Layout(width='100%')
+def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
+    """❌ Create error fallback UI with optional traceback
+    
+    Args:
+        error_message: The error message to display
+        traceback: Optional traceback information
+        
+    Returns:
+        A widget containing the error message and optional traceback
+    """
+    from smartcash.ui.setup.env_config.components.error_component import create_error_component
+    
+    # Create error component with optional traceback
+    error_component = create_error_component(
+        error_message=error_message,
+        traceback=traceback,
+        title="Environment Setup Error",
+        error_type="error"
     )
     
-    return widgets.VBox([error_widget], layout=widgets.Layout(width='100%', padding='10px'))
+    return error_component['container']

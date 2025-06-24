@@ -1,199 +1,222 @@
 """
 File: smartcash/ui/setup/env_config/components/env_config_component.py
-Deskripsi: Component dengan flexbox layout dan display method untuk cell script
+Deskripsi: Shared UI components untuk environment configuration
 """
 
-import logging
-from typing import Dict, Any, Optional
-from IPython.display import display
+import ipywidgets as widgets
+from typing import Dict, Any, Callable, Optional
+from smartcash.ui.setup.env_config.constants import UI_ELEMENTS, STATUS_COLORS
 
-from smartcash.ui.setup.env_config.components.ui_factory import UIFactory
-from smartcash.ui.setup.env_config.handlers.environment_config_orchestrator import EnvironmentConfigOrchestrator
-from smartcash.ui.utils.logging_utils import setup_ipython_logging
-from smartcash.ui.setup.env_config.utils import (
-    show_progress_safe, hide_progress_safe, get_prioritized_missing_items,
-    refresh_environment_state_silent
-)
-
-# Fixed namespace berdasarkan KNOWN_NAMESPACES
-ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
-
-class EnvConfigComponent:
-    """🎯 Component UI dengan flexbox layout dan shared components"""
+def create_env_config_component(setup_callback: Optional[Callable] = None) -> Dict[str, Any]:
+    """🎨 Create complete environment config UI component"""
     
-    def __init__(self):
-        # Initialize UI components dari factory
-        self.ui_components = UIFactory.create_ui_components()
-        
-        # Setup metadata
-        self.ui_components['logger_namespace'] = ENV_CONFIG_LOGGER_NAMESPACE
-        self.ui_components['env_config_initialized'] = True
-        
-        # Initialize logger
-        self.logger = setup_ipython_logging(
-            ui_components=self.ui_components,
-            module_name=ENV_CONFIG_LOGGER_NAMESPACE,
-            log_level=logging.INFO
+    # Header component
+    header = _create_header_component()
+    
+    # Setup button (centered)
+    setup_button = _create_setup_button(setup_callback)
+    
+    # Status panel
+    status_panel = _create_status_panel()
+    
+    # Progress tracker
+    progress_bar, progress_text = _create_progress_components()
+    
+    # Log accordion
+    log_accordion = _create_log_accordion()
+    
+    # Environment summary
+    summary_panel = _create_summary_panel()
+    
+    # Tips & Requirements (2 columns)
+    tips_panel = _create_tips_panel()
+    
+    # Layout container
+    layout = _create_main_layout([
+        header,
+        setup_button,
+        status_panel,
+        widgets.VBox([progress_bar, progress_text]),
+        log_accordion,
+        summary_panel,
+        tips_panel
+    ])
+    
+    # Component dictionary
+    components = {
+        UI_ELEMENTS['setup_button']: setup_button,
+        UI_ELEMENTS['status_panel']: status_panel,
+        UI_ELEMENTS['progress_bar']: progress_bar,
+        UI_ELEMENTS['progress_text']: progress_text,
+        UI_ELEMENTS['log_accordion']: log_accordion,
+        UI_ELEMENTS['summary_panel']: summary_panel,
+        'header': header,
+        'tips_panel': tips_panel,
+        'main_layout': layout
+    }
+    
+    return components
+
+def _create_header_component() -> widgets.HTML:
+    """📌 Create header component"""
+    return widgets.HTML(
+        value="""
+        <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; margin-bottom: 15px;">
+            <h2 style="margin: 0; font-size: 24px;">🚀 SmartCash Environment Setup</h2>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">Konfigurasi environment untuk YOLOv5 + EfficientNet-B4</p>
+        </div>
+        """
+    )
+
+def _create_setup_button(callback: Optional[Callable] = None) -> widgets.Button:
+    """🔘 Create setup button"""
+    button = widgets.Button(
+        description='🚀 Setup Environment',
+        button_style='success',
+        icon='play',
+        layout=widgets.Layout(
+            width='300px',
+            height='50px',
+            margin='10px auto',
+            display='flex'
+        ),
+        style={'font_weight': 'bold'}
+    )
+    
+    if callback:
+        button.on_click(lambda b: callback())
+    
+    return button
+
+def _create_status_panel() -> widgets.HTML:
+    """📊 Create status panel"""
+    return widgets.HTML(
+        value=_get_initial_status_html(),
+        layout=widgets.Layout(margin='10px 0')
+    )
+
+def _create_progress_components() -> tuple:
+    """📈 Create progress bar dan text"""
+    progress_bar = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=100,
+        bar_style='info',
+        layout=widgets.Layout(width='100%', margin='5px 0')
+    )
+    
+    progress_text = widgets.HTML(
+        value='<div style="text-align: center; color: #666;">Siap untuk setup...</div>',
+        layout=widgets.Layout(margin='5px 0')
+    )
+    
+    return progress_bar, progress_text
+
+def _create_log_accordion() -> widgets.Accordion:
+    """📝 Create collapsible log accordion"""
+    log_content = widgets.HTML(
+        value='<div style="font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; padding: 10px; background: #f8f9fa; border-radius: 5px;">Log akan muncul di sini...</div>'
+    )
+    
+    accordion = widgets.Accordion(children=[log_content])
+    accordion.set_title(0, '📝 Setup Logs')
+    accordion.selected_index = None  # Collapsed by default
+    
+    return accordion
+
+def _create_summary_panel() -> widgets.HTML:
+    """📋 Create environment summary panel"""
+    return widgets.HTML(
+        value=_get_initial_summary_html(),
+        layout=widgets.Layout(margin='15px 0')
+    )
+
+def _create_tips_panel() -> widgets.HBox:
+    """💡 Create tips & requirements panel (2 columns)"""
+    tips_column = widgets.HTML(
+        value="""
+        <div style="padding: 15px; background: #e3f2fd; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #1976d2;">💡 Tips Setup</h4>
+            <ul style="margin: 0; padding-left: 20px;">
+                <li>Pastikan Google Drive sudah ter-mount</li>
+                <li>Proses setup memakan waktu 2-3 menit</li>
+                <li>Jangan tutup browser saat setup berlangsung</li>
+                <li>Setup hanya perlu dilakukan sekali</li>
+            </ul>
+        </div>
+        """
+    )
+    
+    requirements_column = widgets.HTML(
+        value="""
+        <div style="padding: 15px; background: #f3e5f5; border-radius: 8px;">
+            <h4 style="margin-top: 0; color: #7b1fa2;">📋 Requirements</h4>
+            <ul style="margin: 0; padding-left: 20px;">
+                <li>Google Colab environment</li>
+                <li>Google Drive access permission</li>
+                <li>Minimal 2GB free space di Drive</li>
+                <li>Koneksi internet stabil</li>
+            </ul>
+        </div>
+        """
+    )
+    
+    return widgets.HBox(
+        [tips_column, requirements_column],
+        layout=widgets.Layout(margin='15px 0')
+    )
+
+def _create_main_layout(components: list) -> widgets.VBox:
+    """📐 Create main layout container"""
+    return widgets.VBox(
+        components,
+        layout=widgets.Layout(
+            padding='20px',
+            border='1px solid #ddd',
+            border_radius='10px',
+            box_shadow='0 2px 10px rgba(0,0,0,0.1)'
         )
-        
-        # Initialize orchestrator
-        self.orchestrator = EnvironmentConfigOrchestrator(self.ui_components)
-        
-        # Setup handlers
-        self._setup_handlers()
-        
-        # Component state
-        self.setup_completed = False
-    
-    def display(self):
-        """🎨 Display UI dengan shared components"""
-        # Display main UI
-        display(self.ui_components['ui_layout'])
-        
-        # Check environment status
-        self._check_and_update_status()
-    
-    def _setup_handlers(self):
-        """🔧 Setup event handlers untuk UI components"""
-        if 'setup_button' in self.ui_components:
-            setup_button = self.ui_components['setup_button']
-            setup_button.on_click(self._handle_setup_click)
-    
-    def _handle_setup_click(self, button):
-        """🚀 Handle setup button click dengan prioritized missing items feedback"""
-        try:
-            # Disable button
-            button.disabled = True
-            button.description = "🔄 Setting up..."
-            
-            # Refresh state sebelum setup
-            refresh_environment_state_silent()
-            
-            # Get prioritized items untuk progress feedback
-            env_status = self.orchestrator.check_environment_status()
-            missing_items = get_prioritized_missing_items(env_status)
-            
-            if missing_items:
-                setup_msg = f"🔄 Setting up {len(missing_items)} items..."
-                self.logger.info(f"📋 Setup items: {', '.join(missing_items)}")
-            else:
-                setup_msg = "🔄 Memulai setup environment..."
-            
-            # Update status dengan specific feedback
-            self._update_status(setup_msg, "info")
-            
-            # Show progress
-            show_progress_safe(self.ui_components)
-            
-            # Run setup
-            result = self.orchestrator.setup_environment()
-            
-            if result.get('success', False):
-                self._update_status("✅ Setup environment berhasil!", "success")
-                self.setup_completed = True
-                button.description = "✅ Setup Complete"
-                
-                if self.logger:
-                    self.logger.info("✅ Environment setup completed successfully")
-            else:
-                error_msg = result.get('error', 'Unknown error')
-                self._update_status(f"❌ Setup gagal: {error_msg}", "error")
-                button.disabled = False
-                button.description = "🔄 Retry Setup"
-                
-                if self.logger:
-                    self.logger.error(f"❌ Setup failed: {error_msg}")
-                    
-        except Exception as e:
-            self._update_status(f"🚨 Error setup: {str(e)}", "error")
-            button.disabled = False
-            button.description = "🔄 Retry Setup"
-            
-            if self.logger:
-                self.logger.error(f"🚨 Setup error: {str(e)}")
-        finally:
-            # Hide progress setelah selesai
-            hide_progress_safe(self.ui_components)
-    
-    def _check_and_update_status(self):
-        """🔍 Check dan update status environment dengan prioritized diagnostics"""
-        try:
-            # Refresh environment state untuk data terbaru
-            refresh_environment_state_silent()
-            
-            # Check environment status
-            env_status = self.orchestrator.check_environment_status()
-            
-            if env_status.get('ready', False):
-                self.setup_completed = True
-                if 'setup_button' in self.ui_components:
-                    self.ui_components['setup_button'].disabled = True
-                    self.ui_components['setup_button'].description = "✅ Already Setup"
-                self._update_status("✅ Environment sudah terkonfigurasi", "success")
-                hide_progress_safe(self.ui_components)
-            else:
-                # Get prioritized missing items untuk user-friendly diagnostics
-                missing_items = get_prioritized_missing_items(env_status)
-                
-                if missing_items:
-                    items_text = ", ".join(missing_items[:3])  # Show max 3 items
-                    more_text = f" (+{len(missing_items)-3} lainnya)" if len(missing_items) > 3 else ""
-                    status_msg = f"🔧 Perlu setup: {items_text}{more_text}"
-                else:
-                    status_msg = "🔧 Environment perlu dikonfigurasi"
-                    
-                self._update_status(status_msg, "info")
-                
-                if self.logger and missing_items:
-                    self.logger.info(f"📋 Missing items: {', '.join(missing_items)}")
-                
-        except Exception as e:
-            self._update_status(f"⚠️ Error check status: {str(e)}", "warning")
-            if self.logger:
-                self.logger.warning(f"⚠️ Status check error: {str(e)}")
-    
-    def _update_status(self, message: str, status_type: str = "info"):
-        """📊 Update status message dengan color coding"""
-        if 'status_panel' in self.ui_components:
-            try:
-                # Update status panel jika menggunakan shared components
-                status_panel = self.ui_components['status_panel']
-                if hasattr(status_panel, 'children') and len(status_panel.children) > 0:
-                    status_html = status_panel.children[0]
-                    if hasattr(status_html, 'value'):
-                        color_map = {
-                            'success': '#d4edda',
-                            'error': '#f8d7da',
-                            'warning': '#fff3cd',
-                            'info': '#d1ecf1'
-                        }
-                        border_map = {
-                            'success': '#28a745',
-                            'error': '#dc3545',
-                            'warning': '#ffc107',
-                            'info': '#17a2b8'
-                        }
-                        
-                        status_html.value = f"""
-                        <div style="background: {color_map.get(status_type, '#d1ecf1')}; 
-                                    padding: 12px; border-radius: 8px; 
-                                    border-left: 4px solid {border_map.get(status_type, '#17a2b8')}; 
-                                    margin: 10px 0px;">
-                            {message}
-                        </div>
-                        """
-            except Exception as e:
-                print(f"⚠️ Error updating status: {e}")
-    
-    def get_ui_components(self) -> Dict[str, Any]:
-        """📦 Get UI components untuk external access"""
-        return self.ui_components
-    
-    def is_setup_completed(self) -> bool:
-        """✅ Check jika setup sudah completed"""
-        return self.setup_completed
+    )
 
-# 🎯 Factory function untuk create component
-def create_env_config_component() -> EnvConfigComponent:
-    """🏭 Factory function untuk create environment config component"""
-    return EnvConfigComponent()
+def _get_initial_status_html() -> str:
+    """Get initial status HTML"""
+    return f"""
+    <div style="padding: 15px; border-left: 4px solid {STATUS_COLORS['info']}; background: rgba(33, 150, 243, 0.1); border-radius: 5px;">
+        <strong>🔍 Mengecek status environment...</strong>
+        <div style="margin-top: 5px; color: #666; font-size: 14px;">
+            Sedang menganalisis konfigurasi environment SmartCash
+        </div>
+    </div>
+    """
+
+def _get_initial_summary_html() -> str:
+    """Get initial summary HTML"""
+    return """
+    <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+        <h4 style="margin-top: 0; color: #495057;">📊 Environment Summary</h4>
+        <div style="color: #6c757d;">
+            Summary akan ditampilkan setelah analisis environment selesai...
+        </div>
+    </div>
+    """
+
+# Utility functions untuk update components
+def update_component_status(components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
+    """Update status component"""
+    from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
+    update_status_panel(components, message, status_type)
+
+def update_component_progress(components: Dict[str, Any], progress: int, message: str = "", is_error: bool = False) -> None:
+    """Update progress components"""
+    from smartcash.ui.setup.env_config.utils.ui_updater import update_progress_bar
+    update_progress_bar(components, progress, message, is_error)
+
+def update_component_button(components: Dict[str, Any], enabled: bool = True, text: str = "Setup Environment") -> None:
+    """Update setup button"""
+    from smartcash.ui.setup.env_config.utils.ui_updater import update_setup_button
+    update_setup_button(components, enabled, text)
+
+def append_component_log(components: Dict[str, Any], message: str, level: str = 'info') -> None:
+    """Append to log component"""
+    from smartcash.ui.setup.env_config.utils.ui_updater import append_to_log
+    append_to_log(components, message, level)

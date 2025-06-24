@@ -1,62 +1,61 @@
 """
 File: smartcash/ui/setup/env_config/constants.py
-Deskripsi: Constants untuk environment config dengan struktur yang konsisten
+Deskripsi: Konstanta untuk environment configuration dengan struktur konsisten
 """
 
 # Required folders untuk setup environment
-REQUIRED_FOLDERS = ['data', 'configs', 'exports', 'logs', 'models', 'output']
-
-# Config templates yang akan di-clone ke Drive
-CONFIG_TEMPLATES = [
-    'base_config.yaml', 'colab_config.yaml', 'dataset_config.yaml',
-    'model_config.yaml', 'training_config.yaml', 'augmentation_config.yaml',
-    'preprocessing_config.yaml', 'hyperparameters_config.yaml', 
-    'backbone_config.yaml', 'split_config.yaml', 'evaluation_config.yaml',
-    'pretrained_config.yaml','analysis_config.yaml', 'strategy_config.yaml'
+REQUIRED_FOLDERS = [
+    'data', 'configs', 'exports', 'logs', 'models', 'output'
 ]
 
-# Essential configs yang minimal harus ada
-ESSENTIAL_CONFIGS = ['base_config.yaml', 'model_config.yaml', 'training_config.yaml', 'dataset_config.yaml', 'backbone_config.yaml']
+# Config discovery settings
+CONFIG_SOURCE_PATH = '/content/smartcash/configs'
+CONFIG_EXTENSIONS = ['.yaml', '.yml', '.json', '.toml']
 
-# Progress ranges untuk setiap operation
-PROGRESS_RANGES = {
-    'start': (1, 5),
-    'analysis': (5, 10),
-    'drive_mount': (10, 25),
-    'folders': (30, 45),
-    'configs': (50, 65),
-    'symlinks': (70, 90),
-    'validation': (95, 100)
+# Essential configs minimal yang harus ada (auto-detected)
+ESSENTIAL_CONFIG_PATTERNS = [
+    'base_config', 'model_config', 'training_config', 
+    'dataset_config', 'backbone_config'
+]
+
+# Progress step definitions
+PROGRESS_STEPS = {
+    'start': {'range': (0, 5), 'label': 'Memulai setup...'},
+    'analysis': {'range': (5, 15), 'label': '🔍 Menganalisis environment...'},
+    'drive_mount': {'range': (15, 30), 'label': '📱 Menghubungkan Google Drive...'},
+    'folders': {'range': (30, 50), 'label': '📁 Membuat folder di Drive...'},
+    'configs': {'range': (50, 70), 'label': '📋 Menyalin template konfigurasi...'},
+    'symlinks': {'range': (70, 85), 'label': '🔗 Membuat symlink...'},
+    'validation': {'range': (85, 95), 'label': '✅ Memvalidasi setup...'},
+    'complete': {'range': (95, 100), 'label': '🎉 Setup selesai!'}
 }
 
-# Drive paths
+# Drive path constants
 DRIVE_MOUNT_POINT = '/content/drive/MyDrive'
 SMARTCASH_DRIVE_PATH = '/content/drive/MyDrive/SmartCash'
 REPO_CONFIG_PATH = '/content/smartcash/configs'
 
-# Status messages
+# Status message templates
 STATUS_MESSAGES = {
-    'ready': "✅ Environment sudah terkonfigurasi",
-    'setup_needed': "🔧 Environment perlu dikonfigurasi", 
-    'setup_start': "🚀 Memulai konfigurasi environment SmartCash...",
-    'setup_success': "🎉 Setup environment berhasil selesai!",
-    'setup_failed': "❌ Setup gagal - Coba lagi",
-    'drive_ready': "✅ Drive siap digunakan dan telah divalidasi",
-    'drive_error': "❌ Drive tidak dapat diakses"
+    'checking': "🔍 Memeriksa status environment...",
+    'ready': "✅ Environment sudah terkonfigurasi dengan baik",
+    'setup_needed': "🔧 Environment perlu dikonfigurasi",
+    'setup_running': "⚙️ Sedang mengkonfigurasi environment...",
+    'setup_success': "🎉 Konfigurasi environment berhasil!",
+    'setup_failed': "❌ Konfigurasi gagal - Silakan coba lagi",
+    'drive_connecting': "📱 Menghubungkan ke Google Drive...",
+    'drive_ready': "✅ Google Drive siap dan tervalidasi",
+    'drive_error': "❌ Google Drive tidak dapat diakses"
 }
 
-# Progress messages templates
-PROGRESS_MESSAGES = {
-    'start': "Memulai setup...",
-    'refresh': "🔄 Refreshing environment state...",
-    'analysis': "🔍 Analyzing environment...", 
-    'drive_connect': "📱 Menghubungkan Google Drive...",
-    'drive_mount': "📱 Connecting to Google Drive...",
-    'folders_create': "📁 Creating Drive folders...",
-    'configs_clone': "📋 Cloning config templates...",
-    'symlinks_create': "🔗 Creating symlinks...",
-    'validation': "✅ Validating setup...",
-    'complete': "✅ Setup completed successfully"
+# UI element IDs untuk konsistensi
+UI_ELEMENTS = {
+    'setup_button': 'env_setup_button',
+    'status_panel': 'env_status_panel', 
+    'progress_bar': 'env_progress_bar',
+    'progress_text': 'env_progress_text',
+    'log_accordion': 'env_log_accordion',
+    'summary_panel': 'env_summary_panel'
 }
 
 # Retry configurations
@@ -67,4 +66,13 @@ RETRY_CONFIG = {
     'symlink_delay': 0.5,
     'status_check_retries': 3,
     'drive_mount_timeout': 45
+}
+
+# Color scheme untuk status
+STATUS_COLORS = {
+    'success': '#4CAF50',
+    'warning': '#FF9800', 
+    'error': '#F44336',
+    'info': '#2196F3',
+    'neutral': '#9E9E9E'
 }

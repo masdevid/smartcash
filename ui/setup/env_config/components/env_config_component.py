@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/components/env_config_component.py
-Deskripsi: Component dengan status_message fix dan config auto-cloning integration
+Deskripsi: Component dengan flexbox layout dan display method untuk cell script
 """
 
 import logging
@@ -19,239 +19,181 @@ from smartcash.ui.setup.env_config.utils import (
 ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
 
 class EnvConfigComponent:
-    """🎯 Component UI dengan status_message fix dan auto-config integration"""
+    """🎯 Component UI dengan flexbox layout dan shared components"""
     
     def __init__(self):
-        # Initialize UI components first
+        # Initialize UI components dari factory
         self.ui_components = UIFactory.create_ui_components()
-        
-        # 🔧 Ensure status_message widget exists
-        if 'status_message' not in self.ui_components:
-            import ipywidgets as widgets
-            self.ui_components['status_message'] = widgets.HTML(
-                value="🔄 Initializing environment config...",
-                layout=widgets.Layout(width='100%', margin='10px 0px')
-            )
         
         # Setup metadata
         self.ui_components['logger_namespace'] = ENV_CONFIG_LOGGER_NAMESPACE
         self.ui_components['env_config_initialized'] = True
         
-        # Ensure log_output registration
-        if 'log_output' not in self.ui_components and 'log_accordion' in self.ui_components:
-            self.ui_components['log_output'] = self.ui_components['log_accordion'].children[0]
-        
-        # Initialize logger with UI components
+        # Initialize logger
         self.logger = setup_ipython_logging(
             ui_components=self.ui_components,
             module_name=ENV_CONFIG_LOGGER_NAMESPACE,
             log_level=logging.INFO
         )
         
-        # Initialize orchestrator with UI components
+        # Initialize orchestrator
         self.orchestrator = EnvironmentConfigOrchestrator(self.ui_components)
         
-        # Setup button handler
-        if 'setup_button' in self.ui_components:
-            self.ui_components['setup_button'].on_click(self._handle_setup_click)
+        # Setup handlers
+        self._setup_handlers()
         
+        # Component state
         self.setup_completed = False
-        
-        # Initialize environment manager
-        self._init_environment_manager_silent()
-        
-        # Display initial status
-        self._update_initial_status()
-        
-        # Log startup
-        if self.logger:
-            self.logger.info("🚀 Environment Config Component initialized")
-    
-    def _init_environment_manager_silent(self):
-        """🔧 Initialize environment manager tanpa premature logging"""
-        try:
-            from smartcash.ui.setup.env_config.helpers.silent_environment_manager import get_silent_environment_manager
-            self.env_manager = get_silent_environment_manager()
-            self.ui_components['env_manager'] = self.env_manager
-        except Exception as e:
-            self.ui_components['status_message'].value = f"⚠️ Gagal inisialisasi environment manager: {str(e)}"
-    
-    def _update_initial_status(self):
-        """📊 Update status awal dengan proper error handling"""
-        try:
-            # Initialize logger if needed
-            if not hasattr(self, 'logger') or self.logger is None:
-                self.logger = self.orchestrator.init_logger()
-            
-            # Check environment status
-            status = self.orchestrator.check_environment_status()
-            
-            # Update status message dengan fallback
-            if isinstance(status, dict):
-                status_message = status.get('status_message', 'Environment status tidak tersedia')
-            else:
-                status_message = 'Tidak dapat memeriksa status environment'
-            
-            self.ui_components['status_message'].value = f"ℹ️ {status_message}"
-            
-            # Log status
-            if self.logger:
-                self.logger.info(f"📍 Status environment: {status_message}")
-            
-        except Exception as e:
-            error_msg = f"Gagal memuat status awal: {str(e)}"
-            self.ui_components['status_message'].value = f"⚠️ {error_msg}"
-            if hasattr(self, 'logger') and self.logger:
-                self.logger.error(f"❌ {error_msg}", exc_info=True)
-    
-    def _handle_setup_click(self, button):
-        """🚀 Handle setup click dengan config auto-cloning"""
-        try:
-            button.disabled = True
-            self._reset_ui_state()
-            self._update_status("🚀 Memulai setup environment SmartCash...", "info")
-            
-            # Auto-clone configs sebelum setup
-            self._auto_clone_configs()
-            
-            # Perform setup
-            success = self.orchestrator.perform_environment_setup()
-            
-            if success:
-                self.setup_completed = True
-                self._update_status("✅ Environment siap digunakan", "success")
-                self._display_environment_summary()
-            else:
-                button.disabled = False
-                self._update_status("❌ Setup gagal - Coba lagi", "error")
-                show_progress_safe(self.ui_components)
-                
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"❌ Error setup: {str(e)}")
-            button.disabled = False
-            self._update_status(f"❌ Error: {str(e)}", "error")
-            show_progress_safe(self.ui_components)
-    
-    def _auto_clone_configs(self):
-        """📋 Use existing SimpleConfigManager untuk sync configs"""
-        try:
-            from smartcash.common.config.manager import get_config_manager
-            
-            if self.logger:
-                self.logger.info("📋 Sinkronisasi configs dengan SimpleConfigManager...")
-            
-            config_manager = get_config_manager()
-            
-            # Check if config sync needed
-            if not config_manager.drive_config_dir.exists():
-                config_manager.drive_config_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Use existing sync functionality
-            sync_success = config_manager.sync_configs_to_drive()
-            
-            if sync_success:
-                if self.logger:
-                    self.logger.info("✅ Config sync berhasil dengan SimpleConfigManager")
-            else:
-                if self.logger:
-                    self.logger.warning("⚠️ Config sync sebagian berhasil")
-                    
-        except Exception as e:
-            if self.logger:
-                self.logger.warning(f"⚠️ Config sync error: {str(e)}")
-    
-    def _reset_ui_state(self):
-        """🔄 Reset UI state dengan utils"""
-        if 'log_output' in self.ui_components:
-            self.ui_components['log_output'].clear_output(wait=True)
-        show_progress_safe(self.ui_components)
-    
-    def _update_status(self, message: str, status_type: str = "info"):
-        """📊 Update status panel dengan fallback"""
-        if 'status_panel' in self.ui_components:
-            try:
-                from smartcash.ui.components import update_status_panel
-                update_status_panel(self.ui_components['status_panel'], message, status_type)
-            except ImportError:
-                pass
-        
-        # Update status_message sebagai fallback
-        emoji_map = {"info": "ℹ️", "success": "✅", "error": "❌", "warning": "⚠️"}
-        emoji = emoji_map.get(status_type, "ℹ️")
-        self.ui_components['status_message'].value = f"{emoji} {message}"
-    
-    def _display_environment_summary(self):
-        """📊 Display environment summary dengan helper integration"""
-        try:
-            from smartcash.ui.setup.env_config.helpers.system_info_helper import SystemInfoHelper
-            
-            system_helper = SystemInfoHelper()
-            summary = system_helper.get_environment_summary()
-            
-            if self.logger and summary:
-                self.logger.info("📊 Environment Summary:")
-                self.logger.info(f"  🔧 Python: {summary.get('python_version', 'Unknown')}")
-                self.logger.info(f"  💾 Memory: {summary.get('memory_info', 'Unknown')}")
-                self.logger.info(f"  📱 Drive: {summary.get('drive_status', 'Unknown')}")
-                
-        except Exception as e:
-            if self.logger:
-                self.logger.debug(f"🔍 Summary display error: {str(e)}")
     
     def display(self):
-        """🎨 Display UI dengan utils integration"""
+        """🎨 Display UI dengan shared components"""
+        # Display main UI
         display(self.ui_components['ui_layout'])
         
-        # Setup logger after display
-        self.logger = setup_ipython_logging(
-            self.ui_components, 
-            ENV_CONFIG_LOGGER_NAMESPACE, 
-            redirect_all_logs=False
-        )
-        
-        # Display environment summary
-        self._display_environment_summary()
-        
-        # Check environment status dengan retry
+        # Check environment status
+        self._check_and_update_status()
+    
+    def _setup_handlers(self):
+        """🔧 Setup event handlers untuk UI components"""
+        if 'setup_button' in self.ui_components:
+            setup_button = self.ui_components['setup_button']
+            setup_button.on_click(self._handle_setup_click)
+    
+    def _handle_setup_click(self, button):
+        """🚀 Handle setup button click dengan prioritized missing items feedback"""
         try:
-            env_status = self._check_environment_status_with_retry()
+            # Disable button
+            button.disabled = True
+            button.description = "🔄 Setting up..."
+            
+            # Refresh state sebelum setup
+            refresh_environment_state_silent()
+            
+            # Get prioritized items untuk progress feedback
+            env_status = self.orchestrator.check_environment_status()
+            missing_items = get_prioritized_missing_items(env_status)
+            
+            if missing_items:
+                setup_msg = f"🔄 Setting up {len(missing_items)} items..."
+                self.logger.info(f"📋 Setup items: {', '.join(missing_items)}")
+            else:
+                setup_msg = "🔄 Memulai setup environment..."
+            
+            # Update status dengan specific feedback
+            self._update_status(setup_msg, "info")
+            
+            # Show progress
+            show_progress_safe(self.ui_components)
+            
+            # Run setup
+            result = self.orchestrator.setup_environment()
+            
+            if result.get('success', False):
+                self._update_status("✅ Setup environment berhasil!", "success")
+                self.setup_completed = True
+                button.description = "✅ Setup Complete"
+                
+                if self.logger:
+                    self.logger.info("✅ Environment setup completed successfully")
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                self._update_status(f"❌ Setup gagal: {error_msg}", "error")
+                button.disabled = False
+                button.description = "🔄 Retry Setup"
+                
+                if self.logger:
+                    self.logger.error(f"❌ Setup failed: {error_msg}")
+                    
+        except Exception as e:
+            self._update_status(f"🚨 Error setup: {str(e)}", "error")
+            button.disabled = False
+            button.description = "🔄 Retry Setup"
+            
+            if self.logger:
+                self.logger.error(f"🚨 Setup error: {str(e)}")
+        finally:
+            # Hide progress setelah selesai
+            hide_progress_safe(self.ui_components)
+    
+    def _check_and_update_status(self):
+        """🔍 Check dan update status environment dengan prioritized diagnostics"""
+        try:
+            # Refresh environment state untuk data terbaru
+            refresh_environment_state_silent()
+            
+            # Check environment status
+            env_status = self.orchestrator.check_environment_status()
             
             if env_status.get('ready', False):
                 self.setup_completed = True
                 if 'setup_button' in self.ui_components:
                     self.ui_components['setup_button'].disabled = True
+                    self.ui_components['setup_button'].description = "✅ Already Setup"
                 self._update_status("✅ Environment sudah terkonfigurasi", "success")
                 hide_progress_safe(self.ui_components)
             else:
-                self._update_status("🔧 Environment perlu dikonfigurasi", "info")
+                # Get prioritized missing items untuk user-friendly diagnostics
+                missing_items = get_prioritized_missing_items(env_status)
+                
+                if missing_items:
+                    items_text = ", ".join(missing_items[:3])  # Show max 3 items
+                    more_text = f" (+{len(missing_items)-3} lainnya)" if len(missing_items) > 3 else ""
+                    status_msg = f"🔧 Perlu setup: {items_text}{more_text}"
+                else:
+                    status_msg = "🔧 Environment perlu dikonfigurasi"
+                    
+                self._update_status(status_msg, "info")
+                
+                if self.logger and missing_items:
+                    self.logger.info(f"📋 Missing items: {', '.join(missing_items)}")
                 
         except Exception as e:
             self._update_status(f"⚠️ Error check status: {str(e)}", "warning")
             if self.logger:
                 self.logger.warning(f"⚠️ Status check error: {str(e)}")
     
-    def _check_environment_status_with_retry(self, max_retries: int = 3) -> Dict[str, Any]:
-        """🔄 Check environment status dengan retry mechanism"""
-        last_error = None
-        
-        for attempt in range(max_retries):
+    def _update_status(self, message: str, status_type: str = "info"):
+        """📊 Update status message dengan color coding"""
+        if 'status_panel' in self.ui_components:
             try:
-                return self.orchestrator.check_environment_status()
+                # Update status panel jika menggunakan shared components
+                status_panel = self.ui_components['status_panel']
+                if hasattr(status_panel, 'children') and len(status_panel.children) > 0:
+                    status_html = status_panel.children[0]
+                    if hasattr(status_html, 'value'):
+                        color_map = {
+                            'success': '#d4edda',
+                            'error': '#f8d7da',
+                            'warning': '#fff3cd',
+                            'info': '#d1ecf1'
+                        }
+                        border_map = {
+                            'success': '#28a745',
+                            'error': '#dc3545',
+                            'warning': '#ffc107',
+                            'info': '#17a2b8'
+                        }
+                        
+                        status_html.value = f"""
+                        <div style="background: {color_map.get(status_type, '#d1ecf1')}; 
+                                    padding: 12px; border-radius: 8px; 
+                                    border-left: 4px solid {border_map.get(status_type, '#17a2b8')}; 
+                                    margin: 10px 0px;">
+                            {message}
+                        </div>
+                        """
             except Exception as e:
-                last_error = e
-                if attempt < max_retries - 1:
-                    import time
-                    time.sleep(0.5)
-        
-        # Return fallback status
-        return {
-            'ready': False,
-            'status_message': f'Error check status: {str(last_error)}',
-            'error': str(last_error)
-        }
+                print(f"⚠️ Error updating status: {e}")
+    
+    def get_ui_components(self) -> Dict[str, Any]:
+        """📦 Get UI components untuk external access"""
+        return self.ui_components
+    
+    def is_setup_completed(self) -> bool:
+        """✅ Check jika setup sudah completed"""
+        return self.setup_completed
 
-# 🎯 Factory function untuk backward compatibility
+# 🎯 Factory function untuk create component
 def create_env_config_component() -> EnvConfigComponent:
     """🏭 Factory function untuk create environment config component"""
     return EnvConfigComponent()

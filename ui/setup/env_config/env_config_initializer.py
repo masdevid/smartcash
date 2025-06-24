@@ -1,55 +1,77 @@
 """
 File: smartcash/ui/setup/env_config/env_config_initializer.py
-Deskripsi: Initializer dengan proper error handling dan fallback yang minimal
+Deskripsi: Environment config initializer dengan return value tanpa assignment
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from IPython.display import display
 
-def initialize_env_config_ui() -> Dict[str, Any]:
-    """🚀 Initialize environment config UI dengan error handling yang proper"""
+from smartcash.ui.setup.env_config.components.env_config_component import EnvConfigComponent
+
+# Global state untuk caching
+_ENV_CONFIG_INITIALIZED = False
+_CACHED_COMPONENT = None
+
+def initialize_env_config_ui(force_refresh: bool = False) -> EnvConfigComponent:
+    """
+    🚀 Initialize environment config UI dengan caching
+    
+    Args:
+        force_refresh: Force refresh UI components
+        
+    Returns:
+        EnvConfigComponent: Component instance untuk chaining
+    """
+    global _ENV_CONFIG_INITIALIZED, _CACHED_COMPONENT
+    
+    # Return cached component jika sudah initialized
+    if _ENV_CONFIG_INITIALIZED and _CACHED_COMPONENT and not force_refresh:
+        return _CACHED_COMPONENT
+    
     try:
-        from smartcash.ui.setup.env_config.components.env_config_component import EnvConfigComponent
-        from smartcash.ui.utils.logger_bridge import setup_ui_logging
-        
         # Create component
-        env_config = EnvConfigComponent()
+        component = EnvConfigComponent()
         
-        # Ensure log output terdaftar
-        if 'log_output' not in env_config.ui_components and 'log_accordion' in env_config.ui_components:
-            env_config.ui_components['log_output'] = env_config.ui_components['log_accordion'].children[0]
+        # Display UI
+        component.display()
         
-        # Setup logging dengan UI components
-        setup_ui_logging(env_config.ui_components, "env_config")
+        # Cache component
+        _CACHED_COMPONENT = component
+        _ENV_CONFIG_INITIALIZED = True
         
-        # Tampilkan UI
-        env_config.display()
-        
-        return env_config.ui_components
+        return component
         
     except Exception as e:
-        # 🔧 Fallback sederhana dengan proper error info
-        error_msg = str(e)
+        print(f"🚨 Error initializing env config UI: {e}")
         
-        print(f"❌ Environment Config Error: {error_msg}")
-        print("💡 Manual setup diperlukan:")
-        print("   1. Mount Google Drive")
-        print("   2. Buat folder: /content/drive/MyDrive/SmartCash")
-        print("   3. Copy configs dari /content/smartcash/configs")
+        # Create fallback component
+        fallback_component = _create_fallback_component(str(e))
+        display(fallback_component)
         
-        # Return structured error response
-        return {
-            'error': error_msg,
-            'manual_setup_required': True,
-            'status': 'failed',
-            'status_message': f'Initialization failed: {error_msg}',
-            'troubleshooting': {
-                'drive_mount': 'Mount Google Drive terlebih dahulu',
-                'config_copy': 'Copy manual configs dari repo ke Drive',
-                'folder_creation': 'Buat folder SmartCash di Drive'
-            }
-        }
+        return fallback_component
 
-# Alias untuk backward compatibility
-def initialize_environment_config_ui() -> Dict[str, Any]:
-    """🔄 Alias untuk kompatibilitas dengan existing code"""
-    return initialize_env_config_ui()
+def initialize_environment_config_ui(force_refresh: bool = False) -> EnvConfigComponent:
+    """🔄 Alias untuk backward compatibility"""
+    return initialize_env_config_ui(force_refresh=force_refresh)
+
+def _create_fallback_component(error_msg: str):
+    """🚨 Create fallback component untuk error handling"""
+    import ipywidgets as widgets
+    
+    return widgets.HTML(
+        value=f"""
+        <div style="background: #f8d7da; padding: 20px; border-radius: 8px; border: 1px solid #f5c6cb; margin: 10px 0px;">
+            <h3>🚨 Error Loading Environment Config</h3>
+            <p><strong>Error:</strong> {error_msg}</p>
+            <p>Silakan refresh cell atau restart runtime untuk mencoba lagi.</p>
+        </div>
+        """
+    )
+
+# Reset function untuk development
+def reset_env_config_ui():
+    """🔄 Reset cached UI untuk development"""
+    global _ENV_CONFIG_INITIALIZED, _CACHED_COMPONENT
+    _ENV_CONFIG_INITIALIZED = False
+    _CACHED_COMPONENT = None
+    print("✅ Environment config UI cache reset")

@@ -40,11 +40,13 @@ class UIFactory:
             button_container = widgets.VBox([setup_button], 
                 layout=widgets.Layout(align_items='center', margin='10px 0px'))
             
-            # Progress tracker menggunakan shared component
-            progress_tracker = create_single_progress_tracker()
+            # Progress tracker - get widget dari shared component
+            progress_tracker_obj = create_single_progress_tracker()
+            progress_tracker = progress_tracker_obj.widget() if hasattr(progress_tracker_obj, 'widget') else progress_tracker_obj
             
-            # Log accordion menggunakan shared component  
-            log_accordion = create_log_accordion()
+            # Log accordion - get widget dari shared component  
+            log_accordion_obj = create_log_accordion()
+            log_accordion = log_accordion_obj.get('widget', log_accordion_obj)
             
             # Environment info panel - simple HTML widget
             env_info_panel = widgets.HTML(
@@ -99,8 +101,10 @@ class UIFactory:
                 'setup_button': setup_button,
                 'button_container': button_container,
                 'status_panel': status_panel,
-                'progress_tracker': progress_tracker,
-                'log_accordion': log_accordion,
+                'progress_tracker': progress_tracker_obj,  # Original object for methods
+                'progress_widget': progress_tracker,       # Widget for display
+                'log_accordion': log_accordion_obj,        # Original object for methods  
+                'log_widget': log_accordion,               # Widget for display
                 # Metadata
                 'initialized': True,
                 'module_name': 'environment_config'

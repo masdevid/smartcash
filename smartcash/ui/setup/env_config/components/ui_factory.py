@@ -40,12 +40,20 @@ class UIFactory:
             button_container = widgets.VBox([setup_button], 
                 layout=widgets.Layout(align_items='center', margin='10px 0px'))
             
-            # Progress tracker - ensure we get the widget instance
-            progress_tracker = create_single_progress_tracker()
-            if hasattr(progress_tracker, 'widget'):
-                progress_tracker = progress_tracker.widget
-            elif callable(getattr(progress_tracker, 'widget', None)):
-                progress_tracker = progress_tracker.widget()
+            # Progress tracker - store both the instance and its widget
+            progress_tracker_obj = create_single_progress_tracker()
+            progress_tracker = progress_tracker_obj
+            
+            # Get the widget from the tracker if it exists
+            if hasattr(progress_tracker_obj, 'widget'):
+                if callable(progress_tracker_obj.widget):
+                    progress_tracker = progress_tracker_obj.widget()
+                else:
+                    progress_tracker = progress_tracker_obj.widget
+            
+            # If we still don't have a widget, use the object itself
+            if not isinstance(progress_tracker, widgets.Widget):
+                progress_tracker = progress_tracker_obj  # Fallback to the original object
             
             # Log accordion - ensure we get the widget instance
             log_accordion = create_log_accordion()

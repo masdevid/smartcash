@@ -43,6 +43,21 @@ class DependencyInitializer(CommonInitializer):
             'save_button', 'reset_button', 'log_output', 'status_panel',
             'progress_tracker', 'logger'
         ]
+        
+    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """
+        Create UI components for dependency management using the main UI component.
+        
+        Args:
+            config: Configuration dictionary
+            env: Environment information
+            **kwargs: Additional arguments
+            
+        Returns:
+            Dictionary containing UI components
+        """
+        from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
+        return create_dependency_main_ui(config=config)
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Setup module handlers - required abstract method"""

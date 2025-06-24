@@ -64,6 +64,9 @@ class FallbackLogger:
         
     def error(self, msg, *args, **kwargs):
         print(f"[ERROR] {msg}")
+        if kwargs.get('exc_info'):
+            import traceback
+            traceback.print_exc()
         
     def exception(self, msg, *args, **kwargs):
         print(f"[EXCEPTION] {msg}")

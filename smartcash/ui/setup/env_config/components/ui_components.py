@@ -5,6 +5,7 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from smartcash.ui.components.header import create_header
 from smartcash.ui.components.log_accordion import create_log_accordion
+from smartcash.ui.components.tips_panel import create_tips_panel
 
 def create_env_config_ui() -> Dict[str, Any]:
     """🎛️ Create complete environment configuration UI - HANYA header dan logger diubah"""
@@ -104,32 +105,17 @@ def create_env_config_ui() -> Dict[str, Any]:
         right_colab_panel
     ], layout=widgets.Layout(width='100%', margin='20px 0'))
     
-    # Tips panel - TIDAK DIUBAH
-    tips_html = """
-    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); 
-                padding: 20px; border-radius: 12px; border-left: 4px solid #2196f3;">
-        <h4 style="margin-top: 0; color: #1976d2; display: flex; align-items: center;">
-            💡 Tips & Requirements
-        </h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div>
-                <ul style="margin: 0; padding-left: 20px; color: #424242;">
-                    <li>Pastikan Google Drive memiliki ruang minimal 12GB</li>
-                    <li>Setup akan membuat folder struktur data lengkap</li>
-                </ul>
-            </div>
-            <div>
-                <ul style="margin: 0; padding-left: 20px; color: #424242;">
-                    <li>Proses setup memerlukan waktu 1-2 menit</li>
-                    <li>Koneksi internet stabil diperlukan</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    """
-    tips_panel = widgets.HTML(
-        value=tips_html,
-        layout=widgets.Layout(margin='20px 0')
+    # Tips panel using shared component
+    tips_panel = create_tips_panel(
+        title="💡 Tips & Requirements",
+        tips=[
+            ["Pastikan Google Drive memiliki ruang minimal 12GB"],
+            ["Setup akan membuat folder struktur data lengkap"],
+            ["Proses setup memerlukan waktu 1-2 menit"],
+            ["Koneksi internet stabil diperlukan"]
+        ],
+        columns=2,
+        margin='20px 0'
     )
     
     # Main layout - TIDAK DIUBAH

@@ -11,6 +11,14 @@ class UIFactory:
     """🏭 Factory untuk membuat UI components environment config dengan flexbox layout"""
     
     @classmethod
+    def create_divider(cls):
+        """Create a consistent divider widget"""
+        import ipywidgets as widgets
+        return widgets.HTML(
+            value="<hr style='margin: 15px 0; border: 1px solid #e0e0e0;'>"
+        )
+    
+    @classmethod
     def create_ui_components(cls) -> Dict[str, Any]:
         """🎨 Create UI components dengan shared components dan flexbox layout"""
         try:
@@ -22,16 +30,13 @@ class UIFactory:
                 create_single_progress_tracker
             )
             
-            # Import divider dengan fallback
+            # Try to import create_divider from shared components
             try:
-                from smartcash.ui.components.layout import create_divider
+                from smartcash.ui.components.layout import create_divider as shared_create_divider
+                create_divider = shared_create_divider
             except ImportError:
-                # Fallback divider jika layout module belum tersedia
-                def create_divider():
-                    import ipywidgets as widgets
-                    return widgets.HTML(
-                        value="<hr style='margin: 15px 0; border: 1px solid #e0e0e0;'>"
-                    )
+                # Use local implementation if shared component not available
+                create_divider = cls.create_divider
             
             # Core components dengan one-liner creation
             header = create_header(
@@ -144,7 +149,7 @@ class UIFactory:
         # Action section
         action_section = widgets.VBox([
             components['button_container'],
-            create_divider(),
+            cls.create_divider(),
             components['status_panel']
         ], layout=widgets.Layout(
             width='100%',
@@ -167,10 +172,10 @@ class UIFactory:
         # Main container dengan flexbox layout
         main_container = widgets.VBox([
             components['header'],
-            create_divider(),
+            cls.create_divider(),
             summary_section,  # Baris pertama
             info_section,     # Baris kedua
-            create_divider(),
+            cls.create_divider(),
             action_section,
             progress_log_section
         ], layout=widgets.Layout(

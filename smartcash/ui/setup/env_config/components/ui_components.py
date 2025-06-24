@@ -6,13 +6,13 @@ Deskripsi: Komponen UI untuk environment configuration dengan layout lengkap
 import ipywidgets as widgets
 from typing import Dict, Any
 from smartcash.ui.components import (
-    create_header, create_action_buttons, create_status_panel,
-    create_log_accordion, create_dual_progress_tracker, create_divider,
-    create_responsive_container, create_responsive_two_column
+    create_header, create_status_panel,
+    create_log_accordion, create_divider
 )
+from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
 from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary
 from smartcash.ui.setup.env_config.components.env_info_panel import create_env_info_panel
-from smartcash.ui.setup.env_config.components.tips_requirements import create_tips_requirements
+from smartcash.ui.setup.env_config.components.tips_panel import create_tips_requirements
 
 def create_env_config_ui() -> Dict[str, Any]:
     """
@@ -54,13 +54,20 @@ def create_env_config_ui() -> Dict[str, Any]:
     
     # 4. Progress Tracker
     progress_tracker = create_dual_progress_tracker(
-        current_label="Tahap Saat Ini:",
-        total_label="Progress Total:",
-        description="Status Setup:"
+        operation="Setup Environment",
+        auto_hide=False
     )
     
     # 5. Log Accordion
-    log_accordion = create_log_accordion("📋 Log Setup Environment")
+    log_accordion = create_log_accordion(
+        module_name="Setup Environment",
+        height="300px",
+        width="100%",
+        max_logs=1000,
+        show_timestamps=True,
+        show_level_icons=True,
+        auto_scroll=True
+    )
     
     # 6. Setup Summary
     setup_summary = create_setup_summary()

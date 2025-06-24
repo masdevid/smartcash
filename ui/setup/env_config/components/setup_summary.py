@@ -200,34 +200,103 @@ def _format_summary_content(data: Dict) -> str:
     details_html = "\n".join(details_sections)
     
     return f"""
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6;">
-        <div style="margin-bottom: 15px;">
-            <h4 style="margin: 0 0 10px 0; color: #333;">Setup Summary</h4>
-            <p style="margin: 5px 0; font-weight: 500;">{overall_status}</p>
-            <p style="margin: 5px 0; font-size: 0.9em; color: #555;">
-                {drive_status_icon} Drive: {data.get('mount_path', 'N/A') if data.get('drive_mounted') else 'Not mounted'}
-            </p>
+    <div style="
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #424242;
+    ">
+        <div style="
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        ">
+            <span style="
+                font-size: 1.2em;
+                font-weight: 600;
+                color: #2196f3;
+            ">📋 Setup Summary</span>
         </div>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
-                <h5 style="margin: 0 0 5px 0; color: #555;">Folders</h5>
-                <div style="margin: 0; font-size: 0.9em;">{folders_info}</div>
+        <div style="
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        ">
+            <div style="
+                background: #ffffff;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                padding: 12px;
+                border-left: 4px solid #2196f3;
+            ">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-weight: 500; color: #333;">Google Drive</span>
+                    <span style="font-size: 0.9em; color: #666;">
+                        {drive_status_icon} {data.get('mount_path', 'N/A') if data.get('drive_mounted') else 'Not mounted'}
+                    </span>
+                </div>
+                <div style="font-size: 0.9em; color: #666;">
+                    {overall_status}
+                </div>
             </div>
-            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
-                <h5 style="margin: 0 0 5px 0; color: #555;">Symlinks</h5>
-                <div style="margin: 0; font-size: 0.9em;">{symlinks_info}</div>
-            </div>
-            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; grid-column: span 2;">
-                <h5 style="margin: 0 0 5px 0; color: #555;">Configurations</h5>
-                <div style="margin: 0; font-size: 0.9em;">{configs_info}</div>
+            
+            <div style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-top: 4px;
+            ">
+                <div style="
+                    background: #ffffff;
+                    border-radius: 6px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    padding: 12px;
+                    border-left: 4px solid #4caf50;
+                ">
+                    <div style="font-weight: 500; color: #333; margin-bottom: 4px;">Folders</div>
+                    <div style="font-size: 0.9em; color: #666;">{folders_info}</div>
+                </div>
+                
+                <div style="
+                    background: #ffffff;
+                    border-radius: 6px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    padding: 12px;
+                    border-left: 4px solid #ff9800;
+                ">
+                    <div style="font-weight: 500; color: #333; margin-bottom: 4px;">Symlinks</div>
+                    <div style="font-size: 0.9em; color: #666;">{symlinks_info}</div>
+                </div>
+                
+                <div style="
+                    background: #ffffff;
+                    border-radius: 6px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    padding: 12px;
+                    grid-column: span 2;
+                    border-left: 4px solid #9c27b0;
+                ">
+                    <div style="font-weight: 500; color: #333; margin-bottom: 4px;">Configurations</div>
+                    <div style="font-size: 0.9em; color: #666;">{configs_info}</div>
+                </div>
             </div>
         </div>
         
         {details_html}
         
-        <div style="margin-top: 15px; background: #f0f7ff; padding: 10px; border-radius: 4px; border-left: 4px solid #2196f3;">
-            <p style="margin: 0; font-size: 0.9em; color: #0d47a1;">{status_message}</p>
+        <div style="
+            margin-top: 12px;
+            background: #f0f7ff;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #2196f3;
+        ">
+            <p style="margin: 0; font-size: 0.9em; color: #0d47a1; font-style: italic;">
+                {status_message}
+            </p>
         </div>
     </div>
     """

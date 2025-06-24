@@ -303,8 +303,15 @@ def validate_setup_integrity(drive_base_path: str = None) -> Dict[str, Any]:
         'warning_count': len(warnings)
     }
 
-def refresh_environment_state_silent() -> bool:
-    """🔄 Refresh environment state tanpa verbose logging"""
+def refresh_environment_state_silent(env_manager=None) -> bool:
+    """🔄 Refresh environment state tanpa verbose logging
+    
+    Args:
+        env_manager: Optional environment manager instance (for backward compatibility)
+        
+    Returns:
+        bool: True if refresh was successful, False otherwise
+    """
     try:
         # Clear any cached state
         import sys

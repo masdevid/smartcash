@@ -234,42 +234,6 @@ class UIFactory:
             return widgets.HTML(value=f"⚠️ Error loading environment info: {e}")
     
     @classmethod
-    def _create_info_panel(cls) -> widgets.Widget:
-        """💡 Create info panel dengan tips dan requirements"""
-        
-        tips_html = """
-        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 5px 0px;">
-            <h4 style="margin-top: 0px;">💡 Tips Setup</h4>
-            <ul style="margin-bottom: 0px; padding-left: 20px;">
-                <li>Pastikan koneksi internet stabil untuk download dependencies</li>
-                <li>Proses setup membutuhkan waktu 5-10 menit</li>
-                <li>Restart runtime jika diperlukan setelah setup</li>
-                <li>Check log output untuk detail progress</li>
-            </ul>
-        </div>
-        """
-        
-        requirements_html = """
-        <div style="background: #d1ecf1; padding: 15px; border-radius: 8px; border-left: 4px solid #17a2b8; margin: 5px 0px;">
-            <h4 style="margin-top: 0px;">📋 Requirements</h4>
-            <ul style="margin-bottom: 0px; padding-left: 20px;">
-                <li>Python 3.8+ dengan pip terinstall</li>
-                <li>Minimum 2GB RAM untuk training</li>
-                <li>Google Drive mounted (untuk Colab)</li>
-                <li>CUDA compatible GPU (opsional)</li>
-            </ul>
-        </div>
-        """
-        
-        return widgets.VBox([
-            widgets.HTML(value=tips_html),
-            widgets.HTML(value=requirements_html)
-        ], layout=widgets.Layout(
-            width='100%',
-            overflow='hidden'
-        ))
-    
-    @classmethod
     def _create_setup_button(cls) -> widgets.Widget:
         """🔧 Create setup button dengan styling"""
         return widgets.Button(
@@ -282,6 +246,100 @@ class UIFactory:
                 margin='10px 0px'
             )
         )
+    
+    @classmethod
+    def _create_environment_summary_panel(cls) -> widgets.Widget:
+        """📊 Create environment summary panel dengan flexbox"""
+        try:
+            from smartcash.common.environment import get_environment_info
+                
+            env_info = get_environment_info()
+                
+            # Create info cards dengan flexbox
+            cards = []
+                
+            # System info card
+            system_info = f"""
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 5px 0px; border-left: 4px solid #007bff;">
+                <strong>🖥️ System:</strong> {env_info.get('platform', 'Unknown')}<br>
+                <strong>🐍 Python:</strong> {env_info.get('python_version', 'Unknown')}<br>
+                <strong>📁 Working Dir:</strong> {env_info.get('working_directory', 'Unknown')[:50]}...
+            </div>
+            """
+            cards.append(widgets.HTML(value=system_info))
+                
+            # GPU info card
+            gpu_info = env_info.get('gpu_info', {})
+            gpu_available = gpu_info.get('available', False)
+            gpu_text = f"""
+            <div style="background: {'#d4edda' if gpu_available else '#f8d7da'}; padding: 12px; border-radius: 8px; margin: 5px 0px; border-left: 4px solid {'#28a745' if gpu_available else '#dc3545'};">
+                <strong>🎮 GPU:</strong> {'Available' if gpu_available else 'Not Available'}<br>
+                <strong>🔧 Device:</strong> {gpu_info.get('device_name', 'CPU Only')}<br>
+                <strong>💾 Memory:</strong> {gpu_info.get('memory_info', 'N/A')}
+            </div>
+            """
+            cards.append(widgets.HTML(value=gpu_text))
+                
+            # Return container dengan flexbox
+            return widgets.VBox(cards, layout=widgets.Layout(
+                width='100%',
+                overflow='hidden'
+            ))
+                
+        except Exception as e:
+            return widgets.HTML(value=f"⚠️ Error loading environment info: {e}")
+
+    @classmethod
+    def _create_info_panel(cls) -> widgets.Widget:
+        """💡 Create compact info panel with tabs for tips and requirements"""
+        # Create tabbed interface
+        tabs = widgets.Tab()
+        
+        # Tips tab content
+        tips_content = widgets.VBox([
+            widgets.HTML("""
+                <div style="padding: 5px 0;">
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Pastikan koneksi internet stabil</li>
+                        <li>Gunakan GPU untuk training lebih cepat</li>
+                        <li>Simpan konfigurasi setelah selesai</li>
+                        <li>Periksa log untuk detail</li>
+                    </ul>
+                </div>
+            """)
+        ], layout=widgets.Layout(width='100%', padding='5px'))
+        
+        # Requirements tab content
+        req_content = widgets.VBox([
+            widgets.HTML("""
+                <div style="padding: 5px 0;">
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li>Python 3.8+ dengan pip</li>
+                        <li>Minimal 2GB RAM</li>
+                        <li>Google Drive (untuk Colab)</li>
+                        <li>GPU CUDA (opsional)</li>
+                    </ul>
+                </div>
+            """)
+        ], layout=widgets.Layout(width='100%', padding='5px'))
+        
+        # Set tab contents
+        tabs.children = [tips_content, req_content]
+        tabs.set_title(0, '💡 Tips')
+        tabs.set_title(1, '📋 Requirements')
+        
+        # Style the tabs
+        tabs.add_class('compact-tabs')
+        
+        return widgets.VBox([
+            tabs
+        ], layout=widgets.Layout(
+            width='100%',
+            margin='5px 0',
+            border='1px solid #e0e0e0',
+            border_radius='4px',
+            overflow='hidden'
+        ))
     
     @classmethod
     def _create_fallback_ui(cls, error_msg: str) -> Dict[str, Any]:

@@ -66,7 +66,8 @@ def create_env_config_ui() -> Dict[str, Any]:
         max_logs=1000,
         show_timestamps=True,
         show_level_icons=True,
-        auto_scroll=True
+        auto_scroll=True,
+        default_open=True  # Make accordion open by default
     )
     
     # 6. Setup Summary

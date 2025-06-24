@@ -130,20 +130,30 @@ class SetupProgressTracker:
                 is_error=True
             )
     
+    def update_step(self, step_name: str, description: str = "") -> None:
+        """Update the current step with a description (compatibility method)"""
+        if self.current_stage is not None:
+            stage_data = self.stages[self.current_stage]
+            stage_data.name = step_name
+            self._update_progress(step_name, stage_data.current, description or step_name)
+    
     def _update_progress(self, stage_name: str, progress: int, message: str, is_error: bool = False) -> None:
         """Update progress UI dan trigger callbacks"""
-        # Update progress tracker
-        tracker = self.ui_components.get('progress_tracker')
-        if tracker:
+        # Update progress bars
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
+            tracker.update_bar('overall', self.overall_progress)
+            tracker.update_bar('current', progress, message)
+        
+        # Update status panel
+        update_status_panel(self.ui_components, message, 'error' if is_error else 'info')
+        
+        # Trigger callbacks
+        for callback in self.callbacks:
             try:
-                # Update overall progress
-                if hasattr(tracker, 'update_overall'):
-                    tracker.update_overall(progress, message)
-                # Update current task
-                if hasattr(tracker, 'update_current'):
-                    tracker.update_current(progress, stage_name)
+                callback(stage_name, progress, message)
             except Exception as e:
-                print(f"⚠️ Error updating progress tracker: {e}")
+                print(f"Error in progress callback: {e}")
         
         # Update status panel
         status_type = "error" if is_error else "info"

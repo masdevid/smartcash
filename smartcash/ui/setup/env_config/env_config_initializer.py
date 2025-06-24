@@ -122,15 +122,11 @@ def _create_error_fallback(error_msg: str) -> widgets.VBox:
     return widgets.VBox([
         widgets.HTML(
             value=f"""
-            <div style="padding: 20px; text-align: center; color: #dc3545;">
-                <h3>❌ Initialization Error</h3>
-                <p>Failed to initialize environment configuration UI:</p>
-                <code>{error_msg}</code>
-                <p style="margin-top: 15px;">
-                    <small>Silakan restart runtime dan coba lagi</small>
-                </p>
-            </div>
-            """,
+            <div style="padding: 20px; background: #ffebee; border: 1px solid #f44336; border-radius: 5px;">
+                <h3 style="color: #c62828; margin-top: 0;">❌ Environment Config Error</h3>
+                <p>Failed to initialize environment configuration: {str(e)}</p>
+                <p><strong>Solusi:</strong> Restart runtime dan coba lagi</p>
+            </div>""",
             layout=widgets.Layout(width='100%', padding='20px')
         )
     ])

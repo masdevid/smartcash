@@ -143,18 +143,30 @@ class UILoggerBridge:
                 self._log_buffer.append((level, message, exc_info))
                 return
             
-            # Mapping level ke LogLevel enum
-            from smartcash.ui.components.log_accordion import LogLevel
-            level_mapping = {
-                'debug': LogLevel.DEBUG,
-                'info': LogLevel.INFO,
-                'success': LogLevel.SUCCESS,
-                'warning': LogLevel.WARNING,
-                'error': LogLevel.ERROR,
-                'critical': LogLevel.CRITICAL
-            }
-            
-            log_level = level_mapping.get(level.lower(), LogLevel.INFO)
+            # Define level mapping with fallback to string values
+            try:
+                from smartcash.ui.components.log_accordion import LogLevel
+                level_mapping = {
+                    'debug': LogLevel.DEBUG,
+                    'info': LogLevel.INFO,
+                    'success': LogLevel.SUCCESS,
+                    'warning': LogLevel.WARNING,
+                    'error': LogLevel.ERROR,
+                    'critical': LogLevel.CRITICAL
+                }
+                log_level = level_mapping.get(level.lower(), LogLevel.INFO)
+            except (ImportError, AttributeError) as e:
+                # Fallback to string values if LogLevel import fails
+                print(f"[WARNING] Using fallback log levels: {str(e)}")
+                level_mapping = {
+                    'debug': 'debug',
+                    'info': 'info',
+                    'success': 'success',
+                    'warning': 'warning',
+                    'error': 'error',
+                    'critical': 'critical'
+                }
+                log_level = level_mapping.get(level.lower(), 'info')
             
             # Panggil append_log dengan parameter yang benar
             log_output.append_log(
@@ -167,20 +179,27 @@ class UILoggerBridge:
             if exc_info and isinstance(exc_info, BaseException):
                 import traceback
                 error_trace = ''.join(traceback.format_exception(type(exc_info), exc_info, exc_info.__traceback__))
-                log_output.append_log(
-                    message=f"Exception details:\n{error_trace}",
-                    level=LogLevel.ERROR,
-                    timestamp=None
-                )
+                try:
+                    log_output.append_log(
+                        message=f"Exception details:\n{error_trace}",
+                        level=LogLevel.ERROR,
+                        timestamp=None
+                    )
+                except NameError:
+                    # Handle case where LogLevel is not available
+                    log_output.append_log(
+                        message=f"Exception details (ERROR):\n{error_trace}",
+                        level='error',
+                        timestamp=None
+                    )
+                except Exception as e:
+                    print(f"[ERROR] Failed to log exception: {str(e)}")
+                    traceback.print_exc()
             
-            print(f"[ERROR] Failed to import LogLevel: {str(e)}")
-            import traceback
-            traceback.print_exc()
         except Exception as e:
             # Log the error to console if UI update fails
             print(f"[ERROR] Failed to log to UI: {str(e)}")
             print(f"[ERROR] Original message: [{level.upper()}] {message}")
-            import traceback
             traceback.print_exc()
     
     def _get_log_output_widget(self):

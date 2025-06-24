@@ -113,7 +113,7 @@ class SetupHandler:
             # Step 1: Mount Drive (if not already mounted)
             if not summary_data.get('drive_mounted', False):
                 self.logger.info("🔧 Step 1: Mounting Google Drive...")
-                progress_tracker.update_stage(SetupStage.DRIVE_MOUNT, "Mounting Google Drive")
+                progress_tracker.update_stage(SetupStage.DRIVE_MOUNT)
                 progress_tracker.update_within_stage(0, "Starting drive mount...")
                 
                 drive_result = self.drive_handler.mount_drive()
@@ -121,41 +121,79 @@ class SetupHandler:
                 # Check if user cancelled the drive mount
                 if drive_result.get('cancelled', False):
                     self.logger.info("ℹ️ Drive mount was cancelled by user")
-                    summary_data['success'] = False
+                    summary_data['status'] = False
                     summary_data['status_message'] = "Drive mount was cancelled"
                     summary_data['cancelled'] = True
                     return summary_data
                     
                 summary_data['drive_mounted'] = drive_result.get('success', False)
                 summary_data['mount_path'] = drive_result.get('mount_path', 'N/A')
+                
+                if summary_data['drive_mounted']:
+                    progress_tracker.update_within_stage(100, "Drive mounted successfully")
+                    progress_tracker.complete_stage("Drive mounted successfully")
             else:
                 self.logger.info("✅ Google Drive already mounted")
+                progress_tracker.update_stage(SetupStage.DRIVE_MOUNT)
+                progress_tracker.update_within_stage(100, "Drive already mounted")
             
             # Step 2: Create Folders (if not already created)
+            progress_tracker.update_stage(SetupStage.FOLDER_SETUP)
+            
             if summary_data.get('folders_created', 0) < len(REQUIRED_FOLDERS):
                 self.logger.info("📁 Step 2: Creating directories...")
-                progress_tracker.update_stage(SetupStage.FOLDER_SETUP, "Creating directories")
-                progress_tracker.update_within_stage(25, "Starting folder creation...")
+                progress_tracker.update_within_stage(0, "Starting folder creation...")
                 
                 folder_result = self.folder_handler.create_required_folders()
-                summary_data['folders_created'] = folder_result.get('created_count', 0)
-                summary_data['symlinks_created'] = folder_result.get('symlinks_count', 0)
+                created_count = folder_result.get('created_count', 0)
+                symlinks_count = folder_result.get('symlinks_count', 0)
+                
+                summary_data['folders_created'] = created_count
+                summary_data['symlinks_created'] = symlinks_count
+                
+                if created_count > 0 or symlinks_count > 0:
+                    progress_tracker.update_within_stage(100, f"Created {created_count} folders and {symlinks_count} symlinks")
+                    progress_tracker.complete_stage("Folder setup completed")
+                else:
+                    progress_tracker.update_within_stage(100, "No new folders or symlinks needed")
             else:
                 self.logger.info("✅ Directories already created")
+                progress_tracker.update_within_stage(100, "All folders already exist")
+            
+            # Step 3: Sync Configurations
+            progress_tracker.update_stage(SetupStage.CONFIG_SYNC)
+            progress_tracker.update_within_stage(0, "Starting config sync...")
             
             config_result = self.config_handler.sync_configurations()
-            summary_data['configs_synced'] = config_result.get('synced_count', 0)
+            synced_count = config_result.get('synced_count', 0)
+            summary_data['configs_synced'] = synced_count
             
-            # Step 3: Create missing symlinks
+            if synced_count > 0:
+                progress_tracker.update_within_stage(100, f"Synced {synced_count} configurations")
+                progress_tracker.complete_stage("Configuration sync completed")
+            else:
+                progress_tracker.update_within_stage(100, "No configurations needed syncing")
+            
+            # Step 4: Create missing symlinks
+            progress_tracker.update_stage(SetupStage.FOLDER_SETUP, "Verifying symlinks...")
+            
             if 'missing_symlinks' in summary_data and summary_data['missing_symlinks']:
-                self.logger.info("🔗 Step 3: Creating missing symlinks...")
-                progress_tracker.update_stage(SetupStage.FOLDER_SETUP, "Creating symlinks")
-                progress_tracker.update_within_stage(50, f"Creating {len(summary_data['missing_symlinks'])} symlinks...")
+                self.logger.info("🔗 Step 4: Creating missing symlinks...")
+                progress_tracker.update_within_stage(0, f"Creating {len(summary_data['missing_symlinks'])} symlinks...")
                 
                 # Create missing symlinks
                 created_symlinks = []
-                for source, target in list(summary_data['missing_symlinks']):
+                total_symlinks = len(summary_data['missing_symlinks'])
+                
+                for i, (source, target) in enumerate(list(summary_data['missing_symlinks'])):
                     try:
+                        # Update progress
+                        progress = int((i / total_symlinks) * 100)
+                        progress_tracker.update_within_stage(
+                            progress, 
+                            f"Creating symlink {i+1}/{total_symlinks}: {os.path.basename(target)}"
+                        )
+                        
                         # Ensure parent directory exists
                         os.makedirs(os.path.dirname(target), exist_ok=True)
                         # Create symlink
@@ -170,108 +208,111 @@ class SetupHandler:
                     if symlink in summary_data['missing_symlinks']:
                         summary_data['missing_symlinks'].remove(symlink)
                         summary_data['verified_symlinks'].append(symlink)
-            
-            # Step 4: Sync Configurations (only if all symlinks are created)
-            if not summary_data.get('missing_symlinks', []):
-                self.logger.info("⚙️ Step 4: Syncing configurations...")
-                progress_tracker.update_stage(SetupStage.CONFIG_SYNC, "Syncing configurations")
-                progress_tracker.update_within_stage(60, "Starting config sync...")
                 
-                config_result = self.config_handler.sync_configurations()
-                summary_data['configs_synced'] = config_result.get('synced_count', 0)
+                if created_symlinks:
+                    progress_tracker.update_within_stage(100, f"Created {len(created_symlinks)} symlinks")
+                    progress_tracker.complete_stage("Symlink creation completed")
+                else:
+                    progress_tracker.update_within_stage(100, "No symlinks needed to be created")
             else:
-                self.logger.warning("⚠️ Skipping config sync due to missing symlinks")
-                summary_data['configs_synced'] = 0
+                progress_tracker.update_within_stage(100, "No missing symlinks found")
             
             # Step 5: Verify Setup
             self.logger.info("✅ Step 5: Verifying setup...")
-            progress_tracker.update_stage(SetupStage.ENV_SETUP, "Verifying setup")
-            progress_tracker.update_within_stage(80, "Verifying environment...")
+            progress_tracker.update_stage(SetupStage.ENV_SETUP)
+            progress_tracker.update_within_stage(0, "Verifying environment setup...")
             
             # Verify all required folders exist
             verified_folders = []
             missing_folders = []
-            for folder in REQUIRED_FOLDERS:
+            total_folders = len(REQUIRED_FOLDERS)
+            
+            for i, folder in enumerate(REQUIRED_FOLDERS):
+                progress = int((i / total_folders) * 100)
+                progress_tracker.update_within_stage(progress, f"Verifying {os.path.basename(folder)}...")
+                
                 if os.path.exists(folder) and os.path.isdir(folder):
                     verified_folders.append(folder)
                 else:
                     missing_folders.append(folder)
             
-            # Verify all symlinks exist and are valid
+            # Verify all required symlinks exist
             verified_symlinks = []
             missing_symlinks = []
-            for source, target in SYMLINK_MAP.items():
-                if os.path.islink(target) and os.path.realpath(target) == os.path.realpath(source):
+            total_symlinks = len(SYMLINK_MAP)
+            
+            for i, (source, target) in enumerate(SYMLINK_MAP.items()):
+                progress = int((i / total_symlinks) * 100)
+                progress_tracker.update_within_stage(
+                    50 + (progress // 2),  # First half for folders, second half for symlinks
+                    f"Verifying symlink {i+1}/{total_symlinks}: {os.path.basename(target)}"
+                )
+                
+                if os.path.lexists(target) and os.path.islink(target):
                     verified_symlinks.append((source, target))
                 else:
                     missing_symlinks.append((source, target))
             
-            # Update summary with verification results
+            # Update summary data
             summary_data['verified_folders'] = verified_folders
             summary_data['missing_folders'] = missing_folders
             summary_data['verified_symlinks'] = verified_symlinks
             summary_data['missing_symlinks'] = missing_symlinks
             
-            # Update counts for backward compatibility
-            summary_data['folders_created'] = len(verified_folders)
-            summary_data['symlinks_created'] = len(verified_symlinks)
-            
-            # Log verification results with more details
-            issues_found = []
-            
-            if missing_folders:
-                folder_issues = f"Missing folders: {', '.join(missing_folders)}"
-                self.logger.warning(folder_issues)
-                issues_found.append(folder_issues)
-                
-            if missing_symlinks:
-                symlink_issues = f"Missing symlinks: {', '.join(f'{s} → {t}' for s, t in missing_symlinks)}"
-                self.logger.warning(symlink_issues)
-                issues_found.append(symlink_issues)
-                
-            if not summary_data['drive_mounted']:
-                drive_issue = "Google Drive is not mounted"
-                self.logger.warning(drive_issue)
-                issues_found.append(drive_issue)
-            
-            # Check if all required items exist
-            all_verified = (
-                not missing_folders and
-                not missing_symlinks and
-                summary_data['drive_mounted']
+            # Determine overall status
+            has_errors = (
+                len(missing_folders) > 0 or 
+                len(missing_symlinks) > 0 or 
+                not summary_data.get('drive_mounted', False)
             )
             
-            # Update status in summary data
-            summary_data['status'] = 'success' if all_verified else 'warning'
-            summary_data['issues'] = issues_found
-            
-            # Complete
-            progress_tracker.update_step("Setup complete", 100)
-            
-            # Prepare status message based on verification results
-            if all_verified:
-                status_msg = "✅ Environment setup completed successfully!"
-                self.logger.success("🎉 Environment setup completed successfully!")
+            if has_errors:
+                summary_data['status'] = False
+                summary_data['status_message'] = "Setup completed with some issues"
+                progress_tracker.update_within_stage(100, "Verification completed with issues")
+                progress_tracker.error("⚠️ Setup completed with some issues")
+                
+                # Log missing items
+                if missing_folders:
+                    self.logger.warning(f"Missing folders: {', '.join(os.path.basename(f) for f in missing_folders)}")
+                if missing_symlinks:
+                    self.logger.warning(f"Missing symlinks: {', '.join(t for _, t in missing_symlinks)}")
+                if not summary_data.get('drive_mounted', False):
+                    self.logger.warning("Google Drive is not mounted")
             else:
-                status_msg = "⚠️ Setup completed with some issues"
-                self.logger.warning("Setup completed with the following issues:")
-                for issue in issues_found:
-                    self.logger.warning(f"  • {issue}")
+                summary_data['status'] = True
+                summary_data['status_message'] = "Setup completed successfully"
+                progress_tracker.update_within_stage(100, "Verification completed successfully")
+                progress_tracker.complete(" Setup completed successfully")
             
-            # Update the setup summary with detailed information
-            if 'setup_summary' in ui_components:
-                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
-                update_setup_summary(
-                    ui_components['setup_summary'],
-                    status_message=status_msg,
-                    status_type=summary_data['status'],
-                    details=summary_data
-                )
+            # Mark all stages as complete if successful
+            if summary_data['status']:
+                for stage in SetupStage:
+                    if stage != SetupStage.COMPLETE:
+                        progress_tracker.complete_stage()
+                progress_tracker.update_stage(SetupStage.COMPLETE)
+                progress_tracker.complete(" All setup steps completed successfully")
+            
+            # Log final summary
+            self.logger.info("\n📋 Setup Summary:" + "\n" + "="*50)
+            self.logger.info(f"Drive Mounted: {'✅' if summary_data.get('drive_mounted', False) else '❌'}")
+            self.logger.info(f"Folders Created: {len(verified_folders)}/{len(REQUIRED_FOLDERS)}")
+            self.logger.info(f"Symlinks Created: {len(verified_symlinks)}/{len(SYMLINK_MAP)}")
+            self.logger.info(f"Configs Synced: {summary_data.get('configs_synced', 0)}")
+            
+            if missing_folders:
+                self.logger.warning(f"Missing Folders: {', '.join(os.path.basename(f) for f in missing_folders)}")
+            if missing_symlinks:
+                self.logger.warning(f"Missing Symlinks: {', '.join(f'-> {t}' for _, t in missing_symlinks)}")
+            
+            self.logger.info("="*50)
+            
+            return summary_data
             
         except Exception as e:
             error_msg = f"❌ Setup workflow failed: {str(e)}"
             self.logger.error(error_msg)
-            summary_data['success'] = False
+            summary_data['status'] = False
             
             # Update the setup summary with error information
             if 'setup_summary' in ui_components:

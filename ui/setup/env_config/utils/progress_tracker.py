@@ -131,9 +131,29 @@ class SetupProgressTracker:
             progress: Progress percentage (0-100)
             message: Optional status message
         """
-        if self.current_stage is not None:
-            self.stages[self.current_stage].current = progress
-            self.update_progress(self.current_stage, progress, message)
+        if self.current_stage is None:
+            self.logger.warning("No active stage to update progress")
+            return
+            
+        # Update the stage progress
+        stage_progress = self.stages[self.current_stage]
+        stage_progress.current = progress
+        
+        # Calculate overall progress
+        self._update_overall_progress()
+        
+        # Update UI
+        self._update_ui(message)
+        
+        # Log the update
+        self.logger.debug(f"Progress update - Stage: {stage_progress.name}, Progress: {progress}%, Message: {message}")
+        
+        # Trigger callbacks
+        for callback in self.callbacks:
+            try:
+                callback(stage_progress.name, progress, message)
+            except Exception as e:
+                self.logger.error(f"Error in progress callback: {e}")
     
     def update_step(self, step_name: str, progress: int = None, description: str = "") -> None:
         """Update the current step with progress and description
@@ -213,12 +233,37 @@ class SetupProgressTracker:
         self.stages[stage].current = progress
         
         # Calculate overall progress
-        total_weight = sum(s.weight for s in self.stages.values())
-        weighted_progress = sum(
-            (s.current / s.total) * s.weight 
-            for s in self.stages.values()
+        self._update_overall_progress()
+        
+        # Update UI
+        self._update_ui(message)
+        
+        # Log the update
+        self.logger.debug(f"Progress update - Stage: {self.stages[stage].name}, Progress: {progress}%, Message: {message}")
+        
+        # Trigger callbacks
+        for callback in self.callbacks:
+            try:
+                callback(self.stages[stage].name, progress, message)
+            except Exception as e:
+                self.logger.error(f"Error in progress callback: {e}")
+    
+    def _update_overall_progress(self) -> None:
+        """Calculate and update the overall progress"""
+        if not self.stages:
+            self.overall_progress = 0
+            return
+            
+        total_weight = sum(stage.weight for stage in self.stages.values())
+        if total_weight == 0:
+            self.overall_progress = 0
+            return
+            
+        weighted_sum = sum(
+            stage.weight * (stage.current / 100) 
+            for stage in self.stages.values()
         )
-        self.overall_progress = int((weighted_progress / total_weight) * 100)
+        self.overall_progress = min(100, int(weighted_sum / total_weight * 100))
         
         # Update UI
         if 'progress_tracker' in self.ui_components:

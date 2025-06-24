@@ -19,9 +19,19 @@ class UIFactory:
                 create_header,
                 create_status_panel,
                 create_log_accordion,
-                create_single_progress_tracker,
-                create_divider
+                create_single_progress_tracker
             )
+            
+            # Import divider dengan fallback
+            try:
+                from smartcash.ui.components.layout import create_divider
+            except ImportError:
+                # Fallback divider jika layout module belum tersedia
+                import ipywidgets as widgets
+                def create_divider():
+                    return widgets.HTML(
+                        value="<hr style='margin: 15px 0; border: 1px solid #e0e0e0;'>"
+                    )
             
             # Core components dengan one-liner creation
             header = create_header(

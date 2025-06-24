@@ -46,7 +46,11 @@ class SetupProgressTracker:
     
     def _initialize_progress_tracker(self) -> None:
         """Initialize progress tracker component"""
+        from IPython.display import display
+        import ipywidgets as widgets
+        
         if 'progress_tracker' not in self.ui_components:
+            # Create progress tracker config
             config = ProgressConfig(
                 bars=[
                     ProgressBarConfig(
@@ -54,18 +58,53 @@ class SetupProgressTracker:
                         label="Overall Progress",
                         level=ProgressLevel.PRIMARY,
                         visible=True,
-                        show_percentage=True
+                        show_percentage=True,
+                        value=0,
+                        bar_style='info',
+                        orientation='horizontal',
+                        min=0,
+                        max=100,
+                        description='Overall:',
+                        description_width='initial'
                     ),
                     ProgressBarConfig(
                         name="current",
                         label="Current Task",
                         level=ProgressLevel.SECONDARY,
                         visible=True,
-                        show_percentage=True
+                        show_percentage=True,
+                        value=0,
+                        bar_style='info',
+                        orientation='horizontal',
+                        min=0,
+                        max=100,
+                        description='Current:',
+                        description_width='initial'
                     )
                 ]
             )
-            self.ui_components['progress_tracker'] = ProgressTracker(config)
+            
+            # Create and display the progress tracker
+            progress_tracker = ProgressTracker(config)
+            self.ui_components['progress_tracker'] = progress_tracker
+            
+            # Create a container for the progress tracker
+            progress_container = widgets.VBox([
+                widgets.HTML('<h3>Setup Progress</h3>'),
+                progress_tracker.widget
+            ])
+            
+            # Display the progress container
+            display(progress_container)
+            
+            # Ensure the progress container is visible in the UI
+            if 'progress_container' in self.ui_components:
+                self.ui_components['progress_container'].children = (progress_container,)
+            else:
+                self.ui_components['progress_container'] = progress_container
+                
+            # Force display update
+            display(progress_container)
     
     def register_callback(self, callback: Callable[[str, int, str], None]) -> None:
         """Register callback untuk progress update"""
@@ -138,37 +177,52 @@ class SetupProgressTracker:
             self._update_progress(step_name, stage_data.current, description or step_name)
     
     def _update_progress(self, stage_name: str, progress: int, message: str, is_error: bool = False) -> None:
-        """Update progress UI dan trigger callbacks"""
-        # Update progress bars
-        if 'progress_tracker' in self.ui_components:
-            tracker = self.ui_components['progress_tracker']
-            tracker.update_bar('overall', self.overall_progress)
-            tracker.update_bar('current', progress, message)
+        """Update progress UI and trigger callbacks with proper error handling"""
+        from IPython.display import display
+        import ipywidgets as widgets
         
-        # Update status panel
-        update_status_panel(self.ui_components, message, 'error' if is_error else 'info')
-        
-        # Trigger callbacks
-        for callback in self.callbacks:
-            try:
-                callback(stage_name, progress, message)
-            except Exception as e:
-                print(f"Error in progress callback: {e}")
-        
-        # Update status panel
-        status_type = "error" if is_error else "info"
-        update_status_panel(
-            self.ui_components.get('status_panel'),
-            message,
-            status_type
-        )
-        
-        # Trigger callbacks
-        for callback in self.callbacks:
-            try:
-                callback(stage_name, progress, message)
-            except Exception as e:
-                print(f"⚠️ Error in progress callback: {e}")
+        try:
+            # Ensure progress is within bounds
+            progress = max(0, min(100, progress))
+            self.overall_progress = max(0, min(100, self.overall_progress))
+            
+            # Update progress bars if tracker exists
+            if 'progress_tracker' in self.ui_components:
+                tracker = self.ui_components['progress_tracker']
+                
+                # Update overall progress
+                tracker.update_bar('overall', self.overall_progress, f"{int(self.overall_progress)}%")
+                
+                # Update current task progress
+                tracker.update_bar('current', progress, message)
+                
+                # Force UI update
+                if 'progress_container' in self.ui_components:
+                    display(self.ui_components['progress_container'])
+            
+            # Update status panel if it exists
+            if 'status_panel' in self.ui_components:
+                status_type = 'error' if is_error else 'info'
+                update_status_panel(
+                    self.ui_components['status_panel'],
+                    message,
+                    status_type
+                )
+            
+            # Trigger callbacks
+            for callback in self.callbacks:
+                try:
+                    callback(stage_name, progress, message)
+                except Exception as e:
+                    print(f"⚠️ Error in progress callback: {e}")
+            
+            # Small delay to allow UI to update
+            import time
+            time.sleep(0.05)
+            
+        except Exception as e:
+            print(f"⚠️ Error updating progress: {e}")
+            print(f"Stage: {stage_name}, Progress: {progress}, Message: {message}")
 
 def track_setup_progress(ui_components: Dict[str, Any]) -> SetupProgressTracker:
     """🎯 Create and initialize progress tracker instance"""

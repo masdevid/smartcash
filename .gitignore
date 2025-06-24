@@ -72,6 +72,10 @@ ENV/
 
 # VS Code
 .vscode/*
+
+# Project data and backups
+backup/
+data/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json

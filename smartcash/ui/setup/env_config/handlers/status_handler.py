@@ -3,7 +3,7 @@ File: smartcash/ui/setup/env_config/handlers/status_handler.py
 Deskripsi: Handler untuk comprehensive status checking dan validation
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from smartcash.ui.setup.env_config.handlers.environment_handler import EnvironmentHandler
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
 from smartcash.ui.setup.env_config.utils.environment_helpers import validate_config_completeness

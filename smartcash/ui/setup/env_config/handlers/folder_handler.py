@@ -2,7 +2,7 @@
 # Deskripsi: Handler untuk folder creation dan management
 
 from pathlib import Path
-from typing import Dict, bool, List
+from typing import Dict, List
 from smartcash.common.constants.paths import get_paths_for_environment
 
 class FolderHandler:

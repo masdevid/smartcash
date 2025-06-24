@@ -1,7 +1,5 @@
-"""
-File: smartcash/ui/setup/env_config/utils/env_detector.py
-Deskripsi: Utility untuk deteksi informasi environment
-"""
+# File: smartcash/ui/setup/env_config/utils/env_detector.py
+# Deskripsi: Utility untuk deteksi informasi environment
 
 import os
 import sys

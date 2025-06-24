@@ -13,12 +13,43 @@ class DependencyInitializer(CommonInitializer):
     """Dependency initializer dengan proper handler setup"""
     
     def __init__(self):
-        from smartcash.ui.setup.dependency.handlers.config_handler import DependencyConfigHandler
+        from .handlers.config_handler import DependencyConfigHandler
         super().__init__('dependency', DependencyConfigHandler, 'setup')
+    
+    def _get_default_config(self) -> Dict[str, Any]:
+        """Get default config - required abstract method"""
+        from .handlers.defaults import get_default_dependency_config
+        return get_default_dependency_config()
+    
+    def _get_critical_components(self) -> list:
+        """Get critical components list - required abstract method"""
+        return [
+            'ui', 'install_button', 'analyze_button', 'check_button', 
+            'save_button', 'reset_button', 'log_output', 'status_panel',
+            'progress_tracker', 'logger'
+        ]
+    
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Setup module handlers - required abstract method"""
+        from .handlers.dependency_handler import setup_dependency_handlers
+        
+        try:
+            handlers = setup_dependency_handlers(ui_components)
+            ui_components['handlers'] = handlers
+            
+            logger = ui_components.get('logger')
+            if logger:
+                logger.info(f"🎯 {len(handlers)} handlers berhasil disetup")
+        except Exception as e:
+            logger = ui_components.get('logger')
+            if logger:
+                logger.error(f"❌ Setup handlers failed: {str(e)}")
+        
+        return ui_components
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
         """Create UI components dengan logger integration"""
-        from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
+        from .components.ui_components import create_dependency_main_ui
         from smartcash.ui.utils.ui_logger import create_ui_logger
         
         # Create UI components

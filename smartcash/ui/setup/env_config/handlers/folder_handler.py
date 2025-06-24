@@ -4,13 +4,14 @@ Deskripsi: Handler untuk membuat folder dan symlink yang diperlukan
 """
 
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP, SOURCE_DIRECTORIES
 
 class FolderHandler:
     """📁 Handler untuk folder dan symlink management"""
     
     def __init__(self, logger=None):
+        """Initialize FolderHandler with optional logger"""
         self.logger = logger or self._create_dummy_logger()
         
     def _create_dummy_logger(self):
@@ -22,12 +23,9 @@ class FolderHandler:
             def warning(self, msg): print(f"⚠️ {msg}")
             def error(self, msg): print(f"❌ {msg}")
         return DummyLogger()
-
-class FolderHandler:
-    """📁 Handler untuk folder dan symlink management"""
-    
+        
     def create_required_folders(self) -> Dict[str, Any]:
-        """🏗️ Buat semua folder dan symlink yang diperlukan"""
+        """🏗️ Create all required folders and symlinks"""
         result = {
             'created_count': 0,
             'symlinks_count': 0,

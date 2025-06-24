@@ -8,12 +8,9 @@ import ipywidgets as widgets
 import traceback
 import sys
 
-# Import logger bridge with error handling
-try:
-    from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
-except ImportError as e:
-    print(f"⚠️ Could not import logger_bridge: {e}")
-    create_ui_logger_bridge = None
+# Import logger utilities
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+from smartcash.ui.utils.simple_logger import create_simple_logger
 
 def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """
@@ -78,34 +75,57 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         ui_components: Dictionary of UI components to update
         config: Configuration dictionary for the environment setup
     """
-    # Initialize logger bridge first to capture all logs
-    logger_bridge = None
-    
-    # Check if we can use the UI logger bridge
-    if create_ui_logger_bridge is not None:
-        try:
-            if 'log_output' not in ui_components:
-                raise ValueError("Log output widget not found in UI components")
+    # Create a temporary logger that will buffer messages until UI is ready
+    class BufferedLogger:
+        def __init__(self):
+            self.buffer = []
+            self.ui_logger = None
+            
+        def log(self, level: str, message: str, *args, **kwargs):
+            # If we have a UI logger, use it, otherwise buffer the message
+            if self.ui_logger:
+                getattr(self.ui_logger, level)(message, *args, **kwargs)
+            else:
+                self.buffer.append((level, message, args, kwargs))
                 
-            # Initialize the logger bridge with the correct parameters
+        def flush_to_ui_logger(self, ui_logger):
+            self.ui_logger = ui_logger
+            for level, message, args, kwargs in self.buffer:
+                getattr(ui_logger, level)(message, *args, **kwargs)
+            self.buffer = []
+    
+    # Create buffered logger and add all standard logging methods
+    buffered_logger = BufferedLogger()
+    for level in ['debug', 'info', 'warning', 'error', 'critical', 'success']:
+        setattr(buffered_logger, level, 
+               lambda msg, *a, lvl=level, **kw: buffered_logger.log(lvl, msg, *a, **kw))
+    
+    # Store the buffered logger in ui_components immediately
+    ui_components['_logger_bridge'] = buffered_logger
+    
+    try:
+        # Initialize the actual UI logger bridge
+        if create_ui_logger_bridge is not None and 'log_output' in ui_components:
             logger_bridge = create_ui_logger_bridge(
                 ui_components={'log_output': ui_components['log_output']},
                 logger_name='EnvConfigLogger'
             )
+            # Flush buffered logs to the UI logger
+            buffered_logger.flush_to_ui_logger(logger_bridge)
+            # Replace the buffered logger with the real one
+            ui_components['_logger_bridge'] = logger_bridge
             logger_bridge.info("✅ Logger bridge initialized successfully")
-            
-        except Exception as e:
-            # Create simple logger for the error message
-            temp_logger = _create_simple_logger()
-            temp_logger.error(f"❌ Failed to initialize UI logger bridge: {str(e)}")
-            logger_bridge = temp_logger
-    else:
-        # create_ui_logger_bridge is None, use simple logger
-        logger_bridge = _create_simple_logger()
-        logger_bridge.warning("⚠️ UI logger bridge not available, using console logger")
-    
-    # Store logger bridge in ui_components for later use
-    ui_components['_logger_bridge'] = logger_bridge
+        else:
+            raise ValueError("UI logger bridge not available or log output widget not found")
+    except Exception as e:
+        # Fall back to simple logger if UI logger initialization fails
+        simple_logger = create_simple_logger('EnvConfigLogger')
+        simple_logger.error(f"❌ Failed to initialize UI logger bridge: {str(e)}")
+        # Flush any buffered logs to the simple logger
+        buffered_logger.flush_to_ui_logger(simple_logger)
+        # Replace the buffered logger with the simple logger
+        ui_components['_logger_bridge'] = simple_logger
+        logger_bridge = simple_logger
     
     # Now that we have a logger, use it for all logging
     logger_bridge.info("🔧 Initializing environment configuration handlers...")
@@ -222,63 +242,8 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
         # Re-raise to allow caller to handle the error
         raise RuntimeError(error_msg) from e
 
-def _create_simple_logger():
-    """📝 Create simple fallback logger with all required methods"""
-    class SimpleLogger:
-        def __init__(self, name: str = 'SimpleLogger'):
-            self.name = name
-            self.level = 'INFO'
-            
-        def _log(self, level: str, msg: str, *args, **kwargs):
-            """Centralized logging method"""
-            prefix = {
-                'debug': '🐛',
-                'info': 'ℹ️',
-                'warning': '⚠️',
-                'error': '❌',
-                'critical': '🔥',
-                'success': '✅'
-            }.get(level.lower(), '📝')
-            
-            # Handle exc_info if present
-            exc_info = kwargs.pop('exc_info', None)
-            if exc_info and exc_info != (None, None, None):
-                if isinstance(exc_info, BaseException):
-                    exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
-                elif not isinstance(exc_info, tuple):
-                    exc_info = sys.exc_info()
-                
-                # Print the message first
-                print(f"{prefix} {msg}")
-                # Then print the traceback
-                traceback.print_exception(exc_info[0], exc_info[1], exc_info[2], file=sys.stderr)
-            else:
-                print(f"{prefix} {msg}")
-        
-        # Standard logging methods
-        def debug(self, msg: str, *args, **kwargs):
-            self._log('debug', msg, *args, **kwargs)
-            
-        def info(self, msg: str, *args, **kwargs):
-            self._log('info', msg, *args, **kwargs)
-            
-        def warning(self, msg: str, *args, **kwargs):
-            self._log('warning', msg, *args, **kwargs)
-            
-        def error(self, msg: str, *args, **kwargs):
-            self._log('error', msg, *args, **kwargs)
-            
-        def critical(self, msg: str, *args, **kwargs):
-            self._log('critical', msg, *args, **kwargs)
-            
-        def success(self, msg: str, *args, **kwargs):
-            self._log('success', msg, *args, **kwargs)
-            
-        def exception(self, msg: str, *args, **kwargs):
-            kwargs['exc_info'] = True
-            self._log('error', msg, *args, **kwargs)
-    
-    return SimpleLogger()
+# Simple logger has been moved to smartcash.ui.utils.simple_logger
+# Use create_simple_logger() instead
 
 def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
     """❌ Create error fallback UI with optional traceback

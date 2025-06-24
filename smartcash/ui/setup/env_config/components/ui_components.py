@@ -15,7 +15,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Header menggunakan shared component
     header = create_header(
         title="Environment Configuration", 
-        subtitle="Setup lingkungan SmartCash untuk deteksi mata uang",
+        description="Setup lingkungan SmartCash untuk deteksi mata uang",
         icon="🚀"
     )
     

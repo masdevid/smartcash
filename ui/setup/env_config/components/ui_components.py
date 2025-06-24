@@ -222,18 +222,32 @@ def create_env_config_ui() -> Dict[str, Any]:
         layout=widgets.Layout(width='100%', margin='15px 0')
     )
     
-    # Tips panel
-    tips_panel = widgets.HTML(
-        value="""
-        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0;">
-            <h5 style="margin-top: 0; color: #856404;">💡 Tips Setup</h5>
-            <ul style="margin: 5px 0; color: #856404;">
-                <li>Pastikan Google Drive sudah di-mount sebelum setup</li>
-                <li>Setup akan membuat folder SmartCash di Drive Anda</li>
-                <li>Template konfigurasi akan disalin otomatis</li>
-            </ul>
+   # Tips panel dengan enhanced styling
+    tips_html = """
+    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); 
+                padding: 20px; border-radius: 12px; border-left: 4px solid #2196f3;">
+        <h4 style="margin-top: 0; color: #1976d2; display: flex; align-items: center;">
+            💡 Tips & Requirements
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+                <ul style="margin: 0; padding-left: 20px; color: #424242;">
+                    <li>Pastikan Google Drive memiliki ruang minimal 12GB</li>
+                    <li>Setup akan membuat folder struktur data lengkap</li>
+                </ul>
+            </div>
+            <div>
+                <ul style="margin: 0; padding-left: 20px; color: #424242;">
+                    <li>Proses setup memerlukan waktu 1-2 menit</li>
+                    <li>Koneksi internet stabil diperlukan</li>
+                </ul>
+            </div>
         </div>
-        """
+    </div>
+    """
+    tips_panel = widgets.HTML(
+        value=tips_html,
+        layout=widgets.Layout(margin='20px 0')
     )
     
     # Main layout

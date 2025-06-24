@@ -190,7 +190,7 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary of UI components to update
     """
-    logger = ui_components.get('_logger_bridge', _create_simple_logger())
+    logger = ui_components.get('_logger_bridge', create_simple_logger('EnvConfigLogger'))
     
     try:
         logger.info("🔍 Starting initial environment status check...")

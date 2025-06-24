@@ -1,68 +1,59 @@
 """
 File: smartcash/ui/setup/env_config/env_config_initializer.py
-Deskripsi: Simple initializer untuk environment configuration tanpa config yaml dependency
+Deskripsi: Simple initializer untuk environment configuration dengan minimal dependencies
 """
 
-from typing import Dict, Any
-from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
-from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
+from typing import Dict, Any, Optional
+import ipywidgets as widgets
 
+def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
+    """
+    🚀 Initialize environment configuration UI dengan setup sederhana
+    
+    Args:
+        config: Konfigurasi opsional untuk setup
+        
+    Returns:
+        UI container siap pakai
+    """
+    try:
+        # 1. Create UI components
+        ui_components = _create_ui_components()
+        
+        # 2. Setup basic handlers
+        _setup_handlers(ui_components, config or {})
+        
+        # 3. Initial status check
+        _perform_initial_status_check(ui_components)
+        
+        return ui_components['ui']
+        
+    except Exception as e:
+        return _create_error_fallback(str(e))
 
-class EnvConfigInitializer:
-    """🔧 Simple initializer untuk environment configuration"""
-    
-    def __init__(self):
-        pass
-        
-    def initialize_ui(self, **kwargs) -> Dict[str, Any]:
-        """Initialize UI components dan handlers"""
-        try:
-            # Create UI components
-            ui_components = self._create_ui_components()
-            
-            # Setup handlers
-            ui_components = self._setup_handlers(ui_components)
-            
-            # Initial status check
-            self._perform_initial_status_check(ui_components)
-            
-            return ui_components
-            
-        except Exception as e:
-            return self._create_error_fallback(str(e))
-    
-    def _create_ui_components(self) -> Dict[str, Any]:
-        """Buat komponen UI dengan shared components"""
-        from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui
-        
-        ui_components = create_env_config_ui()
-        
-        # Validasi required components
-        required = ['setup_button', 'status_panel', 'progress_bar', 'progress_text', 
-                   'log_accordion', 'left_summary_panel', 'right_colab_panel']
-        missing = [w for w in required if w not in ui_components]
-        if missing:
-            raise ValueError(f"Missing UI components: {', '.join(missing)}")
-        
-        return ui_components
-    
-    def _setup_handlers(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Setup handlers dengan logger bridge"""
+def _create_ui_components() -> Dict[str, Any]:
+    """🎨 Buat komponen UI dengan shared components"""
+    from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui
+    return create_env_config_ui()
+
+def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+    """🔧 Setup handlers dan logger bridge"""
+    try:
         from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+        from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
+        from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
         
-        # Setup logger
-        logger = create_ui_logger_bridge(ui_components, 'env_config')
+        # Setup logger bridge
+        logger = create_ui_logger_bridge(ui_components, 'ENV_CONFIG')
+        ui_components['logger'] = logger
         
         # Initialize handlers
-        status_checker = StatusChecker(logger)
         setup_handler = SetupHandler(logger)
+        status_checker = StatusChecker(logger)
         
         # Store handlers
-        ui_components.update({
-            '_status_checker': status_checker,
-            '_setup_handler': setup_handler,
-            '_logger': logger
-        })
+        ui_components['_setup_handler'] = setup_handler
+        ui_components['_status_checker'] = status_checker
         
         # Setup button click handler
         def on_setup_click(button):
@@ -74,34 +65,77 @@ class EnvConfigInitializer:
         
         ui_components['setup_button'].on_click(on_setup_click)
         
-        return ui_components
-    
-    def _perform_initial_status_check(self, ui_components: Dict[str, Any]) -> None:
-        """Lakukan status check awal"""
-        try:
-            status_checker = ui_components['_status_checker']
-            status_checker.check_and_update_status(ui_components)
-        except Exception as e:
-            logger = ui_components.get('_logger')
-            if logger:
-                logger.warning(f"⚠️ Initial status check failed: {str(e)}")
-    
-    def _create_error_fallback(self, error_msg: str) -> Dict[str, Any]:
-        """Create minimal error fallback UI"""
-        import ipywidgets as widgets
+        logger.info("🎯 Environment configuration handlers initialized")
         
-        return {
-            'status_panel': widgets.HTML(f"<p style='color: red;'>❌ Initialization failed: {error_msg}</p>"),
-            'setup_button': widgets.Button(description="Retry Setup", disabled=True),
-            'progress_bar': widgets.IntProgress(value=0, max=100),
-            'progress_text': widgets.HTML("❌ Failed to initialize"),
-            'log_accordion': widgets.Accordion([widgets.Output()]),
-            'left_summary_panel': widgets.HTML(""),
-            'right_colab_panel': widgets.HTML("")
-        }
+    except ImportError as e:
+        # Fallback handler sederhana jika handler utama tidak tersedia
+        _setup_fallback_handler(ui_components)
+        print(f"⚠️  Using fallback handler: {str(e)}")
 
+def _setup_fallback_handler(ui_components: Dict[str, Any]) -> None:
+    """🔄 Setup fallback handler sederhana"""
+    def on_setup_click(button):
+        button.description = "🔄 Setting up..."
+        button.disabled = True
+        
+        # Update status
+        ui_components['status_panel'].children = [
+            widgets.HTML(value="<div style='color: orange;'>⚠️ Using fallback setup...</div>")
+        ]
+        
+        # Reset button
+        import time
+        time.sleep(2)
+        button.description = "🚀 Setup Environment" 
+        button.disabled = False
+    
+    ui_components['setup_button'].on_click(on_setup_click)
 
-def initialize_env_config_ui(**kwargs):
-    """Entry point untuk environment config initialization"""
-    initializer = EnvConfigInitializer()
-    return initializer.initialize_ui(**kwargs)
+def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
+    """🔍 Perform initial environment status check"""
+    try:
+        from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
+        
+        # Create logger if available
+        logger = ui_components.get('logger')
+        if not logger:
+            # Simple fallback logger
+            class SimpleLogger:
+                def info(self, msg): print(msg)
+                def success(self, msg): print(msg)
+                def warning(self, msg): print(msg)
+                def error(self, msg): print(msg)
+            logger = SimpleLogger()
+        
+        # Run status check
+        status_checker = StatusChecker(logger)
+        status_checker.check_environment_status(ui_components)
+        
+    except ImportError:
+        # Simple status display
+        ui_components['status_panel'].children = [
+            widgets.HTML(value="<div style='color: #666;'>📋 Ready for environment setup</div>")
+        ]
+
+def _create_error_fallback(error_msg: str) -> widgets.VBox:
+    """❌ Create error fallback UI"""
+    return widgets.VBox([
+        widgets.HTML(
+            value=f"""
+            <div style="padding: 20px; text-align: center; color: #dc3545;">
+                <h3>❌ Initialization Error</h3>
+                <p>Failed to initialize environment configuration UI:</p>
+                <code>{error_msg}</code>
+                <p style="margin-top: 15px;">
+                    <small>Silakan restart runtime dan coba lagi</small>
+                </p>
+            </div>
+            """,
+            layout=widgets.Layout(width='100%', padding='20px')
+        )
+    ])
+
+# Entry point function
+def create_environment_setup_ui(config=None):
+    """🔧 Entry point untuk membuat environment setup UI"""
+    return initialize_env_config_ui(config)

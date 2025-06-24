@@ -7,6 +7,8 @@ import ipywidgets as widgets
 from IPython.display import HTML
 from typing import Dict, Any, Optional
 
+__all__ = ['UIFactory']  # Export UIFactory at module level
+
 class UIFactory:
     """🏭 Factory untuk membuat UI components environment config dengan flexbox layout"""
     

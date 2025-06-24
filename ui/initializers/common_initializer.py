@@ -42,17 +42,13 @@ class CommonInitializer(ABC):
             config_handler = self._create_config_handler()
             
             # Load merged config menggunakan try_operation_safe
-            merged_config_result = try_operation_safe(
-                lambda: config or config_handler.load_config(),
-                f"Loading config untuk {self.module_name}",
-                self.logger
-            )
-            
-            if not merged_config_result.success:
+            try:
+                merged_config = config or config_handler.load_config()
+                if not merged_config:  # If config is empty or None
+                    raise ValueError("Empty config returned")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Gagal load config untuk {self.module_name}, menggunakan default config. Error: {str(e)}")
                 merged_config = self._get_default_config()
-                self.logger.warning(f"⚠️ Menggunakan default config untuk {self.module_name}")
-            else:
-                merged_config = merged_config_result.data
             
             self.logger.debug(f"📄 Config loaded: {merged_config is not None}")
             

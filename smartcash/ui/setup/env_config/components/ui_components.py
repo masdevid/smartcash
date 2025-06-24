@@ -102,7 +102,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         create_divider(),
         progress_tracker.container,
         create_divider(),
-        log_accordion,
+        log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),
         setup_summary,
         create_divider(),
@@ -116,6 +116,8 @@ def create_env_config_ui() -> Dict[str, Any]:
         border_radius='8px'
     ))
     
+    # Store the log components for later use
+    ui_components['log_components'] = log_accordion
     ui_components['ui'] = main_container
     
     return ui_components

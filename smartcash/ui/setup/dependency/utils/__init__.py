@@ -63,22 +63,13 @@ from smartcash.ui.setup.dependency.utils.package_selector_utils import (
 # Button state utilities
 from smartcash.ui.setup.dependency.utils.button_state import create_button_state_handler
 
-# Report generator - import last to avoid circular dependency
-# Use lazy import to break circular dependency
-def get_report_generators():
-    """Lazy import untuk report generators"""
-    from smartcash.ui.setup.dependency.utils.report_generator_utils import (
-        generate_comprehensive_status_report,
-        generate_installation_summary_report,
-        generate_analysis_summary_report,
-        generate_system_compatibility_report
-    )
-    return {
-        'generate_comprehensive_status_report': generate_comprehensive_status_report,
-        'generate_installation_summary_report': generate_installation_summary_report,
-        'generate_analysis_summary_report': generate_analysis_summary_report,
-        'generate_system_compatibility_report': generate_system_compatibility_report
-    }
+# Report generator utilities - direct import now that circular dependency is fixed
+from smartcash.ui.setup.dependency.utils.report_generator_utils import (
+    generate_comprehensive_status_report,
+    generate_installation_summary_report,
+    generate_analysis_summary_report,
+    generate_system_compatibility_report
+)
 
 __all__ = [
     # Constants
@@ -135,6 +126,9 @@ __all__ = [
     # Button state
     'create_button_state_handler',
     
-    # Report generators (lazy loaded)
-    'get_report_generators'
+    # Report generators
+    'generate_comprehensive_status_report',
+    'generate_installation_summary_report',
+    'generate_analysis_summary_report',
+    'generate_system_compatibility_report',
 ]

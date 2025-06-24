@@ -42,29 +42,34 @@ def initialize_environment_config_ui(force_refresh: bool = False) -> Dict[str, A
         print(f"🚨 Error initializing environment config: {str(e)}")
         return _create_error_component(str(e))
 
-def _create_error_component(error_msg: str) -> Dict[str, Any]:
-    """🚨 Create error component tanpa UI creation"""
-    import ipywidgets as widgets
+class ErrorComponent:
+    """🚨 Error component dengan display method"""
+    def __init__(self, error_msg: str):
+        import ipywidgets as widgets
+        from IPython.display import display
+        
+        self.error_msg = error_msg
+        self.ui = widgets.HTML(
+            value=f"""
+            <div style="background: #f8d7da; padding: 15px; border-radius: 6px; 
+                        border: 1px solid #f5c6cb; margin: 10px 0;">
+                <h4>🚨 Environment Config Error</h4>
+                <p><strong>Error:</strong> {error_msg}</p>
+                <p><strong>Solusi:</strong> Restart runtime dan coba lagi</p>
+            </div>
+            """
+        )
     
-    # Simple error display - minimal UI
-    error_display = widgets.HTML(
-        value=f"""
-        <div style="background: #f8d7da; padding: 15px; border-radius: 6px; 
-                    border: 1px solid #f5c6cb; margin: 10px 0;">
-            <h4>🚨 Environment Config Error</h4>
-            <p><strong>Error:</strong> {error_msg}</p>
-            <p><strong>Solusi:</strong> Restart runtime dan coba lagi</p>
-        </div>
-        """
-    )
+    def display(self):
+        from IPython.display import display
+        display(self.ui)
     
-    # Return simple dict dengan minimal structure
-    return {
-        'ui': error_display,
-        'error': error_msg,
-        'initialized': False,
-        'display': lambda: error_display  # Simple display method
-    }
+    def get_ui_components(self):
+        return {'ui': self.ui, 'error': self.error_msg}
+
+def _create_error_component(error_msg: str) -> ErrorComponent:
+    """🚨 Create error component object"""
+    return ErrorComponent(error_msg)
 
 def reset_env_config_ui():
     """🔄 Reset cached component"""

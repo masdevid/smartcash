@@ -198,8 +198,14 @@ class CommonInitializer(ABC):
             except Exception as e:
                 self.logger.warning(f"⚠️ Gagal create config handler {self.config_handler_class.__name__}: {str(e)}")
         
-        # Return basic ConfigHandler sebagai fallback
-        return ConfigHandler()
+        # Return BaseConfigHandler sebagai fallback dengan empty implementations
+        from smartcash.ui.handlers.config_handlers import BaseConfigHandler
+        return BaseConfigHandler(
+            module_name=self.module_name,
+            extract_fn=lambda ui_components: {},  # Default empty config
+            update_fn=lambda ui_components, config: None,  # No-op update
+            parent_module=self.parent_module
+        )
     
     def _add_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
         """Add logger bridge ke UI components"""

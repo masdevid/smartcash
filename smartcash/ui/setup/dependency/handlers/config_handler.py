@@ -1,10 +1,10 @@
 from typing import Dict, Any
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.handlers.config_handlers import BaseConfigHandler, ConfigHandler
 from smartcash.ui.setup.dependency.handlers import (
     config_extractor, config_updater, defaults
 )
 
-class DependencyConfigHandler(ConfigHandler):
+class DependencyConfigHandler(BaseConfigHandler):
     """Fixed ConfigHandler dengan public config access dan generator cleanup"""
     
     def __init__(self, module_name: str, parent_module: str = None):

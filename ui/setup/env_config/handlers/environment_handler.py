@@ -145,19 +145,19 @@ class EnvironmentHandler:
             return False
             
         return all([
-            self.environment_info['is_colab'],
-            self.environment_info['drive_mounted'],
-            self.environment_info['config_source_exists'],
-            self.environment_info['essential_configs_complete']
+            self.environment_info.get('is_colab', False),
+            self.environment_info.get('drive_mounted', False),
+            self.environment_info.get('config_source_exists', False),
+            self.environment_info.get('essential_configs_complete', False)
         ])
     
     def _log_environment_status(self, status: Dict[str, Any]) -> None:
         """Log environment status dengan emoji"""
-        if not self.logger:
+        if not self.logger or not status:
             return
             
         self.logger.info("🔍 Environment Status:")
-        self.logger.info(f"  📱 Colab Environment: {'✅' if status['is_colab'] else '❌'}")
-        self.logger.info(f"  💾 Drive Mounted: {'✅' if status['drive_mounted'] else '❌'}")
-        self.logger.info(f"  📋 Config Ready: {'✅' if status['config_ready'] else '❌'}")
-        self.logger.info(f"  🔧 Overall Ready: {'✅' if status['ready'] else '❌'}")
+        self.logger.info(f"  📱 Colab Environment: {'✅' if status.get('is_colab') else '❌'}")
+        self.logger.info(f"  💾 Drive Mounted: {'✅' if status.get('drive_mounted') else '❌'}")
+        self.logger.info(f"  📋 Config Ready: {'✅' if status.get('config_ready') else '❌'}")
+        self.logger.info(f"  🔧 Overall Ready: {'✅' if status.get('ready') else '❌'}")

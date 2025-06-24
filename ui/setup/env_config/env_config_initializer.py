@@ -88,21 +88,24 @@ class EnvironmentConfigOrchestrator:
         try:
             update_status_panel(self.ui_components, STATUS_MESSAGES['checking'], 'info')
             
-            # Get comprehensive status
+            # Get comprehensive status dengan error handling
             status = self.status_handler.get_comprehensive_status()
             
-            if status.get('ready', False):
+            # Safe check untuk status
+            if status and status.get('ready', False):
                 update_status_panel(self.ui_components, STATUS_MESSAGES['ready'], 'success')
                 update_setup_button(self.ui_components, False, "Environment Ready")
             else:
                 update_status_panel(self.ui_components, STATUS_MESSAGES['setup_needed'], 'warning')
                 update_setup_button(self.ui_components, True, "Setup Environment")
             
-            # Update summary
-            self._update_environment_summary(status)
+            # Update summary jika status valid
+            if status:
+                self._update_environment_summary(status)
             
         except Exception as e:
-            self.logger.error(f"❌ Initial status check failed: {str(e)}")
+            error_msg = f"❌ Initial status check failed: {str(e)}"
+            append_to_log(self.ui_components, error_msg, 'error')
             update_status_panel(self.ui_components, "❌ Error checking status", 'error')
     
     def _handle_setup_click(self) -> None:

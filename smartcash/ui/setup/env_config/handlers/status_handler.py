@@ -3,7 +3,7 @@ File: smartcash/ui/setup/env_config/handlers/status_handler.py
 Deskripsi: Handler untuk comprehensive status checking dan validation
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from smartcash.ui.setup.env_config.handlers.environment_handler import EnvironmentHandler
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
 from smartcash.ui.setup.env_config.utils.environment_helpers import validate_config_completeness
@@ -19,20 +19,35 @@ class StatusHandler:
     def get_comprehensive_status(self) -> Dict[str, Any]:
         """🔍 Get comprehensive environment status"""
         try:
-            # Environment status
-            env_status = self.env_handler.get_environment_status()
+            # Environment status dengan fallback
+            try:
+                env_status = self.env_handler.get_environment_status()
+            except Exception:
+                env_status = {'ready': False, 'error': 'Environment check failed'}
             
-            # Drive status
-            drive_status = self.drive_handler.get_drive_status()
+            # Drive status dengan fallback
+            try:
+                drive_status = self.drive_handler.get_drive_status()
+            except Exception:
+                drive_status = {'ready': False, 'error': 'Drive check failed'}
             
-            # Config validation
-            config_validation = validate_config_completeness()
+            # Config validation dengan fallback
+            try:
+                config_validation = validate_config_completeness()
+            except Exception:
+                config_validation = {'is_complete': False, 'total_configs': 0}
             
-            # Symlink validation
-            symlink_status = self.env_handler.validate_symlinks()
+            # Symlink validation dengan fallback
+            try:
+                symlink_status = self.env_handler.validate_symlinks()
+            except Exception:
+                symlink_status = {'valid': False, 'valid_count': 0}
             
-            # System info
-            system_info = self.env_handler.get_system_info()
+            # System info dengan fallback
+            try:
+                system_info = self.env_handler.get_system_info()
+            except Exception:
+                system_info = {'platform': 'Unknown'}
             
             # Overall readiness calculation
             overall_ready = self._calculate_overall_readiness(
@@ -41,11 +56,11 @@ class StatusHandler:
             
             comprehensive_status = {
                 'ready': overall_ready,
-                'environment': env_status,
-                'drive': drive_status,
-                'configs': config_validation,
-                'symlinks': symlink_status,
-                'system': system_info,
+                'environment': env_status or {},
+                'drive': drive_status or {},
+                'configs': config_validation or {},
+                'symlinks': symlink_status or {},
+                'system': system_info or {},
                 'summary': self._generate_status_summary(
                     env_status, drive_status, config_validation, symlink_status
                 )
@@ -62,6 +77,11 @@ class StatusHandler:
             return {
                 'ready': False,
                 'error': str(e),
+                'environment': {},
+                'drive': {},
+                'configs': {},
+                'symlinks': {},
+                'system': {},
                 'summary': {'error': 'Status check failed'}
             }
     

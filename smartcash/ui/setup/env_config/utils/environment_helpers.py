@@ -12,33 +12,45 @@ from smartcash.ui.setup.env_config.constants import (
 
 def discover_config_templates() -> List[str]:
     """🔍 Auto-detect semua config templates dari smartcash/configs"""
-    config_path = Path(CONFIG_SOURCE_PATH)
-    if not config_path.exists():
+    try:
+        config_path = Path(CONFIG_SOURCE_PATH)
+        if not config_path.exists():
+            return []
+        
+        discovered_configs = []
+        for ext in CONFIG_EXTENSIONS:
+            try:
+                discovered_configs.extend([
+                    f.name for f in config_path.glob(f'*{ext}')
+                    if f.is_file() and not f.name.startswith('.')
+                ])
+            except Exception:
+                continue
+        
+        return sorted(discovered_configs)
+    except Exception:
         return []
-    
-    discovered_configs = []
-    for ext in CONFIG_EXTENSIONS:
-        discovered_configs.extend([
-            f.name for f in config_path.glob(f'*{ext}')
-            if f.is_file() and not f.name.startswith('.')
-        ])
-    
-    return sorted(discovered_configs)
 
 def get_essential_configs() -> List[str]:
     """📋 Get essential configs berdasarkan pattern detection"""
-    all_configs = discover_config_templates()
-    essential_configs = []
-    
-    for pattern in ESSENTIAL_CONFIG_PATTERNS:
-        matching_configs = [
-            config for config in all_configs 
-            if pattern in config.lower()
-        ]
-        if matching_configs:
-            essential_configs.extend(matching_configs)
-    
-    return list(set(essential_configs))  # Remove duplicates
+    try:
+        all_configs = discover_config_templates()
+        if not all_configs:
+            return []
+            
+        essential_configs = []
+        
+        for pattern in ESSENTIAL_CONFIG_PATTERNS:
+            matching_configs = [
+                config for config in all_configs 
+                if pattern and config and pattern in config.lower()
+            ]
+            if matching_configs:
+                essential_configs.extend(matching_configs)
+        
+        return list(set(essential_configs))  # Remove duplicates
+    except Exception:
+        return []
 
 def validate_config_completeness() -> Dict[str, Any]:
     """✅ Validasi kelengkapan config templates"""

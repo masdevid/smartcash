@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/utils.py  
-Deskripsi: Fixed progress tracker utils dengan consistent API calls
+Deskripsi: Complete utils untuk environment config dengan semua required functions
 """
 
 import time
@@ -12,13 +12,12 @@ from .constants import (
     REPO_CONFIG_PATH, STATUS_MESSAGES, PROGRESS_MESSAGES, RETRY_CONFIG
 )
 
-# === PROGRESS UTILS - FIXED API ===
+# === PROGRESS UTILS ===
 def update_progress_safe(ui_components: Dict[str, Any], value: int, message: str = "") -> None:
-    """🔄 Update progress dengan consistent API - fixed"""
+    """🔄 Update progress dengan consistent API"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker and hasattr(progress_tracker, 'update_overall'):
-            # Use correct API from SHARED_COMPONENTS_README.md
             progress_tracker.update_overall(value, message)
         elif 'progress_bar' in ui_components:
             progress_bar = ui_components['progress_bar']
@@ -31,12 +30,11 @@ def update_progress_safe(ui_components: Dict[str, Any], value: int, message: str
                 if hasattr(message_widget, 'value'):
                     message_widget.value = message
     except Exception as e:
-        # Log instead of silent fail
         if 'logger' in ui_components:
             ui_components['logger'].debug(f"🔍 Progress update error: {str(e)}")
 
 def update_step_progress_safe(ui_components: Dict[str, Any], value: int, message: str = "") -> None:
-    """🔄 Update step progress - new method"""
+    """🔄 Update step progress"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker and hasattr(progress_tracker, 'update_step'):
@@ -46,7 +44,7 @@ def update_step_progress_safe(ui_components: Dict[str, Any], value: int, message
             ui_components['logger'].debug(f"🔍 Step progress error: {str(e)}")
 
 def show_progress_safe(ui_components: Dict[str, Any], operation_name: str = None) -> None:
-    """👁️ Show progress tracker - fixed"""
+    """👁️ Show progress tracker"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker:
@@ -64,7 +62,7 @@ def show_progress_safe(ui_components: Dict[str, Any], operation_name: str = None
             ui_components['logger'].debug(f"🔍 Show progress error: {str(e)}")
 
 def hide_progress_safe(ui_components: Dict[str, Any]) -> None:
-    """🙈 Hide progress tracker - fixed"""
+    """🙈 Hide progress tracker"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker and hasattr(progress_tracker, 'hide'):
@@ -79,35 +77,33 @@ def hide_progress_safe(ui_components: Dict[str, Any]) -> None:
             ui_components['logger'].debug(f"🔍 Hide progress error: {str(e)}")
 
 def complete_progress_safe(ui_components: Dict[str, Any], message: str) -> None:
-    """✅ Complete progress operation - new method"""
+    """✅ Complete progress operation"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker and hasattr(progress_tracker, 'complete_operation'):
             progress_tracker.complete_operation(message)
         else:
-            # Fallback to 100% progress
             update_progress_safe(ui_components, 100, message)
-            time.sleep(1)  # Brief pause to show completion
+            time.sleep(1)
             hide_progress_safe(ui_components)
     except Exception as e:
         if 'logger' in ui_components:
             ui_components['logger'].debug(f"🔍 Complete progress error: {str(e)}")
 
 def error_progress_safe(ui_components: Dict[str, Any], message: str) -> None:
-    """❌ Error progress operation - new method"""
+    """❌ Error progress operation"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker and hasattr(progress_tracker, 'error_operation'):
             progress_tracker.error_operation(message)
         else:
-            # Fallback to hide progress
             hide_progress_safe(ui_components)
     except Exception as e:
         if 'logger' in ui_components:
             ui_components['logger'].debug(f"🔍 Error progress error: {str(e)}")
 
 def reset_progress_safe(ui_components: Dict[str, Any]) -> None:
-    """🔄 Reset progress state - fixed"""
+    """🔄 Reset progress state"""
     try:
         progress_tracker = ui_components.get('progress_tracker')
         if progress_tracker and hasattr(progress_tracker, 'reset'):
@@ -131,31 +127,155 @@ def is_colab_environment() -> bool:
     except ImportError:
         return False
 
-def test_drive_readiness(max_retries: int = 3) -> Tuple[bool, str]:
-    """📱 Test Google Drive readiness dengan retry"""
-    drive_path = Path(DRIVE_MOUNT_POINT)
+def test_drive_readiness(drive_path: Path = None) -> bool:
+    """📱 Test Google Drive readiness"""
+    if drive_path is None:
+        drive_path = Path(DRIVE_MOUNT_POINT)
     
-    for attempt in range(max_retries):
-        try:
-            if drive_path.exists() and drive_path.is_dir():
-                # Test write access
-                test_file = drive_path / 'smartcash_test.tmp'
-                test_file.write_text('test')
-                test_file.unlink()
-                return True, "Drive ready and writable"
-        except Exception as e:
-            if attempt == max_retries - 1:
-                return False, f"Drive test failed: {str(e)}"
-            time.sleep(RETRY_CONFIG['drive_ready_delay'])
-    
-    return False, "Drive not accessible"
+    try:
+        if drive_path.exists() and drive_path.is_dir():
+            # Test write access
+            test_file = drive_path / 'smartcash_test.tmp'
+            test_file.write_text('test')
+            test_file.unlink()
+            return True
+        return False
+    except Exception:
+        return False
 
-def validate_setup_integrity() -> Dict[str, Any]:
+def wait_for_drive_ready(max_wait: int = 30, ui_components: Dict[str, Any] = None) -> Tuple[bool, str]:
+    """⏳ Wait for Drive to be ready dengan timeout"""
+    for i in range(max_wait):
+        if test_drive_readiness():
+            return True, STATUS_MESSAGES['drive_ready']
+        
+        if i % 5 == 0 and i > 0 and ui_components:
+            progress = 15 + (i/max_wait) * 10
+            update_progress_safe(ui_components, int(progress), f"⏳ Validating Drive state... ({i}s)")
+        
+        time.sleep(1)
+    
+    return False, f"Timeout setelah {max_wait}s - Drive tidak dapat divalidasi"
+
+# === FOLDER & CONFIG OPERATIONS ===
+def create_folder_with_retry(folder_path: Path, attempts: int = 3) -> bool:
+    """📁 Create folder dengan retry mechanism"""
+    for attempt in range(attempts):
+        try:
+            if not folder_path.exists():
+                folder_path.mkdir(parents=True, exist_ok=True)
+                time.sleep(0.2)
+            return folder_path.exists() and folder_path.is_dir()
+        except Exception:
+            if attempt < attempts - 1:
+                time.sleep(0.5)
+    return False
+
+def validate_folders(drive_base_path: str) -> Dict[str, bool]:
+    """📁 Validate Drive folders"""
+    drive_base = Path(drive_base_path)
+    return {folder: (folder_path := drive_base / folder).exists() and folder_path.is_dir() 
+            for folder in REQUIRED_FOLDERS}
+
+def validate_configs(drive_base_path: str) -> Dict[str, bool]:
+    """📋 Validate Drive configs"""
+    drive_config_path = Path(drive_base_path) / 'configs'
+    return {config: (config_file := drive_config_path / config).exists() and config_file.is_file() 
+            for config in CONFIG_TEMPLATES}
+
+def validate_repo_configs() -> Dict[str, bool]:
+    """📋 Validate repo configs"""
+    repo_config_path = Path(REPO_CONFIG_PATH)
+    return {config: (repo_config_path / config).exists() for config in CONFIG_TEMPLATES}
+
+# === SYMLINK OPERATIONS ===
+def check_symlink_status(local_path: Path) -> Dict[str, Any]:
+    """🔗 Check single symlink status"""
+    if not local_path.exists():
+        return {'exists': False, 'is_symlink': False, 'valid': False}
+    elif local_path.is_symlink():
+        try:
+            return {'exists': True, 'is_symlink': True, 'valid': local_path.resolve().exists()}
+        except Exception:
+            return {'exists': True, 'is_symlink': True, 'valid': False}
+    else:
+        return {'exists': True, 'is_symlink': False, 'valid': True}
+
+def validate_symlinks() -> Dict[str, Dict[str, Any]]:
+    """🔗 Validate all symlinks"""
+    if not is_colab_environment():
+        return {folder: {'exists': True, 'is_symlink': False, 'valid': True} 
+                for folder in REQUIRED_FOLDERS}
+    
+    return {folder: check_symlink_status(Path(f'/content/{folder}')) 
+            for folder in REQUIRED_FOLDERS}
+
+def create_symlink_with_retry(source_path: Path, target_path: Path, attempts: int = 3) -> bool:
+    """🔗 Create symlink dengan retry"""
+    for attempt in range(attempts):
+        try:
+            if target_path.exists():
+                if target_path.is_symlink():
+                    target_path.unlink()
+                else:
+                    return False  # Don't overwrite existing non-symlink
+            
+            target_path.symlink_to(source_path)
+            return target_path.is_symlink() and target_path.resolve().exists()
+        except Exception:
+            if attempt < attempts - 1:
+                time.sleep(RETRY_CONFIG['symlink_delay'])
+    return False
+
+# === STATUS EVALUATION ===
+def evaluate_readiness(drive_status: Dict[str, Any], repo_configs: Dict[str, bool], 
+                      drive_folders: Dict[str, bool], drive_configs: Dict[str, bool], 
+                      symlinks: Dict[str, Dict[str, Any]]) -> bool:
+    """✅ Evaluate overall readiness"""
+    return (drive_status['mounted'] and drive_status.get('ready', False) and
+            all(repo_configs.values()) and all(drive_folders.values()) and
+            sum(drive_configs.values()) >= len(ESSENTIAL_CONFIGS) and
+            all(link['valid'] for link in symlinks.values()))
+
+def get_missing_items(repo_configs: Dict[str, bool], drive_folders: Dict[str, bool], 
+                     drive_configs: Dict[str, bool], symlinks: Dict[str, Dict[str, Any]]) -> Dict[str, list]:
+    """📋 Get missing items untuk diagnostics"""
+    return {
+        'missing_repo_configs': [k for k, v in repo_configs.items() if not v],
+        'missing_drive_folders': [k for k, v in drive_folders.items() if not v],
+        'missing_drive_configs': [k for k, v in drive_configs.items() if not v],
+        'invalid_symlinks': [k for k, v in symlinks.items() if not v['valid']]
+    }
+
+def get_prioritized_missing_items(env_status: Dict[str, Any] = None) -> list:
+    """🎯 Get prioritized missing items untuk display"""
+    if env_status is None:
+        # Simple fallback
+        return []
+    
+    missing_items = []
+    
+    if not env_status.get('drive', {}).get('mounted', False):
+        missing_items.append("Google Drive")
+    
+    missing_folders = env_status.get('missing_drive_folders', [])[:2]
+    missing_items.extend([f"folder {folder}" for folder in missing_folders])
+    
+    missing_configs = env_status.get('missing_drive_configs', [])[:2]  
+    missing_items.extend([f"config {config.replace('_config.yaml', '')}" for config in missing_configs])
+    
+    return missing_items
+
+# === SETUP VALIDATION ===
+def validate_setup_integrity(drive_base_path: str = None) -> Dict[str, Any]:
     """✅ Validate setup integrity"""
+    if drive_base_path is None:
+        drive_base_path = SMARTCASH_DRIVE_PATH
+    
     issues = []
     warnings = []
     
-    smartcash_dir = Path(SMARTCASH_DRIVE_PATH)
+    smartcash_dir = Path(drive_base_path)
     
     # Check essential directories
     for folder in REQUIRED_FOLDERS:
@@ -181,36 +301,6 @@ def validate_setup_integrity() -> Dict[str, Any]:
         'warnings': warnings,
         'issue_count': len(issues),
         'warning_count': len(warnings)
-    }
-
-def get_prioritized_missing_items() -> Dict[str, Any]:
-    """🎯 Get prioritized missing items untuk setup"""
-    smartcash_dir = Path(SMARTCASH_DRIVE_PATH)
-    
-    missing_essential = []
-    missing_optional = []
-    
-    # Check folders
-    for folder in REQUIRED_FOLDERS:
-        folder_path = smartcash_dir / folder
-        if not folder_path.exists():
-            if folder in ['data', 'configs']:
-                missing_essential.append(f"folder:{folder}")
-            else:
-                missing_optional.append(f"folder:{folder}")
-    
-    # Check configs
-    config_dir = smartcash_dir / 'configs'
-    for config in ESSENTIAL_CONFIGS:
-        config_path = config_dir / config
-        if not config_path.exists():
-            missing_essential.append(f"config:{config}")
-    
-    return {
-        'essential': missing_essential,
-        'optional': missing_optional,
-        'total_missing': len(missing_essential) + len(missing_optional),
-        'setup_needed': len(missing_essential) > 0
     }
 
 def refresh_environment_state_silent() -> bool:
@@ -245,7 +335,7 @@ def get_progress_message(key: str) -> str:
     return PROGRESS_MESSAGES.get(key, f"Progress: {key}")
 
 # === ONE-LINER CONVENIENCE FUNCTIONS ===
-is_drive_ready = lambda: test_drive_readiness()[0]
+is_drive_ready = lambda: test_drive_readiness()
 get_smartcash_dir = lambda: Path(SMARTCASH_DRIVE_PATH)
 get_repo_config_dir = lambda: Path(REPO_CONFIG_PATH)
-setup_needed = lambda: get_prioritized_missing_items()['setup_needed']
+setup_needed = lambda: get_prioritized_missing_items().get('setup_needed', True) if get_prioritized_missing_items() else True

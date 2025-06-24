@@ -1,138 +1,267 @@
-# File: smartcash/ui/setup/env_config/handlers/setup_handler.py
-# Deskripsi: Handler untuk setup workflow dan status management
+"""
+File: smartcash/ui/setup/env_config/handlers/setup_handler.py
+Deskripsi: Fixed setup handler dengan proper UI state management dan workflow
+"""
 
-import os
 import time
 from typing import Dict, Any
-from pathlib import Path
+from smartcash.ui.setup.env_config.handlers.status_handler import StatusHandler
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
 from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.setup.env_config.handlers.status_handler import StatusHandler
-from smartcash.ui.setup.env_config.utils.progress_updater import ProgressUpdater
+from smartcash.ui.setup.env_config.constants import PROGRESS_STEPS, STATUS_MESSAGES
 
 class SetupHandler:
-    """🚀 Handler untuk environment setup workflow"""
+    """🚀 Fixed setup handler dengan comprehensive workflow"""
     
     def __init__(self):
         self.status_handler = StatusHandler()
         self.drive_handler = DriveHandler()
         self.folder_handler = FolderHandler()
         self.config_handler = ConfigHandler()
-        self.progress_updater = ProgressUpdater()
-        
-    def perform_initial_status_check(self, ui_components: Dict[str, Any], logger):
-        """Lakukan pengecekan status awal environment"""
-        logger.info("🔍 Memeriksa status environment saat ini...")
-        
-        # Check environment status
-        env_status = self.status_handler.get_comprehensive_status()
-        
-        # Update status panel
-        self._update_status_panel(ui_components, env_status)
-        
-        # Log hasil check
-        if env_status.get('ready', False):
-            logger.success("✅ Environment sudah terkonfigurasi dengan baik")
-        else:
-            logger.warning("🔧 Environment perlu dikonfigurasi")
-            missing_items = env_status.get('missing_items', [])
-            if missing_items:
-                logger.info(f"📋 Item yang perlu dikonfigurasi: {', '.join(missing_items)}")
     
     def handle_setup_click(self, ui_components: Dict[str, Any], logger):
-        """Handle klik tombol setup dengan workflow lengkap"""
+        """Handle setup button click dengan comprehensive workflow"""
         logger.info("🚀 Memulai konfigurasi environment...")
         
-        # Disable button selama proses
-        self._disable_setup_button(ui_components)
+        # Set UI to setup state
+        self._set_setup_running_state(ui_components)
         
         try:
-            # Setup workflow steps
-            if self._execute_setup_workflow(ui_components, logger):
-                logger.success("🎉 Environment berhasil dikonfigurasi!")
-                self._update_status_panel(ui_components, {'ready': True})
+            # Execute setup workflow
+            success = self._execute_comprehensive_setup(ui_components, logger)
+            
+            if success:
+                # Set UI to ready state
+                self._set_setup_complete_state(ui_components, logger)
             else:
-                logger.error("❌ Setup gagal - silakan coba lagi")
+                # Reset UI to setup needed state
+                self._set_setup_failed_state(ui_components, logger)
                 
         except Exception as e:
-            logger.error(f"❌ Error selama setup: {str(e)}")
-        finally:
-            self._enable_setup_button(ui_components)
+            logger.error(f"❌ Setup failed: {str(e)}")
+            self._set_setup_failed_state(ui_components, logger, str(e))
     
-    def _execute_setup_workflow(self, ui_components: Dict[str, Any], logger) -> bool:
-        """Execute setup workflow dengan progress tracking"""
-        # Step 1: Mount Google Drive
-        self.progress_updater.update_progress(ui_components, 15, "📱 Menghubungkan Google Drive...")
-        if not self.drive_handler.mount_drive(logger):
+    def _execute_comprehensive_setup(self, ui_components: Dict[str, Any], logger) -> bool:
+        """Execute comprehensive setup workflow dengan progress tracking"""
+        
+        # Step 1: Environment Analysis
+        self._update_progress(ui_components, 'analysis', logger)
+        if not self._analyze_environment(logger):
             return False
         
-        # Step 2: Create folder structures
-        self.progress_updater.update_progress(ui_components, 40, "📁 Membuat struktur folder...")
-        self.folder_handler.create_folder_structures(logger)
+        # Step 2: Drive Connection
+        self._update_progress(ui_components, 'drive_mount', logger)
+        if not self._ensure_drive_connection(logger):
+            return False
         
-        # Step 3: Setup configurations
-        self.progress_updater.update_progress(ui_components, 70, "📋 Menyalin konfigurasi...")
-        self.config_handler.setup_configurations(logger)
+        # Step 3: Folder Structure
+        self._update_progress(ui_components, 'folders', logger)
+        if not self._create_folder_structure(logger):
+            return False
         
-        # Step 4: Final validation
-        self.progress_updater.update_progress(ui_components, 90, "✅ Memvalidasi setup...")
-        is_valid = self._validate_setup(logger)
+        # Step 4: Configuration Setup
+        self._update_progress(ui_components, 'configs', logger)
+        if not self._setup_configurations(logger):
+            return False
         
-        # Complete
-        self.progress_updater.update_progress(ui_components, 100, "🎉 Setup selesai!")
-        return is_valid
+        # Step 5: Symlink Creation
+        self._update_progress(ui_components, 'symlinks', logger)
+        if not self._create_symlinks(logger):
+            return False
+        
+        # Step 6: Final Validation
+        self._update_progress(ui_components, 'validation', logger)
+        if not self._validate_complete_setup(logger):
+            return False
+        
+        # Step 7: Complete
+        self._update_progress(ui_components, 'complete', logger)
+        return True
     
-    def _validate_setup(self, logger) -> bool:
-        """Validasi hasil setup"""
+    def _analyze_environment(self, logger) -> bool:
+        """Analyze current environment"""
         try:
-            key_paths = [
-                "/content/drive/MyDrive/SmartCash/data",
-                "/content/drive/MyDrive/SmartCash/configs"
-            ]
+            logger.info("🔍 Menganalisis environment saat ini...")
             
-            all_valid = True
-            for path in key_paths:
-                if os.path.exists(path):
-                    logger.success(f"✅ Validasi OK: {path}")
-                else:
-                    logger.warning(f"⚠️ Path tidak ditemukan: {path}")
-                    all_valid = False
+            # Basic environment checks
+            import os, sys
+            import platform
             
-            return all_valid
+            logger.info(f"📊 Python version: {sys.version.split()[0]}")
+            logger.info(f"📊 Platform: {platform.system()}")
+            
+            # Check if we're in Colab
+            try:
+                import google.colab
+                logger.info("📱 Running in Google Colab")
+                return True
+            except ImportError:
+                logger.warning("⚠️ Not running in Google Colab")
+                return True  # Continue anyway
+                
         except Exception as e:
-            logger.warning(f"⚠️ Warning validasi: {str(e)}")
+            logger.error(f"❌ Environment analysis failed: {str(e)}")
             return False
     
-    def _update_status_panel(self, ui_components: Dict[str, Any], status: Dict[str, Any]):
-        """Update panel status berdasarkan hasil check"""
-        if 'status_panel' not in ui_components:
-            return
+    def _ensure_drive_connection(self, logger) -> bool:
+        """Ensure Google Drive is connected"""
+        try:
+            return self.drive_handler.ensure_drive_mounted(logger)
+        except Exception as e:
+            logger.error(f"❌ Drive connection failed: {str(e)}")
+            return False
+    
+    def _create_folder_structure(self, logger) -> bool:
+        """Create required folder structure"""
+        try:
+            return self.folder_handler.create_smartcash_structure(logger)
+        except Exception as e:
+            logger.error(f"❌ Folder creation failed: {str(e)}")
+            return False
+    
+    def _setup_configurations(self, logger) -> bool:
+        """Setup configuration files"""
+        try:
+            return self.config_handler.setup_essential_configs(logger)
+        except Exception as e:
+            logger.error(f"❌ Configuration setup failed: {str(e)}")
+            return False
+    
+    def _create_symlinks(self, logger) -> bool:
+        """Create symbolic links"""
+        try:
+            import os
+            from pathlib import Path
             
-        panel = ui_components['status_panel']
-        is_ready = status.get('ready', False)
+            logger.info("🔗 Membuat symbolic links...")
+            
+            # Create symlinks dari Drive ke local paths
+            drive_path = '/content/drive/MyDrive/SmartCash'
+            local_path = '/content/smartcash_data'
+            
+            if os.path.exists(drive_path) and not os.path.exists(local_path):
+                os.symlink(drive_path, local_path)
+                logger.success(f"✅ Symlink created: {local_path} -> {drive_path}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Symlink creation failed: {str(e)}")
+            return False
+    
+    def _validate_complete_setup(self, logger) -> bool:
+        """Final validation of complete setup"""
+        try:
+            logger.info("✅ Memvalidasi setup lengkap...")
+            
+            # Get fresh status check
+            final_status = self.status_handler.get_comprehensive_status()
+            
+            if final_status.get('ready', False):
+                logger.success("🎉 Setup validation passed!")
+                return True
+            else:
+                missing = final_status.get('missing_items', [])
+                logger.warning(f"⚠️ Setup incomplete: {', '.join(missing)}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Setup validation failed: {str(e)}")
+            return False
+    
+    def _update_progress(self, ui_components: Dict[str, Any], step: str, logger):
+        """Update progress bar dan text"""
+        if step not in PROGRESS_STEPS:
+            return
         
-        if is_ready:
-            panel.value = """
-            <div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">
-                ✅ Environment sudah terkonfigurasi dengan baik
-            </div>
-            """
-        else:
-            panel.value = """
-            <div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px;">
-                🔧 Environment perlu dikonfigurasi - Klik tombol setup untuk memulai
-            </div>
-            """
+        step_info = PROGRESS_STEPS[step]
+        progress_value = step_info['range'][1]  # Take max value
+        progress_label = step_info['label']
+        
+        # Update progress bar
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = progress_value
+        
+        # Update progress text
+        if 'progress_text' in ui_components:
+            ui_components['progress_text'].value = (
+                f"<span style='color: #007bff;'>{progress_label}</span>"
+            )
+        
+        logger.info(f"📊 Progress: {progress_value}% - {progress_label}")
+        time.sleep(0.5)  # Small delay untuk visual feedback
     
-    def _disable_setup_button(self, ui_components: Dict[str, Any]):
-        """Disable setup button selama proses"""
+    def _set_setup_running_state(self, ui_components: Dict[str, Any]):
+        """Set UI state saat setup sedang berjalan"""
+        # Disable button
         if 'setup_button' in ui_components:
-            ui_components['setup_button'].disabled = True
-            ui_components['setup_button'].description = "⏳ Setting up..."
+            setup_button = ui_components['setup_button']
+            setup_button.disabled = True
+            setup_button.description = "⚙️ Setting Up..."
+            setup_button.button_style = 'warning'
+        
+        # Update status panel
+        if 'status_panel' in ui_components:
+            ui_components['status_panel'].value = (
+                "<p style='color: #856404; padding: 10px; margin: 5px 0; "
+                "background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px;'>"
+                "⚙️ Sedang mengkonfigurasi environment - mohon tunggu...</p>"
+            )
     
-    def _enable_setup_button(self, ui_components: Dict[str, Any]):
-        """Re-enable setup button setelah proses"""
+    def _set_setup_complete_state(self, ui_components: Dict[str, Any], logger):
+        """Set UI state setelah setup berhasil"""
+        # Update button to success state (disabled)
         if 'setup_button' in ui_components:
-            ui_components['setup_button'].disabled = False
-            ui_components['setup_button'].description = "🚀 Setup Environment"
+            setup_button = ui_components['setup_button']
+            setup_button.disabled = True
+            setup_button.description = "✅ Environment Ready"
+            setup_button.button_style = 'success'
+        
+        # Update status panel
+        if 'status_panel' in ui_components:
+            ui_components['status_panel'].value = (
+                "<p style='color: #155724; padding: 10px; margin: 5px 0; "
+                "background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px;'>"
+                "🎉 Environment berhasil dikonfigurasi dan siap digunakan!</p>"
+            )
+        
+        # Set progress to 100%
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 100
+        
+        if 'progress_text' in ui_components:
+            ui_components['progress_text'].value = (
+                "<span style='color: #28a745; font-weight: bold;'>🎉 Setup selesai - Environment siap digunakan!</span>"
+            )
+        
+        logger.success("🎉 Environment berhasil dikonfigurasi!")
+    
+    def _set_setup_failed_state(self, ui_components: Dict[str, Any], logger, error_msg: str = None):
+        """Set UI state jika setup gagal"""
+        # Re-enable button untuk retry
+        if 'setup_button' in ui_components:
+            setup_button = ui_components['setup_button']
+            setup_button.disabled = False
+            setup_button.description = "🔄 Retry Setup"
+            setup_button.button_style = 'danger'
+        
+        # Update status panel dengan error
+        error_text = f" - {error_msg}" if error_msg else ""
+        if 'status_panel' in ui_components:
+            ui_components['status_panel'].value = (
+                f"<p style='color: #721c24; padding: 10px; margin: 5px 0; "
+                f"background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;'>"
+                f"❌ Setup gagal{error_text}. Silakan coba lagi.</p>"
+            )
+        
+        # Reset progress
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 0
+        
+        if 'progress_text' in ui_components:
+            ui_components['progress_text'].value = (
+                "<span style='color: #dc3545;'>❌ Setup gagal - Silakan coba lagi</span>"
+            )
+        
+        logger.error(f"❌ Setup gagal{error_text}")

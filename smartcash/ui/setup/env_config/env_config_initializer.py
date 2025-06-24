@@ -14,6 +14,29 @@ from smartcash.ui.setup.env_config.utils.ui_updater import (
 )
 from smartcash.ui.setup.env_config.constants import STATUS_MESSAGES
 
+class UILogger:
+    """🔧 Logger yang mengarahkan output ke UI log accordion"""
+    
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+        
+    def info(self, message: str) -> None:
+        """Log info message ke UI"""
+        append_to_log(self.ui_components, message, 'info')
+        
+    def warning(self, message: str) -> None:
+        """Log warning message ke UI"""
+        append_to_log(self.ui_components, message, 'warning')
+        
+    def error(self, message: str, exc_info=None) -> None:
+        """Log error message ke UI"""
+        append_to_log(self.ui_components, message, 'error')
+        
+    def success(self, message: str) -> None:
+        """Log success message ke UI"""
+        append_to_log(self.ui_components, message, 'success')
+
+
 class EnvironmentConfigOrchestrator:
     """🎯 Main orchestrator untuk environment configuration"""
     
@@ -28,10 +51,10 @@ class EnvironmentConfigOrchestrator:
     def initialize_ui(self) -> None:
         """🎨 Initialize UI components"""
         try:
-            # Setup logger
-            self._setup_logger()
+            # Setup logger setelah UI ready
+            self.logger = UILogger(self.ui_components)
             
-            # Initialize handlers
+            # Initialize handlers dengan UI logger
             self.status_handler = StatusHandler(self.logger)
             self.drive_handler = DriveHandler(self.logger)
             
@@ -52,20 +75,13 @@ class EnvironmentConfigOrchestrator:
         except Exception as e:
             if self.logger:
                 self.logger.error(f"❌ UI initialization failed: {str(e)}")
+            # Fallback ke print hanya untuk error initialization
             print(f"❌ Error initializing environment config: {str(e)}")
     
     def _setup_logger(self) -> None:
-        """🔧 Setup logger dengan UI integration"""
-        try:
-            from smartcash.common.utils.logger import get_logger
-            self.logger = get_logger('env_config')
-        except Exception:
-            import logging
-            self.logger = logging.getLogger('env_config')
-            if not self.logger.handlers:
-                handler = logging.StreamHandler()
-                self.logger.addHandler(handler)
-                self.logger.setLevel(logging.INFO)
+        """🔧 Setup UI logger (tidak ada console output)"""
+        # Logger akan diset setelah UI components ready
+        pass
     
     def _perform_initial_status_check(self) -> None:
         """🔍 Perform initial status check"""
@@ -77,10 +93,10 @@ class EnvironmentConfigOrchestrator:
             
             if status.get('ready', False):
                 update_status_panel(self.ui_components, STATUS_MESSAGES['ready'], 'success')
-                update_setup_button(self.ui_components, False, "✅ Environment Ready")
+                update_setup_button(self.ui_components, False, "Environment Ready")
             else:
                 update_status_panel(self.ui_components, STATUS_MESSAGES['setup_needed'], 'warning')
-                update_setup_button(self.ui_components, True, "🚀 Setup Environment")
+                update_setup_button(self.ui_components, True, "Setup Environment")
             
             # Update summary
             self._update_environment_summary(status)
@@ -175,7 +191,7 @@ class EnvironmentConfigOrchestrator:
         success_msg = message or STATUS_MESSAGES['setup_success']
         
         update_status_panel(self.ui_components, success_msg, 'success')
-        update_setup_button(self.ui_components, False, "✅ Environment Ready")
+        update_setup_button(self.ui_components, False, "Environment Ready")
         append_to_log(self.ui_components, success_msg, 'success')
         
         # Update summary dengan status terbaru
@@ -188,7 +204,7 @@ class EnvironmentConfigOrchestrator:
     def _handle_setup_error(self, error_message: str) -> None:
         """❌ Handle setup error"""
         update_status_panel(self.ui_components, STATUS_MESSAGES['setup_failed'], 'error')
-        update_setup_button(self.ui_components, True, "🔄 Retry Setup")
+        update_setup_button(self.ui_components, True, "Retry Setup")
         append_to_log(self.ui_components, f"❌ {error_message}", 'error')
         
         if self.logger:

@@ -28,10 +28,10 @@ def create_env_config_component(setup_callback: Optional[Callable] = None) -> Di
     # Environment summary
     summary_panel = _create_summary_panel()
     
-    # Tips & Requirements (2 columns)
+    # Tips & Requirements (flexbox layout)
     tips_panel = _create_tips_panel()
     
-    # Layout container
+    # Main layout dengan flexbox
     layout = _create_main_layout([
         header,
         setup_button,
@@ -71,12 +71,11 @@ def _create_header_component() -> widgets.HTML:
 def _create_setup_button(callback: Optional[Callable] = None) -> widgets.Button:
     """🔘 Create setup button"""
     button = widgets.Button(
-        description='🚀 Setup Environment',
+        description='Setup Environment',
         button_style='success',
-        icon='play',
         layout=widgets.Layout(
             width='300px',
-            height='50px',
+            height='45px',
             margin='10px auto',
             display='flex'
         ),
@@ -131,50 +130,47 @@ def _create_summary_panel() -> widgets.HTML:
         layout=widgets.Layout(margin='15px 0')
     )
 
-def _create_tips_panel() -> widgets.HBox:
-    """💡 Create tips & requirements panel (2 columns)"""
-    tips_column = widgets.HTML(
+def _create_tips_panel() -> widgets.HTML:
+    """💡 Create tips & requirements panel dengan flexbox layout"""
+    return widgets.HTML(
         value="""
-        <div style="padding: 15px; background: #e3f2fd; border-radius: 8px;">
-            <h4 style="margin-top: 0; color: #1976d2;">💡 Tips Setup</h4>
-            <ul style="margin: 0; padding-left: 20px;">
-                <li>Pastikan Google Drive sudah ter-mount</li>
-                <li>Proses setup memakan waktu 2-3 menit</li>
-                <li>Jangan tutup browser saat setup berlangsung</li>
-                <li>Setup hanya perlu dilakukan sekali</li>
-            </ul>
+        <div style="display: flex; gap: 15px; width: 100%; margin: 15px 0;">
+            <div style="flex: 1; padding: 15px; background: #e3f2fd; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: #1976d2; line-height: 1.2;">💡 Tips Setup</h4>
+                <ul style="margin: 0; padding-left: 20px; line-height: 1.3;">
+                    <li style="margin: 0; padding: 0;">Pastikan Google Drive sudah ter-mount</li>
+                    <li style="margin: 0; padding: 0;">Proses setup memakan waktu 2-3 menit</li>
+                    <li style="margin: 0; padding: 0;">Jangan tutup browser saat setup berlangsung</li>
+                    <li style="margin: 0; padding: 0;">Setup hanya perlu dilakukan sekali</li>
+                </ul>
+            </div>
+            <div style="flex: 1; padding: 15px; background: #f3e5f5; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: #7b1fa2; line-height: 1.2;">📋 Requirements</h4>
+                <ul style="margin: 0; padding-left: 20px; line-height: 1.3;">
+                    <li style="margin: 0; padding: 0;">Google Colab environment</li>
+                    <li style="margin: 0; padding: 0;">Google Drive access permission</li>
+                    <li style="margin: 0; padding: 0;">Minimal 2GB free space di Drive</li>
+                    <li style="margin: 0; padding: 0;">Koneksi internet stabil</li>
+                </ul>
+            </div>
         </div>
-        """
-    )
-    
-    requirements_column = widgets.HTML(
-        value="""
-        <div style="padding: 15px; background: #f3e5f5; border-radius: 8px;">
-            <h4 style="margin-top: 0; color: #7b1fa2;">📋 Requirements</h4>
-            <ul style="margin: 0; padding-left: 20px;">
-                <li>Google Colab environment</li>
-                <li>Google Drive access permission</li>
-                <li>Minimal 2GB free space di Drive</li>
-                <li>Koneksi internet stabil</li>
-            </ul>
-        </div>
-        """
-    )
-    
-    return widgets.HBox(
-        [tips_column, requirements_column],
-        layout=widgets.Layout(margin='15px 0')
+        """,
+        layout=widgets.Layout(width='100%')
     )
 
 def _create_main_layout(components: list) -> widgets.VBox:
-    """📐 Create main layout container"""
+    """📐 Create main layout container dengan flexbox styling"""
     return widgets.VBox(
         components,
         layout=widgets.Layout(
+            width='100%',
             padding='20px',
             border='1px solid #ddd',
             border_radius='10px',
-            box_shadow='0 2px 10px rgba(0,0,0,0.1)'
+            box_shadow='0 2px 10px rgba(0,0,0,0.1)',
+            display='flex',
+            flex_flow='column',
+            gap='10px'
         )
     )
 

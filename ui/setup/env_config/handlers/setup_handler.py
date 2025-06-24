@@ -288,14 +288,20 @@ class SetupHandler:
             
             # Mark all stages as complete if successful
             if summary_data['status']:
-                # Just update to COMPLETE stage - no need to iterate through all stages
+                # Explicitly complete each stage
+                for stage in [
+                    SetupStage.INIT,
+                    SetupStage.DRIVE_MOUNT,
+                    SetupStage.CONFIG_SYNC,
+                    SetupStage.FOLDER_SETUP,
+                    SetupStage.ENV_SETUP
+                ]:
+                    progress_tracker.update_stage(stage)
+                    progress_tracker.complete_stage(f"Completed {stage.name.replace('_', ' ').title()}")
+                
+                # Finally, set to complete stage
                 progress_tracker.update_stage(SetupStage.COMPLETE)
                 progress_tracker.complete("✅ All setup steps completed successfully")
-                
-                # Update the progress bar to show 100% for all stages
-                if 'progress_bar' in progress_tracker.ui_components:
-                    progress_tracker.ui_components['progress_bar'].value = 100
-                    progress_tracker.ui_components['progress_bar'].bar_style = 'success'
             
             # Log final summary
             self.logger.info("\n📋 Setup Summary:" + "\n" + "="*50)

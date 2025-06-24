@@ -120,9 +120,15 @@ class SetupProgressTracker:
             self.update_progress(stage, 0, message)
     
     def complete_stage(self, message: str = "") -> None:
-        """Mark current stage as complete"""
+        """Mark current stage as complete
+        
+        Args:
+            message: Optional completion message
+        """
         if self.current_stage is not None:
             self.update_progress(self.current_stage, 100, message)
+        else:
+            self.logger.warning("No current stage to complete")
     
     def update_within_stage(self, progress: int, message: str = "") -> None:
         """Update progress within the current stage

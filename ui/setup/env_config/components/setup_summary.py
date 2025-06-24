@@ -126,8 +126,14 @@ def _format_summary_content(data: Dict) -> str:
     symlinks_created = data.get('symlinks_created', 0)
     folders_created = data.get('folders_created', 0)
     
-    drive_status = "✅ Mounted" if drive_mounted else "❌ Not mounted"
-    mount_info = f"at {mount_path}" if drive_mounted else ""
+    # Format drive status with proper path display
+    if drive_mounted:
+        if mount_path and mount_path != 'N/A':
+            drive_status = f"✅ Mounted at {mount_path}"
+        else:
+            drive_status = "✅ Mounted (path not available)"
+    else:
+        drive_status = "❌ Not mounted"
     
     return f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6;">
@@ -136,7 +142,7 @@ def _format_summary_content(data: Dict) -> str:
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
             <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #2196f3;">
                 <h5 style="margin: 0 0 8px 0; color: #333;">💾 Drive Status</h5>
-                <p style="margin: 0; font-size: 14px;"><strong>{drive_status}</strong> {mount_info}</p>
+                <p style="margin: 0; font-size: 14px;"><strong>{drive_status}</strong></p>
             </div>
             
             <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #4caf50;">

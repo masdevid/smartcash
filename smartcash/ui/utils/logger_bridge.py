@@ -112,61 +112,106 @@ class UILoggerBridge:
         try:
             # Try to get the log output widget
             log_output = self._get_log_output_widget()
-            if not log_output:
+            if not log_output or not hasattr(log_output, 'append_log'):
+                print(f"[DEBUG] Log output widget not found or missing append_log method")
                 return
             
-            # Map log levels to match the LogLevel enum in log_accordion.py
+            # Import LogLevel enum from log_accordion
+            from smartcash.ui.components.log_accordion import LogLevel
+            
+            # Map log levels to LogLevel enum
             level_mapping = {
-                'debug': 'debug',
-                'info': 'info',
-                'success': 'success',
-                'warning': 'warning',
-                'error': 'error',
-                'critical': 'critical'
+                'debug': LogLevel.DEBUG,
+                'info': LogLevel.INFO,
+                'success': LogLevel.SUCCESS,
+                'warning': LogLevel.WARNING,
+                'error': LogLevel.ERROR,
+                'critical': LogLevel.CRITICAL
             }
             
-            # Get the mapped level, default to 'info' if not found
-            mapped_level = level_mapping.get(level.lower(), 'info')
+            # Get the mapped level, default to INFO if not found
+            log_level = level_mapping.get(level.lower(), LogLevel.INFO)
             
-            # Append the log message
+            # Get the current timestamp
+            from datetime import datetime
+            timestamp = datetime.now()
+            
+            # Call append_log with the correct LogLevel enum
             log_output.append_log(
                 message=message,
-                level=mapped_level,
+                level=log_level,
                 namespace='env_config',
-                module='smartcash.ui.setup.env_config'
+                module='smartcash.ui.setup.env_config',
+                timestamp=timestamp
             )
             
+        except ImportError as e:
+            print(f"[ERROR] Failed to import LogLevel: {str(e)}")
+            import traceback
+            traceback.print_exc()
         except Exception as e:
             # Log the error to console if UI update fails
             print(f"[ERROR] Failed to log to UI: {str(e)}")
             print(f"[ERROR] Original message: [{level.upper()}] {message}")
+            import traceback
+            traceback.print_exc()
     
     def _get_log_output_widget(self):
         """Get the log output widget from UI components."""
         try:
-            # First try to get the log_output directly
+            # Debug: Print available keys for troubleshooting
+            available_keys = list(self.ui_components.keys())
+            print(f"[DEBUG] Available UI component keys: {available_keys}")
+            
+            # 1. First try to get log_components
+            if 'log_components' in self.ui_components and self.ui_components['log_components'] is not None:
+                log_components = self.ui_components['log_components']
+                if isinstance(log_components, dict) and 'log_output' in log_components:
+                    log_output = log_components['log_output']
+                    if hasattr(log_output, 'append_log'):
+                        print("[DEBUG] Found log_output in log_components")
+                        return log_output
+            
+            # 2. Try to get log_output directly
             if 'log_output' in self.ui_components:
                 log_output = self.ui_components['log_output']
                 if hasattr(log_output, 'append_log'):
+                    print("[DEBUG] Found log_output directly in ui_components")
                     return log_output
             
-            # Then try to get it from log_components if available
-            if 'log_components' in self.ui_components and isinstance(self.ui_components['log_components'], dict):
-                log_components = self.ui_components['log_components']
-                if 'log_output' in log_components and hasattr(log_components['log_output'], 'append_log'):
-                    return log_components['log_output']
+            # 3. Try to find log_accordion and get its output
+            if 'log_accordion' in self.ui_components:
+                log_accordion = self.ui_components['log_accordion']
+                if hasattr(log_accordion, 'children') and len(log_accordion.children) > 0:
+                    log_output = log_accordion.children[0]
+                    if hasattr(log_output, 'append_log'):
+                        print("[DEBUG] Found log_output in log_accordion children")
+                        return log_output
             
-            # Try to find any widget with 'log' in the key that has append_log method
+            # 4. Try to find any widget with 'log' in the key that has append_log method
             for key, widget in self.ui_components.items():
                 if 'log' in key.lower() and hasattr(widget, 'append_log'):
+                    print(f"[DEBUG] Found log widget with key: {key}")
                     return widget
+                
+                # If it's a container, check its children
+                if hasattr(widget, 'children'):
+                    for child in widget.children:
+                        if hasattr(child, 'append_log'):
+                            print(f"[DEBUG] Found log widget in children of {key}")
+                            return child
             
-            # If we get here, log a debug message
-            print(f"[DEBUG] No log output widget found with append_log method. Available keys: {list(self.ui_components.keys())}")
+            # 5. If we get here, log a debug message with more details
+            print("[DEBUG] No suitable log output widget found. Checking widget types...")
+            for key, widget in self.ui_components.items():
+                print(f"[DEBUG] Widget {key}: {type(widget).__name__}, methods: {[m for m in dir(widget) if not m.startswith('_')]}")
+            
             return None
             
         except Exception as e:
             print(f"[ERROR] Error getting log output widget: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _get_output_widget(self):

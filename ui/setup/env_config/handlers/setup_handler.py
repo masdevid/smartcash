@@ -3,6 +3,7 @@ File: smartcash/ui/setup/env_config/handlers/setup_handler.py
 Deskripsi: Setup handler untuk environment configuration dengan proper workflow
 """
 
+import os
 import time
 from typing import Dict, Any
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler

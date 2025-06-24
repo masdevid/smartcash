@@ -23,20 +23,35 @@ def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets
         logger_bridge = create_ui_logger_bridge(ui_components)
         ui_components['_logger_bridge'] = logger_bridge
         
-        # 3. Now setup handlers (this will do the initial status update)
+        # 3. Initialize status checker if not present
+        if '_status_checker' not in ui_components:
+            from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
+            ui_components['_status_checker'] = StatusChecker(logger=ui_components.get('_logger_bridge'))
+        
+        # 4. Now setup handlers (this will do the initial status update)
         _setup_handlers(ui_components, config or {})
         
-        # 4. Mark UI as ready to flush buffered logs
+        # 5. Mark UI as ready to flush buffered logs
         if hasattr(logger_bridge, 'set_ui_ready'):
             logger_bridge.set_ui_ready(True)
             
-        # 5. Restore output after UI is ready
+        # 6. Restore output after UI is ready
         restore_stdout()
         
-        return ui_components['ui']
+        # Return the container widget which holds the UI
+        if 'container' in ui_components:
+            return ui_components['container']
+        elif 'ui' in ui_components:
+            return ui_components['ui']
+        else:
+            raise ValueError("No valid UI container found in components")
+            
     except Exception as e:
         restore_stdout()  # Ensure output is restored even on error
-        return _create_error_fallback(str(e))
+        error_fallback = _create_error_fallback(str(e))
+        if 'container' in error_fallback:
+            return error_fallback['container']
+        return error_fallback
     
 def _create_ui_components() -> Dict[str, Any]:
     """Create and return UI components using shared components."""
@@ -89,14 +104,22 @@ def _setup_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> No
         if not logger_bridge:
             raise RuntimeError("Logger bridge not initialized")
             
-        # 2. Setup initial status (will be buffered until UI is ready)
+        # 2. Get the status checker
+        status_checker = ui_components.get('_status_checker')
+        if not status_checker:
+            raise RuntimeError("Status checker not initialized")
+            
+        # 3. Setup initial status (will be buffered until UI is ready)
         _update_status(ui_components, "Environment configuration ready", "info")
         
-        # 3. Initialize other handlers
+        # 4. Initialize other handlers
         _setup_event_handlers(ui_components, config)
         
-        # 4. Perform initial status check
-        _perform_initial_status_check(ui_components)
+        # 5. Perform initial status check if status checker is available
+        if status_checker:
+            _perform_initial_status_check(ui_components)
+        else:
+            _update_status(ui_components, "Status checker not available", "warning")
         
     except Exception as e:
         error_msg = f"Error setting up handlers: {str(e)}"

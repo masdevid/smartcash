@@ -9,11 +9,6 @@ from dataclasses import dataclass
 from IPython.display import display
 import ipywidgets as widgets
 
-# Import the progress tracker factory functions
-from smartcash.ui.components.progress_tracker.factory import (
-    create_dual_progress_tracker
-)
-
 class SetupStage(Enum):
     """Tahapan setup environment"""
     INIT = auto()
@@ -73,25 +68,39 @@ class SetupProgressTracker:
         return DummyLogger()
     
     def _initialize_progress_tracker(self) -> None:
-        """Initialize progress tracker component using the factory pattern"""
+        """Initialize progress tracker component with a single progress bar"""
         if 'progress_tracker' not in self.ui_components:
-            # Create a dual progress tracker (overall + current task)
-            tracker = create_dual_progress_tracker(
-                operation="Environment Setup",
-                auto_hide=False,
-                show_step_info=True
+            # Create progress bar
+            progress_bar = widgets.FloatProgress(
+                value=0,
+                min=0,
+                max=100,
+                description='Progress:',
+                bar_style='info',
+                style={'bar_color': '#4CAF50'},
+                orientation='horizontal',
+                layout=widgets.Layout(width='100%')
             )
             
-            # Store the tracker and its container in the UI components
-            self.ui_components['progress_tracker'] = tracker
-            self.ui_components['progress_container'] = tracker.container
+            # Create status text
+            status_text = widgets.HTML(value='<div style="padding: 5px 0;">Initializing setup...</div>')
             
-            # Display the progress container
-            display(tracker.container)
-            if 'progress_container' in self.ui_components:
-                self.ui_components['progress_container'].children = (progress_container,)
-            else:
-                self.ui_components['progress_container'] = progress_container
+            # Create container
+            container = widgets.VBox([
+                widgets.HTML('<h3>Environment Setup</h3>'),
+                progress_bar,
+                status_text
+            ], layout=widgets.Layout(width='100%'))
+            
+            # Store components
+            self.ui_components['progress_tracker'] = {
+                'bar': progress_bar,
+                'text': status_text,
+                'container': container
+            }
+            
+            # Display the container
+            display(container)
                 
             # Force display update
             display(progress_container)
@@ -169,13 +178,24 @@ class SetupProgressTracker:
         # Update the progress tracker with completion
         if 'progress_tracker' in self.ui_components:
             tracker = self.ui_components['progress_tracker']
-            tracker.complete(message=message)
+            tracker['bar'].bar_style = 'success'
+            tracker['bar'].description = "100%"
+            tracker['text'].value = f'''
+                <div style="padding: 5px 0; color: #4CAF50;">
+                    <strong>✅ {message}</strong>
+                </div>
+            '''
     
     def error(self, message: str) -> None:
         """Mark setup as failed with an error"""
         if 'progress_tracker' in self.ui_components:
             tracker = self.ui_components['progress_tracker']
-            tracker.error(message=message)
+            tracker['bar'].bar_style = 'danger'
+            tracker['text'].value = f'''
+                <div style="padding: 5px 0; color: #f44336;">
+                    <strong>❌ {message}</strong>
+                </div>
+            '''
     
     def hide(self) -> None:
         """Hide the progress tracker"""
@@ -203,21 +223,22 @@ class SetupProgressTracker:
         )
         self.overall_progress = int((weighted_progress / total_weight) * 100)
         
-        # Update UI using the factory-created tracker
+        # Update UI
         if 'progress_tracker' in self.ui_components:
             tracker = self.ui_components['progress_tracker']
             
-            # Update overall progress bar
-            tracker.update_overall(
-                progress=self.overall_progress,
-                message=f"Overall: {self.overall_progress}%"
-            )
+            # Update progress bar
+            tracker['bar'].value = self.overall_progress
+            tracker['bar'].description = f"{self.overall_progress}%"
             
-            # Update current task progress
-            tracker.update_current(
-                progress=progress,
-                message=f"{self.stages[stage].name}: {message}" if message else self.stages[stage].name
-            )
+            # Update status text with current stage and message
+            stage_name = self.stages[stage].name
+            tracker['text'].value = f'''
+                <div style="padding: 5px 0;">
+                    <div><strong>Current Task:</strong> {stage_name}</div>
+                    <div style="color: #666; font-size: 0.9em;">{message}</div>
+                </div>
+            '''
         
         # Call registered callbacks
         for callback in self.callbacks:
@@ -230,8 +251,33 @@ class SetupProgressTracker:
             # Small delay to allow UI to update
             import time
             time.sleep(0.05)
-            print(f"⚠️ Error updating progress: {e}")
-            print(f"Stage: {stage_name}, Progress: {progress}, Message: {message}")
+    
+    def complete(self, message: str = "Setup completed successfully") -> None:
+        """Mark setup as complete"""
+        self.update_stage(SetupStage.COMPLETE, message)
+        self.complete_stage()
+        
+        # Update the progress tracker with completion
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
+            tracker['bar'].bar_style = 'success'
+            tracker['bar'].description = "100%"
+            tracker['text'].value = f'''
+                <div style="padding: 5px 0; color: #4CAF50;">
+                    <strong>✅ {message}</strong>
+                </div>
+            '''
+    
+    def error(self, message: str) -> None:
+        """Mark setup as failed with an error"""
+        if 'progress_tracker' in self.ui_components:
+            tracker = self.ui_components['progress_tracker']
+            tracker['bar'].bar_style = 'danger'
+            tracker['text'].value = f'''
+                <div style="padding: 5px 0; color: #f44336;">
+                    <strong>❌ {message}</strong>
+                </div>
+            '''
 
 def track_setup_progress(ui_components: Dict[str, Any], logger=None) -> SetupProgressTracker:
     """🎯 Create and initialize progress tracker instance

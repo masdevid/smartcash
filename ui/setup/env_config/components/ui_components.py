@@ -98,10 +98,10 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Create main container
     main_container = widgets.VBox([
         header,
+        status_panel,
         create_divider(),
         setup_button_container,
         create_divider(),
-        status_panel,
         progress_tracker.container,
         log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),

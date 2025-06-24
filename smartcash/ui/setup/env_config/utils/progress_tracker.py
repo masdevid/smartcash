@@ -34,7 +34,13 @@ class StageProgress:
 class SetupProgressTracker:
     """📊 Progress tracker untuk setup workflow dengan state management"""
     
-    def __init__(self, ui_components: Dict[str, Any]):
+    def __init__(self, ui_components: Dict[str, Any], logger=None):
+        """Initialize the progress tracker
+        
+        Args:
+            ui_components: Dictionary to store UI components
+            logger: Optional logger instance (will create a basic one if not provided)
+        """
         self.ui_components = ui_components
         self.current_stage: Optional[SetupStage] = None
         self.stages: Dict[SetupStage, StageProgress] = {
@@ -47,7 +53,21 @@ class SetupProgressTracker:
         }
         self.overall_progress = 0
         self.callbacks: List[Callable[[str, int, str], None]] = []
+        
+        # Initialize logger
+        self.logger = logger or self._create_dummy_logger()
+        
+        # Initialize the progress tracker UI
         self._initialize_progress_tracker()
+    
+    def _create_dummy_logger(self):
+        """Create a basic logger if none is provided"""
+        class DummyLogger:
+            def info(self, msg): print(f"[INFO] {msg}")
+            def warning(self, msg): print(f"[WARN] {msg}")
+            def error(self, msg): print(f"[ERROR] {msg}")
+            def debug(self, msg): print(f"[DEBUG] {msg}")
+        return DummyLogger()
     
     def _initialize_progress_tracker(self) -> None:
         """Initialize progress tracker component using the factory pattern"""
@@ -172,17 +192,18 @@ class SetupProgressTracker:
             print(f"⚠️ Error updating progress: {e}")
             print(f"Stage: {stage_name}, Progress: {progress}, Message: {message}")
 
-def track_setup_progress(ui_components: Dict[str, Any]) -> SetupProgressTracker:
+def track_setup_progress(ui_components: Dict[str, Any], logger=None) -> SetupProgressTracker:
     """🎯 Create and initialize progress tracker instance
     
     Args:
         ui_components: Dictionary to store UI components
+        logger: Optional logger instance to use for progress tracking
         
     Returns:
         Configured SetupProgressTracker instance
     """
     # Create and initialize the progress tracker
-    progress_tracker = SetupProgressTracker(ui_components)
+    progress_tracker = SetupProgressTracker(ui_components, logger=logger)
     
     # Ensure the progress tracker is visible
     progress_tracker.show()

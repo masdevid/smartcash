@@ -34,8 +34,8 @@ class SetupHandler:
             Dict containing setup results and status
         """
         try:
-            # Initialize progress tracking
-            progress_tracker = track_setup_progress(ui_components)
+            # Initialize progress tracking with logger
+            progress_tracker = track_setup_progress(ui_components, logger=self.logger)
             
             # Set running state
             self._set_running_state(ui_components)

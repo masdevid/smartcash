@@ -1,0 +1,53 @@
+# File: configs/hyperparameters_config.yaml
+# Deskripsi: Konfigurasi hyperparameters disederhanakan sesuai backend model usage
+
+# Training configuration - parameter inti yang digunakan backend
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.01
+  image_size: 640
+  device: 'auto'  # auto-detect CUDA/CPU
+  workers: 4
+
+# Optimizer configuration - parameter yang digunakan backend
+optimizer:
+  type: 'SGD'  # 'SGD' | 'Adam'
+  weight_decay: 0.0005
+  momentum: 0.937
+
+# Learning rate scheduler - parameter yang digunakan backend
+scheduler:
+  type: 'cosine'  # 'cosine' | 'step' | 'plateau'
+  warmup_epochs: 3
+  min_lr: 0.0001
+
+# Loss function weights - parameter yang digunakan backend
+loss:
+  box_loss_gain: 0.05
+  cls_loss_gain: 0.5
+  obj_loss_gain: 1.0
+
+# Early stopping - parameter yang digunakan backend
+early_stopping:
+  enabled: true
+  patience: 15
+  min_delta: 0.001
+  metric: 'mAP_0.5'
+
+# Checkpoint configuration - parameter yang digunakan backend
+checkpoint:
+  save_best: true
+  save_interval: 10
+  metric: 'mAP_0.5'
+
+# Model inference parameters - parameter yang digunakan backend
+model:
+  conf_thres: 0.25
+  iou_thres: 0.45
+  max_det: 1000
+
+# Config metadata
+config_version: '2.2'
+description: 'Simplified hyperparameters untuk SmartCash YOLOv5-EfficientNet'
+module_name: 'hyperparameters'

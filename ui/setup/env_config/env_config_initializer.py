@@ -35,7 +35,7 @@ def initialize_environment_config_ui(force_refresh: bool = False) -> Dict[str, A
         _CACHED_COMPONENT = component
         _ENV_CONFIG_INITIALIZED = True
         
-        # Return component untuk external usage
+        # Return component object langsung
         return component
         
     except Exception as e:

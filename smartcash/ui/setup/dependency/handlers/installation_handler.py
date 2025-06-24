@@ -1,283 +1,137 @@
 """
-File: smartcash/ui/setup/dependency/handlers/installation_handler_refactored.py
-Deskripsi: Handler untuk instalasi package dengan logging terstandarisasi
-
-Fitur Utama:
-- Manajemen instalasi paralel
-- Pelacakan progress real-time
-- Penanganan error yang kuat
-- Laporan hasil terperinci
+File: smartcash/ui/setup/dependency/handlers/installation_handler.py
+Deskripsi: Handler untuk instalasi packages dengan parallel processing
 """
 
-from dataclasses import dataclass
-import logging
-import time
-from typing import Dict, List, Any, Optional, Callable, Tuple
-
-# Core imports
-from smartcash.common import get_logger
-from smartcash.common.threadpools import get_optimal_thread_count, process_in_parallel, safe_worker_count
+from typing import Dict, Any, Callable, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from smartcash.ui.setup.dependency.utils import (
-    LogLevel, with_logging, requires, log_to_ui_safe, update_status_panel,
-    batch_update_package_status, create_operation_context, install_single_package,
-    filter_uninstalled_packages, get_selected_packages, generate_installation_summary_report
+    get_selected_packages, install_single_package, 
+    update_status_panel, with_button_context,
+    show_progress_tracker_safe, complete_operation_with_message
 )
 
-# Konstanta
-PROGRESS_STEPS = {
-    'init': (0, "🔄 Mempersiapkan..."),
-    'analysis': (10, "🔍 Menganalisis package..."),
-    'installation': (50, "⚙️ Menginstal package..."),
-    'complete': (100, "✅ Proses selesai")
-}
-
-# Setup logger
-logger = get_logger(__name__)
-
-@dataclass
-class InstallationResult:
-    """Kelas untuk menyimpan hasil instalasi"""
-    success: bool
-    message: str = ""
-    error: Optional[Exception] = None
-
-def _update_progress(
-    progress_tracker: Any,
-    step: str,
-    message: Optional[str] = None,
-    current: Optional[int] = None,
-    logger: Optional[logging.Logger] = None
-) -> None:
-    """Update progress tracker dengan error handling"""
-    if not progress_tracker:
-        return
-        
-    progress, default_msg = PROGRESS_STEPS.get(step, (0, step))
-    msg = message or default_msg
+def setup_installation_handler(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
+    """Setup installation handler dengan parallel processing"""
     
-    try:
-        if step == 'init':
-            progress_tracker.show(
-                operation="📦 Instalasi Package",
-                steps=["🔍 Analisis", "⚙️ Instalasi"],
-                level='dual'
-            )
+    def handle_installation():
+        """Handle package installation dengan progress tracking"""
+        logger = ui_components.get('logger')
         
-        progress_tracker.update_overall(progress, msg)
-        if current is not None:
-            progress_tracker.update_current(current, f"{msg} ({current}%)")
-            
-    except Exception as e:
-        if logger:
-            logger.warning(f"Gagal update progress: {str(e)}")
-
-def _handle_operation_status(
-    ui_components: Dict[str, Any],
-    status: str,
-    message: str,
-    progress_tracker: Optional[Any] = None
-) -> None:
-    """Handle status operasi dengan konsisten"""
-    log_func = getattr(ui_components.get('logger', logger), 
-                      'error' if status == 'error' else 'info')
-    
-    try:
-        log_to_ui_safe(ui_components, message, status)
-        update_status_panel(ui_components, message, status)
-        log_func(message)
-        
-        if progress_tracker:
-            if status == 'error' and hasattr(progress_tracker, 'error'):
-                progress_tracker.error(message)
+        with with_button_context(ui_components, 'install_button'):
+            try:
+                # Extract packages to install
+                selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
+                custom_packages = _get_custom_packages(ui_components)
+                all_packages = selected_packages + custom_packages
                 
-    except Exception as e:
-        logger.error(f"Gagal memperbarui status: {str(e)}", exc_info=True)
-
-def _process_single_package(
-    pkg: str,
-    config: Dict[str, Any],
-    ui_components: Dict[str, Any]
-) -> Tuple[str, bool]:
-    """Proses instalasi satu package"""
-    try:
-        result = install_single_package(pkg, config.get('timeout', 300))
-        return pkg, result.get('success', False)
-    except Exception as e:
-        error_msg = f"Gagal menginstall {pkg}: {str(e)}"
-        _handle_operation_status(ui_components, 'error', error_msg)
-        return pkg, False
-
-def _install_packages_parallel(
-    packages: List[str],
-    ui_components: Dict[str, Any],
-    config: Dict[str, Any],
-    progress_tracker: Any
-) -> Dict[str, bool]:
-    """Install packages secara paralel"""
-    if not packages:
-        return {}
-        
-    total = len(packages)
-    results = {}
-    max_workers = safe_worker_count(get_optimal_thread_count('io'))
+                if not all_packages:
+                    update_status_panel(ui_components, "⚠️ Tidak ada packages yang dipilih", "warning")
+                    return
+                
+                # Get installation settings
+                config = _extract_installation_config(ui_components)
+                
+                # Start installation
+                update_status_panel(ui_components, f"🚀 Memulai instalasi {len(all_packages)} packages...", "info")
+                show_progress_tracker_safe(ui_components, "Package Installation")
+                
+                if logger:
+                    logger.info(f"📦 Installing {len(all_packages)} packages: {', '.join(all_packages[:5])}{'...' if len(all_packages) > 5 else ''}")
+                
+                # Install packages dengan parallel processing
+                results = _install_packages_parallel(all_packages, config, ui_components)
+                
+                # Process results
+                success_count = sum(1 for r in results if r['success'])
+                failed_packages = [r['package'] for r in results if not r['success']]
+                
+                if success_count == len(all_packages):
+                    complete_operation_with_message(ui_components, f"✅ Berhasil install {success_count} packages!")
+                    if logger:
+                        logger.info(f"🎉 Installation completed successfully: {success_count}/{len(all_packages)}")
+                else:
+                    update_status_panel(ui_components, f"⚠️ {success_count}/{len(all_packages)} berhasil, {len(failed_packages)} gagal", "warning")
+                    if logger:
+                        logger.warning(f"⚠️ Installation partially failed. Failed packages: {', '.join(failed_packages)}")
+                
+            except Exception as e:
+                update_status_panel(ui_components, f"❌ Installation error: {str(e)}", "error")
+                if logger:
+                    logger.error(f"❌ Installation failed: {str(e)}")
     
-    def update_progress(completed: int, current_pkg: str = '') -> None:
-        progress = int((completed / total) * 100)
-        _update_progress(
-            progress_tracker,
-            'installation',
-            f"⚙️ Menginstal {current_pkg or ''}",
-            progress,
-            logger
-        )
+    # Setup button handler
+    install_button = ui_components.get('install_button')
+    if install_button:
+        install_button.on_click(lambda b: handle_installation())
+    
+    return {
+        'handle_installation': handle_installation,
+        'install_packages_parallel': lambda packages, config: _install_packages_parallel(packages, config, ui_components)
+    }
+
+def _get_custom_packages(ui_components: Dict[str, Any]) -> List[str]:
+    """Extract custom packages dari textarea"""
+    try:
+        widget = ui_components.get('custom_packages')
+        if widget and widget.value.strip():
+            return [pkg.strip() for pkg in widget.value.strip().split('\n') if pkg.strip()]
+        return []
+    except:
+        return []
+
+def _extract_installation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract installation config dari UI atau gunakan defaults"""
+    from ..handlers.config_extractor import extract_dependency_config
     
     try:
-        # Proses instalasi paralel
-        results_list = process_in_parallel(
-            items=packages,
-            process_func=lambda p: _process_single_package(p, config, ui_components),
-            max_workers=max_workers,
-            desc="Memproses instalasi package"
-        )
+        full_config = extract_dependency_config(ui_components)
+        return full_config.get('installation', {
+            'parallel_workers': 3,
+            'timeout': 300,
+            'max_retries': 2,
+            'retry_delay': 1.0
+        })
+    except:
+        return {
+            'parallel_workers': 3,
+            'timeout': 300,
+            'max_retries': 2,
+            'retry_delay': 1.0
+        }
+
+def _install_packages_parallel(packages: List[str], config: Dict[str, Any], ui_components: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Install packages dengan parallel processing"""
+    from smartcash.ui.setup.dependency.utils import update_progress_step
+    
+    results = []
+    max_workers = min(config.get('parallel_workers', 3), len(packages))
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_package = {
+            executor.submit(install_single_package, pkg, config): pkg 
+            for pkg in packages
+        }
         
-        # Konversi ke dictionary
-        results = dict(results_list)
-        
-        # Update progress akhir
-        success_count = sum(1 for r in results.values() if r)
-        update_progress(100, f"✅ {success_count}/{total} berhasil")
-        
-    except Exception as e:
-        error_msg = f"Error saat instalasi paralel: {str(e)}"
-        _handle_operation_status(ui_components, 'error', error_msg, progress_tracker)
+        completed = 0
+        for future in as_completed(future_to_package):
+            package = future_to_package[future]
+            completed += 1
+            
+            try:
+                result = future.result()
+                results.append(result)
+                
+                # Update progress
+                progress = int((completed / len(packages)) * 100)
+                update_progress_step(ui_components, "overall", progress, f"Installing {package}")
+                
+            except Exception as e:
+                results.append({
+                    'package': package,
+                    'success': False,
+                    'error': str(e)
+                })
     
     return results
-
-@with_logging("Execute Installation Process", LogLevel.INFO, ui_components_key='ui_components')
-@requires('progress_tracker')
-def _execute_installation_with_utils(
-    ui_components: Dict[str, Any],
-    config: Dict[str, Any],
-    ctx: Any
-) -> None:
-    """Eksekusi proses instalasi"""
-    progress_tracker = ui_components['progress_tracker']
-    start_time = time.time()
-    
-    try:
-        # Inisialisasi
-        _update_progress(progress_tracker, 'init', logger=logger)
-        
-        # Dapatkan package yang dipilih
-        selected = get_selected_packages(ui_components)
-        if not selected:
-            _handle_operation_status(
-                ui_components,
-                'warning',
-                "⚠️ Tidak ada package yang dipilih",
-                progress_tracker
-            )
-            return
-            
-        # Analisis package
-        _update_progress(progress_tracker, 'analysis', logger=logger)
-        packages = filter_uninstalled_packages(
-            selected,
-            lambda msg: log_to_ui_safe(ui_components, msg)
-        )
-        
-        if not packages:
-            _handle_operation_status(
-                ui_components,
-                'success',
-                "✅ Semua package sudah terinstall",
-                progress_tracker
-            )
-            return
-            
-        # Proses instalasi
-        results = _install_packages_parallel(packages, ui_components, config, progress_tracker)
-        
-        # Tampilkan hasil
-        duration = time.time() - start_time
-        _handle_installation_results(ui_components, results, duration, progress_tracker)
-        
-    except Exception as e:
-        error_msg = f"❌ Error dalam proses instalasi: {str(e)}"
-        _handle_operation_status(ui_components, 'error', error_msg, progress_tracker)
-        raise
-
-def _handle_installation_results(
-    ui_components: Dict[str, Any],
-    results: Dict[str, bool],
-    duration: float,
-    progress_tracker: Any
-) -> None:
-    """Tampilkan hasil instalasi"""
-    if not results:
-        _handle_operation_status(
-            ui_components,
-            'warning',
-            "⚠️ Tidak ada package yang diproses",
-            progress_tracker
-        )
-        return
-        
-    total = len(results)
-    success = sum(1 for r in results.values() if r)
-    failed = total - success
-    
-    # Update status UI
-    status = 'success' if success == total else 'warning' if success > 0 else 'error'
-    message = (
-        f"✅ {success}/{total} package berhasil diinstall" if status == 'success' else
-        f"⚠️  {success} berhasil, {failed} gagal" if status == 'warning' else
-        f"❌ Gagal menginstall {failed} package"
-    )
-    
-    _handle_operation_status(ui_components, status, message, progress_tracker)
-    
-    # Generate dan tampilkan laporan
-    report = generate_installation_summary_report(results, duration)
-    if 'log_output' in ui_components:
-        try:
-            from IPython.display import display, HTML
-            with ui_components['log_output']:
-                display(HTML(report))
-        except Exception as e:
-            logger.warning(f"Gagal menampilkan laporan HTML: {str(e)}")
-    
-    # Update status package di UI
-    status_mapping = {
-        pkg.split('>=')[0].split('==')[0].split('<')[0].strip(): 
-        'installed' if success else 'error'
-        for pkg, success in results.items()
-    }
-    batch_update_package_status(ui_components, status_mapping)
-    
-    # Update progress tracker
-    _update_progress(
-        progress_tracker,
-        'complete',
-        f"✅ Selesai ({success}/{total} berhasil)",
-        100,
-        logger
-    )
-
-@with_logging("Setup Installation Handler", LogLevel.INFO)
-@requires('install_button')
-def setup_installation_handler(
-    ui_components: Dict[str, Any],
-    config: Optional[Dict[str, Any]] = None
-) -> None:
-    """Inisialisasi handler untuk tombol instalasi"""
-    def execute_installation(button=None):
-        with create_operation_context(ui_components, 'installation') as ctx:
-            _execute_installation_with_utils(ui_components, config or {}, ctx)
-    
-    try:
-        ui_components['install_button'].on_click(execute_installation)
-        logger.debug("Installation handler berhasil dipasang")
-    except Exception as e:
-        logger.error(f"Gagal memasang installation handler: {str(e)}", exc_info=True)
-        raise

@@ -1,281 +1,199 @@
 """
 File: smartcash/ui/setup/dependency/handlers/analysis_handler.py
-Deskripsi: Fixed analysis handler dengan proper logger reference
+Deskripsi: Handler untuk analisis packages dan compatibility checking
 """
 
-from typing import Dict, Any
-
+from typing import Dict, Any, Callable, List
+from concurrent.futures import ThreadPoolExecutor
 from smartcash.ui.setup.dependency.utils import (
-    ProgressSteps, batch_check_packages_status, create_operation_context,
-    extract_package_name_from_requirement, generate_analysis_summary_report,
-    get_installed_packages_dict, log_to_ui_safe, parse_package_requirement,
-    update_package_status_by_name, update_status_panel
+    get_selected_packages, batch_check_packages_status,
+    update_status_panel, with_button_context, 
+    show_progress_tracker_safe, complete_operation_with_message
 )
 
-def setup_analysis_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
-    """Setup analysis handler dengan fixed logger reference"""
+def setup_analysis_handler(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
+    """Setup analysis handler untuk package analysis"""
     
-    def execute_analysis(button=None):
-        """Execute package analysis dengan operation context"""
-        with create_operation_context(ui_components, 'analysis') as ctx:
-            _execute_analysis_with_utils(ui_components, config, ctx)
+    def handle_analysis():
+        """Handle package analysis dengan batch processing"""
+        logger = ui_components.get('logger')
+        
+        with with_button_context(ui_components, 'analyze_button'):
+            try:
+                # Extract packages untuk analysis
+                selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
+                custom_packages = _get_custom_packages(ui_components)
+                all_packages = selected_packages + custom_packages
+                
+                if not all_packages:
+                    update_status_panel(ui_components, "⚠️ Tidak ada packages untuk dianalisis", "warning")
+                    return
+                
+                # Get analysis settings
+                config = _extract_analysis_config(ui_components)
+                
+                # Start analysis
+                update_status_panel(ui_components, f"🔍 Menganalisis {len(all_packages)} packages...", "info")
+                show_progress_tracker_safe(ui_components, "Package Analysis")
+                
+                if logger:
+                    logger.info(f"🔍 Analyzing {len(all_packages)} packages...")
+                
+                # Analyze packages
+                analysis_results = _analyze_packages_batch(all_packages, config, ui_components)
+                
+                # Generate report
+                report = _generate_analysis_report(analysis_results)
+                
+                # Update UI dengan hasil
+                _update_analysis_results(ui_components, report)
+                
+                complete_operation_with_message(ui_components, f"✅ Analisis selesai: {report['summary']}")
+                
+                if logger:
+                    logger.info(f"📊 Analysis completed: {report['summary']}")
+                
+            except Exception as e:
+                update_status_panel(ui_components, f"❌ Analysis error: {str(e)}", "error")
+                if logger:
+                    logger.error(f"❌ Analysis failed: {str(e)}")
     
-    ui_components['analyze_button'].on_click(execute_analysis)
-    ui_components['trigger_analysis'] = lambda: execute_analysis()
+    # Setup button handler
+    analyze_button = ui_components.get('analyze_button')
+    if analyze_button:
+        analyze_button.on_click(lambda b: handle_analysis())
+    
+    return {
+        'handle_analysis': handle_analysis,
+        'analyze_packages_batch': lambda packages, config: _analyze_packages_batch(packages, config, ui_components)
+    }
 
-from ..utils.ui_deps import requires, get_optional
+def _get_custom_packages(ui_components: Dict[str, Any]) -> List[str]:
+    """Extract custom packages dari textarea"""
+    try:
+        widget = ui_components.get('custom_packages')
+        if widget and widget.value.strip():
+            return [pkg.strip() for pkg in widget.value.strip().split('\n') if pkg.strip()]
+        return []
+    except:
+        return []
 
-@requires('progress_tracker')
-def _execute_analysis_with_utils(ui_components: Dict[str, Any], config: Dict[str, Any], ctx):
-    """Execute analysis dengan validasi komponen otomatis"""
-    # Dapatkan komponen yang sudah divalidasi
-    progress_tracker = ui_components['progress_tracker']
-    logger =  ui_components.get('logger')  # Sudah divalidasi oleh decorator
+def _extract_analysis_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract analysis config dari UI"""
+    from ..handlers.config_extractor import extract_dependency_config
     
     try:
-        # Step 1: Initialize analysis dengan emoji untuk visual feedback
-        try:
-            if not hasattr(progress_tracker, 'show'):
-                log_to_ui_safe(ui_components, "⚠️ Progress tracker tidak mendukung operasi yang diperlukan", "warning")
-                return
-                
-            # Initialize progress tracker with dual-level progress
-            progress_tracker.show(
-                operation="Analisis Dependensi",
-                steps=["🔍 Analisis", "📊 Evaluasi"],
-                level='dual'  # Use dual-level progress
-            )
-            
-            # Update progress with safe error handling
-            progress_tracker.update_overall(10, "🚀 Memulai analisis...")
-            progress_tracker.update_current(25, "🔧 Mempersiapkan...")
-            
-        except Exception as e:
-            error_msg = f"⚠️ Gagal menginisialisasi progress tracker: {str(e)}"
-            log_to_ui_safe(ui_components, error_msg, "warning")
-            logger.error(error_msg, exc_info=True)
-            # Tetap lanjutkan proses dengan progress tracking terbatas
-            
-        log_to_ui_safe(ui_components, "🔍 Memulai analisis dependensi...")
-
-        # Step 2: Get installed packages dengan emoji untuk visual feedback
-        if progress_tracker:
-            try:
-                progress_tracker.update_overall(30, "🔍 Scanning packages...")
-                progress_tracker.update_current(50, "📜 Mendapatkan daftar packages...")
-            except Exception as e:
-                # Silent fail untuk compatibility
-                if logger:
-                    logger.debug(f"🔄 Progress tracker error (non-critical): {str(e)}")
-                # Tetap lanjutkan proses
-        else:
-            ctx.stepped_progress('ANALYSIS_GET_PACKAGES', "📜 Mendapatkan daftar packages...")
-            
-        installed_packages = get_installed_packages_dict()
-        log_to_ui_safe(ui_components, f"📦 Found {len(installed_packages)} installed packages")
-
-        # Step 3: Get package categories dan reset status dengan emoji
-        if progress_tracker:
-            progress_tracker.update_overall(50, "📊 Evaluasi packages...")
-            progress_tracker.update_current(75, "📁 Menganalisis categories...")
-        else:
-            ctx.stepped_progress('ANALYSIS_CATEGORIES', "📁 Menganalisis categories...")
-            
-        package_categories = get_package_categories()
-        _reset_all_package_status_to_checking(ui_components, package_categories)
-        
-        # Step 4: Analyze packages status dengan emoji
-        if progress_tracker:
-            progress_tracker.update_overall(70, "🔎 Checking packages...")
-            progress_tracker.update_current(85, "📚 Memulai pengecekan")
-        else:
-            ctx.stepped_progress('ANALYSIS_CHECK', "🔎 Checking package status...")
-            
-        analysis_results = _analyze_packages_with_utils(
-            package_categories, installed_packages, ui_components, ctx, logger
-        )
-        
-        # Step 5: Update UI dan generate report dengan emoji
-        if progress_tracker:
-            progress_tracker.update_overall(90, "📝 Generating report...")
-            progress_tracker.update_current(95, "📱 Updating UI...")
-        else:
-            ctx.stepped_progress('ANALYSIS_UPDATE_UI', "📱 Updating UI...")
-            
-        _finalize_analysis_results(ui_components, analysis_results, ctx, logger)
-        
-        # Complete operation dengan progress tracker baru dan emoji dengan safe error handling
-        try:
-            if progress_tracker:
-                try:
-                    # Update progress to 100%
-                    progress_tracker.update_overall(100, "✅ Analisis selesai")
-                    progress_tracker.update_current(100, "✅ Selesai")
-                    
-                    # Complete the operation
-                    if hasattr(progress_tracker, 'complete'):
-                        progress_tracker.complete("✅ Analisis dependensi selesai")
-                    
-                except Exception as e:
-                    if logger:
-                        logger.warning(f"Gagal update progress tracker: {str(e)}")
-                    
-                    # Fallback to legacy progress tracking
-                    update_progress = ui_components.get('update_progress')
-                    if callable(update_progress):
-                        update_progress('overall', 100, "✅ Analisis selesai")
-                        update_progress('step', 100, "✅ Complete")
-        except Exception as e:
-            # Silent fail untuk compatibility
-            if logger:
-                logger.debug(f"🔄 Progress tracker completion error (non-critical): {str(e)}")
-            # Tetap lanjutkan proses
-        
-    except Exception as e:
-        # Error handling dengan progress tracker baru dan emoji dengan safe error handling
-        error_msg = f"❌ Analisis gagal: {str(e)}"
-        log_to_ui_safe(ui_components, error_msg, "error")
-        
-        try:
-            if progress_tracker:
-                try:
-                    if hasattr(progress_tracker, 'error'):
-                        progress_tracker.error(error_msg)
-                except Exception as err:
-                    if logger:
-                        logger.warning(f"Gagal menampilkan error di progress tracker: {str(err)}")
-                    
-                    # Fallback ke error operation lama jika tersedia
-                    error_operation = ui_components.get('error_operation')
-                    if callable(error_operation):
-                        error_operation(error_msg)
-        except Exception as err:
-            # Silent fail untuk compatibility
-            if logger:
-                logger.debug(f"🔄 Progress tracker error handling failed (non-critical): {str(err)}")
-        
-        if logger:
-            logger.error(f"💥 Analysis error: {str(e)}")
-        
-        update_status_panel(ui_components, error_msg, "error")
-        raise
-
-def _analyze_packages_with_utils(package_categories: list, installed_packages: Dict[str, str], 
-                                ui_components: Dict[str, Any], ctx, logger) -> Dict[str, Any]:
-    """Analyze packages dengan fixed logger reference"""
-    
-    # Get progress tracker jika tersedia
-    progress_tracker = ui_components.get('progress_tracker')
-    
-    analysis_results = {'installed': [], 'missing': [], 'upgrade_needed': [], 'package_details': {}}
-    total_packages = sum(len(category['packages']) for category in package_categories)
-    current_package = 0
-    
-    # Collect all packages untuk batch processing
-    all_packages = [(package, category['name']) for category in package_categories for package in category['packages']]
-    package_requirements = [pkg['pip_name'] for pkg, _ in all_packages]
-    batch_status = batch_check_packages_status(package_requirements)
-    
-    # Process results
-    for (package, category_name), requirement in zip(all_packages, package_requirements):
-        current_package += 1
-        progress = int((current_package / total_packages) * 100)
-        
-        # Update progress dengan emoji untuk visual feedback
-        status_emoji = "✅" if requirement in installed_packages else "⚠️" if extract_package_name_from_requirement(requirement) in installed_packages else "❌"
-        
-        try:
-            if progress_tracker:
-                # Update level1 (overall) progress dengan safe error handling
-                if hasattr(progress_tracker, 'update_overall'):
-                    progress_tracker.update_overall(70 + int((current_package / total_packages) * 20), 
-                                      f"🔄 Checking {current_package}/{total_packages}")
-                
-                # Update level2 (current) progress dengan safe error handling
-                if hasattr(progress_tracker, 'update_current'):
-                    progress_tracker.update_current(progress, f"{status_emoji} Analyzing {package['name']}...")
-                
-                # Update level3 (step_progress) jika tersedia dengan safe error handling
-                if hasattr(progress_tracker, 'update_step_progress'):
-                    progress_tracker.update_step_progress(progress, f"{status_emoji} {requirement}")
-        except Exception as e:
-            # Silent fail untuk compatibility
-            if logger:
-                logger.debug(f"🔄 Progress tracker update error (non-critical): {str(e)}")
-            # Tetap lanjutkan proses
-        
-        if not progress_tracker:
-            progress = ProgressSteps.ANALYSIS_CHECK + int((current_package / total_packages) * 30)
-            # Gunakan metode yang benar untuk progress tracking
-            if hasattr(ctx, 'update_progress'):
-                ctx.update_progress(progress, f"{status_emoji} Analyzing {package['name']}...")
-            elif hasattr(ctx, 'progress_tracker') and callable(ctx.progress_tracker):
-                # Fallback untuk kompatibilitas dengan context lama
-                ctx.progress_tracker('overall', progress, f"{status_emoji} Analyzing {package['name']}...")
-        
-        package_key, status_info = package['key'], batch_status[requirement]
-        
-        # Store results
-        analysis_results['package_details'][package_key] = {
-            'name': package['name'], 'pip_name': requirement, 'category': category_name,
-            'package_name': extract_package_name_from_requirement(requirement),
-            'required_version': status_info.get('required_version', ''),
-            'status': status_info['status'], 'installed_version': status_info.get('version'),
-            'compatible': status_info.get('compatible', False)
+        full_config = extract_dependency_config(ui_components)
+        return full_config.get('analysis', {
+            'check_compatibility': True,
+            'batch_size': 10,
+            'detailed_info': True
+        })
+    except:
+        return {
+            'check_compatibility': True,
+            'batch_size': 10,
+            'detailed_info': True
         }
+
+def _analyze_packages_batch(packages: List[str], config: Dict[str, Any], ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze packages dalam batch dengan progress tracking"""
+    from smartcash.ui.setup.dependency.utils import update_progress_step
+    
+    batch_size = config.get('batch_size', 10)
+    results = {
+        'installed': [],
+        'not_installed': [],
+        'errors': [],
+        'compatibility_issues': []
+    }
+    
+    # Process in batches
+    for i in range(0, len(packages), batch_size):
+        batch = packages[i:i + batch_size]
         
-        # Categorize dan update UI
-        {'installed': analysis_results['installed'], 'missing': analysis_results['missing'], 
-         'upgrade': analysis_results['upgrade_needed']}.get(status_info['status'], []).append(package_key)
+        # Update progress
+        progress = int((i / len(packages)) * 100)
+        update_progress_step(ui_components, "overall", progress, f"Analyzing batch {i//batch_size + 1}")
         
-        ui_status = _map_status_to_ui(status_info['status'])
-        update_package_status(ui_components, package_key, ui_status)
+        # Check batch status
+        batch_results = batch_check_packages_status(batch)
         
-        # Log progress
-        status_emoji = "✅" if status_info['status'] == 'installed' else "❌" if status_info['status'] == 'missing' else "⚠️"
+        # Categorize results
+        for result in batch_results:
+            if result['success']:
+                if result['installed']:
+                    results['installed'].append(result)
+                else:
+                    results['not_installed'].append(result)
+            else:
+                results['errors'].append(result)
+        
+        # Check compatibility jika enabled
+        if config.get('check_compatibility', True):
+            compatibility_issues = _check_compatibility_batch(batch, config)
+            results['compatibility_issues'].extend(compatibility_issues)
+    
+    return results
+
+def _check_compatibility_batch(packages: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Check compatibility issues untuk batch packages"""
+    issues = []
+    
+    # Simple compatibility checks
+    for package in packages:
+        try:
+            # Check for common compatibility issues
+            if 'tensorflow' in package.lower() and 'torch' in [p.lower() for p in packages]:
+                issues.append({
+                    'package': package,
+                    'issue': 'Potential conflict with PyTorch',
+                    'severity': 'warning'
+                })
+            
+            # Check for version conflicts
+            if '>=' in package and '<=' in package:
+                issues.append({
+                    'package': package,
+                    'issue': 'Complex version constraints',
+                    'severity': 'info'
+                })
+                
+        except Exception:
+            pass
+    
+    return issues
+
+def _generate_analysis_report(results: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate comprehensive analysis report"""
+    total_packages = len(results['installed']) + len(results['not_installed']) + len(results['errors'])
+    
+    return {
+        'total_packages': total_packages,
+        'installed_count': len(results['installed']),
+        'not_installed_count': len(results['not_installed']),
+        'error_count': len(results['errors']),
+        'compatibility_issues_count': len(results['compatibility_issues']),
+        'summary': f"{len(results['installed'])}/{total_packages} installed, {len(results['compatibility_issues'])} issues",
+        'details': results
+    }
+
+def _update_analysis_results(ui_components: Dict[str, Any], report: Dict[str, Any]) -> None:
+    """Update UI dengan analysis results"""
+    try:
+        logger = ui_components.get('logger')
         if logger:
-            logger.debug(f"{status_emoji} {package['name']}: {status_info['status']} ({current_package}/{total_packages})")
-    
-    return analysis_results
-
-def _reset_all_package_status_to_checking(ui_components: Dict[str, Any], package_categories: list):
-    """Reset semua package status ke checking"""
-    [update_package_status(ui_components, package['key'], 'checking') 
-     for category in package_categories for package in category['packages']]
-
-def _map_status_to_ui(status: str) -> str:
-    """Map analysis status ke UI status"""
-    return {'installed': 'installed', 'missing': 'missing', 'upgrade': 'upgrade', 'error': 'error'}.get(status, 'checking')
-
-def _finalize_analysis_results(ui_components: Dict[str, Any], analysis_results: Dict[str, Any], ctx, logger):
-    """Finalize analysis results dengan comprehensive reporting"""
-    
-    # Get progress tracker jika tersedia
-    progress_tracker = ui_components.get('progress_tracker')
-    
-    installed_count, missing_count, upgrade_count = len(analysis_results['installed']), len(analysis_results['missing']), len(analysis_results['upgrade_needed'])
-    total_count = installed_count + missing_count + upgrade_count
-    
-    # Generate dan display report
-    report_html = generate_analysis_summary_report(analysis_results)
-    log_output = ui_components.get('log_output')
-    
-    if log_output and hasattr(log_output, 'clear_output'):
-        with log_output:
-            from IPython.display import display, HTML
-            display(HTML(report_html))
-    
-    # Log summary
-    if logger:
-        logger.info("📊 Analysis Summary:")
-        logger.info(f"   ✅ Installed: {installed_count}/{total_count}")
-        logger.info(f"   ❌ Missing: {missing_count}/{total_count}")
-        logger.info(f"   ⚠️ Need Upgrade: {upgrade_count}/{total_count}")
-    
-    # Update status panel
-    status_msg, status_type = (
-        (f"✅ Semua {installed_count} packages sudah terinstall dengan benar", "success")
-        if missing_count == 0 and upgrade_count == 0
-        else (f"📊 Analysis: {installed_count} installed, {missing_count} missing, {upgrade_count} need upgrade", "info")
-    )
-    update_status_panel(ui_components, status_msg, status_type)
+            logger.info(f"📊 Analysis Report:")
+            logger.info(f"   • Total packages: {report['total_packages']}")
+            logger.info(f"   • Installed: {report['installed_count']}")
+            logger.info(f"   • Not installed: {report['not_installed_count']}")
+            logger.info(f"   • Errors: {report['error_count']}")
+            logger.info(f"   • Compatibility issues: {report['compatibility_issues_count']}")
+            
+            # Log compatibility issues
+            if report['details']['compatibility_issues']:
+                logger.warning("⚠️ Compatibility Issues:")
+                for issue in report['details']['compatibility_issues'][:3]:  # Show first 3
+                    logger.warning(f"   • {issue['package']}: {issue['issue']}")
+    except Exception:
+        pass

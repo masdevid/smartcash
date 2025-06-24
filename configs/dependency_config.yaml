@@ -1,0 +1,42 @@
+# File: smartcash/configs/dependency_config.yaml
+# Deskripsi: Konfigurasi default untuk dependency installer SmartCash
+
+module_name: dependency
+version: "1.0.0"
+created_by: SmartCash
+description: "Dependency installer configuration untuk SmartCash project"
+
+# Package selections
+selected_packages: []
+custom_packages: ""
+auto_analyze: true
+
+# Installation settings
+installation:
+  parallel_workers: 3
+  force_reinstall: false
+  use_cache: true
+  timeout: 300
+  max_retries: 2
+  retry_delay: 1.0
+
+# Analysis settings  
+analysis:
+  check_compatibility: true
+  include_dev_deps: false
+  batch_size: 10
+  detailed_info: true
+
+# UI settings
+ui_settings:
+  auto_analyze_on_render: true
+  show_progress: true
+  log_level: info
+  compact_view: false
+
+# Advanced settings
+advanced:
+  pip_extra_args: []
+  environment_variables: {}
+  pre_install_commands: []
+  post_install_commands: []

@@ -1,32 +1,23 @@
 """
 File: smartcash/ui/setup/dependency/components/ui_components.py
-Deskripsi: Fixed UI components tanpa nested fallbacks, langsung display error UI jika gagal
+Deskripsi: UI components dengan flexbox layout dan tanpa horizontal scrollbar
 """
 
 from typing import Dict, Any, Optional
-import traceback
 import ipywidgets as widgets
-from IPython.display import display, HTML
+from IPython.display import display
 
 def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Create dependency installer UI dengan simple error handling
-    
-    Args:
-        config: Konfigurasi UI
-        
-    Returns:
-        Dictionary berisi komponen UI atau error UI yang bisa di-display
-    """
+    """Create dependency installer UI dengan flexbox layout"""
     try:
         config = config or {}
         
-        # Import components yang diperlukan
+        # Import components
         from smartcash.ui.utils.constants import COLORS, ICONS
         from smartcash.ui.components import (
             create_header,
             create_action_buttons,
-            create_dual_progress_tracker as create_progress_tracker,
+            create_dual_progress_tracker,
             create_status_panel,
             create_log_accordion,
             create_save_reset_buttons,
@@ -34,22 +25,22 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         )
         from smartcash.ui.setup.dependency.utils import create_package_selector_grid
         
-        # Helper untuk icon
-        def get_icon(key: str, fallback: str = "📦") -> str:
-            return ICONS.get(key, fallback)
+        # Helper untuk icons
+        get_icon = lambda key, fallback="📦": ICONS.get(key, fallback)
         
-        # Create komponen utama
+        # Header
         header = create_header(
             f"{get_icon('download')} Dependency Installer",
             "Setup packages yang diperlukan untuk SmartCash"
         )
         
+        # Status panel
         status_panel = create_status_panel(
             "Pilih packages yang akan diinstall dan klik tombol install",
             "info"
         )
         
-        # Package selector
+        # Package selector dengan flexbox
         package_selector = create_package_selector_grid(config)
         
         # Custom packages textarea
@@ -60,11 +51,12 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
                 height='90px',
                 margin='8px 0',
                 border='1px solid #ddd',
-                border_radius='4px'
+                border_radius='4px',
+                overflow='hidden'  # Prevent horizontal scroll
             )
         )
         
-        # Action buttons
+        # Action buttons dengan flexbox
         action_buttons = create_action_buttons(
             primary_label="Install",
             secondary_label="Analyze", 
@@ -75,6 +67,20 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             button_width='120px'
         )
         
+        # Button container dengan flexbox
+        action_container = widgets.HBox([
+            action_buttons['download_button'],
+            action_buttons['check_button'], 
+            action_buttons['cleanup_button']
+        ], layout=widgets.Layout(
+            display='flex',
+            flex_flow='row wrap',
+            align_items='center',
+            justify_content='flex-start',
+            width='100%',
+            overflow='hidden'
+        ))
+        
         # Save/reset buttons
         save_reset_buttons = create_save_reset_buttons(
             save_label="Simpan",
@@ -82,15 +88,26 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             button_width='100px'
         )
         
+        # Save/reset container dengan flexbox
+        save_reset_container = widgets.HBox([
+            save_reset_buttons['save_button'],
+            save_reset_buttons['reset_button']
+        ], layout=widgets.Layout(
+            display='flex',
+            flex_flow='row wrap',
+            align_items='center',
+            justify_content='flex-start',
+            width='100%',
+            overflow='hidden'
+        ))
+        
         # Progress tracker
-        from smartcash.ui.info_boxes import get_dependencies_info
-        progress_info = get_dependencies_info()
-        progress_tracker = create_progress_tracker(progress_info)
+        progress_tracker = create_dual_progress_tracker("Package Installation")
         
         # Log accordion
         log_accordion = create_log_accordion()
         
-        # Main UI assembly
+        # Main UI dengan flexbox layout
         main_ui = widgets.VBox([
             header,
             status_panel,
@@ -99,22 +116,22 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             widgets.HTML(value="<h4>➕ Custom Packages</h4>"),
             custom_packages,
             create_divider(),
-            widgets.HBox([
-                action_buttons['download_button'],
-                action_buttons['check_button'], 
-                action_buttons['cleanup_button']
-            ]),
-            widgets.HBox([
-                save_reset_buttons['save_button'],
-                save_reset_buttons['reset_button']
-            ]),
+            action_container,
+            save_reset_container,
             create_divider(),
-            progress_tracker['widget'],
+            progress_tracker.container,
             log_accordion['widget']
-        ])
+        ], layout=widgets.Layout(
+            display='flex',
+            flex_direction='column',
+            align_items='stretch',
+            width='100%',
+            overflow='hidden',  # Prevent horizontal scroll
+            box_sizing='border-box'
+        ))
         
-        # Return komponen lengkap
-        components = {
+        # Return components
+        return {
             'ui': main_ui,
             'header': header,
             'status_panel': status_panel,
@@ -123,98 +140,34 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             'install_button': action_buttons['download_button'],
             'analyze_button': action_buttons['check_button'],
             'check_button': action_buttons['check_button'],
-            'save_button': save_reset_buttons['save_button'], 
+            'system_report_button': action_buttons['cleanup_button'],
+            'save_button': save_reset_buttons['save_button'],
             'reset_button': save_reset_buttons['reset_button'],
-            'progress_tracker': progress_tracker['widget'],
-            'progress_container': progress_tracker,
-            'log_output': log_accordion['log_output'],
-            'show_for_operation': progress_tracker.get('show_for_operation', lambda x: None),
-            'update_progress': progress_tracker.get('update_progress', lambda x, y, z: None),
-            'complete_operation': progress_tracker.get('complete_operation', lambda x: None),
-            'error_operation': progress_tracker.get('error_operation', lambda x: None),
-            'reset_all': progress_tracker.get('reset_all', lambda: None),
-            'show_success': getattr(status_panel, 'show_success', lambda x: None),
-            'show_error': getattr(status_panel, 'show_error', lambda x: None),
-            'show_warning': getattr(status_panel, 'show_warning', lambda x: None),
-            'show_info': getattr(status_panel, 'show_info', lambda x: None)
+            'progress_tracker': progress_tracker,
+            'log_accordion': log_accordion['widget'],
+            'log_output': log_accordion['output']
         }
         
-        # Add package checkboxes jika ada
-        if 'checkboxes' in package_selector:
-            components.update(package_selector['checkboxes'])
-        
-        return components
-        
     except Exception as e:
-        # Buat error UI yang bisa di-display langsung
-        error_type = type(e).__name__
-        error_msg = str(e) or "Terjadi kesalahan yang tidak diketahui"
-        error_traceback = traceback.format_exc()
+        # Simple error UI tanpa nested fallbacks
+        import traceback
+        error_html = f"""
+        <div style="padding: 20px; border: 2px solid #ff4444; border-radius: 8px; background: #ffe6e6;">
+            <h3>❌ UI Creation Failed</h3>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <details>
+                <summary>Traceback</summary>
+                <pre style="background: #f5f5f5; padding: 10px; overflow-x: auto;">
+{traceback.format_exc()}
+                </pre>
+            </details>
+        </div>
+        """
         
-        print(f"❌ Error dalam create_dependency_main_ui: {error_msg}")
-        print(f"📋 Type: {error_type}")
-        print("🔍 Traceback:")
-        print(error_traceback)
+        error_widget = widgets.HTML(value=error_html)
         
-        # Create error UI yang langsung bisa ditampilkan
-        error_header = widgets.HTML(
-            value=f"""
-            <div style='background: #ffebee; padding: 16px; border-radius: 8px; border-left: 4px solid #f44336; margin: 8px 0;'>
-                <h3 style='color: #c62828; margin: 0 0 8px 0;'>❌ Error membuat UI Components</h3>
-                <p style='margin: 0 0 8px 0;'><strong>Module:</strong> dependency</p>
-                <p style='margin: 0 0 8px 0;'><strong>Error:</strong> {error_msg}</p>
-                <p style='margin: 0;'><strong>Type:</strong> {error_type}</p>
-            </div>
-            """,
-            layout=widgets.Layout(width='100%')
-        )
-        
-        error_details = widgets.Output()
-        with error_details:
-            print("🔍 Full Traceback:")
-            print(error_traceback)
-        
-        error_accordion = widgets.Accordion(
-            children=[error_details],
-            titles=['📋 Error Details']
-        )
-        
-        retry_button = widgets.Button(
-            description="🔄 Retry",
-            button_style='info',
-            layout=widgets.Layout(width='100px', margin='8px 0')
-        )
-        
-        error_ui = widgets.VBox([
-            error_header,
-            retry_button,
-            error_accordion
-        ])
-        
-        # Return error UI yang bisa langsung di-display
         return {
-            'ui': error_ui,
-            'error': True,
-            'error_message': error_msg,
-            'error_type': error_type,
-            'traceback': error_traceback,
-            'header': error_header,
-            'status_panel': error_header,  # Use header as status panel
-            'log_output': error_details,
-            'retry_button': retry_button,
-            # Minimal required components untuk prevent further errors
-            'install_button': widgets.Button(description="Error", disabled=True),
-            'analyze_button': widgets.Button(description="Error", disabled=True),
-            'check_button': widgets.Button(description="Error", disabled=True),
-            'save_button': widgets.Button(description="Error", disabled=True),
-            'reset_button': widgets.Button(description="Error", disabled=True),
-            'show_success': lambda x: print(f"✅ {x}"),
-            'show_error': lambda x: print(f"❌ {x}"),
-            'show_warning': lambda x: print(f"⚠️ {x}"),
-            'show_info': lambda x: print(f"ℹ️ {x}"),
-            'show_for_operation': lambda x: None,
-            'update_progress': lambda x, y, z: None,
-            'complete_operation': lambda x: None,
-            'error_operation': lambda x: None,
-            'reset_all': lambda: None
+            'ui': error_widget,
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }

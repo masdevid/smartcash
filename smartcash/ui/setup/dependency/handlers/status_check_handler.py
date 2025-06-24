@@ -1,299 +1,198 @@
 """
-File: smartcash/ui/setup/dependency/handlers/status_check_handler_refactored.py
-Deskripsi: Refactored status check handler untuk memeriksa status dependensi
-
-Fitur Utama:
-- Pengecekan status dependensi yang lebih efisien
-- Pelacakan progress yang lebih baik
-- Error handling yang lebih kuat
-- Kode yang lebih modular dan mudah dipelihara
+File: smartcash/ui/setup/dependency/handlers/status_check_handler.py
+Deskripsi: Handler untuk status check dan system report generation
 """
 
-from dataclasses import dataclass
-import logging
-import sys
-from typing import Dict, Any, List, Optional, Tuple
-
-# Core imports
-from smartcash.common import get_logger
+from typing import Dict, Any, Callable
 from smartcash.ui.setup.dependency.utils import (
-    LogLevel, with_logging, requires, log_to_ui_safe, with_button_context,
-    create_operation_context, update_status_panel, batch_check_packages_status,
-    parse_package_requirement, get_installed_packages_dict
+    update_status_panel, with_button_context,
+    get_comprehensive_system_info, generate_system_compatibility_report,
+    show_progress_tracker_safe, complete_operation_with_message
 )
-from smartcash.ui.setup.dependency.utils.system_info_utils import check_system_requirements
 
-# Setup logger
-logger = get_logger(__name__)
-
-@dataclass
-class StatusCheckResult:
-    """Hasil pengecekan status dependensi"""
-    package_status: Dict[str, Dict[str, Any]]
-    system_requirements: Dict[str, Any]
-    all_requirements_met: bool = False
-
-class StatusChecker:
-    """Kelas utama untuk menangani pengecekan status dependensi"""
+def setup_status_check_handler(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
+    """Setup status check handler untuk system report"""
     
-    def __init__(self, ui_components: Dict[str, Any], config: Dict[str, Any]):
-        self.ui = ui_components
-        self.config = config
-        self.logger = ui_components.get('logger', logger)
-    
-    @classmethod
-    def setup(cls, ui_components: Dict[str, Any], config: Dict[str, Any]) -> 'StatusChecker':
-        """Factory method untuk inisialisasi checker"""
-        checker = cls(ui_components, config)
-        checker._setup_handlers()
-        return checker
-    
-    def _setup_handlers(self) -> None:
-        """Setup semua handler yang diperlukan"""
-        if 'check_status_button' in self.ui:
-            self.ui['check_status_button'].on_click(
-                lambda b: with_button_context(self.ui, 'check_status_button')(self.execute_status_check)
-            )
-    
-    @with_logging("Status Check", LogLevel.INFO)
-    def execute_status_check(self, *args) -> StatusCheckResult:
-        """
-        Eksekusi pengecekan status dependensi
+    def handle_system_report():
+        """Generate comprehensive system report"""
+        logger = ui_components.get('logger')
         
-        Returns:
-            StatusCheckResult: Hasil pengecekan status
-        """
-        ctx = create_operation_context(self.ui, 'status_check')
-        
-        try:
-            # Inisialisasi progress
-            self._init_progress()
-            
-            # Dapatkan daftar paket yang akan diperiksa
-            packages = self._get_packages_to_check()
-            
-            # Periksa status tiap paket
-            package_status = self._check_packages_status(packages, ctx)
-            
-            # Periksa persyaratan sistem
-            system_requirements = self._check_system_requirements()
-            
-            # Hasilkan ringkasan
-            result = StatusCheckResult(
-                package_status=package_status,
-                system_requirements=system_requirements,
-                all_requirements_met=system_requirements.get('all_requirements_met', False)
-            )
-            
-            # Tampilkan ringkasan
-            self._show_status_summary(result, ctx)
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Gagal mengecek status: {str(e)}", exc_info=True)
-            update_status_panel(self.ui, f"⚠️ Gagal mengecek status: {str(e)}", "error")
-            raise
-        finally:
-            # Pastikan progress ditutup
-            self._complete_progress()
-    
-    def _init_progress(self) -> None:
-        """Inisialisasi progress tracker"""
-        if progress_tracker := self.ui.get('progress_tracker'):
-            progress_tracker.show("Status Check", ["🔍 Analisis", "📊 Evaluasi", "✅ Verifikasi"])
-            progress_tracker.update(0, "Memulai pengecekan status...")
-    
-    def _complete_progress(self) -> None:
-        """Tandai progress selesai"""
-        if progress_tracker := self.ui.get('progress_tracker'):
-            progress_tracker.complete("Pengecekan status selesai")
-    
-    def _get_packages_to_check(self) -> List[Dict[str, Any]]:
-        """Dapatkan daftar paket yang akan diperiksa"""
-        packages = self.config.get('packages', [])
-        self.logger.info(f"Memeriksa status {len(packages)} paket")
-        return packages
-    
-    def _check_packages_status(self, packages: List[Dict[str, Any]], ctx) -> Dict[str, Dict[str, Any]]:
-        """Periksa status tiap paket"""
-        package_status = {}
-        total_packages = len(packages)
-        
-        for idx, pkg in enumerate(packages, 1):
-            pkg_name = pkg.get('name', 'unknown')
+        with with_button_context(ui_components, 'system_report_button'):
             try:
-                # Update progress
-                progress = int((idx / total_packages) * 100)
-                if progress_tracker := self.ui.get('progress_tracker'):
-                    progress_tracker.update(progress, f"Memeriksa {pkg_name}...")
+                update_status_panel(ui_components, "🔍 Mengumpulkan informasi sistem...", "info")
+                show_progress_tracker_safe(ui_components, "System Analysis")
                 
-                # Periksa status paket
-                pkg_status = self._check_single_package(pkg)
-                package_status[pkg_name] = pkg_status
+                if logger:
+                    logger.info("🔍 Generating system compatibility report...")
                 
-                # Update UI
-                self._update_package_ui(pkg_name, pkg_status)
+                # Update progress - gathering system info
+                from smartcash.ui.setup.dependency.utils import update_progress_step
+                update_progress_step(ui_components, "overall", 20, "Collecting system info")
+                
+                # Collect system information
+                system_info = get_comprehensive_system_info()
+                
+                update_progress_step(ui_components, "overall", 50, "Checking compatibility")
+                
+                # Generate compatibility report
+                compatibility_report = generate_system_compatibility_report(system_info)
+                
+                update_progress_step(ui_components, "overall", 80, "Generating report")
+                
+                # Log detailed report
+                _log_system_report(logger, system_info, compatibility_report)
+                
+                update_progress_step(ui_components, "overall", 100, "Report completed")
+                
+                # Summary message
+                summary = _generate_report_summary(system_info, compatibility_report)
+                complete_operation_with_message(ui_components, f"✅ {summary}")
+                
+                if logger:
+                    logger.info(f"📊 System report completed: {summary}")
                 
             except Exception as e:
-                self.logger.error(f"Gagal memeriksa {pkg_name}: {str(e)}", exc_info=True)
-                package_status[pkg_name] = {
-                    'installed': False,
-                    'version': None,
-                    'error': str(e)
-                }
-        
-        return package_status
+                update_status_panel(ui_components, f"❌ System report error: {str(e)}", "error")
+                if logger:
+                    logger.error(f"❌ System report failed: {str(e)}")
     
-    def _check_single_package(self, pkg: Dict[str, Any]) -> Dict[str, Any]:
-        """Periksa status satu paket"""
-        pkg_name = pkg.get('pip_name', pkg.get('name', ''))
-        package_name = pkg_name.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
+    def handle_package_status_check():
+        """Check status dari selected packages"""
+        logger = ui_components.get('logger')
         
-        try:
-            # Dapatkan daftar paket yang terinstall
-            installed_packages = get_installed_packages_dict()
-            
-            # Periksa apakah paket terinstall
-            is_installed = package_name in installed_packages
-            
-            # Dapatkan informasi detail paket
-            detailed_info = self._get_detailed_package_info(package_name, installed_packages)
-            
-            return {
-                'name': pkg.get('name', package_name),
-                'pip_name': pkg_name,
-                'package_name': package_name,
-                'category': pkg.get('category', 'other'),
-                'installed': is_installed,
-                'version': installed_packages.get(package_name) if is_installed else None,
-                'required_version': pkg.get('version', ''),
-                **detailed_info
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Gagal memeriksa {pkg_name}: {str(e)}", exc_info=True)
-            return {
-                'name': pkg.get('name', package_name),
-                'pip_name': pkg_name,
-                'package_name': package_name,
-                'category': pkg.get('category', 'other'),
-                'installed': False,
-                'version': None,
-                'error': str(e)
-            }
-    
-    def _get_detailed_package_info(self, package_name: str, installed_packages: Dict[str, str]) -> Dict[str, Any]:
-        """Dapatkan informasi detail paket"""
-        try:
-            if package_name not in installed_packages:
-                return {'installed': False}
-                
-            # Dapatkan versi yang terinstall
-            version = installed_packages[package_name]
-            
-            # Dapatkan info detail menggunakan pip show
-            detailed_info = {}
+        with with_button_context(ui_components, 'check_button'):
             try:
-                import subprocess
-                import json
+                from smartcash.ui.setup.dependency.utils import get_selected_packages
                 
-                # Gunakan pip show untuk mendapatkan info detail
-                result = subprocess.run(
-                    [sys.executable, '-m', 'pip', 'show', '--no-color', '--no-python-version-warning', package_name],
-                    capture_output=True, text=True, check=False
-                )
+                # Get selected packages
+                selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
                 
-                if result.returncode == 0:
-                    # Parse output pip show
-                    for line in result.stdout.split('\n'):
-                        if ': ' in line:
-                            key, value = line.split(': ', 1)
-                            detailed_info[key.lower().replace('-', '_')] = value.strip()
+                if not selected_packages:
+                    update_status_panel(ui_components, "⚠️ Tidak ada packages yang dipilih", "warning")
+                    return
+                
+                update_status_panel(ui_components, f"🔍 Checking status {len(selected_packages)} packages...", "info")
+                show_progress_tracker_safe(ui_components, "Package Status Check")
+                
+                if logger:
+                    logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
+                
+                # Check packages status
+                results = _check_packages_status_batch(selected_packages, ui_components)
+                
+                # Generate status summary
+                summary = _generate_status_summary(results)
+                complete_operation_with_message(ui_components, f"✅ {summary}")
+                
+                if logger:
+                    logger.info(f"📊 Status check completed: {summary}")
+                
             except Exception as e:
-                self.logger.warning(f"Tidak dapat mendapatkan info detail untuk {package_name}: {str(e)}")
-            
-            return {
-                'installed': True,
-                'version': version,
-                'location': detailed_info.get('location'),
-                'requires': detailed_info.get('requires', '').split(', ') if detailed_info.get('requires') else [],
-                'summary': detailed_info.get('summary', '')
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Gagal mendapatkan info detail paket {package_name}: {str(e)}", exc_info=True)
-            return {'installed': False, 'error': str(e)}
+                update_status_panel(ui_components, f"❌ Status check error: {str(e)}", "error")
+                if logger:
+                    logger.error(f"❌ Status check failed: {str(e)}")
     
-    def _check_system_requirements(self) -> Dict[str, Any]:
-        """Periksa persyaratan sistem"""
-        try:
-            requirements = check_system_requirements()
-            # Pastikan format return sesuai dengan yang diharapkan
-            return {
-                'python_version_ok': requirements.get('python_version_ok', False),
-                'platform_supported': requirements.get('platform_supported', False),
-                'memory_sufficient': requirements.get('memory_sufficient', False),
-                'all_requirements_met': requirements.get('all_requirements_met', False)
-            }
-        except Exception as e:
-            self.logger.error(f"Gagal memeriksa persyaratan sistem: {str(e)}")
-            return {
-                'python_version_ok': False,
-                'platform_supported': False,
-                'memory_sufficient': False,
-                'all_requirements_met': False
-            }
+    # Setup button handlers
+    system_report_button = ui_components.get('system_report_button')
+    if system_report_button:
+        system_report_button.on_click(lambda b: handle_system_report())
     
-    def _update_package_ui(self, pkg_name: str, pkg_status: Dict[str, Any]) -> None:
-        """Perbarui UI berdasarkan status paket"""
-        # Implementasi pembaruan UI disesuaikan dengan framework UI yang digunakan
-        if pkg_status.get('installed'):
-            status_text = f"✅ {pkg_name} (v{pkg_status.get('version', '?')})"
+    check_button = ui_components.get('check_button')
+    if check_button:
+        check_button.on_click(lambda b: handle_package_status_check())
+    
+    return {
+        'handle_system_report': handle_system_report,
+        'handle_package_status_check': handle_package_status_check
+    }
+
+def _check_packages_status_batch(packages: list, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Check status packages dalam batch"""
+    from smartcash.ui.setup.dependency.utils import batch_check_packages_status, update_progress_step
+    
+    results = {
+        'installed': [],
+        'not_installed': [],
+        'errors': []
+    }
+    
+    batch_size = 10
+    for i in range(0, len(packages), batch_size):
+        batch = packages[i:i + batch_size]
+        progress = int((i / len(packages)) * 100)
+        
+        update_progress_step(ui_components, "overall", progress, f"Checking batch {i//batch_size + 1}")
+        
+        batch_results = batch_check_packages_status(batch)
+        
+        for result in batch_results:
+            if result['success']:
+                if result['installed']:
+                    results['installed'].append(result['package'])
+                else:
+                    results['not_installed'].append(result['package'])
+            else:
+                results['errors'].append({'package': result['package'], 'error': result.get('error', 'Unknown error')})
+    
+    return results
+
+def _log_system_report(logger, system_info: Dict[str, Any], compatibility_report: Dict[str, Any]):
+    """Log detailed system report"""
+    if not logger:
+        return
+    
+    try:
+        logger.info("💻 System Information:")
+        logger.info(f"   • Python: {system_info.get('python_version', 'Unknown')}")
+        logger.info(f"   • Platform: {system_info.get('platform', 'Unknown')}")
+        logger.info(f"   • Architecture: {system_info.get('architecture', 'Unknown')}")
+        logger.info(f"   • Memory: {system_info.get('memory_info', {}).get('available_gb', 'Unknown')} GB available")
+        
+        # GPU info
+        gpu_info = system_info.get('gpu_info', {})
+        if gpu_info.get('cuda_available'):
+            logger.info(f"   • CUDA: Available (version {gpu_info.get('cuda_version', 'Unknown')})")
         else:
-            status_text = f"❌ {pkg_name} (Tidak terinstal)"
+            logger.info("   • CUDA: Not available")
         
-        log_to_ui_safe(self.ui, status_text, "info")
-    
-    def _show_status_summary(self, result: StatusCheckResult, ctx) -> None:
-        """Tampilkan ringkasan status"""
-        # Hitung ringkasan per kategori
-        category_summary = {}
-        for pkg_info in result.package_status.values():
-            category = pkg_info.get('category', 'other')
-            if category not in category_summary:
-                category_summary[category] = {'total': 0, 'installed': 0}
-            category_summary[category]['total'] += 1
-            if pkg_info.get('installed'):
-                category_summary[category]['installed'] += 1
+        # Compatibility warnings
+        warnings = compatibility_report.get('warnings', [])
+        if warnings:
+            logger.warning("⚠️ Compatibility Warnings:")
+            for warning in warnings[:3]:  # Show first 3
+                logger.warning(f"   • {warning}")
         
-        # Tampilkan ringkasan
-        for category, stats in category_summary.items():
-            percentage = (stats['installed'] / stats['total'] * 100) if stats['total'] > 0 else 0
-            summary_msg = f"📋 {category}: {stats['installed']}/{stats['total']} ({percentage:.1f}%)"
-            log_to_ui_safe(self.ui, summary_msg, "info")
-        
-        # Tampilkan peringatan jika ada persyaratan sistem yang tidak terpenuhi
-        if not result.system_requirements.get('all_requirements_met', True):
-            log_to_ui_safe(self.ui, "⚠️ Beberapa persyaratan sistem tidak terpenuhi", "warning")
-            
-            requirement_checks = [
-                ('python_version_ok', 'Versi Python tidak didukung'),
-                ('memory_sufficient', 'Memori tidak mencukupi'),
-                ('platform_supported', 'Platform tidak didukung')
-            ]
-            
-            for check, msg in requirement_checks:
-                if not result.system_requirements.get(check, True):
-                    log_to_ui_safe(self.ui, f"  • {msg}", "warning")
+        # Recommendations
+        recommendations = compatibility_report.get('recommendations', [])
+        if recommendations:
+            logger.info("💡 Recommendations:")
+            for rec in recommendations[:3]:  # Show first 3
+                logger.info(f"   • {rec}")
+                
+    except Exception:
+        logger.info("📊 System report generated (details in compatibility report)")
 
-# Fungsi kompatibilitas
-def setup_status_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """
-    Fungsi utama untuk setup status check handler (kompatibilitas ke belakang)
-    
-    Args:
-        ui_components: Komponen UI
-        config: Konfigurasi
-    """
-    return StatusChecker.setup(ui_components, config)
+def _generate_report_summary(system_info: Dict[str, Any], compatibility_report: Dict[str, Any]) -> str:
+    """Generate concise report summary"""
+    try:
+        python_version = system_info.get('python_version', 'Unknown')
+        warnings_count = len(compatibility_report.get('warnings', []))
+        
+        if warnings_count == 0:
+            return f"System compatible (Python {python_version})"
+        else:
+            return f"System report complete, {warnings_count} warnings found"
+    except:
+        return "System report generated"
+
+def _generate_status_summary(results: Dict[str, Any]) -> str:
+    """Generate status check summary"""
+    try:
+        installed = len(results['installed'])
+        not_installed = len(results['not_installed'])
+        errors = len(results['errors'])
+        total = installed + not_installed + errors
+        
+        return f"{installed}/{total} installed, {errors} errors"
+    except:
+        return "Status check completed"

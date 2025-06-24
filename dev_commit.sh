@@ -33,7 +33,7 @@ if git commit -m "$COMMIT_MSG"; then
     echo "✅ Commit successful"
     
     echo "Pushing to remote..."
-    if git push origin migration; then
+    if git push origin migration --force; then
         echo "✅ Push successful"
     else
         echo "⚠️ Warning: Push failed, but commit was successful"

@@ -20,7 +20,7 @@ class SetupHandler:
         self.logger = logger
         self.env_handler = EnvironmentHandler(logger)
         self.drive_handler = DriveHandler(logger)
-        self.folder_handler = FolderHandler(logger)
+        self.folder_handler = FolderHandler()  # Doesn't accept logger parameter
         self.config_handler = ConfigHandler()
     
     def run_full_setup(self, ui_components: Dict[str, Any]) -> bool:

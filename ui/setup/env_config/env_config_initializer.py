@@ -109,7 +109,7 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
         
         # Run status check
         status_checker = StatusChecker(logger)
-        status_checker.check_environment_status(ui_components)
+        status_checker.check_and_update_status(ui_components)
         
     except ImportError:
         # Simple status display

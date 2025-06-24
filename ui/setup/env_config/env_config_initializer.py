@@ -4,7 +4,7 @@ Deskripsi: Fixed initializer dengan proper state management untuk UI berdasarkan
 """
 
 from typing import Dict, Any
-from smartcash.ui.setup.env_config.ui_components import create_env_config_ui, setup_ui_logger_bridge, update_summary_panels
+from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui, setup_ui_logger_bridge, update_summary_panels
 from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
 from smartcash.ui.setup.env_config.handlers.system_info_handler import SystemInfoHandler
 from smartcash.ui.setup.env_config.handlers.status_handler import StatusHandler

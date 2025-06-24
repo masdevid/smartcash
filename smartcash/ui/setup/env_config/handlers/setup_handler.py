@@ -288,11 +288,14 @@ class SetupHandler:
             
             # Mark all stages as complete if successful
             if summary_data['status']:
-                for stage_enum in SetupStage:
-                    if stage_enum != SetupStage.COMPLETE:
-                        progress_tracker.complete_stage()
+                # Just update to COMPLETE stage - no need to iterate through all stages
                 progress_tracker.update_stage(SetupStage.COMPLETE)
                 progress_tracker.complete("✅ All setup steps completed successfully")
+                
+                # Update the progress bar to show 100% for all stages
+                if 'progress_bar' in progress_tracker.ui_components:
+                    progress_tracker.ui_components['progress_bar'].value = 100
+                    progress_tracker.ui_components['progress_bar'].bar_style = 'success'
             
             # Log final summary
             self.logger.info("\n📋 Setup Summary:" + "\n" + "="*50)

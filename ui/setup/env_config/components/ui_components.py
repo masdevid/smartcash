@@ -98,7 +98,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         header,
         status_panel,
         setup_button_container,
-        progress_tracker.ui_components['progress_tracker']['container'],
+        progress_tracker.ui_components['progress_container'],
         log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),
         setup_summary,

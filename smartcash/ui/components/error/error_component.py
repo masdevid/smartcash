@@ -69,6 +69,8 @@ class ErrorComponent:
         
         # Create traceback widget if traceback is provided
         traceback_widget = None
+        toggle_button = None
+        
         if traceback and show_traceback:
             traceback_widget = widgets.Textarea(
                 value=traceback,
@@ -119,7 +121,7 @@ class ErrorComponent:
             'container': container,
             'error_widget': error_widget,
             'traceback_widget': traceback_widget,
-            'toggle_button': toggle_button if traceback and show_traceback else None
+            'toggle_button': toggle_button
         }
         
         return self._components

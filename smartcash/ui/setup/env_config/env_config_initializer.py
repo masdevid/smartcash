@@ -104,7 +104,7 @@ def _create_error_fallback(error_message: str, traceback: Optional[str] = None) 
     Returns:
         A widget containing the error message and optional traceback
     """
-    from smartcash.ui.setup.env_config.components.error_component import create_error_component
+    from smartcash.ui.components import create_error_component
     
     # Create error component with optional traceback
     error_component = create_error_component(

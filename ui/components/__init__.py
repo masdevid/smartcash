@@ -48,6 +48,7 @@ def __getattr__(name):
 from smartcash.ui.components.log_accordion import create_log_accordion, update_log
 from smartcash.ui.components.tabs import create_tab_widget, create_tabs
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from smartcash.ui.components.error import ErrorComponent, create_error_component
 
 # Info components
 from smartcash.ui.components.info import (

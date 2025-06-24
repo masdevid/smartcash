@@ -125,45 +125,109 @@ def _get_initial_summary_content(message: Optional[str] = None) -> str:
 
 def _format_summary_content(data: Dict) -> str:
     """📊 Format summary data untuk drive mount, config sync, symlinks, dan folders"""
-    drive_mounted = data.get('drive_mounted', False)
-    mount_path = data.get('mount_path', 'N/A')
-    configs_synced = data.get('configs_synced', 0)
-    symlinks_created = data.get('symlinks_created', 0)
-    folders_created = data.get('folders_created', 0)
+    from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
     
-    # Format drive status with proper path display
-    if drive_mounted:
-        if mount_path and mount_path != 'N/A':
-            drive_status = f"✅ Mounted at {mount_path}"
-        else:
-            drive_status = "✅ Mounted (path not available)"
-    else:
-        drive_status = "❌ Not mounted"
+    # Get verification data
+    verified_folders = data.get('verified_folders', [])
+    missing_folders = data.get('missing_folders', [])
+    verified_symlinks = data.get('verified_symlinks', [])
+    missing_symlinks = data.get('missing_symlinks', [])
+    
+    # Calculate counts
+    folders_verified = len(verified_folders)
+    folders_required = len(REQUIRED_FOLDERS)
+    symlinks_verified = len(verified_symlinks)
+    symlinks_required = len(SYMLINK_MAP)
+    configs_synced = data.get('configs_synced', 0)
+    
+    # Format status indicators
+    folders_status = "✅" if not missing_folders else "⚠️"
+    symlinks_status = "✅" if not missing_symlinks else "⚠️"
+    configs_status = "✅" if configs_synced > 0 else "⚠️"
+    drive_status_icon = "✅" if data.get('drive_mounted') else "❌"
+    
+    # Format info with verification results
+    folders_info = f"{folders_status} {folders_verified}/{folders_required} folders verified"
+    if missing_folders:
+        folders_info += f"<br><small style='color:#d32f2f;'>{len(missing_folders)} missing</small>"
+    
+    symlinks_info = f"{symlinks_status} {symlinks_verified}/{symlinks_required} symlinks verified"
+    if missing_symlinks:
+        symlinks_info += f"<br><small style='color:#d32f2f;'>{len(missing_symlinks)} missing</small>"
+    
+    configs_info = f"{configs_status} {configs_synced} configs synced"
+    
+    # Format status message
+    status_message = data.get('status_message', 'Setup completed')
+    
+    # Determine overall status
+    all_verified = (
+        not missing_folders and
+        not missing_symlinks and
+        configs_synced > 0 and
+        data.get('drive_mounted', False)
+    )
+    overall_status = "✅ All checks passed" if all_verified else "⚠️ Some checks failed"
+    
+    # Create details sections
+    details_sections = []
+    
+    # Add missing folders section if any
+    if missing_folders:
+        missing_folders_list = "\n".join(f"<li>{folder}</li>" for folder in missing_folders)
+        details_sections.append(f"""
+        <div style="margin-top: 10px; background: #fff3e0; padding: 10px; border-radius: 4px;">
+            <h5 style="margin: 0 0 5px 0; color: #e65100;">⚠️ Missing Folders</h5>
+            <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 0.9em;">
+                {missing_folders_list}
+            </ul>
+        </div>
+        """)
+    
+    # Add missing symlinks section if any
+    if missing_symlinks:
+        missing_symlinks_list = "\n".join(f"<li>{src} → {dst}</li>" for src, dst in missing_symlinks)
+        details_sections.append(f"""
+        <div style="margin-top: 10px; background: #fff3e0; padding: 10px; border-radius: 4px;">
+            <h5 style="margin: 0 0 5px 0; color: #e65100;">⚠️ Missing Symlinks</h5>
+            <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 0.9em;">
+                {missing_symlinks_list}
+            </ul>
+        </div>
+        """)
+    
+    # Combine all sections
+    details_html = "\n".join(details_sections)
     
     return f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6;">
-        <h4 style="color: #2196f3; margin-top: 0; margin-bottom: 15px;">📋 Setup Summary</h4>
+        <div style="margin-bottom: 15px;">
+            <h4 style="margin: 0 0 10px 0; color: #333;">Setup Summary</h4>
+            <p style="margin: 5px 0; font-weight: 500;">{overall_status}</p>
+            <p style="margin: 5px 0; font-size: 0.9em; color: #555;">
+                {drive_status_icon} Drive: {data.get('mount_path', 'N/A') if data.get('drive_mounted') else 'Not mounted'}
+            </p>
+        </div>
         
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #2196f3;">
-                <h5 style="margin: 0 0 8px 0; color: #333;">💾 Drive Status</h5>
-                <p style="margin: 0; font-size: 14px;"><strong>{drive_status}</strong></p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                <h5 style="margin: 0 0 5px 0; color: #555;">Folders</h5>
+                <div style="margin: 0; font-size: 0.9em;">{folders_info}</div>
             </div>
-            
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #4caf50;">
-                <h5 style="margin: 0 0 8px 0; color: #333;">⚙️ Configs Synced</h5>
-                <p style="margin: 0; font-size: 14px;"><strong>{configs_synced}</strong> config files</p>
+            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                <h5 style="margin: 0 0 5px 0; color: #555;">Symlinks</h5>
+                <div style="margin: 0; font-size: 0.9em;">{symlinks_info}</div>
             </div>
-            
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #ff9800;">
-                <h5 style="margin: 0 0 8px 0; color: #333;">🔗 Symlinks Created</h5>
-                <p style="margin: 0; font-size: 14px;"><strong>{symlinks_created}</strong> symlinks</p>
+            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; grid-column: span 2;">
+                <h5 style="margin: 0 0 5px 0; color: #555;">Configurations</h5>
+                <div style="margin: 0; font-size: 0.9em;">{configs_info}</div>
             </div>
-            
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #9c27b0;">
-                <h5 style="margin: 0 0 8px 0; color: #333;">📁 Folders Created</h5>
-                <p style="margin: 0; font-size: 14px;"><strong>{folders_created}</strong> directories</p>
-            </div>
+        </div>
+        
+        {details_html}
+        
+        <div style="margin-top: 15px; background: #f0f7ff; padding: 10px; border-radius: 4px; border-left: 4px solid #2196f3;">
+            <p style="margin: 0; font-size: 0.9em; color: #0d47a1;">{status_message}</p>
         </div>
     </div>
     """

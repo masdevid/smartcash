@@ -52,12 +52,16 @@ class SetupHandler:
     
     def _execute_setup_workflow(self, ui_components: Dict[str, Any], progress_tracker) -> Dict[str, Any]:
         """🔧 Execute setup steps dengan progress tracking"""
+        from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
+        
         summary_data = {
             'drive_mounted': False,
             'mount_path': 'N/A',
             'configs_synced': 0,
             'symlinks_created': 0,
             'folders_created': 0,
+            'required_folders': len(REQUIRED_FOLDERS),
+            'required_symlinks': len(SYMLINK_MAP),
             'success': False
         }
         
@@ -98,19 +102,63 @@ class SetupHandler:
             self.logger.info("✅ Step 4: Verifying setup...")
             progress_tracker.update_step("Verifying setup", 75)
             
-            # Verification logic here
-            time.sleep(1)  # Simulate verification
+            # Verify all required folders exist
+            verified_folders = []
+            missing_folders = []
+            for folder in REQUIRED_FOLDERS:
+                if os.path.exists(folder) and os.path.isdir(folder):
+                    verified_folders.append(folder)
+                else:
+                    missing_folders.append(folder)
+            
+            # Verify all symlinks exist and are valid
+            verified_symlinks = []
+            missing_symlinks = []
+            for source, target in SYMLINK_MAP.items():
+                if os.path.islink(target) and os.path.realpath(target) == os.path.realpath(source):
+                    verified_symlinks.append((source, target))
+                else:
+                    missing_symlinks.append((source, target))
+            
+            # Update summary with verification results
+            summary_data['verified_folders'] = verified_folders
+            summary_data['missing_folders'] = missing_folders
+            summary_data['verified_symlinks'] = verified_symlinks
+            summary_data['missing_symlinks'] = missing_symlinks
+            
+            # Update counts for backward compatibility
+            summary_data['folders_created'] = len(verified_folders)
+            summary_data['symlinks_created'] = len(verified_symlinks)
+            
+            # Check if all required items exist
+            all_verified = (
+                not missing_folders and
+                not missing_symlinks and
+                summary_data['drive_mounted'] and
+                summary_data['configs_synced'] > 0  # At least one config should be synced
+            )
+            
+            summary_data['success'] = all_verified
+            
+            # Log verification results
+            if missing_folders:
+                self.logger.warning(f"Missing folders: {', '.join(missing_folders)}")
+            if missing_symlinks:
+                self.logger.warning(f"Missing symlinks: {', '.join(f'{s} -> {t}' for s, t in missing_symlinks)}")
             
             # Complete
             progress_tracker.update_step("Setup complete", 100)
-            summary_data['success'] = True
             
             # Update the setup summary with detailed information
             if 'setup_summary' in ui_components:
                 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+                status_msg = (
+                    "✅ Environment setup completed successfully!" if all_verified
+                    else "⚠️ Setup completed with some issues"
+                )
                 update_setup_summary(
                     ui_components['setup_summary'],
-                    status_message="✅ Environment setup completed successfully!",
+                    status_message=status_msg,
                     status_type='success',
                     details=summary_data
                 )
@@ -186,6 +234,12 @@ class SetupHandler:
             ui_components: Dictionary containing UI components
         """
         try:
+            # Clear log accordion if it exists
+            if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'children'):
+                log_output = ui_components['log_accordion'].children[0]
+                if hasattr(log_output, 'clear_output'):
+                    log_output.clear_output()
+            
             # Disable button during setup
             button.disabled = True
             button.description = "🔄 Setting up..."

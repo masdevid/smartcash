@@ -37,16 +37,18 @@ def create_header(title: str, description: Optional[str] = None, icon: Optional[
         HTML widget containing the header
     """
     try:
-        # Get colors from constants or use defaults
-        primary_color = COLORS.get('primary', '#4f46e5') if COLORS else '#4f46e5'
-        primary_light = COLORS.get('primary_light', '#818cf8') if COLORS else '#818cf8'
-        text_color = COLORS.get('text', '#1f2937') if COLORS else '#1f2937'
+        # Set gradient colors - blue to emerald
+        blue_color = '#3b82f6'  # Blue-500
+        emerald_color = '#10b981'  # Emerald-500
+        
+        # Get text color from constants or use default
+        text_color = COLORS.get('text', '#ffffff') if COLORS else '#ffffff'
         
         # Add icon if provided
         title_with_icon = f"{icon} {title}" if icon else title
         
-        # Create gradient background
-        gradient = f"linear-gradient(135deg, {primary_color} 0%, {primary_light} 100%)"
+        # Create gradient background - blue to emerald
+        gradient = f"linear-gradient(135deg, {blue_color} 0%, {emerald_color} 100%)"
         
         # Build HTML
         html_content = f"""

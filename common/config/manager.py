@@ -1,6 +1,6 @@
 """
 File: smartcash/common/config/manager.py
-Deskripsi: Config manager dengan tanggung jawab yang jelas dan logging minimal
+Deskripsi: Extended SimpleConfigManager dengan sync_configs_to_drive method
 """
 
 import os
@@ -9,13 +9,13 @@ import shutil
 import logging
 import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List, Tuple
 
 from smartcash.common.constants.core import DEFAULT_CONFIG_DIR, APP_NAME
 from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
 
 class SimpleConfigManager:
-    """Config manager dengan fokus pada operasi config tanpa environment management"""
+    """Config manager dengan sync functionality"""
     
     def __init__(self, base_dir: Optional[str] = None, config_file: Optional[str] = None):
         """Inisialisasi config manager"""
@@ -23,7 +23,7 @@ class SimpleConfigManager:
         self._logger = logging.getLogger(__name__)
         if not self._logger.handlers:
             handler = logging.StreamHandler()
-            handler.setLevel(logging.WARNING)  # Hanya warning dan error
+            handler.setLevel(logging.WARNING)
             self._logger.addHandler(handler)
             self._logger.setLevel(logging.WARNING)
         
@@ -41,7 +41,7 @@ class SimpleConfigManager:
         self.repo_config_dir = Path('/content/smartcash/configs')
         self.drive_config_dir = Path(DRIVE_PATH) / DEFAULT_CONFIG_DIR
         
-        # Setup structure hanya jika diperlukan
+        # Setup structure
         self._ensure_config_directory()
     
     def _get_default_base_dir(self) -> Path:
@@ -50,86 +50,149 @@ class SimpleConfigManager:
             import google.colab
             return Path(COLAB_PATH)
         except ImportError:
-            return Path(__file__).resolve().parents[3]
+            return Path(os.getcwd())
     
-    def _ensure_config_directory(self) -> None:
+    def _ensure_config_directory(self):
         """Ensure config directory exists"""
         try:
-            import google.colab
-            is_colab = True
-        except ImportError:
-            is_colab = False
             self.config_dir.mkdir(parents=True, exist_ok=True)
-            return
+        except Exception as e:
+            self._logger.warning(f"Could not create config directory: {str(e)}")
+    
+    def discover_repo_configs(self) -> List[str]:
+        """🔍 Discover semua config files di repo"""
+        if not self.repo_config_dir.exists():
+            return []
         
-        if not is_colab:
-            return
-            
-        # Check jika symlink sudah ada dan valid
-        if (self.config_dir.is_symlink() and 
-            self.config_dir.exists() and 
-            self.config_dir.resolve() == self.drive_config_dir.resolve()):
-            return
+        config_extensions = ['.yaml', '.yml', '.json', '.toml']
+        discovered = []
         
-        # Setup symlink jika drive tersedia
-        if Path('/content/drive/MyDrive').exists():
+        for ext in config_extensions:
+            discovered.extend([
+                f.name for f in self.repo_config_dir.glob(f'*{ext}')
+                if f.is_file() and not f.name.startswith('.')
+            ])
+        
+        return sorted(list(set(discovered)))  # Remove duplicates
+    
+    def sync_single_config(self, filename: str, force_overwrite: bool = False) -> Tuple[bool, str]:
+        """📋 Sync single config file dari repo ke Drive"""
+        source_file = self.repo_config_dir / filename
+        dest_file = self.drive_config_dir / filename
+        
+        # Check source exists
+        if not source_file.exists():
+            return False, f"Source tidak ditemukan: {filename}"
+        
+        # Ensure destination directory
+        self.drive_config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if overwrite needed
+        if dest_file.exists() and not force_overwrite:
             try:
-                self.drive_config_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Remove existing directory/symlink
-                if self.config_dir.exists():
-                    if self.config_dir.is_symlink():
-                        self.config_dir.unlink()
-                    else:
-                        shutil.rmtree(self.config_dir)
-                
-                # Create symlink
-                self.config_dir.symlink_to(self.drive_config_dir)
+                # Quick content comparison
+                if source_file.read_text(encoding='utf-8') == dest_file.read_text(encoding='utf-8'):
+                    return True, f"Identik, skip: {filename}"
             except Exception:
-                # Fallback to local directory
-                self.config_dir.mkdir(parents=True, exist_ok=True)
+                pass  # Proceed with copy if comparison fails
+        
+        # Perform copy
+        try:
+            shutil.copy2(source_file, dest_file)
+            return True, f"Sync berhasil: {filename}"
+        except Exception as e:
+            return False, f"Error sync {filename}: {str(e)}"
+    
+    def sync_configs_to_drive(self, force_overwrite: bool = False, 
+                            target_configs: Optional[List[str]] = None) -> Dict[str, Any]:
+        """🚀 Sync configs dari repo ke Drive dengan auto-discovery"""
+        
+        # Discover configs yang tersedia
+        available_configs = self.discover_repo_configs()
+        
+        if not available_configs:
+            return {
+                'success': False,
+                'message': 'Tidak ada config ditemukan di repo',
+                'synced_count': 0,
+                'error_count': 1
+            }
+        
+        # Determine configs to sync
+        if target_configs:
+            configs_to_sync = [cfg for cfg in target_configs if cfg in available_configs]
         else:
-            # Local directory jika drive tidak tersedia
-            self.config_dir.mkdir(parents=True, exist_ok=True)
+            configs_to_sync = available_configs
+        
+        # Sync each config
+        synced_files = []
+        skipped_files = []
+        error_files = []
+        
+        for config in configs_to_sync:
+            success, message = self.sync_single_config(config, force_overwrite)
+            
+            if success:
+                if "skip" in message.lower():
+                    skipped_files.append(config)
+                else:
+                    synced_files.append(config)
+            else:
+                error_files.append((config, message))
+        
+        # Generate result
+        total_processed = len(synced_files) + len(skipped_files) + len(error_files)
+        success_rate = (len(synced_files) + len(skipped_files)) / max(total_processed, 1)
+        
+        return {
+            'success': success_rate >= 0.8,  # 80% success threshold
+            'message': self._generate_sync_message(synced_files, skipped_files, error_files),
+            'synced_count': len(synced_files),
+            'skipped_count': len(skipped_files),
+            'error_count': len(error_files),
+            'synced_files': synced_files,
+            'skipped_files': skipped_files,
+            'error_files': error_files,
+            'discovered_configs': available_configs,
+            'success_rate': round(success_rate * 100, 1)
+        }
+    
+    def _generate_sync_message(self, synced: List[str], skipped: List[str], 
+                             errors: List[Tuple[str, str]]) -> str:
+        """📊 Generate human-readable sync message"""
+        if not errors:
+            if synced:
+                return f"✅ Sync {len(synced)} configs" + (f", skip {len(skipped)} identik" if skipped else "")
+            else:
+                return f"ℹ️ Semua {len(skipped)} configs up-to-date"
+        else:
+            return f"⚠️ Sync {len(synced)} berhasil, {len(errors)} error"
+    
+    # === EXISTING METHODS ===
     
     def get_config_path(self, config_name: str = None) -> Path:
-        """Get path ke config file"""
-        if config_name is None:
-            config_name = self.config_file
-        
-        # Jika nama file sudah lengkap dengan ekstensi, gunakan apa adanya
-        if config_name.endswith('.yaml') or config_name.endswith('.yml'):
-            return self.config_dir / config_name
-        
-        # Tambahkan _config jika tidak ada dan bukan dari file config spesial
-        special_configs = ['model', 'hyperparameters', 'training', 'dataset', 'base', 'backbone', 'split', 'strategy', 'evaluation', 'analysis', 'augmentation', 'preprocessing', 'pretrained']
-        if config_name in special_configs:
-            config_name = f"{config_name}_config.yaml"
-        # Jika sudah berakhiran _config, tambahkan ekstensi saja
-        elif config_name.endswith('_config'):
-            config_name = f"{config_name}.yaml"
-        # Selain itu, tambahkan _config.yaml
-        else:
-            config_name = f"{config_name}_config.yaml"
-        
-        return self.config_dir / config_name
+        """Get path untuk config file"""
+        filename = config_name or self.config_file
+        return self.config_dir / filename
     
     def load_config(self, config_name: str = None) -> Dict[str, Any]:
-        """Load config file"""
+        """Load config dari file"""
         config_path = self.get_config_path(config_name)
         
         try:
             if config_path.exists():
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = yaml.safe_load(f) or {}
-                
+                    
                 cache_key = config_name or self.config_file
                 self.config_cache[cache_key] = copy.deepcopy(config)
                 return config
+            else:
+                return {}
+                
         except Exception as e:
-            self._logger.error(f"Error loading config {config_path}: {str(e)}")
-        
-        return {}
+            self._logger.error(f"Error loading config: {str(e)}")
+            return {}
     
     def save_config(self, config: Dict[str, Any], config_name: str = None) -> bool:
         """Save config file"""

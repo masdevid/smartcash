@@ -98,13 +98,11 @@ class SetupProgressTracker:
                 'text': status_text,
                 'container': container
             }
+            self.ui_components['progress_container'] = container
             
             # Display the container
             display(container)
                 
-            # Force display update
-            display(progress_container)
-    
     def register_callback(self, callback: Callable[[str, int, str], None]) -> None:
         """Register callback untuk progress update"""
         if callback not in self.callbacks:
@@ -199,13 +197,13 @@ class SetupProgressTracker:
     
     def hide(self) -> None:
         """Hide the progress tracker"""
-        if 'progress_container' in self.ui_components:
-            self.ui_components['progress_container'].layout.visibility = 'hidden'
+        if 'progress_tracker' in self.ui_components and 'container' in self.ui_components['progress_tracker']:
+            self.ui_components['progress_tracker']['container'].layout.visibility = 'hidden'
     
     def show(self) -> None:
         """Show the progress tracker"""
-        if 'progress_container' in self.ui_components:
-            self.ui_components['progress_container'].layout.visibility = 'visible'
+        if 'progress_tracker' in self.ui_components and 'container' in self.ui_components['progress_tracker']:
+            self.ui_components['progress_tracker']['container'].layout.visibility = 'visible'
     
     def update_progress(self, stage: SetupStage, progress: int, message: str = "") -> None:
         """Update progress for a specific stage"""

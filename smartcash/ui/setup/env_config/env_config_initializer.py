@@ -44,5 +44,13 @@ class EnvConfigInitializer:
 
 def initialize_environment_config_ui() -> Dict[str, Any]:
     """🚀 Entry point untuk environment config UI"""
+    from IPython.display import display
+    
     initializer = EnvConfigInitializer()
-    return initializer.initialize_env_config_ui()
+    ui_components = initializer.initialize_env_config_ui()
+    
+    # Display UI
+    if 'ui' in ui_components:
+        display(ui_components['ui'])
+    
+    return ui_components

@@ -7,15 +7,12 @@ import ipywidgets as widgets
 from IPython.display import HTML
 from typing import Dict, Any, Optional
 
-__all__ = ['UIFactory']  # Export UIFactory at module level
-
 class UIFactory:
     """🏭 Factory untuk membuat UI components environment config dengan flexbox layout"""
     
     @classmethod
     def create_divider(cls):
         """Create a consistent divider widget"""
-        import ipywidgets as widgets
         return widgets.HTML(
             value="<hr style='margin: 15px 0; border: 1px solid #e0e0e0;'>"
         )
@@ -61,48 +58,34 @@ class UIFactory:
             ))
             
             # Status panel
-            status_panel = create_status_panel(
-                message="🔍 Siap untuk konfigurasi environment",
-                status_type="info"
-            )
+            status_panel = create_status_panel()
             
-            # Progress tracker dengan error handling
-            progress_tracker = None
-            try:
-                progress_tracker = create_single_progress_tracker(
-                    operation="Environment Setup"
-                )
-                if progress_tracker and hasattr(progress_tracker, 'container'):
-                    progress_tracker.container.layout.width = '100%'
-            except Exception as e:
-                print(f"⚠️ Error creating progress tracker: {e}")
+            # Progress tracker
+            progress_tracker = create_single_progress_tracker()
             
-            # Log accordion dengan error handling
-            log_components = {}
-            try:
-                log_components = create_log_accordion(
-                    module_name="env_config",
-                    height='180px',
-                    width='100%'
-                )
-            except Exception as e:
-                print(f"⚠️ Error creating log accordion: {e}")
-                log_components = {'log_accordion': None, 'log_output': None}
+            # Log accordion
+            log_accordion = create_log_accordion()
             
-            # Main layout dengan flexbox - dua baris layout
-            main_layout = cls._create_main_layout(
-                header=header,
-                env_summary_panel=env_summary_panel,
-                info_panel=info_panel,
-                button_container=button_container,
-                status_panel=status_panel,
-                progress_tracker=progress_tracker,
-                log_components=log_components
-            )
+            # Main layout dengan flexbox
+            main_layout = widgets.VBox([
+                header,
+                create_divider(),
+                env_summary_panel,
+                info_panel,
+                create_divider(),
+                button_container,
+                status_panel,
+                progress_tracker,
+                log_accordion
+            ], layout=widgets.Layout(
+                width='100%',
+                max_width='900px',
+                margin='0 auto',
+                padding='20px',
+                box_sizing='border-box'
+            ))
             
-            # Return all components
             return {
-                # Core UI
                 'ui_layout': main_layout,
                 'header': header,
                 'env_summary_panel': env_summary_panel,
@@ -110,254 +93,92 @@ class UIFactory:
                 'setup_button': setup_button,
                 'button_container': button_container,
                 'status_panel': status_panel,
-                'status_message': status_panel,  # Alias untuk compatibility
-                
-                # Progress dan logging
                 'progress_tracker': progress_tracker,
-                'progress_container': progress_tracker.container if progress_tracker else None,
-                'log_accordion': log_components.get('log_accordion'),
-                'log_output': log_components.get('log_output'),
-                
-                # Metadata
-                'logger_namespace': 'smartcash.ui.env_config',
-                'env_config_initialized': True
+                'log_accordion': log_accordion,
+                'create_divider': create_divider
             }
             
-        except Exception as e:
-            print(f"🚨 Error creating UI components: {e}")
-            return cls._create_fallback_ui(str(e))
+        except ImportError as e:
+            print(f"🚨 Import error dalam UIFactory: {e}")
+            return cls._create_fallback_ui()
     
     @classmethod
-    def _create_main_layout(cls, **components) -> widgets.Widget:
-        """📐 Create main layout dengan flexbox - dua baris layout"""
-        
-        # Baris pertama: Summary dan Info (sekarang vertikal)
-        summary_section = widgets.VBox([
-            widgets.HTML(value="<h3>📊 Environment Summary</h3>"),
-            components['env_summary_panel']
-        ], layout=widgets.Layout(
-            width='100%',
-            margin='0px 0px 15px 0px'
-        ))
-        
-        info_section = widgets.VBox([
-            widgets.HTML(value="<h3>💡 Tips & Requirements</h3>"),
-            components['info_panel']
-        ], layout=widgets.Layout(
-            width='100%',
-            margin='0px 0px 15px 0px'
-        ))
-        
-        # Action section
-        action_section = widgets.VBox([
-            components['button_container'],
-            cls.create_divider(),
-            components['status_panel']
-        ], layout=widgets.Layout(
-            width='100%',
-            margin='10px 0px'
-        ))
-        
-        # Progress dan log section
-        progress_log_section = widgets.VBox([], layout=widgets.Layout(width='100%'))
-        
-        if components['progress_tracker']:
-            progress_log_section.children = list(progress_log_section.children) + [
-                components['progress_tracker'].container
-            ]
-        
-        if components['log_components'].get('log_accordion'):
-            progress_log_section.children = list(progress_log_section.children) + [
-                components['log_components']['log_accordion']
-            ]
-        
-        # Main container dengan flexbox layout
-        main_container = widgets.VBox([
-            components['header'],
-            cls.create_divider(),
-            summary_section,  # Baris pertama
-            info_section,     # Baris kedua
-            cls.create_divider(),
-            action_section,
-            progress_log_section
-        ], layout=widgets.Layout(
-            display='flex',
-            flex_direction='column',
-            align_items='stretch',
-            width='100%',
-            max_width='100%',
-            overflow='hidden',  # Prevent horizontal scroll
-            box_sizing='border-box',
-            padding='0px'
-        ))
-        
-        return main_container
-    
-    @classmethod
-    def _create_environment_summary_panel(cls) -> widgets.Widget:
-        """📊 Create environment summary panel dengan flexbox"""
-        try:
-            from smartcash.common.environment import get_environment_info
-            
-            env_info = get_environment_info()
-            
-            # Create info cards dengan flexbox
-            cards = []
-            
-            # System info card
-            system_info = f"""
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 5px 0px; border-left: 4px solid #007bff;">
-                <strong>🖥️ System:</strong> {env_info.get('platform', 'Unknown')}<br>
-                <strong>🐍 Python:</strong> {env_info.get('python_version', 'Unknown')}<br>
-                <strong>📁 Working Dir:</strong> {env_info.get('working_directory', 'Unknown')[:50]}...
+    def _create_environment_summary_panel(cls):
+        """🌍 Create environment summary panel"""
+        return widgets.HTML(
+            value="""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                       color: white; padding: 20px; border-radius: 10px; margin: 10px 0;">
+                <h3>🌍 Environment Summary</h3>
+                <div id="env-info">
+                    <p>📊 <strong>Platform:</strong> <span id="platform-info">Detecting...</span></p>
+                    <p>💾 <strong>Drive Status:</strong> <span id="drive-info">Checking...</span></p>
+                    <p>🔧 <strong>Python Version:</strong> <span id="python-info">Loading...</span></p>
+                    <p>📁 <strong>Working Directory:</strong> <span id="workdir-info">Getting...</span></p>
+                </div>
             </div>
-            """
-            cards.append(widgets.HTML(value=system_info))
-            
-            # GPU info card
-            gpu_info = env_info.get('gpu_info', {})
-            gpu_available = gpu_info.get('available', False)
-            gpu_text = f"""
-            <div style="background: {'#d4edda' if gpu_available else '#f8d7da'}; padding: 12px; border-radius: 8px; margin: 5px 0px; border-left: 4px solid {'#28a745' if gpu_available else '#dc3545'};">
-                <strong>🎮 GPU:</strong> {'Available' if gpu_available else 'Not Available'}<br>
-                <strong>🔧 Device:</strong> {gpu_info.get('device_name', 'CPU Only')}<br>
-                <strong>💾 Memory:</strong> {gpu_info.get('memory_info', 'N/A')}
-            </div>
-            """
-            cards.append(widgets.HTML(value=gpu_text))
-            
-            # Return container dengan flexbox
-            return widgets.VBox(cards, layout=widgets.Layout(
-                width='100%',
-                overflow='hidden'
-            ))
-            
-        except Exception as e:
-            return widgets.HTML(value=f"⚠️ Error loading environment info: {e}")
+            """,
+            layout=widgets.Layout(width='100%')
+        )
     
     @classmethod
-    def _create_setup_button(cls) -> widgets.Widget:
-        """🔧 Create setup button dengan styling"""
+    def _create_info_panel(cls):
+        """ℹ️ Create info panel dengan tips dan requirements"""
+        return widgets.HTML(
+            value="""
+            <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; 
+                       border-left: 4px solid #2196F3; margin: 10px 0;">
+                <h4 style="color: #1565C0; margin-top: 0;">💡 Setup Requirements</h4>
+                <ul style="color: #424242; margin: 0;">
+                    <li>🐍 Python 3.7+ environment</li>
+                    <li>📁 Read/write access to working directory</li>
+                    <li>🌐 Internet connection for dependencies</li>
+                    <li>💾 Minimum 2GB free disk space</li>
+                </ul>
+            </div>
+            """,
+            layout=widgets.Layout(width='100%')
+        )
+    
+    @classmethod
+    def _create_setup_button(cls):
+        """🚀 Create setup button dengan styling"""
         return widgets.Button(
-            description="🚀 Setup Environment",
+            description='🚀 Setup Environment',
             button_style='primary',
-            tooltip='Klik untuk memulai setup environment SmartCash',
             layout=widgets.Layout(
                 width='200px',
-                height='40px',
-                margin='10px 0px'
+                height='45px',
+                margin='10px'
+            ),
+            style=widgets.ButtonStyle(
+                font_weight='bold',
+                font_size='14px'
             )
         )
     
     @classmethod
-    def _create_environment_summary_panel(cls) -> widgets.Widget:
-        """📊 Create environment summary panel dengan flexbox"""
-        try:
-            from smartcash.common.environment import get_environment_info
-                
-            env_info = get_environment_info()
-                
-            # Create info cards dengan flexbox
-            cards = []
-                
-            # System info card
-            system_info = f"""
-            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 5px 0px; border-left: 4px solid #007bff;">
-                <strong>🖥️ System:</strong> {env_info.get('platform', 'Unknown')}<br>
-                <strong>🐍 Python:</strong> {env_info.get('python_version', 'Unknown')}<br>
-                <strong>📁 Working Dir:</strong> {env_info.get('working_directory', 'Unknown')[:50]}...
-            </div>
-            """
-            cards.append(widgets.HTML(value=system_info))
-                
-            # GPU info card
-            gpu_info = env_info.get('gpu_info', {})
-            gpu_available = gpu_info.get('available', False)
-            gpu_text = f"""
-            <div style="background: {'#d4edda' if gpu_available else '#f8d7da'}; padding: 12px; border-radius: 8px; margin: 5px 0px; border-left: 4px solid {'#28a745' if gpu_available else '#dc3545'};">
-                <strong>🎮 GPU:</strong> {'Available' if gpu_available else 'Not Available'}<br>
-                <strong>🔧 Device:</strong> {gpu_info.get('device_name', 'CPU Only')}<br>
-                <strong>💾 Memory:</strong> {gpu_info.get('memory_info', 'N/A')}
-            </div>
-            """
-            cards.append(widgets.HTML(value=gpu_text))
-                
-            # Return container dengan flexbox
-            return widgets.VBox(cards, layout=widgets.Layout(
-                width='100%',
-                overflow='hidden'
-            ))
-                
-        except Exception as e:
-            return widgets.HTML(value=f"⚠️ Error loading environment info: {e}")
-
-    @classmethod
-    def _create_info_panel(cls) -> widgets.Widget:
-        """💡 Create compact info panel with tabs for tips and requirements"""
-        # Create tabbed interface
-        tabs = widgets.Tab()
-        
-        # Tips tab content
-        tips_content = widgets.VBox([
-            widgets.HTML("""
-                <div style="padding: 5px 0;">
-                    <ul style="margin: 0; padding-left: 20px;">
-                        <li>Pastikan koneksi internet stabil</li>
-                        <li>Gunakan GPU untuk training lebih cepat</li>
-                        <li>Simpan konfigurasi setelah selesai</li>
-                        <li>Periksa log untuk detail</li>
-                    </ul>
-                </div>
-            """)
-        ], layout=widgets.Layout(width='100%', padding='5px'))
-        
-        # Requirements tab content
-        req_content = widgets.VBox([
-            widgets.HTML("""
-                <div style="padding: 5px 0;">
-                    <ul style="margin: 0; padding-left: 20px;">
-                        <li>Python 3.8+ dengan pip</li>
-                        <li>Minimal 2GB RAM</li>
-                        <li>Google Drive (untuk Colab)</li>
-                        <li>GPU CUDA (opsional)</li>
-                    </ul>
-                </div>
-            """)
-        ], layout=widgets.Layout(width='100%', padding='5px'))
-        
-        # Set tab contents
-        tabs.children = [tips_content, req_content]
-        tabs.set_title(0, '💡 Tips')
-        tabs.set_title(1, '📋 Requirements')
-        
-        # Style the tabs
-        tabs.add_class('compact-tabs')
-        
-        return widgets.VBox([
-            tabs
-        ], layout=widgets.Layout(
-            width='100%',
-            margin='5px 0',
-            border='1px solid #e0e0e0',
-            border_radius='4px',
-            overflow='hidden'
-        ))
-    
-    @classmethod
-    def _create_fallback_ui(cls, error_msg: str) -> Dict[str, Any]:
-        """🚨 Create fallback UI jika terjadi error"""
-        error_widget = widgets.HTML(
-            value=f"""
-            <div style="background: #f8d7da; padding: 20px; border-radius: 8px; border: 1px solid #f5c6cb;">
-                <h3>🚨 Error Loading UI</h3>
-                <p><strong>Error:</strong> {error_msg}</p>
-                <p>Silakan refresh cell atau restart runtime.</p>
+    def _create_fallback_ui(cls) -> Dict[str, Any]:
+        """🚨 Create fallback UI jika shared components gagal load"""
+        fallback_html = widgets.HTML(
+            value="""
+            <div style="background: #fff3cd; padding: 20px; border-radius: 8px; 
+                       border: 1px solid #ffeaa7; margin: 10px 0;">
+                <h3>⚠️ Fallback UI Mode</h3>
+                <p>Shared components tidak dapat dimuat. Menggunakan basic UI.</p>
+                <button onclick="alert('Setup belum tersedia dalam fallback mode')" 
+                        style="background: #007bff; color: white; padding: 10px 20px; 
+                               border: none; border-radius: 5px; cursor: pointer;">
+                    🚀 Setup Environment (Fallback)
+                </button>
             </div>
             """
         )
         
         return {
-            'ui_layout': error_widget,
-            'error': True,
-            'error_message': error_msg
+            'ui_layout': fallback_html,
+            'fallback_mode': True
         }
+
+# Export UIFactory at module level
+__all__ = ['UIFactory']

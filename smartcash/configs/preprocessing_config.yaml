@@ -1,0 +1,49 @@
+# File: configs/preprocessing_config.yaml
+# Deskripsi: Konfigurasi preprocessing essential sesuai API specifications
+
+_base_: 'base_config.yaml'
+
+# Core preprocessing configuration
+preprocessing:
+  enabled: true
+  target_splits: ['train', 'valid']
+  output_dir: 'data/preprocessed'
+  force_reprocess: false
+  
+  # YOLO-specific normalization
+  normalization:
+    enabled: true
+    method: 'minmax'
+    target_size: [640, 640]
+    preserve_aspect_ratio: true
+    normalize_pixel_values: true
+    pixel_range: [0, 1]
+    
+  # Essential validation
+  validation:
+    enabled: true
+    move_invalid: true
+    invalid_dir: 'data/invalid'
+    check_image_quality: true
+    check_labels: true
+    check_coordinates: true
+    
+  # Cleanup configuration
+  cleanup:
+    target: 'preprocessed'  # 'preprocessed', 'samples', 'both'
+    backup_enabled: false
+    patterns:
+      preprocessed: ['pre_*.npy']
+      samples: ['sample_*.jpg']
+
+# Performance settings
+performance:
+  batch_size: 32
+  use_gpu: true
+  max_memory_usage_gb: 4.0
+  
+# API compatibility
+api_settings:
+  progress_tracking: true
+  ui_integration: true
+  enhanced_validation: true

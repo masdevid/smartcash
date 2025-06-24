@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 17
+names: ['001', '002', '005', '010', '020', '050', '100', 'l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100', 'l3_sign', 'l3_text', 'l3_thread']
+
+roboflow:
+  workspace: smartcash-wo2us
+  project: rupiah-emisi-2022
+  version: 3
+  license: Public Domain
+  url: https://universe.roboflow.com/smartcash-wo2us/rupiah-emisi-2022/dataset/3

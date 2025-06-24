@@ -150,27 +150,46 @@ class SetupHandler:
                 progress_tracker.update_within_stage(100, "Drive already mounted")
             
             # Step 2: Create Folders (if not already created)
-            progress_tracker.update_stage(SetupStage.FOLDER_SETUP)
-            
-            if summary_data.get('folders_created', 0) < len(REQUIRED_FOLDERS):
-                self.logger.info("📁 Step 2: Creating directories...")
-                progress_tracker.update_within_stage(0, "Starting folder creation...")
+            try:
+                progress_tracker.update_stage(SetupStage.FOLDER_SETUP)
                 
-                folder_result = self.folder_handler.create_required_folders()
-                created_count = folder_result.get('created_count', 0)
-                symlinks_count = folder_result.get('symlinks_count', 0)
-                
-                summary_data['folders_created'] = created_count
-                summary_data['symlinks_created'] = symlinks_count
-                
-                if created_count > 0 or symlinks_count > 0:
-                    progress_tracker.update_within_stage(100, f"Created {created_count} folders and {symlinks_count} symlinks")
+                if summary_data.get('folders_created', 0) < len(REQUIRED_FOLDERS):
+                    self.logger.info("📁 Step 2: Creating directories...")
+                    progress_tracker.update_within_stage(0, "Starting folder creation...")
+                    
+                    # Execute folder creation
+                    folder_result = self.folder_handler.create_required_folders()
+                    created_count = folder_result.get('created_count', 0)
+                    symlinks_count = folder_result.get('symlinks_count', 0)
+                    
+                    # Update summary data
+                    summary_data['folders_created'] = created_count
+                    summary_data['symlinks_created'] = symlinks_count
+                    
+                    # Update progress based on results
+                    if created_count > 0 or symlinks_count > 0:
+                        status_msg = f"Created {created_count} folders and {symlinks_count} symlinks"
+                        self.logger.info(status_msg)
+                        progress_tracker.update_within_stage(100, status_msg)
+                    else:
+                        status_msg = "No new folders or symlinks needed"
+                        self.logger.info(status_msg)
+                        progress_tracker.update_within_stage(100, status_msg)
+                    
+                    # Complete the stage with the final status
                     progress_tracker.complete_stage("Folder setup completed")
                 else:
-                    progress_tracker.update_within_stage(100, "No new folders or symlinks needed")
-            else:
-                self.logger.info("✅ Directories already created")
-                progress_tracker.update_within_stage(100, "All folders already exist")
+                    self.logger.info("✅ Directories already created")
+                    progress_tracker.update_within_stage(100, "All folders already exist")
+                    progress_tracker.complete_stage("All folders already exist")
+                    
+            except Exception as e:
+                error_msg = f"Error during folder creation: {str(e)}"
+                self.logger.error(error_msg)
+                progress_tracker.error(error_msg)
+                summary_data['status'] = 'error'
+                summary_data['message'] = error_msg
+                return summary_data
             
             # Step 3: Sync Configurations
             progress_tracker.update_stage(SetupStage.CONFIG_SYNC)

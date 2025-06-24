@@ -138,14 +138,21 @@ def create_log_accordion(
         """Create a styled log entry widget."""
         style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
         
+        # Format timestamp if needed
         timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3] if show_timestamps else ''
+        timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>" if timestamp else ''
+        
+        # Get level icon if needed
         level_icon = style['icon'] if show_level_icons else ''
         
         # Create namespace/module prefix if available
         ns = entry.get('namespace') or entry.get('module')
         ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
         
-        # Create the HTML with proper formatting
+        # Build the HTML string with direct variable interpolation
+        bg_color = style['bg']
+        text_color = style['color']
+        
         html = f"""
         <div style='
             padding: 6px 12px;
@@ -156,22 +163,14 @@ def create_log_accordion(
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 13px;
             line-height: 1.4;
-            transition: all 0.2s ease;
-        '>
+            transition: all 0.2s ease;'>
             <div style='display: flex; align-items: flex-start; gap: 8px;'>
                 {level_icon}
-                <span style='flex: 1;'>{ns_display}{message}</span>
-                {f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>" if timestamp else ''}
+                <span style='flex: 1;'>{ns_display}{entry['message']}</span>
+                {timestamp_html}
             </div>
         </div>
-        """.format(
-            bg_color=style['bg'],
-            text_color=style['color'],
-            level_icon=level_icon,
-            ns_display=ns_display,
-            message=entry['message'],
-            timestamp=timestamp
-        )
+        """
         
         return widgets.HTML(html)
     

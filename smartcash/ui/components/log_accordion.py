@@ -52,7 +52,7 @@ def create_log_accordion(
         Dictionary containing 'log_output' and 'log_accordion' widgets
     """
     # Create a container for log messages
-    log_container = widgets.Box(
+    log_container = widgets.VBox(
         layout=widgets.Layout(
             width='100%',
             height=height,
@@ -62,10 +62,27 @@ def create_log_accordion(
             border_radius='8px',
             margin='5px 0',
             display='flex',
-            flex_direction='column-reverse',
-            gap='4px'
+            flex_flow='column-reverse',
+            align_items='stretch',
+            overflow='hidden'
         )
     )
+    
+    # Create a container to hold all log entries
+    entries_container = widgets.VBox(
+        layout=widgets.Layout(
+            width='100%',
+            display='flex',
+            flex_flow='column',
+            align_items='stretch',
+            gap='4px',
+            margin='0',
+            padding='0'
+        )
+    )
+    
+    # Add the entries container to the main container
+    log_container.children = [entries_container]
     
     # Store logs in memory
     log_entries: List[Dict[str, Any]] = []
@@ -127,10 +144,23 @@ def create_log_accordion(
     def _update_log_display():
         """Update the log container with current entries."""
         try:
-            # Update the children directly without using context manager
-            log_container.children = tuple(_create_log_entry(entry) for entry in log_entries)
+            # Update the entries container with new log entries
+            entries_container.children = tuple(_create_log_entry(entry) for entry in log_entries)
+            
+            # Auto-scroll to bottom if enabled
+            if auto_scroll:
+                def scroll_to_bottom():
+                    log_container.scroll_to_bottom()
+                
+                # Use a small delay to ensure the widget is rendered
+                import threading
+                timer = threading.Timer(0.1, scroll_to_bottom)
+                timer.start()
+                
         except Exception as e:
             print(f"[ERROR] Failed to update log display: {str(e)}")
+            import traceback
+            traceback.print_exc()
             import traceback
             traceback.print_exc()
     
@@ -176,18 +206,29 @@ def create_log_accordion(
     
     # Add methods to the container for external use
     log_container.append_log = append_log
-    log_container.clear_logs = lambda: log_entries.clear() or _update_log_display()
     
     # Create the accordion
-    accordion = widgets.Accordion(
-        children=[log_container],
-        layout=widgets.Layout(width=width, margin='10px 0')
-    )
-    accordion.set_title(0, f"📋 {module_name} Logs")
+    accordion = widgets.Accordion(children=[log_container])
+    accordion.set_title(0, f"{module_name} Logs")
+    accordion.selected_index = None  # Start collapsed
+    
+    def clear_logs():
+        """Clear all log entries."""
+        nonlocal log_entries
+        log_entries = []
+        entries_container.children = ()
+    
+    # Expose the append_log and clear_logs methods
+    log_container.append_log = append_log
+    log_container.clear_logs = clear_logs
+    
+    # Add clear_logs to the entries container as well for backward compatibility
+    entries_container.clear_logs = clear_logs
     
     return {
         'log_output': log_container,
-        'log_accordion': accordion
+        'log_accordion': accordion,
+        'entries_container': entries_container
     }
 
 def update_log(

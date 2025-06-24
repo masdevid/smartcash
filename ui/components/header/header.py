@@ -1,101 +1,213 @@
 """
 File: smartcash/ui/components/header/header.py
-Deskripsi: Komponen header untuk UI yang konsisten
+Modern header component with gradient styling and responsive typography.
 """
 
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import ipywidgets as widgets
+from IPython.display import display, HTML
 from smartcash.ui.utils.constants import COLORS, ICONS
+
+# Add Google Fonts for modern typography
+FONT_IMPORT = """
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    body {
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+</style>
+"""
 
 
 def create_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
     """
-    Buat komponen header dengan style konsisten.
+    Create a modern header with gradient background.
     
     Args:
-        title: Judul header
-        description: Deskripsi opsional
-        icon: Emoji icon opsional
+        title: Header title text
+        description: Optional description text
+        icon: Optional emoji or icon character
         
     Returns:
-        Widget HTML berisi header
+        HTML widget containing the header
     """
     try:
-        # Default colors
-        colors = {
-            'header_bg': '#f0f8ff',
-            'primary': '#3498db',
-            'dark': '#212529'
-        }
-        
-        # Update with COLORS if available
-        if COLORS:
-            colors.update({
-                'header_bg': COLORS.get('header_bg', colors['header_bg']),
-                'primary': COLORS.get('primary', colors['primary']),
-                'dark': COLORS.get('dark', colors['dark'])
-            })
+        # Get colors from constants or use defaults
+        primary_color = COLORS.get('primary', '#4f46e5') if COLORS else '#4f46e5'
+        primary_light = COLORS.get('primary_light', '#818cf8') if COLORS else '#818cf8'
+        text_color = COLORS.get('text', '#1f2937') if COLORS else '#1f2937'
         
         # Add icon if provided
         title_with_icon = f"{icon} {title}" if icon else title
         
-        header_html = f"""
-        <div style="background-color: {bg_color}; padding: 15px; color: black; 
-                border-radius: 5px; margin-bottom: 15px; border-left: 5px solid {border_color};">
-            <h2 style="color: {text_color}; margin-top: 0;">{title_with_icon}</h2>
+        # Create gradient background
+        gradient = f"linear-gradient(135deg, {primary_color} 0%, {primary_light} 100%)"
+        
+        # Build HTML
+        html_content = f"""
+        <div style="
+            background: {gradient};
+            color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        ">
+            <h2 style="
+                margin: 0 0 0.5rem 0;
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: white;
+            ">
+                {title_with_icon}
+            </h2>
         """.format(
-            bg_color=colors['header_bg'],
-            border_color=colors['primary'],
-            text_color=colors['dark'],
-            title_with_icon=title_with_icon
+            gradient=gradient,
+            title_with_icon=title_with_icon,
+            text_color=text_color
         )
         
         if description:
-            header_html += f'<p style="color: black; margin-bottom: 0;">{description}</p>'
+            html_content += f"""
+            <p style="
+                margin: 0;
+                opacity: 0.9;
+                font-size: 1rem;
+                line-height: 1.5;
+            ">
+                {description}
+            </p>
+            """.format(description=description)
         
-        header_html += "</div>"
+        html_content += "</div>"
         
-        return widgets.HTML(value=header_html)
+        return widgets.HTML(html_content)
         
     except Exception as e:
         # Fallback minimal header
+        print(f"⚠️ Error creating header: {str(e)}")
         title_with_icon = f"{icon} {title}" if icon else title
         return widgets.HTML(
-            f'<div style="padding:15px;margin-bottom:15px;border-left:5px solid #3498db">'
-            f'<h2 style="margin-top:0">{title_with_icon}</h2>'
-            f'<p style="margin-bottom:0">{description or ""}</p>'
+            FONT_IMPORT + 
+            f'<div style="padding:1rem;margin-bottom:1.5rem;background:#f0f8ff;border-radius:0.5rem">'
+            f'<h2 style="margin:0 0 0.5rem 0;color:#1f2937;font-family:var(--font-sans)">{title_with_icon}</h2>'
+            f'<p style="margin:0;color:#4b5563;font-family:var(--font-sans)">{description or ""}</p>'
             '</div>'
         )
 
 
-def create_section_title(title: str, icon: Optional[str] = "") -> widgets.HTML:
+def create_section_title(title: str, level: int = 3, icon: Optional[str] = None) -> widgets.HTML:
     """
-    Buat judul section dengan style konsisten.
+    Create a modern section title with consistent styling.
     
     Args:
-        title: Judul section
-        icon: Emoji icon opsional
+        title: Section title text
+        level: Heading level (2-6)
+        icon: Optional emoji or icon character
         
     Returns:
-        Widget HTML berisi judul section
+        HTML widget containing the section title
     """
     try:
-        # Default color
-        primary_color = '#007bff'
+        # Validate level
+        level = max(2, min(6, level))
         
-        # Use COLORS if available
-        if COLORS and 'primary' in COLORS:
-            primary_color = COLORS['primary']
-            
+        # Get colors from constants or use defaults
+        primary_color = COLORS.get('primary', '#4f46e5') if COLORS else '#4f46e5'
+        text_color = COLORS.get('text', '#1f2937') if COLORS else '#1f2937'
+        muted_color = COLORS.get('muted', '#6b7280') if COLORS else '#6b7280'
+        
+        # Add icon if provided
         title_with_icon = f"{icon} {title}" if icon else title
         
+        # Base styles for all levels
+        base_styles = {
+            'fontFamily': "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            'fontWeight': '600',
+            'lineHeight': '1.25',
+            'margin': '1.5rem 0 1rem',
+            'color': text_color,
+        }
+        
+        # Level-specific styles
+        level_styles = {
+            2: {
+                'fontSize': '1.5rem',
+                'fontWeight': '700',
+                'margin': '2rem 0 1.25rem',
+                'paddingBottom': '0.5rem',
+                'borderBottom': f'2px solid {primary_color}',
+                'display': 'inline-block',
+                'position': 'relative',
+            },
+            3: {
+                'fontSize': '1.25rem',
+                'margin': '1.75rem 0 1rem',
+                'color': text_color,
+            },
+            4: {
+                'fontSize': '1.1rem',
+                'margin': '1.5rem 0 0.75rem',
+                'color': text_color,
+                'opacity': '0.9',
+            },
+            5: {
+                'fontSize': '1rem',
+                'margin': '1.25rem 0 0.5rem',
+                'color': muted_color,
+                'textTransform': 'uppercase',
+                'letterSpacing': '0.05em',
+                'fontWeight': '600',
+            },
+            6: {
+                'fontSize': '0.9rem',
+                'margin': '1rem 0 0.5rem',
+                'color': muted_color,
+                'fontWeight': '600',
+            }
+        }
+        
+        # Get styles for the specified level
+        styles = {**base_styles, **level_styles.get(level, level_styles[3])}
+        
+        # Generate CSS string
+        style_str = '; '.join(f"{k}: {v}" for k, v in styles.items() if v is not None)
+        
+        # Add accent line for h2
+        if level == 2:
+            title_with_icon = f"""
+                {title_with_icon}
+                <span style="
+                    position: absolute;
+                    left: 0;
+                    bottom: -2px;
+                    width: 100%;
+                    height: 2px;
+                    background: linear-gradient(90deg, {primary_color} 0%, {primary_color}33 100%);
+                    content: '';
+                "></span>
+            """.format(primary_color=primary_color)
+        
+        return widgets.HTML(f'<h{level} style="{style_str}">{title_with_icon}</h{level}>')
+        
+    except Exception as e:
+        # Fallback minimal title
+        print(f"⚠️ Error creating section title: {str(e)}")
+        title_with_icon = f"{icon} {title}" if icon else title
         return widgets.HTML(
-            f'<h3 style="color:{primary_color};'
-            'margin-top:20px;margin-bottom:10px;border-bottom:1px solid #eee;'
-            'padding-bottom:5px;font-weight:500">'
-            f'{title_with_icon}</h3>'
+            FONT_IMPORT + 
+            f'<h{level} style="margin:1.5rem 0 1rem;font-weight:600;font-family:var(--font-sans)">'
+            f'{title_with_icon}</h{level}>'
         )
-    except Exception:
-        # Fallback minimal section title
-        title_with_icon = f"{icon} {title}" if icon else title
-        return widgets.HTML(f'<h3 style="color:#007bff;margin:20px 0 10px">{title_with_icon}</h3>')
+
+
+# Module exports
+__all__ = [
+    'create_header',
+    'create_section_title'
+]

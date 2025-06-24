@@ -89,28 +89,50 @@ def create_log_accordion(
         """
         nonlocal log_entries
         
-        # Create log entry
-        entry = {
-            'id': len(log_entries) + 1,
-            'timestamp': timestamp or datetime.now(),
-            'level': level,
-            'namespace': namespace,
-            'module': module,
-            'message': str(message)
-        }
-        
-        # Add to log entries and maintain max size
-        log_entries.append(entry)
-        if len(log_entries) > max_logs:
-            log_entries.pop(0)
-        
-        # Update the display
-        _update_log_display()
+        try:
+            # Validate input
+            if not message:
+                return
+                
+            # Ensure level is a LogLevel enum
+            if not isinstance(level, LogLevel):
+                try:
+                    level = LogLevel(level.lower() if isinstance(level, str) else 'info')
+                except (ValueError, AttributeError):
+                    level = LogLevel.INFO
+            
+            # Create log entry
+            entry = {
+                'id': len(log_entries) + 1,
+                'timestamp': timestamp or datetime.now(),
+                'level': level,
+                'namespace': namespace,
+                'module': module,
+                'message': str(message)
+            }
+            
+            # Add to log entries and maintain max size
+            log_entries.append(entry)
+            if len(log_entries) > max_logs:
+                log_entries.pop(0)
+            
+            # Update the display
+            _update_log_display()
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to append log: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def _update_log_display():
         """Update the log container with current entries."""
-        with log_container:
-            log_container.children = [_create_log_entry(entry) for entry in log_entries]
+        try:
+            # Update the children directly without using context manager
+            log_container.children = tuple(_create_log_entry(entry) for entry in log_entries)
+        except Exception as e:
+            print(f"[ERROR] Failed to update log display: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
         """Create a styled log entry widget."""

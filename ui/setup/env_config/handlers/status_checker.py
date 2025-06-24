@@ -3,6 +3,7 @@ File: smartcash/ui/setup/env_config/handlers/status_checker.py
 Handler for checking initial environment status and updating UI components
 """
 
+import os
 from typing import Dict, Any, Optional
 from smartcash.ui.setup.env_config.utils.env_detector import detect_environment_info
 from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel

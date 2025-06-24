@@ -56,7 +56,15 @@ def update_setup_summary(
         details: Optional dictionary with additional details to display
     """
     try:
-        content = _format_summary_content(status_message, status_type, details)
+        # Convert the details to the format expected by _format_summary_content
+        if details is None:
+            details = {}
+            
+        # Add status message to details if not present
+        if 'status_message' not in details:
+            details['status_message'] = status_message
+            
+        content = _format_summary_content(details)
         summary_widget.value = content
     except Exception as e:
         error_html = """
@@ -110,147 +118,40 @@ def _get_initial_summary_content(message: Optional[str] = None) -> str:
     </div>
     """
 
-def _format_summary_content(
-    status_message: str,
-    status_type: StatusType = 'info',
-    details: Optional[Dict[str, Any]] = None
-) -> str:
-    """
-    Format the summary content with status information
+def _format_summary_content(data: Dict) -> str:
+    """📊 Format summary data untuk drive mount, config sync, symlinks, dan folders"""
+    drive_mounted = data.get('drive_mounted', False)
+    mount_path = data.get('mount_path', 'N/A')
+    configs_synced = data.get('configs_synced', 0)
+    symlinks_created = data.get('symlinks_created', 0)
+    folders_created = data.get('folders_created', 0)
     
-    Args:
-        status_message: The main status message to display
-        status_type: Type of status ('success', 'warning', 'error', 'info')
-        details: Optional dictionary with additional details
-        
-    Returns:
-        Formatted HTML content for the summary
-    """
-    # Validate status type
-    status_type = status_type.lower() if status_type else 'info'
-    if status_type not in STATUS_COLORS:
-        status_type = 'info'
-    
-    # Get status styling
-    status_color = STATUS_COLORS.get(status_type, STATUS_COLORS['default'])
-    status_icon = {
-        'success': '✅',
-        'warning': '⚠️',
-        'error': '❌',
-        'info': 'ℹ️'
-    }.get(status_type, 'ℹ️')
-    
-    # Format details if provided
-    details_html = ""
-    if details and isinstance(details, dict):
-        details_items = []
-        for key, value in details.items():
-            if isinstance(value, dict):
-                # Handle nested dictionaries
-                nested_items = ", ".join([f"{k}: {v}" for k, v in value.items()])
-                details_items.append(f"<strong>{key}:</strong> {nested_items}")
-            elif isinstance(value, (list, tuple)):
-                # Handle lists/tuples
-                list_items = ", ".join([str(v) for v in value])
-                details_items.append(f"<strong>{key}:</strong> {list_items}")
-            else:
-                details_items.append(f"<strong>{key}:</strong> {value}")
-        
-        if details_items:
-            details_html = """
-            <div style="
-                margin-top: 12px;
-                padding: 10px;
-                background: #ffffff;
-                border-radius: 4px;
-                border: 1px solid #e0e0e0;
-                font-size: 0.9em;
-                line-height: 1.5;
-            ">
-                <div style="
-                    font-weight: 600;
-                    margin-bottom: 8px;
-                    color: #616161;
-                ">
-                    Details:
-                </div>
-                <div style="padding-left: 10px;">
-                    {details_list}
-                </div>
-            </div>
-            """.format(details_list="<br>".join(details_items))
-    
-    # Format the timestamp
-    from datetime import datetime
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    drive_status = "✅ Mounted" if drive_mounted else "❌ Not mounted"
+    mount_info = f"at {mount_path}" if drive_mounted else ""
     
     return f"""
-    <div style="
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        line-height: 1.6;
-        color: #424242;
-    ">
-        <div style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #e0e0e0;
-        ">
-            <span style="
-                font-size: 1.2em;
-                font-weight: 600;
-                color: #2196f3;
-            ">📋 Setup Summary</span>
-            <span style="
-                font-size: 0.85em;
-                color: #9e9e9e;
-            ">{timestamp}</span>
-        </div>
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6;">
+        <h4 style="color: #2196f3; margin-top: 0; margin-bottom: 15px;">📋 Setup Summary</h4>
         
-        <div style="
-            padding: 14px;
-            background: #ffffff;
-            border-radius: 6px;
-            border-left: 4px solid {status_color};
-            margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        ">
-            <div style="display: flex; align-items: flex-start;">
-                <span style="
-                    font-size: 1.4em;
-                    margin-right: 12px;
-                    line-height: 1;
-                    margin-top: 2px;
-                ">{status_icon}</span>
-                <div style="flex: 1;">
-                    <div style="
-                        font-weight: 500;
-                        color: {status_color};
-                        margin-bottom: 4px;
-                        line-height: 1.3;
-                    ">{status_message}</div>
-                    
-                    {details_html}
-                    
-                    <!-- Symlinks and Folders Info -->
-                    <div style="margin-top: 12px; display: flex; gap: 15px; flex-wrap: wrap;">
-                        <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #9c27b0; flex: 1; min-width: 150px;">
-                            <h5 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">🔗 Symlinks</h5>
-                            <p style="margin: 0; font-size: 14px;">
-                                <strong>{details.get('symlinks_created', 0)}</strong> created
-                            </p>
-                        </div>
-                        
-                        <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #4caf50; flex: 1; min-width: 150px;">
-                            <h5 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">📁 Folders</h5>
-                            <p style="margin: 0; font-size: 14px;">
-                                <strong>{details.get('folders_created', 0)}</strong> created
-                            </p>
-                        </div>
-                    </div>
-                </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #2196f3;">
+                <h5 style="margin: 0 0 8px 0; color: #333;">💾 Drive Status</h5>
+                <p style="margin: 0; font-size: 14px;"><strong>{drive_status}</strong> {mount_info}</p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #4caf50;">
+                <h5 style="margin: 0 0 8px 0; color: #333;">⚙️ Configs Synced</h5>
+                <p style="margin: 0; font-size: 14px;"><strong>{configs_synced}</strong> config files</p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #ff9800;">
+                <h5 style="margin: 0 0 8px 0; color: #333;">🔗 Symlinks Created</h5>
+                <p style="margin: 0; font-size: 14px;"><strong>{symlinks_created}</strong> symlinks</p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #9c27b0;">
+                <h5 style="margin: 0 0 8px 0; color: #333;">📁 Folders Created</h5>
+                <p style="margin: 0; font-size: 14px;"><strong>{folders_created}</strong> directories</p>
             </div>
         </div>
     </div>

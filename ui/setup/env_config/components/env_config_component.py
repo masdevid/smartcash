@@ -13,8 +13,16 @@ def create_env_config_component(setup_callback: Optional[Callable] = None) -> Di
     # Header component
     header = _create_header_component()
     
-    # Setup button (centered)
+    # Setup button (centered dengan wrapper)
     setup_button = _create_setup_button(setup_callback)
+    setup_button_container = widgets.HBox(
+        [setup_button],
+        layout=widgets.Layout(
+            width='100%',
+            justify_content='center',
+            margin='15px 0'
+        )
+    )
     
     # Status panel
     status_panel = _create_status_panel()
@@ -34,7 +42,7 @@ def create_env_config_component(setup_callback: Optional[Callable] = None) -> Di
     # Main layout dengan flexbox
     layout = _create_main_layout([
         header,
-        setup_button,
+        setup_button_container,
         status_panel,
         widgets.VBox([progress_bar, progress_text]),
         log_accordion,
@@ -74,12 +82,12 @@ def _create_setup_button(callback: Optional[Callable] = None) -> widgets.Button:
         description='Setup Environment',
         button_style='success',
         layout=widgets.Layout(
-            width='300px',
-            height='45px',
-            margin='10px auto',
-            display='flex'
+            width='400px',
+            height='50px'
         ),
-        style={'font_weight': 'bold'}
+        style={
+            'font_weight': 'bold'
+        }
     )
     
     if callback:
@@ -149,7 +157,7 @@ def _create_tips_panel() -> widgets.HTML:
                 <ul style="margin: 0; padding-left: 20px; line-height: 1.3;">
                     <li style="margin: 0; padding: 0;">Google Colab environment</li>
                     <li style="margin: 0; padding: 0;">Google Drive access permission</li>
-                    <li style="margin: 0; padding: 0;">Minimal 2GB free space di Drive</li>
+                    <li style="margin: 0; padding: 0;">Minimal 12GB free space di Drive</li>
                     <li style="margin: 0; padding: 0;">Koneksi internet stabil</li>
                 </ul>
             </div>

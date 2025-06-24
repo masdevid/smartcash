@@ -51,6 +51,9 @@ class EnvironmentConfigOrchestrator:
     def initialize_ui(self) -> None:
         """🎨 Initialize UI components"""
         try:
+            # Create UI components terlebih dahulu
+            self.ui_components = create_env_config_component(self._handle_setup_click)
+            
             # Setup logger setelah UI ready
             self.logger = UILogger(self.ui_components)
             
@@ -61,11 +64,13 @@ class EnvironmentConfigOrchestrator:
             # Initialize progress tracker
             self.progress_tracker = ProgressTracker(self._update_progress_callback)
             
-            # Create UI components
-            self.ui_components = create_env_config_component(self._handle_setup_click)
-            
-            # Initial status check
-            self._perform_initial_status_check()
+            # Initial status check dengan safe execution
+            try:
+                self._perform_initial_status_check()
+            except Exception as e:
+                append_to_log(self.ui_components, f"❌ Status check error: {str(e)}", 'error')
+                update_status_panel(self.ui_components, STATUS_MESSAGES['setup_needed'], 'warning')
+                update_setup_button(self.ui_components, True, "Setup Environment")
             
             # Display UI
             self._display_ui()

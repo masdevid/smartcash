@@ -105,21 +105,51 @@ def check_symlink_validity(symlink_path: str) -> bool:
 def get_environment_info() -> Dict[str, Any]:
     """🔍 Get environment information summary"""
     try:
-        import google.colab
-        is_colab = True
-        drive_mounted = Path('/content/drive').exists()
-    except ImportError:
-        is_colab = False
-        drive_mounted = False
-    
-    config_validation = validate_config_completeness()
-    
-    return {
-        'is_colab': is_colab,
-        'drive_mounted': drive_mounted,
-        'config_source_exists': Path(CONFIG_SOURCE_PATH).exists(),
-        'total_configs_found': config_validation['total_configs'],
-        'essential_configs_complete': config_validation['is_complete'],
-        'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}",
-        'working_directory': str(Path.cwd())
-    }
+        # Check Colab environment
+        try:
+            import google.colab
+            is_colab = True
+        except ImportError:
+            is_colab = False
+        
+        # Check Drive mount
+        try:
+            drive_mounted = Path('/content/drive').exists()
+        except Exception:
+            drive_mounted = False
+        
+        # Check config source
+        try:
+            config_source_exists = Path(CONFIG_SOURCE_PATH).exists()
+        except Exception:
+            config_source_exists = False
+        
+        # Validate configs with safe execution
+        try:
+            config_validation = validate_config_completeness()
+            total_configs = config_validation.get('total_configs', 0) if config_validation else 0
+            essential_complete = config_validation.get('is_complete', False) if config_validation else False
+        except Exception:
+            total_configs = 0
+            essential_complete = False
+        
+        return {
+            'is_colab': is_colab,
+            'drive_mounted': drive_mounted,
+            'config_source_exists': config_source_exists,
+            'total_configs_found': total_configs,
+            'essential_configs_complete': essential_complete,
+            'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}",
+            'working_directory': str(Path.cwd())
+        }
+    except Exception:
+        # Fallback minimal info
+        return {
+            'is_colab': False,
+            'drive_mounted': False,
+            'config_source_exists': False,
+            'total_configs_found': 0,
+            'essential_configs_complete': False,
+            'python_version': '3.x',
+            'working_directory': '/content'
+        }

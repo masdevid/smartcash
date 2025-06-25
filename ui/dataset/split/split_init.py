@@ -90,7 +90,7 @@ def create_split_config_ui(config: Dict[str, Any]) -> Dict[str, Any]:
         
     except Exception as e:
         logger = get_logger('smartcash.ui.dataset.split')
-        logger.error(f"Error creating split config UI: {str(e)}", exc_info=True)
+        logger.error(f"Error creating split config UI: {str(e)}\n{traceback.format_exc()}")
         raise
 
 

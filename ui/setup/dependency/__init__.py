@@ -8,6 +8,9 @@ including installation, status checking, and UI components.
 # Standard library imports
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+# Import and expose the main initialization function
+from smartcash.ui.setup.dependency.dependency_initializer import initialize_dependency_ui
+
 # Re-export core utilities
 from smartcash.ui.setup.dependency.utils.core import *
 from smartcash.ui.setup.dependency.utils.package import *
@@ -17,6 +20,11 @@ from smartcash.ui.setup.dependency.utils.reporting import *
 # Lazy imports for UI components to prevent circular imports
 if TYPE_CHECKING:
     from smartcash.ui.setup.dependency.utils.ui import *
+
+__all__ = [
+    'initialize_dependency_ui',
+    # Other exports from core, package, system, and reporting modules
+]
 
 # Import modules to get their __all__ attributes
 from smartcash.ui.setup.dependency.utils import core, package, system, reporting

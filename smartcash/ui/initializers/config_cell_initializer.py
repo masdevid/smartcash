@@ -95,10 +95,7 @@ def create_config_cell(
     config_handler_class: Optional[Type] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Legacy factory function for backward compatibility.
-    
-    This is maintained for backward compatibility with existing code.
-    New code should use initialize_config_cell() directly.
+    """Factory function for creating configuration cells.
     
     Args:
         module_name: Name of the module
@@ -107,19 +104,51 @@ def create_config_cell(
         config: Initial configuration
         parent_module: Optional parent module name
         config_handler_class: Optional custom config handler class
-        **kwargs: Additional keyword arguments (for future compatibility)
+        **kwargs: Additional keyword arguments
         
     Returns:
         Dict[str, Any]: Dictionary containing UI components and handlers
     """
-    return initialize_config_cell(
-        module_name=module_name,
-        config_filename=config_filename,
-        config_handler_class=config_handler_class,
-        parent_module=parent_module,
-        env=env,
-        config=config
-    )
+    logger = get_logger(__name__)
+    
+    try:
+        # Get or create config handler
+        if config_handler_class:
+            handler = config_handler_class(config or {})
+        else:
+            handler = ConfigCellHandler(module_name, parent_module)
+            if config:
+                handler.update_config(config)
+        
+        # Create UI components
+        ui_components = {}
+        
+        # Add container for the config cell
+        container = widgets.VBox()
+        ui_components['container'] = container
+        
+        # Store the handler for later use
+        ui_components['_config_handler'] = handler
+        
+        # Add status bar
+        status_bar = widgets.HTML()
+        ui_components['status_bar'] = status_bar
+        
+        # Add the status bar to the container
+        container.children = [status_bar]
+        
+        # Update status
+        _update_status(ui_components, f"Initialized {module_name} configuration", 'info')
+        
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"Failed to create config cell: {str(e)}")
+        logger.debug(traceback.format_exc())
+        return create_error_fallback(
+            f"Failed to initialize {module_name} configuration",
+            str(e)
+        )
 
 def connect_config_to_parent(
     ui_components: Dict[str, Any],

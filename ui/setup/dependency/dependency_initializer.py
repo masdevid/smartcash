@@ -355,11 +355,11 @@ class DependencyInitializer(CommonInitializer):
 _dependency_initializer = None
 
 def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Initialize and return the dependency UI with fallback on error.
+    """Initialize and display the dependency UI with fallback on error.
     
-    This is the main entry point for initializing the dependency management UI.
+    This is the main entry point for initializing and displaying the dependency management UI.
     It handles the complete setup process including UI creation, handler setup,
-    and error handling.
+    error handling, and display of the UI components.
     
     Args:
         config: Optional configuration dictionary. If not provided, defaults will be used.
@@ -395,18 +395,32 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         
         # Initialize the UI with the config
         ui_components = _dependency_initializer.initialize_ui(config)
+        
+        # Display the main container if it exists
+        if 'main_container' in ui_components:
+            display(ui_components['main_container'])
+        # Fallback to displaying the root component if main_container doesn't exist
+        elif 'root' in ui_components:
+            display(ui_components['root'])
+            
         return ui_components
         
     except Exception as e:
-        # Log the error and provide a fallback UI
+        # Log the error
         import traceback
         error_msg = f"Failed to initialize dependency UI: {str(e)}"
-        print(error_msg, file=sys.stderr)
-        print(traceback.format_exc(), file=sys.stderr)
+        error_traceback = traceback.format_exc()
         
-        # Return a minimal error UI
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        error_display = create_fallback_ui(error_msg, "Dependency Installer")
-        return {'ui': error_display}
+        # Create and display error component
+        from smartcash.ui.components.error.error_component import ErrorComponent
+        error_component = ErrorComponent(title="Dependency Installer Error")
+        error_ui = error_component.create(
+            error_message=error_msg,
+            traceback=error_traceback,
+            error_type="error",
+            show_traceback=True
+        )
+        display(error_ui['widget'])
+        return error_ui
 
 __all__ = ['initialize_dependency_ui']

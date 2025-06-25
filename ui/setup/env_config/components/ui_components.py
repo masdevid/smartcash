@@ -55,15 +55,29 @@ def create_env_config_ui() -> Dict[str, Any]:
     # 4. Progress Tracker
     progress_tracker = track_setup_progress()
     
-    # Initialize UI components dictionary with progress tracker components
-    ui_components = {
-        'progress_tracker': progress_tracker,
-        'progress_container': progress_tracker.progress_container
-    }
+    # Initialize UI components dictionary
+    ui_components = {}
     
-    # Add any additional components from the progress tracker
+    # Ensure progress tracker is initialized
+    if hasattr(progress_tracker, '_init_tracker'):
+        progress_tracker._init_tracker()
+    
+    # Add progress tracker components
+    if hasattr(progress_tracker, 'progress_container'):
+        ui_components['progress_container'] = progress_tracker.progress_container
+    
     if hasattr(progress_tracker, 'ui_components'):
         ui_components.update(progress_tracker.ui_components)
+    
+    # Add progress tracker itself
+    ui_components['progress_tracker'] = progress_tracker
+    
+    # Ensure progress container exists
+    if 'progress_container' not in ui_components or ui_components['progress_container'] is None:
+        import ipywidgets as widgets
+        ui_components['progress_container'] = widgets.VBox()
+        if hasattr(progress_tracker, '_progress_container'):
+            progress_tracker._progress_container = ui_components['progress_container']
     
     # 5. Log Accordion
     log_accordion = create_log_accordion(

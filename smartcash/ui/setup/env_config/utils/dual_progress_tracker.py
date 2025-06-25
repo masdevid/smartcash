@@ -44,23 +44,47 @@ class DualProgressTracker:
     def _init_tracker(self):
         """Initialize the underlying progress tracker if not already done."""
         if self._initialized:
-            return
+            return self._progress_container
             
-        # Create the progress tracker
-        self._new_tracker = create_dual_progress_tracker(
-            operation="Environment Setup",
-            auto_hide=False
-        )
-        
-        # Initialize the progress container
-        self._progress_container = self._new_tracker.container
-        
-        # Add to UI components if provided
-        if self._ui_components:
-            self._ui_components['progress_tracker'] = self._new_tracker
-            self._ui_components['progress_container'] = self._progress_container
+        try:
+            # Create the progress tracker
+            self._new_tracker = create_dual_progress_tracker(
+                operation="Environment Setup",
+                auto_hide=False
+            )
             
-        self._initialized = True
+            # Initialize the progress container
+            if hasattr(self._new_tracker, 'container'):
+                self._progress_container = self._new_tracker.container
+            else:
+                # Fallback if container is not available
+                import ipywidgets as widgets
+                self._progress_container = widgets.VBox()
+                
+            # Ensure the container is visible
+            if hasattr(self._progress_container, 'layout'):
+                if not hasattr(self._progress_container.layout, 'visibility'):
+                    self._progress_container.layout.visibility = 'visible'
+                if not hasattr(self._progress_container.layout, 'display'):
+                    self._progress_container.layout.display = 'flex'
+            
+            # Add to UI components if provided
+            if self._ui_components:
+                self._ui_components['progress_tracker'] = self._new_tracker
+                self._ui_components['progress_container'] = self._progress_container
+                
+            self._initialized = True
+            return self._progress_container
+            
+        except Exception as e:
+            import traceback
+            print(f"Error initializing progress tracker: {e}")
+            print(traceback.format_exc())
+            # Fallback to a simple container
+            import ipywidgets as widgets
+            self._progress_container = widgets.VBox()
+            self._initialized = True
+            return self._progress_container
     
     def update_stage(self, stage: SetupStage, message: str = None):
         """Update the current stage of the setup process.
@@ -185,15 +209,25 @@ class DualProgressTracker:
         Returns:
             The progress container widget
         """
-        self._init_tracker()
+        # Ensure we have a container, even if initialization fails
         if not hasattr(self, '_progress_container') or self._progress_container is None:
-            # Fallback to getting container from the tracker if not set
-            if hasattr(self, '_new_tracker') and self._new_tracker is not None:
-                self._progress_container = self._new_tracker.container
-            else:
-                # Last resort, create a simple container
+            # Try to initialize the tracker
+            container = self._init_tracker()
+            if container is not None:
+                self._progress_container = container
+            
+            # Last resort, create a simple container
+            if self._progress_container is None:
                 import ipywidgets as widgets
                 self._progress_container = widgets.VBox()
+                
+            # Ensure the container is visible
+            if hasattr(self._progress_container, 'layout'):
+                if not hasattr(self._progress_container.layout, 'visibility'):
+                    self._progress_container.layout.visibility = 'visible'
+                if not hasattr(self._progress_container.layout, 'display'):
+                    self._progress_container.layout.display = 'flex'
+                    
         return self._progress_container
         
     @property

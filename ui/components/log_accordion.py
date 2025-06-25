@@ -100,60 +100,24 @@ def create_log_accordion(
     # Add entries container to log container
     log_container.children = [entries_container]
     
-    # Add custom CSS for the log container
+    # Add minimal CSS for the log container
     display(HTML(f"""
     <style>
-        /* Main container styling */
         .{log_container.log_id} {{
             display: flex !important;
             flex-direction: column !important;
             height: 100% !important;
             width: 100% !important;
-            max-width: 100% !important;
             overflow: hidden !important;
         }}
         
-        /* Ensure output area takes full height */
-        .{log_container.log_id} > .lm-Widget {{
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: hidden !important;
-        }}
-        
-        /* Entries container */
-        .{log_container.log_id} .p-Widget.panel-widgets-box {{
+        .{log_container.log_id} > .p-Widget.panel-widgets-box {{
             overflow-y: auto !important;
             overflow-x: hidden !important;
             max-height: 100% !important;
             width: 100% !important;
             padding: 8px !important;
             margin: 0 !important;
-        }}
-        
-        /* Hide horizontal scrollbar */
-        .{log_container.log_id}::-webkit-scrollbar {{
-            width: 6px !important;
-            height: 6px !important;
-        }}
-        
-        .{log_container.log_id}::-webkit-scrollbar-thumb {{
-            background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 3px;
-        }}
-        
-        .{log_container.log_id}::-webkit-scrollbar-track {{
-            background: transparent;
-        }}
-        
-        /* Ensure log entries don't cause horizontal scroll */
-        .log-entry {{
-            max-width: 100% !important;
-            overflow: hidden !important;
-            word-wrap: break-word !important;
-            white-space: pre-wrap !important;
         }}
     </style>
     """))
@@ -374,9 +338,7 @@ def create_log_accordion(
             traceback.print_exc()
     
     def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
-        """Create a styled log entry widget."""
-        style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
-        
+        """Create a simple log entry widget - styling is now handled in ui_logger.py"""
         # Format timestamp
         timestamp_html = ''
         if show_timestamps and 'timestamp' in entry and entry['timestamp']:
@@ -389,14 +351,7 @@ def create_log_accordion(
                 local_ts = ts.astimezone(local_tz)
                 timestamp = local_ts.strftime('%H:%M:%S.%f')[:-3]
                 timezone_str = local_ts.strftime('%Z')
-                
-                # Add duplicate count if present
-                count_html = ""
-                if entry.get('count', 0) > 0:
-                    count_bg = "#ffc107" if entry.get('show_duplicate_indicator', False) else "rgba(0,0,0,0.1)"
-                    count_html = f" <span class='duplicate-count' style='background: {count_bg};'>{entry['count']+1}x</span>"
-                
-                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp} {timezone_str}{count_html}</span>"
+                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp} {timezone_str}</span>"
                 
             except Exception as e:
                 timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3]

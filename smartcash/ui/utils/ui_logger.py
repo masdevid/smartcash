@@ -57,13 +57,40 @@ class UILogger:
                 except ImportError: 
                     pass
                 
+                # Check if this is a duplicate message
+                is_duplicate = hasattr(self, '_last_message') and self._last_message == clean_msg
+                self._last_message = clean_msg
+                
+                # Add border for duplicates
+                border_style = '2px solid #e9ecef' if is_duplicate else 'none'
+                
+                # Add namespace badge if available
+                namespace_badge = ''
+                try:
+                    from smartcash.ui.utils.ui_logger_namespace import get_namespace_id, get_namespace_name
+                    namespace_id = get_namespace_id(self.ui_components)
+                    if namespace_id:
+                        namespace = get_namespace_name(namespace_id) or f"NS:{namespace_id[:4]}"
+                        namespace_badge = (
+                            f'<span style="display:inline-block;padding:0 6px;margin:0 6px;'
+                            f'background-color:#f1f3f5;color:#5f3dc4;border-radius:4px;'
+                            f'font-size:11px;font-weight:500;line-height:1.4;vertical-align:middle">'
+                            f'{namespace}</span>'
+                        )
+                except ImportError:
+                    pass
+                
                 html = (
-                    f'<div style="margin:2px 0;padding:4px 8px;border-radius:4px;'
+                    f'<div style="margin:2px 0;padding:4px 12px;border-radius:4px;'
                     f'background-color:rgba(248,249,250,0.8);border-left:3px solid {border_color};'
-                    f'font-family:\'Courier New\',monospace;font-size:13px;">'
-                    f'<span style="color:#6c757d;font-size:11px;">[{timestamp}]</span> '
-                    f'<span style="font-size:14px;">{emoji}</span> '
-                    f'<span style="color:{color};margin-left:4px;">{clean_msg}</span>'
+                    f'border-right:{border_style};border-left:{border_style};'
+                    f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
+                    f'font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
+                    f'overflow-wrap:break-word;">'
+                    f'<span style="color:#6c757d;font-size:11px;font-family:monospace;margin-right:6px;">[{timestamp}]</span> '
+                    f'<span style="font-size:13px;margin-right:4px;">{emoji}</span>'
+                    f'{namespace_badge}'
+                    f'<span style="color:{color};">{clean_msg}</span>'
                     f'</div>'
                 )
                 

@@ -97,16 +97,8 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         
     except Exception as e:
         logger = get_logger("smartcash.ui.setup.dependency")
-        logger.error(f"Failed to initialize dependency UI: {e}", exc_info=True)
-        
-        # Create error UI
-        from IPython.display import HTML
-        return HTML(f"""
-            <div style='color: #dc3545; padding: 1em; border: 1px solid #f5c6cb; 
-                        background: #f8d7da; border-radius: 4px;'>
-                <h4>❌ Failed to initialize Dependency Manager</h4>
-                <p>Error: {str(e)}</p>
-            </div>
-        """)
+        error_msg = f"❌ Failed to initialize dependency UI: {e}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
 
 __all__ = ['initialize_dependency_ui']

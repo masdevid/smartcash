@@ -65,79 +65,95 @@ def create_log_accordion(
         Dictionary containing 'log_output' and 'log_accordion' widgets
     """
     # Create main container
-    log_container = widgets.Output(layout={
-        'border': '1px solid #e0e0e0',
-        'border_radius': '8px',
-        'overflow': 'hidden',
-        'width': width,
-        'height': height,
-        'margin': '5px 0',
-        'display': 'flex',
-        'flex_direction': 'column'
-    })
+    log_container = widgets.Box(
+        layout=widgets.Layout(
+            width=width,
+            height=height,
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            overflow='hidden',
+            display='flex',
+            flex_flow='column',
+            align_items='stretch'
+        )
+    )
     
-    # Add custom CSS
+    # Add custom class for JavaScript targeting
     log_container.add_class('smartcash-log-container')
     log_container.log_id = f'log-container-{uuid.uuid4().hex}'
     
     # Create entries container
-    entries_container = widgets.VBox(layout={
-        'overflow_y': 'auto',
-        'height': '100%',
-        'padding': '8px',
-        'flex': '1',
-        'min_height': '0'  # Important for flexbox scrolling
-    })
+    entries_container = widgets.VBox(
+        layout=widgets.Layout(
+            width='100%',
+            display='flex',
+            flex_flow='column',
+            align_items='stretch',
+            gap='4px',
+            margin='0',
+            padding='8px',
+            overflow_y='auto',
+            overflow_x='hidden'
+        )
+    )
     
     # Add entries container to log container
-    with log_container:
-        display(entries_container)
+    log_container.children = [entries_container]
     
     # Add custom CSS for the log container
     display(HTML(f"""
     <style>
+        /* Main container styling */
         .{log_container.log_id} {{
-            display: flex;
-            flex-direction: column;
-            height: 100%;
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100% !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
         }}
         
-        .{log_container.log_id} .jp-OutputArea-output {{
-            height: 100%;
-            display: flex;
-            flex-direction: column;
+        /* Ensure output area takes full height */
+        .{log_container.log_id} > .lm-Widget {{
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
         }}
         
-        .{log_container.log_id} .lm-Widget {{
+        /* Entries container */
+        .{log_container.log_id} .p-Widget.panel-widgets-box {{
             overflow-y: auto !important;
+            overflow-x: hidden !important;
+            max-height: 100% !important;
+            width: 100% !important;
+            padding: 8px !important;
+            margin: 0 !important;
         }}
         
-        @keyframes pulse {{
-            0% {{ transform: scale(0.95); opacity: 0.7; }}
-            50% {{ transform: scale(1.1); opacity: 1; }}
-            100% {{ transform: scale(0.95); opacity: 0.7; }}
+        /* Hide horizontal scrollbar */
+        .{log_container.log_id}::-webkit-scrollbar {{
+            width: 6px !important;
+            height: 6px !important;
         }}
         
-        .duplicate-indicator {{
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            background-color: #ffc107;
-            border-radius: 50%;
-            margin-right: 6px;
-            vertical-align: middle;
-            animation: pulse 1.5s infinite;
+        .{log_container.log_id}::-webkit-scrollbar-thumb {{
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
         }}
         
-        .duplicate-count {{
-            background-color: #ffc107;
-            border-radius: 8px;
-            padding: 0 6px;
-            font-size: 0.85em;
-            transition: background 0.3s ease;
-            margin-left: 4px;
-            color: #000;
-            font-weight: bold;
+        .{log_container.log_id}::-webkit-scrollbar-track {{
+            background: transparent;
+        }}
+        
+        /* Ensure log entries don't cause horizontal scroll */
+        .log-entry {{
+            max-width: 100% !important;
+            overflow: hidden !important;
+            word-wrap: break-word !important;
+            white-space: pre-wrap !important;
         }}
     </style>
     """))
@@ -258,15 +274,82 @@ def create_log_accordion(
         _update_log_display()
     
     def _scroll_to_bottom():
-        """Scroll the log container to the bottom."""
-        display(Javascript(f"""
+        """Scroll the log container to the bottom using JavaScript."""
+        from IPython.display import display, Javascript
+        
+        js_code = f"""
         (function() {{
-            const container = document.querySelector('.{log_container.log_id}');
-            if (container) {{
-                container.scrollTop = container.scrollHeight;
+            // Try to find our specific log container first
+            let logContainer = document.querySelector('.{log_container.log_id}');
+            
+            // If not found, try to find any scrollable container
+            if (!logContainer) {{
+                const selectors = [
+                    '.smartcash-log-container',
+                    '.jp-OutputArea-output',
+                    '.output_scroll',
+                    '.output_subarea',
+                    '.output'
+                ];
+                
+                for (const selector of selectors) {{
+                    const elements = document.querySelectorAll(selector);
+                    for (const el of elements) {{
+                        if (el.scrollHeight > el.clientHeight) {{
+                            logContainer = el;
+                            break;
+                        }}
+                    }}
+                    if (logContainer) break;
+                }}
+            }}
+            
+            if (!logContainer) return;
+            
+            // Check if we're already at the bottom (or close)
+            const isNearBottom = logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop < 50;
+            
+            // Only auto-scroll if we're near the bottom or if forced
+            if (isNearBottom || {auto_scroll}) {{
+                // Smooth scroll to bottom
+                function scrollToBottom() {{
+                    if (!logContainer) return;
+                    
+                    const start = logContainer.scrollTop;
+                    const end = logContainer.scrollHeight - logContainer.clientHeight;
+                    const duration = 150; // ms
+                    
+                    // Skip animation if we're already at the bottom
+                    if (Math.abs(start - end) < 1) return;
+                    
+                    const startTime = performance.now();
+                    
+                    function step(currentTime) {{
+                        const elapsed = currentTime - startTime;
+                        const progress = Math.min(elapsed / duration, 1);
+                        
+                        // Ease in-out function
+                        const easeInOut = t => t < 0.5 
+                            ? 2 * t * t 
+                            : -1 + (4 - 2 * t) * t;
+                        
+                        logContainer.scrollTop = start + (end - start) * easeInOut(progress);
+                        
+                        if (progress < 1) {{
+                            window.requestAnimationFrame(step);
+                        }}
+                    }}
+                    
+                    window.requestAnimationFrame(step);
+                }}
+                
+                // Small delay to ensure the new content is rendered
+                setTimeout(scrollToBottom, 10);
             }}
         }})();
-        """))
+        """.format(log_container=log_container.log_id, auto_scroll='true' if auto_scroll else 'false')
+        
+        display(Javascript(js_code))
     
     def _update_log_display():
         """Update the log container with current entries."""

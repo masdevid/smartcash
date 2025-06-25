@@ -10,6 +10,7 @@ from typing import Dict, Any, Callable, Optional
 
 class SetupStage(Enum):
     """Stages for setup progress tracking"""
+    INIT = auto()
     DRIVE_MOUNT = auto()
     FOLDER_SETUP = auto()
     SYMLINK_SETUP = auto()

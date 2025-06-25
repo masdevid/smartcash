@@ -3,14 +3,14 @@ File: smartcash/ui/setup/env_config/utils/__init__.py
 Deskripsi: Utility untuk environment configuration
 """
 
-from .progress_tracker import (
+from .dual_progress_tracker import (
     SetupStage,
-    SetupProgressTracker,
+    DualProgressTracker,
     track_setup_progress
 )
 
 __all__ = [
     'SetupStage',
-    'SetupProgressTracker',
+    'DualProgressTracker',
     'track_setup_progress'
 ]

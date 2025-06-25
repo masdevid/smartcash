@@ -9,7 +9,7 @@ from smartcash.ui.components import (
     create_header, create_status_panel,
     create_log_accordion, create_divider
 )
-from smartcash.ui.setup.env_config.utils.progress_tracker import track_setup_progress
+from smartcash.ui.setup.env_config.utils.dual_progress_tracker import track_setup_progress
 from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary
 from smartcash.ui.setup.env_config.components.env_info_panel import create_env_info_panel
 from smartcash.ui.setup.env_config.components.tips_panel import create_tips_requirements

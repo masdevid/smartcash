@@ -88,19 +88,19 @@ class UILogger:
                     f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
                     f'font-size:12px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
                     f'overflow-wrap:break-word;border-right:{border_style};border-left:{border_style};">',
-                    # Icon container (left side, aligned to top)
-                    f'<div style="display:flex;align-self:flex-start;padding:2px 6px 2px 0;flex-shrink:0;font-size:12px;line-height:1.5;">',
+                    # Icon container (left side, full height)
+                    f'<div style="display:flex;align-items:flex-start;padding:2px 6px 2px 0;flex-shrink:0;font-size:12px;line-height:1.5;height:100%;">',
                     f'{emoji}',
                     '</div>',
-                    # Main content (right side)
-                    f'<div style="flex:1;min-width:0;display:flex;flex-direction:column;">',
-                    f'<div style="color:{color};display:flex;align-items:flex-start;width:100%;">',
-                    f'<div style="display:flex;flex:1;min-width:0;align-items:flex-start;gap:4px;">',
+                    # Main content (middle, full height)
+                    f'<div style="flex:1;min-width:0;display:flex;align-items:center;height:100%;">',
+                    f'<div style="color:{color};display:flex;align-items:center;width:100%;">',
+                    f'<div style="display:flex;flex:1;min-width:0;align-items:center;gap:4px;">',
                     f'{namespace_badge if namespace_badge else ""}',
-                    f'<span style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:left;">{clean_msg}</span>',
+                    f'<span style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:left;line-height:1.5;padding:2px 0;">{clean_msg}</span>',
                     '</div>',  # End of message container
-                    # Timestamp (right side)
-                    f'<div style="color:#6c757d;font-size:10px;font-family:monospace;white-space:nowrap;margin-left:8px;line-height:1.5;flex-shrink:0;align-self:flex-start;">',
+                    # Timestamp (right side, full height)
+                    f'<div style="color:#6c757d;font-size:10px;font-family:monospace;white-space:nowrap;margin-left:8px;line-height:1.5;flex-shrink:0;align-self:center;height:100%;display:flex;align-items:center;">',
                     f'{timestamp}',
                     '</div>',  # End of timestamp
                     '</div>',  # End of message row

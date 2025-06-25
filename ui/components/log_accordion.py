@@ -1,16 +1,22 @@
 """
-Modern Log Accordion Component
+Modern Log Accordion Component with Deduplication
 
-A flexible, modern log display component with smooth scrolling and rich formatting.
+A flexible, modern log display component with smooth scrolling, rich formatting,
+and smart message deduplication.
 """
 
-import ipywidgets as widgets
-from typing import Dict, Any, Optional, List, Tuple
-from IPython.display import display, HTML
-from datetime import datetime
 from enum import Enum
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+import ipywidgets as widgets
+from IPython.display import display, HTML, Javascript
+import time
+import uuid
+import pytz
+from threading import Timer
 
 class LogLevel(Enum):
+    """Log level enumeration."""
     DEBUG = 'debug'
     INFO = 'info'
     SUCCESS = 'success'
@@ -18,14 +24,19 @@ class LogLevel(Enum):
     ERROR = 'error'
     CRITICAL = 'critical'
 
+# Define log level styles
 LOG_LEVEL_STYLES = {
     LogLevel.DEBUG: {'color': '#6c757d', 'bg': '#f8f9fa', 'icon': '🔍'},
     LogLevel.INFO: {'color': '#0d6efd', 'bg': '#e7f1ff', 'icon': 'ℹ️'},
     LogLevel.SUCCESS: {'color': '#198754', 'bg': '#e7f8f0', 'icon': '✅'},
     LogLevel.WARNING: {'color': '#ffc107', 'bg': '#fff8e6', 'icon': '⚠️'},
     LogLevel.ERROR: {'color': '#dc3545', 'bg': '#fdf0f2', 'icon': '❌'},
-    LogLevel.CRITICAL: {'color': '#ffffff', 'bg': '#dc3545', 'icon': '🔥'}
+    LogLevel.CRITICAL: {'color': '#dc3545', 'bg': '#fdf0f2', 'icon': '🔥'}
 }
+
+# Constants for deduplication
+DUPLICATE_WINDOW_MS = 1000  # 1 second window for considering messages as duplicates
+MAX_DUPLICATE_COUNT = 2   # Maximum number of duplicates to show
 
 def create_log_accordion(
     module_name: str = 'Process',
@@ -34,10 +45,11 @@ def create_log_accordion(
     max_logs: int = 1000,
     show_timestamps: bool = True,
     show_level_icons: bool = True,
-    auto_scroll: bool = True
-) -> Dict[str, widgets.Widget]:
+    auto_scroll: bool = True,
+    enable_deduplication: bool = True
+) -> Dict[str, Any]:
     """
-    Create a modern log accordion with rich formatting and smooth scrolling.
+    Create a modern log accordion with rich formatting and deduplication.
     
     Args:
         module_name: Name to display in the accordion header
@@ -47,47 +59,71 @@ def create_log_accordion(
         show_timestamps: Whether to show timestamps
         show_level_icons: Whether to show level icons
         auto_scroll: Whether to automatically scroll to bottom on new messages
+        enable_deduplication: Whether to enable message deduplication
         
     Returns:
         Dictionary containing 'log_output' and 'log_accordion' widgets
     """
-    # Create a container for log messages with a custom class for JavaScript targeting
-    log_container = widgets.VBox(
-        layout=widgets.Layout(
-            width='100%',
-            height=height,
-            overflow_y='auto',
-            padding='10px',
-            border='1px solid #e9ecef',
-            border_radius='8px',
-            margin='5px 0',
-            display='flex',
-            flex_flow='column-reverse',
-            align_items='stretch',
-            overflow='hidden'
-        )
-    )
-    # Add a custom class for JavaScript targeting
+    # Create main container
+    log_container = widgets.Output(layout={
+        'border': '1px solid #e0e0e0',
+        'border_radius': '8px',
+        'overflow': 'hidden',
+        'width': width,
+        'height': height,
+        'margin': '5px 0'
+    })
+    
+    # Add custom CSS
     log_container.add_class('smartcash-log-container')
+    log_container.log_id = f'log-container-{uuid.uuid4().hex}'
     
-    # Create a container to hold all log entries
-    entries_container = widgets.VBox(
-        layout=widgets.Layout(
-            width='100%',
-            display='flex',
-            flex_flow='column',
-            align_items='stretch',
-            gap='4px',
-            margin='0',
-            padding='0'
-        )
-    )
+    # Create entries container
+    entries_container = widgets.VBox(layout={
+        'overflow_y': 'auto',
+        'height': '100%',
+        'padding': '8px'
+    })
     
-    # Add the entries container to the main container
-    log_container.children = [entries_container]
+    # Add entries container to log container
+    with log_container:
+        display(entries_container)
     
-    # Store logs in memory
+    # Add custom CSS for the log container
+    display(HTML(f"""
+    <style>
+        @keyframes pulse {{
+            0% {{ transform: scale(0.95); opacity: 0.7; }}
+            50% {{ transform: scale(1.1); opacity: 1; }}
+            100% {{ transform: scale(0.95); opacity: 0.7; }}
+        }}
+        
+        .duplicate-indicator {{
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-color: #ffc107;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+            animation: pulse 1.5s infinite;
+        }}
+        
+        .duplicate-count {{
+            background-color: #ffc107;
+            border-radius: 8px;
+            padding: 0 6px;
+            font-size: 0.85em;
+            transition: background 0.3s ease;
+        }}
+    </style>
+    """))
+    
+    # Store log entries
     log_entries: List[Dict[str, Any]] = []
+    last_message = None
+    duplicate_count = 0
+    last_timestamp = None
     
     def append_log(
         message: str,
@@ -96,20 +132,10 @@ def create_log_accordion(
         module: str = None,
         timestamp: datetime = None
     ) -> None:
-        """
-        Append a log message to the container.
-        
-        Args:
-            message: The log message
-            level: Log level (DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL)
-            namespace: Optional namespace for categorization
-            module: Optional module name
-            timestamp: Optional custom timestamp
-        """
-        nonlocal log_entries
+        """Append a log message with deduplication support."""
+        nonlocal log_entries, last_message, duplicate_count, last_timestamp
         
         try:
-            # Validate input
             if not message:
                 return
                 
@@ -120,15 +146,67 @@ def create_log_accordion(
                 except (ValueError, AttributeError):
                     level = LogLevel.INFO
             
-            # Create log entry
+            current_timestamp = timestamp or datetime.now()
+            
+            # Check for duplicates if enabled
+            if enable_deduplication:
+                is_duplicate = (
+                    last_message is not None and
+                    last_message.get('message') == str(message) and
+                    last_message.get('level') == level and
+                    last_message.get('namespace') == namespace and
+                    last_message.get('module') == module and
+                    (current_timestamp - last_message['timestamp']).total_seconds() * 1000 < DUPLICATE_WINDOW_MS
+                )
+                
+                if is_duplicate:
+                    duplicate_count = min(duplicate_count + 1, MAX_DUPLICATE_COUNT)
+                    last_message['count'] = duplicate_count
+                    last_message['last_timestamp'] = current_timestamp
+                    last_message['show_duplicate_indicator'] = True
+                    
+                    # Update the display
+                    _update_duplicate_count(
+                        entry_id=last_message['id'],
+                        count=duplicate_count,
+                        show_indicator=True
+                    )
+                    
+                    # Schedule indicator removal
+                    def remove_indicator():
+                        if last_message and last_message['id'] == entry_id:
+                            last_message['show_duplicate_indicator'] = False
+                            _update_log_display()
+                    
+                    entry_id = last_message['id']
+                    Timer(2.0, remove_indicator).start()
+                    return
+            
+            # Reset duplicate tracking for new message
+            if duplicate_count > 0:
+                _update_duplicate_count(
+                    entry_id=last_message['id'],
+                    count=duplicate_count,
+                    show_indicator=False
+                )
+            
+            duplicate_count = 0
+            
+            # Create new log entry
             entry = {
                 'id': len(log_entries) + 1,
-                'timestamp': timestamp or datetime.now(),
+                'timestamp': current_timestamp,
                 'level': level,
                 'namespace': namespace,
                 'module': module,
-                'message': str(message)
+                'message': str(message),
+                'count': 0,
+                'show_duplicate_indicator': False
             }
+            
+            # Update last message tracking
+            last_message = entry
+            last_timestamp = current_timestamp
             
             # Add to log entries and maintain max size
             log_entries.append(entry)
@@ -143,109 +221,44 @@ def create_log_accordion(
             import traceback
             traceback.print_exc()
     
+    def _update_duplicate_count(entry_id: int, count: int, show_indicator: bool = False) -> None:
+        """Update the duplicate count for an existing log entry."""
+        nonlocal log_entries
+        
+        for entry in reversed(log_entries):
+            if entry['id'] == entry_id:
+                entry['count'] = count
+                if show_indicator:
+                    entry['show_duplicate_indicator'] = True
+                break
+        
+        _update_log_display()
+    
     def _scroll_to_bottom():
-        """Scroll the log container to the bottom using JavaScript."""
-        from IPython.display import display, Javascript
-        
-        # Generate a unique ID for our log container if it doesn't have one
-        if not hasattr(log_container, 'log_id'):
-            import uuid
-            log_container.log_id = f'log-container-{uuid.uuid4().hex}'
-            log_container.add_class(log_container.log_id)
-        
-        # Add a data attribute to track if we should auto-scroll
-        js_code = f"""
+        """Scroll the log container to the bottom."""
+        display(Javascript(f"""
         (function() {{
-            // Try to find our specific log container first
-            let logContainer = document.querySelector('.{log_container.log_id}');
-            
-            // If not found, try to find any scrollable container
-            if (!logContainer) {{
-                const selectors = [
-                    '.smartcash-log-container',
-                    '.jp-OutputArea-output',
-                    '.output_scroll',
-                    '.output_subarea',
-                    '.output'
-                ];
-                
-                for (const selector of selectors) {{
-                    const elements = document.querySelectorAll(selector);
-                    for (const el of elements) {{
-                        if (el.scrollHeight > el.clientHeight) {{
-                            logContainer = el;
-                            break;
-                        }}
-                    }}
-                    if (logContainer) break;
-                }}
-            }}
-            
-            if (!logContainer) return;
-            
-            // Check if we're already at the bottom (or close)
-            const isNearBottom = logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop < 50;
-            
-            // Only auto-scroll if we're near the bottom or if forced
-            if (isNearBottom || {force_scroll}) {{
-                // Smooth scroll to bottom
-                function scrollToBottom() {{
-                    if (!logContainer) return;
-                    
-                    const start = logContainer.scrollTop;
-                    const end = logContainer.scrollHeight - logContainer.clientHeight;
-                    const duration = 150; // ms
-                    
-                    // Skip animation if we're already at the bottom
-                    if (Math.abs(start - end) < 1) return;
-                    
-                    const startTime = performance.now();
-                    
-                    function step(currentTime) {{
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / duration, 1);
-                        
-                        // Ease in-out function
-                        const easeInOut = t => t < 0.5 
-                            ? 2 * t * t 
-                            : -1 + (4 - 2 * t) * t;
-                        
-                        logContainer.scrollTop = start + (end - start) * easeInOut(progress);
-                        
-                        if (progress < 1) {{
-                            window.requestAnimationFrame(step);
-                        }}
-                    }}
-                    
-                    window.requestAnimationFrame(step);
-                }}
-                
-                // Small delay to ensure the new content is rendered
-                setTimeout(scrollToBottom, 10);
+            const container = document.querySelector('.{log_container.log_id}');
+            if (container) {{
+                container.scrollTop = container.scrollHeight;
             }}
         }})();
-        """.format(log_container=log_container.log_id, force_scroll='true' if auto_scroll else 'false')
-        
-        display(Javascript(js_code))
+        """))
     
     def _update_log_display():
         """Update the log container with current entries."""
         try:
-            # Only update if there are new entries
             current_count = len(entries_container.children)
             new_entries = log_entries[current_count:]
             
             if not new_entries:
                 return
                 
-            # Store the current scroll position and container reference
-            scroll_container = log_container
-            
-            # Add only new entries to the container
+            # Create widgets for new entries
             new_widgets = [_create_log_entry(entry) for entry in new_entries]
             entries_container.children = list(entries_container.children) + new_widgets
             
-            # Auto-scroll to bottom if enabled and user hasn't scrolled up
+            # Auto-scroll if enabled
             if auto_scroll:
                 _scroll_to_bottom()
                 
@@ -255,62 +268,56 @@ def create_log_accordion(
             traceback.print_exc()
     
     def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
-        """Create a styled log entry widget with local timezone support."""
+        """Create a styled log entry widget."""
         style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
         
-        # Format timestamp in local timezone if needed
+        # Format timestamp
         timestamp_html = ''
         if show_timestamps and 'timestamp' in entry and entry['timestamp']:
             try:
-                # Convert to local timezone
-                import pytz
-                from datetime import datetime
-                
-                # Get the timestamp (assume UTC if timezone-naive)
                 ts = entry['timestamp']
                 if ts.tzinfo is None:
                     ts = pytz.utc.localize(ts)
                 
-                # Convert to local timezone
-                local_tz = pytz.timezone('Asia/Jakarta')  # Default to WIB
+                local_tz = pytz.timezone('Asia/Jakarta')
                 local_ts = ts.astimezone(local_tz)
+                timestamp = local_ts.strftime('%H:%M:%S.%f')[:-3]
+                timezone_str = local_ts.strftime('%Z')
                 
-                # Format with milliseconds and timezone
-                timestamp = local_ts.strftime('%H:%M:%S.%f')[:-3]  # HH:MM:SS.mmm
-                timezone_str = local_ts.strftime('%Z')  # Timezone abbreviation
+                # Add duplicate count if present
+                count_html = ""
+                if entry.get('count', 0) > 0:
+                    count_bg = "#ffc107" if entry.get('show_duplicate_indicator', False) else "rgba(0,0,0,0.1)"
+                    count_html = f" <span class='duplicate-count' style='background: {count_bg};'>{entry['count']+1}x</span>"
                 
-                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp} {timezone_str}</span>"
+                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp} {timezone_str}{count_html}</span>"
                 
             except Exception as e:
-                # Fallback to simple timestamp if any error occurs
                 timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3]
-                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>"
-                print(f"[WARNING] Failed to format local time: {str(e)}")
+                count_html = f" <span class='duplicate-count'>{entry['count']+1}x</span>" if entry.get('count', 0) > 0 else ""
+                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}{count_html}</span>"
         
-        # Get level icon if needed
-        level_icon = style['icon'] if show_level_icons else ''
-        
-        # Create namespace/module prefix if available
+        # Create namespace/module prefix
         ns = entry.get('namespace') or entry.get('module')
         ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
         
-        # Build the HTML string with direct variable interpolation
-        bg_color = style['bg']
-        text_color = style['color']
+        # Add duplicate indicator if needed
+        indicator_html = "<span class='duplicate-indicator'></span>" if entry.get('show_duplicate_indicator', False) else ""
         
+        # Create the HTML
         html = f"""
         <div style='
             padding: 6px 12px;
             margin: 2px 0;
             border-radius: 6px;
-            background: {bg_color};
-            color: {text_color};
+            background: {style['bg']};
+            color: {style['color']};
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 13px;
             line-height: 1.4;
             transition: all 0.2s ease;'>
             <div style='display: flex; align-items: flex-start; gap: 8px;'>
-                {level_icon}
+                {indicator_html}{style['icon'] if show_level_icons else ''}
                 <span style='flex: 1;'>{ns_display}{entry['message']}</span>
                 {timestamp_html}
             </div>
@@ -319,26 +326,23 @@ def create_log_accordion(
         
         return widgets.HTML(html)
     
-    # Add methods to the container for external use
+    def clear_logs():
+        """Clear all log entries."""
+        nonlocal log_entries, last_message, duplicate_count
+        log_entries = []
+        last_message = None
+        duplicate_count = 0
+        entries_container.children = ()
+    
+    # Expose methods
     log_container.append_log = append_log
+    log_container.clear_logs = clear_logs
+    entries_container.clear_logs = clear_logs
     
     # Create the accordion
     accordion = widgets.Accordion(children=[log_container])
     accordion.set_title(0, f"{module_name} Logs")
     accordion.selected_index = None  # Start collapsed
-    
-    def clear_logs():
-        """Clear all log entries."""
-        nonlocal log_entries
-        log_entries = []
-        entries_container.children = ()
-    
-    # Expose the append_log and clear_logs methods
-    log_container.append_log = append_log
-    log_container.clear_logs = clear_logs
-    
-    # Add clear_logs to the entries container as well for backward compatibility
-    entries_container.clear_logs = clear_logs
     
     return {
         'log_output': log_container,

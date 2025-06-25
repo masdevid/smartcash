@@ -6,6 +6,7 @@ Deskripsi: Independent configuration cell for dataset split configuration with d
 from typing import Dict, Any, Optional
 from pathlib import Path
 import yaml
+import ipywidgets as widgets
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.initializers.config_cell_initializer import create_config_cell
@@ -180,7 +181,7 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
     except Exception as e:
         # Log the error
         import traceback
-        error_msg = f"Failed to initialize dependency UI: {str(e)}"
+        error_msg = f"Failed to initialize Split Config UI: {str(e)}"
         error_traceback = traceback.format_exc()
         return _create_error_fallback(error_msg, error_traceback)
 

@@ -10,7 +10,8 @@ including UI component creation, handler setup, and configuration management.
 
 # Standard library imports
 import sys
-from typing import Dict, Any, Optional, Type, TYPE_CHECKING
+from typing import Dict, Any, Optional
+import ipywidgets as widgets
 
 # Absolute imports
 from smartcash.ui.initializers.common_initializer import CommonInitializer
@@ -416,5 +417,5 @@ def _create_error_fallback(error_message: str, traceback: Optional[str] = None) 
     """Create a fallback UI component to display error messages."""
     from smartcash.ui.components import create_error_component
     return create_error_component("Initialization Error", error_message, traceback)
-    
+
 __all__ = ['initialize_dependency_ui']

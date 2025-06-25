@@ -1,13 +1,11 @@
 """
 File: smartcash/ui/setup/env_config/utils/dual_progress_tracker.py
-Deskripsi: Dual progress tracker implementation using the new ProgressTracker component
+Deskripsi: Simple and clean progress tracker for environment setup
 """
 
-from typing import Dict, Any, Optional, List, Callable
 from enum import Enum, auto
-import ipywidgets
-from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
-from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker as NewProgressTracker
+import ipywidgets as widgets
+from typing import Dict, Any, Callable, Optional
 
 class SetupStage(Enum):
     """Stages for setup progress tracking"""
@@ -19,276 +17,152 @@ class SetupStage(Enum):
     COMPLETE = auto()
 
 class DualProgressTracker:
-    """Dual progress tracker for setup workflow with two-level progress tracking.
+    """Simple and clean progress tracker for environment setup
     
-    This provides a backward-compatible interface for the old progress tracker
-    while using the new ProgressTracker component under the hood.
+    Features:
+    - Single progress bar with status text
+    - Stage tracking with automatic progress calculation
+    - Callback support for progress updates
+    - Error and completion handling
     """
     
-    def __init__(self, ui_components: Dict[str, Any] = None, logger=None):
-        """Initialize the dual progress tracker.
-        
-        Args:
-            ui_components: Dictionary containing UI components
-            logger: Optional logger instance
-        """
+    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, logger=None):
+        """Initialize the progress tracker with optional UI components and logger"""
         self.logger = logger
-        self._ui_components = ui_components or {}
+        self.components = ui_components or {}
         self.current_stage = None
         self.overall_progress = 0
         self.stage_progress = 0
         self.callbacks = []
-        self._initialized = False
-        self._new_tracker: Optional[NewProgressTracker] = None
-        self._progress_container = None
         
-    def _init_tracker(self):
-        """Initialize the underlying progress tracker if not already done."""
-        try:
-            # If already initialized, return the existing container
-            if self._initialized and self._progress_container is not None:
-                return self._progress_container
-                
-            # Create a simple container first as fallback
-            self._progress_container = ipywidgets.VBox()
-            
-            # Try to create the progress tracker
-            self._new_tracker = create_dual_progress_tracker(
-                operation="Environment Setup",
-                auto_hide=False
-            )
-            
-            # Initialize the progress container from the tracker if available
-            if hasattr(self._new_tracker, 'container') and self._new_tracker.container is not None:
-                self._progress_container = self._new_tracker.container
-            
-            # Ensure the container has proper layout
-            if not hasattr(self._progress_container, 'layout') or self._progress_container.layout is None:
-                self._progress_container.layout = ipywidgets.Layout()
-                
-            # Set container visibility
-            if hasattr(self._progress_container.layout, 'visibility'):
-                self._progress_container.layout.visibility = 'visible'
-            if hasattr(self._progress_container.layout, 'display'):
-                self._progress_container.layout.display = 'flex'
-            
-            # Update UI components if provided
-            if self._ui_components is not None:
-                self._ui_components['progress_tracker'] = self._new_tracker
-                self._ui_components['progress_container'] = self._progress_container
-            
-            self._initialized = True
-            return self._progress_container
-            
-        except Exception as e:
-            import traceback
-            error_msg = f"Error initializing progress tracker: {str(e)}"
-            print(error_msg)
-            print(traceback.format_exc())
-            
-            # Ensure we always return a valid container
-            if not hasattr(self, '_progress_container') or self._progress_container is None:
-                self._progress_container = ipywidgets.VBox()
-                
-            self._initialized = True
-            return self._progress_container
+        # Create UI elements
+        self._create_ui()
+        
+        # Register with UI components
+        self.components.update({
+            'progress_container': self.container,
+            'progress_tracker': self
+        })
     
-    def update_stage(self, stage: SetupStage, message: str = None):
-        """Update the current stage of the setup process.
+    def _create_ui(self):
+        """Create and configure the UI elements"""
+        # Progress bar
+        self.progress_bar = widgets.FloatProgress(
+            value=0,
+            min=0,
+            max=100,
+            description='Progress:',
+            bar_style='info',
+            orientation='horizontal'
+        )
         
-        Args:
-            stage: The current setup stage
-            message: Optional message to display
-        """
-        self._init_tracker()
+        # Status text
+        self.status_text = widgets.HTML(value="<i>Ready to start setup...</i>")
+        
+        # Main container
+        self.container = widgets.VBox([
+            self.progress_bar,
+            self.status_text
+        ])
+    
+    def update_stage(self, stage: SetupStage, message: Optional[str] = None):
+        """Update the current stage of the setup process"""
         self.current_stage = stage
         stage_name = stage.name.replace('_', ' ').title()
-        
-        if message is None:
-            message = f"{stage_name}..."
-            
-        self._new_tracker.update_overall(
-            self.overall_progress,
-            f"{stage_name}: {message}"
-        )
-        self._process_callbacks(stage, 0, message)
+        status = message or f"{stage_name}..."
+        self._update_status(status)
+        self.update_progress(0, status)
     
-    def update_within_stage(self, progress: int, message: str = ""):
-        """Update progress within the current stage.
-        
-        Args:
-            progress: Progress percentage (0-100)
-            message: Optional progress message
-        """
-        if not self._initialized or self.current_stage is None:
-            return
-            
+    def update_progress(self, progress: float, message: Optional[str] = None):
+        """Update the progress of the current stage"""
+        # Update progress values
         self.stage_progress = max(0, min(100, progress))
-        stage_name = self.current_stage.name.replace('_', ' ').title()
+        self.progress_bar.value = self.stage_progress
         
-        self._new_tracker.update_current(
-            progress,
-            f"{stage_name}: {message}" if message else stage_name
-        )
+        # Update status if message provided
+        if message:
+            self._update_status(message)
         
-        # Update overall progress based on stage weights
+        # Calculate overall progress if we have a current stage
         self._update_overall_progress()
-        self._process_callbacks(self.current_stage, progress, message)
+        
+        # Notify callbacks
+        self._notify_callbacks(message or "")
     
-    def complete_stage(self, message: str = ""):
-        """Mark the current stage as complete.
-        
-        Args:
-            message: Optional completion message
-        """
-        if not self._initialized or self.current_stage is None:
-            return
-            
-        self.update_within_stage(100, message or f"{self.current_stage.name.replace('_', ' ').title()} completed")
-    
-    def complete(self, message: str = "Setup completed successfully!"):
-        """Mark the entire setup as complete.
-        
-        Args:
-            message: Completion message
-        """
-        self._init_tracker()
-        self.current_stage = SetupStage.COMPLETE
-        self.overall_progress = 100
-        self.stage_progress = 100
-        
-        self._new_tracker.complete(message)
-        self._process_callbacks(self.current_stage, 100, message)
-    
-    def error(self, message: str):
-        """Report an error in the setup process.
-        
-        Args:
-            message: Error message
-        """
-        self._init_tracker()
-        self._new_tracker.error(message)
-        
-        if self.logger:
-            self.logger.error(message)
-    
-    def add_callback(self, callback: Callable):
-        """Add a callback function to be called on progress updates.
-        
-        Args:
-            callback: Function with signature (stage, progress, message)
-        """
-        if callable(callback) and callback not in self.callbacks:
-            self.callbacks.append(callback)
-    
-    def remove_callback(self, callback: Callable):
-        """Remove a previously registered callback.
-        
-        Args:
-            callback: Callback function to remove
-        """
-        if callback in self.callbacks:
-            self.callbacks.remove(callback)
-    
-    def _update_overall_progress(self):
-        """Update the overall progress based on the current stage and progress."""
+    def complete_stage(self, message: Optional[str] = None):
+        """Mark the current stage as complete"""
         if self.current_stage is None:
             return
             
-        # Simple linear progress calculation - can be enhanced with stage weights
-        stage_count = len(SetupStage) - 1  # Exclude COMPLETE stage
-        stage_index = list(SetupStage).index(self.current_stage)
+        # Update UI
+        stage_name = self.current_stage.name.replace('_', ' ').title()
+        status = message or f"{stage_name} completed"
+        self._update_status(f"✓ {status}")
         
-        # Calculate progress based on stage completion and within-stage progress
+        # Set progress to 100%
+        self.stage_progress = 100
+        self.progress_bar.value = 100
+        
+        # Update overall progress
+        self._update_overall_progress()
+        
+        # Notify callbacks
+        self._notify_callbacks(status)
+    
+    def complete(self, message: str = "Setup completed successfully!"):
+        """Mark the entire setup as complete"""
+        self.overall_progress = 100
+        self.stage_progress = 100
+        self.progress_bar.value = 100
+        self._update_status(f"✓ {message}")
+        self._notify_callbacks(message)
+    
+    def error(self, message: str):
+        """Report an error in the setup process"""
+        self._update_status(f"❌ Error: {message}")
+        if self.logger:
+            self.logger.error(message)
+    
+    def add_callback(self, callback: Callable[[float, float, str], None]):
+        """Add a callback function to be called on progress updates"""
+        if callable(callback) and callback not in self.callbacks:
+            self.callbacks.append(callback)
+    
+    def _update_status(self, message: str):
+        """Update the status text with proper HTML formatting"""
+        self.status_text.value = f"<b>{message}</b>"
+    
+    def _update_overall_progress(self):
+        """Calculate and update the overall progress based on current stage"""
+        if self.current_stage is None:
+            return
+            
+        stage_count = len(SetupStage)
+        stage_idx = list(SetupStage).index(self.current_stage)
         stage_weight = 100 / stage_count
-        completed_stages = stage_index - 1  # -1 because we don't count the current stage
-        stage_progress = (self.stage_progress / 100) * stage_weight
         
-        self.overall_progress = min(100, int(completed_stages * stage_weight + stage_progress))
-        
-        # Update the overall progress bar
-        self._new_tracker.update_overall(self.overall_progress)
+        base_progress = (stage_idx / stage_count) * 100
+        stage_contribution = (self.stage_progress / 100) * stage_weight
+        self.overall_progress = min(100, base_progress + stage_contribution)
+    
+    def _notify_callbacks(self, message: str):
+        """Notify all registered callbacks with current progress"""
+        for callback in self.callbacks:
+            try:
+                callback(self.overall_progress, self.stage_progress, message)
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error in progress callback: {e}")
     
     @property
     def progress_container(self):
-        """Get the progress container widget.
-        
-        Returns:
-            The progress container widget
-        """
-        try:
-            # If we already have a container, return it
-            if hasattr(self, '_progress_container') and self._progress_container is not None:
-                return self._progress_container
-                
-            # Otherwise, try to initialize the tracker
-            container = self._init_tracker()
-            if container is not None:
-                self._progress_container = container
-                return container
-                
-            # If initialization returned None, create a basic container
-            self._progress_container = ipywidgets.VBox()
-            
-            # Ensure the container has a layout
-            if not hasattr(self._progress_container, 'layout') or self._progress_container.layout is None:
-                self._progress_container.layout = ipywidgets.Layout()
-                
-            # Set container visibility
-            if hasattr(self._progress_container.layout, 'visibility'):
-                self._progress_container.layout.visibility = 'visible'
-            if hasattr(self._progress_container.layout, 'display'):
-                self._progress_container.layout.display = 'flex'
-                
-            return self._progress_container
-            
-        except Exception as e:
-            import traceback
-            print(f"Error in progress_container property: {e}")
-            print(traceback.format_exc())
-            # Return a basic container as fallback
-            return ipywidgets.VBox()
-        
+        """Get the progress container widget"""
+        return self.container
+    
     @property
     def ui_components(self) -> Dict[str, Any]:
-        """Get the UI components dictionary with progress container.
-        
-        Returns:
-            Dictionary containing UI components including progress container
-        """
-        if not self._initialized:
-            self._init_tracker()
-        return {
-            'progress_tracker': self._new_tracker,
-            'progress_container': self.progress_container
-        }
-        
-    @ui_components.setter
-    def ui_components(self, value: Dict[str, Any]) -> None:
-        """Set the UI components dictionary.
-        
-        Args:
-            value: Dictionary containing UI components
-        """
-        if not isinstance(value, dict):
-            raise ValueError("UI components must be a dictionary")
-        self._ui_components = value
-
-    def _process_callbacks(self, stage: SetupStage, progress: int, message: str):
-        """Process all registered callbacks.
-        
-        Args:
-            stage: Current setup stage
-            progress: Current progress percentage
-            message: Progress message
-        """
-        for callback in list(self.callbacks):  # Create a copy to avoid modification during iteration
-            try:
-                if callable(callback):
-                    callback(stage, progress, message)
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error in progress callback: {e}", exc_info=True)
+        """Get the UI components dictionary"""
+        return self.components
 
 # Backward compatibility
 track_setup_progress = DualProgressTracker

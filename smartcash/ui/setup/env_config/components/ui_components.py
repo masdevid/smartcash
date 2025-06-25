@@ -58,39 +58,25 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Initialize UI components dictionary
     ui_components = {}
     
-    # Initialize progress tracker
+    # Initialize progress tracker and its container
     try:
-        # Ensure progress tracker is properly initialized
-        if hasattr(progress_tracker, '_init_tracker'):
-            container = progress_tracker._init_tracker()
-            if container is not None:
-                ui_components['progress_container'] = container
-        
-        # Get progress container from tracker if available
-        if 'progress_container' not in ui_components and hasattr(progress_tracker, 'progress_container'):
+        # Get the progress container from the tracker
+        if hasattr(progress_tracker, 'progress_container'):
             ui_components['progress_container'] = progress_tracker.progress_container
         
-        # Add any additional UI components from the tracker
-        if hasattr(progress_tracker, 'ui_components'):
-            ui_components.update(progress_tracker.ui_components)
-        
-        # Ensure progress container exists
+        # Fallback to a simple container if not available
         if 'progress_container' not in ui_components or ui_components['progress_container'] is None:
             ui_components['progress_container'] = ipywidgets.VBox()
-            
-        # Update the progress tracker's internal reference
-        if hasattr(progress_tracker, '_progress_container'):
-            progress_tracker._progress_container = ui_components['progress_container']
-            
+        
+        # Store the progress tracker reference
+        ui_components['progress_tracker'] = progress_tracker
+        
     except Exception as e:
-        print(f"Error initializing progress tracker: {e}")
-        import traceback
-        traceback.print_exc()
-        # Fallback to a simple container
+        # Fallback to minimal working state
         ui_components['progress_container'] = ipywidgets.VBox()
-    
-    # Always ensure we have a progress tracker reference
-    ui_components['progress_tracker'] = progress_tracker
+        ui_components['progress_tracker'] = progress_tracker
+        if hasattr(progress_tracker, 'logger'):
+            progress_tracker.logger.error(f"Error initializing progress tracker: {e}", exc_info=True)
     
     # 5. Log Accordion
     log_accordion = create_log_accordion(

@@ -400,23 +400,36 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui
         # Initialize the UI with the config
         ui_components = _dependency_initializer.initialize_ui(config)
         
-        # Display the UI if requested
-        if display_ui:
-            from IPython.display import display
-            
+        # Ensure we have a displayable component
+        display_component = None
         if 'container' in ui_components:
-            return ui_components['container']
+            display_component = ui_components['container']
         elif 'ui' in ui_components:
-            return ui_components['ui']
+            display_component = ui_components['ui']
         else:
             raise ValueError("No valid UI container found in components")
         
+        # Display the UI if requested
+        if display_ui and display_component is not None:
+            from IPython.display import display
+            display(display_component)
+            
+        return display_component
+        
     except Exception as e:
+        import traceback
         restore_stdout()  # Ensure output is restored even on error
-        error_fallback = _create_error_fallback(str(e))
-        if 'container' in error_fallback:
-            return error_fallback['container']
-        return error_fallback
+        error_ui = _create_error_fallback(
+            error_message=str(e),
+            traceback=traceback.format_exc()
+        )
+        
+        # Display the error UI if requested
+        if display_ui and error_ui is not None:
+            from IPython.display import display
+            display(error_ui)
+            
+        return error_ui
 
 def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
     """Create a fallback UI component to display error messages."""

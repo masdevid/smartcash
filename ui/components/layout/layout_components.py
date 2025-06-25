@@ -184,5 +184,52 @@ def get_responsive_config(widget_type: str, **kwargs) -> Dict[str, Any]:
 # Fungsi bantuan satu baris
 create_divider = lambda margin='15px 0', color='#eee', height='1px': create_element('divider', margin=margin, color=color, height=height)
 create_responsive_container = lambda children, container_type='vbox', **kwargs: create_element('container', children, container_type=container_type, **kwargs)
-create_responsive_two_column = lambda left_content, right_content, **kwargs: create_element('two_column', [left_content, right_content], **kwargs)
+
+def create_responsive_two_column(left_content, right_content, **kwargs):
+    """Create a responsive two-column layout.
+    
+    Args:
+        left_content: Widget or component for the left column
+        right_content: Widget or component for the right column
+        **kwargs: Additional layout parameters
+        
+    Returns:
+        HBox containing the two columns
+    """
+    left_width = kwargs.pop('left_width', '48%')
+    right_width = kwargs.pop('right_width', '48%')
+    vertical_align = kwargs.pop('vertical_align', 'flex-start')
+    
+    # Create new layout objects
+    left_layout = widgets.Layout(
+        width=left_width,
+        margin='0',
+        padding='4px',
+        overflow='hidden'
+    )
+    
+    right_layout = widgets.Layout(
+        width=right_width,
+        margin='0',
+        padding='4px',
+        overflow='hidden'
+    )
+    
+    left_wrapper = widgets.VBox([left_content], layout=left_layout)
+    right_wrapper = widgets.VBox([right_content], layout=right_layout)
+    
+    return widgets.HBox(
+        [left_wrapper, right_wrapper],
+        layout=widgets.Layout(
+            width='100%',
+            max_width='100%',
+            justify_content='space-between',
+            align_items=vertical_align,
+            margin='0',
+            padding='0',
+            overflow='hidden',
+            **kwargs.get('layout', {})
+        )
+    )
+
 get_responsive_button_layout = lambda width='auto', max_width='150px': get_responsive_config('button', width=width, max_width=max_width)['layout']

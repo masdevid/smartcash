@@ -94,23 +94,47 @@ def create_split_config_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
         return ui_components
         
     except Exception as e:
-        logger = get_logger('smartcash.ui.dataset.split')
-        error_msg = f"Error creating split config UI: {str(e)}\n{traceback.format_exc()}"
-        logger.error(error_msg)
-        # Create a minimal error UI
-        import ipywidgets as widgets
-        from IPython.display import display
+        import traceback
+        error_msg = f"Error creating split config UI: {str(e)}"
+        error_traceback = traceback.format_exc()
         
-        error_output = widgets.Output()
-        with error_output:
-            print(error_msg)
+        # Log the error
+        logger = get_logger('smartcash.ui.dataset.split')
+        logger.error(f"{error_msg}\n{error_traceback}")
+        
+        try:
+            # Try to create and display error component
+            from smartcash.ui.components.error.error_component import ErrorComponent
+            error_component = ErrorComponent(title="Split Configuration Error")
+            error_ui = error_component.create(
+                error_message=error_msg,
+                traceback=error_traceback,
+                error_type="error",
+                show_traceback=True
+            )
             
-        error_ui = {
-            'error_output': error_output,
-            'container': widgets.VBox([widgets.HTML('<h3>Error in Split Configuration UI</h3>'), error_output])
-        }
-        display(error_ui['container'])
-        return error_ui
+            # Safely get the widget to display
+            display_widget = error_ui.get('widget') or error_ui.get('container') or error_ui
+            display(display_widget)
+            
+            # Return the full error UI components
+            return error_ui
+            
+        except Exception as inner_e:
+            # If we can't create the error component, fall back to basic error display
+            import ipywidgets as widgets
+            from IPython.display import display, HTML
+            
+            error_html = f"""
+            <div style='color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; 
+                        padding: 15px; border-radius: 4px; margin: 10px 0;'>
+                <h4>Split Configuration Error</h4>
+                <p>{error_msg}</p>
+                <pre style='white-space: pre-wrap;'>{error_traceback}</pre>
+            </div>
+            """
+            display(HTML(error_html))
+            return {'error': error_msg, 'traceback': error_traceback}
 
 
 def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -158,14 +182,19 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         error_msg = f"Failed to initialize Split Config UI: {str(e)}"
         error_traceback = traceback.format_exc()
         
-        # Create and display error component
+        # Try to create and display error component
         from smartcash.ui.components.error.error_component import ErrorComponent
-        error_component = ErrorComponent(title="Split Config Installer Error")
+        error_component = ErrorComponent(title="Split Config Error")
         error_ui = error_component.create(
             error_message=error_msg,
             traceback=error_traceback,
             error_type="error",
             show_traceback=True
         )
-        display(error_ui['widget'])
+        
+        # Safely get the widget to display
+        display_widget = error_ui.get('widget') or error_ui.get('container') or error_ui
+        display(display_widget)
+        
+        # Return the full error UI components
         return error_ui

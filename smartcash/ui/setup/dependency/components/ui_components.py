@@ -1,48 +1,33 @@
 """
 File: smartcash/ui/setup/dependency/components/ui_components.py
-Deskripsi: UI components dengan flexbox layout dan tanpa horizontal scrollbar
+Deskripsi: UI components tanpa check/uncheck buttons integration
 """
 
-from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from IPython.display import display
+from typing import Dict, Any, Optional
+
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.components import create_dual_progress_tracker, create_header, create_status_panel, create_log_accordion, create_save_reset_buttons, create_action_buttons
+from smartcash.ui.setup.dependency.components.ui_package_selector import create_package_selector_grid
 
 def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create dependency installer UI dengan flexbox layout"""
-    config = config or {}
+    """Create dependency installer UI tanpa check/uncheck buttons"""
     
-    # Import components
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.components import (
-        create_header,
-        create_action_buttons,
-        create_dual_progress_tracker,
-        create_status_panel,
-        create_log_accordion,
-        create_save_reset_buttons,
-        create_divider
-    )
-    from smartcash.ui.setup.dependency.components.ui_package_selector import create_package_selector_grid
-    
-    # Helper untuk icons
-    get_icon = lambda key, fallback="📦": ICONS.get(key, fallback)
+    get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
     
     # Header
     header = create_header(
-        f"{get_icon('download')} Dependency Installer",
+        f"{get_icon('download', '📦')} Dependency Installer", 
         "Setup packages yang diperlukan untuk SmartCash"
     )
     
     # Status panel
-    status_panel = create_status_panel(
-        "Pilih packages yang akan diinstall dan klik tombol install",
-        "info"
-    )
+    status_panel = create_status_panel("Pilih packages yang akan diinstall dan klik tombol install", "info")
     
-    # Package selector dengan flexbox
+    # Package selector grid
     package_selector = create_package_selector_grid(config)
-        
-    # Custom packages textarea
+    
+    # Custom packages input
     custom_packages = widgets.Textarea(
         placeholder='Package tambahan (satu per baris)\ncontoh: numpy>=1.21.0\nopencv-python>=4.5.0',
         layout=widgets.Layout(
@@ -55,21 +40,25 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         )
     )
     
-    # Action buttons with flexbox
+    # Action buttons
     action_buttons = create_action_buttons(
         primary_label="Install",
         primary_icon='download',
         secondary_buttons=[
             ('Analyze', 'search', 'info'),
+            ('Status Check', 'check-circle', 'info'),
             ('System Report', 'info', 'info')
         ],
         button_width='120px'
     )
     
-    # Button container dengan flexbox
+    # Map button names for backward compatibility
+    action_buttons['status_check_button'] = action_buttons['check_button']
+    
+    # Action buttons container
     action_container = widgets.HBox([
         action_buttons['download_button'],
-        action_buttons['check_button'], 
+        action_buttons['status_check_button'],
         action_buttons['cleanup_button']
     ], layout=widgets.Layout(
         display='flex',
@@ -77,6 +66,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         align_items='center',
         justify_content='flex-start',
         width='100%',
+        gap='8px',
         overflow='hidden'
     ))
     
@@ -87,7 +77,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         button_width='100px'
     )
     
-    # Save/reset container dengan flexbox
+    # Save/reset container
     save_reset_container = widgets.HBox([
         save_reset_buttons['save_button'],
         save_reset_buttons['reset_button']
@@ -97,6 +87,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         align_items='center',
         justify_content='flex-start',
         width='100%',
+        gap='8px',
         overflow='hidden'
     ))
     
@@ -106,30 +97,29 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Log accordion
     log_accordion = create_log_accordion()
     
-    # Create a list of all widgets, filtering out None values
+    # Create main UI components
     main_ui_children = [
         header,
         status_panel,
         widgets.HTML(value="<h4>📦 Package Selection</h4>"),
-        package_selector.get('container'),
+        package_selector.get('container', widgets.VBox()),
         widgets.HTML(value="<h4>➕ Custom Packages</h4>"),
         custom_packages,
-        create_divider(),
+        widgets.HTML('<hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">'),
         action_container,
         save_reset_container,
-        create_divider(),
+        widgets.HTML('<hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">'),
         progress_tracker.ui_manager.container
     ]
     
-    # Add log_accordion widget if it exists
-    log_widget = log_accordion.get('widget')
-    if log_widget is not None:
-        main_ui_children.append(log_widget)
+    # Add log accordion if available
+    if log_accordion and 'widget' in log_accordion and log_accordion['widget'] is not None:
+        main_ui_children.append(log_accordion['widget'])
     
-    # Filter out any None values that might have been added
-    main_ui_children = [child for child in main_ui_children if child is not None]
+    # Filter out None values
+    main_ui_children = [c for c in main_ui_children if c is not None]
     
-    # Create the main UI with the filtered children and layout
+    # Create main container
     main_ui = widgets.VBox(
         main_ui_children,
         layout=widgets.Layout(
@@ -137,26 +127,29 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             flex_direction='column',
             align_items='stretch',
             width='100%',
-            padding='10px',
-            gap='10px',
-            overflow='hidden',  # Prevent horizontal scroll
+            padding='12px',
+            gap='12px',
+            overflow='hidden',
             box_sizing='border-box'
         )
     )
     
-    # Return components with all required keys
+    # Prepare components dictionary
     components = {
         # Core UI components
         'ui': main_ui,
+        'container': main_ui,  # Alias for backward compatibility
+        'main_container': main_ui,  # Alias for backward compatibility
         'header': header,
         'status_panel': status_panel,
-        'package_selector': package_selector.get('container'),
+        'package_selector': package_selector.get('container', None),
         'custom_packages': custom_packages,
         
         # Action buttons
         'install_button': action_buttons.get('download_button'),
         'analyze_button': action_buttons.get('check_button'),
-        'check_button': action_buttons.get('check_button'),  # Duplicate of analyze_button for backward compatibility
+        'check_button': action_buttons.get('check_button'),  # Alias for analyze_button
+        'status_check_button': action_buttons.get('check_button'),  # Alias for backward compatibility
         'system_report_button': action_buttons.get('cleanup_button'),
         
         # Form controls
@@ -168,14 +161,17 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'log_accordion': log_accordion.get('widget'),
         'log_output': log_accordion.get('output'),
         
-        # Additional components for reference
+        # Additional references
         'action_buttons': action_buttons,
         'save_reset_buttons': save_reset_buttons,
-        'package_selector_widget': package_selector  # Keep full selector for advanced usage
+        'package_selector_widget': package_selector
     }
     
-    # Log any missing critical components
-    from smartcash.ui.utils.logging_utils import log_missing_components
-    log_missing_components(components)
-
+    # Log missing components if needed
+    try:
+        from smartcash.ui.utils.logging_utils import log_missing_components
+        log_missing_components(components)
+    except ImportError:
+        pass  # Skip if logging utils not available
+    
     return components

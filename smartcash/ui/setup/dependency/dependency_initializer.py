@@ -354,18 +354,21 @@ class DependencyInitializer(CommonInitializer):
 # Module-level variable to store the singleton instance
 _dependency_initializer = None
 
-def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Initialize and display the dependency UI with fallback on error.
+def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui: bool = True) -> Dict[str, Any]:
+    """Initialize and optionally display the dependency UI.
     
-    This is the main entry point for initializing and displaying the dependency management UI.
+    This is the main entry point for initializing the dependency management UI.
     It handles the complete setup process including UI creation, handler setup,
-    error handling, and display of the UI components.
+    and error handling.
     
     Args:
         config: Optional configuration dictionary. If not provided, defaults will be used.
+        display_ui: Whether to automatically display the UI components. Defaults to True.
+                  Set to False if you want to handle display manually.
         
     Returns:
-        Dictionary containing the initialized UI components
+        Dictionary containing the initialized UI components. If an error occurs,
+        returns a dictionary with error information.
     """
     global _dependency_initializer
     
@@ -396,23 +399,24 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         # Initialize the UI with the config
         ui_components = _dependency_initializer.initialize_ui(config)
         
-        # Import display here to avoid circular imports
-        from IPython.display import display
-        
-        # Display the most appropriate UI component
-        if 'main_container' in ui_components:
-            display(ui_components['main_container'])
-        elif 'root' in ui_components:
-            display(ui_components['root'])
-        elif 'widget' in ui_components:
-            display(ui_components['widget'])
-        else:
-            # If no standard container is found, try to display the first available widget
-            for key, value in ui_components.items():
-                if hasattr(value, '_ipython_display_') or hasattr(value, '_repr_html_'):
-                    display(value)
-                    break
+        # Display the UI if requested
+        if display_ui:
+            from IPython.display import display
             
+            # Display the most appropriate UI component
+            if 'main_container' in ui_components:
+                display(ui_components['main_container'])
+            elif 'root' in ui_components:
+                display(ui_components['root'])
+            elif 'widget' in ui_components:
+                display(ui_components['widget'])
+            else:
+                # If no standard container is found, try to display the first available widget
+                for key, value in ui_components.items():
+                    if hasattr(value, '_ipython_display_') or hasattr(value, '_repr_html_'):
+                        display(value)
+                        break
+        
         return ui_components
         
     except Exception as e:
@@ -421,7 +425,7 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         error_msg = f"Failed to initialize dependency UI: {str(e)}"
         error_traceback = traceback.format_exc()
         
-        # Create and display error component
+        # Create error component
         from smartcash.ui.components.error.error_component import ErrorComponent
         error_component = ErrorComponent(title="Dependency Installer Error")
         error_ui = error_component.create(
@@ -430,7 +434,12 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
             error_type="error",
             show_traceback=True
         )
-        display(error_ui['widget'])
-        return error_ui
+        
+        # Display the error if UI display is enabled
+        if display_ui:
+            from IPython.display import display
+            display(error_ui.get('widget', error_ui.get('container', str(error_ui))))
+            
+        return {'error': error_msg, 'traceback': error_traceback, 'ui': error_ui}
 
 __all__ = ['initialize_dependency_ui']

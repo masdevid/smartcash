@@ -5,7 +5,7 @@ Deskripsi: Dual progress tracker implementation using the new ProgressTracker co
 
 from typing import Dict, Any, Optional, List, Callable
 from enum import Enum, auto
-import ipywidgets as widgets
+import ipywidgets
 from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker as NewProgressTracker
 

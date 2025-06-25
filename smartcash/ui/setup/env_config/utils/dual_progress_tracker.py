@@ -45,15 +45,19 @@ class DualProgressTracker:
         if self._initialized:
             return
             
+        # Create the progress tracker
         self._new_tracker = create_dual_progress_tracker(
             operation="Environment Setup",
             auto_hide=False
         )
         
+        # Initialize the progress container
+        self.progress_container = self._new_tracker.container
+        
         # Add to UI components if provided
         if self.ui_components:
             self.ui_components['progress_tracker'] = self._new_tracker
-            self.ui_components['progress_container'] = self._new_tracker.container
+            self.ui_components['progress_container'] = self.progress_container
             
         self._initialized = True
     

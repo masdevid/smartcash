@@ -69,14 +69,23 @@ class SetupHandler:
             # Only update the summary if we have new data
             if 'setup_summary' in ui_components:
                 try:
-                    status_msg = (
-                        "✅ Environment setup completed successfully!" if summary_data.get('status') == 'success'
-                        else "⚠️ Setup completed with some issues"
-                    )
+                    is_success = summary_data.get('status') in ['success', True]
+                    has_warnings = summary_data.get('status') == 'warning'
+                    
+                    if is_success:
+                        status_msg = "✅ Environment setup completed successfully!"
+                        status_type = 'success'
+                    elif has_warnings:
+                        status_msg = "⚠️ Setup completed with some issues"
+                        status_type = 'warning'
+                    else:
+                        status_msg = "❌ Setup failed"
+                        status_type = 'error'
+                    
                     update_setup_summary(
                         ui_components['setup_summary'],
                         status_message=status_msg,
-                        status_type='success' if summary_data.get('status') == 'success' else 'warning',
+                        status_type=status_type,
                         details=summary_data
                     )
                 except Exception as e:
@@ -84,8 +93,8 @@ class SetupHandler:
                     if progress_tracker:
                         progress_tracker.logger.error(f"Error updating setup summary: {str(e)}")
             
-            # Set completion state if we have a successful status
-            if summary_data.get('status') == 'success':
+            # Set completion state if we have a successful or warning status
+            if summary_data.get('status') in ['success', 'warning', True]:
                 self._set_completion_state(ui_components, summary_data)
             
             # Ensure we return a dictionary with at least a status
@@ -360,10 +369,10 @@ class SetupHandler:
             )
             
             if has_errors:
-                summary_data['status'] = False
+                summary_data['status'] = 'warning'  # Changed from False to 'warning'
                 summary_data['status_message'] = "Setup completed with some issues"
                 progress_tracker.update_within_stage(100, "Verification completed with issues")
-                progress_tracker.error("⚠️ Setup completed with some issues")
+                progress_tracker.warning("⚠️ Setup completed with some issues")
                 
                 # Log missing items
                 if missing_folders:
@@ -373,10 +382,10 @@ class SetupHandler:
                 if not summary_data.get('drive_mounted', False):
                     self.logger.warning("Google Drive is not mounted")
             else:
-                summary_data['status'] = True
+                summary_data['status'] = 'success'  # Changed from True to 'success'
                 summary_data['status_message'] = "Setup completed successfully"
                 progress_tracker.update_within_stage(100, "Verification completed successfully")
-                progress_tracker.complete(" Setup completed successfully")
+                progress_tracker.complete("✅ Setup completed successfully")
             
             # Mark all stages as complete if successful
             if summary_data['status']:

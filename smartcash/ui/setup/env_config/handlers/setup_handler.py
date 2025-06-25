@@ -387,8 +387,8 @@ class SetupHandler:
                 progress_tracker.update_within_stage(100, "Verification completed successfully")
                 progress_tracker.complete("✅ Setup completed successfully")
             
-            # Mark all stages as complete if successful
-            if summary_data['status']:
+            # Mark all stages as complete if successful or has warnings
+            if summary_data.get('status') in ['success', 'warning']:
                 # Explicitly complete each stage
                 for stage in [
                     SetupStage.INIT,
@@ -422,17 +422,35 @@ class SetupHandler:
             
         except Exception as e:
             error_msg = f"❌ Setup workflow failed: {str(e)}"
-            self.logger.error(error_msg)
-            summary_data['status'] = False
+            self.logger.error(error_msg, exc_info=True)  # Include traceback in logs
             
-            # Update setup summary
-            if 'setup_summary' in ui_components:
-                update_setup_summary(
-                    ui_components['setup_summary'],
-                    status_message=error_msg,
-                    status_type='error',
-                    details=summary_data
-                )
+            # Ensure summary_data has the correct structure
+            if not isinstance(summary_data, dict):
+                summary_data = {}
+                
+            summary_data.update({
+                'status': 'error',
+                'status_message': error_msg,
+                'error': str(e),
+                'success': False
+            })
+            
+            # Update setup summary if UI components are available
+            try:
+                if 'setup_summary' in ui_components:
+                    update_setup_summary(
+                        ui_components['setup_summary'],
+                        status_message=error_msg,
+                        status_type='error',
+                        details=summary_data
+                    )
+                
+                # Update progress tracker with error if available
+                if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'error'):
+                    ui_components['progress_tracker'].error(error_msg)
+                    
+            except Exception as ui_error:
+                self.logger.error(f"Failed to update UI with error: {str(ui_error)}", exc_info=True)
             
         return summary_data
     

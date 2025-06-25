@@ -83,14 +83,14 @@ class UILogger:
                 
                 # Build the HTML with namespace badge if available
                 html_parts = [
-                    f'<div style="margin:1px 0;padding:3px 8px 3px 6px;border-radius:2px;'
+                    f'<div style="margin:0 0 1px 0;padding:2px 8px 2px 6px;border-radius:2px;'
                     f'background-color:rgba(248,249,250,0.8);border-left:2px solid {border_color};'
                     f'border-right:{border_style};border-left:{border_style};'
                     f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
                     f'font-size:12px;line-height:1.3;word-break:break-word;white-space:pre-wrap;'
-                    f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:22px;">',
+                    f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:20px;">',
                     f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin:1px 4px 0 0;white-space:nowrap;align-self:flex-start;">{timestamp}</span>',
-                    f'<span style="font-size:12px;margin:1px 2px 0 0;line-height:1;display:inline-flex;align-items:center;">{emoji}</span>'
+                    f'<span style="font-size:12px;margin:0 2px 0 0;line-height:1;display:inline-flex;align-items:center;">{emoji}</span>'
                 ]
                 
                 # Add namespace badge if available
@@ -99,7 +99,7 @@ class UILogger:
                 
                 # Add the message and close the div
                 html_parts.extend([
-                    f'<span style="color:{color};flex:1;margin:1px 0 0 0;line-height:1.3;">{clean_msg}</span>',
+                    f'<span style="color:{color};flex:1;margin:0;line-height:1.3;">{clean_msg}</span>',
                     '</div>'
                 ])
                 

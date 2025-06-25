@@ -417,9 +417,31 @@ class SetupHandler:
     
     def _set_running_state(self, ui_components: Dict[str, Any]) -> None:
         """🔄 Set UI ke running state"""
-        ui_components['setup_button'].disabled = True
-        ui_components['setup_button'].description = "⏳ Running Setup..."
-        update_status_panel(ui_components['status_panel'], "Setup sedang berjalan...", "warning")
+        try:
+            # Disable setup button
+            ui_components['setup_button'].disabled = True
+            ui_components['setup_button'].description = "⏳ Running Setup..."
+            
+            # Show progress container if it exists
+            if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+                ui_components['progress_container'].layout.visibility = 'visible'
+                ui_components['progress_container'].layout.display = 'flex'
+            
+            # Show progress bar if it exists in the progress tracker
+            progress_tracker = ui_components.get('progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'show'):
+                progress_tracker.show()
+            
+            # Update status panel
+            update_status_panel(ui_components['status_panel'], "Setup sedang berjalan...", "warning")
+            
+            # Force UI update
+            if hasattr(ui_components.get('progress_bar', None), 'value'):
+                ui_components['progress_bar'].value = 0
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error in _set_running_state: {str(e)}", exc_info=True)
     
     def _set_completion_state(self, ui_components: Dict[str, Any], summary_data: Dict[str, Any]) -> None:
         """✅ Set UI ke completion state"""

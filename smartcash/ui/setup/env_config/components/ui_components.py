@@ -99,12 +99,18 @@ def create_env_config_ui() -> Dict[str, Any]:
         'tips_requirements': tips_requirements
     }
     
+    # Ensure progress container exists and is valid
+    progress_container = ui_components.get('progress_container')
+    if not isinstance(progress_container, ipywidgets.VBox):
+        progress_container = ipywidgets.VBox()
+        ui_components['progress_container'] = progress_container
+    
     # Create main container
     main_container = ipywidgets.VBox([
         header,
         status_panel,
         setup_button_container,
-        ui_components['progress_container'],  # Use the progress container directly
+        progress_container,  # Use the validated progress container
         log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),
         setup_summary,

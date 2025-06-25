@@ -5,6 +5,7 @@ Deskripsi: Setup handler untuk environment configuration dengan proper workflow
 
 import os
 import time
+import traceback
 from enum import Enum
 from typing import Dict, Any
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
@@ -94,27 +95,38 @@ class SetupHandler:
             return summary_data
             
         except Exception as e:
-            error_msg = f"❌ Setup failed: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            # Get detailed error information
+            error_type = type(e).__name__
+            error_msg = str(e) or "No error message"
+            error_traceback = traceback.format_exc()
+            
+            # Format the full error message
+            full_error_msg = f"❌ Setup failed: {error_type}: {error_msg}"
+            
+            # Log the error with traceback
+            self.logger.error(full_error_msg, exc_info=True)
+            print(f"\n=== ERROR DETAILS ===\n{error_traceback}\n===================\n")
             
             # Try to update UI with error
             try:
                 if progress_tracker and hasattr(progress_tracker, 'error'):
-                    progress_tracker.error(error_msg)
-                self._set_error_state(ui_components, error_msg)
+                    progress_tracker.error(full_error_msg)
+                self._set_error_state(ui_components, full_error_msg)
             except Exception as ui_error:
-                self.logger.error(f"Failed to update UI with error: {str(ui_error)}")
+                error_msg = f"Failed to update UI with error: {str(ui_error)}"
+                self.logger.error(error_msg, exc_info=True)
+                print(f"\n=== UI UPDATE ERROR ===\n{error_msg}\n{str(ui_error)}\n======================\n")
             
-            # Ensure we return a dictionary with error information
-            if not isinstance(summary_data, dict):
-                summary_data = {}
-            summary_data.update({
+            # Return detailed error information
+            return {
                 'status': 'error',
-                'error': str(e),
-                'message': error_msg
-            })
-            return summary_data
-            return {'status': 'error', 'message': error_msg}
+                'error_type': error_type,
+                'error': error_msg,
+                'message': full_error_msg,
+                'traceback': error_traceback,
+                'success': False,
+                'phase': 'initialization'
+            }
         finally:
             # Clean up the progress tracker
             if progress_tracker and hasattr(progress_tracker, 'complete'):

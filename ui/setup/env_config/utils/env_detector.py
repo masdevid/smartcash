@@ -4,37 +4,60 @@
 import os
 import sys
 import platform
+import traceback
 from typing import Dict, Any
 
 def detect_environment_info() -> Dict[str, Any]:
     """🔍 Deteksi informasi environment lengkap"""
+    # Initialize result with basic info that's unlikely to fail
+    result = {
+        'python_version': _get_python_version(),
+        'platform': _get_platform_info(),
+        'status': 'success'
+    }
+    
+    # Helper function to safely get values
+    def safe_get(func, default=None, *args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f"Warning: Error in {func.__name__}: {str(e)}")
+            return default
+    
+    # Get additional info with error handling
     try:
-        # Get drive mount status once to avoid multiple checks
-        drive_mounted, mount_path = _is_drive_mounted()
+        result.update({
+            'is_colab': safe_get(_is_google_colab, False),
+            'gpu_info': safe_get(_get_gpu_info, 'Unknown'),
+            'cpu_cores': safe_get(_get_cpu_cores, 0),
+            'total_ram': safe_get(_get_total_ram, 0),
+            'storage_info': safe_get(_get_storage_info, {})
+        })
         
-        return {
-            'python_version': _get_python_version(),
-            'platform': _get_platform_info(),
-            'is_colab': _is_google_colab(),
-            'gpu_info': _get_gpu_info(),
-            'drive_mounted': drive_mounted,
-            'drive_mount_path': mount_path,
-            'cpu_cores': _get_cpu_cores(),
-            'total_ram': _get_total_ram(),
-            'storage_info': _get_storage_info(),
-            'status': 'success'
-        }
+        # Get drive mount status with detailed error handling
+        try:
+            drive_mounted, mount_path = _is_drive_mounted()
+            result.update({
+                'drive_mounted': drive_mounted,
+                'drive_mount_path': mount_path or ''
+            })
+        except Exception as e:
+            print(f"Warning: Error checking drive mount: {str(e)}")
+            result.update({
+                'drive_mounted': False,
+                'drive_mount_path': '',
+                'drive_mount_error': str(e)
+            })
+            
     except Exception as e:
-        # Return a minimal set of information with error status
-        return {
-            'python_version': _get_python_version(),
-            'platform': _get_platform_info(),
-            'is_colab': _is_google_colab(),
-            'drive_mounted': False,
-            'drive_mount_path': None,
+        print(f"Error in detect_environment_info: {str(e)}")
+        result.update({
             'status': 'error',
-            'error': str(e)
-        }
+            'error': str(e),
+            'traceback': str(traceback.format_exc())
+        })
+    
+    return result
 
 def _get_python_version() -> str:
     """🐍 Get Python version"""

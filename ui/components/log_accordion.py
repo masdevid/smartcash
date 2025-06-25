@@ -407,11 +407,31 @@ def create_log_accordion(
         ns = entry.get('namespace') or entry.get('module')
         ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
         
-        # Add duplicate indicator if needed
-        indicator_html = "<span class='duplicate-indicator'></span>" if entry.get('show_duplicate_indicator', False) else ""
+        # Add duplicate indicator dot next to timestamp if needed
+        duplicate_dot = ""
+        if entry.get('show_duplicate_indicator', False):
+            duplicate_dot = """
+            <span style='
+                display: inline-block;
+                width: 6px;
+                height: 6px;
+                background-color: #ffc107;
+                border-radius: 50%;
+                margin-right: 4px;
+                vertical-align: middle;
+                animation: pulse 1.5s infinite;
+            '></span>
+            """
         
         # Create the HTML
         html = f"""
+        <style>
+            @keyframes pulse {{
+                0% {{ opacity: 0.7; transform: scale(0.95); }}
+                50% {{ opacity: 1; transform: scale(1.1); }}
+                100% {{ opacity: 0.7; transform: scale(0.95); }}
+            }}
+        </style>
         <div style='
             padding: 6px 12px;
             margin: 2px 0;
@@ -423,9 +443,12 @@ def create_log_accordion(
             line-height: 1.4;
             transition: all 0.2s ease;'>
             <div style='display: flex; align-items: flex-start; gap: 8px;'>
-                {indicator_html}{style['icon'] if show_level_icons else ''}
+                {style['icon'] if show_level_icons else ''}
                 <span style='flex: 1;'>{ns_display}{entry['message']}</span>
-                {timestamp_html}
+                <span style='display: inline-flex; align-items: center;'>
+                    {duplicate_dot}
+                    {timestamp_html}
+                </span>
             </div>
         </div>
         """

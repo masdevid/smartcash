@@ -92,8 +92,9 @@ class SetupHandler:
             if 'progress_tracker' in locals() and progress_tracker is not None:
                 try:
                     # Only complete if not already in error state
-                    if not isinstance(e, Exception) or not hasattr(e, 'handled'):
-                        progress_tracker.complete("Setup completed" if 'error' not in locals() else "Setup failed")
+                    error_occurred = 'error' in locals() and isinstance(error, Exception)
+                    if not error_occurred or not hasattr(error, 'handled'):
+                        progress_tracker.complete("Setup completed" if not error_occurred else "Setup failed")
                 except Exception as cleanup_error:
                     self.logger.error(f"Error during progress tracker cleanup: {str(cleanup_error)}", exc_info=True)
                 

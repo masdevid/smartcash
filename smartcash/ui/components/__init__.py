@@ -144,6 +144,7 @@ __all__ = [
     # Header components
     'create_header',
     'create_section_title',
+    'create_error_component',
     
     # Progress Tracker components
     'ProgressLevel',

@@ -1,89 +1,144 @@
 """
 File: smartcash/ui/dataset/split/split_init.py
-Deskripsi: Config cell untuk split dataset dengan arsitektur yang diperbaharui menggunakan ConfigCellInitializer
+Deskripsi: Independent configuration cell for dataset split configuration with defaults integration
 """
 
-import sys
-import traceback
 from typing import Dict, Any, Optional
-from IPython.display import display
+from pathlib import Path
+import yaml
 
-from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.common.logger import get_logger
+from smartcash.ui.initializers.config_cell_initializer import create_config_cell
+from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
+from smartcash.ui.dataset.split.handlers.defaults import get_default_split_config
+from smartcash.ui.dataset.split.handlers.config_extractor import extract_split_config
+from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui, reset_ui_to_defaults
 
-class SplitConfigInitializer(ConfigCellInitializer):
-    """Config cell initializer untuk split dataset configuration"""
+
+class SplitConfigHandler(ConfigCellHandler):
+    """Handler for split configuration with integrated defaults and validation"""
     
-    def __init__(self, module_name='split_dataset', config_filename='dataset_config', config_handler_class=None, 
-                 parent_module: Optional[str] = None):
-        super().__init__(module_name, config_filename, config_handler_class, parent_module)
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize with default config and update with provided values"""
+        super().__init__(module_name="split_config")
+        # Initialize with default config
+        self.config = get_default_split_config()
+        # Update with any provided config values
+        if config:
+            self.update_config(config)
+        # Save the initial config
+        self.save()
     
-    def _create_config_ui(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Buat UI components untuk split config"""
+    def update_config(self, new_config: Dict[str, Any]) -> None:
+        """Update configuration with new values"""
+        # Update config and notify listeners
+        self.config.update(new_config)
+        self.save()
+    
+    def reset_to_defaults(self) -> None:
+        """Reset configuration to default values"""
+        self.config = get_default_split_config()
+        self.save()
+    
+    def update_from_ui(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Update configuration from UI components
+        
+        Args:
+            ui_components: Dictionary of UI components containing the configuration
+            
+        Returns:
+            Dictionary containing the extracted configuration
+        """
         try:
-            from smartcash.ui.dataset.split.components.ui_form import create_split_form
-            from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
-            from smartcash.ui.dataset.split.handlers.slider_handlers import setup_slider_handlers
-            
-            form_components = create_split_form(config)
-            layout_components = create_split_layout(form_components)
-            ui_components = {**form_components, **layout_components}
-            
-            # Setup custom slider handlers
-            setup_slider_handlers(ui_components)
-            
-            return ui_components
+            # Extract configuration from UI components
+            config = extract_split_config(ui_components)
+            self.update_config(config)
+            return config
             
         except Exception as e:
-            return self.handle_ui_exception(e, context="UI split dataset configuration")
+            logger = get_logger('smartcash.ui.dataset.split')
+            logger.error(f"Failed to update config from UI: {str(e)}", exc_info=True)
+            raise
 
 
-class SplitConfigHandler(ConfigHandler):
-    """Config handler untuk split dataset configuration"""
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dari UI components"""
-        from smartcash.ui.dataset.split.handlers.config_extractor import extract_split_config
-        return extract_split_config(ui_components)
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI components dari config"""
-        from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui
-        update_split_ui(ui_components, config)
-    
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default split configuration"""
-        from smartcash.ui.dataset.split.handlers.defaults import get_default_split_config
-        return get_default_split_config()
-
-
-def create_split_config_cell(env=None, config=None, parent_module=None, parent_callbacks=None, **kwargs):
-    """
-    Factory function untuk create split config cell
+def create_split_config_ui(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create UI components for split configuration
     
     Args:
-        env: Environment manager instance
-        config: Override config values
-        parent_module: Parent module name (e.g., 'dataset', 'training')
-        parent_callbacks: Callbacks for parent modules
-        **kwargs: Additional arguments
+        config: Current configuration values
         
     Returns:
-        UI components atau fallback UI
+        Dict containing UI components
     """
-    return create_config_cell(
-        SplitConfigInitializer, 
-        'split_dataset', 
-        'dataset_config', 
-        env=env, 
-        config=config, 
-        config_handler_class=SplitConfigHandler,
-        parent_module=parent_module,
-        parent_callbacks=parent_callbacks,
-        **kwargs
-    )
+    try:
+        from smartcash.ui.dataset.split.components.ui_form import create_split_form
+        from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
+        from smartcash.ui.dataset.split.handlers.slider_handlers import setup_slider_handlers
+        
+        # Create form and layout components
+        form_components = create_split_form(config)
+        layout_components = create_split_layout(form_components)
+        ui_components = {**form_components, **layout_components}
+        
+        # Setup custom slider handlers
+        setup_slider_handlers(ui_components)
+        
+        # Update UI with config values
+        update_split_ui(ui_components, config)
+        
+        return ui_components
+        
+    except Exception as e:
+        logger = get_logger('smartcash.ui.dataset.split')
+        logger.error(f"Error creating split config UI: {str(e)}", exc_info=True)
+        raise
 
 
-# Backward compatibility aliases
+def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create an independent split configuration cell
+    
+    Args:
+        config: Optional initial configuration (merged with defaults)
+        
+    Returns:
+        Dictionary containing UI components and handlers
+    """
+    logger = get_logger('smartcash.ui.dataset.split')
+    
+    try:
+        # Create handler with default config and update with provided values
+        handler = SplitConfigHandler(config)
+        
+        # Initialize the config cell
+        ui_components = create_config_cell(
+            module_name="split_config",
+            config_filename="split_config",
+            config_handler_class=lambda c=handler.config: SplitConfigHandler(c),
+            config=handler.config  # Use handler.config directly since it's now inherited
+        )
+        
+        # Create the split config UI with the current config
+        split_ui = create_split_config_ui(handler.config)
+        
+        # Connect the UI to the config handler
+        ui_components.update(split_ui)
+        
+        # Add reset handler if reset button exists
+        if 'reset_button' in ui_components:
+            def on_reset_clicked(b):
+                handler.reset_to_defaults()
+                reset_ui_to_defaults(ui_components)
+                ui_components['_config_handler'].update_config(handler.config)
+            
+            ui_components['reset_button'].on_click(on_reset_clicked)
+        
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"Failed to create split config cell: {str(e)}", exc_info=True)
+        raise
+
+
+
 initialize_split_ui = create_split_config_cell
 create_split_init = create_split_config_cell

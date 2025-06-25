@@ -6,12 +6,7 @@ Deskripsi: UI components for config cell with collapsible log accordion
 from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
 from IPython.display import display, HTML
-from smartcash.ui.components import (
-    create_header,
-    create_button,
-    create_status_panel,
-    create_log_accordion
-)
+
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -53,17 +48,7 @@ def create_config_cell_ui(module_name: str) -> Dict[str, Any]:
         )
         
         # Create action buttons
-        save_btn = create_button(
-            "💾 Save",
-            "success",
-            tooltip="Save configuration to file"
-        )
-        
-        load_btn = create_button(
-            "🔄 Load",
-            "info",
-            tooltip="Load configuration from file"
-        )
+
         
         # Create status panel
         status_bar = create_status_panel()

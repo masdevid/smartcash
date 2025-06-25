@@ -103,42 +103,77 @@ class FolderHandler:
             
         return created
     
-    def _create_backup(self, path: str, backup_dir: str) -> Optional[str]:
-        """Create a backup of the given path in the backup directory.
+    def _create_temp_backup(self, path: str, temp_dir: str) -> Optional[Tuple[str, str]]:
+        """Create a temporary backup of the given path.
         
         Args:
             path: Path to the file/directory to back up
-            backup_dir: Directory to store the backup
+            temp_dir: Temporary directory to store the backup
             
         Returns:
-            Path to the backup if successful, None otherwise
+            Tuple of (temp_backup_path, final_backup_name) if successful, None otherwise
         """
         try:
-            # Create backup directory if it doesn't exist
-            os.makedirs(backup_dir, exist_ok=True)
+            # Create temp directory if it doesn't exist
+            os.makedirs(temp_dir, exist_ok=True)
             
-            # Generate backup path
+            # Generate backup name with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_name = f"{os.path.basename(path)}_backup_{timestamp}"
-            backup_path = os.path.join(backup_dir, backup_name)
+            temp_backup_path = os.path.join(temp_dir, backup_name)
             
+            # Create the backup in temp location
             if os.path.isfile(path):
                 # Backup file
-                shutil.copy2(path, backup_path)
+                shutil.copy2(path, temp_backup_path)
             elif os.path.isdir(path):
                 # Backup directory
                 if os.path.islink(path):
                     # Handle symlink to directory
                     link_target = os.readlink(path)
-                    os.symlink(link_target, backup_path)
+                    os.symlink(link_target, temp_backup_path)
                 else:
-                    shutil.copytree(path, backup_path, symlinks=True)
+                    shutil.copytree(path, temp_backup_path, symlinks=True)
             
-            self.logger.info(f"Created backup at: {backup_path}")
-            return backup_path
+            self.logger.debug(f"Created temporary backup at: {temp_backup_path}")
+            return temp_backup_path, backup_name
             
         except Exception as e:
-            self.logger.error(f"Failed to create backup of {path}: {e}")
+            self.logger.error(f"Failed to create temporary backup of {path}: {e}")
+            return None
+            
+    def _move_to_final_backup(self, temp_backup_path: str, final_backup_dir: str, backup_name: str) -> Optional[str]:
+        """Move a backup from temp location to final backup directory.
+        
+        Args:
+            temp_backup_path: Path to the temporary backup
+            final_backup_dir: Final backup directory
+            backup_name: Name of the backup file/directory
+            
+        Returns:
+            Final backup path if successful, None otherwise
+        """
+        try:
+            # Create final backup directory if it doesn't exist
+            os.makedirs(final_backup_dir, exist_ok=True)
+            
+            final_backup_path = os.path.join(final_backup_dir, backup_name)
+            
+            # Handle case where final backup already exists (should be rare due to timestamps)
+            if os.path.exists(final_backup_path):
+                # Add a random suffix to avoid conflicts
+                import uuid
+                base, ext = os.path.splitext(backup_name)
+                backup_name = f"{base}_{uuid.uuid4().hex[:8]}{ext}"
+                final_backup_path = os.path.join(final_backup_dir, backup_name)
+            
+            # Move the backup to final location
+            shutil.move(temp_backup_path, final_backup_path)
+            self.logger.info(f"Moved backup to final location: {final_backup_path}")
+            return final_backup_path
+            
+        except Exception as e:
+            self.logger.error(f"Failed to move backup to final location: {e}")
             return None
 
     def _create_symlinks(self) -> Tuple[List[str], List[Tuple[str, str]]]:
@@ -147,64 +182,84 @@ class FolderHandler:
         Returns:
             Tuple of (created_symlinks, backup_info) where:
             - created_symlinks: List of created symlink paths
-            - backup_info: List of tuples (original_path, backup_path) for successful backups
+            - backup_info: List of tuples (original_path, final_backup_path) for successful backups
         """
+        import tempfile
+        import shutil
+        
         created = []
         backup_info = []
-        backup_dir = os.path.join(os.path.expanduser('~'), 'data', 'backup')
+        final_backup_dir = os.path.join(os.path.expanduser('~'), 'data', 'backup')
         
-        for source, target in SYMLINK_MAP.items():
-            try:
-                # Skip if symlink already exists and points to the correct location
-                if (os.path.islink(target) and 
-                    os.path.realpath(target) == os.path.realpath(source)):
-                    continue
-                
-                # Create parent directory for target if it doesn't exist
-                target_parent = os.path.dirname(target)
-                if target_parent and not os.path.exists(target_parent):
-                    os.makedirs(target_parent, exist_ok=True)
-                
-                # Handle existing target
-                if os.path.lexists(target):
-                    try:
-                        # Create backup before modifying existing files/directories
-                        backup_path = self._create_backup(target, backup_dir)
-                        if backup_path:
-                            backup_info.append((target, backup_path))
-                        
-                        # Remove existing target
-                        if os.path.isdir(target) and not os.path.islink(target):
-                            # For directories, only remove if empty
-                            try:
-                                os.rmdir(target)
-                            except OSError as e:
-                                if e.errno == errno.ENOTEMPTY:
-                                    self.logger.warning(
-                                        f"Skipping non-empty directory (backup created): {target}"
-                                    )
-                                    continue
-                                raise
-                        else:
-                            # For files and symlinks
-                            os.remove(target)
-                            
-                    except Exception as e:
-                        self.logger.error(f"Failed to handle existing {target}: {e}")
+        # Create a temporary directory for initial backups
+        with tempfile.TemporaryDirectory(prefix='smartcash_backup_') as temp_backup_dir:
+            temp_backups = []
+            
+            # First pass: Create temporary backups and remove originals
+            for source, target in SYMLINK_MAP.items():
+                try:
+                    # Skip if symlink already exists and points to the correct location
+                    if (os.path.islink(target) and 
+                        os.path.realpath(target) == os.path.realpath(source)):
                         continue
-                
-                # Create the symlink
-                os.symlink(source, target, target_is_directory=os.path.isdir(source))
-                created.append(f"{source} -> {target}")
-                
-            except Exception as e:
-                self.logger.error(f"Failed to create symlink {source} -> {target}: {e}")
+                    
+                    # Create parent directory for target if it doesn't exist
+                    target_parent = os.path.dirname(target)
+                    if target_parent and not os.path.exists(target_parent):
+                        os.makedirs(target_parent, exist_ok=True)
+                    
+                    # Handle existing target
+                    if os.path.lexists(target):
+                        try:
+                            # Create temporary backup before modifying existing files/directories
+                            temp_backup = self._create_temp_backup(target, temp_backup_dir)
+                            if not temp_backup:
+                                raise Exception("Failed to create temporary backup")
+                                
+                            temp_backup_path, backup_name = temp_backup
+                            temp_backups.append((target, temp_backup_path, backup_name))
+                            
+                            # Remove existing target
+                            if os.path.isdir(target) and not os.path.islink(target):
+                                # For directories, only remove if empty
+                                try:
+                                    os.rmdir(target)
+                                except OSError as e:
+                                    if e.errno == errno.ENOTEMPTY:
+                                        self.logger.warning(
+                                            f"Skipping non-empty directory (backup created): {target}"
+                                        )
+                                        continue
+                                    raise
+                            else:
+                                # For files and symlinks
+                                os.remove(target)
+                                
+                        except Exception as e:
+                            self.logger.error(f"Failed to handle existing {target}: {e}")
+                            continue
+                    
+                    # Create the symlink
+                    os.symlink(source, target, target_is_directory=os.path.isdir(source))
+                    created.append(f"{source} -> {target}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to create symlink {source} -> {target}: {e}")
+            
+            # If we got here, all symlinks were created successfully
+            # Now move temp backups to final location
+            for target, temp_backup_path, backup_name in temp_backups:
+                final_backup_path = self._move_to_final_backup(
+                    temp_backup_path, final_backup_dir, backup_name
+                )
+                if final_backup_path:
+                    backup_info.append((target, final_backup_path))
         
         if created:
             self.logger.success(f"Created {len(created)} symlinks")
             
         if backup_info:
             backup_summary = "\n".join(f"- {src} -> {dst}" for src, dst in backup_info)
-            self.logger.info(f"Created {len(backup_info)} backups:\n{backup_summary}")
+            self.logger.info(f"Successfully created {len(backup_info)} backups in {final_backup_dir}:\n{backup_summary}")
                 
         return created, backup_info

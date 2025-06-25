@@ -239,42 +239,6 @@ def _setup_log_output_widget(ui_components: Dict[str, Any]) -> None:
     except Exception as e:
         print(f"[WARNING] Failed to setup log output widget: {str(e)}")
 
-def _perform_initial_setup(ui_components: Dict[str, Any], logger_bridge) -> None:
-    """Initialize handlers and perform initial status check with the provided logger bridge."""
-    from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
-    from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
-    
-    logger_bridge.info("🔧 Initializing environment configuration handlers...")
-    
-    # Initialize handlers
-    setup_handler = SetupHandler(logger_bridge)
-    status_checker = StatusChecker(logger_bridge)
-    
-    # Store components for later use
-    ui_components.update({
-        '_setup_handler': setup_handler,
-        '_status_checker': status_checker,
-        '_logger_bridge': logger_bridge
-    })
-    
-    logger_bridge.info("✅ Handlers initialized successfully")
-    
-    # Perform initial status check with error handling
-    try:
-        _perform_initial_status_check(ui_components)
-        logger_bridge.info("✅ Environment configuration handlers setup completed")
-    except Exception as e:
-        error_msg = f"❌ Error during initial status check: {str(e)}"
-        logger_bridge.error(error_msg, exc_info=True)
-        _update_status(ui_components, error_msg, "error")
-        
-        # Try to perform status check even if there was an error
-        if '_status_checker' in ui_components:
-            try:
-                logger_bridge.info("🔍 Attempting status check after error...")
-                _perform_initial_status_check(ui_components)
-            except Exception as status_error:
-                logger_bridge.error(f"❌ Failed to perform status check: {str(status_error)}", exc_info=True)
 
 def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
     """Check environment status and update UI components."""

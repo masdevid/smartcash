@@ -10,7 +10,7 @@ def generate_comprehensive_status_report(system_info: Dict[str, Any],
     """Generate comprehensive HTML report"""
     
     # Import locally to avoid circular dependency
-    from smartcash.ui.setup.dependency.utils.package_selector_utils import get_package_categories
+    from smartcash.ui.setup.dependency.components.ui_package_selector import get_package_categories
     
     # Report sections
     system_section = _generate_system_info_section(system_info)

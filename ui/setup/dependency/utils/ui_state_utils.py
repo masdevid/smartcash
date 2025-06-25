@@ -92,7 +92,7 @@ def update_package_status_by_name(ui_components: Dict[str, Any], package_name: s
     """Update package status by name"""
     try:
         # Import locally to avoid circular dependency
-        from smartcash.ui.setup.dependency.utils.package_selector_utils import update_package_status
+        from smartcash.ui.setup.dependency.components.ui_package_selector import update_package_status
         package_selector = ui_components.get('package_selector')
         if package_selector:
             update_package_status(package_selector, package_name, status == 'installed')

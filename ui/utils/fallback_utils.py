@@ -130,154 +130,74 @@ def create_status_message(message: str, title: str = 'Status', status_type: str 
 
 
 def create_fallback_ui(
-    error_message: str, 
-    module_name: str = "module", 
+    error_message: str,
+    module_name: str = "module",
     ui_components: Dict[str, Any] = None,
     exc_info: Optional[Tuple] = None,
     config: Optional[FallbackConfig] = None
 ) -> Dict[str, Any]:
-    """Create fallback UI dengan existing alert compatibility"""
-    logger = get_safe_logger('fallback_ui')
+    """Create a fallback UI using ErrorComponent.
     
-    try:
-        # Initialize config with defaults if not provided
-        if config is None:
-            config = FallbackConfig()
+    Args:
+        error_message: The error message to display
+        module_name: Name of the module where the error occurred
+        ui_components: Optional dictionary of UI components
+        exc_info: Optional exception info tuple (type, value, traceback)
+        config: Optional FallbackConfig with additional settings
         
-        # Update config with provided values
-        config.message = str(error_message) or config.message
-        config.module_name = str(module_name) or config.module_name
-        
-        # Get traceback if not provided but exception info is available
-        if exc_info and not config.traceback:
-            try:
-                if exc_info[0] is not None and exc_info[1] is not None:
-                    config.traceback = ''.join(traceback.format_exception(*exc_info))
-                else:
-                    config.traceback = "No exception information available"
-            except Exception as tb_error:
-                config.traceback = f"Failed to generate traceback: {str(tb_error)}"
-        
-        logger.error(f"Creating fallback UI for {config.module_name}: {config.message}")
-        if config.traceback:
-            logger.error(f"Traceback:\n{config.traceback}")
-        
-        # Create error details section
-        error_details = [
-            f"<div style='margin-bottom: 10px;'><strong>Module:</strong> {html.escape(config.module_name)}</div>",
-            f"<div style='margin-bottom: 10px;'><strong>Error:</strong> {html.escape(str(config.message))}</div>"
-        ]
-        
-        if config.show_traceback and config.traceback:
-            error_details.extend([
-                "<hr style='margin: 10px 0; border: 0; border-top: 1px solid #f5c6cb;'>",
-                "<div style='margin-bottom: 5px;'><strong>Error Details:</strong></div>",
-                f"<pre style='background: rgba(0,0,0,0.05); padding: 10px; border-radius: 4px; overflow-x: auto; margin: 0; white-space: pre-wrap;'>"
-                f"{html.escape(config.traceback) if isinstance(config.traceback, str) else str(config.traceback)}"
-                "</pre>"
-            ])
+    Returns:
+        Dictionary containing the error UI and related components
+    """
+    from smartcash.ui.components.error.error_component import create_error_component
     
-        # Create action buttons
-        buttons = []
-        if config.show_retry and config.retry_callback:
-            try:
-                retry_button = widgets.Button(
-                    description="🔄 Retry",
-                    button_style='warning',
-                    layout=widgets.Layout(width='100px')
-                )
-                retry_button.on_click(lambda _: config.retry_callback())
-                buttons.append(retry_button)
-            except Exception as btn_error:
-                logger.error(f"Failed to create retry button: {str(btn_error)}")
-        
-        # Prepare error details HTML
-        error_details_html = "".join(error_details)
-        
-        # Create the error widget
+    # Initialize config with defaults if not provided
+    if config is None:
+        config = FallbackConfig()
+    
+    # Update config with provided values
+    error_message = str(error_message or config.message)
+    module_name = str(module_name or config.module_name)
+    
+    # Get traceback if not provided but exception info is available
+    tb_text = config.traceback
+    if exc_info and not tb_text:
         try:
-            error_widget = widgets.VBox(
-                [
-                    widgets.HTML(
-                        f"""
-                        <div style="padding: 15px; border-radius: 4px; {config.container_style.get('border', '')};
-                            background: {config.container_style.get('background', '#f8d7da')};
-                            color: {config.container_style.get('color', '#721c24')};">
-                            <h4 style="margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.1);">
-                                {config.title}
-                            </h4>
-                            <div style="font-family: monospace;">
-                                {error_details_html}
-                            </div>
-                        </div>
-                        """
-                    ),
-                    widgets.HBox(buttons) if buttons else widgets.HTML("")
-                ],
-                layout=widgets.Layout(
-                    width='100%',
-                    **{k: v for k, v in config.container_style.items() if k != 'margin'}
-                )
-            )
-        except Exception as widget_error:
-            logger.error(f"Failed to create error widget: {str(widget_error)}")
-            # Create a minimal fallback widget
-            error_widget = widgets.HTML(
-                f"<div style='padding: 10px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px;'>"
-                f"<strong>Error in {html.escape(config.module_name)}:</strong> {html.escape(str(config.message))}"
-                "</div>"
-            )
-        
-        # Update status panel if available
-        status_widget = None
-        if ui_components:
-            try:
-                if 'status' in ui_components:
-                    with ui_components['status']:
-                        display(HTML(
-                            f"<div style='color: #721c24; font-family: monospace; white-space: pre;'>"
-                            f"<strong>Error in {html.escape(config.module_name)}:</strong> {html.escape(str(config.message))}"
-                            f"</div>"
-                        ))
-            except Exception as status_error:
-                logger.error(f"Failed to update status panel: {str(status_error)}")
-        
-        # Create status widget for the return value
-        try:
-            status_widget = widgets.HTML(
-                f"<div style='color: #721c24; font-family: monospace; white-space: pre;'>"
-                f"{html.escape(str(config.message))}"
-                "</div>"
-            )
+            if exc_info[0] is not None and exc_info[1] is not None:
+                import traceback as tb
+                tb_text = ''.join(tb.format_exception(*exc_info))
         except Exception:
-            status_widget = widgets.HTML("<div>Error occurred</div>")
-        
-        return {
-            'ui': error_widget,
-            'error': str(config.message),
-            'status': status_widget,
-            'fallback_mode': True,
-            'error_details': {
-                'module': str(config.module_name),
-                'message': str(config.message),
-                'traceback': str(config.traceback) if config.show_traceback and config.traceback else None
-            }
+            tb_text = "Failed to generate traceback"
+    
+    # Create error component
+    error_ui = create_error_component(
+        error_message=error_message,
+        traceback=tb_text if config.show_traceback else None,
+        title=f"Error in {module_name}",
+        error_type="error"
+    )
+    
+    # Prepare return value
+    result = {
+        'ui': error_ui['widget'],
+        'error': error_message,
+        'fallback_mode': True,
+        'error_details': {
+            'module': module_name,
+            'message': error_message,
+            'traceback': tb_text if config.show_traceback and tb_text else None
         }
-        
-    except Exception as ui_error:
-        logger.error(f"Critical error in create_fallback_ui: {str(ui_error)}\n{traceback.format_exc()}")
-        # Return minimal fallback UI
-        return {
-            'ui': widgets.HTML(f"<div style='padding:10px;color:red'>Error: {html.escape(str(ui_error))}</div>"),
-            'error': str(ui_error),
-            'status': widgets.HTML(f"<div>Error: {html.escape(str(ui_error))}</div>"),
-            'fallback_mode': True,
-            'error_details': {
-                'module': 'fallback_ui',
-                'message': f'Failed to create fallback UI: {str(ui_error)}',
-                'traceback': traceback.format_exc()
-            }
-        }
+    }
+    
+    # Add status widget if needed
+    if ui_components and 'status' in ui_components:
+        try:
+            status_widget = error_ui['message_widget']
+            ui_components['status'].value = status_widget.value
+            result['status'] = status_widget
+        except Exception as e:
+            get_safe_logger('fallback_ui').warning(f"Failed to update status: {e}")
+    
+    return result
 
 
 def create_error_ui(error_message: str, module_name: str = "module") -> widgets.HTML:

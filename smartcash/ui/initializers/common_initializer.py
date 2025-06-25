@@ -1,258 +1,220 @@
 """
 File: smartcash/ui/initializers/common_initializer.py
-Deskripsi: Base initializer dengan fix untuk merged_config_result error
+Deskripsi: Simplified base initializer for UI modules with fail-fast approach
 """
 
-import datetime
-import traceback
+from typing import Dict, Any, Optional, Type, Callable
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type, List
+import traceback
 
-# Import yang diperbaiki - menggunakan structure yang konsisten
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.logging_utils import suppress_all_outputs
-from smartcash.ui.utils.fallback_utils import try_operation_safe, show_status_safe, create_fallback_ui
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-
+from smartcash.ui.utils.logging_utils import suppress_all_outputs
 
 class CommonInitializer(ABC):
-    """Base class untuk semua initializer dengan proper abstract methods dan error handling yang diperbaiki"""
+    """
+    Simplified base initializer for UI modules with fail-fast approach.
     
-    def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None, 
-                 parent_module: Optional[str] = None):
-        """Initialize dengan proper namespace dan logger setup"""
-        self.module_name = module_name
-        self.parent_module = parent_module
-        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
-        
-        # Logger setup dengan namespace yang benar
-        self.logger_namespace = f"smartcash.ui.{self.full_module_name}"
-        self.logger = get_logger(self.logger_namespace)
-        self.config_handler_class = config_handler_class
-        
-        self.logger.debug(f"🚀 Initializing {self.module_name} dengan parent: {parent_module}")
+    Features:
+    - Simple initialization flow
+    - Fail-fast error handling
+    - Minimal required methods
+    - Clear separation of concerns
+    """
     
-    def initialize(self, env=None, config=None, **kwargs) -> Any:
-        """Main initialization dengan proper error handling dan fallback"""
-        try:
-            suppress_all_outputs()
-            self.logger.info(f"🔄 Memulai inisialisasi {self.module_name}...")
-            
-            # Create config handler
-            config_handler = self._create_config_handler()
-            
-            # Load merged config dengan proper error handling
-            try:
-                merged_config = config or config_handler.load_config()
-                if not merged_config:  # If config is empty or None
-                    raise ValueError("Empty config returned")
-                
-                self.logger.debug(f"📄 Config loaded successfully: {bool(merged_config)}")
-                
-            except Exception as e:
-                self.logger.warning(f"⚠️ Gagal load config untuk {self.module_name}, menggunakan default config. Error: {str(e)}")
-                merged_config = self._get_default_config()
-            
-            # Create UI components - WAJIB diimplementasi oleh subclass
-            ui_result = try_operation_safe(
-                lambda: self._create_ui_components(merged_config, env, **kwargs),
-                operation_name=f"Creating UI components untuk {self.module_name}",
-                logger=self.logger
-            )
-            
-            if not ui_result or not isinstance(ui_result, dict):
-                error_msg = f"❌ {self.module_name}: Gagal membuat UI components"
-                self.logger.error(error_msg)
-                return create_fallback_ui(error_msg, self.module_name)
-            
-            ui_components = ui_result
-            
-            # Add config handler dan logger bridge
-            ui_components['config_handler'] = config_handler
-            self._add_logger_bridge(ui_components)
-            
-            # Setup module handlers menggunakan try_operation_safe
-            handlers_result = try_operation_safe(
-                lambda: self._setup_module_handlers(ui_components, merged_config, env, **kwargs),
-                fallback_value=ui_components,  # Return original ui_components jika gagal
-                operation_name=f"Setting up handlers untuk {self.module_name}",
-                logger=self.logger
-            )
-            
-            result_components = handlers_result if handlers_result else ui_components
-            
-            # Validation
-            if not self._validate_critical_components(result_components):
-                error_msg = f"❌ {self.module_name}: Komponen kritis tidak valid"
-                self.logger.error(error_msg)
-                return create_fallback_ui(error_msg, self.module_name)
-            
-            # Finalization
-            self._finalize_setup(result_components, merged_config)
-            
-            # Post-initialization hook
-            try_operation_safe(
-                lambda: self._post_initialization_hook(result_components, merged_config, env, **kwargs),
-                operation_name=f"Post initialization untuk {self.module_name}",
-                logger=self.logger
-            )
-            
-            show_status_safe(f"✅ {self.module_name} berhasil diinisialisasi", "success", result_components)
-            self.logger.info(f"🎉 {self.module_name} initialization selesai")
-            
-            return self._get_return_value(result_components)
-            
-        except Exception as e:
-            error_msg = f"❌ Critical error dalam {self.module_name}: {str(e)}"
-            self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
-            return create_fallback_ui(error_msg, self.module_name)
-    
-    # ABSTRACT METHODS - WAJIB diimplementasi oleh subclass
-    @abstractmethod
-    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+    def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):
         """
-        Buat komponen UI untuk module ini.
+        Initialize the initializer with module name and optional config handler.
         
         Args:
-            config: Konfigurasi yang sudah di-load/merge
-            env: Environment info
-            **kwargs: Parameter tambahan
+            module_name: Name of the module (used for logging)
+            config_handler_class: Optional ConfigHandler class for config management
+        """
+        self.module_name = module_name
+        self.logger = get_logger(f"smartcash.ui.{module_name}")
+        self.config_handler = config_handler_class() if config_handler_class else None
+        self.logger.debug(f"Initializing {module_name} module")
+    
+    def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Any:
+        """
+        Main initialization method that follows a simple fail-fast approach.
+        
+        Args:
+            config: Optional config dict. If not provided, will try to load from config handler.
+            **kwargs: Additional arguments passed to component creation
             
         Returns:
-            Dict berisi UI components yang diperlukan
+            The root UI component or error UI if initialization fails
+        """
+        try:
+            suppress_all_outputs()
+            self.logger.info(f"🚀 Starting {self.module_name} initialization")
+            
+            # 1. Load and validate config
+            config = self._load_config(config)
+            if not config:
+                raise ValueError("Failed to load configuration")
+                
+            # 2. Create UI components (including log accordion)
+            ui_components = self._create_ui_components(config, **kwargs)
+            if not ui_components:
+                raise ValueError("Failed to create UI components")
+                
+            # 3. Add logger bridge
+            self._add_logger_bridge(ui_components)
+                
+            # 4. Setup handlers if implemented
+            if hasattr(self, '_setup_handlers'):
+                ui_components = self._setup_handlers(ui_components, config, **kwargs) or ui_components
+                
+            # 5. Get the root UI component
+            root_ui = self._get_ui_root(ui_components)
+            if not root_ui:
+                raise ValueError("No root UI component found")
+            
+            # 6. Run pre-initialization checks (after everything is set up)
+            try:
+                self._pre_initialize_checks(**kwargs)
+                self.logger.info(f"✅ {self.module_name} initialized successfully")
+                return root_ui
+            except Exception as e:
+                error_msg = f"Initialization failed: {str(e)}"
+                self.logger.error(error_msg)
+                return self._create_error_ui(error_msg)
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize {self.module_name}: {str(e)}\n{traceback.format_exc()}")
+            return self._create_error_ui(str(e))
+    
+    def _load_config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Load and validate configuration"""
+        if config is not None:
+            return config
+            
+        if self.config_handler:
+            try:
+                config = self.config_handler.load_config()
+                if config:
+                    return config
+            except Exception as e:
+                self.logger.warning(f"Failed to load config: {str(e)}")
+                
+        # Fall back to default config
+        return self._get_default_config()
+    
+    @abstractmethod
+    def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        """
+        Create and return UI components as a dictionary.
+        
+        Args:
+            config: Loaded configuration
+            **kwargs: Additional arguments
+            
+        Returns:
+            Dictionary of UI components
         """
         pass
-    
+        
     @abstractmethod
     def _get_default_config(self) -> Dict[str, Any]:
         """
-        Return default configuration untuk module ini.
-        HARUS menggunakan function dari handlers/defaults.py
+        Return default configuration for this module.
         
         Returns:
-            Dict berisi default configuration
+            Default configuration dictionary
         """
         pass
-    
-    @abstractmethod
-    def _get_critical_components(self) -> List[str]:
-        """
-        Return list komponen kritis yang harus ada setelah initialization.
         
-        Returns:
-            List nama komponen kritis
+    def _get_ui_root(self, ui_components: Dict[str, Any]) -> Any:
         """
-        pass
-    
-    # OPTIONAL METHODS - bisa di-override oleh subclass
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
-                              env=None, **kwargs) -> Dict[str, Any]:
-        """
-        Setup handlers untuk module ini.
-        Default implementation mengembalikan ui_components tanpa perubahan.
+        Get the root UI component from the components dictionary.
         
         Args:
-            ui_components: Komponen UI yang sudah dibuat
-            config: Konfigurasi
-            env: Environment info
-            **kwargs: Parameter tambahan
+            ui_components: Dictionary of UI components
             
         Returns:
-            Dict ui_components yang sudah di-setup
+            The root UI component or None if not found
         """
-        return ui_components
-    
-    def _post_initialization_hook(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
-                                env=None, **kwargs) -> None:
+        # Try common root component names
+        for key in ['ui', 'container', 'widget', 'root']:
+            if key in ui_components:
+                return ui_components[key]
+                
+        # Return first widget-like component if no root found
+        for component in ui_components.values():
+            if hasattr(component, 'layout') and hasattr(component, 'value'):
+                return component
+                
+        return None
+        
+    def _pre_initialize_checks(self, **kwargs) -> None:
         """
-        Hook yang dipanggil setelah initialization selesai.
-        Default implementation kosong.
+        Override this method to perform pre-initialization checks.
+        Raise an exception if any check fails.
+        
+        Args:
+            **kwargs: Additional arguments that might be needed for checks
+            
+        Raises:
+            Exception: If any pre-initialization check fails
         """
         pass
-    
-    def _get_return_value(self, ui_components: Dict[str, Any]) -> Any:
-        """
-        Determine nilai return dari initialize().
-        Default implementation mengembalikan UI container atau fallback.
-        """
-        # Return UI container utama atau fallback message
-        if 'ui' in ui_components:
-            return ui_components['ui']
-        elif 'container' in ui_components:
-            return ui_components['container']
-        else:
-            # Return first widget-like component found
-            for key, value in ui_components.items():
-                if hasattr(value, 'layout'):  # Likely a widget
-                    return value
-            
-            # Final fallback
-            return create_fallback_ui(f"No UI container found in {self.module_name}", self.module_name)
-    
-    # HELPER METHODS
-    def _create_config_handler(self) -> ConfigHandler:
-        """Create config handler instance atau return default"""
-        if self.config_handler_class:
-            try:
-                return self.config_handler_class()
-            except Exception as e:
-                self.logger.warning(f"⚠️ Gagal create config handler {self.config_handler_class.__name__}: {str(e)}")
         
-        # Return BaseConfigHandler sebagai fallback dengan empty implementations
-        from smartcash.ui.handlers.config_handlers import BaseConfigHandler
-        return BaseConfigHandler(
-            module_name=self.module_name,
-            extract_fn=lambda ui_components: {},  # Default empty config
-            update_fn=lambda ui_components, config: None,  # No-op update
-            parent_module=self.parent_module
-        )
-    
     def _add_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
-        """Add logger bridge ke UI components"""
+        """
+        Add logger bridge to UI components for logging to UI output.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
         try:
-            # Simple logger bridge yang safe
-            def log_to_ui(message: str, level: str = 'info'):
+            def log_to_ui(message: str, level: str = 'info') -> None:
+                """
+                Log message to UI output if available.
+                
+                Args:
+                    message: Message to log
+                    level: Log level (info, success, warning, error)
+                """
                 try:
                     if 'log_output' in ui_components and ui_components['log_output']:
                         with ui_components['log_output']:
                             icons = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌'}
                             print(f"{icons.get(level, 'ℹ️')} {message}")
                 except Exception:
-                    pass  # Silent fail untuk logger bridge
+                    pass  # Silent fail for logger bridge
             
             ui_components['logger_bridge'] = log_to_ui
-            ui_components['logger_namespace'] = self.logger_namespace
+            ui_components['logger_namespace'] = f"smartcash.ui.{self.module_name}"
             
         except Exception as e:
-            self.logger.warning(f"⚠️ Gagal setup logger bridge: {str(e)}")
-    
-    def _validate_critical_components(self, ui_components: Dict[str, Any]) -> bool:
-        """Validate bahwa komponen kritis tersedia"""
+            self.logger.warning(f"⚠️ Failed to setup logger bridge: {str(e)}")
+            
+    def _create_error_ui(self, error_message: str) -> Any:
+        """
+        Create an error UI component using the shared ErrorComponent.
+        
+        Args:
+            error_message: Error message to display
+            
+        Returns:
+            Error UI component
+        """
         try:
-            critical_components = self._get_critical_components()
-            missing_components = [comp for comp in critical_components if comp not in ui_components or ui_components[comp] is None]
+            from smartcash.ui.components.error.error_component import create_error_component
+            import traceback
             
-            if missing_components:
-                self.logger.error(f"❌ Missing critical components: {missing_components}")
-                return False
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"❌ Error validating components: {str(e)}")
-            return False
-    
-    def _finalize_setup(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Finalize setup dengan metadata"""
-        try:
-            # Tambah metadata ke ui_components
-            ui_components.update({
-                'module_name': self.module_name,
-                'parent_module': self.parent_module,
-                'initialization_time': datetime.datetime.now().isoformat(),
-                'config_loaded': bool(config),
-                'logger_namespace': self.logger_namespace
-            })
+            error_components = create_error_component(
+                error_message=error_message,
+                traceback=traceback.format_exc(),
+                title=f"❌ {self.module_name} Initialization Error",
+                error_type="error",
+                show_traceback=True,
+                width='100%'
+            )
+            return error_components['widget']
             
         except Exception as e:
-            self.logger.warning(f"⚠️ Error during finalization: {str(e)}")
+            # Fallback to simple error message if component creation fails
+            return f"Error initializing {self.module_name}: {error_message}\n{str(e)}"

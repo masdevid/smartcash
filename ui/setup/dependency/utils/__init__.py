@@ -51,7 +51,7 @@ from smartcash.ui.setup.dependency.utils.system_info_utils import (
 )
 
 # Package selector utilities - import after others to avoid circular dependency
-from smartcash.ui.setup.dependency.utils.package_selector_utils import (
+from smartcash.ui.setup.dependency.components.ui_package_selector import (
     create_package_selector_grid,
     get_package_categories,
     update_package_status,

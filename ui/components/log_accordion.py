@@ -407,31 +407,31 @@ def create_log_accordion(
         ns = entry.get('namespace') or entry.get('module')
         ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
         
-        # Add duplicate indicator dot next to timestamp if needed
-        duplicate_dot = ""
-        if entry.get('show_duplicate_indicator', False):
-            duplicate_dot = """
+        # Add right border for duplicate messages
+        border_style = '2px solid #e0e0e0' if entry.get('show_duplicate_indicator', False) else 'none'
+        
+        # Create namespace badge with proper styling
+        ns_badge = ''
+        if ns:
+            ns_badge = f"""
             <span style='
                 display: inline-block;
-                width: 6px;
-                height: 6px;
-                background-color: #ffc107;
-                border-radius: 50%;
-                margin-right: 4px;
-                vertical-align: middle;
-                animation: pulse 1.5s infinite;
-            '></span>
+                background: #f0f0f0;
+                color: #6f42c1;
+                font-weight: 500;
+                font-size: 11px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                margin-right: 6px;
+                line-height: 1.2;
+                white-space: nowrap;
+            '>
+                {ns.split('.')[-1]}
+            </span>
             """
         
-        # Create the HTML
+        # Create the HTML with right border for duplicates
         html = f"""
-        <style>
-            @keyframes pulse {{
-                0% {{ opacity: 0.7; transform: scale(0.95); }}
-                50% {{ opacity: 1; transform: scale(1.1); }}
-                100% {{ opacity: 0.7; transform: scale(0.95); }}
-            }}
-        </style>
         <div style='
             padding: 6px 12px;
             margin: 2px 0;
@@ -441,14 +441,17 @@ def create_log_accordion(
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 13px;
             line-height: 1.4;
-            transition: all 0.2s ease;'>
-            <div style='display: flex; align-items: flex-start; gap: 8px;'>
+            transition: all 0.2s ease;
+            border-right: {border_style};
+            border-left: {border_style};
+            position: relative;
+            overflow: hidden;
+        '>
+            <div style='display: flex; align-items: center; gap: 8px;'>
                 {style['icon'] if show_level_icons else ''}
-                <span style='flex: 1;'>{ns_display}{entry['message']}</span>
-                <span style='display: inline-flex; align-items: center;'>
-                    {duplicate_dot}
-                    {timestamp_html}
-                </span>
+                {ns_badge}
+                <span style='flex: 1; white-space: pre-wrap; word-break: break-word;'>{entry['message']}</span>
+                <span style='flex-shrink: 0; margin-left: 8px;'>{timestamp_html}</span>
             </div>
         </div>
         """

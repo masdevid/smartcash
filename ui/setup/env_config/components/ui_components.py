@@ -3,7 +3,7 @@ File: smartcash/ui/setup/env_config/components/ui_components.py
 Deskripsi: Komponen UI untuk environment configuration dengan layout lengkap
 """
 
-import ipywidgets as widgets
+import ipywidgets
 from typing import Dict, Any
 from smartcash.ui.components import (
     create_header, create_status_panel,
@@ -29,10 +29,10 @@ def create_env_config_ui() -> Dict[str, Any]:
     )
     
     # 2. Setup Button (Centered)
-    setup_button = widgets.Button(
+    setup_button = ipywidgets.Button(
         description="▶️ Setup Environment",
         button_style='primary',
-        layout=widgets.Layout(
+        layout=ipywidgets.Layout(
             width='200px',
             height='45px',
             margin='15px 0',
@@ -40,9 +40,9 @@ def create_env_config_ui() -> Dict[str, Any]:
         )
     )
     
-    setup_button_container = widgets.HBox(
+    setup_button_container = ipywidgets.HBox(
         [setup_button],
-        layout=widgets.Layout(
+        layout=ipywidgets.Layout(
             justify_content='center',
             align_items='center',
             width='100%'
@@ -75,7 +75,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Ensure progress container exists
     if 'progress_container' not in ui_components or ui_components['progress_container'] is None:
         import ipywidgets as widgets
-        ui_components['progress_container'] = widgets.VBox()
+        ui_components['progress_container'] = ipywidgets.VBox()
         if hasattr(progress_tracker, '_progress_container'):
             progress_tracker._progress_container = ui_components['progress_container']
     
@@ -117,7 +117,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     }
     
     # Create main container
-    main_container = widgets.VBox([
+    main_container = ipywidgets.VBox([
         header,
         status_panel,
         setup_button_container,
@@ -127,7 +127,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         setup_summary,
         env_info_panel,
         tips_requirements
-    ], layout=widgets.Layout(
+    ], layout=ipywidgets.Layout(
         width='100%',
         padding='15px',
         border='1px solid #ddd',

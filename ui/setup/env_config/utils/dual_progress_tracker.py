@@ -59,7 +59,7 @@ class DualProgressTracker:
                 self._progress_container = self._new_tracker.container
             else:
                 # Fallback if container is not available
-                self._progress_container = widgets.VBox()
+                self._progress_container = ipywidgets.VBox()
                 
             # Ensure the container is visible
             if hasattr(self._progress_container, 'layout'):
@@ -81,7 +81,7 @@ class DualProgressTracker:
             print(f"Error initializing progress tracker: {e}")
             print(traceback.format_exc())
             # Fallback to a simple container
-            self._progress_container = widgets.VBox()
+            self._progress_container = ipywidgets.VBox()
             self._initialized = True
             return self._progress_container
     
@@ -217,8 +217,7 @@ class DualProgressTracker:
             
             # Last resort, create a simple container
             if self._progress_container is None:
-                from ipywidgets import widgets
-                self._progress_container = widgets.VBox()
+                self._progress_container = ipywidgets.VBox()
                 
             # Ensure the container is visible
             if hasattr(self._progress_container, 'layout'):

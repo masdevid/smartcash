@@ -30,21 +30,25 @@ class DualProgressTracker:
     def __init__(self, ui_components: Optional[Dict[str, Any]] = None, logger=None):
         """Initialize the progress tracker with optional UI components and logger"""
         self.logger = logger
-        self.components = ui_components or {}
+        self.components = ui_components if ui_components is not None else {}
         self.current_stage = None
         self.overall_progress = 0
         self.stage_progress = 0
         self.callbacks = []
         
+        # Initialize container first
+        self.container = None
+        
         # Create UI elements
         self._create_ui()
         
+        # Ensure we have a valid container
+        if self.container is None:
+            self.container = VBox()
+            
         # Register with UI components
-        if self.components is not None:
-            self.components.update({
-                'progress_container': self.container,
-                'progress_tracker': self
-            })
+        self.components['progress_container'] = self.container
+        self.components['progress_tracker'] = self
     
     def _create_ui(self):
         """Create and configure the UI elements"""

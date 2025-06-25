@@ -52,16 +52,15 @@ def create_env_config_ui() -> Dict[str, Any]:
     # 3. Status Panel
     status_panel = create_status_panel("Siap untuk setup environment", "info")
     
-    # 4. Progress Tracker
+    # 4. Progress Tracker - Initialize with empty components
     ui_components = {}
+    
+    # Create progress tracker - it will register itself in the components
     progress_tracker = track_setup_progress(ui_components)
     
-    # Ensure progress container exists
-    if 'progress_container' not in ui_components:
+    # Double-check we have a valid container
+    if 'progress_container' not in ui_components or ui_components['progress_container'] is None:
         ui_components['progress_container'] = ipywidgets.VBox()
-    
-    # Store the progress tracker reference
-    ui_components['progress_tracker'] = progress_tracker
     
     # 5. Log Accordion
     log_accordion = create_log_accordion(

@@ -40,7 +40,7 @@ def setup_installation_handler(ui_components: UIComponents) -> Dict[str, Callabl
     """
     logger = ui_components.get('logger', get_logger(__name__))
     
-    @with_button_context('install_button')
+    @with_button_context(ui_components, 'install_button')
     def handle_installation() -> None:
         """Handle package installation with progress tracking.
         

@@ -69,7 +69,7 @@ class AnalysisHandler:
         if button := self.ui.get('analyze_button'):
             button.on_click(lambda _: self.handle_analysis())
     
-    @with_button_context('analyze_button')
+    @with_button_context(self.ui, 'analyze_button')
     def handle_analysis(self) -> None:
         """Handle package analysis with progress tracking."""
         try:

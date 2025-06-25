@@ -3,7 +3,7 @@ File: smartcash/ui/dataset/split/split_init.py
 Deskripsi: Independent configuration cell for dataset split configuration with defaults integration
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 import yaml
 import ipywidgets as widgets
@@ -14,21 +14,38 @@ from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 from smartcash.ui.dataset.split.handlers.defaults import get_default_split_config
 from smartcash.ui.dataset.split.handlers.config_extractor import extract_split_config
 from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui, reset_ui_to_defaults
+from smartcash.ui.utils.logging_utils import suppress_all_outputs, restore_stdout
 
 
 class SplitConfigHandler(ConfigCellHandler):
     """Handler for split configuration with integrated defaults and validation"""
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize with default config and update with provided values"""
-        super().__init__(module_name="split_config")
-        # Initialize with default config
-        self.config = get_default_split_config()
-        # Update with any provided config values
-        if config:
-            self.update_config(config)
-        # Save the initial config
-        self.save()
+    def __init__(self, config: Optional[Dict[str, Any]] = None, logger_bridge: Optional[Callable] = None):
+        """
+        Initialize with default config and update with provided values
+        
+        Args:
+            config: Optional configuration dictionary
+            logger_bridge: Optional logger bridge function for UI logging
+        """
+        # Initialize logger bridge first to capture any initialization logs
+        self.logger_bridge = logger_bridge or get_logger('smartcash.ui.dataset.split')
+        
+        # Suppress output during initialization
+        with suppress_all_outputs():
+            super().__init__(module_name="split_config")
+            # Initialize with default config
+            self.config = get_default_split_config()
+            # Update with any provided config values
+            if config:
+                self.update_config(config)
+            # Save the initial config
+            self.save()
+            
+            # Log successful initialization
+            if hasattr(self.logger_bridge, '__call__'):
+                self.logger_bridge("SplitConfigHandler initialized successfully", level='info')
+            else:
+                self.logger_bridge.info("SplitConfigHandler initialized successfully")
     
     def update_config(self, new_config: Dict[str, Any]) -> None:
         """Update configuration with new values"""
@@ -57,8 +74,13 @@ class SplitConfigHandler(ConfigCellHandler):
             return config
             
         except Exception as e:
-            logger = get_logger('smartcash.ui.dataset.split')
-            logger.error(f"Failed to update config from UI: {str(e)}", exc_info=True)
+            # Try to use logger_bridge if available, otherwise fall back to standard logger
+            logger = getattr(self, 'logger_bridge', None) or get_logger('smartcash.ui.dataset.split')
+            error_msg = f"Failed to update config from UI: {str(e)}"
+            if hasattr(logger, '__call__'):
+                logger(error_msg, level='error')
+            else:
+                logger.error(error_msg, exc_info=True)
             raise
 
 
@@ -95,47 +117,11 @@ def create_split_config_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
         return ui_components
         
     except Exception as e:
-        import traceback
-        error_msg = f"Error creating split config UI: {str(e)}"
-        error_traceback = traceback.format_exc()
-        
-        # Log the error
-        logger = get_logger('smartcash.ui.dataset.split')
-        logger.error(f"{error_msg}\n{error_traceback}")
-        
-        try:
-            # Try to create and display error component
-            from smartcash.ui.components.error.error_component import ErrorComponent
-            error_component = ErrorComponent(title="Split Configuration Error")
-            error_ui = error_component.create(
-                error_message=error_msg,
-                traceback=error_traceback,
-                error_type="error",
-                show_traceback=True
-            )
-            
-            # Safely get the widget to display
-            display_widget = error_ui.get('widget') or error_ui.get('container') or error_ui
-            display(display_widget)
-            
-            # Return the full error UI components
-            return error_ui
-            
-        except Exception as inner_e:
-            # If we can't create the error component, fall back to basic error display
-            import ipywidgets as widgets
-            from IPython.display import display, HTML
-            
-            error_html = f"""
-            <div style='color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; 
-                        padding: 15px; border-radius: 4px; margin: 10px 0;'>
-                <h4>Split Configuration Error</h4>
-                <p>{error_msg}</p>
-                <pre style='white-space: pre-wrap;'>{error_traceback}</pre>
-            </div>
-            """
-            display(HTML(error_html))
-            return {'error': error_msg, 'traceback': error_traceback}
+        restore_stdout()  # Ensure output is restored even on error
+        error_fallback = _create_error_fallback(str(e))
+        if 'container' in error_fallback:
+            return error_fallback['container']
+        return error_fallback
 
 
 def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -179,11 +165,11 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         return ui_components
         
     except Exception as e:
-        # Log the error
-        import traceback
-        error_msg = f"Failed to initialize Split Config UI: {str(e)}"
-        error_traceback = traceback.format_exc()
-        return _create_error_fallback(error_msg, error_traceback)
+        restore_stdout()  # Ensure output is restored even on error
+        error_fallback = _create_error_fallback(str(e))
+        if 'container' in error_fallback:
+            return error_fallback['container']
+        return error_fallback
 
 def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
     """Create a fallback UI component to display error messages."""

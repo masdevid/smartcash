@@ -125,7 +125,7 @@ class StatusCheckHandler:
             'handle_package_status_check': self.handle_package_status_check
         }
     
-    @with_button_context('system_report_button')
+    @with_button_context(self.ui, 'system_report_button')
     def handle_system_report(self) -> None:
         """Generate and display a comprehensive system report."""
         try:
@@ -155,7 +155,7 @@ class StatusCheckHandler:
         except Exception as e:
             self._handle_error("System report", e)
     
-    @with_button_context('check_button')
+    @with_button_context(self.ui, 'check_button')
     def handle_package_status_check(self) -> None:
         """Check and display the status of selected packages."""
         try:

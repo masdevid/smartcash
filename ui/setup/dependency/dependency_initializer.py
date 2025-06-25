@@ -18,7 +18,7 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.common.logger import get_logger
 from smartcash.ui.setup.dependency.utils.core.validators import DependencyValidator
 from smartcash.ui.setup.dependency.utils.types import UIComponents
-
+from smartcash.ui.utils.logging_utils import suppress_all_outputs, restore_stdout
 # Global instance to avoid circular imports
 _dependency_initializer: Optional['DependencyInitializer'] = None
 
@@ -219,7 +219,7 @@ class DependencyInitializer(CommonInitializer):
                 
             raise RuntimeError(error_msg) from e
     
-    def _pre_initialize_checks(self, **kwargs) -> None:
+    def _after_init_checks(self, **kwargs) -> None:
         """Run pre-initialization checks for dependencies including package analysis.
         
         This method performs the following tasks:
@@ -404,14 +404,19 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui
         if display_ui:
             from IPython.display import display
             
-        return display(ui_components['ui'])
+        if 'container' in ui_components:
+            return ui_components['container']
+        elif 'ui' in ui_components:
+            return ui_components['ui']
+        else:
+            raise ValueError("No valid UI container found in components")
         
     except Exception as e:
-        # Log the error
-        import traceback
-        error_msg = f"Failed to initialize dependency UI: {str(e)}"
-        error_traceback = traceback.format_exc()
-        return _create_error_fallback(error_msg, error_traceback)
+        restore_stdout()  # Ensure output is restored even on error
+        error_fallback = _create_error_fallback(str(e))
+        if 'container' in error_fallback:
+            return error_fallback['container']
+        return error_fallback
 
 def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
     """Create a fallback UI component to display error messages."""

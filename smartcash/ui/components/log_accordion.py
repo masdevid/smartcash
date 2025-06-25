@@ -370,7 +370,7 @@ def create_log_accordion(
             traceback.print_exc()
     
     def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
-        """Create a log entry widget with proper styling."""
+        """Create a compact log entry widget with proper styling."""
         # Format timestamp
         timestamp_html = ''
         if show_timestamps and 'timestamp' in entry and entry['timestamp']:
@@ -382,44 +382,52 @@ def create_log_accordion(
                 local_tz = pytz.timezone('Asia/Jakarta')
                 local_ts = ts.astimezone(local_tz)
                 timestamp = local_ts.strftime('%H:%M:%S.%f')[:-3]
-                timezone_str = local_ts.strftime('%Z')
-                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp} {timezone_str}</span>"
+                timestamp_html = f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp}</span>"
                 
             except Exception as e:
                 timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3]
-                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>"
+                timestamp_html = f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp}</span>"
         
         # Create namespace/module prefix
         ns = entry.get('namespace') or entry.get('module')
-        ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
+        ns_badge = ''
+        if ns:
+            ns_badge = (
+                f'<span style="display:inline-block;padding:0 4px;margin:0 4px 0 2px;'
+                f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
+                f'font-size:10px;font-weight:500;line-height:1.2;vertical-align:middle;white-space:nowrap;">'
+                f'{ns.split(".")[-1]}</span>'
+            )
         
         # Get style for the log level
         style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
         
         # Add border for duplicate messages
-        border_style = '2px solid #e0e0e0' if entry.get('show_duplicate_indicator', False) else 'none'
+        border_style = '2px solid #e9ecef' if entry.get('show_duplicate_indicator', False) else 'none'
         
         # Create the HTML for the log entry
         html = f"""
         <div class='log-entry' style='
-            padding: 6px 12px;
-            margin: 2px 0;
-            border-radius: 4px;
+            padding: 2px 8px;
+            margin: 1px 0;
+            border-radius: 2px;
             background: {style['bg']};
             color: {style['color']};
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            font-size: 13px;
-            line-height: 1.4;
+            font-size: 12px;
+            line-height: 1.2;
             word-break: break-word;
             white-space: pre-wrap;
             border-right: {border_style};
             border-left: {border_style};
+            display: flex;
+            align-items: center;
+            min-height: 20px;
         '>
-            <div style='display: flex; align-items: flex-start; gap: 8px;'>
-                <span style='flex-shrink: 0;'>{style['icon'] if show_level_icons else ''}</span>
-                <span style='flex: 1;'>{ns_display}{entry['message']}</span>
-                <span style='flex-shrink: 0; margin-left: 8px;'>{timestamp_html}</span>
-            </div>
+            <span style='flex-shrink: 0;font-size:12px;margin-right:2px;line-height:1;display:inline-flex;align-items:center;'>{style['icon'] if show_level_icons else ''}</span>
+            {ns_badge}
+            <span style='flex: 1;margin-left: 2px;'>{entry['message']}</span>
+            {timestamp_html}
         </div>
         """
         

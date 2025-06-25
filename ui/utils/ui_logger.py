@@ -72,25 +72,25 @@ class UILogger:
                     if namespace_id:
                         namespace = get_namespace_name(namespace_id) or f"NS:{namespace_id[:4]}"
                         namespace_badge = (
-                            f'<span style="display:inline-block;padding:0 6px;margin:0 6px;'
-                            f'background-color:#f1f3f5;color:#5f3dc4;border-radius:4px;'
-                            f'font-size:11px;font-weight:500;line-height:1.4;vertical-align:middle">'
+                            f'<span style="display:inline-block;padding:0 4px;margin:0 4px 0 2px;'
+                            f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
+                            f'font-size:10px;font-weight:500;line-height:1.2;vertical-align:middle;white-space:nowrap;">'
                             f'{namespace}</span>'
                         )
                 except ImportError:
                     pass
                 
                 html = (
-                    f'<div style="margin:2px 0;padding:4px 12px;border-radius:4px;'
-                    f'background-color:rgba(248,249,250,0.8);border-left:3px solid {border_color};'
+                    f'<div style="margin:1px 0;padding:2px 8px;border-radius:2px;'
+                    f'background-color:rgba(248,249,250,0.8);border-left:2px solid {border_color};'
                     f'border-right:{border_style};border-left:{border_style};'
                     f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
-                    f'font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
-                    f'overflow-wrap:break-word;">'
-                    f'<span style="color:#6c757d;font-size:11px;font-family:monospace;margin-right:6px;">[{timestamp}]</span> '
-                    f'<span style="font-size:13px;margin-right:4px;">{emoji}</span>'
+                    f'font-size:12px;line-height:1.2;word-break:break-word;white-space:pre-wrap;'
+                    f'overflow-wrap:break-word;display:flex;align-items:center;min-height:20px;">'
+                    f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin-right:4px;white-space:nowrap;">[{timestamp}]</span> '
+                    f'<span style="font-size:12px;margin-right:2px;line-height:1;display:inline-flex;align-items:center;">{emoji}</span>'
                     f'{namespace_badge}'
-                    f'<span style="color:{color};">{clean_msg}</span>'
+                    f'<span style="color:{color};flex:1;margin-left:2px;">{clean_msg}</span>'
                     f'</div>'
                 )
                 

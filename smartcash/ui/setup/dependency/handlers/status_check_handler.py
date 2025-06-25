@@ -62,7 +62,7 @@ def setup_status_check_handler(ui_components: Dict[str, Any]) -> Dict[str, Calla
         
         with with_button_context(ui_components, 'check_button'):
             try:
-                from smartcash.ui.setup.dependency.utils import get_selected_packages
+                from smartcash.ui.setup.dependency.components.ui_package_selector import get_selected_packages
                 
                 # Get selected packages
                 selected_packages = get_selected_packages(ui_components.get('package_selector', {}))

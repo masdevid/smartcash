@@ -273,19 +273,20 @@ def create_log_accordion(
         """Scroll the log container to the bottom using JavaScript."""
         from IPython.display import display, Javascript
         
-        js_code = f"""
+        js_code = """
         (function() {{
             // Try to find our specific log container first
-            let logContainer = document.querySelector('.{log_container.log_id}');
+            let logContainer = document.querySelector('.{log_container}');
             
             // If not found, try to find any scrollable container
             if (!logContainer) {{
                 const selectors = [
                     '.smartcash-log-container',
-                    '.jp-OutputArea-output',
                     '.output_scroll',
-                    '.output_subarea',
-                    '.output'
+                    '.output',
+                    '.jp-OutputArea-output',
+                    '.lm-Widget.p-Widget.jp-OutputArea-output',
+                    '.jp-OutputArea-child'
                 ];
                 
                 for (const selector of selectors) {{
@@ -300,50 +301,28 @@ def create_log_accordion(
                 }}
             }}
             
-            if (!logContainer) return;
-            
-            // Check if we're already at the bottom (or close)
-            const isNearBottom = logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop < 50;
-            
-            // Only auto-scroll if we're near the bottom or if forced
-            if (isNearBottom || {auto_scroll}) {{
+            if (logContainer) {{
+                // Store reference to the container
+                const container = logContainer;
+                
                 // Smooth scroll to bottom
-                function scrollToBottom() {{
-                    if (!logContainer) return;
-                    
-                    const start = logContainer.scrollTop;
-                    const end = logContainer.scrollHeight - logContainer.clientHeight;
-                    const duration = 150; // ms
-                    
-                    // Skip animation if we're already at the bottom
-                    if (Math.abs(start - end) < 1) return;
-                    
-                    const startTime = performance.now();
-                    
-                    function step(currentTime) {{
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / duration, 1);
-                        
-                        // Ease in-out function
-                        const easeInOut = t => t < 0.5 
-                            ? 2 * t * t 
-                            : -1 + (4 - 2 * t) * t;
-                        
-                        logContainer.scrollTop = start + (end - start) * easeInOut(progress);
-                        
-                        if (progress < 1) {{
-                            window.requestAnimationFrame(step);
-                        }}
+                const scrollToBottom = () => {{
+                    if ({auto_scroll_js}) {{
+                        container.scrollTo({{
+                            top: container.scrollHeight,
+                            behavior: 'smooth'
+                        }});
                     }}
-                    
-                    window.requestAnimationFrame(step);
-                }}
+                }};
                 
                 // Small delay to ensure the new content is rendered
                 setTimeout(scrollToBottom, 10);
             }}
         }})();
-        """.format(log_container=log_container.log_id, auto_scroll='true' if auto_scroll else 'false')
+        """.format(
+            log_container=log_container.log_id,
+            auto_scroll_js='true' if auto_scroll else 'false'
+        )
         
         display(Javascript(js_code))
     

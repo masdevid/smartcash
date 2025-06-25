@@ -4,7 +4,7 @@ Deskripsi: Helper untuk ekstrak nilai dari UI components ke struktur config
 """
 
 from typing import Dict, Any, List
-from smartcash.ui.setup.dependency.utils import get_selected_packages
+from smartcash.ui.setup.dependency.components.ui_package_selector import get_selected_packages
 
 def extract_dependency_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract config dari UI components dengan error handling"""

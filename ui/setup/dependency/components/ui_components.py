@@ -22,7 +22,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         create_save_reset_buttons,
         create_divider
     )
-    from smartcash.ui.setup.dependency.utils import create_package_selector_grid
+    from smartcash.ui.setup.dependency.components.ui_package_selector import create_package_selector_grid
     
     # Helper untuk icons
     get_icon = lambda key, fallback="📦": ICONS.get(key, fallback)

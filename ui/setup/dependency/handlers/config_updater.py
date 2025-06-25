@@ -4,7 +4,7 @@ Deskripsi: Helper untuk update UI components dari config values
 """
 
 from typing import Dict, Any, List
-from smartcash.ui.setup.dependency.utils import reset_package_selections
+from smartcash.ui.setup.dependency.components.ui_package_selector import reset_package_selections
 
 def update_dependency_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update UI components dari config dengan error handling"""
@@ -41,7 +41,7 @@ def _update_package_selections(ui_components: Dict[str, Any], config: Dict[str, 
             reset_package_selections(package_selector)
             
             # Set selected packages
-            from smartcash.ui.setup.dependency.utils import update_package_status
+            from smartcash.ui.setup.dependency.components.ui_package_selector import update_package_status
             for package in selected_packages:
                 update_package_status(package_selector, package, True)
     except Exception as e:

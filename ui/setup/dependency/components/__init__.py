@@ -4,7 +4,7 @@ Deskripsi: Dependency UI components exports tanpa check/uncheck buttons
 """
 
 from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
-from smartcash.ui.setup.dependency.utils import (
+from smartcash.ui.setup.dependency.components.ui_package_selector import (
     create_package_selector_grid,
     get_package_categories,
     update_package_status,

@@ -178,23 +178,14 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         return ui_components
         
     except Exception as e:
+        # Log the error
         import traceback
-        error_msg = f"Failed to initialize Split Config UI: {str(e)}"
+        error_msg = f"Failed to initialize dependency UI: {str(e)}"
         error_traceback = traceback.format_exc()
+        return _create_error_fallback(error_msg, error_traceback)
+
+def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
+    """Create a fallback UI component to display error messages."""
+    from smartcash.ui.components import create_error_component
+    return create_error_component("Initialization Error", error_message, traceback)
         
-        # Try to create and display error component
-        from smartcash.ui.components.error.error_component import ErrorComponent
-        error_component = ErrorComponent(title="Split Config Error")
-        error_ui = error_component.create(
-            error_message=error_msg,
-            traceback=error_traceback,
-            error_type="error",
-            show_traceback=True
-        )
-        
-        # Safely get the widget to display
-        display_widget = error_ui.get('widget') or error_ui.get('container') or error_ui
-        display(display_widget)
-        
-        # Return the full error UI components
-        return error_ui

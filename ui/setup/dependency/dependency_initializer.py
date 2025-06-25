@@ -403,43 +403,18 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui
         if display_ui:
             from IPython.display import display
             
-            # Display the most appropriate UI component
-            if 'main_container' in ui_components:
-                display(ui_components['main_container'])
-            elif 'root' in ui_components:
-                display(ui_components['root'])
-            elif 'widget' in ui_components:
-                display(ui_components['widget'])
-            else:
-                # If no standard container is found, try to display the first available widget
-                for key, value in ui_components.items():
-                    if hasattr(value, '_ipython_display_') or hasattr(value, '_repr_html_'):
-                        display(value)
-                        break
-        
-        return ui_components
+        return display(ui_components['ui'])
         
     except Exception as e:
         # Log the error
         import traceback
         error_msg = f"Failed to initialize dependency UI: {str(e)}"
         error_traceback = traceback.format_exc()
-        
-        # Create error component
-        from smartcash.ui.components.error.error_component import ErrorComponent
-        error_component = ErrorComponent(title="Dependency Installer Error")
-        error_ui = error_component.create(
-            error_message=error_msg,
-            traceback=error_traceback,
-            error_type="error",
-            show_traceback=True
-        )
-        
-        # Display the error if UI display is enabled
-        if display_ui:
-            from IPython.display import display
-            display(error_ui.get('widget', error_ui.get('container', str(error_ui))))
-            
-        return {'error': error_msg, 'traceback': error_traceback, 'ui': error_ui}
+        return _create_error_fallback(error_msg, error_traceback)
 
+def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
+    """Create a fallback UI component to display error messages."""
+    from smartcash.ui.components import create_error_component
+    return create_error_component("Initialization Error", error_message, traceback)
+    
 __all__ = ['initialize_dependency_ui']

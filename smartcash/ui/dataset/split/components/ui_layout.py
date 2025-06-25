@@ -37,7 +37,7 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         header, 
         form_components['status_panel'], 
         form_container, 
-        info_accordion['container'],
+        info_accordion,
         log_accordion
     ], layout=widgets.Layout(width='100%', padding='10px'))
     

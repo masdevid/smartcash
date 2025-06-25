@@ -83,25 +83,27 @@ class UILogger:
                 
                 # Build the HTML with row layout
                 html_parts = [
-                    f'<div style="margin:0 0 1px 0;padding:2px 8px;border-radius:2px;display:flex;'
+                    f'<div style="margin:0 0 1px 0;padding:4px 8px;border-radius:2px;display:flex;'
                     f'background-color:rgba(248,249,250,0.8);border-left:2px solid {border_color};'
                     f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
                     f'font-size:12px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
                     f'overflow-wrap:break-word;border-right:{border_style};border-left:{border_style};">',
-                    # Icon container (left side)
-                    f'<div style="display:flex;align-items:flex-start;padding:2px 6px 2px 0;flex-shrink:0;font-size:12px;line-height:1.5;">',
+                    # Icon container (left side, aligned to top)
+                    f'<div style="display:flex;align-self:flex-start;padding:2px 6px 2px 0;flex-shrink:0;font-size:12px;line-height:1.5;">',
                     f'{emoji}',
                     '</div>',
-                    # Main content (middle)
-                    f'<div style="flex:1;min-width:0;display:flex;align-items:center;padding:1px 0;">',
-                    f'<div style="color:{color};display:flex;align-items:center;flex:1;gap:4px;min-width:0;">',
+                    # Main content (right side)
+                    f'<div style="flex:1;min-width:0;display:flex;flex-direction:column;">',
+                    f'<div style="color:{color};display:flex;align-items:flex-start;width:100%;">',
+                    f'<div style="display:flex;flex:1;min-width:0;align-items:flex-start;gap:4px;">',
                     f'{namespace_badge if namespace_badge else ""}',
-                    f'<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">{clean_msg}</span>',
-                    '</div>',  # End of message content
+                    f'<span style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;text-align:left;">{clean_msg}</span>',
+                    '</div>',  # End of message container
                     # Timestamp (right side)
-                    f'<div style="color:#6c757d;font-size:10px;font-family:monospace;white-space:nowrap;margin-left:8px;line-height:1.5;flex-shrink:0;">',
+                    f'<div style="color:#6c757d;font-size:10px;font-family:monospace;white-space:nowrap;margin-left:8px;line-height:1.5;flex-shrink:0;align-self:flex-start;">',
                     f'{timestamp}',
                     '</div>',  # End of timestamp
+                    '</div>',  # End of message row
                     '</div>',  # End of main content
                     '</div>'  # End of log entry
                 ]

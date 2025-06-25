@@ -81,27 +81,32 @@ class UILogger:
                 except (ImportError, NameError):
                     pass
                 
-                # Build the HTML with namespace badge if available
+                # Build the HTML with improved layout
                 html_parts = [
                     f'<div style="margin:0 0 1px 0;padding:2px 8px 2px 6px;border-radius:2px;'
                     f'background-color:rgba(248,249,250,0.8);border-left:2px solid {border_color};'
-                    f'border-right:{border_style};border-left:{border_style};'
                     f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
-                    f'font-size:12px;line-height:1.3;word-break:break-word;white-space:pre-wrap;'
-                    f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:20px;">',
-                    f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin:1px 4px 0 0;white-space:nowrap;align-self:flex-start;">{timestamp}</span>',
-                    f'<span style="font-size:12px;margin:0 2px 0 0;line-height:1;display:inline-flex;align-items:center;">{emoji}</span>'
+                    f'font-size:12px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
+                    f'overflow-wrap:break-word;display:flex;align-items:stretch;gap:6px;'
+                    f'border-right:{border_style};border-left:{border_style};">',
+                    # Icon container with middle alignment
+                    f'<div style="display:flex;align-items:center;flex-shrink:0;font-size:12px;line-height:1.5;">',
+                    f'{emoji}',
+                    '</div>',
+                    # Main content area with message and namespace
+                    f'<div style="flex:1;display:flex;flex-direction:column;min-width:0;">',
+                    f'<div style="color:{color};flex:1;display:flex;align-items:flex-start;gap:4px;line-height:1.5;">',
+                    f'{namespace_badge if namespace_badge else ""}',
+                    f'<span style="flex:1;">{clean_msg}</span>',
+                    '</div>',  # End of message row
+                    '</div>',  # End of main content
+                    # Timestamp on the right
+                    f'<div style="flex-shrink:0;align-self:flex-start;color:#6c757d;font-size:10px;'
+                    f'font-family:monospace;white-space:nowrap;margin-left:4px;line-height:1.5;">',
+                    f'{timestamp}',
+                    '</div>',
+                    '</div>'  # End of log entry
                 ]
-                
-                # Add namespace badge if available
-                if namespace_badge:
-                    html_parts.append(namespace_badge)
-                
-                # Add the message and close the div
-                html_parts.extend([
-                    f'<span style="color:{color};flex:1;margin:0;line-height:1.3;">{clean_msg}</span>',
-                    '</div>'
-                ])
                 
                 html = ''.join(html_parts)
                 

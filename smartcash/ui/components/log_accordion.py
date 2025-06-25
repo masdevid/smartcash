@@ -420,27 +420,32 @@ def create_log_accordion(
         # Add border for duplicate messages
         border_style = '2px solid #e9ecef' if entry.get('show_duplicate_indicator', False) else 'none'
         
-        # Build the HTML for the log entry
+        # Build the HTML for the log entry with improved layout
         html_parts = [
             f'<div style="margin:0 0 1px 0;padding:2px 8px 2px 6px;border-radius:2px;'
             f'background-color:{style["bg"]};border-left:2px solid {style["color"]};'
             f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
-            f'font-size:12px;line-height:1.3;word-break:break-word;white-space:pre-wrap;'
-            f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:20px;'
+            f'font-size:12px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
+            f'overflow-wrap:break-word;display:flex;align-items:stretch;gap:6px;'
             f'border-right:{border_style};border-left:{border_style};">',
-            f'<span style="font-size:12px;margin:0 2px 0 0;line-height:1;display:inline-flex;align-items:center;">{style["icon"]}</span>'
+            # Icon container with middle alignment
+            f'<div style="display:flex;align-items:center;flex-shrink:0;font-size:12px;line-height:1.5;">',
+            f'{style["icon"]}',
+            '</div>',
+            # Main content area with message and namespace
+            f'<div style="flex:1;display:flex;flex-direction:column;min-width:0;">',
+            f'<div style="color:{style["color"]};flex:1;display:flex;align-items:flex-start;gap:4px;line-height:1.5;">',
+            f'{ns_badge if ns_badge else ""}',
+            f'<span style="flex:1;">{entry["message"]}</span>',
+            '</div>',  # End of message row
+            '</div>',  # End of main content
+            # Timestamp on the right
+            f'<div style="flex-shrink:0;align-self:flex-start;color:#6c757d;font-size:10px;'
+            f'font-family:monospace;white-space:nowrap;margin-left:4px;line-height:1.5;">',
+            f'{timestamp}',
+            '</div>',
+            '</div>'  # End of log entry
         ]
-        
-        # Add namespace badge if available
-        if ns_badge:
-            html_parts.append(ns_badge)
-            
-        # Add the message, timestamp, and close the div
-        html_parts.extend([
-            f'<span style="color:{style["color"]};flex:1;margin:0;line-height:1.3;">{entry["message"]}</span>',
-            f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin-left:8px;white-space:nowrap;align-self:flex-start;">{timestamp}</span>',
-            '</div>'
-        ])
         
         html = ''.join(html_parts)
         

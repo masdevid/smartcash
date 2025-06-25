@@ -408,7 +408,7 @@ def create_log_accordion(
         # Create the HTML for the log entry
         html = f"""
         <div class='log-entry' style='
-            padding: 2px 8px;
+            padding: 2px 8px 2px 8px;
             margin: 1px 0;
             border-radius: 2px;
             background: {style['bg']};
@@ -421,12 +421,12 @@ def create_log_accordion(
             border-right: {border_style};
             border-left: {border_style};
             display: flex;
-            align-items: center;
-            min-height: 20px;
+            align-items: flex-start;
+            min-height: 22px;
         '>
             <span style='flex-shrink: 0;font-size:12px;margin-right:2px;line-height:1;display:inline-flex;align-items:center;'>{style['icon'] if show_level_icons else ''}</span>
             {ns_badge}
-            <span style='flex: 1;margin-left: 2px;'>{entry['message']}</span>
+            <span style='flex: 1;margin: 0 2px;'>{entry['message']}</span>
             {timestamp_html}
         </div>
         """

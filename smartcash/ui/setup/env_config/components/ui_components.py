@@ -54,7 +54,16 @@ def create_env_config_ui() -> Dict[str, Any]:
     
     # 4. Progress Tracker
     progress_tracker = track_setup_progress()
-    ui_components = {**progress_tracker.ui_components}
+    
+    # Initialize UI components dictionary with progress tracker components
+    ui_components = {
+        'progress_tracker': progress_tracker,
+        'progress_container': progress_tracker.progress_container
+    }
+    
+    # Add any additional components from the progress tracker
+    if hasattr(progress_tracker, 'ui_components'):
+        ui_components.update(progress_tracker.ui_components)
     
     # 5. Log Accordion
     log_accordion = create_log_accordion(
@@ -98,7 +107,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         header,
         status_panel,
         setup_button_container,
-        progress_tracker.ui_components['progress_container'],
+        ui_components['progress_container'],  # Use the progress container directly
         log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
         create_divider(),
         setup_summary,

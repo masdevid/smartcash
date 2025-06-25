@@ -185,8 +185,15 @@ class DualProgressTracker:
         Returns:
             The progress container widget
         """
-        if not self._initialized:
-            self._init_tracker()
+        self._init_tracker()
+        if not hasattr(self, '_progress_container') or self._progress_container is None:
+            # Fallback to getting container from the tracker if not set
+            if hasattr(self, '_new_tracker') and self._new_tracker is not None:
+                self._progress_container = self._new_tracker.container
+            else:
+                # Last resort, create a simple container
+                import ipywidgets as widgets
+                self._progress_container = widgets.VBox()
         return self._progress_container
         
     @property

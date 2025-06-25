@@ -125,60 +125,72 @@ class StatusCheckHandler:
             'handle_package_status_check': self.handle_package_status_check
         }
     
+    @with_button_context('system_report_button')
     def handle_system_report(self) -> None:
         """Generate and display a comprehensive system report."""
-        with with_button_context(self.ui, 'system_report_button'):
-            try:
-                self._update_status("🔍 Collecting system information...", "info")
-                show_progress_tracker_safe(self.ui, "System Analysis")
-                
-                self.logger.info("🔍 Generating system compatibility report...")
-                
-                # Collect system information
-                self._update_progress(20, "Collecting system info")
-                system_info = get_comprehensive_system_info()
-                
-                # Generate compatibility report
-                self._update_progress(50, "Checking compatibility")
-                compatibility_report = generate_system_compatibility_report(system_info)
-                
-                # Log and finalize report
-                self._update_progress(80, "Generating report")
-                self._log_system_report(system_info, compatibility_report)
-                
-                # Show completion
-                self._update_progress(100, "Report completed")
-                summary = self._generate_report_summary(system_info, compatibility_report)
-                complete_operation_with_message(self.ui, f"✅ {summary}")
-                self.logger.info(f"📊 System report completed: {summary}")
-                
-            except Exception as e:
-                self._handle_error("System report", e)
+        try:
+            self._update_status("🔍 Collecting system information...", "info")
+            show_progress_tracker_safe(self.ui, "System Analysis")
+            
+            self.logger.info("🔍 Generating system compatibility report...")
+            
+            # Collect system information
+            self._update_progress(20, "Collecting system info")
+            system_info = get_comprehensive_system_info()
+            
+            # Generate compatibility report
+            self._update_progress(50, "Checking compatibility")
+            compatibility_report = generate_system_compatibility_report(system_info)
+            
+            # Log and finalize report
+            self._update_progress(80, "Generating report")
+            self._log_system_report(system_info, compatibility_report)
+            
+            # Show completion
+            self._update_progress(100, "Report completed")
+            summary = self._generate_report_summary(system_info, compatibility_report)
+            complete_operation_with_message(self.ui, f"✅ {summary}")
+            self.logger.info(f"📊 System report completed: {summary}")
+            
+        except Exception as e:
+            self._handle_error("System report", e)
     
+    @with_button_context('check_button')
     def handle_package_status_check(self) -> None:
         """Check and display the status of selected packages."""
-        with with_button_context(self.ui, 'check_button'):
+        try:
+            selected_packages = get_selected_packages(self.ui.get('package_selector', {}))
+            
+            if not selected_packages:
+                self._update_status("⚠️ No packages selected", "warning")
+                return
+            
+            self._update_status(f"🔍 Checking status of {len(selected_packages)} packages...", "info")
+            show_progress_tracker_safe(self.ui, "Package Status Check")
+            self.logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
+            
             try:
-                selected_packages = get_selected_packages(self.ui.get('package_selector', {}))
-                
-                if not selected_packages:
-                    self._update_status("⚠️ No packages selected", "warning")
-                    return
-                
-                self._update_status(f"🔍 Checking status of {len(selected_packages)} packages...", "info")
-                show_progress_tracker_safe(self.ui, "Package Status Check")
-                self.logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
-                
                 # Check packages status
                 results = self._check_packages_status_batch(selected_packages)
                 
-                # Generate status summary
+                # Update status with results
                 summary = self._generate_status_summary(results)
-                complete_operation_with_message(self.ui, f"✅ {summary}")
-                self.logger.info(f"📊 Status check completed: {summary}")
+                self._update_status(summary, "success" if not results.get('errors') else "warning")
+                
+                # Log detailed results
+                self.logger.info(f"✅ Status check completed: {len(results.get('installed', []))} installed, "
+                              f"{len(results.get('not_installed', []))} not installed, "
+                              f"{len(results.get('errors', []))} errors")
+                
+                # Show detailed results in UI if enabled
+                if self.config.show_detailed_logs:
+                    self.logger.debug(f"Detailed package status: {results}")
                 
             except Exception as e:
-                self._handle_error("Status check", e)
+                self._handle_error("Package status check", e)
+        
+        except Exception as e:
+            self._handle_error("Status check", e)
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
         """Update the status panel with a message.

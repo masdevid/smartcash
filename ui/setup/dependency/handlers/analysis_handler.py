@@ -17,6 +17,7 @@ from smartcash.ui.setup.dependency.utils.package.installer import (
     check_package_installation_status,
     get_installed_packages_dict
 )
+from smartcash.ui.setup.dependency.utils.ui.state import with_button_context
 # Package status utilities will be imported here if needed in the future
 from smartcash.ui.setup.dependency.utils.ui.components.buttons import with_button_state
 from smartcash.ui.setup.dependency.utils.ui.state import (
@@ -68,13 +69,13 @@ class AnalysisHandler:
         if button := self.ui.get('analyze_button'):
             button.on_click(lambda _: self.handle_analysis())
     
+    @with_button_context('analyze_button')
     def handle_analysis(self) -> None:
         """Handle package analysis with progress tracking."""
-        with with_button_context(self.ui, 'analyze_button'):
-            try:
-                self._perform_analysis()
-            except Exception as e:
-                self._handle_analysis_error(e)
+        try:
+            self._perform_analysis()
+        except Exception as e:
+            self._handle_analysis_error(e)
     
     def _perform_analysis(self) -> None:
         """Execute the analysis workflow."""

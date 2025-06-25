@@ -27,19 +27,31 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     # Create log accordion
     log_accordion = create_log_accordion()
     
-    # Layout containers - remove header from main_container since it's already in header
-    form_container = widgets.VBox([
+    # Ensure all components are widgets
+    form_container_children = [
         create_responsive_two_column(ratio_section, path_section),
-        form_components['save_reset_container']
-    ], layout=widgets.Layout(width='100%', margin='10px 0'))
+        form_components.get('save_reset_container', widgets.HTML(''))
+    ]
     
-    main_container = widgets.VBox([
-        header, 
-        form_components['status_panel'], 
-        form_container, 
-        info_accordion,
-        log_accordion
-    ], layout=widgets.Layout(width='100%', padding='10px'))
+    # Create form container
+    form_container = widgets.VBox(
+        [c for c in form_container_children if c is not None],
+        layout=widgets.Layout(width='100%', margin='10px 0')
+    )
+    
+    # Create main container with all widgets
+    main_children = [
+        header,
+        form_components.get('status_panel', widgets.HTML('')),
+        form_container,
+        info_accordion if info_accordion is not None else widgets.HTML(''),
+        log_accordion if log_accordion is not None else widgets.HTML('')
+    ]
+    
+    main_container = widgets.VBox(
+        [c for c in main_children if c is not None],
+        layout=widgets.Layout(width='100%', padding='10px')
+    )
     
     components = {
         'header': header, 

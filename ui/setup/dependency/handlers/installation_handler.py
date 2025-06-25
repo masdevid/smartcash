@@ -40,6 +40,7 @@ def setup_installation_handler(ui_components: UIComponents) -> Dict[str, Callabl
     """
     logger = ui_components.get('logger', get_logger(__name__))
     
+    @with_button_context('install_button')
     def handle_installation() -> None:
         """Handle package installation with progress tracking.
         
@@ -49,27 +50,26 @@ def setup_installation_handler(ui_components: UIComponents) -> Dict[str, Callabl
         - Starting the installation process
         - Updating the UI with progress and results
         """
-        with with_button_context(ui_components, 'install_button'):
-            try:
-                # Extract and validate packages
-                selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
-                custom_packages = _get_custom_packages(ui_components)
-                all_packages = selected_packages + custom_packages
-                
-                if not all_packages:
-                    update_status_panel(ui_components, "⚠️ No packages selected", "warning")
-                    return
-                
-                # Get installation configuration
-                config = _extract_installation_config(ui_components)
-                
-                # Start installation process
-                _start_installation(ui_components, all_packages, config, logger)
-                
-            except Exception as e:
-                error_msg = f"❌ Installation error: {str(e)}"
-                update_status_panel(ui_components, error_msg, "error")
-                logger.error(f"Installation error: {str(e)}", exc_info=True)
+        try:
+            # Extract and validate packages
+            selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
+            custom_packages = _get_custom_packages(ui_components)
+            all_packages = selected_packages + custom_packages
+            
+            if not all_packages:
+                update_status_panel(ui_components, "⚠️ No packages selected", "warning")
+                return
+            
+            # Get installation configuration
+            config = _extract_installation_config(ui_components)
+            
+            # Start installation process
+            _start_installation(ui_components, all_packages, config, logger)
+            
+        except Exception as e:
+            error_msg = f"❌ Installation error: {str(e)}"
+            update_status_panel(ui_components, error_msg, "error")
+            logger.error(f"Installation error: {str(e)}", exc_info=True)
     
     # Setup button handler
     install_button = ui_components.get('install_button')

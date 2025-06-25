@@ -420,30 +420,28 @@ def create_log_accordion(
         # Add border for duplicate messages
         border_style = '2px solid #e9ecef' if entry.get('show_duplicate_indicator', False) else 'none'
         
-        # Build the HTML for the log entry with improved layout
+        # Build the HTML for the log entry with row layout
         html_parts = [
             f'<div style="margin:0 0 1px 0;padding:2px 8px 2px 6px;border-radius:2px;'
             f'background-color:{style["bg"]};border-left:2px solid {style["color"]};'
             f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
             f'font-size:12px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
-            f'overflow-wrap:break-word;display:flex;align-items:stretch;gap:6px;'
+            f'overflow-wrap:break-word;display:flex;flex-direction:row;align-items:flex-start;gap:6px;'
             f'border-right:{border_style};border-left:{border_style};">',
-            # Icon container with middle alignment
+            # Icon container
             f'<div style="display:flex;align-items:center;flex-shrink:0;font-size:12px;line-height:1.5;">',
             f'{style["icon"]}',
             '</div>',
-            # Main content area with message and namespace
-            f'<div style="flex:1;display:flex;flex-direction:column;min-width:0;">',
-            f'<div style="color:{style["color"]};flex:1;display:flex;align-items:flex-start;gap:4px;line-height:1.5;">',
+            # Message and namespace in a row
+            f'<div style="flex:1;display:flex;flex-direction:row;align-items:flex-start;gap:4px;line-height:1.5;min-width:0;">',
+            f'<div style="color:{style["color"]};flex:1;display:flex;flex-direction:row;align-items:flex-start;gap:4px;">',
             f'{ns_badge if ns_badge else ""}',
             f'<span style="flex:1;">{entry["message"]}</span>',
-            '</div>',  # End of message row
-            '</div>',  # End of main content
-            # Timestamp on the right
-            f'<div style="flex-shrink:0;align-self:flex-start;color:#6c757d;font-size:10px;'
-            f'font-family:monospace;white-space:nowrap;margin-left:4px;line-height:1.5;">',
+            '</div>',  # End of message content
+            f'<div style="color:#6c757d;font-size:10px;font-family:monospace;white-space:nowrap;margin-left:4px;line-height:1.5;">',
             f'{timestamp}',
-            '</div>',
+            '</div>',  # End of timestamp
+            '</div>',  # End of message row
             '</div>'  # End of log entry
         ]
         

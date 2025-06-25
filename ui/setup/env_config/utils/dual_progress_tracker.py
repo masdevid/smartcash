@@ -5,6 +5,7 @@ Deskripsi: Dual progress tracker implementation using the new ProgressTracker co
 
 from typing import Dict, Any, Optional, List, Callable
 from enum import Enum, auto
+import ipywidgets as widgets
 from smartcash.ui.components.progress_tracker.factory import create_dual_progress_tracker
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker as NewProgressTracker
 
@@ -58,7 +59,6 @@ class DualProgressTracker:
                 self._progress_container = self._new_tracker.container
             else:
                 # Fallback if container is not available
-                import ipywidgets as widgets
                 self._progress_container = widgets.VBox()
                 
             # Ensure the container is visible
@@ -81,7 +81,6 @@ class DualProgressTracker:
             print(f"Error initializing progress tracker: {e}")
             print(traceback.format_exc())
             # Fallback to a simple container
-            import ipywidgets as widgets
             self._progress_container = widgets.VBox()
             self._initialized = True
             return self._progress_container
@@ -218,7 +217,7 @@ class DualProgressTracker:
             
             # Last resort, create a simple container
             if self._progress_container is None:
-                import ipywidgets as widgets
+                from ipywidgets import widgets
                 self._progress_container = widgets.VBox()
                 
             # Ensure the container is visible

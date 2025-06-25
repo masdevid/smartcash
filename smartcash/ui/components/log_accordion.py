@@ -428,7 +428,6 @@ def create_log_accordion(
             f'font-size:12px;line-height:1.3;word-break:break-word;white-space:pre-wrap;'
             f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:20px;'
             f'border-right:{border_style};border-left:{border_style};">',
-            f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin:1px 4px 0 0;white-space:nowrap;align-self:flex-start;">{timestamp}</span>',
             f'<span style="font-size:12px;margin:0 2px 0 0;line-height:1;display:inline-flex;align-items:center;">{style["icon"]}</span>'
         ]
         
@@ -436,10 +435,10 @@ def create_log_accordion(
         if ns_badge:
             html_parts.append(ns_badge)
             
-        # Add the message and timestamp, then close the div
+        # Add the message, timestamp, and close the div
         html_parts.extend([
             f'<span style="color:{style["color"]};flex:1;margin:0;line-height:1.3;">{entry["message"]}</span>',
-            timestamp_html,
+            f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin-left:8px;white-space:nowrap;align-self:flex-start;">{timestamp}</span>',
             '</div>'
         ])
         

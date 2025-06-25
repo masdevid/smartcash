@@ -95,6 +95,21 @@ class DualProgressTracker:
         # Notify callbacks
         self._notify_callbacks(message or "")
     
+    def update_within_stage(self, current: int, total: int, message: Optional[str] = None):
+        """
+        Update progress within the current stage using item counts
+        
+        Args:
+            current: Current item number (1-based)
+            total: Total number of items in this stage
+            message: Optional status message
+        """
+        if total <= 0:
+            return
+            
+        progress = (current / total) * 100
+        self.update_progress(progress, message or f"Processing item {current} of {total}")
+    
     def complete_stage(self, message: Optional[str] = None):
         """Mark the current stage as complete"""
         if self.current_stage is None:
@@ -169,6 +184,26 @@ class DualProgressTracker:
     def ui_components(self) -> Dict[str, Any]:
         """Get the UI components dictionary"""
         return self.components
+        
+    def show(self):
+        """Make the progress container visible"""
+        if not hasattr(self.container, 'layout'):
+            return
+            
+        # Try visibility first
+        if hasattr(self.container.layout, 'visibility'):
+            self.container.layout.visibility = 'visible'
+        # Fall back to display
+        if hasattr(self.container.layout, 'display'):
+            self.container.layout.display = 'flex'
+            
+    def hide(self):
+        """Hide the progress container"""
+        if hasattr(self.container, 'layout'):
+            if hasattr(self.container.layout, 'visibility'):
+                self.container.layout.visibility = 'hidden'
+            elif hasattr(self.container.layout, 'display'):
+                self.container.layout.display = 'none'
 
 # Backward compatibility
 track_setup_progress = DualProgressTracker

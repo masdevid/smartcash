@@ -59,17 +59,39 @@ class DualProgressTracker:
             max=100,
             description='Progress:',
             bar_style='info',
-            orientation='horizontal'
+            orientation='horizontal',
+            layout={
+                'width': '100%',
+                'visibility': 'visible',
+                'display': 'flex'
+            }
         )
         
         # Status text
-        self.status_text = HTML(value="<i>Ready to start setup...</i>")
+        self.status_text = HTML(
+            value="<i>Ready to start setup...</i>",
+            layout={
+                'width': '100%',
+                'visibility': 'visible',
+                'display': 'block'
+            }
+        )
         
-        # Main container
-        self.container = VBox([
-            self.progress_bar,
-            self.status_text
-        ])
+        # Main container with visible layout
+        self.container = VBox(
+            [self.progress_bar, self.status_text],
+            layout={
+                'width': '100%',
+                'visibility': 'visible',
+                'display': 'flex',
+                'flex_flow': 'column',
+                'align_items': 'stretch',
+                'padding': '10px',
+                'border': '1px solid #e0e0e0',
+                'border_radius': '5px',
+                'margin': '5px 0'
+            }
+        )
     
     def update_stage(self, stage: SetupStage, message: Optional[str] = None):
         """Update the current stage of the setup process"""
@@ -200,12 +222,19 @@ class DualProgressTracker:
         if not hasattr(self.container, 'layout'):
             return
             
-        # Try visibility first
-        if hasattr(self.container.layout, 'visibility'):
-            self.container.layout.visibility = 'visible'
-        # Fall back to display
-        if hasattr(self.container.layout, 'display'):
-            self.container.layout.display = 'flex'
+        # Ensure the container and its children are visible
+        for widget in [self.container, self.progress_bar, self.status_text]:
+            if hasattr(widget, 'layout'):
+                if hasattr(widget.layout, 'visibility'):
+                    widget.layout.visibility = 'visible'
+                if hasattr(widget.layout, 'display'):
+                    widget.layout.display = 'flex' if widget == self.container else 'block'
+        
+        # Ensure the container is properly sized
+        if hasattr(self.container.layout, 'width'):
+            self.container.layout.width = '100%'
+        if hasattr(self.container.layout, 'height') and self.container.layout.height is None:
+            self.container.layout.height = 'auto'
             
     def hide(self):
         """Hide the progress container"""

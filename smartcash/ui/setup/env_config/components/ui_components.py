@@ -53,8 +53,8 @@ def create_env_config_ui() -> Dict[str, Any]:
     status_panel = create_status_panel("Siap untuk setup environment", "info")
     
     # 4. Progress Tracker
-    ui_components = {}
-    progress_tracker = track_setup_progress(ui_components)
+    progress_tracker = track_setup_progress()
+    ui_components = {**progress_tracker.ui_components}
     
     # 5. Log Accordion
     log_accordion = create_log_accordion(

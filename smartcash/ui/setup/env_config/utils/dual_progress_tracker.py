@@ -39,6 +39,7 @@ class DualProgressTracker:
         self.callbacks = []
         self._initialized = False
         self._new_tracker: Optional[NewProgressTracker] = None
+        self._progress_container = None
         
     def _init_tracker(self):
         """Initialize the underlying progress tracker if not already done."""
@@ -52,12 +53,12 @@ class DualProgressTracker:
         )
         
         # Initialize the progress container
-        self.progress_container = self._new_tracker.container
+        self._progress_container = self._new_tracker.container
         
         # Add to UI components if provided
         if self.ui_components:
             self.ui_components['progress_tracker'] = self._new_tracker
-            self.ui_components['progress_container'] = self.progress_container
+            self.ui_components['progress_container'] = self._progress_container
             
         self._initialized = True
     
@@ -177,6 +178,31 @@ class DualProgressTracker:
         # Update the overall progress bar
         self._new_tracker.update_overall(self.overall_progress)
     
+    @property
+    def progress_container(self):
+        """Get the progress container widget.
+        
+        Returns:
+            The progress container widget
+        """
+        if not self._initialized:
+            self._init_tracker()
+        return self._progress_container
+        
+    @property
+    def ui_components(self) -> Dict[str, Any]:
+        """Get the UI components dictionary with progress container.
+        
+        Returns:
+            Dictionary containing UI components including progress container
+        """
+        if not self._initialized:
+            self._init_tracker()
+        return {
+            'progress_tracker': self._new_tracker,
+            'progress_container': self.progress_container
+        }
+
     def _process_callbacks(self, stage: SetupStage, progress: int, message: str):
         """Process all registered callbacks.
         

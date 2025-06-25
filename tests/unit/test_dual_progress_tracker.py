@@ -50,16 +50,52 @@ class TestDualProgressTracker(unittest.TestCase):
     def test_update_within_stage(self):
         """Test updating progress using item counts"""
         self.tracker.update_stage(SetupStage.ENV_SETUP)
+        
+        # Test with integer inputs
         self.tracker.update_within_stage(3, 10, "Processing items")
         self.assertEqual(self.tracker.stage_progress, 30)
         self.assertIn("Processing items", self.tracker.status_text.value)
         
+        # Test with string inputs
+        self.tracker.update_within_stage("5", "10", "String inputs")
+        self.assertEqual(self.tracker.stage_progress, 50)
+        
         # Test edge cases
         self.tracker.update_within_stage(0, 0, "Should not update")
-        self.assertEqual(self.tracker.stage_progress, 30)  # Should remain unchanged
+        self.assertEqual(self.tracker.stage_progress, 50)  # Should remain unchanged
         
         self.tracker.update_within_stage(1, 1, "Single item")
         self.assertEqual(self.tracker.stage_progress, 100)
+        
+    def test_update_within_stage_invalid_inputs(self):
+        """Test update_within_stage with invalid inputs"""
+        # Save original error handler
+        original_error = self.tracker.error
+        error_messages = []
+        
+        def mock_error(msg):
+            error_messages.append(msg)
+            
+        try:
+            self.tracker.error = mock_error
+            
+            # Test with invalid string inputs
+            self.tracker.update_within_stage("invalid", "10", "Invalid current")
+            self.assertIn("Invalid progress values", error_messages[-1])
+            
+            self.tracker.update_within_stage(5, "invalid", "Invalid total")
+            self.assertIn("Invalid progress values", error_messages[-1])
+            
+            # Test with None values
+            self.tracker.update_within_stage(None, 10, "None current")
+            self.assertIn("Invalid progress values", error_messages[-1])
+            
+            self.tracker.update_within_stage(5, None, "None total")
+            self.assertIn("Invalid progress values", error_messages[-1])
+            
+        finally:
+            # Restore original error handler
+            self.tracker.error = original_error
 
     def test_complete_stage(self):
         """Test completing the current stage"""

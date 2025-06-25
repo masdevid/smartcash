@@ -100,15 +100,25 @@ class DualProgressTracker:
         Update progress within the current stage using item counts
         
         Args:
-            current: Current item number (1-based)
-            total: Total number of items in this stage
+            current: Current item number (1-based, can be string or int)
+            total: Total number of items in this stage (can be string or int)
             message: Optional status message
         """
-        if total <= 0:
-            return
+        try:
+            # Convert to integers if they're strings
+            current = int(current)
+            total = int(total)
             
-        progress = (current / total) * 100
-        self.update_progress(progress, message or f"Processing item {current} of {total}")
+            if total <= 0:
+                return
+                
+            progress = (current / total) * 100
+            self.update_progress(progress, message or f"Processing item {current} of {total}")
+        except (TypeError, ValueError) as e:
+            error_msg = f"Invalid progress values - current: {current}, total: {total}"
+            if self.logger:
+                self.logger.error(f"{error_msg}: {e}")
+            self.error(error_msg)
     
     def complete_stage(self, message: Optional[str] = None):
         """Mark the current stage as complete"""

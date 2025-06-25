@@ -5,13 +5,13 @@ Deskripsi: Setup handler untuk environment configuration dengan proper workflow
 
 import os
 import time
+from enum import Enum
 from typing import Dict, Any
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
 from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.setup.env_config.utils.ui_updater import update_progress_bar, update_status_panel
+from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
 from smartcash.ui.setup.env_config.utils.progress_tracker import track_setup_progress, SetupStage
-from enum import Enum
 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
 
 class SetupHandler:
@@ -67,7 +67,6 @@ class SetupHandler:
             
             # Only update the summary if we have new data
             if 'setup_summary' in ui_components:
-                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
                 try:
                     status_msg = (
                         "✅ Environment setup completed successfully!" if summary_data.get('status') == 'success'
@@ -391,9 +390,8 @@ class SetupHandler:
             self.logger.error(error_msg)
             summary_data['status'] = False
             
-            # Update the setup summary with error information
+            # Update setup summary
             if 'setup_summary' in ui_components:
-                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
                 update_setup_summary(
                     ui_components['setup_summary'],
                     status_message=error_msg,

@@ -39,8 +39,8 @@ class UILogger:
         console_fallback = False
         
         try:
-            # Siapkan pesan untuk console fallback
-            timestamp = datetime.now().strftime('%H:%M:%S')
+            # Prepare message for console fallback with timezone
+            timestamp = datetime.now().astimezone().strftime('%H:%M:%S %Z')
             clean_msg = _clean_message(message)
             emoji = _get_emoji(level)
             console_msg = f"[{timestamp}] {emoji} {clean_msg}"
@@ -67,32 +67,43 @@ class UILogger:
                 # Add namespace badge if available
                 namespace_badge = ''
                 try:
-                    from smartcash.ui.utils.ui_logger_namespace import get_namespace_id, get_namespace_name
-                    namespace_id = get_namespace_id(self.ui_components)
-                    if namespace_id:
-                        namespace = get_namespace_name(namespace_id) or f"NS:{namespace_id[:4]}"
+                    # Get namespace ID from the existing call at the top of the function
+                    if 'namespace_id' in locals() and namespace_id:
+                        # Look up the namespace ID in KNOWN_NAMESPACES
+                        from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES
+                        namespace = KNOWN_NAMESPACES.get(namespace_id, f"NS:{namespace_id[:4]}")
                         namespace_badge = (
-                            f'<span style="display:inline-block;padding:0 4px;margin:0 4px 0 2px;'
+                            f'<span style="display:inline-block;padding:1px 4px;margin:1px 4px 0 0;align-self:flex-start;'
                             f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
-                            f'font-size:10px;font-weight:500;line-height:1.2;vertical-align:middle;white-space:nowrap;">'
+                            f'font-size:10px;font-weight:500;line-height:1.2;white-space:nowrap;">'
                             f'{namespace}</span>'
                         )
-                except ImportError:
+                except (ImportError, NameError):
                     pass
                 
-                html = (
-                    f'<div style="margin:1px 0;padding:2px 8px 2px 8px;border-radius:2px;'
+                # Build the HTML with namespace badge if available
+                html_parts = [
+                    f'<div style="margin:1px 0;padding:3px 8px 3px 6px;border-radius:2px;'
                     f'background-color:rgba(248,249,250,0.8);border-left:2px solid {border_color};'
                     f'border-right:{border_style};border-left:{border_style};'
                     f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
-                    f'font-size:12px;line-height:1.2;word-break:break-word;white-space:pre-wrap;'
-                    f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:22px;">'
-                    f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin-right:4px;white-space:nowrap;">[{timestamp}]</span> '
-                    f'<span style="font-size:12px;margin-right:2px;line-height:1;display:inline-flex;align-items:center;">{emoji}</span>'
-                    f'{namespace_badge}'
-                    f'<span style="color:{color};flex:1;margin:0 2px;">{clean_msg}</span>'
-                    f'</div>'
-                )
+                    f'font-size:12px;line-height:1.3;word-break:break-word;white-space:pre-wrap;'
+                    f'overflow-wrap:break-word;display:flex;align-items:flex-start;min-height:22px;">',
+                    f'<span style="color:#6c757d;font-size:10px;font-family:monospace;margin:1px 4px 0 0;white-space:nowrap;align-self:flex-start;">{timestamp}</span>',
+                    f'<span style="font-size:12px;margin:1px 2px 0 0;line-height:1;display:inline-flex;align-items:center;">{emoji}</span>'
+                ]
+                
+                # Add namespace badge if available
+                if namespace_badge:
+                    html_parts.append(namespace_badge)
+                
+                # Add the message and close the div
+                html_parts.extend([
+                    f'<span style="color:{color};flex:1;margin:1px 0 0 0;line-height:1.3;">{clean_msg}</span>',
+                    '</div>'
+                ])
+                
+                html = ''.join(html_parts)
                 
                 widget = next(
                     (self.ui_components[k] for k in ['log_output', 'status', 'output'] 
@@ -156,7 +167,7 @@ def get_current_ui_logger() -> Optional[UILogger]:
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
     if not ui_components or not message or not message.strip(): return
-    clean_msg, timestamp, emoji, color = _clean_message(message), datetime.now().strftime('%H:%M:%S'), icon or _get_emoji(level), _get_color(level); border_color = color
+    clean_msg, timestamp, emoji, color = _clean_message(message), datetime.now().astimezone().strftime('%H:%M:%S %Z'), icon or _get_emoji(level), _get_color(level); border_color = color
     try: 
         from smartcash.ui.utils.ui_logger_namespace import get_namespace_id, get_namespace_color; namespace_id = get_namespace_id(ui_components); border_color = get_namespace_color(namespace_id) if namespace_id else color
     except ImportError: pass

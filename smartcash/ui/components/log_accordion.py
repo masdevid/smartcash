@@ -379,25 +379,32 @@ def create_log_accordion(
                 if ts.tzinfo is None:
                     ts = pytz.utc.localize(ts)
                 
-                local_tz = pytz.timezone('Asia/Jakarta')
-                local_ts = ts.astimezone(local_tz)
-                timestamp = local_ts.strftime('%H:%M:%S.%f')[:-3]
+                # Convert to local timezone with TZ
+                local_ts = ts.astimezone()
+                timestamp = local_ts.strftime('%H:%M:%S %Z')
                 timestamp_html = f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp}</span>"
                 
             except Exception as e:
-                timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3]
+                # Fallback format without timezone if conversion fails
+                timestamp = entry['timestamp'].strftime('%H:%M:%S')
                 timestamp_html = f"<span style='color:#6c757d;font-size:10px;font-family:monospace;margin-left:4px;white-space:nowrap;'>{timestamp}</span>"
         
-        # Create namespace/module prefix
-        ns = entry.get('namespace') or entry.get('module')
+        # Create namespace badge if available
         ns_badge = ''
-        if ns:
-            ns_badge = (
-                f'<span style="display:inline-block;padding:0 4px;margin:0 4px 0 2px;'
-                f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
-                f'font-size:10px;font-weight:500;line-height:1.2;vertical-align:middle;white-space:nowrap;">'
-                f'{ns.split(".")[-1]}</span>'
-            )
+        try:
+            ns = entry.get('namespace') or entry.get('module')
+            if ns:
+                # Try to get namespace from KNOWN_NAMESPACES first
+                from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES
+                ns_display = KNOWN_NAMESPACES.get(ns, ns.split('.')[-1])
+                ns_badge = (
+                    f'<span style="display:inline-block;padding:1px 4px;margin:1px 4px 0 0;align-self:flex-start;'
+                    f'background-color:#f1f3f5;color:#5f3dc4;border-radius:2px;'
+                    f'font-size:10px;font-weight:500;line-height:1.2;white-space:nowrap;">'
+                    f'{ns_display}</span>'
+                )
+        except (ImportError, AttributeError):
+            pass
         
         # Get style for the log level
         style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
@@ -408,14 +415,14 @@ def create_log_accordion(
         # Create the HTML for the log entry
         html = f"""
         <div class='log-entry' style='
-            padding: 2px 8px 2px 8px;
+            padding: 3px 8px 3px 6px;
             margin: 1px 0;
             border-radius: 2px;
             background: {style['bg']};
             color: {style['color']};
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 12px;
-            line-height: 1.2;
+            line-height: 1.3;
             word-break: break-word;
             white-space: pre-wrap;
             border-right: {border_style};
@@ -424,9 +431,9 @@ def create_log_accordion(
             align-items: flex-start;
             min-height: 22px;
         '>
-            <span style='flex-shrink: 0;font-size:12px;margin-right:2px;line-height:1;display:inline-flex;align-items:center;'>{style['icon'] if show_level_icons else ''}</span>
+            <span style='flex-shrink: 0;font-size:12px;margin:1px 2px 0 0;line-height:1;display:inline-flex;align-items:center;'>{style['icon'] if show_level_icons else ''}</span>
             {ns_badge}
-            <span style='flex: 1;margin: 0 2px;'>{entry['message']}</span>
+            <span style='flex: 1;margin: 1px 0 0 0;line-height:1.3;'>{entry['message']}</span>
             {timestamp_html}
         </div>
         """

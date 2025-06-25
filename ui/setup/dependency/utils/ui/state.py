@@ -1,11 +1,30 @@
 """
-File: smartcash/ui/setup/dependency/utils/ui_state_utils.py  
-Deskripsi: UI state management utilities dengan complete function set
+File: smartcash/ui/setup/dependency/utils/ui/state.py
+
+UI state management utilities.
+
+This module provides utilities for managing UI state, progress tracking, and status updates.
 """
 
+# Standard library imports
 import functools
-from typing import Dict, Any, Optional, Callable, List
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
+
+__all__ = [
+    'ProgressSteps',
+    'create_operation_context',
+    'update_status_panel',
+    'log_to_ui_safe',
+    'update_progress_step',
+    'show_progress_tracker_safe',
+    'reset_progress_tracker_safe',
+    'complete_operation_with_message',
+    'error_operation_with_message',
+    'update_package_status_by_name',
+    'batch_update_package_status',
+    'with_button_context'
+]
 
 class ProgressSteps(Enum):
     """Progress steps enumeration"""

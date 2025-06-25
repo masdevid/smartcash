@@ -13,132 +13,128 @@ logger = get_logger(__name__)
 
 def create_strategy_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     """Buat layout strategy dengan grid system yang aman"""
-    try:
-        from .ui_form import create_config_summary_card
-        
-        # Fungsi helper untuk mendapatkan komponen dengan aman
-        def get_component(key: str, default=None):
-            widget = form_components.get(key)
-            if widget is None:
-                logger.warning(f"⚠️ Komponen {key} tidak ditemukan, menggunakan default")
-                return default or widgets.HTML(f"<div style='color: red;'>⚠️ {key} not found</div>")
-            return widget
-        
-        # ===== GRID LAYOUT =====
-        grid = widgets.GridBox(
-            layout=widgets.Layout(
-                width='100%',
-                grid_gap='15px',
-                padding='10px',
-                grid_template_columns='repeat(2, 1fr)',
-                grid_template_rows='auto auto auto auto auto',
-                grid_template_areas='''
-                    "header header"
-                    "summary summary"
-                    "validation training"
-                    "multiscale multiscale"
-                    "controls controls"
-                '''
-            )
-        )
-        
-        # ===== KOMPONEN UTAMA =====
-        # Header
-        header = widgets.VBox([
-            widgets.HTML("<h2 style='color: #8E44AD; margin: 10px 0;'>🎯 Konfigurasi Strategy Training</h2>"),
-            widgets.HTML("<p style='color: #666; margin: 5px 0 15px 0;'><i>Konfigurasi strategi training yang tidak overlap dengan hyperparameters</i></p>")
-        ], layout=widgets.Layout(grid_area='header'))
-        
-        # Summary card
-        config = _extract_config_from_form(form_components)
-        summary_card = create_config_summary_card(config)
-        summary_card.layout.grid_area = 'summary'
-        
-        # ===== BAGIAN VALIDASI =====
-        validation_section = widgets.VBox([
-            widgets.HTML("<h3 style='color: #2C3E50; margin: 10px 0;'>🔍 Validasi</h3>"),
-            get_component('val_frequency_slider'),
-            get_component('iou_thres_slider'),
-            get_component('conf_thres_slider'),
-            get_component('max_detections_slider')
-        ], layout=widgets.Layout(
-            grid_area='validation',
-            border='1px solid #E0E0E0',
-            padding='15px',
-            border_radius='8px'
-        ))
-        
-        # ===== BAGIAN TRAINING =====
-        training_section = widgets.VBox([
-            widgets.HTML("<h3 style='color: #2C3E50; margin: 10px 0;'>⚙️ Training</h3>"),
-            get_component('experiment_name_text'),
-            get_component('tensorboard_checkbox'),
-            get_component('log_metrics_slider'),
-            get_component('visualize_batch_slider'),
-            get_component('layer_mode_dropdown')
-        ], layout=widgets.Layout(
-            grid_area='training',
-            border='1px solid #E0E0E0',
-            padding='15px',
-            border_radius='8px'
-        ))
-        
-        # ===== BAGIAN MULTI-SCALE =====
-        multiscale_section = widgets.VBox([
-            widgets.HTML("<h3 style='color: #2C3E50; margin: 10px 0;'>🔄 Multi-scale Training</h3>"),
-            get_component('multi_scale_checkbox'),
-            widgets.HBox([
-                get_component('img_size_min_slider'),
-                get_component('img_size_max_slider')
-            ])
-        ], layout=widgets.Layout(
-            grid_area='multiscale',
-            border='1px solid #E0E0E0',
-            padding='15px',
-            border_radius='8px'
-        ))
-        
-        # ===== TOMBOL AKSI =====
-        controls_section = widgets.HBox([
-            get_component('save_button'),
-            get_component('reset_button')
-        ], layout=widgets.Layout(
-            grid_area='controls',
-            justify_content='flex-end',
-            margin='10px 0'
-        ))
-        
-        # ===== GABUNGKAN SEMUA KOMPONEN =====
-        grid.children = [
-            header,
-            summary_card,
-            validation_section,
-            training_section,
-            multiscale_section,
-            controls_section
-        ]
-        
-        # ===== HASIL AKHIR =====
-        layout_components = {
-            'main_layout': grid,
-            'header': header,
-            'summary_card': summary_card,
-            'validation_section': validation_section,
-            'training_section': training_section,
-            'multiscale_section': multiscale_section,
-            'controls_section': controls_section
-        }
-        
-        # Gabungkan dengan form components
-        layout_components.update(form_components)
-        
-        logger.info("✅ Layout strategy berhasil dibuat")
-        return layout_components
-        
-    except Exception as e:
-        logger.error(f"❌ Gagal membuat layout strategy: {str(e)}")
-        raise
 
+    from smartcash.ui.strategy.components.ui_form import create_config_summary_card
+    
+    # Fungsi helper untuk mendapatkan komponen dengan aman
+    def get_component(key: str, default=None):
+        widget = form_components.get(key)
+        if widget is None:
+            logger.warning(f"⚠️ Komponen {key} tidak ditemukan, menggunakan default")
+            return default or widgets.HTML(f"<div style='color: red;'>⚠️ {key} not found</div>")
+        return widget
+    
+    # ===== GRID LAYOUT =====
+    grid = widgets.GridBox(
+        layout=widgets.Layout(
+            width='100%',
+            grid_gap='15px',
+            padding='10px',
+            grid_template_columns='repeat(2, 1fr)',
+            grid_template_rows='auto auto auto auto auto',
+            grid_template_areas='''
+                "header header"
+                "summary summary"
+                "validation training"
+                "multiscale multiscale"
+                "controls controls"
+            '''
+        )
+    )
+    
+    # ===== KOMPONEN UTAMA =====
+    # Header
+    header = widgets.VBox([
+        widgets.HTML("<h2 style='color: #8E44AD; margin: 10px 0;'>🎯 Konfigurasi Strategy Training</h2>"),
+        widgets.HTML("<p style='color: #666; margin: 5px 0 15px 0;'><i>Konfigurasi strategi training yang tidak overlap dengan hyperparameters</i></p>")
+    ], layout=widgets.Layout(grid_area='header'))
+    
+    # Summary card
+    config = _extract_config_from_form(form_components)
+    summary_card = create_config_summary_card(config)
+    summary_card.layout.grid_area = 'summary'
+    
+    # ===== BAGIAN VALIDASI =====
+    validation_section = widgets.VBox([
+        widgets.HTML("<h3 style='color: #2C3E50; margin: 10px 0;'>🔍 Validasi</h3>"),
+        get_component('val_frequency_slider'),
+        get_component('iou_thres_slider'),
+        get_component('conf_thres_slider'),
+        get_component('max_detections_slider')
+    ], layout=widgets.Layout(
+        grid_area='validation',
+        border='1px solid #E0E0E0',
+        padding='15px',
+        border_radius='8px'
+    ))
+    
+    # ===== BAGIAN TRAINING =====
+    training_section = widgets.VBox([
+        widgets.HTML("<h3 style='color: #2C3E50; margin: 10px 0;'>⚙️ Training</h3>"),
+        get_component('experiment_name_text'),
+        get_component('tensorboard_checkbox'),
+        get_component('log_metrics_slider'),
+        get_component('visualize_batch_slider'),
+        get_component('layer_mode_dropdown')
+    ], layout=widgets.Layout(
+        grid_area='training',
+        border='1px solid #E0E0E0',
+        padding='15px',
+        border_radius='8px'
+    ))
+    
+    # ===== BAGIAN MULTI-SCALE =====
+    multiscale_section = widgets.VBox([
+        widgets.HTML("<h3 style='color: #2C3E50; margin: 10px 0;'>🔄 Multi-scale Training</h3>"),
+        get_component('multi_scale_checkbox'),
+        widgets.HBox([
+            get_component('img_size_min_slider'),
+            get_component('img_size_max_slider')
+        ])
+    ], layout=widgets.Layout(
+        grid_area='multiscale',
+        border='1px solid #E0E0E0',
+        padding='15px',
+        border_radius='8px'
+    ))
+    
+    # ===== TOMBOL AKSI =====
+    controls_section = widgets.HBox([
+        get_component('save_button'),
+        get_component('reset_button')
+    ], layout=widgets.Layout(
+        grid_area='controls',
+        justify_content='flex-end',
+        margin='10px 0'
+    ))
+    
+    # ===== GABUNGKAN SEMUA KOMPONEN =====
+    grid.children = [
+        header,
+        summary_card,
+        validation_section,
+        training_section,
+        multiscale_section,
+        controls_section
+    ]
+    
+    # ===== HASIL AKHIR =====
+    ui_components = {
+        'main_layout': grid,
+        'header': header,
+        'summary_card': summary_card,
+        'validation_section': validation_section,
+        'training_section': training_section,
+        'multiscale_section': multiscale_section,
+        'controls_section': controls_section
+    }
+    
+    # Gabungkan dengan form components
+    ui_components.update(form_components)
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(ui_components)
+    return ui_components
+   
 
 def _extract_config_from_form(form_components: Dict[str, Any]) -> Dict[str, Any]:
     """Extract config dari form components untuk summary"""
@@ -205,4 +201,3 @@ def setup_dynamic_summary_updates(ui_components: Dict[str, Any]) -> None:
         if widget:
             widget.observe(on_value_change, names='value')
     
-    logger.info("🔄 Dynamic summary updates berhasil di-setup")

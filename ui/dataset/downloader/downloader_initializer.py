@@ -13,10 +13,10 @@ class DownloaderInitializer(CommonInitializer):
     """Downloader initializer dengan complete UI dan backend service integration"""
     
     def __init__(self):
+        self.parent_module = 'dataset'  # Store parent module as instance variable
         super().__init__(
             module_name='downloader',
-            config_handler_class=DownloaderConfigHandler,
-            parent_module='dataset'
+            config_handler_class=DownloaderConfigHandler
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:

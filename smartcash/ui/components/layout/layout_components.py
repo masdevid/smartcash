@@ -133,10 +133,15 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
         left_width, right_width = kwargs.get('left_width', '48%'), kwargs.get('right_width', '48%')
         vertical_align = kwargs.get('vertical_align', 'flex-start')
         
-        left_layout = LAYOUTS['two_column_left'].copy()
-        left_layout.width = left_width
-        right_layout = LAYOUTS['two_column_right'].copy()
-        right_layout.width = right_width
+        # Create new layout objects instead of copying
+        left_layout = widgets.Layout(**{
+            **LAYOUTS['two_column_left'],
+            'width': left_width
+        })
+        right_layout = widgets.Layout(**{
+            **LAYOUTS['two_column_right'],
+            'width': right_width
+        })
         
         left_wrapper = widgets.VBox([left_content], layout=left_layout)
         right_wrapper = widgets.VBox([right_content], layout=right_layout)

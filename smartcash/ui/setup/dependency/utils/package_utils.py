@@ -1,243 +1,259 @@
 """
-File: smartcash/ui/setup/dependency/utils/package_utils.py
-Deskripsi: Fixed package utilities dengan konsisten return types dan error handling
+Package Utility Functions.
+
+This module provides utility functions for working with package configurations,
+including filtering, searching, and validating package data.
 """
+from typing import Any, Dict, List, Optional, Tuple
+import os
 
-from typing import Dict, Any, List, Tuple, Optional
-import subprocess
-import sys
-import json
-import re
-from importlib.metadata import distributions, version, PackageNotFoundError
-from importlib.metadata import packages_distributions
+from smartcash.common.logger import get_logger
 
-# Cache untuk distribusi yang sudah dimuat
-_DISTRIBUTIONS_CACHE = None
+logger = get_logger(__name__)
 
-def get_installed_packages_dict() -> Dict[str, str]:
-    """Get normalized dictionary of installed packages dengan versi - one-liner approach"""
-    try:
-        # Primary method: pip list JSON
-        process = subprocess.run([sys.executable, "-m", "pip", "list", "--format=json"], 
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
-        
-        if process.returncode == 0:
-            packages = json.loads(process.stdout)
-            # One-liner normalization dengan multiple variants
-            return {variant: pkg['version'] 
-                   for pkg in packages 
-                   for variant in _get_package_name_variants(pkg['name'].lower())}
-    except Exception:
-        pass
-    
-    # Fallback: importlib.metadata dengan one-liner normalization
-    try:
-        global _DISTRIBUTIONS_CACHE
-        if _DISTRIBUTIONS_CACHE is None:
-            _DISTRIBUTIONS_CACHE = {
-                dist.metadata['Name'].lower(): dist
-                for dist in distributions()
-                if dist.metadata['Name']
-            }
-        
-        return {variant: dist.version 
-               for name, dist in _DISTRIBUTIONS_CACHE.items()
-               for variant in _get_package_name_variants(name)}
-    except Exception as e:
-        print(f"Error getting installed packages: {str(e)}", file=sys.stderr)
-        return {}
-
-def _get_package_name_variants(name: str) -> List[str]:
-    """Get all variants dari package name untuk comprehensive matching - one-liner"""
-    return [name, name.replace('-', '_'), name.replace('_', '-')]
-
-def parse_package_requirement(requirement: str) -> Tuple[str, str]:
-    """Parse pip requirement string menjadi (name, version_spec) - one-liner regex"""
-    requirement = requirement.strip().split('#')[0].strip()  # Remove comments
-    match = re.match(r'^([a-zA-Z0-9_\-\.]+)([<>=!~]+.+)?$', requirement)
-    return (match.group(1).lower(), match.group(2) or "") if match else (requirement.lower(), "")
-
-def check_version_compatibility(installed_version: str, version_spec: str) -> bool:
-    """Check version compatibility dengan fallback - one-liner try/except"""
-    if not version_spec:
-        return True
-    
-    try:
-        return pkg_resources.parse_version(installed_version) in pkg_resources.Requirement.parse(f"dummy{version_spec}").specifier
-    except Exception:
-        # Fallback: simple version comparison
-        return _simple_version_check(installed_version, version_spec)
-
-def _simple_version_check(installed: str, spec: str) -> bool:
-    """Simple version check fallback - one-liner mapping"""
-    comparisons = {
-        '>=': lambda i, r: pkg_resources.parse_version(i) >= pkg_resources.parse_version(r),
-        '==': lambda i, r: i == r,
-        '>': lambda i, r: pkg_resources.parse_version(i) > pkg_resources.parse_version(r),
-        '<=': lambda i, r: pkg_resources.parse_version(i) <= pkg_resources.parse_version(r),
-        '<': lambda i, r: pkg_resources.parse_version(i) < pkg_resources.parse_version(r)
-    }
-    
-    for op, func in comparisons.items():
-        if spec.startswith(op):
-            try:
-                return func(installed, spec[len(op):])
-            except Exception:
-                return True
-    return True
-
-def check_package_installation_status(package_name: str, version_spec: str = "", 
-                                    installed_packages: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-    """Check comprehensive installation status untuk single package"""
-    
-    if installed_packages is None:
-        installed_packages = get_installed_packages_dict()
-    
-    # Check all variants
-    variants = _get_package_name_variants(package_name.lower())
-    installed_version = next((installed_packages[variant] for variant in variants if variant in installed_packages), None)
-    
-    if not installed_version:
-        return {'status': 'missing', 'installed': False, 'version': None, 'compatible': False}
-    
-    # Check compatibility
-    compatible = check_version_compatibility(installed_version, version_spec)
-    status = 'installed' if compatible else 'upgrade'
-    
-    return {
-        'status': status,
-        'installed': True,
-        'version': installed_version,
-        'compatible': compatible,
-        'required_version': version_spec
-    }
-
-def filter_uninstalled_packages(selected_packages: List[str], logger_func=None) -> List[str]:
-    """Filter packages yang belum terinstall untuk skip installed ones dengan logger function"""
-    
-    installed_packages = get_installed_packages_dict()
-    packages_to_install = []
-    
-    for package in selected_packages:
-        package_name, version_spec = parse_package_requirement(package)
-        status_info = check_package_installation_status(package_name, version_spec, installed_packages)
-        
-        if status_info['installed']:
-            version_info = status_info.get('version', 'unknown')
-            logger_func and logger_func(f"⏭️ {package_name} sudah terinstall v{version_info}, dilewati")
-        else:
-            packages_to_install.append(package)
-            logger_func and logger_func(f"📦 {package_name} akan diinstall")
-    
-    return packages_to_install
-
-def install_single_package(package: str, timeout: int = 300) -> Dict[str, Any]:
-    """
-    FIXED: Install single package dan return Dict dengan consistent structure
+def filter_packages(
+    packages: List[Dict[str, Any]],
+    include_required: bool = True,
+    include_optional: bool = True,
+    include_installed: bool = True,
+    include_not_installed: bool = True,
+    search_term: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Filter a list of packages based on various criteria.
     
     Args:
-        package: Package requirement string
-        timeout: Installation timeout dalam detik
+        packages: List of package dictionaries to filter
+        include_required: Include packages marked as required
+        include_optional: Include packages not marked as required
+        include_installed: Include packages marked as installed
+        include_not_installed: Include packages not marked as installed
+        search_term: Optional search term to filter package names and descriptions
         
     Returns:
-        Dict dengan keys: success (bool), message (str), package_name (str)
+        Filtered list of package dictionaries
     """
+    if not packages:
+        return []
     
-    # Extract package name untuk logging
-    package_name = parse_package_requirement(package)[0]
+    filtered = []
     
-    try:
-        process = subprocess.run(
-            [sys.executable, "-m", "pip", "install", package, "--no-cache-dir", "--quiet"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, 
-            check=False, timeout=timeout
-        )
+    for pkg in packages:
+        # Skip if package doesn't match required/optional filter
+        is_required = pkg.get('required', pkg.get('default', False))
+        if (is_required and not include_required) or (not is_required and not include_optional):
+            continue
+            
+        # Skip if package doesn't match installed filter
+        is_installed = pkg.get('installed', False)
+        if (is_installed and not include_installed) or (not is_installed and not include_not_installed):
+            continue
+            
+        # Apply search term filter if provided
+        if search_term:
+            search_lower = search_term.lower()
+            name_matches = search_lower in pkg.get('name', '').lower()
+            desc_matches = search_lower in pkg.get('description', '').lower()
+            
+            if not (name_matches or desc_matches):
+                continue
         
-        if process.returncode == 0:
-            return {
-                'success': True,
-                'message': f"Successfully installed {package}",
-                'package_name': package_name,
-                'package': package
-            }
+        filtered.append(pkg)
+    
+    return filtered
+
+def get_package_details(
+    package_key: str,
+    categories: List[Dict[str, Any]],
+    case_sensitive: bool = False
+) -> Optional[Dict[str, Any]]:
+    """Retrieve details for a specific package by its key or name.
+    
+    Args:
+        package_key: The package key or name to search for
+        categories: List of categories to search in
+        case_sensitive: Whether the search should be case-sensitive
+        
+    Returns:
+        The package details dictionary if found, None otherwise
+    """
+    if not package_key or not categories:
+        return None
+    
+    # Normalize search key if case-insensitive
+    search_key = package_key if case_sensitive else package_key.lower()
+    
+    for category in categories:
+        for pkg in category.get('packages', []):
+            # Check both key and name fields
+            pkg_key = pkg.get('key', pkg.get('name', ''))
+            pkg_name = pkg.get('name', '')
+            
+            # Compare based on case sensitivity
+            if case_sensitive:
+                key_matches = pkg_key == search_key
+                name_matches = pkg_name == search_key
+            else:
+                key_matches = pkg_key.lower() == search_key
+                name_matches = pkg_name.lower() == search_key
+            
+            if key_matches or name_matches:
+                return pkg
+    
+    return None
+
+def get_all_package_names(
+    categories: List[Dict[str, Any]],
+    include_keys: bool = True,
+    include_names: bool = True,
+    unique_only: bool = True
+) -> List[str]:
+    """Retrieve all package names and/or keys from the configuration.
+    
+    Args:
+        categories: List of categories to search in
+        include_keys: Whether to include package keys in the result
+        include_names: Whether to include package names in the result
+        unique_only: Whether to return only unique values
+        
+    Returns:
+        List of package names and/or keys
+    """       
+    result = []
+    
+    for category in categories:
+        for pkg in category.get('packages', []):
+            if include_keys:
+                if 'key' in pkg and pkg['key']:
+                    result.append(pkg['key'])
+                elif 'name' in pkg and pkg['name'] and not include_names:
+                    # Use name as key if key is not available
+                    result.append(pkg['name'])
+            
+            if include_names and 'name' in pkg and pkg['name']:
+                result.append(pkg['name'])
+    
+    if unique_only:
+        # Remove duplicates while preserving order
+        seen = set()
+        result = [x for x in result if not (x in seen or seen.add(x))]
+    
+    return result
+
+def merge_configs(
+    base_config: Dict[str, Any], 
+    override_config: Dict[str, Any],
+    list_merge_strategy: str = 'replace'
+) -> Dict[str, Any]:
+    """Merge two configuration dictionaries with support for nested structures.
+    
+    Args:
+        base_config: The base configuration that will be overridden
+        override_config: The configuration containing overrides
+        list_merge_strategy: How to handle list merging. Can be one of:
+            - 'replace': Replace the entire list (default)
+            - 'extend': Extend the base list with override values
+            - 'merge_unique': Merge unique values from both lists
+            
+    Returns:
+        A new dictionary containing the merged configuration
+    """
+    if not isinstance(base_config, dict) or not isinstance(override_config, dict):
+        return override_config if override_config is not None else base_config
+    
+    result = base_config.copy()
+    
+    for key, value in override_config.items():
+        if key in result:
+            # Handle nested dictionaries recursively
+            if isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = merge_configs(result[key], value, list_merge_strategy)
+            # Handle lists based on merge strategy
+            elif isinstance(result[key], list) and isinstance(value, list):
+                if list_merge_strategy == 'extend':
+                    result[key].extend(value)
+                elif list_merge_strategy == 'merge_unique':
+                    result[key] = list(dict.fromkeys(result[key] + value))
+                else:  # 'replace' or unknown strategy
+                    result[key] = value
+            # Handle all other types by overriding
+            else:
+                result[key] = value
         else:
-            return {
-                'success': False,
-                'message': f"pip error: {process.stderr}",
-                'package_name': package_name,
-                'package': package
-            }
+            result[key] = value
+    
+    return result
+
+def validate_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    """Validate a configuration dictionary against the expected schema.
+    
+    Args:
+        config: The configuration dictionary to validate
         
-    except subprocess.TimeoutExpired:
-        return {
-            'success': False,
-            'message': f"Installation timeout ({timeout}s)",
-            'package_name': package_name,
-            'package': package
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'message': f"Exception: {str(e)}",
-            'package_name': package_name,
-            'package': package
-        }
-
-def get_package_detailed_info(package_name: str) -> Dict[str, Any]:
-    """Get detailed info untuk package menggunakan pip show - one-liner parsing"""
+    Returns:
+        Tuple of (is_valid, issues) where:
+        - is_valid: Boolean indicating if the config is valid
+        - issues: List of strings describing any validation issues found
+    """
+    issues = []
     
-    try:
-        process = subprocess.run([sys.executable, "-m", "pip", "show", package_name],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
-        
-        if process.returncode == 0:
-            # One-liner parsing pip show output
-            details = {line.split(': ', 1)[0].lower(): line.split(': ', 1)[1] 
-                      for line in process.stdout.strip().split('\n') 
-                      if ': ' in line}
+    # Check for required top-level fields
+    required_fields = [
+        'version', 
+        'schema_version',
+        'selected_packages',
+        'categories',
+        'package_manager',
+        'python_path'
+    ]
+    
+    for field in required_fields:
+        if field not in config:
+            issues.append(f"Missing required field: {field}")
+    
+    # Validate version format if present
+    if 'version' in config and not isinstance(config['version'], str):
+        issues.append("Version must be a string")
+    
+    # Validate selected_packages is a list of strings
+    selected_pkgs = config.get('selected_packages', [])
+    if not isinstance(selected_pkgs, list) or \
+       not all(isinstance(pkg, str) for pkg in selected_pkgs):
+        issues.append("selected_packages must be a list of strings")
+    
+    # Validate categories structure
+    categories = config.get('categories', [])
+    if not isinstance(categories, list):
+        issues.append("categories must be a list")
+    else:
+        for i, cat in enumerate(categories):
+            if not isinstance(cat, dict):
+                issues.append(f"Category at index {i} is not a dictionary")
+                continue
+                
+            # Check required category fields
+            for field in ['name', 'packages']:
+                if field not in cat:
+                    issues.append(f"Category at index {i} missing required field: {field}")
             
-            # Special handling untuk requires field
-            if 'requires' in details:
-                details['requires'] = [pkg.strip() for pkg in details['requires'].split(',')] if details['requires'] else []
-            
-            return details
-    except Exception:
-        pass
+            # Validate packages in category
+            if 'packages' in cat and isinstance(cat['packages'], list):
+                for j, pkg in enumerate(cat['packages']):
+                    if not isinstance(pkg, dict):
+                        issues.append(f"Package at index {j} in category '{cat.get('name', 'unknown')}' is not a dictionary")
+                        continue
+                        
+                    # Check required package fields
+                    for pkg_field in ['key', 'name']:
+                        if pkg_field not in pkg:
+                            issues.append(
+                                f"Package at index {j} in category '{cat.get('name', 'unknown')}' "
+                                f"missing required field: {pkg_field}"
+                            )
     
-    return {}
-
-def batch_check_packages_status(package_list: List[str]) -> Dict[str, Dict[str, Any]]:
-    """Batch check status untuk multiple packages - one-liner mapping"""
+    # Check for any deprecated fields
+    deprecated_fields = ['installation', 'analysis', 'ui_settings', 'advanced']
+    for field in deprecated_fields:
+        if field in config:
+            issues.append(f"Deprecated field found: {field}")
     
-    installed_packages = get_installed_packages_dict()
-    
-    return {
-        package: check_package_installation_status(
-            *parse_package_requirement(package), 
-            installed_packages
-        )
-        for package in package_list
-    }
-
-def normalize_package_name_for_matching(name: str) -> str:
-    """Normalize package name untuk consistent matching - one-liner"""
-    return name.lower().replace('-', '_').replace(' ', '_')
-
-def extract_package_name_from_requirement(requirement: str) -> str:
-    """Extract clean package name dari pip requirement - one-liner"""
-    return parse_package_requirement(requirement)[0]
-
-def is_package_installed(package_name: str, installed_packages: Optional[Dict[str, str]] = None) -> bool:
-    """Simple check apakah package terinstall - one-liner"""
-    if installed_packages is None:
-        installed_packages = get_installed_packages_dict()
-    
-    return any(variant in installed_packages for variant in _get_package_name_variants(package_name.lower()))
-
-def get_package_version(package_name: str, installed_packages: Optional[Dict[str, str]] = None) -> Optional[str]:
-    """Get installed version untuk package - one-liner dengan None fallback"""
-    if installed_packages is None:
-        installed_packages = get_installed_packages_dict()
-    
-    return next((installed_packages[variant] for variant in _get_package_name_variants(package_name.lower()) 
-                if variant in installed_packages), None)
+    return len(issues) == 0, issues

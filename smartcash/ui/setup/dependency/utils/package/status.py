@@ -1,7 +1,75 @@
-# File: smartcash/ui/setup/dependency/utils/package_status_utils.py
-# Deskripsi: Utilities untuk mengelola status package terpisah dari UI state
+"""
+File: /Users/masdevid/Projects/smartcash/smartcash/ui/setup/dependency/utils/package/status.py
 
-from typing import Dict, Any, List
+Package status management utilities.
+
+This module provides functions to manage and query package statuses in the UI.
+"""
+
+from typing import Dict, Any, List, Optional
+from collections import Counter
+
+# Absolute imports
+from smartcash.ui.setup.dependency.utils.package.categories import get_package_categories
+
+def analyze_packages(config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """
+    Analyze package status based on the provided configuration.
+    
+    Args:
+        config: Configuration dictionary containing package information
+        
+    Returns:
+        Dictionary mapping package names to their status information
+    """
+    from smartcash.ui.setup.dependency.utils.package.installer import get_installed_packages_dict
+    
+    # Get installed packages
+    installed_packages = get_installed_packages_dict()
+    
+    # Initialize result dictionary
+    result = {}
+    
+    # Get package dependencies from config
+    dependencies = config.get('dependencies', {})
+    
+    # Check each package's installation status
+    for pkg_name, pkg_info in dependencies.items():
+        required = pkg_info.get('required', True)
+        required_version = pkg_info.get('version', '')
+        
+        # Check if package is installed
+        installed = pkg_name.lower() in (pkg.lower() for pkg in installed_packages.keys())
+        
+        # Get installed version if available
+        installed_version = None
+        for pkg, version in installed_packages.items():
+            if pkg.lower() == pkg_name.lower():
+                installed_version = version
+                break
+        
+        # Add to results
+        result[pkg_name] = {
+            'installed': installed,
+            'required': required,
+            'required_version': required_version,
+            'installed_version': installed_version
+        }
+    
+    return result
+
+__all__ = [
+    'update_package_status',
+    'update_package_status_by_name',
+    'batch_update_package_status',
+    'get_package_status_from_ui',
+    'get_all_package_statuses',
+    'reset_all_package_statuses',
+    'filter_packages_by_status',
+    'count_packages_by_status',
+    'sync_package_status_with_system',
+    'analyze_packages'
+]
 
 def update_package_status(ui_components: Dict[str, Any], package_key: str, status: str):
     """Update status package di UI selector dengan one-liner safe approach"""

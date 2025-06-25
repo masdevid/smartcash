@@ -1,11 +1,25 @@
 """
-File: smartcash/ui/setup/dependency/utils/system_info_utils.py
-Deskripsi: System information utilities dengan consolidated approach
+File: smartcash/ui/setup/dependency/utils/system/info.py
+
+System information utilities.
+
+This module provides functions to gather and format system information
+for compatibility checking and reporting.
 """
 
-from typing import Dict, Any
+# Standard library imports
 import platform
 import sys
+from typing import Any, Dict, List, Optional, Tuple
+
+__all__ = [
+    'get_comprehensive_system_info',
+    'format_system_info_html',
+    'get_system_summary_text',
+    'check_system_requirements',
+    'get_environment_specific_info',
+    'format_requirements_check_html'
+]
 
 def get_comprehensive_system_info() -> Dict[str, Any]:
     """Get comprehensive system information dengan one-liner approach"""

@@ -11,7 +11,7 @@ import ipywidgets as widgets
 
 # Local application imports
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.setup.dependency.utils.package_categories import get_package_categories
+from smartcash.ui.setup.dependency.utils.package.categories import get_package_categories
 
 def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create package selector grid with improved spacing and justify alignment
@@ -76,7 +76,7 @@ def _create_category_widget_improved(
     # Create checkboxes for each package in the category
     package_widgets = []
     for pkg in category['packages']:
-        pkg_key = pkg['key']
+        pkg_key = pkg['name']
         
         # Determine if package should be checked
         is_default = pkg.get('default', False)
@@ -212,51 +212,3 @@ def update_package_status(ui_components: Dict[str, Any], package_key: str, statu
     # Update tooltip if message is provided
     if message:
         status_widget.tooltip = message
-    
-    # Update checkbox style
-    checkbox.layout.border = f'1px solid {border_color}'
-    checkbox.layout.background_color = bg_color
-
-def get_selected_packages(ui_components: Dict[str, Any]) -> list:
-    """Get list of selected packages for installation"""
-    if not hasattr(ui_components, 'get') or 'checkboxes' not in ui_components:
-        return []
-        
-    checkboxes = ui_components['checkboxes']
-    selected = []
-    
-    for pkg_key, checkbox in checkboxes.items():
-        if checkbox.value:  # If checkbox is checked
-            selected.append({
-                'key': pkg_key,
-                'name': checkbox.description,
-                'optional': not checkbox.disabled
-            })
-    
-    return selected
-
-def reset_package_selections(ui_components: Dict[str, Any]) -> None:
-    """Reset package selections to default values"""
-    if not hasattr(ui_components, 'get') or 'checkboxes' not in ui_components:
-        return
-        
-    checkboxes = ui_components['checkboxes']
-    categories = get_package_categories()
-    
-    # Create a mapping of package keys to their default values
-    defaults = {}
-    for category in categories:
-        for pkg in category['packages']:
-            defaults[pkg['key']] = pkg.get('default', False)
-    
-    # Update checkboxes
-    for pkg_key, checkbox in checkboxes.items():
-        if pkg_key in defaults:
-            checkbox.value = defaults[pkg_key]
-            # Reset status
-            if hasattr(checkbox, 'status'):
-                checkbox.status.value = ''
-                checkbox.status.tooltip = ''
-            # Reset style
-            checkbox.layout.border = '1px solid #e0e0e0'
-            checkbox.layout.background_color = '#f9f9f9'

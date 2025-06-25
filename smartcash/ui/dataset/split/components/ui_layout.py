@@ -6,6 +6,7 @@ Deskripsi: Layout komponen untuk UI split dataset - refactored dengan reusable c
 from typing import Dict, Any
 import ipywidgets as widgets
 
+from smartcash.ui import components
 from smartcash.ui.dataset.split.components.ui_form import create_ratio_section, create_path_section
 from smartcash.ui.components import create_header, create_responsive_two_column
 from smartcash.ui.info_boxes.split_info import get_split_info    
@@ -36,9 +37,11 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         form_container, 
         info_accordion['container']
     ], layout=widgets.Layout(width='100%', padding='10px'))
-    
-    return {
+    components = {
         'header': header, 'ratio_section': ratio_section, 'path_section': path_section,
         'form_container': form_container, 'info_accordion': info_accordion, 'main_container': main_container
     }
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(components)
+    return components
 

@@ -204,10 +204,8 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         width='100%',
         min_height='100vh'
     ))
-    
-    logger.info("✅ Layout hyperparameters responsive dengan color-coded groups berhasil dibuat")
-    
-    return {
+        
+    components = {
         'main_layout': main_container,
         'training_group': training_group,
         'optimizer_group': optimizer_group,
@@ -218,3 +216,6 @@ def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, 
         'save_button': save_reset_buttons.children[0],
         'reset_button': save_reset_buttons.children[1]
     }
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(components)
+    return components

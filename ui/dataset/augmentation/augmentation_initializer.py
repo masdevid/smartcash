@@ -14,9 +14,8 @@ class AugmentationInitializer(CommonInitializer):
     
     def __init__(self):
         super().__init__(
-            module_name='augmentation',
-            config_handler_class=AugmentationConfigHandler,
-            parent_module='dataset'
+            module_name='dataset.augmentation',
+            config_handler_class=AugmentationConfigHandler
         )
     
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:

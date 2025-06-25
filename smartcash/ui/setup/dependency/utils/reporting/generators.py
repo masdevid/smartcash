@@ -1,13 +1,24 @@
 """
-File: smartcash/ui/setup/dependency/utils/report_generator_utils.py
-Deskripsi: Report generation utilities with fixed circular imports
+File: smartcash/ui/setup/dependency/utils/reporting/generators.py
+
+Report generation utilities for dependency management.
+
+This module provides functions to generate various reports including system
+compatibility, installation summaries, and package status reports.
 """
 
 # Standard library imports
-from typing import Dict, Any, List, Callable
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Local application imports
-from smartcash.ui.setup.dependency.utils.package_categories import get_package_categories
+# Absolute imports
+from smartcash.ui.setup.dependency.utils.package.categories import get_package_categories
+
+__all__ = [
+    'generate_comprehensive_status_report',
+    'generate_installation_summary_report',
+    'generate_analysis_summary_report',
+    'generate_system_compatibility_report'
+]
 
 def generate_comprehensive_status_report(system_info: Dict[str, Any], 
                                         package_status: Dict[str, Dict[str, Any]]) -> str:

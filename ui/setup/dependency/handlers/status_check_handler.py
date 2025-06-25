@@ -1,198 +1,395 @@
 """
 File: smartcash/ui/setup/dependency/handlers/status_check_handler.py
-Deskripsi: Handler untuk status check dan system report generation
+
+Status check and system report generation handler.
+
+This module provides functionality for checking system status and generating
+comprehensive system reports with detailed compatibility information.
 """
 
-from typing import Dict, Any, Callable
-from smartcash.ui.setup.dependency.utils import (
-    update_status_panel, with_button_context,
-    get_comprehensive_system_info, generate_system_compatibility_report,
-    show_progress_tracker_safe, complete_operation_with_message
+# Standard library imports
+from dataclasses import dataclass, field
+from typing import (
+    Any, Callable, Dict, List, Optional, TypedDict, Union, Literal,
+    Sequence, TypeVar, Generic, Mapping, MutableMapping
 )
 
-def setup_status_check_handler(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
-    """Setup status check handler untuk system report"""
+# Absolute imports
+from smartcash.common.logger import get_logger
+from smartcash.ui.setup.dependency.utils.ui.state import (
+    update_status_panel,
+    show_progress_tracker_safe,
+    complete_operation_with_message,
+    with_button_context,
+    update_progress_step
+)
+from smartcash.ui.setup.dependency.utils.system.info import get_comprehensive_system_info
+from smartcash.ui.setup.dependency.utils.reporting.generators import generate_system_compatibility_report
+from smartcash.ui.setup.dependency.utils.ui.utils import get_selected_packages
+
+# Type variables for generic typing
+T = TypeVar('T')
+K = TypeVar('K')
+V = TypeVar('V')
+
+# Type aliases for better code clarity and type safety
+UIComponents = Dict[str, Any]
+PackageName = str
+PackageList = List[PackageName]
+
+class StatusResult(TypedDict, total=False):
+    """Result of a single package status check."""
+    success: bool
+    package: str
+    installed: bool
+    error: Optional[str]
+    version: Optional[str]
+
+class StatusResults(TypedDict):
+    """Aggregated results of package status checks."""
+    installed: List[PackageName]
+    not_installed: List[PackageName]
+    errors: List[Dict[str, str]]
+
+class SystemInfo(TypedDict, total=False):
+    """Structure for system information."""
+    python_version: str
+    platform: str
+    architecture: str
+    memory_info: Dict[str, Union[int, float]]
+    gpu_info: Dict[str, Any]
+    os_info: Dict[str, str]
+    python_implementation: str
+
+class CompatibilityReport(TypedDict, total=False):
+    """Structure for system compatibility report."""
+    warnings: List[str]
+    recommendations: List[str]
+    compatibility_score: float
+    system_requirements: Dict[str, Any]
+    missing_requirements: List[str]
+
+class UIButtonState(TypedDict):
+    """State management for UI buttons."""
+    enabled: bool
+    text: str
+    variant: Literal['primary', 'secondary', 'success', 'danger', 'warning', 'info']
+
+# Constants
+DEFAULT_BATCH_SIZE = 10
+MAX_BATCH_SIZE = 50
+MIN_PROGRESS_UPDATE_INTERVAL = 0.1  # seconds
+
+# Type aliases for UI components
+UIComponent = Any
+UIButton = UIComponent
+UILabel = UIComponent
+UIProgressBar = UIComponent
+
+@dataclass
+class StatusCheckConfig:
+    """Configuration for status check operations."""
+    batch_size: int = DEFAULT_BATCH_SIZE
+    show_detailed_logs: bool = True
+    enable_progress_updates: bool = True
+
+class StatusCheckHandler:
+    """Handler for status check and system report generation."""
     
-    def handle_system_report():
-        """Generate comprehensive system report"""
-        logger = ui_components.get('logger')
+    def __init__(self, ui_components: UIComponents, config: Optional[StatusCheckConfig] = None):
+        """Initialize the status check handler.
         
-        with with_button_context(ui_components, 'system_report_button'):
+        Args:
+            ui_components: Dictionary of UI components
+            config: Optional configuration for status checks
+        """
+        self.ui = ui_components
+        self.logger = ui_components.get('logger', get_logger(__name__))
+        self.config = config or StatusCheckConfig()
+    
+    def setup_handlers(self) -> Dict[str, Callable]:
+        """Setup and return the handler functions.
+        
+        Returns:
+            Dictionary mapping handler names to functions
+        """
+        # Setup button handlers
+        if system_report_btn := self.ui.get('system_report_button'):
+            system_report_btn.on_click(lambda _: self.handle_system_report())
+        
+        if check_btn := self.ui.get('check_button'):
+            check_btn.on_click(lambda _: self.handle_package_status_check())
+        
+        return {
+            'handle_system_report': self.handle_system_report,
+            'handle_package_status_check': self.handle_package_status_check
+        }
+    
+    def handle_system_report(self) -> None:
+        """Generate and display a comprehensive system report."""
+        with with_button_context(self.ui, 'system_report_button'):
             try:
-                update_status_panel(ui_components, "🔍 Mengumpulkan informasi sistem...", "info")
-                show_progress_tracker_safe(ui_components, "System Analysis")
+                self._update_status("🔍 Collecting system information...", "info")
+                show_progress_tracker_safe(self.ui, "System Analysis")
                 
-                if logger:
-                    logger.info("🔍 Generating system compatibility report...")
-                
-                # Update progress - gathering system info
-                from smartcash.ui.setup.dependency.utils import update_progress_step
-                update_progress_step(ui_components, "overall", 20, "Collecting system info")
+                self.logger.info("🔍 Generating system compatibility report...")
                 
                 # Collect system information
+                self._update_progress(20, "Collecting system info")
                 system_info = get_comprehensive_system_info()
                 
-                update_progress_step(ui_components, "overall", 50, "Checking compatibility")
-                
                 # Generate compatibility report
+                self._update_progress(50, "Checking compatibility")
                 compatibility_report = generate_system_compatibility_report(system_info)
                 
-                update_progress_step(ui_components, "overall", 80, "Generating report")
+                # Log and finalize report
+                self._update_progress(80, "Generating report")
+                self._log_system_report(system_info, compatibility_report)
                 
-                # Log detailed report
-                _log_system_report(logger, system_info, compatibility_report)
-                
-                update_progress_step(ui_components, "overall", 100, "Report completed")
-                
-                # Summary message
-                summary = _generate_report_summary(system_info, compatibility_report)
-                complete_operation_with_message(ui_components, f"✅ {summary}")
-                
-                if logger:
-                    logger.info(f"📊 System report completed: {summary}")
+                # Show completion
+                self._update_progress(100, "Report completed")
+                summary = self._generate_report_summary(system_info, compatibility_report)
+                complete_operation_with_message(self.ui, f"✅ {summary}")
+                self.logger.info(f"📊 System report completed: {summary}")
                 
             except Exception as e:
-                update_status_panel(ui_components, f"❌ System report error: {str(e)}", "error")
-                if logger:
-                    logger.error(f"❌ System report failed: {str(e)}")
+                self._handle_error("System report", e)
     
-    def handle_package_status_check():
-        """Check status dari selected packages"""
-        logger = ui_components.get('logger')
-        
-        with with_button_context(ui_components, 'check_button'):
+    def handle_package_status_check(self) -> None:
+        """Check and display the status of selected packages."""
+        with with_button_context(self.ui, 'check_button'):
             try:
-                from smartcash.ui.setup.dependency.components.ui_package_selector import get_selected_packages
-                
-                # Get selected packages
-                selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
+                selected_packages = get_selected_packages(self.ui.get('package_selector', {}))
                 
                 if not selected_packages:
-                    update_status_panel(ui_components, "⚠️ Tidak ada packages yang dipilih", "warning")
+                    self._update_status("⚠️ No packages selected", "warning")
                     return
                 
-                update_status_panel(ui_components, f"🔍 Checking status {len(selected_packages)} packages...", "info")
-                show_progress_tracker_safe(ui_components, "Package Status Check")
-                
-                if logger:
-                    logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
+                self._update_status(f"🔍 Checking status of {len(selected_packages)} packages...", "info")
+                show_progress_tracker_safe(self.ui, "Package Status Check")
+                self.logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
                 
                 # Check packages status
-                results = _check_packages_status_batch(selected_packages, ui_components)
+                results = self._check_packages_status_batch(selected_packages)
                 
                 # Generate status summary
-                summary = _generate_status_summary(results)
-                complete_operation_with_message(ui_components, f"✅ {summary}")
-                
-                if logger:
-                    logger.info(f"📊 Status check completed: {summary}")
+                summary = self._generate_status_summary(results)
+                complete_operation_with_message(self.ui, f"✅ {summary}")
+                self.logger.info(f"📊 Status check completed: {summary}")
                 
             except Exception as e:
-                update_status_panel(ui_components, f"❌ Status check error: {str(e)}", "error")
-                if logger:
-                    logger.error(f"❌ Status check failed: {str(e)}")
+                self._handle_error("Status check", e)
     
-    # Setup button handlers
-    system_report_button = ui_components.get('system_report_button')
-    if system_report_button:
-        system_report_button.on_click(lambda b: handle_system_report())
-    
-    check_button = ui_components.get('check_button')
-    if check_button:
-        check_button.on_click(lambda b: handle_package_status_check())
-    
-    return {
-        'handle_system_report': handle_system_report,
-        'handle_package_status_check': handle_package_status_check
-    }
-
-def _check_packages_status_batch(packages: list, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Check status packages dalam batch"""
-    from smartcash.ui.setup.dependency.utils import batch_check_packages_status, update_progress_step
-    
-    results = {
-        'installed': [],
-        'not_installed': [],
-        'errors': []
-    }
-    
-    batch_size = 10
-    for i in range(0, len(packages), batch_size):
-        batch = packages[i:i + batch_size]
-        progress = int((i / len(packages)) * 100)
+    def _update_status(self, message: str, status_type: str = "info") -> None:
+        """Update the status panel with a message.
         
-        update_progress_step(ui_components, "overall", progress, f"Checking batch {i//batch_size + 1}")
-        
-        batch_results = batch_check_packages_status(batch)
-        
-        for result in batch_results:
-            if result['success']:
-                if result['installed']:
-                    results['installed'].append(result['package'])
-                else:
-                    results['not_installed'].append(result['package'])
-            else:
-                results['errors'].append({'package': result['package'], 'error': result.get('error', 'Unknown error')})
+        Args:
+            message: The message to display
+            status_type: Type of status (info, warning, error)
+        """
+        update_status_panel(self.ui, message, status_type)
     
-    return results
-
-def _log_system_report(logger, system_info: Dict[str, Any], compatibility_report: Dict[str, Any]):
-    """Log detailed system report"""
-    if not logger:
-        return
+    def _update_progress(self, percent: int, message: str) -> None:
+        """Update the progress indicator.
+        
+        Args:
+            percent: Progress percentage (0-100)
+            message: Status message
+        """
+        if self.config.enable_progress_updates:
+            update_progress_step(self.ui, "overall", percent, message)
     
-    try:
-        logger.info("💻 System Information:")
-        logger.info(f"   • Python: {system_info.get('python_version', 'Unknown')}")
-        logger.info(f"   • Platform: {system_info.get('platform', 'Unknown')}")
-        logger.info(f"   • Architecture: {system_info.get('architecture', 'Unknown')}")
-        logger.info(f"   • Memory: {system_info.get('memory_info', {}).get('available_gb', 'Unknown')} GB available")
+    def _handle_error(self, operation: str, error: Exception) -> None:
+        """Handle and log an error.
         
-        # GPU info
-        gpu_info = system_info.get('gpu_info', {})
-        if gpu_info.get('cuda_available'):
-            logger.info(f"   • CUDA: Available (version {gpu_info.get('cuda_version', 'Unknown')})")
-        else:
-            logger.info("   • CUDA: Not available")
+        Args:
+            operation: Name of the operation that failed
+            error: The exception that was raised
+        """
+        error_msg = str(error)
+        self._update_status(f"❌ {operation} error: {error_msg}", "error")
+        self.logger.error(f"❌ {operation} failed: {error_msg}", exc_info=True)
+    
+    def _check_packages_status_batch(self, packages: PackageList) -> StatusResults:
+        """Check the status of packages in batches.
         
-        # Compatibility warnings
-        warnings = compatibility_report.get('warnings', [])
-        if warnings:
-            logger.warning("⚠️ Compatibility Warnings:")
-            for warning in warnings[:3]:  # Show first 3
-                logger.warning(f"   • {warning}")
+        Args:
+            packages: List of package names to check
+            
+        Returns:
+            Dictionary containing lists of installed, not_installed, and errors
+        """
+        from smartcash.ui.setup.dependency.utils.package.installer import batch_check_packages_status
         
-        # Recommendations
-        recommendations = compatibility_report.get('recommendations', [])
-        if recommendations:
-            logger.info("💡 Recommendations:")
-            for rec in recommendations[:3]:  # Show first 3
-                logger.info(f"   • {rec}")
+        results: StatusResults = {
+            'installed': [],
+            'not_installed': [],
+            'errors': []
+        }
+        
+        batch_size = self.config.batch_size
+        total_batches = (len(packages) + batch_size - 1) // batch_size
+        
+        for i in range(0, len(packages), batch_size):
+            batch = packages[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            progress = int((i / len(packages)) * 100)
+            
+            self._update_progress(progress, f"Checking batch {batch_num}/{total_batches}")
+            
+            try:
+                batch_results = batch_check_packages_status(batch)
                 
-    except Exception:
-        logger.info("📊 System report generated (details in compatibility report)")
-
-def _generate_report_summary(system_info: Dict[str, Any], compatibility_report: Dict[str, Any]) -> str:
-    """Generate concise report summary"""
-    try:
-        python_version = system_info.get('python_version', 'Unknown')
-        warnings_count = len(compatibility_report.get('warnings', []))
+                for result in batch_results:
+                    if result.get('success', False):
+                        if result.get('installed', False):
+                            results['installed'].append(result['package'])
+                        else:
+                            results['not_installed'].append(result['package'])
+                    else:
+                        results['errors'].append({
+                            'package': result.get('package', 'unknown'),
+                            'error': result.get('error', 'Unknown error')
+                        })
+                        
+            except Exception as e:
+                self.logger.error(f"Error checking package batch {batch_num}: {str(e)}")
+                for pkg in batch:
+                    results['errors'].append({
+                        'package': pkg,
+                        'error': f"Batch processing error: {str(e)}"
+                    })
         
-        if warnings_count == 0:
-            return f"System compatible (Python {python_version})"
+        return results
+    
+    def _log_system_report(self, system_info: SystemInfo, compatibility_report: CompatibilityReport) -> None:
+        """Log detailed system information and compatibility report.
+        
+        Args:
+            system_info: Dictionary containing system information
+            compatibility_report: Dictionary containing compatibility information
+        """
+        try:
+            self._log_system_info(system_info)
+            self._log_compatibility_issues(compatibility_report)
+            self._log_recommendations(compatibility_report)
+        except Exception as e:
+            self.logger.error(f"Error logging system report: {str(e)}", exc_info=True)
+    
+    def _log_system_info(self, system_info: SystemInfo) -> None:
+        """Log basic system information.
+        
+        Args:
+            system_info: Dictionary containing system information
+        """
+        self.logger.info("💻 System Information:")
+        self.logger.info(f"   • Python: {system_info.get('python_version', 'Unknown')}")
+        self.logger.info(f"   • Platform: {system_info.get('platform', 'Unknown')}")
+        self.logger.info(f"   • Architecture: {system_info.get('architecture', 'Unknown')}")
+        
+        # Log memory information if available
+        if mem_info := system_info.get('memory_info', {}):
+            if 'available_gb' in mem_info:
+                self.logger.info(f"   • Memory: {mem_info['available_gb']:.1f} GB available")
+        
+        # Log GPU/CUDA information
+        self._log_gpu_info(system_info.get('gpu_info', {}))
+    
+    def _log_gpu_info(self, gpu_info: Dict[str, Any]) -> None:
+        """Log GPU and CUDA information.
+        
+        Args:
+            gpu_info: Dictionary containing GPU information
+        """
+        if gpu_info.get('cuda_available', False):
+            self.logger.info(
+                f"   • CUDA: Available (version {gpu_info.get('cuda_version', 'Unknown')})"
+            )
         else:
-            return f"System report complete, {warnings_count} warnings found"
-    except:
-        return "System report generated"
-
-def _generate_status_summary(results: Dict[str, Any]) -> str:
-    """Generate status check summary"""
-    try:
-        installed = len(results['installed'])
-        not_installed = len(results['not_installed'])
-        errors = len(results['errors'])
-        total = installed + not_installed + errors
+            self.logger.info("   • CUDA: Not available")
+    
+    def _log_compatibility_issues(self, report: CompatibilityReport) -> None:
+        """Log compatibility warnings.
         
-        return f"{installed}/{total} installed, {errors} errors"
-    except:
-        return "Status check completed"
+        Args:
+            report: Dictionary containing compatibility information
+        """
+        if warnings := report.get('warnings', [])[:3]:  # Limit to first 3 warnings
+            self.logger.warning("⚠️ Compatibility Warnings:")
+            for warning in warnings:
+                self.logger.warning(f"   • {warning}")
+    
+    def _log_recommendations(self, report: CompatibilityReport) -> None:
+        """Log system recommendations.
+        
+        Args:
+            report: Dictionary containing recommendations
+        """
+        if recommendations := report.get('recommendations', [])[:3]:  # Limit to first 3
+            self.logger.info("💡 Recommendations:")
+            for rec in recommendations:
+                self.logger.info(f"   • {rec}")
+    
+    def _generate_report_summary(self, system_info: SystemInfo, 
+                              compatibility_report: CompatibilityReport) -> str:
+        """Generate a summary of the system report.
+        
+        Args:
+            system_info: Dictionary containing system information
+            compatibility_report: Dictionary containing compatibility information
+            
+        Returns:
+            String summary of the system report
+        """
+        try:
+            python_version = system_info.get('python_version', 'Unknown')
+            warnings_count = len(compatibility_report.get('warnings', []))
+            
+            return (
+                f"System compatible (Python {python_version})" 
+                if warnings_count == 0
+                else f"System report complete, {warnings_count} warnings found"
+            )
+        except Exception as e:
+            self.logger.error(f"Error generating report summary: {str(e)}")
+            return "System report generated"
+    
+    def _generate_status_summary(self, results: StatusResults) -> str:
+        """Generate a summary of package status check results.
+        
+        Args:
+            results: Dictionary containing package status results
+            
+        Returns:
+            String summary of the status check
+        """
+        try:
+            installed = len(results.get('installed', []))
+            not_installed = len(results.get('not_installed', []))
+            errors = len(results.get('errors', []))
+            total = installed + not_installed + errors
+            
+            if total == 0:
+                return "No packages checked"
+                
+            return f"{installed}/{total} installed, {errors} errors"
+            
+        except Exception as e:
+            self.logger.error(f"Error generating status summary: {str(e)}")
+            return "Status check completed"
+
+
+def setup_status_check_handler(ui_components: UIComponents) -> Dict[str, Callable]:
+    """Setup and return status check handlers.
+    
+    This function initializes the StatusCheckHandler with the provided UI components
+    and returns a dictionary of handler functions that can be connected to UI events.
+    
+    Args:
+        ui_components: Dictionary containing UI components needed by the handlers
+        
+    Returns:
+        Dictionary mapping handler names to their corresponding functions
+    """
+    handler = StatusCheckHandler(ui_components)
+    return handler.setup_handlers()

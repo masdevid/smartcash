@@ -1,0 +1,576 @@
+✅ smartcash berhasil diimpor
+   - 10 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common berhasil diimpor
+   - 137 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.config berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.config.compat berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.config.manager berhasil diimpor
+   - 27 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.core berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.dataset berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.enums berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.environment berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.file_types berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.log_messages berhasil diimpor
+   - 46 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.model berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.paths berhasil diimpor
+   - 50 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.constants.ui berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.environment berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.exceptions berhasil diimpor
+   - 36 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.interfaces berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.interfaces.layer_config_interface berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.layer_config berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.logger berhasil diimpor
+   - 22 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.opencv_compat berhasil diimpor
+   - 13 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.threadpools berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.types berhasil diimpor
+   - 31 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.utils berhasil diimpor
+   - 38 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.utils.core berhasil diimpor
+   - 35 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.common.utils.file_naming_manager berhasil diimpor
+   - 33 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.configs berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+/opt/anaconda3/lib/python3.12/site-packages/albumentations/__init__.py:28: UserWarning: A new version of Albumentations is available: '2.0.8' (you have '2.0.7'). Upgrade using: pip install -U albumentations. To disable automatic update checks, set the environment variable NO_ALBUMENTATIONS_UPDATE to 1.
+  check_for_updates()
+✅ smartcash.dataset.augmentor berhasil diimpor
+   - 47 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.balancer berhasil diimpor
+   - 26 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.balancer.balancer berhasil diimpor
+   - 23 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.balancer.selector berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.core berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.core.engine berhasil diimpor
+   - 30 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.core.normalizer berhasil diimpor
+   - 25 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.core.pipeline_factory berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.service berhasil diimpor
+   - 27 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils berhasil diimpor
+   - 41 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.balance_calculator berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.cleanup_manager berhasil diimpor
+   - 13 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.config_validator berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.file_processor berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.file_scanner berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.filename_manager berhasil diimpor
+   - 13 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.path_resolver berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.progress_bridge berhasil diimpor
+   - 13 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.augmentor.utils.sample_generator berhasil diimpor
+   - 22 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.collate berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.collate.multilayer_collate berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.collate.yolo_collate berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.datasets berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.datasets.base_dataset berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.datasets.multilayer_dataset berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.datasets.yolo_dataset berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.geometry berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.geometry.coord_converter berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.geometry.geometry_utils berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.components.geometry.polygon_handler berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.base berhasil diimpor
+   - 33 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.cleanup_behavior berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.cleanup_service berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.dataset_scanner berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.download_service berhasil diimpor
+   - 27 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.file_processor berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.progress_tracker berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.roboflow_client berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.downloader.validators berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.evaluation.augmentation_utils berhasil diimpor
+   - 37 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.evaluation.evaluation_augmentation berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.organizer.dataset_file_renamer berhasil diimpor
+   - 28 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.organizer.dataset_organizer berhasil diimpor
+   - 27 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor berhasil diimpor
+   - 46 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.api berhasil diimpor
+   - 54 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.api.cleanup_api berhasil diimpor
+   - 22 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.api.normalization_api berhasil diimpor
+   - 30 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.api.preprocessing_api berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.api.samples_api berhasil diimpor
+   - 25 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.api.stats_api berhasil diimpor
+   - 27 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.config berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.config.defaults berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.config.validator berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.core berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.core.file_processor berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.core.normalizer berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.core.stats_collector berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.utils berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.utils.path_manager berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.utils.progress_bridge berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.validation berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.validation.directory_validator berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.preprocessor.validation.filename_validator berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.utils berhasil diimpor
+   - 10 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.utils.dataset_constants berhasil diimpor
+   - 80 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.utils.dataset_utils berhasil diimpor
+   - 28 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.utils.move_utils berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.dataset.utils.path_validator berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model berhasil diimpor
+   - 47 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis berhasil diimpor
+   - 15 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.analysis_service berhasil diimpor
+   - 22 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.class_analyzer berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.currency_analyzer berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.layer_analyzer berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.utils berhasil diimpor
+   - 10 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.utils.analysis_progress_bridge berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.utils.data_aggregator berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.utils.metrics_processor berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.visualization berhasil diimpor
+   - 10 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.visualization.chart_generator berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.visualization.confusion_matrix_viz berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.analysis.visualization.visualization_manager berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.api berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.api.core berhasil diimpor
+   - 28 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.core berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.core.checkpoint_manager berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.core.model_builder berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.core.yolo_head berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation berhasil diimpor
+   - 39 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.checkpoint_selector berhasil diimpor
+   - 23 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.evaluation_metrics berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.evaluation_service berhasil diimpor
+   - 27 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.scenario_augmentation berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.scenario_manager berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.utils berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.utils.evaluation_progress_bridge berhasil diimpor
+   - 16 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.utils.inference_timer berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.evaluation.utils.results_aggregator berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.comparison_generator berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.research berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.research.currency_generator berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.research.methodology_generator berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.research.performance_generator berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.research.recommendation_generator berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.research_generator berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.generators.summary_generator berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.reporting.report_service berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training berhasil diimpor
+   - 43 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.data_loader_factory berhasil diimpor
+   - 26 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.loss_manager berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.metrics_tracker berhasil diimpor
+   - 23 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.optimizer_factory berhasil diimpor
+   - 30 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.training_service berhasil diimpor
+   - 33 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.utils berhasil diimpor
+   - 11 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.utils.early_stopping berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.utils.lr_scheduler_factory berhasil diimpor
+   - 8 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.training.utils.training_progress_bridge berhasil diimpor
+   - 19 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.utils berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.utils.backbone_factory berhasil diimpor
+   - 24 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.utils.device_utils berhasil diimpor
+   - 25 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.model.utils.progress_bridge berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.tests berhasil diimpor
+   - 20 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.tests.conftest berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone berhasil diimpor
+   - 12 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.backbone_init berhasil diimpor
+   - 21 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.components.selection_change berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.components.ui_form berhasil diimpor
+   - 14 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.components.ui_layout berhasil diimpor
+   - 18 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.handlers.config_handler berhasil diimpor
+   - 13 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.handlers.defaults berhasil diimpor
+   - 17 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.backbone.utils berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+VBox(children=(HTML(value='<div style="background:#f8f9fa;padding:15px;border-radius:5px;border-left:5px solid #3498db;margin-bottom:15px"><h1 style="margin:0;color:#2F58CD">🚀 Setup Proyek SmartCash</h1><p style="margin:5px 0;color: black">Clone atau update repository project</p></div>'), HBox(children=(Text(value='https://github.com/masdevid/smartcash.git', description='🔗 URL:', layout=Layout(margin='10px 0', width='70%'), style=TextStyle(description_width='initial')), Dropdown(description='🌿', layout=Layout(margin='10px 0', width='30%'), options=('main', 'migration', 'dev'), style=DescriptionStyle(description_width='initial'), value='main'))), Button(button_style='primary', description='Clone/Update Repository', icon='sync', layout=Layout(margin='10px 0', width='100%'), style=ButtonStyle()), Output(layout=Layout(border_bottom='1px solid #ddd', border_left='1px solid #ddd', border_right='1px solid #ddd', border_top='1px solid #ddd', margin='10px 0', min_height='200px', width='100%'))), layout=Layout(padding='15px', width='100%'))
+✅ smartcash.ui.cells.cell_1_1_repo_clone berhasil diimpor
+   - 23 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.cells.cell_1_2_env_config berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+<IPython.core.display.HTML object>
+[01:25:14] WARNING - Skipping status_check handler - missing components: ['status_check_button']
+WARNING:smartcash.ui.setup.dependency.handlers:Skipping status_check handler - missing components: ['status_check_button']
+[01:25:14] INFO - ✅ Successfully initialized all dependency handlers
+INFO:smartcash.ui.setup.dependency.handlers:✅ Successfully initialized all dependency handlers
+[01:25:14] INFO - Successfully set up dependency handlers
+[01:25:14] INFO - Successfully set up dependency handlers
+INFO:smartcash.ui.setup.dependency.initializer:Successfully set up dependency handlers
+✅ smartcash.ui.cells.cell_1_3_dependency_installer berhasil diimpor
+   - 9 simbol ditemukan
+--------------------------------------------------------------------------------
+[01:25:15] INFO - 🚀 Starting downloader initialization
+[01:25:15] INFO - ✅ downloader initialized successfully
+[01:25:15] INFO - 🚀 Starting dataset.augmentation initialization
+[01:25:15] ERROR - ❌ Failed to initialize dataset.augmentation: 'widget'
+Traceback (most recent call last):
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/dataset/augmentation/components/ui_components.py", line 83, in create_augmentation_main_ui
+    action_section = widgets.VBox([
+                     ^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.12/site-packages/ipywidgets/widgets/widget_box.py", line 64, in __init__
+    super().__init__(**kwargs)
+  File "/opt/anaconda3/lib/python3.12/site-packages/ipywidgets/widgets/widget.py", line 503, in __init__
+    super().__init__(**kwargs)
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 1355, in __init__
+    setattr(self, key, value)
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 716, in __set__
+    self.set(obj, value)
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 690, in set
+    new_value = self._validate(obj, value)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 722, in _validate
+    value = self.validate(obj, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 3482, in validate
+    value = self.validate_elements(obj, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 3494, in validate_elements
+    self.error(obj, v, error)
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 810, in error
+    raise error
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 3492, in validate_elements
+    v = self._trait._validate(obj, v)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 722, in _validate
+    value = self.validate(obj, value)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 2311, in validate
+    self.error(obj, value)
+  File "/opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py", line 815, in error
+    raise TraitError(value, info or self.info(), self)
+traitlets.traitlets.TraitError: The 'children' trait of a VBox instance contains an Instance of a TypedTuple which expected a Widget, not the tuple (Output(layout=Layout(border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='none', margin='10px 0', max_height='800px', min_height='0px', overflow='auto', padding='5px', width='100%')), {'width': '100%', 'min_height': '0px', 'max_height': '800px', 'margin': '10px 0', 'padding': '5px', 'border': '1px solid #e0e0e0', 'border_radius': '4px', 'background_color': '#fafafa', 'overflow': 'auto', 'visibility': 'hidden'}).
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/initializers/common_initializer.py", line 59, in initialize
+    ui_components = self._create_ui_components(config, **kwargs)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/dataset/augmentation/augmentation_initializer.py", line 23, in _create_ui_components
+    ui_components = create_augmentation_main_ui(config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/dataset/augmentation/components/ui_components.py", line 145, in create_augmentation_main_ui
+    return _create_fallback_ui(str(e))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/dataset/augmentation/components/ui_components.py", line 369, in _create_fallback_ui
+    error_widget = create_fallback_ui(
+                   ^^^^^^^^^^^^^^^^^^^
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/utils/fallback_utils.py", line 181, in create_fallback_ui
+    'ui': error_ui['widget'],
+          ~~~~~~~~^^^^^^^^^^
+KeyError: 'widget'
+

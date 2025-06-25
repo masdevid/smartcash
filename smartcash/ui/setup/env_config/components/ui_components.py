@@ -147,5 +147,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Store the log components for later use
     ui_components['log_components'] = log_accordion
     ui_components['ui'] = main_container
-    
+    # Log any missing critical components
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(ui_components)
     return ui_components

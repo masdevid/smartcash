@@ -1,10 +1,16 @@
 """
 File: smartcash/ui/setup/dependency/handlers/config_updater.py
-Deskripsi: Helper untuk update UI components dari config values
+
+Configuration updater for dependency management UI.
+
+This module provides functionality to update UI components based on configuration values.
 """
 
-from typing import Dict, Any, List
-from smartcash.ui.setup.dependency.components.ui_package_selector import reset_package_selections
+# Standard library imports
+from typing import Any, Dict, List, Optional, Tuple
+
+# Absolute imports
+from smartcash.ui.setup.dependency.utils.ui.utils import reset_package_selections
 
 def update_dependency_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """Update UI components dari config dengan error handling"""

@@ -114,19 +114,59 @@ class TestImports(unittest.TestCase):
         success = total - len(failed_imports)
         
         print("\n📊 Ringkasan Hasil Import:")
-        print("=" * 50)
+        print("=" * 80)
         print(f"\n✅ {success} dari {total} modul berhasil diimport")
         print(f"❌ {len(failed_imports)} modul gagal diimport\n")
         
-        self._print_error_analysis(import_errors)
+        # Group errors by type for better analysis
+        error_groups = {}
+        for error, modules in import_errors.items():
+            error_groups[error] = modules
+        
+        # Print error statistics
+        if error_groups:
+            print("\n🔍 Error Distribution:")
+            print("-" * 80)
+            for error, modules in sorted(error_groups.items(), key=lambda x: -len(x[1])):
+                print(f"{len(modules):4d} x {error}")
+        
+        # Show top failing modules
+        if failed_imports:
+            print("\n🔍 Top Failing Modules:")
+            print("-" * 80)
+            for module in sorted(failed_imports)[:10]:  # Show top 10
+                error = next((e for e, m in import_errors.items() if module in m), "Unknown error")
+                print(f"- {module}: {error}")
+        
+        # Show some successful imports for reference
         self._print_success_examples(failed_imports)
-        self._print_recommendations(import_errors)
-        self._print_error_summary(import_errors)
-        self._print_statistics(failed_imports, total)
-        self._print_failed_modules(failed_imports)
+        
+        # Print recommendations
+        print("\n💡 Rekomendasi:")
+        print("-" * 80)
+        if "No module named" in str(error_groups.keys()):
+            print("1. Beberapa modul Python tidak ditemukan. Coba install dengan pip:")
+            for error in [e for e in error_groups if "No module named" in e]:
+                module = error.split("'")[1].split('.')[0]
+                print(f"   pip install {module}")
+        
+        if failed_imports:
+            print("\n2. Untuk modul yang gagal, coba:")
+            print("   - Periksa apakah semua dependensi sudah terinstall")
+            print("   - Periksa kompatibilitas versi dependensi")
+            print("   - Periksa error spesifik di atas")
         
         # Tampilkan lokasi file log
         print(f"\n📝 Log lengkap disimpan di: {os.path.abspath(log_file)}")
+        
+        # Print environment info for debugging
+        print("\n🛠️  Environment Info:")
+        print("-" * 80)
+        print(f"Python: {sys.version}")
+        print(f"Python Path: {sys.executable}")
+        print(f"Working Directory: {os.getcwd()}")
+        print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
+        print(f"sys.path: {sys.path[:3]}...")  # Show first 3 paths
     
     def _print_error_analysis(self, import_errors):
         """Mencetak analisis error"""
@@ -381,9 +421,6 @@ class TestImports(unittest.TestCase):
                 # Hitung durasi tes
                 duration = datetime.now() - start_time
                 
-                # Tampilkan ringkasan
-                self._print_import_summary(failed_imports, import_errors, log_file)
-                
                 # Tampilkan ringkasan eksekusi
                 print("\n" + "=" * 80)
                 print(f"🏁 Selesai dalam {duration.total_seconds():.2f} detik")
@@ -393,9 +430,70 @@ class TestImports(unittest.TestCase):
                 
                 # Tampilkan modul yang gagal dengan detail
                 if failed_imports:
-                    print("\n" + "🔍" * 40)
+                    print("\n" + "🔍" * 80)
                     print("MODUL YANG GAGAL DIIMPOR:")
+                    print("🔍" * 80)
+                    
+                    # Print detailed failure information
+                    for module_name in sorted(failed_imports):
+                        error_msg = next((msg for msg, modules in import_errors.items() 
+                                       if module_name in modules), "Unknown error")
+                        print(f"\n❌ {module_name}")
+                        print(f"   Error: {error_msg}")
+                        
+                        # Try to get more details about the module
+                        try:
+                            # Check if it's a file or package
+                            parts = module_name.split('.')
+                            module_path = os.path.join(*parts) + '.py'
+                            package_path = os.path.join(*parts, '__init__.py')
+                            
+                            # Check in all Python paths
+                            found = False
+                            for path in sys.path:
+                                full_path = os.path.join(path, module_path)
+                                if os.path.exists(full_path):
+                                    print(f"   File: {full_path}")
+                                    found = True
+                                    break
+                                    
+                                full_pkg_path = os.path.join(path, package_path)
+                                if os.path.exists(full_pkg_path):
+                                    print(f"   Package: {full_pkg_path}")
+                                    found = True
+                                    break
+                            
+                            if not found:
+                                print("   File/Package not found in sys.path")
+                                
+                            # Check module spec
+                            spec = importlib.util.find_spec(module_name)
+                            if spec:
+                                print(f"   Spec: {spec.origin}")
+                                if spec.submodule_search_locations:
+                                    print(f"   Submodule locations: {spec.submodule_search_locations}")
+                            else:
+                                print("   No module spec found")
+                                
+                        except Exception as e:
+                            print(f"   Error getting module info: {str(e)}")
+                    
+                    print("\n" + "🔍" * 40)
+                    print("ANALYSIS OF FAILED IMPORTS:")
                     print("🔍" * 40)
+                    
+                    # Group by error type
+                    error_groups = {}
+                    for error, modules in import_errors.items():
+                        error_groups[error] = modules
+                    
+                    # Print analysis by error type
+                    for error, modules in error_groups.items():
+                        print(f"\n❌ {error} (affects {len(modules)} modules):")
+                        for module in sorted(modules)[:5]:  # Show first 5 examples
+                            print(f"   - {module}")
+                        if len(modules) > 5:
+                            print(f"   - ...and {len(modules) - 5} more")
                     
                     # Kelompokkan modul yang gagal berdasarkan direktori
                     failed_by_dir = {}

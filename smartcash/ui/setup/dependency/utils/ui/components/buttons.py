@@ -1,10 +1,16 @@
 """
-File: smartcash/ui/setup/dependency/utils/button_state.py
+File: smartcash/ui/setup/dependency/utils/ui/components/buttons.py
 
-Utilitas sederhana untuk mengelola state tombol saat operasi berjalan.
+Button state management utilities.
+
+This module provides decorators and utilities for managing button states during operations.
 """
-from typing import List, Dict, Any, Callable
+
+# Standard library imports
 import functools
+from typing import Any, Callable, Dict, List, Optional
+
+__all__ = ['with_button_state', 'create_button_state_handler']
 
 def with_button_state(buttons: List[Any]):
     """

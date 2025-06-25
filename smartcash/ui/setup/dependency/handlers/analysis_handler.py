@@ -1,199 +1,288 @@
 """
 File: smartcash/ui/setup/dependency/handlers/analysis_handler.py
-Deskripsi: Handler untuk analisis packages dan compatibility checking
+
+Package analysis and compatibility checking handler.
+
+This module provides functionality for analyzing Python packages and checking
+for compatibility issues in a batch processing manner.
 """
 
-from typing import Dict, Any, Callable, List
-from concurrent.futures import ThreadPoolExecutor
-from smartcash.ui.setup.dependency.utils import (
-    get_selected_packages, batch_check_packages_status,
-    update_status_panel, with_button_context, 
-    show_progress_tracker_safe, complete_operation_with_message
+# Standard library imports
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Protocol, TypedDict
+
+# Absolute imports
+from smartcash.common.logger import get_logger
+from smartcash.ui.setup.dependency.utils.package.installer import (
+    check_package_installation_status,
+    get_installed_packages_dict
 )
+# Package status utilities will be imported here if needed in the future
+from smartcash.ui.setup.dependency.utils.ui.components.buttons import with_button_state
+from smartcash.ui.setup.dependency.utils.ui.state import (
+    complete_operation_with_message,
+    show_progress_tracker_safe,
+    update_progress_step,
+    update_status_panel
+)
+from smartcash.ui.setup.dependency.utils.ui.utils import get_selected_packages
 
-def setup_analysis_handler(ui_components: Dict[str, Any]) -> Dict[str, Callable]:
-    """Setup analysis handler untuk package analysis"""
+# Type aliases
+UIComponents = Dict[str, Any]
+PackageList = List[str]
+AnalysisResults = Dict[str, Any]
+AnalysisReport = Dict[str, Any]
+
+# Protocol for UI Components that have a 'value' attribute
+class HasValue(Protocol):
+    value: str
+
+# Constants
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_ANALYSIS_CONFIG = {
+    'check_compatibility': True,
+    'batch_size': DEFAULT_BATCH_SIZE,
+    'include_dev_deps': False,
+    'detailed_info': True
+}
+
+@dataclass
+class AnalysisConfig:
+    """Configuration for package analysis."""
+    check_compatibility: bool = True
+    batch_size: int = DEFAULT_BATCH_SIZE
+    include_dev_deps: bool = False
+    detailed_info: bool = True
+
+class AnalysisHandler:
+    """Handles package analysis operations with progress tracking."""
     
-    def handle_analysis():
-        """Handle package analysis dengan batch processing"""
-        logger = ui_components.get('logger')
-        
-        with with_button_context(ui_components, 'analyze_button'):
+    def __init__(self, ui_components: UIComponents):
+        """Initialize with UI components."""
+        self.ui = ui_components
+        self.logger = get_logger(__name__)
+        self._setup_handlers()
+    
+    def _setup_handlers(self) -> None:
+        """Setup UI event handlers."""
+        if button := self.ui.get('analyze_button'):
+            button.on_click(lambda _: self.handle_analysis())
+    
+    def handle_analysis(self) -> None:
+        """Handle package analysis with progress tracking."""
+        with with_button_context(self.ui, 'analyze_button'):
             try:
-                # Extract packages untuk analysis
-                selected_packages = get_selected_packages(ui_components.get('package_selector', {}))
-                custom_packages = _get_custom_packages(ui_components)
-                all_packages = selected_packages + custom_packages
-                
-                if not all_packages:
-                    update_status_panel(ui_components, "⚠️ Tidak ada packages untuk dianalisis", "warning")
-                    return
-                
-                # Get analysis settings
-                config = _extract_analysis_config(ui_components)
-                
-                # Start analysis
-                update_status_panel(ui_components, f"🔍 Menganalisis {len(all_packages)} packages...", "info")
-                show_progress_tracker_safe(ui_components, "Package Analysis")
-                
-                if logger:
-                    logger.info(f"🔍 Analyzing {len(all_packages)} packages...")
-                
-                # Analyze packages
-                analysis_results = _analyze_packages_batch(all_packages, config, ui_components)
-                
-                # Generate report
-                report = _generate_analysis_report(analysis_results)
-                
-                # Update UI dengan hasil
-                _update_analysis_results(ui_components, report)
-                
-                complete_operation_with_message(ui_components, f"✅ Analisis selesai: {report['summary']}")
-                
-                if logger:
-                    logger.info(f"📊 Analysis completed: {report['summary']}")
-                
+                self._perform_analysis()
             except Exception as e:
-                update_status_panel(ui_components, f"❌ Analysis error: {str(e)}", "error")
-                if logger:
-                    logger.error(f"❌ Analysis failed: {str(e)}")
+                self._handle_analysis_error(e)
     
-    # Setup button handler
-    analyze_button = ui_components.get('analyze_button')
-    if analyze_button:
-        analyze_button.on_click(lambda b: handle_analysis())
-    
-    return {
-        'handle_analysis': handle_analysis,
-        'analyze_packages_batch': lambda packages, config: _analyze_packages_batch(packages, config, ui_components)
-    }
-
-def _get_custom_packages(ui_components: Dict[str, Any]) -> List[str]:
-    """Extract custom packages dari textarea"""
-    try:
-        widget = ui_components.get('custom_packages')
-        if widget and widget.value.strip():
-            return [pkg.strip() for pkg in widget.value.strip().split('\n') if pkg.strip()]
-        return []
-    except:
-        return []
-
-def _extract_analysis_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract analysis config dari UI"""
-    from ..handlers.config_extractor import extract_dependency_config
-    
-    try:
-        full_config = extract_dependency_config(ui_components)
-        return full_config.get('analysis', {
-            'check_compatibility': True,
-            'batch_size': 10,
-            'detailed_info': True
-        })
-    except:
-        return {
-            'check_compatibility': True,
-            'batch_size': 10,
-            'detailed_info': True
-        }
-
-def _analyze_packages_batch(packages: List[str], config: Dict[str, Any], ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Analyze packages dalam batch dengan progress tracking"""
-    from smartcash.ui.setup.dependency.utils import update_progress_step
-    
-    batch_size = config.get('batch_size', 10)
-    results = {
-        'installed': [],
-        'not_installed': [],
-        'errors': [],
-        'compatibility_issues': []
-    }
-    
-    # Process in batches
-    for i in range(0, len(packages), batch_size):
-        batch = packages[i:i + batch_size]
+    def _perform_analysis(self) -> None:
+        """Execute the analysis workflow."""
+        packages = self._get_packages_for_analysis()
+        if not packages:
+            update_status_panel(self.ui, "⚠️ No packages to analyze", "warning")
+            return
         
-        # Update progress
-        progress = int((i / len(packages)) * 100)
-        update_progress_step(ui_components, "overall", progress, f"Analyzing batch {i//batch_size + 1}")
+        config = self._get_analysis_config()
+        self._start_analysis_ui(len(packages))
         
-        # Check batch status
-        batch_results = batch_check_packages_status(batch)
+        analysis_results = self._analyze_packages_batch(packages, config)
+        report = self._generate_analysis_report(analysis_results)
         
-        # Categorize results
-        for result in batch_results:
-            if result['success']:
-                if result['installed']:
-                    results['installed'].append(result)
-                else:
-                    results['not_installed'].append(result)
-            else:
-                results['errors'].append(result)
-        
-        # Check compatibility jika enabled
-        if config.get('check_compatibility', True):
-            compatibility_issues = _check_compatibility_batch(batch, config)
-            results['compatibility_issues'].extend(compatibility_issues)
+        self._update_analysis_results(report)
+        self._complete_analysis(report)
     
-    return results
-
-def _check_compatibility_batch(packages: List[str], config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Check compatibility issues untuk batch packages"""
-    issues = []
+    def _get_packages_for_analysis(self) -> PackageList:
+        """Retrieve and combine selected and custom packages."""
+        selected = get_selected_packages(self.ui.get('package_selector', {}))
+        custom = self._get_custom_packages()
+        return selected + custom
     
-    # Simple compatibility checks
-    for package in packages:
+    def _get_custom_packages(self) -> PackageList:
+        """Extract custom packages from the custom packages textarea."""
         try:
-            # Check for common compatibility issues
-            if 'tensorflow' in package.lower() and 'torch' in [p.lower() for p in packages]:
-                issues.append({
-                    'package': package,
-                    'issue': 'Potential conflict with PyTorch',
-                    'severity': 'warning'
-                })
+            if widget := self.ui.get('custom_packages'):
+                if hasattr(widget, 'value') and widget.value.strip():
+                    return [pkg.strip() for pkg in widget.value.strip().split('\n') if pkg.strip()]
+        except Exception as e:
+            self.logger.warning(f"Error reading custom packages: {e}")
+        return []
+    
+    def _get_analysis_config(self) -> AnalysisConfig:
+        """Extract and validate analysis configuration."""
+        config_data = self._extract_analysis_config()
+        return AnalysisConfig(**config_data)
+    
+    def _extract_analysis_config(self) -> Dict[str, Any]:
+        """Extract analysis configuration from UI."""
+        try:
+            from ..handlers.config_extractor import extract_dependency_config
+            full_config = extract_dependency_config(self.ui)
+            return full_config.get('analysis', DEFAULT_ANALYSIS_CONFIG)
+        except Exception as e:
+            self.logger.warning(f"Error extracting analysis config: {e}")
+            return DEFAULT_ANALYSIS_CONFIG
+    
+    def _start_analysis_ui(self, package_count: int) -> None:
+        """Update UI at the start of analysis."""
+        update_status_panel(self.ui, f"🔍 Analyzing {package_count} packages...", "info")
+        show_progress_tracker_safe(self.ui, "Package Analysis")
+        self.logger.info(f"Analyzing {package_count} packages...")
+    
+    def _analyze_packages_batch(self, packages: PackageList, config: AnalysisConfig) -> AnalysisResults:
+        """Analyze packages in batches with progress tracking."""
+        results: AnalysisResults = {
+            'total': len(packages),
+            'succeeded': 0,
+            'failed': 0,
+            'compatibility_issues': [],
+            'details': []
+        }
+        
+        # Get installed packages once for the entire batch
+        installed_packages = get_installed_packages_dict()
+        
+        batch_size = min(config.batch_size, len(packages))
+        for i in range(0, len(packages), batch_size):
+            batch = packages[i:i + batch_size]
+            batch_results = self._check_compatibility_batch(batch, installed_packages)
             
-            # Check for version conflicts
-            if '>=' in package and '<=' in package:
-                issues.append({
-                    'package': package,
-                    'issue': 'Complex version constraints',
-                    'severity': 'info'
-                })
+            # Update results
+            results['succeeded'] += batch_results.get('succeeded', 0)
+            results['failed'] += batch_results.get('failed', 0)
+            results['compatibility_issues'].extend(batch_results.get('compatibility_issues', []))
+            results['details'].extend(batch_results.get('details', []))
+            
+            # Update progress
+            progress = min(100, int((i + len(batch)) / len(packages) * 100))
+            update_progress_step(self.ui, f"Processed {i + len(batch)}/{len(packages)} packages")
+            
+        return results
+    
+    def _check_compatibility_batch(self, packages: PackageList, installed_packages: Dict[str, str]) -> Dict[str, Any]:
+        """Check compatibility for a batch of packages."""
+        results = {
+            'succeeded': 0,
+            'failed': 0,
+            'compatibility_issues': [],
+            'details': []
+        }
+        
+        try:
+            # Process packages in the current batch
+            for pkg in packages:
+                try:
+                    # Check installation status
+                    status = check_package_installation_status(pkg, installed_packages=installed_packages)
+                    
+                    # Add to results
+                    if status.get('success', False):
+                        results['succeeded'] += 1
+                        results['details'].append({
+                            'package': pkg,
+                            'status': 'installed' if status.get('installed', False) else 'not_installed',
+                            'version': status.get('version', 'unknown'),
+                            'compatible': status.get('compatible', False)
+                        })
+                        
+                        # Check for compatibility issues
+                        if not status.get('compatible', True):
+                            results['compatibility_issues'].append({
+                                'package': pkg,
+                                'issue': f"Version {status.get('version', 'unknown')} is not compatible with the required version"
+                            })
+                    else:
+                        results['failed'] += 1
+                        results['details'].append({
+                            'package': pkg,
+                            'status': 'error',
+                            'error': status.get('error', 'Unknown error')
+                        })
+                        
+                except Exception as e:
+                    results['failed'] += 1
+                    self.logger.warning(f"Failed to analyze package {pkg}: {str(e)}")
+                    results['details'].append({
+                        'package': pkg,
+                        'status': 'error',
+                        'error': str(e)
+                    })
+                        
+        except Exception as e:
+            self.logger.error(f"Error in batch processing: {str(e)}")
+            results['failed'] = len(packages)
+            
+        return results
+    
+    def _generate_analysis_report(self, results: AnalysisResults) -> AnalysisReport:
+        """Generate a comprehensive analysis report."""
+        total = results.get('total', 0)
+        succeeded = results.get('succeeded', 0)
+        failed = results.get('failed', 0)
+        issues = len(results.get('compatibility_issues', []))
+        
+        summary = f"{succeeded}/{total} packages analyzed successfully"
+        if failed > 0:
+            summary += f", {failed} failed"
+        if issues > 0:
+            summary += f", {issues} compatibility issues found"
+            
+        return {
+            'summary': summary,
+            'total_packages': total,
+            'succeeded': succeeded,
+            'failed': failed,
+            'compatibility_issues': results.get('compatibility_issues', []),
+            'details': results.get('details', [])
+        }
+    
+    def _update_analysis_results(self, report: AnalysisReport) -> None:
+        """Update UI with analysis results."""
+        try:
+            if results_panel := self.ui.get('results_panel'):
+                # Clear previous results
+                results_panel.clear_output()
                 
-        except Exception:
-            pass
+                # Display summary
+                with results_panel:
+                    print("📊 Analysis Results")
+                    print("=" * 40)
+                    print(f"✅ {report['succeeded']}/{report['total_packages']} packages analyzed successfully")
+                    
+                    if report['failed'] > 0:
+                        print(f"❌ {report['failed']} packages failed analysis")
+                        
+                    if issues := report['compatibility_issues']:
+                        print("\n⚠️  Compatibility Issues:")
+                        for issue in issues[:5]:  # Show first 5 issues
+                            print(f"- {issue}")
+                        if len(issues) > 5:
+                            print(f"... and {len(issues) - 5} more")
+        except Exception as e:
+            self.logger.error(f"Error updating results UI: {str(e)}")
     
-    return issues
+    def _complete_analysis(self, report: AnalysisReport) -> None:
+        """Finalize analysis with success message."""
+        complete_operation_with_message(self.ui, f"✅ Analysis complete: {report['summary']}")
+        self.logger.info(f"Analysis completed: {report['summary']}")
+    
+    def _handle_analysis_error(self, error: Exception) -> None:
+        """Handle analysis errors consistently."""
+        error_msg = str(error)
+        update_status_panel(self.ui, f"❌ Analysis error: {error_msg}", "error")
+        self.logger.error(f"Analysis failed: {error_msg}", exc_info=True)
 
-def _generate_analysis_report(results: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate comprehensive analysis report"""
-    total_packages = len(results['installed']) + len(results['not_installed']) + len(results['errors'])
+def setup_analysis_handler(ui_components: UIComponents) -> Dict[str, Callable]:
+    """Initialize and return analysis handler with bound methods.
     
+    Args:
+        ui_components: Dictionary of UI components
+        
+    Returns:
+        Dictionary of handler functions bound to the UI components
+    """
+    handler = AnalysisHandler(ui_components)
     return {
-        'total_packages': total_packages,
-        'installed_count': len(results['installed']),
-        'not_installed_count': len(results['not_installed']),
-        'error_count': len(results['errors']),
-        'compatibility_issues_count': len(results['compatibility_issues']),
-        'summary': f"{len(results['installed'])}/{total_packages} installed, {len(results['compatibility_issues'])} issues",
-        'details': results
+        'handle_analysis': handler.handle_analysis,
+        'analyze_packages_batch': handler._analyze_packages_batch
     }
-
-def _update_analysis_results(ui_components: Dict[str, Any], report: Dict[str, Any]) -> None:
-    """Update UI dengan analysis results"""
-    try:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.info(f"📊 Analysis Report:")
-            logger.info(f"   • Total packages: {report['total_packages']}")
-            logger.info(f"   • Installed: {report['installed_count']}")
-            logger.info(f"   • Not installed: {report['not_installed_count']}")
-            logger.info(f"   • Errors: {report['error_count']}")
-            logger.info(f"   • Compatibility issues: {report['compatibility_issues_count']}")
-            
-            # Log compatibility issues
-            if report['details']['compatibility_issues']:
-                logger.warning("⚠️ Compatibility Issues:")
-                for issue in report['details']['compatibility_issues'][:3]:  # Show first 3
-                    logger.warning(f"   • {issue['package']}: {issue['issue']}")
-    except Exception:
-        pass

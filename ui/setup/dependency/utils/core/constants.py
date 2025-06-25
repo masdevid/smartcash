@@ -1,5 +1,11 @@
 """
-File: smartcash/ui/setup/dependency/utils/constants.py
+File: /Users/masdevid/Projects/smartcash/smartcash/ui/setup/dependency/utils/core/constants.py
+
+Core constants and enums for the dependency management system.
+
+This module contains fundamental constants and enums used throughout
+the dependency management system.
+
 Deskripsi: Consolidated constants untuk dependency installer dengan DRY approach
 """
 

@@ -195,6 +195,23 @@ def create_silent_context():
     
     return SilentContext()
 
+def log_missing_components(components: Dict[str, Any], exclude: list = None) -> None:
+    """Log a warning for any None values in the components dictionary.
+    
+    Args:
+        components: Dictionary of component names and their values
+        exclude: List of component names to exclude from the check
+    """
+    if exclude is None:
+        exclude = ['logger']
+    
+    missing = [k for k, v in components.items() if v is None and k not in exclude]
+    if missing:
+        logger = logging.getLogger(__name__)
+        logger.warning("Missing optional UI components: %s", 
+                     ", ".join(f"'{m}'" for m in missing),
+                     extra={"missing_components": missing})
+
 # Specific suppression functions dengan safe error handling
 def suppress_ml_logs() -> None:
     """Suppress ML library logs dengan safe handling"""

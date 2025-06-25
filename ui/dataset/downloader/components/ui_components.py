@@ -7,8 +7,11 @@ import ipywidgets as widgets
 from typing import Dict, Any
 from smartcash.ui.components import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.components import (create_action_buttons, create_dual_progress_tracker,create_divider,
-                                     create_status_panel, create_log_accordion, create_save_reset_buttons, create_confirmation_area)
+from smartcash.ui.components import (
+    create_action_buttons, create_dual_progress_tracker, create_divider,
+    create_status_panel, create_log_accordion, create_save_reset_buttons
+)
+from smartcash.ui.components.dialog import create_confirmation_area
 from .input_options import create_downloader_input_options
 
 
@@ -39,7 +42,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         button_width='130px'
     )
     # Confirmation area - VISIBLE dan di bawah action buttons seperti preprocessing
-    confirmation_area = create_confirmation_area()
+    confirmation_area, _ = create_confirmation_area()
     
     # Save & reset buttons
     save_reset_buttons = create_save_reset_buttons(
@@ -156,17 +159,6 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'help_panel': help_panel,
         'module_name': 'downloader'
     }
-    
-    # Validate critical components - create fallback buttons if missing
-    critical_components = ['download_button', 'check_button', 'save_button', 'reset_button']
-    for comp_name in critical_components:
-        if ui_components.get(comp_name) is None:
-            ui_components[comp_name] = widgets.Button(
-                description=comp_name.replace('_', ' ').title(),
-                button_style='primary' if 'download' in comp_name else '',
-                disabled=True,
-                tooltip=f"Component {comp_name} tidak tersedia",
-                layout=widgets.Layout(width='auto', max_width='150px')
-            )
-    
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(ui_components)
     return ui_components

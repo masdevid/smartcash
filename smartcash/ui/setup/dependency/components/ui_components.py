@@ -55,14 +55,14 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         )
     )
     
-    # Action buttons dengan flexbox
+    # Action buttons with flexbox
     action_buttons = create_action_buttons(
         primary_label="Install",
-        secondary_label="Analyze", 
-        warning_label="System Report",
-        primary_icon=get_icon('download'),
-        secondary_icon=get_icon('search'),
-        warning_icon=get_icon('info'),
+        primary_icon='download',
+        secondary_buttons=[
+            ('Analyze', 'search', 'info'),
+            ('System Report', 'info', 'info')
+        ],
         button_width='120px'
     )
     
@@ -106,28 +106,43 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Log accordion
     log_accordion = create_log_accordion()
     
-    # Main UI dengan flexbox layout
-    main_ui = widgets.VBox([
+    # Create a list of all widgets, filtering out None values
+    main_ui_children = [
         header,
         status_panel,
         widgets.HTML(value="<h4>📦 Package Selection</h4>"),
-        package_selector['widget'],
+        package_selector.get('container'),
         widgets.HTML(value="<h4>➕ Custom Packages</h4>"),
         custom_packages,
         create_divider(),
         action_container,
         save_reset_container,
         create_divider(),
-        progress_tracker.container,
-        log_accordion['widget']
-    ], layout=widgets.Layout(
-        display='flex',
-        flex_direction='column',
-        align_items='stretch',
-        width='100%',
-        overflow='hidden',  # Prevent horizontal scroll
-        box_sizing='border-box'
-    ))
+        progress_tracker.ui_manager.container
+    ]
+    
+    # Add log_accordion widget if it exists
+    log_widget = log_accordion.get('widget')
+    if log_widget is not None:
+        main_ui_children.append(log_widget)
+    
+    # Filter out any None values that might have been added
+    main_ui_children = [child for child in main_ui_children if child is not None]
+    
+    # Create the main UI with the filtered children and layout
+    main_ui = widgets.VBox(
+        main_ui_children,
+        layout=widgets.Layout(
+            display='flex',
+            flex_direction='column',
+            align_items='stretch',
+            width='100%',
+            padding='10px',
+            gap='10px',
+            overflow='hidden',  # Prevent horizontal scroll
+            box_sizing='border-box'
+        )
+    )
     
     # Return components with all required keys
     components = {
@@ -135,7 +150,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'ui': main_ui,
         'header': header,
         'status_panel': status_panel,
-        'package_selector': package_selector.get('widget'),
+        'package_selector': package_selector.get('container'),
         'custom_packages': custom_packages,
         
         # Action buttons
@@ -149,7 +164,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'reset_button': save_reset_buttons.get('reset_button'),
         
         # Progress and logging
-        'progress_tracker': progress_tracker,
+        'progress_tracker': progress_tracker.ui_manager,
         'log_accordion': log_accordion.get('widget'),
         'log_output': log_accordion.get('output'),
         
@@ -160,9 +175,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     }
     
     # Log any missing critical components
-    missing = [k for k, v in components.items() if v is None and k not in ['logger']]
-    if missing:
-        import logging
-        logging.warning(f"Missing optional components: {missing}")
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(components)
 
     return components

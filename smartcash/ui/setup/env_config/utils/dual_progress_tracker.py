@@ -40,10 +40,11 @@ class DualProgressTracker:
         self._create_ui()
         
         # Register with UI components
-        self.components.update({
-            'progress_container': self.container,
-            'progress_tracker': self
-        })
+        if self.components is not None:
+            self.components.update({
+                'progress_container': self.container,
+                'progress_tracker': self
+            })
     
     def _create_ui(self):
         """Create and configure the UI elements"""

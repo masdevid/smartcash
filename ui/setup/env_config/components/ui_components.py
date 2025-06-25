@@ -74,7 +74,6 @@ def create_env_config_ui() -> Dict[str, Any]:
     
     # Ensure progress container exists
     if 'progress_container' not in ui_components or ui_components['progress_container'] is None:
-        import ipywidgets as widgets
         ui_components['progress_container'] = ipywidgets.VBox()
         if hasattr(progress_tracker, '_progress_container'):
             progress_tracker._progress_container = ui_components['progress_container']

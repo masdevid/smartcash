@@ -100,7 +100,7 @@ def create_log_accordion(
     # Add entries container to log container
     log_container.children = [entries_container]
     
-    # Add minimal CSS for the log container
+    # Add CSS for the log container
     display(HTML(f"""
     <style>
         .{log_container.log_id} {{
@@ -108,6 +108,7 @@ def create_log_accordion(
             flex-direction: column !important;
             height: 100% !important;
             width: 100% !important;
+            max-width: 100% !important;
             overflow: hidden !important;
         }}
         
@@ -118,6 +119,37 @@ def create_log_accordion(
             width: 100% !important;
             padding: 8px !important;
             margin: 0 !important;
+        }}
+        
+        /* Ensure log entries are visible and properly formatted */
+        .{log_container.log_id} .p-Widget.panel-widgets-box > div {{
+            margin-bottom: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }}
+        
+        /* Style for log entries */
+        .log-entry {{
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+            word-wrap: break-word !important;
+            white-space: pre-wrap !important;
+        }}
+        
+        /* Scrollbar styling */
+        .{log_container.log_id}::-webkit-scrollbar {{
+            width: 6px !important;
+            height: 6px !important;
+        }}
+        
+        .{log_container.log_id}::-webkit-scrollbar-thumb {{
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }}
+        
+        .{log_container.log_id}::-webkit-scrollbar-track {{
+            background: transparent;
         }}
     </style>
     """))
@@ -338,7 +370,7 @@ def create_log_accordion(
             traceback.print_exc()
     
     def _create_log_entry(entry: Dict[str, Any]) -> widgets.HTML:
-        """Create a simple log entry widget - styling is now handled in ui_logger.py"""
+        """Create a log entry widget with proper styling."""
         # Format timestamp
         timestamp_html = ''
         if show_timestamps and 'timestamp' in entry and entry['timestamp']:
@@ -355,63 +387,45 @@ def create_log_accordion(
                 
             except Exception as e:
                 timestamp = entry['timestamp'].strftime('%H:%M:%S.%f')[:-3]
-                count_html = f" <span class='duplicate-count'>{entry['count']+1}x</span>" if entry.get('count', 0) > 0 else ""
-                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}{count_html}</span>"
+                timestamp_html = f"<span style='font-size: 11px; opacity: 0.7;'>{timestamp}</span>"
         
         # Create namespace/module prefix
         ns = entry.get('namespace') or entry.get('module')
         ns_display = f"<span style='color: #6f42c1; font-weight: 500;'>[{ns.split('.')[-1]}]</span> " if ns else ""
         
-        # Add right border for duplicate messages
+        # Get style for the log level
+        style = LOG_LEVEL_STYLES.get(entry['level'], LOG_LEVEL_STYLES[LogLevel.INFO])
+        
+        # Add border for duplicate messages
         border_style = '2px solid #e0e0e0' if entry.get('show_duplicate_indicator', False) else 'none'
         
-        # Create namespace badge with proper styling
-        ns_badge = ''
-        if ns:
-            ns_badge = f"""
-            <span style='
-                display: inline-block;
-                background: #f0f0f0;
-                color: #6f42c1;
-                font-weight: 500;
-                font-size: 11px;
-                padding: 2px 6px;
-                border-radius: 4px;
-                margin-right: 6px;
-                line-height: 1.2;
-                white-space: nowrap;
-            '>
-                {ns.split('.')[-1]}
-            </span>
-            """
-        
-        # Create the HTML with right border for duplicates
+        # Create the HTML for the log entry
         html = f"""
-        <div style='
+        <div class='log-entry' style='
             padding: 6px 12px;
             margin: 2px 0;
-            border-radius: 6px;
+            border-radius: 4px;
             background: {style['bg']};
             color: {style['color']};
-            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 13px;
             line-height: 1.4;
-            transition: all 0.2s ease;
+            word-break: break-word;
+            white-space: pre-wrap;
             border-right: {border_style};
             border-left: {border_style};
-            position: relative;
-            overflow: hidden;
         '>
-            <div style='display: flex; align-items: center; gap: 8px;'>
-                {style['icon'] if show_level_icons else ''}
-                {ns_badge}
-                <span style='flex: 1; white-space: pre-wrap; word-break: break-word;'>{entry['message']}</span>
+            <div style='display: flex; align-items: flex-start; gap: 8px;'>
+                <span style='flex-shrink: 0;'>{style['icon'] if show_level_icons else ''}</span>
+                <span style='flex: 1;'>{ns_display}{entry['message']}</span>
                 <span style='flex-shrink: 0; margin-left: 8px;'>{timestamp_html}</span>
             </div>
         </div>
         """
         
         return widgets.HTML(html)
+    
+    duplicate_count = 0
     
     def clear_logs():
         """Clear all log entries."""

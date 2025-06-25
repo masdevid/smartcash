@@ -32,7 +32,7 @@ class DualProgressTracker:
             logger: Optional logger instance
         """
         self.logger = logger
-        self.ui_components = ui_components or {}
+        self._ui_components = ui_components or {}
         self.current_stage = None
         self.overall_progress = 0
         self.stage_progress = 0
@@ -56,9 +56,9 @@ class DualProgressTracker:
         self._progress_container = self._new_tracker.container
         
         # Add to UI components if provided
-        if self.ui_components:
-            self.ui_components['progress_tracker'] = self._new_tracker
-            self.ui_components['progress_container'] = self._progress_container
+        if self._ui_components:
+            self._ui_components['progress_tracker'] = self._new_tracker
+            self._ui_components['progress_container'] = self._progress_container
             
         self._initialized = True
     
@@ -202,6 +202,17 @@ class DualProgressTracker:
             'progress_tracker': self._new_tracker,
             'progress_container': self.progress_container
         }
+        
+    @ui_components.setter
+    def ui_components(self, value: Dict[str, Any]) -> None:
+        """Set the UI components dictionary.
+        
+        Args:
+            value: Dictionary containing UI components
+        """
+        if not isinstance(value, dict):
+            raise ValueError("UI components must be a dictionary")
+        self._ui_components = value
 
     def _process_callbacks(self, stage: SetupStage, progress: int, message: str):
         """Process all registered callbacks.

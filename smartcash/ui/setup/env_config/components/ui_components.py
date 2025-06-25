@@ -56,7 +56,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     ui_components = {}
     
     # Create progress tracker - it will register itself in the components
-    progress_tracker = track_setup_progress(ui_components)
+    progress_tracker = track_setup_progress(ui_components=ui_components)
     
     # Double-check we have a valid container
     if 'progress_container' not in ui_components or ui_components['progress_container'] is None:

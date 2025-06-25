@@ -146,10 +146,21 @@ def create_log_accordion(
     def _scroll_to_bottom():
         """Scroll the log container to the bottom using JavaScript."""
         from IPython.display import display, Javascript
-        display(Javascript(
-            """
-            (function() {
-                // Try multiple selectors to find the log container
+        
+        # Generate a unique ID for our log container if it doesn't have one
+        if not hasattr(log_container, 'log_id'):
+            import uuid
+            log_container.log_id = f'log-container-{uuid.uuid4().hex}'
+            log_container.add_class(log_container.log_id)
+        
+        # Add a data attribute to track if we should auto-scroll
+        js_code = f"""
+        (function() {{
+            // Try to find our specific log container first
+            let logContainer = document.querySelector('.{log_container.log_id}');
+            
+            // If not found, try to find any scrollable container
+            if (!logContainer) {{
                 const selectors = [
                     '.smartcash-log-container',
                     '.jp-OutputArea-output',
@@ -158,43 +169,85 @@ def create_log_accordion(
                     '.output'
                 ];
                 
-                let logContainer = null;
-                for (const selector of selectors) {
+                for (const selector of selectors) {{
                     const elements = document.querySelectorAll(selector);
-                    if (elements.length > 0) {
-                        // Find the most likely container with scrolling
-                        for (const el of elements) {
-                            if (el.scrollHeight > el.clientHeight) {
-                                logContainer = el;
-                                break;
-                            }
-                        }
-                        if (logContainer) break;
-                        // If no scrolling container found, use the first match
-                        logContainer = elements[0];
-                        break;
-                    }
-                }
+                    for (const el of elements) {{
+                        if (el.scrollHeight > el.clientHeight) {{
+                            logContainer = el;
+                            break;
+                        }}
+                    }}
+                    if (logContainer) break;
+                }}
+            }}
+            
+            if (!logContainer) return;
+            
+            // Check if we're already at the bottom (or close)
+            const isNearBottom = logContainer.scrollHeight - logContainer.clientHeight - logContainer.scrollTop < 50;
+            
+            // Only auto-scroll if we're near the bottom or if forced
+            if (isNearBottom || {force_scroll}) {{
+                // Smooth scroll to bottom
+                function scrollToBottom() {{
+                    if (!logContainer) return;
+                    
+                    const start = logContainer.scrollTop;
+                    const end = logContainer.scrollHeight - logContainer.clientHeight;
+                    const duration = 150; // ms
+                    
+                    // Skip animation if we're already at the bottom
+                    if (Math.abs(start - end) < 1) return;
+                    
+                    const startTime = performance.now();
+                    
+                    function step(currentTime) {{
+                        const elapsed = currentTime - startTime;
+                        const progress = Math.min(elapsed / duration, 1);
+                        
+                        // Ease in-out function
+                        const easeInOut = t => t < 0.5 
+                            ? 2 * t * t 
+                            : -1 + (4 - 2 * t) * t;
+                        
+                        logContainer.scrollTop = start + (end - start) * easeInOut(progress);
+                        
+                        if (progress < 1) {{
+                            window.requestAnimationFrame(step);
+                        }}
+                    }}
+                    
+                    window.requestAnimationFrame(step);
+                }}
                 
-                if (logContainer) {
-                    logContainer.scrollTop = logContainer.scrollHeight;
-                }
-            })();
-            """
-        ))
+                // Small delay to ensure the new content is rendered
+                setTimeout(scrollToBottom, 10);
+            }}
+        }})();
+        """.format(log_container=log_container.log_id, force_scroll='true' if auto_scroll else 'false')
+        
+        display(Javascript(js_code))
     
     def _update_log_display():
         """Update the log container with current entries."""
         try:
-            # Update the entries container with new log entries
-            entries_container.children = tuple(_create_log_entry(entry) for entry in log_entries)
+            # Only update if there are new entries
+            current_count = len(entries_container.children)
+            new_entries = log_entries[current_count:]
             
-            # Auto-scroll to bottom if enabled
+            if not new_entries:
+                return
+                
+            # Store the current scroll position and container reference
+            scroll_container = log_container
+            
+            # Add only new entries to the container
+            new_widgets = [_create_log_entry(entry) for entry in new_entries]
+            entries_container.children = list(entries_container.children) + new_widgets
+            
+            # Auto-scroll to bottom if enabled and user hasn't scrolled up
             if auto_scroll:
-                # Use a small delay to ensure the widget is rendered
-                import threading
-                timer = threading.Timer(0.1, _scroll_to_bottom)
-                timer.start()
+                _scroll_to_bottom()
                 
         except Exception as e:
             print(f"[ERROR] Failed to update log display: {str(e)}")

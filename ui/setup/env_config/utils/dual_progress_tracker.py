@@ -117,30 +117,38 @@ class DualProgressTracker:
         # Notify callbacks
         self._notify_callbacks(message or "")
     
-    def update_within_stage(self, current: int, total: int, message: Optional[str] = None):
+    def update_within_stage(self, current, total=None, message: Optional[str] = None):
         """
-        Update progress within the current stage using item counts
+        Update progress within the current stage using item counts or update status message only.
         
         Args:
-            current: Current item number (1-based, can be string or int)
-            total: Total number of items in this stage (can be string or int)
-            message: Optional status message
+            current: Current item number (1-based, can be string or int) or status message
+            total: Total number of items in this stage (can be string or int), or None if current is a message
+            message: Optional status message (alternative to passing message as first arg)
         """
+        # Handle case where current is a status message and total is None
+        if total is None and (isinstance(current, str) or message is None):
+            message = str(current)
+            self._update_status(message)
+            self._notify_callbacks(message)
+            return
+            
+        # Handle case where we have both current and total values
         try:
             # Convert to integers if they're strings
-            current = int(current)
-            total = int(total)
+            current_int = int(current)
+            total_int = int(total)
             
-            if total <= 0:
+            if total_int <= 0:
                 return
                 
-            progress = (current / total) * 100
-            self.update_progress(progress, message or f"Processing item {current} of {total}")
+            progress = (current_int / total_int) * 100
+            self.update_progress(progress, message or f"Processing item {current_int} of {total_int}")
         except (TypeError, ValueError) as e:
-            error_msg = f"Invalid progress values - current: {current}, total: {total}"
-            if self.logger:
-                self.logger.error(f"{error_msg}: {e}")
-            self.error(error_msg)
+            # If conversion fails, treat it as a status update
+            status_message = message or str(current)
+            self._update_status(status_message)
+            self._notify_callbacks(status_message)
     
     def complete_stage(self, message: Optional[str] = None):
         """Mark the current stage as complete"""

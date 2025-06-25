@@ -8,11 +8,12 @@ import time
 import traceback
 from enum import Enum
 from typing import Dict, Any
+from smartcash.ui.setup.env_config.utils.dual_progress_tracker import SetupStage
 from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
 from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
 from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
-from smartcash.ui.setup.env_config.utils.dual_progress_tracker import track_setup_progress, SetupStage
+from smartcash.ui.setup.env_config.utils.dual_progress_tracker import track_setup_progress
 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
 
 class SetupHandler:
@@ -46,7 +47,7 @@ class SetupHandler:
             # Initialize progress tracker if not already done
             if 'progress_tracker' not in ui_components:
                 self.logger.info("🔧 Initializing progress tracker...")
-                from smartcash.ui.setup.env_config.utils.dual_progress_tracker import DualProgressTracker, SetupStage
+                from smartcash.ui.setup.env_config.utils.dual_progress_tracker import DualProgressTracker
                 progress_tracker = DualProgressTracker(ui_components=ui_components, logger=self.logger)
                 ui_components['progress_tracker'] = progress_tracker
                 self.logger.info("✅ Progress tracker initialized")

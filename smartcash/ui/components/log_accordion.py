@@ -71,7 +71,9 @@ def create_log_accordion(
         'overflow': 'hidden',
         'width': width,
         'height': height,
-        'margin': '5px 0'
+        'margin': '5px 0',
+        'display': 'flex',
+        'flex_direction': 'column'
     })
     
     # Add custom CSS
@@ -82,7 +84,9 @@ def create_log_accordion(
     entries_container = widgets.VBox(layout={
         'overflow_y': 'auto',
         'height': '100%',
-        'padding': '8px'
+        'padding': '8px',
+        'flex': '1',
+        'min_height': '0'  # Important for flexbox scrolling
     })
     
     # Add entries container to log container
@@ -92,6 +96,22 @@ def create_log_accordion(
     # Add custom CSS for the log container
     display(HTML(f"""
     <style>
+        .{log_container.log_id} {{
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }}
+        
+        .{log_container.log_id} .jp-OutputArea-output {{
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }}
+        
+        .{log_container.log_id} .lm-Widget {{
+            overflow-y: auto !important;
+        }}
+        
         @keyframes pulse {{
             0% {{ transform: scale(0.95); opacity: 0.7; }}
             50% {{ transform: scale(1.1); opacity: 1; }}
@@ -115,6 +135,9 @@ def create_log_accordion(
             padding: 0 6px;
             font-size: 0.85em;
             transition: background 0.3s ease;
+            margin-left: 4px;
+            color: #000;
+            font-weight: bold;
         }}
     </style>
     """))

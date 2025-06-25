@@ -61,37 +61,56 @@ class SplitConfigHandler(ConfigCellHandler):
             raise
 
 
-def create_split_config_ui(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create UI components for split configuration
+def create_split_config_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create and return the split configuration UI components.
     
     Args:
-        config: Current configuration values
+        config: Optional configuration dictionary
         
     Returns:
-        Dict containing UI components
+        Dictionary of UI components
     """
     try:
-        from smartcash.ui.dataset.split.components.ui_form import create_split_form
-        from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
-        from smartcash.ui.dataset.split.handlers.slider_handlers import setup_slider_handlers
+        from .components.ui_form import create_split_form
+        from .components.ui_layout import create_split_layout
+        from .handlers.slider_handlers import setup_slider_handlers
         
-        # Create form and layout components
-        form_components = create_split_form(config)
+        # Create form components with the provided config
+        form_components = create_split_form(config or {})
+        
+        # Create layout with form components
         layout_components = create_split_layout(form_components)
+        
+        # Combine all components
         ui_components = {**form_components, **layout_components}
         
         # Setup custom slider handlers
         setup_slider_handlers(ui_components)
         
-        # Update UI with config values
-        update_split_ui(ui_components, config)
-        
+        # Update UI with config values if provided
+        if config:
+            update_split_ui(ui_components, config)
+            
         return ui_components
         
     except Exception as e:
         logger = get_logger('smartcash.ui.dataset.split')
-        logger.error(f"Error creating split config UI: {str(e)}\n{traceback.format_exc()}")
-        raise
+        error_msg = f"Error creating split config UI: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        # Create a minimal error UI
+        import ipywidgets as widgets
+        from IPython.display import display
+        
+        error_output = widgets.Output()
+        with error_output:
+            print(error_msg)
+            
+        error_ui = {
+            'error_output': error_output,
+            'container': widgets.VBox([widgets.HTML('<h3>Error in Split Configuration UI</h3>'), error_output])
+        }
+        display(error_ui['container'])
+        return error_ui
 
 
 def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -135,10 +154,18 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         return ui_components
         
     except Exception as e:
-        logger.error(f"Failed to create split config cell: {str(e)}", exc_info=True)
-        raise
-
-
-
-initialize_split_ui = create_split_config_cell
-create_split_init = create_split_config_cell
+        import traceback
+        error_msg = f"Failed to initialize Split Config UI: {str(e)}"
+        error_traceback = traceback.format_exc()
+        
+        # Create and display error component
+        from smartcash.ui.components.error.error_component import ErrorComponent
+        error_component = ErrorComponent(title="Split Config Installer Error")
+        error_ui = error_component.create(
+            error_message=error_msg,
+            traceback=error_traceback,
+            error_type="error",
+            show_traceback=True
+        )
+        display(error_ui['widget'])
+        return error_ui

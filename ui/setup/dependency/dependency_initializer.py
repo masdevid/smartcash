@@ -396,12 +396,22 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         # Initialize the UI with the config
         ui_components = _dependency_initializer.initialize_ui(config)
         
-        # Display the main container if it exists
+        # Import display here to avoid circular imports
+        from IPython.display import display
+        
+        # Display the most appropriate UI component
         if 'main_container' in ui_components:
             display(ui_components['main_container'])
-        # Fallback to displaying the root component if main_container doesn't exist
         elif 'root' in ui_components:
             display(ui_components['root'])
+        elif 'widget' in ui_components:
+            display(ui_components['widget'])
+        else:
+            # If no standard container is found, try to display the first available widget
+            for key, value in ui_components.items():
+                if hasattr(value, '_ipython_display_') or hasattr(value, '_repr_html_'):
+                    display(value)
+                    break
             
         return ui_components
         

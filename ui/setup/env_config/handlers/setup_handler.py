@@ -34,10 +34,23 @@ class SetupHandler:
         Returns:
             Dict containing setup results and status
         """
+        # Initialize variables
         progress_tracker = None
+        summary_data = {'status': 'error', 'message': 'Setup not started'}
+        
         try:
+            # Validate UI components
+            if not ui_components or not isinstance(ui_components, dict):
+                raise ValueError("Invalid UI components provided")
+                
             # Initialize progress tracking with logger
-            progress_tracker = track_setup_progress(ui_components, logger=self.logger)
+            try:
+                progress_tracker = track_setup_progress(ui_components, logger=self.logger)
+                if not progress_tracker:
+                    raise ValueError("Failed to initialize progress tracker")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize progress tracker: {str(e)}")
+                raise
             
             # Set running state
             self._set_running_state(ui_components)
@@ -51,33 +64,57 @@ class SetupHandler:
             
             # Store the summary data for future reference
             self._last_summary_data = summary_data
-                
+            
             # Only update the summary if we have new data
             if 'setup_summary' in ui_components:
                 from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
-                status_msg = (
-                    "✅ Environment setup completed successfully!" if summary_data.get('status') == 'success'
-                    else "⚠️ Setup completed with some issues"
-                )
-                update_setup_summary(
-                    ui_components['setup_summary'],
-                    status_message=status_msg,
-                    status_type='success' if summary_data.get('status') == 'success' else 'warning',
-                    details=summary_data
-                )
+                try:
+                    status_msg = (
+                        "✅ Environment setup completed successfully!" if summary_data.get('status') == 'success'
+                        else "⚠️ Setup completed with some issues"
+                    )
+                    update_setup_summary(
+                        ui_components['setup_summary'],
+                        status_message=status_msg,
+                        status_type='success' if summary_data.get('status') == 'success' else 'warning',
+                        details=summary_data
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error updating setup summary: {str(e)}")
+                    if progress_tracker:
+                        progress_tracker.logger.error(f"Error updating setup summary: {str(e)}")
             
-            # Set completion state
-            self._set_completion_state(ui_components, summary_data)
+            # Set completion state if we have a successful status
+            if summary_data.get('status') == 'success':
+                self._set_completion_state(ui_components, summary_data)
             
-            # Ensure we return a dictionary, not the progress tracker
-            return summary_data if isinstance(summary_data, dict) else {'status': 'success'}
+            # Ensure we return a dictionary with at least a status
+            if not isinstance(summary_data, dict):
+                summary_data = {'status': 'success' if not summary_data else 'unknown'}
+                
+            return summary_data
             
         except Exception as e:
             error_msg = f"❌ Setup failed: {str(e)}"
-            self.logger.error(error_msg)
-            if progress_tracker and hasattr(progress_tracker, 'error'):
-                progress_tracker.error(error_msg)
-            self._set_error_state(ui_components, error_msg)
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Try to update UI with error
+            try:
+                if progress_tracker and hasattr(progress_tracker, 'error'):
+                    progress_tracker.error(error_msg)
+                self._set_error_state(ui_components, error_msg)
+            except Exception as ui_error:
+                self.logger.error(f"Failed to update UI with error: {str(ui_error)}")
+            
+            # Ensure we return a dictionary with error information
+            if not isinstance(summary_data, dict):
+                summary_data = {}
+            summary_data.update({
+                'status': 'error',
+                'error': str(e),
+                'message': error_msg
+            })
+            return summary_data
             return {'status': 'error', 'message': error_msg}
         finally:
             # Clean up the progress tracker

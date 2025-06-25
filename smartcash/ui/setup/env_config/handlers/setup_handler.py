@@ -201,14 +201,28 @@ class SetupHandler:
                     # Update summary data
                     summary_data['folders_created'] = created_count
                     summary_data['symlinks_created'] = symlinks_count
+                    summary_data['backups_created'] = folder_result.get('backups_created', [])
+                    summary_data['backups_count'] = folder_result.get('backups_count', 0)
                     
                     # Update progress based on results
-                    if created_count > 0 or symlinks_count > 0:
-                        status_msg = f"Created {created_count} folders and {symlinks_count} symlinks"
+                    backups_count = folder_result.get('backups_count', 0)
+                    status_parts = []
+                    
+                    if created_count > 0:
+                        status_parts.append(f"{created_count} folders")
+                    if symlinks_count > 0:
+                        status_parts.append(f"{symlinks_count} symlinks")
+                    if backups_count > 0:
+                        status_parts.append(f"{backups_count} backups")
+                    
+                    if status_parts:
+                        status_msg = f"Created {', '.join(status_parts)}"
+                        if backups_count > 0:
+                            status_msg += " (backups in ~/data/backup)"
                         self.logger.info(status_msg)
                         progress_tracker.update_within_stage(100, status_msg)
                     else:
-                        status_msg = "No new folders or symlinks needed"
+                        status_msg = "No new folders, symlinks, or backups needed"
                         self.logger.info(status_msg)
                         progress_tracker.update_within_stage(100, status_msg)
                     

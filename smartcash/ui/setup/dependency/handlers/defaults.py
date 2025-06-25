@@ -216,7 +216,3 @@ def get_environment_specific_config() -> Dict[str, Any]:
     config['ui_settings']['compact_view'] = True  # Compact view di Colab
     
     return config
-
-def get_package_categories() -> List[Dict[str, Any]]:
-    """Get package categories with their configurations"""
-    return copy.deepcopy(PACKAGE_CATEGORIES)

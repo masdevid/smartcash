@@ -1,17 +1,17 @@
 """
 File: smartcash/ui/setup/dependency/utils/report_generator_utils.py
-Deskripsi: Report generation utilities dengan fixed circular import
+Deskripsi: Report generation utilities with fixed circular imports
 """
 
-from typing import Dict, Any, List
+# Standard library imports
+from typing import Dict, Any, List, Callable
+
+# Local application imports
+from smartcash.ui.setup.dependency.utils.package_categories import get_package_categories
 
 def generate_comprehensive_status_report(system_info: Dict[str, Any], 
                                         package_status: Dict[str, Dict[str, Any]]) -> str:
     """Generate comprehensive HTML report"""
-    
-    # Import locally to avoid circular dependency
-    from smartcash.ui.setup.dependency.components.ui_package_selector import get_package_categories
-    
     # Report sections
     system_section = _generate_system_info_section(system_info)
     summary_section = _generate_summary_section(package_status)

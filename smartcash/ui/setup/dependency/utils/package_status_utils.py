@@ -11,7 +11,7 @@ def update_package_status(ui_components: Dict[str, Any], package_key: str, statu
 def update_package_status_by_name(ui_components: Dict[str, Any], package_name: str, status: str):
     """Update package status berdasarkan nama dengan pencarian otomatis - one-liner"""
     [update_package_status(ui_components, package['key'], status)
-     for category in __import__('smartcash.ui.setup.dependency.components.package_selector', fromlist=['get_package_categories']).get_package_categories()
+     for category in __import__('smartcash.ui.setup.dependency.utils.package_categories', fromlist=['get_package_categories']).get_package_categories()
      for package in category['packages']
      if package['pip_name'].split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip().lower() == package_name.lower()]
 
@@ -56,7 +56,7 @@ def sync_package_status_with_system(ui_components: Dict[str, Any], installed_pac
     
     # Get all packages dari UI
     try:
-        get_package_categories = __import__('smartcash.ui.setup.dependency.components.package_selector', 
+        get_package_categories = __import__('smartcash.ui.setup.dependency.utils.package_categories', 
                                           fromlist=['get_package_categories']).get_package_categories
         categories = get_package_categories()
     except ImportError:

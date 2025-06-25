@@ -3,10 +3,15 @@ File: smartcash/ui/setup/dependency/components/ui_package_selector.py
 Deskripsi: Package selector utilities with improved spacing and justify alignment
 """
 
-import ipywidgets as widgets
+# Standard library imports
 from typing import Dict, Any, Optional, List
+
+# Third-party imports
+import ipywidgets as widgets
+
+# Local application imports
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.setup.dependency.handlers.defaults import get_package_categories
+from smartcash.ui.setup.dependency.utils.package_categories import get_package_categories
 
 def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create package selector grid with improved spacing and justify alignment
@@ -161,15 +166,6 @@ def _create_category_widget_improved(
         'widget': container,
         'checkboxes': checkboxes
     }
-
-def get_package_categories() -> List[Dict[str, Any]]:
-    """Get package categories with their configurations
-    
-    Returns:
-        List of package category configurations
-    """
-    from smartcash.ui.setup.dependency.handlers.defaults import get_package_categories as get_default_package_categories
-    return get_default_package_categories()
 
 def update_package_status(ui_components: Dict[str, Any], package_key: str, status: str, message: str = None) -> None:
     """Update status widget for package with improved styling

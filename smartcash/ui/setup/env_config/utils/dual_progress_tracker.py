@@ -5,6 +5,7 @@ Deskripsi: Simple and clean progress tracker for environment setup
 
 from enum import Enum, auto
 import ipywidgets as widgets
+from ipywidgets import VBox, FloatProgress, HTML
 from typing import Dict, Any, Callable, Optional
 
 class SetupStage(Enum):
@@ -47,7 +48,7 @@ class DualProgressTracker:
     def _create_ui(self):
         """Create and configure the UI elements"""
         # Progress bar
-        self.progress_bar = widgets.FloatProgress(
+        self.progress_bar = FloatProgress(
             value=0,
             min=0,
             max=100,
@@ -57,10 +58,10 @@ class DualProgressTracker:
         )
         
         # Status text
-        self.status_text = widgets.HTML(value="<i>Ready to start setup...</i>")
+        self.status_text = HTML(value="<i>Ready to start setup...</i>")
         
         # Main container
-        self.container = widgets.VBox([
+        self.container = VBox([
             self.progress_bar,
             self.status_text
         ])

@@ -422,16 +422,12 @@ def create_log_accordion(
         
         # Build the HTML for the log entry with row layout
         html_parts = [
-            f'<div style="margin:0 0 1px 0;padding:2px 8px;border-radius:2px;display:flex;'
+            f'<div style="margin:0 0 1px 0;padding:4px 8px;border-radius:2px;display:flex;'
             f'background-color:{style["bg"]};border-left:2px solid {style["color"]};'
             f'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;'
             f'font-size:12px;line-height:1.5;word-break:break-word;white-space:pre-wrap;'
             f'overflow-wrap:break-word;border-right:{border_style};border-left:{border_style};">',
-            # Icon container (left side)
-            f'<div style="display:flex;align-items:flex-start;padding:2px 6px 2px 0;flex-shrink:0;font-size:12px;line-height:1.5;">',
-            f'{style["icon"]}',
-            '</div>',
-            # Main content (middle)
+            # Main content (left side)
             f'<div style="flex:1;min-width:0;display:flex;align-items:center;padding:1px 0;">',
             f'<div style="color:{style["color"]};display:flex;align-items:center;flex:1;gap:4px;min-width:0;">',
             f'{ns_badge if ns_badge else ""}',

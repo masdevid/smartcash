@@ -44,44 +44,52 @@ class DualProgressTracker:
         
     def _init_tracker(self):
         """Initialize the underlying progress tracker if not already done."""
-        if self._initialized:
-            return self._progress_container
-            
         try:
-            # Create the progress tracker
+            # If already initialized, return the existing container
+            if self._initialized and self._progress_container is not None:
+                return self._progress_container
+                
+            # Create a simple container first as fallback
+            self._progress_container = ipywidgets.VBox()
+            
+            # Try to create the progress tracker
             self._new_tracker = create_dual_progress_tracker(
                 operation="Environment Setup",
                 auto_hide=False
             )
             
-            # Initialize the progress container
-            if hasattr(self._new_tracker, 'container'):
+            # Initialize the progress container from the tracker if available
+            if hasattr(self._new_tracker, 'container') and self._new_tracker.container is not None:
                 self._progress_container = self._new_tracker.container
-            else:
-                # Fallback if container is not available
-                self._progress_container = ipywidgets.VBox()
-                
-            # Ensure the container is visible
-            if hasattr(self._progress_container, 'layout'):
-                if not hasattr(self._progress_container.layout, 'visibility'):
-                    self._progress_container.layout.visibility = 'visible'
-                if not hasattr(self._progress_container.layout, 'display'):
-                    self._progress_container.layout.display = 'flex'
             
-            # Add to UI components if provided
-            if self._ui_components:
+            # Ensure the container has proper layout
+            if not hasattr(self._progress_container, 'layout') or self._progress_container.layout is None:
+                self._progress_container.layout = ipywidgets.Layout()
+                
+            # Set container visibility
+            if hasattr(self._progress_container.layout, 'visibility'):
+                self._progress_container.layout.visibility = 'visible'
+            if hasattr(self._progress_container.layout, 'display'):
+                self._progress_container.layout.display = 'flex'
+            
+            # Update UI components if provided
+            if self._ui_components is not None:
                 self._ui_components['progress_tracker'] = self._new_tracker
                 self._ui_components['progress_container'] = self._progress_container
-                
+            
             self._initialized = True
             return self._progress_container
             
         except Exception as e:
             import traceback
-            print(f"Error initializing progress tracker: {e}")
+            error_msg = f"Error initializing progress tracker: {str(e)}"
+            print(error_msg)
             print(traceback.format_exc())
-            # Fallback to a simple container
-            self._progress_container = ipywidgets.VBox()
+            
+            # Ensure we always return a valid container
+            if not hasattr(self, '_progress_container') or self._progress_container is None:
+                self._progress_container = ipywidgets.VBox()
+                
             self._initialized = True
             return self._progress_container
     
@@ -208,25 +216,38 @@ class DualProgressTracker:
         Returns:
             The progress container widget
         """
-        # Ensure we have a container, even if initialization fails
-        if not hasattr(self, '_progress_container') or self._progress_container is None:
-            # Try to initialize the tracker
+        try:
+            # If we already have a container, return it
+            if hasattr(self, '_progress_container') and self._progress_container is not None:
+                return self._progress_container
+                
+            # Otherwise, try to initialize the tracker
             container = self._init_tracker()
             if container is not None:
                 self._progress_container = container
-            
-            # Last resort, create a simple container
-            if self._progress_container is None:
-                self._progress_container = ipywidgets.VBox()
+                return container
                 
-            # Ensure the container is visible
-            if hasattr(self._progress_container, 'layout'):
-                if not hasattr(self._progress_container.layout, 'visibility'):
-                    self._progress_container.layout.visibility = 'visible'
-                if not hasattr(self._progress_container.layout, 'display'):
-                    self._progress_container.layout.display = 'flex'
-                    
-        return self._progress_container
+            # If initialization returned None, create a basic container
+            self._progress_container = ipywidgets.VBox()
+            
+            # Ensure the container has a layout
+            if not hasattr(self._progress_container, 'layout') or self._progress_container.layout is None:
+                self._progress_container.layout = ipywidgets.Layout()
+                
+            # Set container visibility
+            if hasattr(self._progress_container.layout, 'visibility'):
+                self._progress_container.layout.visibility = 'visible'
+            if hasattr(self._progress_container.layout, 'display'):
+                self._progress_container.layout.display = 'flex'
+                
+            return self._progress_container
+            
+        except Exception as e:
+            import traceback
+            print(f"Error in progress_container property: {e}")
+            print(traceback.format_exc())
+            # Return a basic container as fallback
+            return ipywidgets.VBox()
         
     @property
     def ui_components(self) -> Dict[str, Any]:

@@ -164,9 +164,8 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
         )
     }
     
-    # Reuse existing shared components
-    save_reset_buttons = create_save_reset_buttons()
-    
+    # Add save/reset buttons to form components
+    form_components['save_reset_buttons'] = create_save_reset_buttons()
     
     return form_components
 

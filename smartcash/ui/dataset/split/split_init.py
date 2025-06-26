@@ -234,15 +234,12 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         The dictionary includes all interactive components for programmatic access.
     """
     try:
-        # Initialize the split config
+        # Initialize the split config with the provided config
         initializer = SplitConfigInitializer()
         
-        # Create handler with the provided or default config
-        handler = initializer.create_handler(config or {})
-        initializer.handler = handler
-        
-        # Create and initialize UI components
-        ui_components = initializer.create_ui_components(handler.config)
+        # Create and initialize UI components with the provided config
+        # The handler will be created internally by the initializer
+        ui_components = initializer.initialize(config or {})
         
         # Store references for later use
         initializer.ui_components = ui_components

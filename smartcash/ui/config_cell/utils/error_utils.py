@@ -3,7 +3,7 @@ File: smartcash/ui/config_cell/utils/error_utils.py
 Deskripsi: Error handling utilities for config cell
 """
 from typing import Dict, Any, Optional
-from IPython.display import display, HTML
+from IPython.display import display, HTML    
 
 from smartcash.ui.components.error.error_component import create_error_component
 def create_error_fallback(
@@ -29,20 +29,14 @@ def create_error_fallback(
         **kwargs
     )
     
-    # Display the error
-    display(error_component['error_widget'])
+    # Try to get widget in order of preference: widget > container > error_widget
+    widget = next(
+        (w for w in [
+            error_component.get('widget'),
+            error_component.get('container'),
+            error_component.get('error_widget')
+        ] if w is not None),
+        None
+    )
     
-    # Get the widget from the component
-    widget = error_component.get('widget')
-    
-    # If we have a widget, return it directly
-    if widget is not None:
-        return widget
-        
-    # Fallback to container if widget is not available
-    if 'container' in error_component:
-        return error_component['container']
-        
-    # Last resort: create a simple error widget
-    title = kwargs.get('title', 'Error')
-    return HTML(f'<div style="color:red; padding: 10px; border: 1px solid red;">{title}: {error_message}</div>')
+    return (widget or HTML(f'<div style="color:red;padding:10px;border:1px solid red;margin:5px 0;border-radius:4px;background-color:#fff0f0"><strong>{kwargs.get("title", "Error")}:</strong> {error_message}</div>'))

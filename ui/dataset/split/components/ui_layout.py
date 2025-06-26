@@ -54,14 +54,8 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         form_components: Dictionary of form components
         
     Returns:
-        Dictionary containing the main container and content area
+        Dictionary containing the container and content area
     """
-    # Create header
-    header = create_header(
-        "Dataset Split Configuration",
-        "Configure how to split your dataset into training, validation, and test sets"
-    )
-    
     # Create sections
     ratio_section = create_ratio_section(form_components)
     path_section = create_path_section(form_components)
@@ -75,14 +69,8 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
         layout=widgets.Layout(**STYLES['container'])
     )
     
-    # Create main container
-    main_container = widgets.VBox(
-        [header, form_container],
-        layout=widgets.Layout(width='100%')
-    )
-    
     return {
-        'container': main_container,
+        'container': form_container,
         'content': form_container
     }
     

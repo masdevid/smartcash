@@ -198,9 +198,9 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui
         
     except Exception as e:
         # Log the error and re-raise
-        error_msg = f"Failed to initialize dependency UI: {str(e)}"
+        error_msg = f"Failed to initialize dependency UI: {str(e)}\n{traceback.format_exc()}"
         if _dependency_initializer and hasattr(_dependency_initializer, 'logger'):
-            _dependency_initializer.logger.error(error_msg, exc_info=True)
+            _dependency_initializer.logger.error(error_msg)
         raise RuntimeError(error_msg) from e
         
     finally:

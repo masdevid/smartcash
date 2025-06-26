@@ -1,51 +1,47 @@
 """
-File: smartcash/ui/setup/dependency/handlers/config_handler.py
-
 Dependency Configuration Handler for SmartCash UI.
 
-This module provides a configuration handler for the dependency management
-interface, handling extraction, validation, and application of configuration.
+Implements the ConfigHandler pattern to manage dependency configurations with:
+- Configuration extraction from UI components
+- UI state management based on configuration
+- Configuration persistence with inheritance support
+- Validation and error handling
+
+Design Pattern:
+- Follows the Template Method pattern through ConfigHandler base class
+- Implements Strategy pattern for config extraction and UI updates
+- Uses Composition for config management (ConfigManager)
+- Follows Open/Closed Principle for extensibility
 """
 
-import os
-from typing import Dict, Any, Optional, TypeVar, List, Tuple
-from dataclasses import dataclass, field
-from smartcash.ui.handlers.config_handlers import BaseConfigHandler
+from typing import Dict, Any, List, Optional
+import copy
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.common.logger import get_logger, safe_log_to_ui
+from smartcash.common.config.manager import get_config_manager
 
-# Import from defaults to access package categories
-from .defaults import (
-    PACKAGE_CATEGORIES,
-    CONFIG_VERSION,
-    CONFIG_SCHEMA_VERSION,
-    PackageConfig,
-    PackageCategory,
-    DEFAULT_CONFIG
-)
+# Import from defaults
+from smartcash.ui.setup.dependency.handlers.defaults import PACKAGE_CATEGORIES
 
 # Type aliases
 ConfigDict = Dict[str, Any]
-UIComponents = Dict[str, Any]
-PackageKey = str
-T = TypeVar('T')
 
 # Constants
 MODULE_NAME = 'dependency'
 PARENT_MODULE = 'setup'
+CONFIG_FILENAME = 'dependency_config.yaml'
 
-@dataclass
-class ConfigState:
-    """Holds the current state of the configuration."""
-    config: ConfigDict = field(default_factory=dict)
-    ui_components: UIComponents = field(default_factory=dict)
-    last_error: Optional[str] = None
-    package_categories: List[PackageCategory] = field(default_factory=list)
-
-class DependencyConfigHandler(BaseConfigHandler):
-    """Configuration handler for dependency management.
+class DependencyConfigHandler(ConfigHandler):
+    """Manages dependency configurations with UI integration and inheritance support.
     
-    Handles extraction, validation, and application of dependency configurations
-    with proper error handling and logging.
+    Handles config lifecycle: load/save (with _base_ inheritance), UI sync, and validation.
+    Uses 'dependency_config.yaml' by default.
+    
+    Example:
+        handler = DependencyConfigHandler()
+        config = handler.load_config()
+        handler.update_ui(ui_components, config)
+        handler.save_config(ui_components)  # Saves with extracted config
     """
     
     def __init__(self, module_name: str = MODULE_NAME, 
@@ -57,13 +53,59 @@ class DependencyConfigHandler(BaseConfigHandler):
             parent_module: Parent module name (default: 'setup')
         """
         super().__init__(module_name, parent_module)
-        self._state = ConfigState()
-        self.logger = get_logger(f"smartcash.ui.{parent_module}.{module_name}")
+        self._package_categories = PACKAGE_CATEGORIES
+        self.config_manager = get_config_manager()
+        self.config_filename = CONFIG_FILENAME
+        self._ui_components: Dict[str, Any] = {}
         
-        # Initialize package categories from defaults
-        self._state.package_categories = PACKAGE_CATEGORIES
+    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract configuration from UI components.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            
+        Returns:
+            Extracted configuration dictionary
+        """
+        from smartcash.ui.setup.dependency.handlers.config_extractor import extract_dependency_config
+        return extract_dependency_config(ui_components)
     
-    def get_default_selected_packages(self) -> List[PackageKey]:
+    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Update UI components from configuration.
+        
+        Args:
+            ui_components: Dictionary of UI components to update
+            config: Configuration dictionary to apply
+        """
+        from smartcash.ui.setup.dependency.handlers.config_updater import update_dependency_ui
+        update_dependency_ui(ui_components, config)
+    
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration with fallback to minimal config.
+        
+        Returns:
+            Default configuration dictionary
+        """
+        try:
+            # Try to get default config from parent
+            config = super().get_default_config()
+            
+            # Ensure required fields exist
+            config.setdefault('version', '1.0.0')
+            config.setdefault('module_name', self.module_name)
+            config.setdefault('selected_packages', self.get_default_selected_packages())
+            
+            return config
+            
+        except Exception as e:
+            self.logger.error(f"Error getting default config: {e}")
+            return {
+                'module_name': self.module_name,
+                'version': '1.0.0',
+                'selected_packages': self.get_default_selected_packages()
+            }
+    
+    def get_default_selected_packages(self) -> List[str]:
         """Get list of package keys that are selected by default.
         
         Returns:
@@ -73,7 +115,7 @@ class DependencyConfigHandler(BaseConfigHandler):
             selected = []
             
             # Get all packages that are marked as default or required
-            for category in PACKAGE_CATEGORIES:
+            for category in self._package_categories:
                 for pkg in category.get('packages', []):
                     pkg_key = pkg.get('key')
                     if not pkg_key:
@@ -91,279 +133,154 @@ class DependencyConfigHandler(BaseConfigHandler):
             self.logger.error(f"Error getting default selected packages: {e}", exc_info=True)
             return ['torch', 'torchvision', 'numpy', 'pandas']
     
-    def get_default_config(self) -> ConfigDict:
-        """Get the default configuration for the dependency installer.
+    def load_config(self, config_filename: str = None) -> Dict[str, Any]:
+        """Load config with inheritance handling.
         
+        Args:
+            config_filename: Optional custom config filename
+            
         Returns:
-            Dictionary containing the default configuration with all settings.
+            Loaded configuration dictionary
         """
         try:
-            # Create a deep copy of categories to avoid modifying the original
-            categories_copy = []
-            for cat in PACKAGE_CATEGORIES:
-                cat_copy = {
-                    'name': cat['name'],
-                    'icon': cat.get('icon', '📦'),
-                    'description': cat.get('description', ''),
-                    'packages': []
-                }
-                
-                # Copy packages with proper formatting
-                for pkg in cat.get('packages', []):
-                    pkg_copy = {
-                        'key': pkg.get('key', pkg.get('name', '')),
-                        'name': pkg.get('name', ''),
-                        'description': pkg.get('description', ''),
-                        'pip_name': pkg.get('pip_name', pkg.get('name', '')),
-                        'default': pkg.get('default', False),
-                        'min_version': pkg.get('min_version'),
-                        'max_version': pkg.get('max_version')
-                    }
-                    # Remove None values
-                    pkg_copy = {k: v for k, v in pkg_copy.items() if v is not None}
-                    cat_copy['packages'].append(pkg_copy)
-                    
-                categories_copy.append(cat_copy)
+            filename = config_filename or self.config_filename
+            config = self.config_manager.load_config(filename)
             
-            return {
-                'version': CONFIG_VERSION,
-                'schema_version': CONFIG_SCHEMA_VERSION,
-                'auto_update': True,
-                'check_on_startup': True,
-                'selected_packages': self.get_default_selected_packages(),
-                'package_manager': 'pip',
-                'python_path': 'python',
-                'use_venv': True,
-                'venv_path': '.venv',
-                'upgrade_strategy': 'eager',
-                'timeout': 300,  # 5 minutes
-                'retries': 3,
-                'http_retries': 3,
-                'prefer_binary': False,
-                'trusted_hosts': [],
-                'extra_index_urls': [],
-                'constraints': [],
-                'environment_variables': {},
-                'post_install_commands': [],
-                'log_level': 'INFO',
-                'log_file': 'dependency_installer.log',
-                'max_workers': min(4, (os.cpu_count() or 1) * 2),  # 2x CPU cores, max 4
-                'categories': categories_copy
-            }
+            if not config:
+                safe_log_to_ui(self._ui_components, "⚠️ Config is empty, using default", "warning")
+                return self.get_default_config()
             
-        except Exception as e:
-            self.logger.error(f"Error generating default config: {e}", exc_info=True)
-            return self.get_minimal_config()
-    
-    def get_minimal_config(self) -> ConfigDict:
-        """Get a minimal configuration for basic functionality.
-        
-        This configuration is used as a fallback or for testing purposes.
-        It includes only essential settings with minimal dependencies.
-        """
-        try:
-            # Get core packages that are marked as required
-            required_packages = [
-                pkg.get('key', pkg.get('name', ''))
-                for cat in (self._state.package_categories or [])
-                for pkg in cat.get('packages', [])
-                if pkg.get('required', False) or pkg.get('default', False)
-            ]
+            # Handle inheritance
+            if '_base_' in config:
+                base_config = self.config_manager.load_config(config['_base_']) or {}
+                merged_config = self._merge_configs(base_config, config)
+                safe_log_to_ui(self._ui_components, f"📂 Config loaded from {filename} with inheritance", "info")
+                return merged_config
             
-            # Ensure we have at least some basic packages
-            if not required_packages:
-                required_packages = ['numpy', 'pandas', 'matplotlib']
-                
-            return {
-                'version': CONFIG_VERSION,
-                'schema_version': CONFIG_SCHEMA_VERSION,
-                'auto_update': False,  # Disable auto-updates in minimal mode
-                'check_on_startup': False,  # Don't check on startup
-                'selected_packages': required_packages,
-                'package_manager': 'pip',
-                'python_path': 'python',
-                'use_venv': True,
-                'venv_path': '.venv',
-                'upgrade_strategy': 'only-if-needed',
-                'timeout': 120,  # Shorter timeout for minimal config
-                'retries': 2,  # Fewer retries
-                'http_retries': 2,
-                'prefer_binary': True,  # Prefer binaries for faster installation
-                'trusted_hosts': ['pypi.org', 'files.pythonhosted.org'],
-                'extra_index_urls': [],
-                'constraints': [],
-                'environment_variables': {},
-                'post_install_commands': [],
-                'log_level': 'WARNING',  # Higher log level to reduce noise
-                'log_file': 'dependency_minimal.log',
-                'max_workers': 2,  # Fewer workers
-                'categories': [
-                    {
-                        'name': 'Core Dependencies',
-                        'icon': '⚙️',
-                        'description': 'Essential packages for minimal functionality',
-                        'packages': [
-                            pkg for cat in (self._state.package_categories or [])
-                            for pkg in cat.get('packages', [])
-                            if pkg.get('required', False) or pkg.get('default', False)
-                        ][:5]  # Limit to first 5 packages
-                    }
-                ] if self._state.package_categories else [],
-                'minimal': True  # Flag to indicate this is a minimal config
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error generating minimal config: {e}", exc_info=True)
-            # Return absolute minimum configuration on error
-            return {
-                'version': CONFIG_VERSION,
-                'schema_version': CONFIG_SCHEMA_VERSION,
-                'auto_update': False,
-                'check_on_startup': False,
-                'selected_packages': ['numpy', 'pandas'],
-                'categories': [],
-                'error': str(e)
-            }
-    
-    def get_default_dependency_config(self) -> ConfigDict:
-        """Get the complete default configuration for the dependency installer.
-        
-        This method ensures that the configuration is properly initialized and validated.
-        """
-        try:
-            # Get the default configuration
-            config = self.get_default_config()
-            
-            # Ensure required fields exist
-            required_fields = [
-                'version', 'schema_version', 'selected_packages', 'categories',
-                'package_manager', 'python_path', 'use_venv', 'venv_path'
-            ]
-            
-            for field in required_fields:
-                if field not in config:
-                    self.logger.warning(f"Missing required field in config: {field}")
-                    config[field] = None
-            
-            # Ensure categories is a list
-            if not isinstance(config.get('categories'), list):
-                self.logger.warning("Invalid or missing 'categories' in config, initializing...")
-                config['categories'] = []
-                
-            # Ensure selected_packages is a list
-            if not isinstance(config.get('selected_packages'), list):
-                self.logger.warning("Invalid or missing 'selected_packages' in config, initializing...")
-                config['selected_packages'] = self.get_default_selected_packages()
-            
-            # Set default values for critical settings if missing
-            config.setdefault('auto_update', True)
-            config.setdefault('check_on_startup', True)
-            config.setdefault('package_manager', 'pip')
-            config.setdefault('python_path', 'python')
-            config.setdefault('use_venv', True)
-            config.setdefault('venv_path', '.venv')
-            config.setdefault('max_workers', min(4, (os.cpu_count() or 1) * 2))
-            
+            safe_log_to_ui(self._ui_components, f"📂 Config loaded from {filename}", "info")
             return config
             
         except Exception as e:
-            self.logger.error(f"Error in get_default_dependency_config: {e}", exc_info=True)
-            return self.get_minimal_config()
+            error_msg = f"Error loading config: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            safe_log_to_ui(self._ui_components, f"❌ {error_msg}", "error")
+            return self.get_default_config()
     
-    def extract_config(self, ui_components: UIComponents) -> ConfigDict:
-        """Extract configuration from UI components with safe fallback.
+    def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
+        """Save configuration to file.
         
         Args:
-            ui_components: Dictionary of UI components to extract from
+            ui_components: Dictionary of UI components
+            config_filename: Optional custom config filename
             
         Returns:
-            Extracted and validated configuration dictionary
+            True if save was successful, False otherwise
         """
-        self._state.ui_components = ui_components
-        
         try:
-            from .config_extractor import extract_dependency_config
-            self._state.config = extract_dependency_config(ui_components)
-            self._state.last_error = None
-            return self._state.config
+            filename = config_filename or self.config_filename
+            config = self.extract_config(ui_components)
             
+            success = self.config_manager.save_config(config, filename)
+            
+            if success:
+                safe_log_to_ui(ui_components, f"✅ Config saved to {filename}", "success")
+                self._refresh_ui_after_save(ui_components, filename)
+                return True
+            else:
+                safe_log_to_ui(ui_components, "❌ Failed to save config", "error")
+                return False
+                
         except Exception as e:
-            self._state.last_error = str(e)
-            self.logger.warning(f"Extract config error: {str(e)}", exc_info=True)
-            self._state.config = self.get_default_config()
-            return self._state.config
+            error_msg = f"Error saving config: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            safe_log_to_ui(ui_components, f"❌ {error_msg}", "error")
+            return False
     
-    def update_ui(self, ui_components: UIComponents, config: ConfigDict) -> None:
-        """Update UI components with the current configuration.
+    def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
+        """Reset config to defaults.
         
         Args:
-            ui_components: Dictionary of UI components to update
-            config: Configuration to apply to the UI
-        """
-        if not isinstance(ui_components, dict) or not isinstance(config, dict):
-            self.logger.error("Invalid UI components or config provided")
-            return
+            ui_components: Dictionary of UI components
+            config_filename: Optional custom config filename
             
-        self._state.ui_components = ui_components
-        self._state.config = config.copy()
-        
-        try:
-            from .config_updater import update_dependency_ui
-            update_dependency_ui(ui_components, config)
-            self._log_to_ui("Dependency config updated", "success", ui_components)
-            self._state.last_error = None
-            
-        except Exception as e:
-            self._state.last_error = str(e)
-            self.logger.error(f"Update UI error: {str(e)}", exc_info=True)
-            self._log_to_ui(f"Update error: {str(e)}", "error", ui_components)
-    
-    def get_default_config(self) -> ConfigDict:
-        """Get the default configuration with safe fallback.
-        
         Returns:
-            Default configuration dictionary
+            True if reset was successful, False otherwise
         """
         try:
-            # Return the default config from defaults.py
-            return DEFAULT_CONFIG.copy()
+            filename = config_filename or self.config_filename
+            default_config = self.get_default_config()
             
+            success = self.config_manager.save_config(default_config, filename)
+            
+            if success:
+                safe_log_to_ui(ui_components, "🔄 Config reset to defaults", "success")
+                self.update_ui(ui_components, default_config)
+                return True
+            else:
+                safe_log_to_ui(ui_components, "❌ Failed to reset config", "error")
+                return False
+                
         except Exception as e:
-            self._state.last_error = str(e)
-            self.logger.error(f"Error getting default config: {e}", exc_info=True)
-            self.logger.info("Using fallback default config")
-            return {
-                'module_name': MODULE_NAME,
-                'dependencies': {
-                    'torch': {'version': 'latest', 'required': True},
-                    'torchvision': {'version': 'latest', 'required': True},
-                    'ultralytics': {'version': 'latest', 'required': True}
-                },
-                'install_options': {
-                    'force_reinstall': False,
-                    'upgrade': True,
-                    'quiet': False
-                }
-            }
+            error_msg = f"Error resetting config: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            safe_log_to_ui(ui_components, f"❌ {error_msg}", "error")
+            return False
     
-    def get_current_config(self) -> Dict[str, Any]:
-        """Public API untuk current config"""
-        return self._current_config.copy()
-    
-    def _log_to_ui(self, message: str, level: str, ui_components: Optional[Dict[str, Any]] = None):
-        """Safe logging ke UI components"""
-        target_ui = ui_components or self._ui_components
-        if target_ui:
-            safe_log_to_ui(target_ui, message, level)
+    def _merge_configs(self, base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge configurations with deep merge.
         
-        # Log ke standard logger juga
-        if level == 'error':
-            self.logger.error(message)
-        elif level == 'warning':
-            self.logger.warning(message)
-        else:
-            self.logger.info(message)
+        Args:
+            base_config: Base configuration dictionary
+            override_config: Configuration with overrides
+            
+        Returns:
+            Merged configuration dictionary
+        """
+        merged = copy.deepcopy(base_config)
+        
+        for key, value in override_config.items():
+            if key == '_base_':
+                continue
+            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+                merged[key] = self._deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        
+        return merged
     
-    def set_ui_components(self, ui_components: Dict[str, Any]):
-        """Set UI components reference untuk logging"""
-        self._ui_components = ui_components
+    def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """Deep merge helper for nested dictionaries.
+        
+        Args:
+            base: Base dictionary
+            override: Dictionary with overrides
+            
+        Returns:
+            Merged dictionary
+        """
+        result = copy.deepcopy(base)
+        
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        
+        return result
+    
+    def _refresh_ui_after_save(self, ui_components: Dict[str, Any], filename: str) -> None:
+        """Refresh UI after saving configuration.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            filename: Name of the saved config file
+        """
+        try:
+            saved_config = self.load_config(filename)
+            if saved_config:
+                self.update_ui(ui_components, saved_config)
+                safe_log_to_ui(ui_components, "🔄 UI refreshed with saved config", "info")
+        except Exception as e:
+            error_msg = f"Error refreshing UI: {str(e)}"
+            self.logger.warning(error_msg)
+            safe_log_to_ui(ui_components, f"⚠️ {error_msg}", "warning")

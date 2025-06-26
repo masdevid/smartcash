@@ -6,8 +6,14 @@ Deskripsi: Fixed logging utilities tanpa tqdm suppression untuk avoid AttributeE
 import logging
 import sys
 import warnings
-from typing import Dict, Any, Optional
+import os
+from typing import Dict, Any, Optional, List, Union, Callable, TypeVar
 from IPython.display import display, HTML
+
+# Type aliases for better type hints
+T = TypeVar('T')
+LoggerType = logging.Logger
+
 
 def setup_aggressive_log_suppression() -> None:
     """Setup aggressive log suppression untuk prevent pollution dari backend services tanpa tqdm manipulation"""

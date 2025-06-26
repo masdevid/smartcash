@@ -235,57 +235,6 @@ class ConfigHandler(ABC):
         return {'valid': True, 'errors': []}
 
 
-class BaseConfigHandler(ConfigHandler):
-    """Base implementation dengan parent module support dan extract/update yang fleksibel"""
-    
-    def __init__(self, module_name: str, extract_fn: Optional[Callable] = None, 
-                 update_fn: Optional[Callable] = None, parent_module: Optional[str] = None):
-        super().__init__(module_name, parent_module)
-        self.extract_fn, self.update_fn = extract_fn, update_fn
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dengan fallback ke function atau auto-extract"""
-        return (self.extract_fn(ui_components) if self.extract_fn 
-               else {key: widget.value for key, widget in ui_components.items() 
-                     if hasattr(widget, 'value') and not key.startswith('_')})
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dengan fallback ke function atau auto-update"""
-        if self.update_fn:
-            return self.update_fn(ui_components, config)
-        
-        # One-liner auto-update dengan walrus operator
-        [setattr(widget, 'value', config[key]) 
-         for key, widget in ui_components.items() 
-         if hasattr(widget, 'value') and key in config]
-
-
-class SimpleConfigHandler(BaseConfigHandler):
-    """Simple config handler dengan parent module support untuk kasus sederhana"""
-    
-    def __init__(self, module_name: str, config_mapping: Optional[Dict[str, str]] = None, 
-                 parent_module: Optional[str] = None):
-        super().__init__(module_name, parent_module=parent_module)
-        self.config_mapping = config_mapping or {}
-    
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract dengan mapping atau auto-detection"""
-        return (super().extract_config(ui_components) if not self.config_mapping
-               else {config_key: getattr(ui_components.get(widget_key), 'value', None)
-                     for config_key, widget_key in self.config_mapping.items()
-                     if widget_key in ui_components})
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update dengan mapping atau auto-detection"""
-        if not self.config_mapping:
-            return super().update_ui(ui_components, config)
-        
-        # One-liner update dengan mapping
-        [setattr(ui_components[widget_key], 'value', config.get(config_key))
-         for config_key, widget_key in self.config_mapping.items()
-         if widget_key in ui_components and config_key in config]
-
-
 # Factory functions dengan one-liner returns
 def create_config_handler(module_name: str, extract_fn: Callable = None, update_fn: Callable = None, 
                          parent_module: str = None) -> BaseConfigHandler:

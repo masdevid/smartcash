@@ -8,7 +8,7 @@ Uses shared components from the UI components directory.
 from typing import Dict, Any, Callable
 import ipywidgets as widgets
 from smartcash.ui.components import create_section_title as create_shared_section_title
-from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons as create_shared_buttons
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 
 # Constants
 STYLES = {
@@ -50,7 +50,7 @@ def create_save_reset_buttons() -> Dict[str, Any]:
         - reset_button: Reset button widget
         - save_reset_container: Container HBox with both buttons
     """
-    return create_shared_buttons(
+    return create_save_reset_buttons(
         save_label='Save',
         reset_label='Reset',
         button_width='100px',

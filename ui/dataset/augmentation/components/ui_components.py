@@ -83,7 +83,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     )
     
     # Confirmation area untuk dialog integration
-    confirmation_area = create_confirmation_area()
+    confirmation_area, _ = create_confirmation_area()  # Unpack the tuple, we only need the widget
     
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')

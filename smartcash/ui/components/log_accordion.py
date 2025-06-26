@@ -441,7 +441,7 @@ def create_log_accordion(
     
     # Create the accordion
     accordion = widgets.Accordion(children=[log_container])
-    accordion.set_title(0, f"{module_name} Logs")
+    accordion.set_title(0, f"{module_name.upper()} LOGS")
     accordion.selected_index = None  # Start collapsed
     
     return {

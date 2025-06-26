@@ -37,17 +37,32 @@ def create_package_selector_grid(config: Optional[Dict[str, Any]] = None) -> Dic
         checkboxes.update(category_widget['checkboxes'])
         category_widgets.append(category_widget['widget'])
     
+    # Create a grid container for categories
+    grid = widgets.GridBox(
+        children=category_widgets,
+        layout=widgets.Layout(
+            width='100%',
+            grid_template_columns='repeat(auto-fill, minmax(300px, 1fr))',
+            grid_gap='12px',
+            margin='0 0 20px 0',
+            padding='0',
+            align_items='stretch',
+            justify_content='space-between'
+        )
+    )
+    
     # Create main container with consistent spacing
     container = widgets.VBox(
-        category_widgets,
+        [grid],
         layout=widgets.Layout(
             width='100%',
             margin='0 0 20px 0',
-            padding='10px',
+            padding='12px',
             border='1px solid #e0e0e0',
-            border_radius='5px',
-            overflow_y='auto',
-            max_height='500px'
+            border_radius='8px',
+            overflow='hidden',
+            max_height='500px',
+            overflow_y='auto'
         )
     )
     
@@ -122,13 +137,36 @@ def _create_category_widget_improved(
         
         # Create row with checkbox and status
         row = widgets.HBox(
-            [checkbox, status],
+            [
+                widgets.Box(
+                    [checkbox],
+                    layout=widgets.Layout(
+                        flex='1 1 auto',
+                        overflow='hidden',
+                        margin='0',
+                        padding='0 4px 0 0'
+                    )
+                ),
+                widgets.Box(
+                    [status],
+                    layout=widgets.Layout(
+                        flex='0 0 auto',
+                        margin='0',
+                        padding='0'
+                    )
+                )
+            ],
             layout=widgets.Layout(
                 width='100%',
+                min_height='32px',
+                margin='0',
+                padding='4px 8px',
+                border_radius='4px',
+                border='1px solid #f0f0f0',
+                background_color='#fafafa',
                 justify_content='space-between',
                 align_items='center',
-                margin='2px 0',
-                padding='2px 0'
+                overflow='hidden'
             )
         )
         
@@ -149,16 +187,34 @@ def _create_category_widget_improved(
         )
     )
     
-    # Create category container
+    # Create category container with improved layout
     container = widgets.VBox(
-        [header] + package_widgets,
+        [
+            header,
+            widgets.VBox(
+                package_widgets,
+                layout=widgets.Layout(
+                    width='100%',
+                    margin='0',
+                    padding='0',
+                    align_items='stretch',
+                    gap='4px'
+                )
+            )
+        ],
         layout=widgets.Layout(
             width='100%',
-            margin='0 0 20px 0',
+            min_width='280px',
+            margin='0',
             padding='12px',
             border='1px solid #e0e0e0',
-            border_radius='6px',
-            background='white'
+            border_radius='8px',
+            background='white',
+            box_shadow='0 1px 3px rgba(0,0,0,0.1)',
+            display='flex',
+            flex_direction='column',
+            align_items='stretch',
+            overflow='hidden'
         )
     )
     

@@ -36,11 +36,17 @@ class SplitConfigInitializer(ConfigCellInitializer):
             parent_module=parent_module,
             is_container=True  # Mark as container to avoid default UI components
         )
-        self.handler = None
         
-    def create_handler(self, config: Dict[str, Any]) -> SplitConfigHandler:
-        """Create and return a SplitConfigHandler instance."""
-        return SplitConfigHandler(config)
+    def create_handler(self, config: Optional[Dict[str, Any]] = None) -> SplitConfigHandler:
+        """Create and return a SplitConfigHandler instance.
+        
+        Args:
+            config: Optional configuration dictionary
+            
+        Returns:
+            Initialized SplitConfigHandler instance
+        """
+        return SplitConfigHandler(config or {})
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create the UI components for the dataset split configuration.

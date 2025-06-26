@@ -97,7 +97,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Log accordion
     log_accordion = create_log_accordion()
     
-    # Create main UI components
+    # Create main UI components - ensure we're not duplicating the package selector container
     main_ui_children = [
         header,
         status_panel,
@@ -111,6 +111,20 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         widgets.HTML('<hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">'),
         progress_tracker.ui_manager.container
     ]
+    
+    # Remove any duplicate package selector containers that might exist
+    seen_containers = set()
+    unique_children = []
+    for child in main_ui_children:
+        if hasattr(child, 'layout') and hasattr(child.layout, 'grid_template_columns'):
+            # This is likely a package selector container
+            if 'package_selector' not in seen_containers:
+                seen_containers.add('package_selector')
+                unique_children.append(child)
+        else:
+            unique_children.append(child)
+    
+    main_ui_children = unique_children
     
     # Add log accordion if available
     if log_accordion and 'widget' in log_accordion and log_accordion['widget'] is not None:

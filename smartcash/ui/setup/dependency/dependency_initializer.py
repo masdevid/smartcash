@@ -153,28 +153,55 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui
     Raises:
         Exception: If initialization fails, the exception will propagate up
     """
+    global _dependency_initializer
+    
     # Suppress outputs during initialization
     suppress_all_outputs()
+    
     try:
-        # Initialize the initializer
-        initializer = DependencyInitializer()
+        from IPython.display import display
+        from ipywidgets import Output
+        
+        # Create a new initializer if one doesn't exist
+        if _dependency_initializer is None:
+            _dependency_initializer = DependencyInitializer()
         
         # Ensure config is properly formatted
         if config is None:
-            config = initializer._get_default_config()
+            config = _dependency_initializer._get_default_config()
         else:
             # Convert list of dependencies to dict if needed
             if 'dependencies' in config and isinstance(config['dependencies'], list):
                 config['dependencies'] = {dep: {} for dep in config['dependencies']}
-                
+        
         # Initialize UI components and handlers
-        result = initializer.initialize(config)
+        ui_components = _dependency_initializer.initialize(config)
         
-        # Display the result using the widget utility
-        from smartcash.ui.utils.widget_utils import safe_display
-        safe_display(result, condition=display_ui)
+        # Clear any existing output before displaying
+        if display_ui and 'ui' in ui_components and ui_components['ui'] is not None:
+            # Clear any existing output
+            from IPython.display import clear_output
+            clear_output(wait=True)
+            
+            # Create a clean output widget to prevent double display
+            output = Output()
+            with output:
+                display(ui_components['ui'])
+            
+            # Store the output widget in the components
+            ui_components['_output'] = output
+            
+            # Display the output widget
+            display(output)
         
-        return result
+        return ui_components
+        
+    except Exception as e:
+        # Log the error and re-raise
+        error_msg = f"Failed to initialize dependency UI: {str(e)}"
+        if _dependency_initializer and hasattr(_dependency_initializer, 'logger'):
+            _dependency_initializer.logger.error(error_msg, exc_info=True)
+        raise RuntimeError(error_msg) from e
         
     finally:
         # Always restore output

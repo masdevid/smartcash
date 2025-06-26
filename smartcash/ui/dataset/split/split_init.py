@@ -36,7 +36,7 @@ class SplitConfigInitializer(ConfigCellInitializer):
         super().__init__(
             module_name=MODULE_NAME,
             config_filename=MODULE_NAME,
-            is_container=False  
+            is_container=True  # We need a container for the UI
         )
         
     def create_handler(self, config: Optional[Dict[str, Any]] = None) -> SplitConfigHandler:
@@ -109,14 +109,8 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         # Initialize the split config with the provided config
         initializer = SplitConfigInitializer()
         
-        # Create and initialize UI components with the provided config
-        # The handler will be created internally by the initializer
-        result = initializer.initialize(config or {})
-        
-        # Get the container from the component registry
-        container_id = f"{MODULE_NAME}.container"
-        container = component_registry.get_component(container_id)
-        
+        # Initialize and get the container widget directly
+        container = initializer.initialize(config or {})
         if not container:
             raise RuntimeError("Failed to initialize split configuration container")
             

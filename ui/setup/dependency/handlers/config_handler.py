@@ -58,6 +58,35 @@ class DependencyConfigHandler(ConfigHandler):
         self.config_filename = CONFIG_FILENAME
         self._ui_components: Dict[str, Any] = {}
         
+        # Ensure config directory exists and initialize default config
+        self._ensure_config_directory()
+        self._initialize_default_config()
+    
+    def _ensure_config_directory(self) -> None:
+        """Ensure the config directory exists."""
+        try:
+            config_dir = self.config_manager.get_config_path().parent
+            config_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"✅ Config directory: {config_dir}")
+        except Exception as e:
+            error_msg = f"❌ Failed to create config directory: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            safe_log_to_ui(self._ui_components, error_msg, "error")
+    
+    def _initialize_default_config(self) -> None:
+        """Initialize default config if it doesn't exist."""
+        try:
+            config_path = self.config_manager.get_config_path(self.config_filename)
+            if not config_path.exists():
+                default_config = self.get_default_config()
+                success = self.config_manager.save_config(default_config, self.config_filename)
+                if success:
+                    self.logger.info(f"✅ Created default config at {config_path}")
+                else:
+                    self.logger.warning(f"⚠️ Failed to create default config at {config_path}")
+        except Exception as e:
+            self.logger.error(f"Error initializing default config: {str(e)}", exc_info=True)
+        
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract configuration from UI components.
         
@@ -143,25 +172,38 @@ class DependencyConfigHandler(ConfigHandler):
             Loaded configuration dictionary
         """
         try:
+            # Get the full config path
             filename = config_filename or self.config_filename
+            config_path = self.config_manager.get_config_path(filename)
+            
+            # Log where we're looking for the config
+            self.logger.info(f"🔍 Looking for config at: {config_path}")
+            
+            # Load the config
             config = self.config_manager.load_config(filename)
             
             if not config:
-                safe_log_to_ui(self._ui_components, "⚠️ Config is empty, using default", "warning")
+                msg = f"⚠️ Config is empty at {config_path}, using default"
+                safe_log_to_ui(self._ui_components, msg, "warning")
+                self.logger.warning(msg)
                 return self.get_default_config()
             
             # Handle inheritance
             if '_base_' in config:
                 base_config = self.config_manager.load_config(config['_base_']) or {}
                 merged_config = self._merge_configs(base_config, config)
-                safe_log_to_ui(self._ui_components, f"📂 Config loaded from {filename} with inheritance", "info")
+                msg = f"📂 Config loaded from {config_path} with inheritance"
+                safe_log_to_ui(self._ui_components, msg, "info")
+                self.logger.info(msg)
                 return merged_config
             
-            safe_log_to_ui(self._ui_components, f"📂 Config loaded from {filename}", "info")
+            msg = f"📂 Config loaded from {config_path}"
+            safe_log_to_ui(self._ui_components, msg, "info")
+            self.logger.info(msg)
             return config
             
         except Exception as e:
-            error_msg = f"Error loading config: {str(e)}"
+            error_msg = f"Error loading config from {getattr(config_path, 'as_posix', lambda: str(config_path))()}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             safe_log_to_ui(self._ui_components, f"❌ {error_msg}", "error")
             return self.get_default_config()

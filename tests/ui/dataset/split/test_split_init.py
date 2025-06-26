@@ -11,6 +11,27 @@ from ipywidgets import VBox
 from unittest.mock import MagicMock, patch, ANY, call, PropertyMock
 from typing import Dict, Any, Optional
 
+def test_module_import():
+    """Test that the module can be imported correctly."""
+    # Test importing from the package
+    from smartcash.ui.dataset.split import split_init
+    
+    # Check that essential components are available
+    assert hasattr(split_init, 'SplitConfigInitializer')
+    assert hasattr(split_init, 'create_split_config_cell')
+    assert hasattr(split_init, 'MODULE_NAME')
+    assert split_init.MODULE_NAME == 'split_config'
+    
+    # Test that the public API is available through the package
+    from smartcash.ui.dataset.split import (
+        create_split_config_cell,
+        SplitConfigHandler,
+        initialize_split_ui
+    )
+    
+    # Verify the handler class
+    assert SplitConfigHandler.__name__ == 'SplitConfigHandler'
+
 # Import the component registry
 from smartcash.ui.initializers.config_cell_initializer import component_registry
 
@@ -56,19 +77,36 @@ def mock_handler():
 @pytest.fixture
 def split_initializer(mock_handler, mock_ui_components):
     """Fixture that provides a configured SplitConfigInitializer instance."""
-    # Create a mock logger bridge with required ui_components
-    mock_logger_bridge = MagicMock()
-    
-    with patch('smartcash.ui.dataset.split.split_init.SplitConfigHandler', return_value=mock_handler), \
+    with patch('smartcash.ui.dataset.split.split_init.ComponentRegistry') as mock_registry, \
          patch('smartcash.ui.dataset.split.split_init.create_split_form', return_value=mock_ui_components), \
-         patch('smartcash.ui.dataset.split.split_init.create_split_layout', return_value={}), \
-         patch('smartcash.ui.initializers.config_cell_initializer.UILoggerBridge', return_value=mock_logger_bridge):
-
-        initializer = SplitConfigInitializer(logger_bridge=mock_logger_bridge)
-        # Use create_handler to set up the handler instead of direct assignment
-        initializer._handler = mock_handler  # Set the internal _handler directly for testing
+         patch('smartcash.ui.dataset.split.split_init.create_split_layout', return_value=VBox()):
+        
+        initializer = SplitConfigInitializer()
+        initializer._handler = mock_handler
         initializer.ui_components = mock_ui_components
+        initializer.parent_component = MagicMock()
+        initializer.parent_component.container = VBox()
+        initializer.parent_component.content_area = VBox()
+        initializer._is_initialized = True
+        
         yield initializer
+
+# Fixture to mock IPython display
+@pytest.fixture
+def mock_display():
+    """Fixture to mock IPython's display function."""
+    with patch('smartcash.ui.dataset.split.split_init.display') as mock_display:
+        yield mock_display
+
+# Fixture to mock error handler
+@pytest.fixture
+def mock_error_handler():
+    """Fixture to mock the error handler used in create_split_config_cell."""
+    with patch('smartcash.ui.dataset.split.split_init.logger') as mock_logger, \
+         patch('smartcash.ui.dataset.split.split_init.create_error_response') as mock_create_error:
+        mock_error_widget = MagicMock()
+        mock_create_error.return_value = mock_error_widget
+        yield mock_logger, mock_create_error, mock_error_widget
 
 @pytest.fixture
 def mock_handler():
@@ -91,19 +129,83 @@ def mock_ui_components():
 class TestSplitConfigInitializer:
     """Test cases for SplitConfigInitializer class."""
     
-    def test_initialization(self, mock_component_registry):
-        """Test that the initializer is properly initialized."""
-        with patch('smartcash.ui.dataset.split.split_init.ConfigCellInitializer.__init__') as mock_parent_init:
-            initializer = SplitConfigInitializer()
-            
-            # Verify parent initialization was called with correct parameters
-            mock_parent_init.assert_called_once_with(
-                config={},
-                parent_id=None,
-                component_id=MODULE_NAME,
-                title='Dataset Split Configuration',
-                children=[]
-            )
+    @patch('smartcash.ui.dataset.split.split_init.ConfigCellInitializer.__init__', return_value=None)
+    @patch('smartcash.ui.dataset.split.split_init.logger')
+    def test_initialization(self, mock_logger, mock_parent_init, mock_component_registry):
+        """Test that the initializer is properly initialized with default values."""
+        # Setup mocks
+        mock_logger_instance = MagicMock()
+        mock_logger.getChild.return_value = mock_logger_instance
+        
+        # Create instance with default values
+        initializer = SplitConfigInitializer()
+        
+        # Manually set required attributes that would be set by the parent __init__
+        initializer.ui_components = {}
+        initializer._handler = None
+        initializer._logger = mock_logger_instance
+        initializer._is_initialized = True
+        
+        # Verify parent initialization was called with correct parameters
+        mock_parent_init.assert_called_once()
+        args, kwargs = mock_parent_init.call_args
+        
+        # Verify the arguments passed to parent's __init__
+        assert kwargs['config'] == {}
+        assert kwargs['parent_id'] is None
+        assert kwargs['component_id'] == "split_config"
+        assert kwargs['title'] == "Dataset Split Configuration"
+        assert kwargs['children'] == []
+        
+        # Verify instance attributes are set
+        assert initializer is not None
+        assert hasattr(initializer, 'ui_components')
+        assert hasattr(initializer, '_handler')
+        assert hasattr(initializer, '_logger')
+    
+    @patch('smartcash.ui.dataset.split.split_init.ConfigCellInitializer.__init__', return_value=None)
+    @patch('smartcash.ui.dataset.split.split_init.logger')
+    def test_initialization_with_custom_values(self, mock_logger, mock_parent_init, mock_component_registry):
+        """Test initialization with custom values."""
+        # Setup mocks
+        mock_logger_instance = MagicMock()
+        mock_logger.getChild.return_value = mock_logger_instance
+        
+        # Setup test data
+        custom_config = {"test": "config"}
+        children_config = [{"type": "test_child"}]
+        
+        # Create instance with custom values
+        initializer = SplitConfigInitializer(
+            config=custom_config,
+            parent_id="parent_123",
+            component_id="custom_id",
+            title="Custom Title",
+            children=children_config
+        )
+        
+        # Manually set required attributes that would be set by the parent __init__
+        initializer.ui_components = {}
+        initializer._handler = None
+        initializer._logger = mock_logger_instance
+        initializer._is_initialized = True
+        
+        # Verify parent initialization was called with correct parameters
+        mock_parent_init.assert_called_once()
+        args, kwargs = mock_parent_init.call_args
+        
+        # Verify the arguments passed to parent's __init__
+        assert kwargs['config'] == custom_config
+        assert kwargs['parent_id'] == "parent_123"
+        assert kwargs['component_id'] == "custom_id"
+        assert kwargs['title'] == "Custom Title"
+        assert kwargs['children'] == children_config
+        
+        # Verify instance attributes are set
+        assert initializer is not None
+        assert hasattr(initializer, 'ui_components')
+        assert hasattr(initializer, '_handler')
+        assert hasattr(initializer, '_logger')
     
     def test_create_handler(self, mock_component_registry, mock_handler):
         """Test handler creation with config."""
@@ -174,42 +276,114 @@ class TestSplitConfigInitializer:
             )
 
 
-def test_create_split_config_cell():
-    """Test the create_split_config_cell function."""
-    # Mock the display function
-    mock_display = MagicMock()
+# Add import at the top of the file if not already present
+from unittest.mock import ANY
+
+class TestCreateSplitConfigCell:
+    """Test cases for the create_split_config_cell function."""
     
-    # Mock the initializer and its methods
-    mock_initializer = MagicMock()
-    mock_container = MagicMock()
-    mock_initializer.initialize.return_value = mock_container
-    mock_initializer.ui_components = {'test': 'components'}
+    def test_successful_ui_display(self, mock_display):
+        """Test that the UI is properly displayed on successful initialization."""
+        # Setup mock initializer
+        mock_initializer = MagicMock()
+        mock_container = MagicMock()
+        mock_initializer.initialize.return_value = mock_container
+        mock_initializer.ui_components = {'test': 'components'}
+        mock_initializer.parent_component = MagicMock()
+        mock_initializer.parent_component.container = 'mock_container'
+        mock_initializer.parent_component.content_area = 'mock_content_area'
+        
+        with patch('smartcash.ui.dataset.split.split_init.SplitConfigInitializer', 
+                  return_value=mock_initializer) as mock_init:
+            # Call with custom config
+            config = {'test': 'config'}
+            result = create_split_config_cell(config=config, some_arg='value')
+            
+            # Verify initializer was created with correct args
+            mock_init.assert_called_once_with(config=config, some_arg='value')
+            
+            # Verify initialization and display
+            mock_initializer.initialize.assert_called_once()
+            mock_display.assert_called_once_with(mock_container)
+            
+            # Verify return value
+            assert result == {
+                'test': 'components',
+                'container': 'mock_container',
+                'content_area': 'mock_content_area'
+            }
     
-    # Mock the parent component
-    mock_parent_component = MagicMock()
-    mock_parent_component.container = 'mock_container'
-    mock_parent_component.content_area = 'mock_content_area'
-    mock_initializer.parent_component = mock_parent_component
-
-    with patch('smartcash.ui.dataset.split.split_init.SplitConfigInitializer', return_value=mock_initializer), \
-         patch('smartcash.ui.dataset.split.split_init.display', mock_display):
-
-        # Call the function with a custom config
-        config = {'test': 'config'}
-        result = create_split_config_cell(config=config)
-
-        # Check that the initializer was created with the config
-        mock_initializer.initialize.assert_called_once()
+    def test_error_handling(self, mock_display):
+        """Test proper error handling and display when initialization fails."""
+        # Setup mock error response
+        mock_error_widget = MagicMock()
+        test_error = Exception("Test error")
         
-        # Check that the container was displayed
-        mock_display.assert_called_once_with(mock_container)
+        # Mock the error handler
+        with patch('smartcash.ui.dataset.split.split_init.logger') as mock_logger, \
+             patch('smartcash.ui.config_cell.handlers.error_handler.create_error_response') as mock_create_error, \
+             patch('smartcash.ui.dataset.split.split_init.SplitConfigInitializer') as mock_init_class:
+            
+            # Configure mocks
+            mock_create_error.return_value = mock_error_widget
+            
+            # Setup mock initializer to raise exception
+            mock_initializer = MagicMock()
+            mock_initializer.initialize.side_effect = test_error
+            mock_initializer.ui_components = {}
+            mock_initializer.parent_component = MagicMock()
+            mock_initializer.parent_component.container = MagicMock()
+            mock_initializer.parent_component.content_area = MagicMock()
+            mock_init_class.return_value = mock_initializer
+            
+            # Call the function
+            result = create_split_config_cell()
+            
+            # Verify error was logged
+            mock_logger.error.assert_called_once()
+            assert "Failed to create split config cell" in mock_logger.error.call_args[0][0]
+            
+            # Verify error response was created with correct parameters
+            mock_create_error.assert_called_once()
+            call_args = mock_create_error.call_args[1]
+            assert call_args['error'] == test_error
+            assert "Failed to create split config cell" in call_args['error_message']
+            assert call_args['title'] == "Error in Dataset Split Configuration"
+            assert call_args['include_traceback'] is True
+            
+            # Verify error widget was displayed
+            mock_display.assert_called_once_with(mock_error_widget)
+            
+            # Verify return value contains error
+            assert result == {'error': mock_error_widget}
+    
+    def test_display_called_before_return(self, mock_display):
+        """Test that display is called before returning the result."""
+        mock_initializer = MagicMock()
+        mock_container = MagicMock()
+        mock_initializer.initialize.return_value = mock_container
+        mock_initializer.ui_components = {}
         
-        # Check that the result contains the expected components
-        assert result == {
-            'test': 'components',
-            'container': 'mock_container',
-            'content_area': 'mock_content_area'
-        }
+        # Track call order
+        call_order = []
+        
+        def track_display(*args, **kwargs):
+            call_order.append('display')
+            return MagicMock()
+            
+        def track_initialize():
+            call_order.append('initialize')
+            return mock_container
+            
+        mock_display.side_effect = track_display
+        mock_initializer.initialize.side_effect = track_initialize
+        
+        with patch('smartcash.ui.dataset.split.split_init.SplitConfigInitializer', 
+                  return_value=mock_initializer):
+            create_split_config_cell()
+            
+            # Verify display was called after initialization but before returning
+            assert call_order == ['initialize', 'display']
 
 
 @pytest.fixture

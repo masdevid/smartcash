@@ -257,6 +257,10 @@ def get_alert_style(style_type: str) -> dict:
     """Get alert style with fallback to default if style_type is invalid"""
     return ALERT_STYLES.get(style_type.lower(), DEFAULT_STYLE)
 
+# File extensions
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'}
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv'}
+
 # Button styles mapping
 BUTTON_STYLES = {
     'primary': 'primary',

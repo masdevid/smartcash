@@ -73,9 +73,13 @@ class ConfigCellInitializer(Generic[T], ABC):
         self.parent_id = parent_id
         self.component_id = component_id or self.__class__.__name__
         self.title = title or self.component_id
-        self.logger_bridge = logger_bridge or UILoggerBridge()
-        self._handler: Optional[T] = None  # Initialize the protected attribute
+        
+        # Initialize UI components dictionary
         self.ui_components: Dict[str, Any] = {}
+        
+        # Store the logger bridge if provided, will be initialized after UI components are created
+        self._logger_bridge = logger_bridge
+        self._handler: Optional[T] = None  # Initialize the protected attribute
         self._is_initialized = False
         self._suppress_output = False
         self._original_stdout = None
@@ -87,6 +91,16 @@ class ConfigCellInitializer(Generic[T], ABC):
             parent_id=self.component_id,
             title=self.title
         )
+        
+        # Initialize logger bridge after parent component is created
+        if self._logger_bridge is None:
+            self._logger_bridge = UILoggerBridge(
+                ui_components={
+                    'parent': self.parent_component,
+                    'container': getattr(self.parent_component, 'container', None)
+                },
+                logger_name=f"{self.__class__.__name__.lower()}_bridge"
+            )
         
         # Store children configurations for lazy initialization
         self._children_config = children or []
@@ -418,44 +432,43 @@ def handler(self) -> T:
         self._handler = self.create_handler()
     return self._handler
 
-    @abstractmethod
-    def create_handler(self) -> T:
-        """Create and return a configuration handler instance.
-        
-        This method must be implemented by subclasses to create and return
-        an instance of the appropriate configuration handler.
-        
-        Returns:
-            An instance of a ConfigCellHandler subclass.
-        """
-        pass
+@abstractmethod
+def create_handler(self) -> T:
+    """Create and return a configuration handler instance.
     
-    def cleanup(self) -> None:
-        """Release all resources and unregister components."""
-        try:
-            self._logger.debug(f"Cleaning up {self.component_id} resources")
-            
-            # Clean up logger bridge if it exists
-            if hasattr(self, '_logger_bridge'):
-                self._logger_bridge.cleanup()
-            
-            # Unregister components from the registry
-            if hasattr(self, '_component_id'):
-                component_registry.unregister_component(self._component_id)
-                
-                # Unregister all child components
-                for child in self._children:
-                    if hasattr(child, 'component_id'):
-                        component_registry.unregister_component(child.component_id)
-            
-            # Clean up handler if it exists
-            if hasattr(self, '_handler') and hasattr(self._handler, 'cleanup'):
-                self._handler.cleanup()
-                
-            self._logger.info(f"Cleaned up resources for {self.component_id}")
-            
-        except Exception as e:
-            self._logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
-        finally:
-            restore_stdout()
+    This method must be implemented by subclasses to create and return
+    an instance of the appropriate configuration handler.
     
+    Returns:
+        An instance of a ConfigCellHandler subclass.
+    """
+    pass
+
+def cleanup(self) -> None:
+    """Release all resources and unregister components."""
+    try:
+        self._logger.debug(f"Cleaning up {self.component_id} resources")
+        
+        # Clean up logger bridge if it exists
+        if hasattr(self, '_logger_bridge'):
+            self._logger_bridge.cleanup()
+        
+        # Unregister components from the registry
+        if hasattr(self, '_component_id'):
+            component_registry.unregister_component(self._component_id)
+            
+            # Unregister all child components
+            for child in self._children:
+                if hasattr(child, 'component_id'):
+                    component_registry.unregister_component(child.component_id)
+        
+        # Clean up handler if it exists
+        if hasattr(self, '_handler') and hasattr(self._handler, 'cleanup'):
+            self._handler.cleanup()
+            
+        self._logger.info(f"Cleaned up resources for {self.component_id}")
+        
+    except Exception as e:
+        self._logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
+    finally:
+        restore_stdout()

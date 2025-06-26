@@ -104,9 +104,9 @@ def create_error_response(
     )
     
     # Return the container widget directly
-    container = error_ui.get('container')
-    if container is not None:
-        return container
+    if hasattr(error_ui, 'keys') and 'container' in error_ui:
+        return error_ui['container']
+    return error_ui
     
     # Fallback in case the container is not available
     from IPython.display import HTML

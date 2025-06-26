@@ -184,6 +184,12 @@ class DualProgressTracker:
         self._update_status(f"❌ Error: {message}")
         if self.logger:
             self.logger.error(message)
+            
+    def warning(self, message: str):
+        """Report a warning in the setup process"""
+        self._update_status(f"⚠️ {message}")
+        if self.logger:
+            self.logger.warning(message)
     
     def add_callback(self, callback: Callable[[float, float, str], None]):
         """Add a callback function to be called on progress updates"""

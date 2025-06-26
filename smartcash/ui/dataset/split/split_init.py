@@ -239,19 +239,26 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         
         # Create and initialize UI components with the provided config
         # The handler will be created internally by the initializer
-        ui_components = initializer.initialize(config or {})
+        result = initializer.initialize(config or {})
         
-        # Store references for later use
-        initializer.ui_components = ui_components
-        
-        # Display the container if it exists
-        container = ui_components.get('container')
-        if container is not None:
-            safe_display(container)
+        # Handle different return types from initialize()
+        if isinstance(result, dict):
+            ui_components = result
+            # Store references for later use
+            initializer.ui_components = ui_components
+            
+            # Display the container if it exists
+            container = ui_components.get('container')
+            if container is not None:
+                safe_display(container)
+            else:
+                logger.warning("No container found in UI components")
+            
+            return ui_components
         else:
-            logger.warning("No container found in UI components")
-        
-        return ui_components
+            # If initialize() returns a widget directly
+            safe_display(result)
+            return {'container': result}
         
     except Exception as e:
         error_msg = f"Failed to create split config cell: {str(e)}"

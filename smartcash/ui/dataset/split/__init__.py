@@ -5,9 +5,11 @@ Deskripsi: Ekspor utilitas dan fungsi split dataset
 
 from .split_init import (
     create_split_config_cell,
-    create_split_config_ui,
     SplitConfigHandler
 )
+
+# For backward compatibility
+create_split_config_ui = create_split_config_cell
 
 # Public API
 def initialize_split_ui(config=None):
@@ -28,6 +30,7 @@ create_split_init = create_split_config_cell
 __all__ = [
     'initialize_split_ui',
     'create_split_init',
-    'create_split_config_ui',
+    'create_split_config_ui',  # Backward compatibility
+    'create_split_config_cell',
     'SplitConfigHandler'
 ]

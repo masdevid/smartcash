@@ -10,31 +10,28 @@ registration while delegating UI component creation to the components module.
 from __future__ import annotations
 
 # Standard library
+import logging
 from abc import ABC, abstractmethod
 from ast import Return
-from typing import Any, Dict, Generic, Optional, TypeVar
+from typing import Any, Dict, Generic, Optional, TypeVar, Union, List
 # Third-party
 import ipywidgets as widgets
 
-# SmartCash - Core
-from smartcash.common.logger import get_logger
-
 # SmartCash - UI Components
 from smartcash.ui.config_cell.components import component_registry
+from smartcash.ui.config_cell.components.ui_parent_components import ParentComponentManager, create_parent_component
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 from smartcash.ui.config_cell.handlers.error_handler import create_error_response
 from smartcash.ui.utils.logger_bridge import UILoggerBridge
 from smartcash.ui.utils.logging_utils import (
-    restore_stdout,
-    setup_aggressive_log_suppression,
-    setup_stdout_suppression
+    restore_stdout
 )
 
 # Type variables
 T = TypeVar('T', bound=ConfigCellHandler)
 
 # Logger setup
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class ConfigCellInitializer(Generic[T], ABC):
     """Orchestrates the initialization and lifecycle of configuration cells.
@@ -52,73 +49,148 @@ class ConfigCellInitializer(Generic[T], ABC):
     """
     
     def __init__(
-        self, 
-        module_name: str, 
-        config_filename: str, 
-        parent_module: Optional[str] = None,
-        is_container: bool = False,
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        parent_id: Optional[str] = None,
+        component_id: Optional[str] = None,
+        logger_bridge: Optional[UILoggerBridge] = None,
+        title: Optional[str] = None,
+        children: Optional[List[Dict[str, Any]]] = None,
         **kwargs
-    ):
-        """Initialize the configuration cell.
+    ) -> None:
+        """Initialize the config cell with optional config and parent ID.
         
         Args:
-            module_name: Unique identifier for this module (e.g., 'split', 'strategy').
-            config_filename: Base filename for configuration persistence.
-            parent_module: Optional parent module path (e.g., 'dataset' for 'dataset.split').
-            is_container: If True, this component can contain other child components.
-            **kwargs: Additional keyword arguments for future extension.
-            
-        Note:
-            - The module hierarchy is separate from UI component hierarchy.
-            - Use parent_module to define module relationships (e.g., 'dataset.split').
-            - Use is_container to indicate if this component can contain other components.
+            config: Configuration dictionary
+            parent_id: Optional parent component ID for hierarchical relationships
+            component_id: Optional unique identifier for this component
+            logger_bridge: Optional logger bridge for UI logging
+            title: Optional title for the component
+            children: Optional list of child component configurations
+            **kwargs: Additional configuration parameters
         """
-        self.module_name = module_name
-        self.config_filename = config_filename
-        self.parent_module = parent_module
-        self.is_container = is_container
+        self.config = config or {}
+        self.parent_id = parent_id
+        self.component_id = component_id or self.__class__.__name__
+        self.title = title or self.component_id
+        self.logger_bridge = logger_bridge or UILoggerBridge()
+        self._handler: Optional[T] = None  # Initialize the protected attribute
+        self.ui_components: Dict[str, Any] = {}
+        self._is_initialized = False
+        self._suppress_output = False
+        self._original_stdout = None
+        self._original_stderr = None
+        self._logger = logger.getChild(self.component_id)
         
-        # Setup logging and component registry
-        self._setup_logging()
-        self._setup_component_registry()
-        
-        # Initialize handler lazily
-        self._handler: Optional[T] = None
-    
-    def _setup_logging(self) -> None:
-        """Initialize logging infrastructure."""
-        self.ui_components = {}
-        self._logger_bridge = UILoggerBridge(
-            self.ui_components, 
-            f"smartcash.ui.{self.module_name}"
+        # Initialize parent component manager
+        self.parent_component = ParentComponentManager(
+            parent_id=self.component_id,
+            title=self.title
         )
-        self.logger = self._logger_bridge.logger
+        
+        # Store children configurations for lazy initialization
+        self._children_config = children or []
+        self._children: List[Any] = []
+    
+    def _setup_output_suppression(self) -> None:
+        """Set up output suppression using the project's logging utilities.
+        
+        This method uses the centralized logging utilities to suppress output
+        during initialization, preventing cluttering the notebook with unnecessary messages.
+        """
+        from smartcash.ui.utils.logging_utils import (
+            setup_aggressive_log_suppression,
+            setup_stdout_suppression
+        )
+        
+        # Set up aggressive log suppression for known noisy libraries
         setup_aggressive_log_suppression()
+        
+        # Set up stdout/stderr suppression if we have UI components
+        if hasattr(self, 'ui_components') and self.ui_components:
+            setup_stdout_suppression()
+            
+        self._logger.debug("Output suppression enabled")
+        
+    def _restore_output(self) -> None:
+        """Restore the original output settings using the project's logging utilities."""
+        from smartcash.ui.utils.logging_utils import (
+            restore_stdout,
+            allow_tqdm_display
+        )
+        
+        # Restore stdout/stderr if they were suppressed
+        if hasattr(self, 'ui_components') and self.ui_components:
+            restore_stdout()
+            
+        # Ensure tqdm is allowed to display progress bars
+        allow_tqdm_display()
+        
+        self._logger.debug("Output settings restored")
+
+    def _setup_logging(self) -> None:
+        """Initialize logging infrastructure and redirect all logs to parent's log accordion."""
+        try:
+            # Initialize logger bridge with parent's UI components if available
+            parent_components = {}
+            if self.parent_id:
+                from smartcash.ui.config_cell.components.component_registry import component_registry
+                parent = component_registry.get_component(self.parent_id)
+                if parent and hasattr(parent, 'get'):
+                    parent_components = parent
+            
+            # Use parent's UI components if available, otherwise use our own
+            ui_components = parent_components.get('ui_components', {}) or self.ui_components
+            
+            # Initialize logger bridge
+            self._logger_bridge = UILoggerBridge(
+                ui_components=ui_components,
+                logger_name=f"smartcash.ui.{self.component_id}"
+            )
+            
+            # Set up the logger
+            self._logger = self._logger_bridge.logger
+            
+            # Mark UI as ready to flush any buffered logs
+            if hasattr(self._logger_bridge, 'set_ui_ready'):
+                self._logger_bridge.set_ui_ready(True)
+                
+            self._logger.debug(f"Logging initialized for {self.component_id}")
+            
+        except Exception as e:
+            # Fallback to basic logging if UI logging setup fails
+            import logging
+            self._logger = logging.getLogger(f"smartcash.ui.{self.component_id}")
+            self._logger.warning(f"Failed to initialize UI logging: {str(e)}", exc_info=True)
     
     def _setup_component_registry(self) -> None:
         """Register this component in the component registry.
         
         Registers the component with its full module path and sets up parent-child
-        relationships if a parent_module is specified.
+        relationships if a parent_id is specified.
         """
         # Create component ID using module hierarchy (e.g., 'dataset.split')
         self._component_id = (
-            f"{self.parent_module}.{self.module_name}" 
-            if self.parent_module 
-            else self.module_name
+            f"{self.parent_id}.{self.component_id}" 
+            if self.parent_id 
+            else self.component_id
         )
         
         # Only register if not already registered
         if not component_registry.get_component(self._component_id):
             component_registry.register_component(
                 component_id=self._component_id,
-                component=self.ui_components,
-                parent_id=self.parent_module
+                component={
+                    **self.ui_components,
+                    'container': self.parent_component.container,
+                    'content_area': self.parent_component.content_area
+                },
+                parent_id=self.parent_id
             )
             
-            # Set up container if needed
-            if self.is_container:
-                self._initialize_as_container()
+            # Set up children if any
+            if self._children_config:
+                self._initialize_children()
     
     @property
     def handler(self) -> T:
@@ -148,346 +220,220 @@ class ConfigCellInitializer(Generic[T], ABC):
         """
         pass
         
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> 'widgets.Widget':
-        """Initialize the configuration cell UI with the given config.
-        
-        This method orchestrates the entire initialization process:
-        1. Creates or retrieves the configuration handler
-        2. Loads or validates the provided configuration
-        3. Delegates UI component creation to the components module
-        4. Sets up event handlers and callbacks
-        5. Returns the root widget (container) for display
-        
-        Args:
-            config: Optional initial configuration. If not provided, the handler's
-                   load_config() method will be used to load the configuration.
-                   
-        Returns:
-            An ipywidgets.Widget instance (usually a container) that can be displayed.
-            In case of error, returns an error widget with the error message.
-            
-        Raises:
-            RuntimeError: If initialization fails due to configuration errors
-        """
-        try:
-            # Import widgets here to avoid circular imports
-            import ipywidgets as widgets
-            
-            # Update handler with provided config
-            if config is not None:
-                self.handler.update(config)
-            
-            # Delegate UI creation to components module
-            ui_components = self.create_ui_components(self.handler.config)
-            
-            # Update the ui_components dictionary with new components
-            self.ui_components.update(ui_components)
-            
-            # Ensure we have a valid container widget
-            container = self.ui_components.get('container')
-            if not isinstance(container, widgets.Widget):
-                container = widgets.VBox()
-                self.ui_components['container'] = container
-            
-            # Ensure the container is properly initialized
-            if not hasattr(container, '_model_id'):
-                # Force widget initialization if not already done
-                container._repr_mimebundle_()
-            
-            # Connect to parent if this is a child component
-            if self.parent_module:
-                self.connect_to_parent()
-            
-            self.logger.info(f"Successfully initialized {self.module_name} UI")
-            
-            # Verify the container is a proper widget
-            if not isinstance(container, widgets.Widget):
-                raise RuntimeError(
-                    f"Container must be a widget, got {type(container).__name__}"
-                )
-                
-            return container
-            
-        except Exception as e:
-            error_msg = f"Failed to initialize {self.module_name}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            
-            # Delegate error UI creation to the centralized error handler
-            # which now returns a widget directly
-            return create_error_response(
-                error_message=error_msg,
-                error=e,
-                title=f"Error in {self.module_name}",
-                include_traceback=True
-            )
-        
-    def connect_to_parent(self) -> None:
-        """Connect this component to its parent in the component hierarchy."""
-        if not self.parent_module:
-            self.logger.debug("No parent module specified, skipping parent connection")
-            return
-            
-        parent_id = f"{self.parent_module}.parent"
-        parent = component_registry.get_component(parent_id)
-        
-        if not parent:
-            error_msg = f"Parent component {parent_id} not found in registry"
-            self.logger.error(error_msg)
-            raise RuntimeError(error_msg)
-            
-        try:
-            # Add this component to the parent's content area
-            if hasattr(parent, 'add_child'):
-                parent.add_child(self.ui_components['container'])
-                self.logger.debug(f"Connected {self._component_id} to parent {parent_id}")
-            else:
-                self.logger.warning(f"Parent {parent_id} does not support add_child")
-                
-        except Exception as e:
-            error_msg = f"Failed to connect to parent {parent_id}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            raise RuntimeError(error_msg) from e
-    
+    @abstractmethod
     def setup_handlers(self) -> None:
-        """Set up event handlers and callbacks for UI components.
+        """Set up event handlers for the UI components.
         
-        This method is called after UI components are created and can be overridden
-        to set up any additional event handlers, observers, or callbacks needed
-        for the UI to function properly.
-        
-        The default implementation sets up cleanup handlers for when the UI is closed
-        or refreshed.
-        
-        Note:
-            - This method is called automatically during initialization.
-            - Access UI components through self.ui_components.
-            - Connect widgets to handler methods as needed.
-            - Override this method to add custom handlers, but make sure to call super().setup_handlers()
-            
-        Example:
-            def setup_handlers(self):
-                # Call parent implementation
-                super().setup_handlers()
-                
-                # Connect a button click to a handler method
-                self.ui_components['save_button'].on_click(self._on_save_clicked)
-                
-                # Set up an observer on a text input
-                self.ui_components['text_input'].observe(
-                    self._on_text_changed,
-                    names='value'
-                )
+        This method should be implemented by subclasses to set up any
+        event handlers, observers, or callbacks needed for the UI to function.
+        The parent class's implementation should be called first using super().
         """
-        try:
-            # Register cleanup function for when the cell is re-executed
-            self._register_cleanup()
-            
-            # Log that handlers have been set up
-            self.logger.debug(f"UI event handlers set up for {self.module_name}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to set up UI handlers: {str(e)}", exc_info=True)
-    
-    def _register_cleanup(self) -> None:
-        """Register cleanup function for when the cell is re-executed.
+        pass
         
-        This ensures that resources are properly cleaned up when the UI is refreshed.
-        """
-        try:
-            from IPython import get_ipython
-            ipython = get_ipython()
-            
-            if ipython is not None:
-                # Register cleanup function to run before cell execution
-                def cleanup():
-                    try:
-                        import sys
-                        self.logger.debug(f"Cleaning up {self.module_name} resources")
-                        
-                        # Clean up logger bridge if it exists
-                        if hasattr(self, '_logger_bridge') and self._logger_bridge:
-                            if hasattr(self._logger_bridge, 'cleanup'):
-                                self._logger_bridge.cleanup()
-                            
-                        # Restore stdout/stderr
-                        if hasattr(sys, '_original_stdout_saved'):
-                            sys.stdout = sys._original_stdout_saved
-                            del sys._original_stdout_saved
-                        if hasattr(sys, '_original_stderr_saved'):
-                            sys.stderr = sys._original_stderr_saved
-                            del sys._original_stderr_saved
-                            
-                    except Exception as e:
-                        # Use print as logging might not be available during cleanup
-                        print(f"Error during cleanup: {str(e)}")
-                
-                # Register the cleanup function
-                ipython.events.register('pre_run_cell', lambda: cleanup())
-                
-        except Exception as e:
-            self.logger.warning(f"Failed to register cleanup function: {str(e)}", exc_info=True)
-    
-    def _initialize_logger_bridge(self) -> None:
-        """Initialize the logger bridge for UI logging.
-        
-        This sets up a bridge between the Python logging system and the UI,
-        allowing log messages to be displayed in the application's log panel.
-        
-        The logger bridge is already initialized in __init__, this method
-        configures it with the current UI components.
-        """
-        if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
-            self.logger.warning("Logger bridge not initialized, creating a new one")
-            self._logger_bridge = UILoggerBridge(
-                self.ui_components,
-                f"smartcash.ui.{self.module_name}"
-            )
-        
-        try:
-            # Update the logger instance to use the bridge
-            self.logger = self._logger_bridge.logger
-            
-            # Log a test message to verify logging is working
-            self.logger.debug(f"Logger bridge initialized for {self.module_name}")
-            
-        except Exception as e:
-            # Fallback to basic logging if bridge initialization fails
-            self.logger = get_logger(f"smartcash.ui.{self.module_name}")
-            self.logger.warning(f"Failed to configure logger bridge: {str(e)}", exc_info=True)
-            
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Any:
-        """Initialize the configuration cell with the given configuration.
-        
-        This is the main entry point that sets up the configuration interface.
-        It performs the following steps:
-        1. Suppresses all output during initialization
-        2. Updates the handler with the provided configuration
-        3. Creates UI components based on the current config
-        4. Sets up event handlers and callbacks
-        5. Ensures a container widget exists
-        6. Restores output and returns the root widget
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> 'widgets.Widget':
+        """Initialize the UI components and return the root widget.
         
         Args:
-            config: Optional initial configuration dictionary. If provided,
-                  this will update the current configuration before creating
-                  the UI components.
-                  
+            config: Optional configuration to override the initial config
+            
         Returns:
-            The root ipywidgets.Widget (usually a container) that can be displayed or embedded.
-            In case of error, returns an error widget with the error message.
-                          
-        Raises:
-            RuntimeError: If initialization fails due to invalid configuration
-                        or UI component creation errors.
-                        
-        Example:
-            initializer = MyConfigInitializer('my_module', 'config')
-            ui = initializer.initialize({'setting': 'value'})
-            display(ui)
+            The root widget containing the initialized UI
         """
-        setup_stdout_suppression()
+        if config is not None:
+            self.config = config
+            
         try:
-            # Initialize handler with config if provided
-            if config:
-                self.handler.update_config(config)
+            # Set up output suppression if needed
+            if self._suppress_output:
+                self._setup_output_suppression()
             
-            # Create UI components using current config
-            self.ui_components = self.create_ui_components(self.handler.config)
+            # Create the handler
+            self.handler = self.create_handler()
             
-            # Update logger bridge with the new UI components
-            self._logger_bridge.ui_components = self.ui_components
+            # Create UI components using the parent component system
+            self._setup_ui_components()
             
-            # Initialize logger bridge with the UI components
-            self._initialize_logger_bridge()
+            # Initialize child components if any
+            self._initialize_children()
             
-            # Mark UI as ready to flush any buffered logs
-            self._logger_bridge.set_ui_ready(True)
-            
-            # Setup any additional event handlers
+            # Set up event handlers
             self.setup_handlers()
             
-            # Ensure a container widget exists
-            if 'container' not in self.ui_components:
-                self.ui_components['container'] = widgets.VBox()
+            # Register the component
+            self._register_component()
             
-            # Get the container widget
-            container = self.ui_components.get('container')
+            # Mark as initialized
+            self._is_initialized = True
             
-            # Ensure we have a valid widget
-            if not isinstance(container, widgets.Widget):
-                self.logger.warning(
-                    f"Container is not a Widget (got {type(container)}), "
-                    "creating a new VBox"
-                )
-                container = widgets.VBox()
-                self.ui_components['container'] = container
-            
-            # Ensure the container has a reasonable layout if it's a Box
-            if hasattr(container, 'layout'):
-                if not container.layout:
-                    container.layout = widgets.Layout()
-                container.layout.overflow = 'visible'
-                container.layout.width = '100%'
-            
-            self.logger.debug(f"Returning container widget: {container!r}")
-            
-            # Return the container widget directly instead of the dictionary
-            # This matches the expected behavior in the tests
-            if isinstance(container, widgets.Widget):
-                return container
-            else:
-                # Fallback to the container from ui_components if needed
-                return self.ui_components.get('container', widgets.VBox())
+            # Return the container widget from parent component
+            return self.parent_component.container
             
         except Exception as e:
-            error_msg = f"Failed to initialize {self.module_name}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            
-            # Delegate error UI creation to the centralized error handler
-            # which now returns a widget directly
-            return create_error_response(
-                error_message=error_msg,
-                error=e,
-                title=f"Error in {self.module_name}",
-                include_traceback=True
-            )
+            error_msg = f"Failed to initialize {self.__class__.__name__}: {str(e)}"
+            self._logger.error(error_msg, exc_info=True)
+            return create_error_response(error_msg, str(e))
             
         finally:
-            restore_stdout()
+            # Restore output settings if they were suppressed
+            if self._suppress_output:
+                self._restore_output()
+                
+    def _setup_ui_components(self) -> None:
+        """Set up UI components using the parent component system."""
+        # Create the main UI components
+        self.ui_components = self.create_ui_components(self.config)
+        
+        # Add main components to the parent component
+        if 'container' in self.ui_components:
+            # If the component provides its own container, use it as the main content
+            self.parent_component.content_area.children = (self.ui_components['container'],)
+        else:
+            # Otherwise, add all components to the content area
+            widgets_to_add = [
+                widget for key, widget in self.ui_components.items()
+                if isinstance(widget, widgets.Widget)
+            ]
+            self.parent_component.content_area.children = tuple(widgets_to_add)
     
-    def _initialize_as_container(self) -> None:
-        """Initialize this component as a container for other components.
+    def _initialize_children(self) -> None:
+        """Initialize child components if any are configured."""
+        if not self._children_config:
+            return
+            
+        for child_config in self._children_config:
+            try:
+                # Create child component using the factory function
+                child = create_parent_component(
+                    parent_id=f"{self.component_id}.{child_config['id']}",
+                    **{k: v for k, v in child_config.items() if k != 'id'}
+                )
+                self._children.append(child)
+                
+                # Add child to the parent component
+                self.parent_component.add_child_component(
+                    child_id=child_config['id'],
+                    component=child,
+                    config=child_config.get('config', {})
+                )
+                
+            except Exception as e:
+                self._logger.error(
+                    f"Failed to initialize child component {child_config.get('id')}: {str(e)}",
+                    exc_info=True
+                )
+    
+    def _register_component(self) -> None:
+        """Register this component with the component registry and set up parent-child relationships.
         
-        Creates and registers a container widget that can hold child components.
-        The container is registered with a '.container' suffix in the component registry.
+        This method handles:
+        1. Registering the component with a unique ID
+        2. Setting up parent-child relationships in the UI hierarchy
+        3. Registering all child components recursively
         """
-        from smartcash.ui.config_cell.components.ui_factory import create_container
+        # Generate the full component ID with parent prefix if parent exists
+        full_component_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
         
-        self.logger.debug(f"Initializing container for {self._component_id}")
+        # Prepare component data with container and content area
+        component_data = {
+            **getattr(self, 'ui_components', {}),
+            'container': getattr(self, 'container', None),
+            'content_area': getattr(self, 'content_area', None)
+        }
         
-        # Create container using the factory
-        container_ui = create_container(
-            title=f"{self.module_name} Configuration",
-            container_id=self._component_id
-        )
-        
-        # Update UI components with container
-        self.ui_components.update(container_ui)
-        
-        # Register container in the registry
-        container_id = f"{self._component_id}.container"
+        # Register the main component
         component_registry.register_component(
-            component_id=container_id,
-            component=container_ui,
-            parent_id=self._component_id
+            component_id=full_component_id,
+            component=component_data,
+            parent_id=self.parent_id
         )
         
-        self.logger.info(f"Initialized container {container_id}")
+        # If this is a child component (has a parent_id), add to parent's content area
+        if self.parent_id:
+            # Get the parent component from the registry
+            parent_component = component_registry.get_component(self.parent_id)
+            
+            if parent_component and 'content_area' in parent_component:
+                parent_content = parent_component['content_area']
+                
+                if parent_content and hasattr(parent_content, 'children'):
+                    current_children = list(parent_content.children)
+                    
+                    # Add the current component's container to the parent's content area
+                    if hasattr(self, 'container') and self.container and self.container not in current_children:
+                        parent_content.children = tuple(current_children + [self.container])
+        
+        # Register all children components
+        for child in getattr(self, '_children', []):
+            if not (hasattr(child, 'component_id') and hasattr(child, 'parent_component')):
+                continue
+                
+            child_parent_id = full_component_id
+            child_component_id = f"{child_parent_id}.{child.component_id}"
+            
+            # Ensure child has ui_components attribute
+            if not hasattr(child, 'ui_components'):
+                child.ui_components = {}
+                
+            # Create component data for the child
+            child_component = {
+                **child.ui_components,
+                'container': getattr(child, 'container', None),
+                'content_area': getattr(child, 'content_area', None)
+            }
+            
+            # Register the child component
+            component_registry.register_component(
+                component_id=child_component_id,
+                component=child_component,
+                parent_id=child_parent_id
+            )
+            
+            # Add child's container to the current component's content area
+            if (hasattr(self, 'content_area') and 
+                hasattr(child, 'container') and 
+                child.container is not None):
+                
+                current_children = list(self.content_area.children)
+                if child.container not in current_children:
+                    self.content_area.children = tuple(current_children + [child.container])
+            
+            # Recursively register any children of this child
+            if hasattr(child, '_register_component'):
+                child._register_component()
+    
+    def get_container(self) -> 'widgets.Widget':
+        """Get the root container widget.
+        
+        Returns:
+            The root container widget from the parent component
+        """
+        # Register the component before returning the container
+        self._register_component()
+        return self.parent_component.container
+
+@property
+def handler(self) -> T:
+    """Lazy initialization of the configuration handler."""
+    if self._handler is None:
+        self._handler = self.create_handler()
+    return self._handler
+
+    @abstractmethod
+    def create_handler(self) -> T:
+        """Create and return a configuration handler instance.
+        
+        This method must be implemented by subclasses to create and return
+        an instance of the appropriate configuration handler.
+        
+        Returns:
+            An instance of a ConfigCellHandler subclass.
+        """
+        pass
     
     def cleanup(self) -> None:
         """Release all resources and unregister components."""
         try:
-            self.logger.debug(f"Cleaning up {self.module_name} resources")
+            self._logger.debug(f"Cleaning up {self.component_id} resources")
             
             # Clean up logger bridge if it exists
             if hasattr(self, '_logger_bridge'):
@@ -496,17 +442,20 @@ class ConfigCellInitializer(Generic[T], ABC):
             # Unregister components from the registry
             if hasattr(self, '_component_id'):
                 component_registry.unregister_component(self._component_id)
-                if self.is_parent:
-                    component_registry.unregister_component(f"{self._component_id}.parent")
+                
+                # Unregister all child components
+                for child in self._children:
+                    if hasattr(child, 'component_id'):
+                        component_registry.unregister_component(child.component_id)
             
             # Clean up handler if it exists
             if hasattr(self, '_handler') and hasattr(self._handler, 'cleanup'):
                 self._handler.cleanup()
                 
-            self.logger.info(f"Cleaned up resources for {self.module_name}")
+            self._logger.info(f"Cleaned up resources for {self.component_id}")
             
         except Exception as e:
-            self.logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
+            self._logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
         finally:
             restore_stdout()
     

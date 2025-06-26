@@ -237,9 +237,9 @@ class ConfigHandler(ABC):
 
 # Factory functions dengan one-liner returns
 def create_config_handler(module_name: str, extract_fn: Callable = None, update_fn: Callable = None, 
-                         parent_module: str = None) -> BaseConfigHandler:
-    """Factory untuk BaseConfigHandler dengan parent module support"""
-    return BaseConfigHandler(module_name, extract_fn, update_fn, parent_module)
+                         parent_module: str = None) -> ConfigHandler:
+    """Factory untuk ConfigHandler dengan parent module support"""
+    return ConfigHandler(module_name, extract_fn, update_fn, parent_module)
 
 def create_simple_handler(module_name: str, mapping: Dict[str, str] = None, 
                          parent_module: str = None) -> SimpleConfigHandler:

@@ -170,11 +170,10 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, display_ui
         # Initialize UI components and handlers
         result = initializer.initialize(config)
         
-        # Display UI if requested
-        if display_ui and result and 'ui' in result:
-            from IPython.display import display
-            display(result['ui'])
-            
+        # Display the result using the widget utility
+        from smartcash.ui.utils.widget_utils import safe_display
+        safe_display(result, condition=display_ui)
+        
         return result
         
     finally:

@@ -9,7 +9,7 @@ from config_cell_initializer.
 
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from IPython.display import display
+from smartcash.ui.utils import safe_display
 import logging
 
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer
@@ -17,6 +17,7 @@ from smartcash.ui.dataset.split.components.ui_form import create_split_form
 from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
 from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui, reset_ui_to_defaults
 from smartcash.ui.dataset.split.handlers.defaults import validate_split_ratios
+from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +244,7 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         # Display the container if it exists
         container = ui_components.get('container')
         if container is not None:
-            display(container)
+            safe_display(container)
         else:
             logger.warning("No container found in UI components")
         
@@ -258,6 +259,6 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
             f"<div style='color: red; padding: 10px; border: 1px solid #f5c6cb; border-radius: 4px;'>"
             f"<strong>Error:</strong> {error_msg}</div>"
         )
-        display(error_widget)
+        safe_display(error_widget)
         
         return {'container': error_widget, 'error': str(e)}

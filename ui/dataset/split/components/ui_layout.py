@@ -1,69 +1,88 @@
 """
 File: smartcash/ui/dataset/split/components/ui_layout.py
-Deskripsi: Layout komponen untuk UI split dataset - refactored dengan reusable components
+
+Layout components for dataset split configuration.
+Uses shared components from the UI components directory.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 import ipywidgets as widgets
 
-from smartcash.ui.components import create_header, create_responsive_two_column, create_log_accordion
-from smartcash.ui.dataset.split.components.ui_form import create_ratio_section, create_path_section
-from smartcash.ui.info_boxes.split_info import get_split_info
+# Shared components
 
+# Local imports
+from smartcash.ui.dataset.split.components.ui_form import (
+    create_ratio_section,
+    create_path_section
+)
+
+# Constants
+STYLES = {
+    'container': {
+        'width': '100%',
+        'margin': '10px 0',
+        'padding': '15px',
+        'border': '1px solid #e0e0e0',
+        'border_radius': '4px',
+        'background': '#fff'
+    }
+}
+
+def create_responsive_two_column(left: widgets.Widget, right: widgets.Widget) -> widgets.HBox:
+    """Create a responsive two-column layout.
+    
+    Args:
+        left: Left column widget
+        right: Right column widget
+        
+    Returns:
+        widgets.HBox: Two-column layout container
+    """
+    return widgets.HBox(
+        [left, right],
+        layout=widgets.Layout(
+            width='100%',
+            justify_content='space-between',
+            flex_flow='row wrap'
+        )
+    )
 
 def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Buat layout utama untuk UI split dataset dengan responsive design"""
+    """Create the main layout for dataset split configuration.
     
-    # Header dengan icon
-    header = create_header("Konfigurasi Split Dataset", "Pengaturan pembagian dataset untuk training, validation, dan testing", "✂️")
+    Args:
+        form_components: Dictionary of form components
+        
+    Returns:
+        Dictionary containing the main container and content area
+    """
+    # Create header
+    header = create_header(
+        "Dataset Split Configuration",
+        "Configure how to split your dataset into training, validation, and test sets"
+    )
     
     # Create sections
     ratio_section = create_ratio_section(form_components)
     path_section = create_path_section(form_components)
     
-    # Info accordion
-    info_accordion = get_split_info()
-    
-    # Create log accordion
-    log_accordion = create_log_accordion()
-    
-    # Ensure all components are widgets
-    form_container_children = [
-        create_responsive_two_column(ratio_section, path_section),
-        form_components.get('save_reset_container', widgets.HTML(''))
-    ]
-    
-    # Create form container
+    # Create form container with responsive layout
     form_container = widgets.VBox(
-        [c for c in form_container_children if c is not None],
-        layout=widgets.Layout(width='100%', margin='10px 0')
+        [
+            create_responsive_two_column(ratio_section, path_section),
+            form_components.get('save_reset_container', widgets.HTML(''))
+        ],
+        layout=widgets.Layout(**STYLES['container'])
     )
     
-    # Create main container with all widgets
-    main_children = [
-        header,
-        form_components.get('status_panel', widgets.HTML('')),
-        form_container,
-        info_accordion if info_accordion is not None else widgets.HTML(''),
-        log_accordion if log_accordion is not None else widgets.HTML('')
-    ]
-    
+    # Create main container
     main_container = widgets.VBox(
-        [c for c in main_children if c is not None],
-        layout=widgets.Layout(width='100%', padding='10px')
+        [header, form_container],
+        layout=widgets.Layout(width='100%')
     )
     
-    components = {
-        'header': header, 
-        'ratio_section': ratio_section, 
-        'path_section': path_section,
-        'form_container': form_container, 
-        'info_accordion': info_accordion, 
-        'log_accordion': log_accordion,
-        'main_container': main_container
+    return {
+        'container': main_container,
+        'content': form_container
     }
     
-    from smartcash.ui.utils.logging_utils import log_missing_components
-    log_missing_components(components)
-    return components
-

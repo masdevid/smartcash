@@ -7,146 +7,257 @@ logic for dataset split configuration while leveraging the common infrastructure
 from config_cell_initializer.
 """
 
-from typing import Dict, Any, Optional, Type, List
+from typing import Dict, Any, Optional
 import ipywidgets as widgets
+from IPython.display import display
+import logging
 
-from smartcash.common.logger import get_logger
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer
-from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
-from smartcash.ui.dataset.split.handlers.defaults import get_default_split_config
-from smartcash.ui.dataset.split.handlers.config_extractor import extract_split_config
+from smartcash.ui.dataset.split.components.ui_form import create_split_form
+from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
 from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui, reset_ui_to_defaults
-from smartcash.ui.utils.logging_utils import suppress_all_outputs, restore_stdout
+from smartcash.ui.dataset.split.handlers.defaults import validate_split_ratios
 
-class SplitConfigHandler(ConfigCellHandler):
-    """Handler for dataset split configuration.
-    
-    This extends the base ConfigCellHandler with dataset split specific
-    configuration handling and validation.
-    """
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None, **kwargs):
-        """Initialize with default split configuration."""
-        super().__init__(module_name="split_config", **kwargs)
-        self.config = get_default_split_config()
-        if config:
-            self.update_config(config)
-    
-    def update_from_ui(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Update configuration from UI components."""
-        config = extract_split_config(ui_components)
-        self.update_config(config)
-        return config
-    
-    def reset_to_defaults(self) -> None:
-        """Reset configuration to default values."""
-        self.config = get_default_split_config()
-        self.save()
+logger = logging.getLogger(__name__)
 
-
-def create_split_config_ui(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Create UI components for split configuration."""
-    from smartcash.ui.dataset.split.components.ui_form import create_split_form
-    from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
-    from smartcash.ui.dataset.split.handlers.slider_handlers import setup_slider_handlers
+class SplitConfigInitializer(ConfigCellInitializer):
+    """Initialize the dataset split configuration UI components."""
     
-    # Create form and layout components
-    form_components = create_split_form(config or {})
-    layout_components = create_split_layout(form_components)
-    
-    # Combine all components
-    ui_components = {**form_components, **layout_components}
-    
-    # Ensure we have a container
-    if 'container' not in ui_components:
-        ui_components['container'] = widgets.VBox()
-    
-    # Setup custom handlers
-    setup_slider_handlers(ui_components)
-    
-    # Update UI with config values
-    if config:
-        update_split_ui(ui_components, config)
-    
-    return ui_components
-
-
-class SplitConfigInitializer(ConfigCellInitializer[SplitConfigHandler]):
-    """Initializer for dataset split configuration UI."""
-    
-    def __init__(self):
-        super().__init__(
-            module_name="split_config",
-            config_filename="split_config"
-        )
-        self.logger = get_logger('smartcash.ui.dataset.split.initializer')
-    
-    def create_handler(self) -> SplitConfigHandler:
-        """Create and return a new SplitConfigHandler instance."""
-        return SplitConfigHandler()
-    
-    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create and return UI components for split configuration.
+    def __init__(self, parent_module: str = None):
+        """Initialize the split config initializer.
         
         Args:
-            config: Configuration dictionary
-            
-        Returns:
-            Dict containing UI components with 'container' as the root widget
+            parent_module: Optional parent module name for component registration
         """
-        # Create UI components
-        ui_components = create_split_config_ui(config or {})
-        
-        # Get the main container from components or create a new one
-        main_container = ui_components.get('main_container')
-        if not isinstance(main_container, widgets.Widget):
-            main_container = widgets.VBox()
-            
-        # Style the main container
-        main_container.layout = widgets.Layout(
-            width='100%',
-            padding='10px',
-            border='1px solid #e0e0e0',
-            margin='5px 0',
-            display='flex',
-            flex_flow='column',
-            align_items='stretch',
-            overflow='visible'
+        super().__init__(
+            module_name="dataset_split",
+            config_filename="dataset_split_config",
+            parent_module=parent_module,
+            is_container=True  # Mark as container to avoid default UI components
         )
+        self.handler = None
         
-        # Ensure all children are valid widgets
-        if hasattr(main_container, 'children'):
-            valid_children = [
-                child for child in main_container.children 
-                if isinstance(child, widgets.Widget)
-            ]
-            main_container.children = valid_children
-        
-        # Update the container in ui_components
-        ui_components['container'] = main_container
-            
-        return ui_components
+    def create_handler(self, config: Dict[str, Any]) -> SplitConfigHandler:
+        """Create and return a SplitConfigHandler instance."""
+        return SplitConfigHandler(config)
     
-    def setup_handlers(self) -> None:
-        """Set up event handlers for UI components."""
-        if 'reset_button' in self.ui_components:
-            def on_reset_clicked(b):
-                with suppress_all_outputs():
-                    self.handler.reset_to_defaults()
-                    reset_ui_to_defaults(self.ui_components)
-                    update_split_ui(self.ui_components, self.handler.config)
-                    
-                    if 'status' in self.ui_components:
-                        self.ui_components['status'].value = "Reset to default values"
+    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Create the UI components for the dataset split configuration.
+        
+        Returns:
+            Dictionary containing the UI components with 'container' as the root widget
+        """
+        try:
+            # Create form components
+            ui_components = create_split_form(config or {})
             
-            self.ui_components['reset_button'].on_click(on_reset_clicked)
+            # Create the main layout
+            layout_components = create_split_layout(ui_components)
+            ui_components.update(layout_components)
+            
+            # Set up event handlers
+            self._setup_event_handlers(ui_components)
+            
+            return ui_components
+            
+        except Exception as e:
+            logger.error(f"Error creating UI components: {e}")
+            # Return a minimal error UI
+            return {
+                'container': widgets.HTML(
+                    f"<div style='color: red; padding: 10px;'>"
+                    f"Error initializing split configuration: {str(e)}</div>"
+                )
+            }
+    
+    def _setup_event_handlers(self, ui_components: Dict[str, Any]) -> None:
+        """Set up event handlers for the UI components.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        # Connect slider changes to update the total
+        for slider in ['train_slider', 'valid_slider', 'test_slider']:
+            if slider in ui_components:
+                ui_components[slider].observe(
+                    lambda change: self._on_slider_change(ui_components),
+                    names='value'
+                )
+        
+        # Connect save button
+        if 'save_button' in ui_components:
+            ui_components['save_button'].on_click(
+                lambda b: self._on_save_clicked(ui_components)
+            )
+        
+        # Connect reset button
+        if 'reset_button' in ui_components:
+            ui_components['reset_button'].on_click(
+                lambda b: self._on_reset_clicked(ui_components)
+            )
+    
+    def _on_slider_change(self, ui_components: Dict[str, Any]) -> None:
+        """Handle slider value changes and update the total.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        try:
+            total = sum([
+                ui_components['train_slider'].value,
+                ui_components['valid_slider'].value,
+                ui_components['test_slider'].value
+            ])
+            
+            # Update the total label
+            if 'total_label' in ui_components:
+                color = "#28a745" if abs(total - 1.0) < 0.001 else "#dc3545"
+                ui_components['total_label'].value = (
+                    f"<div style='padding: 10px; color: {color}; font-weight: bold;'>"
+                    f"Total: {total:.2f} {'✓' if abs(total - 1.0) < 0.001 else '✗'}</div>"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error updating slider total: {e}")
+    
+    def _on_save_clicked(self, ui_components: Dict[str, Any]) -> None:
+        """Handle save button click.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        try:
+            # Validate the split ratios
+            if not validate_split_ratios(ui_components):
+                self._update_status(ui_components, "Error: Split ratios must sum to 1.0", "danger")
+                return
+                
+            # Update the config
+            self.handler.update_config({
+                'data': {
+                    'split_ratios': {
+                        'train': ui_components['train_slider'].value,
+                        'valid': ui_components['valid_slider'].value,
+                        'test': ui_components['test_slider'].value
+                    },
+                    'stratified_split': ui_components['stratified_checkbox'].value,
+                    'random_seed': ui_components['random_seed'].value
+                },
+                'split_settings': {
+                    'backup_before_split': ui_components['backup_checkbox'].value,
+                    'dataset_path': ui_components['dataset_path'].value,
+                    'preprocessed_path': ui_components['preprocessed_path'].value,
+                    'backup_dir': ui_components['backup_dir'].value
+                }
+            })
+            
+            # Save the config
+            self.handler.save_config()
+            self._update_status(ui_components, "Configuration saved successfully!", "success")
+            
+        except Exception as e:
+            logger.error(f"Error saving configuration: {e}")
+            self._update_status(ui_components, f"Error saving configuration: {str(e)}", "danger")
+    
+    def _on_reset_clicked(self, ui_components: Dict[str, Any]) -> None:
+        """Handle reset button click.
+        
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        try:
+            # Reset to default values
+            reset_ui_to_defaults(ui_components)
+            
+            # Update the UI with the default values
+            update_split_ui(ui_components, self.handler.get_default_config())
+            
+            self._update_status(ui_components, "Reset to default values", "info")
+            
+        except Exception as e:
+            logger.error(f"Error resetting to defaults: {e}")
+            self._update_status(ui_components, f"Error resetting to defaults: {str(e)}", "danger")
+    
+    def _update_status(self, ui_components: Dict[str, Any], message: str, status_type: str) -> None:
+        """Update the status message.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            message: Status message to display
+            status_type: Type of status (success, danger, info, warning)
+        """
+        # Log the status message
+        log_level = {
+            'success': logging.INFO,
+            'danger': logging.ERROR,
+            'warning': logging.WARNING,
+            'info': logging.INFO
+        }.get(status_type, logging.INFO)
+        
+        logger.log(log_level, message)
+        
+        # If there's a status panel, update it
+        if 'status_panel' in ui_components:
+            ui_components['status_panel'].value = message
+            ui_components['status_panel'].style = {
+                'description_width': 'initial',
+                'font_weight': 'bold',
+                'color': {
+                    'success': '#28a745',
+                    'danger': '#dc3545',
+                    'warning': '#ffc107',
+                    'info': '#17a2b8'
+                }.get(status_type, '#17a2b8')
+            }
 
 
-def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> None:
-    """Create and display a split configuration cell.
+def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create and display a standalone split configuration container.
+    
+    This function initializes the split configuration UI and displays it in the notebook.
+    The returned UI components dictionary includes all interactive elements and can be
+    used to programmatically interact with the UI.
     
     Args:
-        config: Optional configuration to override defaults
+        config: Optional configuration dictionary to override defaults. If not provided,
+               default values will be used.
+               
+    Returns:
+        Dictionary containing the UI components with 'container' as the root widget.
+        The dictionary includes all interactive components for programmatic access.
     """
-    initializer = SplitConfigInitializer()
-    initializer.initialize(config or {})
+    try:
+        # Initialize the split config
+        initializer = SplitConfigInitializer()
+        
+        # Create handler with the provided or default config
+        handler = initializer.create_handler(config or {})
+        initializer.handler = handler
+        
+        # Create and initialize UI components
+        ui_components = initializer.create_ui_components(handler.config)
+        
+        # Store references for later use
+        initializer.ui_components = ui_components
+        
+        # Display the container if it exists
+        container = ui_components.get('container')
+        if container is not None:
+            display(container)
+        else:
+            logger.warning("No container found in UI components")
+        
+        return ui_components
+        
+    except Exception as e:
+        error_msg = f"Failed to create split config cell: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        
+        # Create and display an error message
+        error_widget = widgets.HTML(
+            f"<div style='color: red; padding: 10px; border: 1px solid #f5c6cb; border-radius: 4px;'>"
+            f"<strong>Error:</strong> {error_msg}</div>"
+        )
+        display(error_widget)
+        
+        return {'container': error_widget, 'error': str(e)}

@@ -78,6 +78,31 @@ class DependencyInitializer(CommonInitializer):
         if config.get('install_options', {}).get('run_analysis_on_startup', True):
             self._run_package_analysis(ui_components, config)
     
+    def _get_default_config(self) -> Dict[str, Any]:
+        """Get the default configuration for the dependency management module.
+        
+        Returns:
+            Dictionary containing default configuration values from the config handler
+        """
+        if hasattr(self, 'config_handler') and hasattr(self.config_handler, 'get_default_config'):
+            return self.config_handler.get_default_config()
+            
+        # Fallback to a basic config if config_handler is not available
+        return {
+            'dependencies': {},
+            'install_options': {
+                'run_analysis_on_startup': True,
+                'auto_install': False,
+                'upgrade_strategy': 'if_needed'
+            },
+            'ui': {
+                'show_advanced': False,
+                'theme': 'light'
+            },
+            'module_name': self.module_name,
+            'version': '1.0.0'
+        }
+    
     def _run_package_analysis(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Run package analysis if enabled in config."""
         if 'handlers' in ui_components and 'analyze_packages' in ui_components['handlers']:

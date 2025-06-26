@@ -75,6 +75,9 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Helper functions for component creation
     def create_ratio_slider(value: float, min_val: float, max_val: float, desc: str) -> widgets.FloatSlider:
+        # Create a copy of the slider style to avoid modifying the original
+        slider_style = STYLES['slider'].copy()
+        
         return widgets.FloatSlider(
             value=value,
             min=min_val,
@@ -82,14 +85,19 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
             step=0.05,
             description=desc,
             readout_format='.2f',
-            layout=widgets.Layout(**STYLES['slider'])
+            layout=widgets.Layout(**slider_style)
         )
     
     def create_text_input(value: str, desc: str, width: str = '90%') -> widgets.Text:
+        # Create a copy of the input style and update width if needed
+        input_style = STYLES['input'].copy()
+        if 'width' not in input_style:
+            input_style['width'] = width
+            
         return widgets.Text(
             value=str(value),
             description=desc,
-            layout=widgets.Layout(width=width, **STYLES['input'])
+            layout=widgets.Layout(**input_style)
         )
     
     def create_checkbox(value: bool, desc: str) -> widgets.Checkbox:
@@ -101,10 +109,14 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
         )
     
     def create_int_input(value: int, desc: str) -> widgets.IntText:
+        # Create a copy of the input style and update width
+        input_style = STYLES['input'].copy()
+        input_style['width'] = '50%'  # Override width for int inputs
+        
         return widgets.IntText(
             value=int(value) if value is not None else 0,
             description=desc,
-            layout=widgets.Layout(width='50%', **STYLES['input'])
+            layout=widgets.Layout(**input_style)
         )
     
     # Create form components

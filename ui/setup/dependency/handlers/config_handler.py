@@ -113,26 +113,60 @@ class DependencyConfigHandler(ConfigHandler):
         """Get default configuration with fallback to minimal config.
         
         Returns:
-            Default configuration dictionary
+            Default configuration dictionary with required fields
         """
         try:
-            # Try to get default config from parent
+            # Get default config from parent
             config = super().get_default_config()
             
-            # Ensure required fields exist
-            config.setdefault('version', '1.0.0')
-            config.setdefault('module_name', self.module_name)
-            config.setdefault('selected_packages', self.get_default_selected_packages())
+            # Ensure required fields exist with proper structure
+            config.update({
+                'version': '1.0.0',
+                'module_name': self.module_name,
+                'dependencies': self._get_default_dependencies(),
+                'install_options': {
+                    'run_analysis_on_startup': True,
+                    'auto_install': False,
+                    'upgrade_strategy': 'if_needed',
+                    'timeout': 300,  # 5 minutes
+                    'retries': 3
+                },
+                'selected_packages': self.get_default_selected_packages(),
+                'ui': {
+                    'show_advanced': False,
+                    'theme': 'light'
+                }
+            })
             
             return config
             
         except Exception as e:
-            self.logger.error(f"Error getting default config: {e}")
+            self.logger.error(f"Error getting default config: {e}", exc_info=True)
+            # Fallback to minimal valid config
             return {
                 'module_name': self.module_name,
                 'version': '1.0.0',
+                'dependencies': {},
+                'install_options': {
+                    'run_analysis_on_startup': True,
+                    'auto_install': False,
+                    'upgrade_strategy': 'if_needed'
+                },
                 'selected_packages': self.get_default_selected_packages()
             }
+            
+    def _get_default_dependencies(self) -> Dict[str, Any]:
+        """Get default dependencies configuration.
+        
+        Returns:
+            Dictionary of default package dependencies
+        """
+        try:
+            from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependencies
+            return get_default_dependencies()
+        except Exception as e:
+            self.logger.error(f"Error getting default dependencies: {e}", exc_info=True)
+            return {}
     
     def get_default_selected_packages(self) -> List[str]:
         """Get list of package keys that are selected by default.

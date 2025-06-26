@@ -48,7 +48,7 @@ def create_responsive_two_column(left: widgets.Widget, right: widgets.Widget) ->
     )
 
 def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Create the main layout for dataset split configuration.
+    """Create the main layout for dataset split configuration using a two-column grid.
     
     Args:
         form_components: Dictionary of form components
@@ -60,14 +60,40 @@ def create_split_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
     ratio_section = create_ratio_section(form_components)
     path_section = create_path_section(form_components)
     
-    # Create form container with responsive layout
+    # Create a two-column grid layout
+    grid = widgets.GridBox(
+        children=[ratio_section, path_section],
+        layout=widgets.Layout(
+            width='100%',
+            grid_template_columns='1fr 1fr',  # Two equal columns
+            grid_gap='20px',
+            margin='0 0 20px 0'
+        )
+    )
+    
+    # Get save/reset buttons if they exist
+    save_reset_buttons = form_components.get('save_reset_buttons', {})
+    save_reset_container = save_reset_buttons.get('container', widgets.HBox())
+    
+    # Create form container with the grid and save/reset buttons
     form_container = widgets.VBox(
         [
-            create_responsive_two_column(ratio_section, path_section),
-            form_components.get('save_reset_container', widgets.HTML(''))
+            grid,
+            save_reset_container
         ],
-        layout=widgets.Layout(**STYLES['container'])
+        layout=widgets.Layout(
+            width='100%',
+            padding='15px',
+            border='1px solid #e0e0e0',
+            border_radius='4px',
+            background='#fff',
+            margin_top='10px'
+        )
     )
+    
+    # Add the container to form_components for easy access
+    if 'save_reset_buttons' in form_components:
+        form_components['save_reset_buttons']['container'] = save_reset_container
     
     return {
         'container': form_container,

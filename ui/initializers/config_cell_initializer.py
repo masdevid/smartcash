@@ -13,7 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from ast import Return
 from typing import Any, Dict, Generic, Optional, TypeVar
-
+import sys
 # Third-party
 import ipywidgets as widgets
 
@@ -109,16 +109,17 @@ class ConfigCellInitializer(Generic[T], ABC):
             else self.module_name
         )
         
-        # Register with component registry
-        component_registry.register_component(
-            component_id=self._component_id,
-            component=self.ui_components,
-            parent_id=self.parent_module
-        )
-        
-        # Set up container if needed
-        if self.is_container:
-            self._initialize_as_container()
+        # Only register if not already registered
+        if not component_registry.get_component(self._component_id):
+            component_registry.register_component(
+                component_id=self._component_id,
+                component=self.ui_components,
+                parent_id=self.parent_module
+            )
+            
+            # Set up container if needed
+            if self.is_container:
+                self._initialize_as_container()
     
     @property
     def handler(self) -> T:
@@ -180,22 +181,23 @@ class ConfigCellInitializer(Generic[T], ABC):
             # Delegate UI creation to components module
             ui_components = self.create_ui_components(self.handler.config)
             
-            # Ensure we have a valid container widget
-            container = None
-            if 'container' in ui_components and isinstance(ui_components['container'], widgets.Widget):
-                container = ui_components['container']
-            else:
-                # Create a new container if none exists
-                container = widgets.VBox()
-                ui_components['container'] = container
-            
-            # Update the ui_components dictionary
+            # Update the ui_components dictionary with new components
             self.ui_components.update(ui_components)
+            
+            # Ensure we have a valid container widget
+            container = self.ui_components.get('container')
+            if not isinstance(container, widgets.Widget):
+                container = widgets.VBox()
+                self.ui_components['container'] = container
             
             # Ensure the container is properly initialized
             if not hasattr(container, '_model_id'):
                 # Force widget initialization if not already done
                 container._repr_mimebundle_()
+            
+            # Connect to parent if this is a child component
+            if self.parent_module:
+                self.connect_to_parent()
             
             self.logger.info(f"Successfully initialized {self.module_name} UI")
             

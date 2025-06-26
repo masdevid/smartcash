@@ -9,6 +9,8 @@ from functools import wraps
 import traceback
 import logging
 
+from IPython import display
+
 from smartcash.common.exceptions import SmartCashError
 from smartcash.ui.config_cell.utils.error_utils import create_error_fallback
 
@@ -74,7 +76,7 @@ def create_error_response(
     error: Optional[Exception] = None,
     title: str = "Error",
     include_traceback: bool = True
-) -> Dict[str, Any]:
+) -> Any:
     """
     Create a standardized error response with an error UI component.
     
@@ -85,7 +87,7 @@ def create_error_response(
         include_traceback: Whether to include traceback in the error UI
         
     Returns:
-        Dictionary with 'container' (the error UI) and 'error' (True) keys
+        A widget containing the error UI
     """
     error_traceback = traceback.format_exc() if (error and include_traceback) else None
     
@@ -97,11 +99,16 @@ def create_error_response(
     
     error_ui = create_error_fallback(
         error_message=error_message,
-        traceback=error_traceback
+        traceback=error_traceback,
+        title=title  # Pass the title to the error fallback
     )
     
-    return {
-        'container': error_ui['container'],
-        'error': True
-    }
+    # Return the container widget directly
+    container = error_ui.get('container')
+    if container is not None:
+        return container
+    
+    # Fallback in case the container is not available
+    from IPython.display import HTML
+    return HTML(f"<div style='color:red;'>{title}: {error_message}</div>")
 

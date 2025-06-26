@@ -19,6 +19,7 @@ from typing import Dict, Any, Optional, Type, Callable
 from abc import ABC, abstractmethod
 import traceback
 import sys
+import ipywidgets as widgets
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.handlers.config_handlers import ConfigHandler
@@ -102,26 +103,25 @@ class CommonInitializer(ABC):
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
             self.logger.warning(f"Failed to initialize logger bridge: {str(e)}")
     
-    def initialize(self, config: Dict[str, Any] = None, **kwargs) -> None:
-        """Initialize and display the UI module with the given configuration.
+    def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Any:
+        """Initialize and return the UI module with the given configuration.
         
         This is the main entry point that orchestrates the initialization process.
-        It follows a strict sequence of operations, ensures proper error handling,
-        and displays the UI directly.
+        It follows a strict sequence of operations and ensures proper error handling.
         
         Args:
             config: Optional configuration dictionary. If None, will attempt to load
                    configuration using the configured config handler.
             **kwargs: Additional keyword arguments that may be required by subclasses.
-                  
-        Raises:
-            ValueError: If required UI components are missing or invalid.
-            RuntimeError: If initialization fails due to system or configuration issues.
-            Exception: Any other exception that might occur during initialization.
+                   
+        Returns:
+            The root UI widget that can be displayed or embedded in other UIs.
+            In case of error, returns an error widget with the error message.
             
         Example:
             >>> initializer = MyInitializer()
-            >>> initializer.initialize()  # UI will be displayed automatically
+            >>> ui = initializer.initialize()
+            >>> display(ui)  # Explicitly display the UI
         """
         from IPython.display import display
         
@@ -156,16 +156,15 @@ class CommonInitializer(ABC):
                 self._after_init_checks(ui_components=ui_components, config=config, **kwargs)
             
             self.logger.info(f"✅ {self.module_name} initialized successfully")
-            
-            # Display the root UI component directly
-            display(root_ui)
+            # 7. Restore output and return the UI widget
+            restore_stdout()
+            return root_ui
             
         except Exception as e:
             error_msg = f"❌ Failed to initialize {self.module_name}: {str(e)}"
             self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
-            restore_stdout()  # Restore output before showing error UI
-            error_ui = self._create_error_ui(error_msg)
-            display(error_ui if error_ui else str(error_msg))
+            restore_stdout()
+            return self._create_error_ui(error_msg)
         finally:
             # Ensure output is restored in case of any other exceptions
             restore_stdout()
@@ -292,17 +291,26 @@ class CommonInitializer(ABC):
             self.logger.warning(f"⚠️ Failed to setup logger bridge: {str(e)}")
             
     def _create_error_ui(self, error_message: str) -> Any:
-        """Create a fallback UI component to display error messages."""
-        try:
-            from smartcash.ui.components import create_error_component
-            import traceback
+        """Create a fallback UI component to display error messages.
+        
+        Args:
+            error_message: The error message to display
             
-            error_components = create_error_component(
-                title=f"{self.module_name} Initialization Error",
-                error_message=error_message,
-                traceback=traceback.format_exc(),
-                error_type="error"
-            )
-            return error_components['widget'] if 'widget' in error_components else str(error_components)
-        except Exception as e:
-            return f"Error initializing {self.module_name}: {error_message}\n{str(e)}"
+        Returns:
+            A widget that displays the error message. Always returns a widget.
+        """
+        from smartcash.ui.components.error.error_component import create_error_component
+        
+        # Create error component with the module name in the title
+        error_component = create_error_component(
+            error_message=error_message,
+            title=f"Error in {self.module_name}",
+            error_type="error",
+            show_traceback=False
+        )
+        
+        # Return the container widget which is the main display
+        return error_component.get('container', error_component)
+
+        #Note: Don't create fallbacks
+

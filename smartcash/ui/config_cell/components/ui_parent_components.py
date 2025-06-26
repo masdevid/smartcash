@@ -12,7 +12,7 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.config_cell.components.component_registry import component_registry
 from smartcash.ui.config_cell.components.ui_factory import (
     create_config_cell_ui,
-    create_parent_container
+    create_container
 )
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 from smartcash.ui.config_cell.handlers.error_handler import handle_ui_errors
@@ -38,7 +38,7 @@ class ParentComponentManager:
     
     def _initialize_container(self):
         """Initialize the parent container using the UI factory."""
-        parent_ui = create_parent_container(title=self.title)
+        parent_ui = create_container(title=self.title)
         self.container = parent_ui['container']
         self.content_area = parent_ui['content_area']
     

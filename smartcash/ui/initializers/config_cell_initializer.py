@@ -11,6 +11,7 @@ from __future__ import annotations
 
 # Standard library
 from abc import ABC, abstractmethod
+from ast import Return
 from typing import Any, Dict, Generic, Optional, TypeVar
 
 # Third-party
@@ -26,7 +27,8 @@ from smartcash.ui.config_cell.handlers.error_handler import create_error_respons
 from smartcash.ui.utils.logger_bridge import UILoggerBridge
 from smartcash.ui.utils.logging_utils import (
     restore_stdout,
-    setup_aggressive_log_suppression
+    setup_aggressive_log_suppression,
+    setup_stdout_suppression
 )
 
 # Type variables
@@ -146,7 +148,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         """
         pass
         
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> 'widgets.Widget':
         """Initialize the configuration cell UI with the given config.
         
         This method orchestrates the entire initialization process:
@@ -154,39 +156,69 @@ class ConfigCellInitializer(Generic[T], ABC):
         2. Loads or validates the provided configuration
         3. Delegates UI component creation to the components module
         4. Sets up event handlers and callbacks
-        5. Returns the UI components dictionary
+        5. Returns the root widget (container) for display
         
         Args:
             config: Optional initial configuration. If not provided, the handler's
                    load_config() method will be used to load the configuration.
                    
         Returns:
-            Dictionary of UI components that can be displayed or further customized.
-            The dictionary will always contain a 'container' widget as the root element.
+            An ipywidgets.Widget instance (usually a container) that can be displayed.
+            In case of error, returns an error widget with the error message.
             
         Raises:
             RuntimeError: If initialization fails due to configuration errors
         """
         try:
+            # Import widgets here to avoid circular imports
+            import ipywidgets as widgets
+            
             # Update handler with provided config
             if config is not None:
                 self.handler.update(config)
             
             # Delegate UI creation to components module
             ui_components = self.create_ui_components(self.handler.config)
+            
+            # Ensure we have a valid container widget
+            container = None
+            if 'container' in ui_components and isinstance(ui_components['container'], widgets.Widget):
+                container = ui_components['container']
+            else:
+                # Create a new container if none exists
+                container = widgets.VBox()
+                ui_components['container'] = container
+            
+            # Update the ui_components dictionary
             self.ui_components.update(ui_components)
             
-            # Ensure container exists
-            if 'container' not in self.ui_components:
-                self.ui_components['container'] = widgets.VBox()
+            # Ensure the container is properly initialized
+            if not hasattr(container, '_model_id'):
+                # Force widget initialization if not already done
+                container._repr_mimebundle_()
             
             self.logger.info(f"Successfully initialized {self.module_name} UI")
-            return self.ui_components
+            
+            # Verify the container is a proper widget
+            if not isinstance(container, widgets.Widget):
+                raise RuntimeError(
+                    f"Container must be a widget, got {type(container).__name__}"
+                )
+                
+            return container
             
         except Exception as e:
-            error_msg = f"Failed to initialize {self.module_name} UI: {str(e)}"
+            error_msg = f"Failed to initialize {self.module_name}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            return self._create_error_ui(error_msg)
+            
+            # Delegate error UI creation to the centralized error handler
+            # which now returns a widget directly
+            return create_error_response(
+                error_message=error_msg,
+                error=e,
+                title=f"Error in {self.module_name}",
+                include_traceback=True
+            )
         
     def connect_to_parent(self) -> None:
         """Connect this component to its parent in the component hierarchy."""
@@ -321,7 +353,7 @@ class ConfigCellInitializer(Generic[T], ABC):
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
             self.logger.warning(f"Failed to configure logger bridge: {str(e)}", exc_info=True)
             
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Any:
         """Initialize the configuration cell with the given configuration.
         
         This is the main entry point that sets up the configuration interface.
@@ -331,7 +363,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         3. Creates UI components based on the current config
         4. Sets up event handlers and callbacks
         5. Ensures a container widget exists
-        6. Restores output and returns the UI components
+        6. Restores output and returns the root widget
         
         Args:
             config: Optional initial configuration dictionary. If provided,
@@ -339,9 +371,8 @@ class ConfigCellInitializer(Generic[T], ABC):
                   the UI components.
                   
         Returns:
-            Dict[str, Any]: A dictionary containing at least a 'container' key
-                          with the root widget, along with any other UI components
-                          created by create_ui_components().
+            The root ipywidgets.Widget (usually a container) that can be displayed or embedded.
+            In case of error, returns an error widget with the error message.
                           
         Raises:
             RuntimeError: If initialization fails due to invalid configuration
@@ -349,10 +380,10 @@ class ConfigCellInitializer(Generic[T], ABC):
                         
         Example:
             initializer = MyConfigInitializer('my_module', 'config')
-            ui_components = initializer.initialize({'setting': 'value'})
-            display(ui_components['container'])
+            ui = initializer.initialize({'setting': 'value'})
+            display(ui)
         """
-        suppress_all_outputs()
+        setup_stdout_suppression()
         try:
             # Initialize handler with config if provided
             if config:
@@ -376,16 +407,48 @@ class ConfigCellInitializer(Generic[T], ABC):
             # Ensure a container widget exists
             if 'container' not in self.ui_components:
                 self.ui_components['container'] = widgets.VBox()
-                
-            # Return both the container and components
-            result = {'container': self.ui_components['container']}
-            result.update(self.ui_components)
-            return result
+            
+            # Get the container widget
+            container = self.ui_components.get('container')
+            
+            # Ensure we have a valid widget
+            if not isinstance(container, widgets.Widget):
+                self.logger.warning(
+                    f"Container is not a Widget (got {type(container)}), "
+                    "creating a new VBox"
+                )
+                container = widgets.VBox()
+                self.ui_components['container'] = container
+            
+            # Ensure the container has a reasonable layout if it's a Box
+            if hasattr(container, 'layout'):
+                if not container.layout:
+                    container.layout = widgets.Layout()
+                container.layout.overflow = 'visible'
+                container.layout.width = '100%'
+            
+            self.logger.debug(f"Returning container widget: {container!r}")
+            
+            # Return the container widget directly instead of the dictionary
+            # This matches the expected behavior in the tests
+            if isinstance(container, widgets.Widget):
+                return container
+            else:
+                # Fallback to the container from ui_components if needed
+                return self.ui_components.get('container', widgets.VBox())
             
         except Exception as e:
             error_msg = f"Failed to initialize {self.module_name}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            return self._create_error_ui(error_msg)
+            
+            # Delegate error UI creation to the centralized error handler
+            # which now returns a widget directly
+            return create_error_response(
+                error_message=error_msg,
+                error=e,
+                title=f"Error in {self.module_name}",
+                include_traceback=True
+            )
             
         finally:
             restore_stdout()
@@ -445,16 +508,3 @@ class ConfigCellInitializer(Generic[T], ABC):
         finally:
             restore_stdout()
     
-    def _create_error_ui(
-        self, 
-        error_message: str, 
-        details: Optional[str] = None,
-        title: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Create a fallback UI for error conditions."""
-        error_title = title or f"Error in {self.module_name}"
-        return create_error_response(
-            error_message=error_message,
-            title=error_title,
-            include_traceback=bool(details)
-        )

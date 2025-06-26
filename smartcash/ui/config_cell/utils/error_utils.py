@@ -3,15 +3,14 @@ File: smartcash/ui/config_cell/utils/error_utils.py
 Deskripsi: Error handling utilities for config cell
 """
 from typing import Dict, Any, Optional
-from IPython.display import display
+from IPython.display import display, HTML
 
 from smartcash.ui.components.error.error_component import create_error_component
-
 def create_error_fallback(
     error_message: str, 
     traceback: Optional[str] = None,
     **kwargs
-) -> Dict[str, Any]:
+) -> Any:
     """Create a fallback UI for error states using the standard ErrorComponent
     
     Args:
@@ -20,10 +19,7 @@ def create_error_fallback(
         **kwargs: Additional arguments passed to create_error_component
         
     Returns:
-        Dictionary containing error UI components with keys:
-        - container: The main error widget
-        - error: The error message
-        - initialized: Always False for error states
+        A widget containing the error UI
     """
     error_component = create_error_component(
         error_message=error_message,
@@ -33,11 +29,20 @@ def create_error_fallback(
         **kwargs
     )
     
-    # Ensure the error is displayed
-    display(error_component['widget'])
+    # Display the error
+    display(error_component['error_widget'])
     
-    return {
-        'container': error_component['widget'],
-        'error': error_message,
-        'initialized': False
-    }
+    # Get the widget from the component
+    widget = error_component.get('widget')
+    
+    # If we have a widget, return it directly
+    if widget is not None:
+        return widget
+        
+    # Fallback to container if widget is not available
+    if 'container' in error_component:
+        return error_component['container']
+        
+    # Last resort: create a simple error widget
+    title = kwargs.get('title', 'Error')
+    return HTML(f'<div style="color:red; padding: 10px; border: 1px solid red;">{title}: {error_message}</div>')

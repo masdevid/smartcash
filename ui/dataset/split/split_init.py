@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from smartcash.ui.utils import safe_display
 import logging
+from IPython.display import display
 
 
 # Initializers
@@ -54,18 +55,30 @@ class SplitConfigInitializer(ConfigCellInitializer):
         """Create the UI components for the dataset split configuration.
         
         Returns:
-            Dictionary containing the UI components. The parent class will handle
-            container creation and component registration.
+            Dictionary containing the UI components with a 'container' widget.
         """
         # Create form components
         ui_components = create_split_form(config or {})
         
-        # Create the main layout - this should not include a container
+        # Create the main layout
         layout_components = create_split_layout(ui_components)
         ui_components.update(layout_components)
         
-        # Remove any container-related components as they're handled by parent
-        ui_components.pop('container', None)
+        # Ensure we have a container
+        if 'container' not in ui_components:
+            ui_components['container'] = widgets.VBox()
+            
+        # Get the main container
+        container = ui_components['container']
+        
+        # Add all components to the container if it's a container widget
+        if hasattr(container, 'children'):
+            # Get all widgets that should be in the container
+            widgets_to_add = [
+                widget for key, widget in ui_components.items() 
+                if key != 'container' and isinstance(widget, widgets.Widget)
+            ]
+            container.children = tuple(widgets_to_add)
         
         return ui_components
     
@@ -102,20 +115,29 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
                default values will be used.
                
     Returns:
-        Dictionary containing the UI components with 'container' as the root widget.
-        The dictionary includes all interactive components for programmatic access.
+        An ipywidgets.Widget instance that can be displayed.
     """
     try:
         # Initialize the split config with the provided config
         initializer = SplitConfigInitializer()
         
-        # Initialize and get the container widget directly
-        container = initializer.initialize(config or {})
+        # Get the UI components
+        ui_components = initializer.create_ui_components(config or {})
+        
+        # Get the container widget
+        container = ui_components.get('container')
         if not container:
-            raise RuntimeError("Failed to initialize split configuration container")
+            container = widgets.VBox()
+            ui_components['container'] = container
             
-        # Direct display of the container
-        return safe_display(container)
+        # Set up handlers
+        initializer.setup_handlers()
+        
+        # Display the container
+        display(container)
+        
+        # Return all components for programmatic access
+        return ui_components
         
     except Exception as e:
         error_msg = f"Failed to create split config cell: {str(e)}"

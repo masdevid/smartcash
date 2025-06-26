@@ -15,6 +15,7 @@ Initialization Flow:
 10. Return UI components and cleanup
 """
 
+import logging
 from typing import Dict, Any, Optional, Type, Callable
 from abc import ABC, abstractmethod
 import traceback
@@ -57,50 +58,53 @@ class CommonInitializer(ABC):
             module_name: Name of the module (used for logging)
             config_handler_class: Optional ConfigHandler class for config management
         """
+        # Setup aggressive log suppression before any logging can occur
+        setup_aggressive_log_suppression()
+        
         self.module_name = module_name
         self._ui_components = {}
         self._logger_bridge = None
         self.config_handler = config_handler_class() if config_handler_class else None
         
-        # Initialize with a basic logger first
+        # Initialize basic logger with high threshold before UI is ready
         self.logger = get_logger(f"smartcash.ui.{module_name}")
-        
-        # Setup aggressive log suppression
-        setup_aggressive_log_suppression()
+        # Use set_level instead of setLevel for SmartCashLogger
+        if hasattr(self.logger, 'set_level'):
+            self.logger.set_level(logging.CRITICAL)  # Suppress all but critical logs before UI is ready
+        else:
+            self.logger.setLevel(logging.CRITICAL)  # Fallback for standard loggers
     
     def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
         """Set up the logger bridge for redirecting logs to the UI.
         
         This method creates a bridge between the Python logging system and the UI,
         allowing log messages to be displayed in the application's log panel.
-        
         Args:
-            ui_components: Dictionary containing UI components, which should include
-                         a log output component if UI logging is desired.
-                          
-        Note:
-            If logger bridge initialization fails, the method will fall back to
-            standard logging and continue execution.
+            ui_components: Dictionary of UI components that may be needed for logging
         """
         try:
-            # Create and store the logger bridge
             self._logger_bridge = create_ui_logger_bridge(
                 ui_components=ui_components,
                 logger_name=f"smartcash.ui.{self.module_name}"
             )
-            
-            # Update the logger to use the bridge
             self.logger = self._logger_bridge.logger
-            
-            # Mark UI as ready to flush any buffered logs
+            # Use set_level instead of setLevel for SmartCashLogger
+            if hasattr(self.logger, 'set_level'):
+                self.logger.set_level(logging.INFO)  # Set to desired log level now that UI is ready
+            else:
+                self.logger.setLevel(logging.INFO)  # Fallback for standard loggers
+                
             if hasattr(self._logger_bridge, 'set_ui_ready'):
                 self._logger_bridge.set_ui_ready(True)
-                
             self.logger.debug(f"Logger bridge initialized for {self.module_name}")
-            
         except Exception as e:
-            # Fallback to basic logging if bridge initialization fails
+            # Fallback to basic logger if UI logger bridge fails
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
+            # Use set_level instead of setLevel for SmartCashLogger
+            if hasattr(self.logger, 'set_level'):
+                self.logger.set_level(logging.INFO)  # Ensure proper log level even in fallback
+            else:
+                self.logger.setLevel(logging.INFO)  # Fallback for standard loggers
             self.logger.warning(f"Failed to initialize logger bridge: {str(e)}")
     
     def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Any:

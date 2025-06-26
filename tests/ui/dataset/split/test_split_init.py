@@ -77,9 +77,9 @@ def mock_handler():
 @pytest.fixture
 def split_initializer(mock_handler, mock_ui_components):
     """Fixture that provides a configured SplitConfigInitializer instance."""
-    with patch('smartcash.ui.dataset.split.split_init.ComponentRegistry') as mock_registry, \
+    with patch('smartcash.ui.config_cell.components.component_registry.ComponentRegistry') as mock_registry, \
          patch('smartcash.ui.dataset.split.split_init.create_split_form', return_value=mock_ui_components), \
-         patch('smartcash.ui.dataset.split.split_init.create_split_layout', return_value=VBox()):
+         patch('smartcash.ui.dataset.split.split_init.create_split_layout', return_value={'container': VBox()}):
         
         initializer = SplitConfigInitializer()
         initializer._handler = mock_handler
@@ -232,13 +232,19 @@ class TestSplitConfigInitializer:
     
     def test_create_ui_components(self, split_initializer, mock_ui_components):
         """Test UI components creation."""
+        # Create a mock layout return value that includes a container
+        mock_layout_return = {
+            'layout': 'test-layout',
+            'container': mock_ui_components['container']
+        }
+        
         # Mock the form and layout creation
         with patch('smartcash.ui.dataset.split.split_init.create_split_form') as mock_form, \
              patch('smartcash.ui.dataset.split.split_init.create_split_layout') as mock_layout:
             
             # Set up mock return values
             mock_form.return_value = mock_ui_components
-            mock_layout.return_value = {'layout': 'test-layout'}
+            mock_layout.return_value = mock_layout_return
             
             # Call the method under test
             config = {'test': 'config'}
@@ -248,16 +254,14 @@ class TestSplitConfigInitializer:
             mock_form.assert_called_once_with(config)
             mock_layout.assert_called_once_with(mock_ui_components)
             
-            # Verify the returned components
-            assert components == {
-                **mock_ui_components,
-                'layout': 'test-layout',
-                'container': mock_ui_components['container']
-            }
+            # Verify the returned components are merged correctly
+            expected_components = {**mock_ui_components, **mock_layout_return}
+            assert components == expected_components, "Returned components should merge form and layout components"
             
-            # Verify container children are set up correctly
-            container = components['container']
-            assert hasattr(container, 'children'), "Container should have children attribute"
+            # Verify container is in the returned components
+            assert 'container' in components, "Returned components should include container"
+            assert components['container'] is mock_ui_components['container'], \
+                "Container should be the one from mock_ui_components"
     
     def test_setup_handlers(self, split_initializer):
         """Test that event handlers are properly set up."""
@@ -274,10 +278,36 @@ class TestSplitConfigInitializer:
                 split_initializer, 
                 split_initializer.ui_components
             )
+    
+    def test_initialize_runs_without_errors(self, split_initializer, mock_handler, mock_ui_components):
+        """Test that the initializer runs without errors with default configuration."""
+        # Setup mock for parent initialize
+        with patch('smartcash.ui.dataset.split.split_init.ConfigCellInitializer.initialize') as mock_parent_initialize:
+            # Configure the parent initialize to return the container
+            mock_container = MagicMock()
+            mock_parent_initialize.return_value = mock_container
+            
+            # Test initialization
+            try:
+                result = split_initializer.initialize()
+                
+                # Verify the result is the container from parent
+                assert result == mock_container, "Should return container from parent initialize"
+                
+                # Verify parent initialize was called
+                mock_parent_initialize.assert_called_once()
+                
+                # Verify handler exists (was set up in the fixture)
+                assert hasattr(split_initializer, '_handler'), "Handler should be created"
+                assert split_initializer._handler is mock_handler, "Handler should be the one from fixture"
+                
+            except Exception as e:
+                pytest.fail(f"Initialization failed with error: {str(e)}")
 
 
 # Add import at the top of the file if not already present
-from unittest.mock import ANY
+from unittest.mock import ANY, patch
+import ipywidgets as widgets
 
 class TestCreateSplitConfigCell:
     """Test cases for the create_split_config_cell function."""

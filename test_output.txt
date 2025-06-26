@@ -6,46 +6,95 @@ configfile: pytest.ini
 plugins: cov-6.2.1, anyio-4.6.2
 collecting ... collected 1 item
 
-tests/ui/initializers/test_config_cell_initializer.py::TestConfigCellInitializerDisplay::test_initialize_returns_widgets 
-=== Starting test_initialize_returns_widgets ===
-Creating TestConfigCellInitializer instance...
+tests/ui/dataset/preprocessing/test_preprocessing_initializer.py::TestPreprocessingInitializerLogging::test_ui_components_structure <IPython.core.display.HTML object>
 
---- Debug: Checking handler creation ---
+=== Available UI Components ===
+container: VBox
+  children: []
+log_accordion: Accordion
+  children: ['Box']
+log_output: Box
+  children: ['VBox']
+status_output: Output
+module_name: str
+
+=== log_accordion attributes ===
+Type: Accordion
+Children: ['Box']
+Attributes: ['add_class', 'add_traits', 'blur', 'box_style', 'children', 'class_own_trait_events', 'class_own_traits', 'class_trait_names', 'class_traits', 'close', 'close_all', 'comm', 'cross_validation_lock', 'focus', 'get_manager_state', 'get_state', 'get_title', 'get_view_spec', 'handle_comm_opened', 'handle_control_comm_opened', 'has_trait', 'hold_sync', 'hold_trait_notifications', 'keys', 'layout', 'log', 'model_id', 'notify_change', 'observe', 'on_msg', 'on_trait_change', 'on_widget_constructed', 'open', 'remove_class', 'selected_index', 'send', 'send_state', 'set_state', 'set_title', 'set_trait', 'setup_instance', 'tabbable', 'titles', 'tooltip', 'trait_defaults', 'trait_events', 'trait_has_value', 'trait_metadata', 'trait_names', 'trait_values', 'traits', 'unobserve', 'unobserve_all', 'widget_types', 'widgets']
+
+=== log_output attributes ===
+Type: Box
+Children: ['VBox']
+Attributes: ['add_class', 'add_traits', 'append_log', 'blur', 'box_style', 'children', 'class_own_trait_events', 'class_own_traits', 'class_trait_names', 'class_traits', 'clear_logs', 'close', 'close_all', 'comm', 'cross_validation_lock', 'focus', 'get_manager_state', 'get_state', 'get_view_spec', 'handle_comm_opened', 'handle_control_comm_opened', 'has_trait', 'hold_sync', 'hold_trait_notifications', 'keys', 'layout', 'log', 'log_id', 'model_id', 'notify_change', 'observe', 'on_msg', 'on_trait_change', 'on_widget_constructed', 'open', 'remove_class', 'send', 'send_state', 'set_state', 'set_trait', 'setup_instance', 'tabbable', 'tooltip', 'trait_defaults', 'trait_events', 'trait_has_value', 'trait_metadata', 'trait_names', 'trait_values', 'traits', 'unobserve', 'unobserve_all', 'widget_types', 'widgets']
+[04:04:04] INFO - ✅ preprocessing initialized successfully
 FAILED
 
 =================================== FAILURES ===================================
-_______ TestConfigCellInitializerDisplay.test_initialize_returns_widgets _______
+_______ TestPreprocessingInitializerLogging.test_ui_components_structure _______
 
-self = <test_config_cell_initializer.TestConfigCellInitializerDisplay object at 0x111c2f950>
+self = <test_preprocessing_initializer.TestPreprocessingInitializerLogging object at 0x17d34f500>
+mock_ui_components = {'config_handler': <smartcash.ui.dataset.preprocessing.handlers.config_handler.PreprocessingConfigHandler object at 0x..., overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('PREPROCESSING LOGS',)), ...}
+mock_create_ui = <MagicMock name='create_preprocessing_main_ui' id='6383180144'>
+mock_handlers = <MagicMock name='setup_preprocessing_handlers' id='6396269136'>
 
-    def test_initialize_returns_widgets(self):
-        """Test that initialize() returns widgets instead of dict."""
-        print("\n=== Starting test_initialize_returns_widgets ===")
-        # Arrange
-        print("Creating TestConfigCellInitializer instance...")
-        initializer = TestConfigCellInitializer(
-            module_name='test_module',
-            config_filename='test_config.yaml'
-        )
+    def test_ui_components_structure(self, mock_ui_components, mock_create_ui, mock_handlers):
+        """Test that the UI components have the expected structure."""
+        # Debug: Print available components
+        print("\n=== Available UI Components ===")
+        for key, value in mock_ui_components.items():
+            print(f"{key}: {type(value).__name__}")
+            if hasattr(value, 'children'):
+                print(f"  children: {[type(c).__name__ for c in value.children] if value.children else '[]'}")
     
-        # Debug: Check handler creation
-        print("\n--- Debug: Checking handler creation ---")
->       handler = initializer.create_handler()
+        # Debug: Print attributes of log_accordion and log_output
+        if 'log_accordion' in mock_ui_components:
+            print("\n=== log_accordion attributes ===")
+            log_accordion = mock_ui_components['log_accordion']
+            print(f"Type: {type(log_accordion).__name__}")
+            print(f"Children: {[type(c).__name__ for c in log_accordion.children] if hasattr(log_accordion, 'children') else 'No children'}")
+            print(f"Attributes: {[a for a in dir(log_accordion) if not a.startswith('_')]}")
+    
+        if 'log_output' in mock_ui_components:
+            print("\n=== log_output attributes ===")
+            log_output = mock_ui_components['log_output']
+            print(f"Type: {type(log_output).__name__}")
+            print(f"Children: {[type(c).__name__ for c in log_output.children] if hasattr(log_output, 'children') else 'No children'}")
+            print(f"Attributes: {[a for a in dir(log_output) if not a.startswith('_')]}")
+    
+        # Arrange
+        initializer = PreprocessingInitializer()
+    
+        # Act
+        result = initializer.initialize()
+    
+        # Assert
+        assert isinstance(result, widgets.Widget), "Should return a widget"
+        mock_create_ui.assert_called_once()
+    
+        # Get the config passed to create_ui_components
+        config = mock_create_ui.call_args[0][0]
+        assert isinstance(config, dict), "Config should be a dictionary"
+>       assert 'module_name' in config, "Config should include module_name"
+E       AssertionError: Config should include module_name
+E       assert 'module_name' in {'_base_': 'base_config.yaml', 'api_settings': {'enhanced_validation': True, 'progress_tracking': True, 'ui_integration': True}, 'data': {'dir': 'data', 'invalid_dir': 'data/invalid', 'local': {'test': 'data/test', 'train': 'data/train', 'valid': 'data/valid'}, 'preprocessed_dir': 'data/preprocessed'}, 'file_naming': {'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}', 'preserve_uuid': True, 'raw_pattern': 'rp_{nominal}_{uuid}'}, ...}
 
-tests/ui/initializers/test_config_cell_initializer.py:57: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <test_config_cell_initializer.TestConfigCellInitializer object at 0x3039b7e90>
-
-    def create_handler(self) -> TestConfigHandler:
-        """Create a test handler."""
->       return TestConfigHandler()
-E       TypeError: ConfigCellHandler.__init__() missing 1 required positional argument: 'module_name'
-
-tests/ui/initializers/test_config_cell_initializer.py:26: TypeError
+tests/ui/dataset/preprocessing/test_preprocessing_initializer.py:236: AssertionError
 =============================== warnings summary ===============================
 ../../../../opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py:1385
   /opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py:1385: DeprecationWarning: Passing unrecognized arguments to super(Layout).__init__(border_radius='4px').
+  object.__init__() takes exactly one argument (the instance to initialize)
+  This is deprecated in traitlets 4.2.This error will be raised in a future release of traitlets.
+    warn(
+
+tests/ui/dataset/preprocessing/test_preprocessing_initializer.py::TestPreprocessingInitializerLogging::test_ui_components_structure
+  /opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py:1385: DeprecationWarning: Passing unrecognized arguments to super(Layout).__init__(border_radius='8px').
+  object.__init__() takes exactly one argument (the instance to initialize)
+  This is deprecated in traitlets 4.2.This error will be raised in a future release of traitlets.
+    warn(
+
+tests/ui/dataset/preprocessing/test_preprocessing_initializer.py::TestPreprocessingInitializerLogging::test_ui_components_structure
+  /opt/anaconda3/lib/python3.12/site-packages/traitlets/traitlets.py:1385: DeprecationWarning: Passing unrecognized arguments to super(Layout).__init__(gap='4px', overflow_y='auto', overflow_x='hidden').
   object.__init__() takes exactly one argument (the instance to initialize)
   This is deprecated in traitlets 4.2.This error will be raised in a future release of traitlets.
     warn(
@@ -60,7 +109,7 @@ smartcash/__init__.py                                                           
 smartcash/common/__init__.py                                                   18      0   100%
 smartcash/common/config/__init__.py                                             5      0   100%
 smartcash/common/config/compat.py                                               7      2    71%   17, 33
-smartcash/common/config/manager.py                                            134    109    19%   23-45, 49-53, 57-60, 64-76, 80-104, 111-147, 163-169, 175-176, 180-195, 199-212, 216-221, 225, 234-242
+smartcash/common/config/manager.py                                            134     79    41%   34, 51, 59-60, 64-76, 80-104, 111-147, 163-169, 184-189, 193-195, 199-212, 216-221, 225, 237-240
 smartcash/common/constants/__init__.py                                          0      0   100%
 smartcash/common/constants/core.py                                              7      0   100%
 smartcash/common/constants/dataset.py                                          10      0   100%
@@ -76,7 +125,7 @@ smartcash/common/exceptions.py                                                 8
 smartcash/common/interfaces/__init__.py                                         2      0   100%
 smartcash/common/interfaces/layer_config_interface.py                          12      3    75%   13, 18, 23
 smartcash/common/layer_config.py                                              126    103    18%   58-59, 75-81, 93, 102, 106, 115-124, 133-136, 148-151, 163-196, 208-233, 246-262, 275-278, 287-309, 328
-smartcash/common/logger.py                                                     97     51    47%   37, 40-42, 70-95, 100-106, 110, 113, 116, 119, 122, 125, 128, 133, 137-138, 148-171, 175-177
+smartcash/common/logger.py                                                     97     39    60%   42, 73-95, 116, 119, 122, 125, 128, 133, 148-171, 175-177
 smartcash/common/opencv_compat.py                                              14      9    36%   28-35, 40-45
 smartcash/common/threadpools.py                                                47     35    26%   27-37, 41, 45, 49, 53-73, 77-107
 smartcash/common/types.py                                                      33      0   100%
@@ -239,7 +288,7 @@ smartcash/ui/components/info_accordion.py                                      1
 smartcash/ui/components/info_panel.py                                          11     11     0%   7-151
 smartcash/ui/components/layout/__init__.py                                      2      0   100%
 smartcash/ui/components/layout/layout_components.py                            63     52    17%   53-163, 168-182, 199-221
-smartcash/ui/components/log_accordion.py                                      150    129    14%   68-447, 474-491
+smartcash/ui/components/log_accordion.py                                      150    105    30%   173-257, 263-270, 274-327, 331-349, 354-425, 432-435, 474-491
 smartcash/ui/components/progress_tracker/__init__.py                            7      0   100%
 smartcash/ui/components/progress_tracker/callback_manager.py                   42     31    26%   13-14, 18-21, 25-27, 31-45, 49-53, 57-58, 62, 66
 smartcash/ui/components/progress_tracker/factory.py                            15      8    47%   12-18, 22-28, 35-44, 48
@@ -260,80 +309,82 @@ smartcash/ui/components/widgets/slider.py                                       
 smartcash/ui/components/widgets/text_input.py                                   5      5     0%   6-32
 smartcash/ui/config_cell/__init__.py                                            0      0   100%
 smartcash/ui/config_cell/components/__init__.py                                 4      0   100%
-smartcash/ui/config_cell/components/component_registry.py                      34     19    44%   35-38, 49, 60-61, 72-73, 84-100
+smartcash/ui/config_cell/components/component_registry.py                      34     21    38%   32-38, 49, 60-61, 72-73, 84-100
 smartcash/ui/config_cell/components/ui_factory.py                              54     40    26%   42-72, 84, 104, 123, 143-156, 179-249
 smartcash/ui/config_cell/components/ui_parent_components.py                    57     38    33%   33-37, 41-43, 69-100, 111, 122-136, 140, 163-177
 smartcash/ui/config_cell/constants.py                                           7      0   100%
 smartcash/ui/config_cell/handlers/config_handler.py                            52     39    25%   21-25, 29-36, 40-47, 51-58, 62-63, 67-68, 72-73, 77-82
-smartcash/ui/config_cell/handlers/error_handler.py                             38     26    32%   35-69, 90-103
-smartcash/ui/config_cell/utils/error_utils.py                                   7      3    57%   28-39
-smartcash/ui/dataset/__init__.py                                                5      5     0%   6-11
-smartcash/ui/dataset/augmentation/__init__.py                                   5      5     0%   6-23
-smartcash/ui/dataset/augmentation/augmentation_initializer.py                  39     39     0%   6-123
-smartcash/ui/dataset/augmentation/components/__init__.py                        5      5     0%   6-11
-smartcash/ui/dataset/augmentation/components/advanced_opts_widget.py           14     14     0%   6-103
-smartcash/ui/dataset/augmentation/components/augtypes_opts_widget.py            9      9     0%   6-50
-smartcash/ui/dataset/augmentation/components/basic_opts_widget.py               9      9     0%   6-76
+smartcash/ui/config_cell/handlers/error_handler.py                             41     28    32%   37-71, 92-109
+smartcash/ui/config_cell/utils/error_utils.py                                   7      3    57%   24-42
+smartcash/ui/dataset/__init__.py                                               29      3    90%   37-39
+smartcash/ui/dataset/augmentation/__init__.py                                   5      0   100%
+smartcash/ui/dataset/augmentation/augmentation_initializer.py                  39     29    26%   14, 30-49, 63-72, 81-96, 108-109, 123
+smartcash/ui/dataset/augmentation/components/__init__.py                        5      0   100%
+smartcash/ui/dataset/augmentation/components/advanced_opts_widget.py           14     10    29%   15-103
+smartcash/ui/dataset/augmentation/components/augtypes_opts_widget.py            9      5    44%   16-50
+smartcash/ui/dataset/augmentation/components/basic_opts_widget.py               9      5    44%   16-76
 smartcash/ui/dataset/augmentation/components/live_preview_widget.py            12     12     0%   6-80
-smartcash/ui/dataset/augmentation/components/ui_components.py                  42     42     0%   6-176
+smartcash/ui/dataset/augmentation/components/ui_components.py                  42     29    31%   28, 37-38, 42-43, 47-48, 52-53, 60-176
 smartcash/ui/dataset/augmentation/handlers/__init__.py                          0      0   100%
 smartcash/ui/dataset/augmentation/handlers/augmentation_handlers.py           312    312     0%   6-660
-smartcash/ui/dataset/augmentation/handlers/config_extractor.py                 72     72     0%   6-124
-smartcash/ui/dataset/augmentation/handlers/config_handler.py                  118    118     0%   6-186
-smartcash/ui/dataset/augmentation/handlers/config_updater.py                   70     70     0%   6-108
+smartcash/ui/dataset/augmentation/handlers/config_extractor.py                 72     67     7%   10-73, 78-100, 104-119, 123-124
+smartcash/ui/dataset/augmentation/handlers/config_handler.py                  118     98    17%   16-19, 23-32, 36, 40-41, 45-65, 69-90, 94-111, 115-127, 131-135, 139-151, 155-164, 168-174, 178-182, 186
+smartcash/ui/dataset/augmentation/handlers/config_updater.py                   70     63    10%   11-45, 49-63, 67-84, 88-91, 95-101, 105-108
 smartcash/ui/dataset/augmentation/handlers/defaults.py                          3      3     0%   6-10
 smartcash/ui/dataset/augmentation/utils/__init__.py                             0      0   100%
 smartcash/ui/dataset/augmentation/utils/button_manager.py                     149    149     0%   6-254
 smartcash/ui/dataset/augmentation/utils/config_handlers.py                    123    123     0%   6-264
 smartcash/ui/dataset/augmentation/utils/dialog_utils.py                       114    114     0%   6-330
-smartcash/ui/dataset/augmentation/utils/style_utils.py                         60     60     0%   6-167
+smartcash/ui/dataset/augmentation/utils/style_utils.py                         60     36    40%   28-57, 64-66, 79-80, 85, 99-109, 114-130, 134-140, 149-158
 smartcash/ui/dataset/augmentation/utils/ui_utils.py                           271    271     0%   6-449
-smartcash/ui/dataset/downloader/__init__.py                                     2      2     0%   6-9
+smartcash/ui/dataset/downloader/__init__.py                                     2      0   100%
 smartcash/ui/dataset/downloader/components/__init__.py                          0      0   100%
 smartcash/ui/dataset/downloader/components/input_options.py                    41     41     0%   6-178
 smartcash/ui/dataset/downloader/components/ui_components.py                    29     29     0%   6-164
-smartcash/ui/dataset/downloader/downloader_initializer.py                      20     20     0%   6-97
+smartcash/ui/dataset/downloader/downloader_initializer.py                      20     11    45%   24-25, 41-54, 68-69, 81-82, 97
 smartcash/ui/dataset/downloader/handlers/__init__.py                            0      0   100%
-smartcash/ui/dataset/downloader/handlers/config_extractor.py                   18     18     0%   6-127
-smartcash/ui/dataset/downloader/handlers/config_handler.py                    178    178     0%   6-329
-smartcash/ui/dataset/downloader/handlers/config_updater.py                     69     69     0%   6-180
+smartcash/ui/dataset/downloader/handlers/config_extractor.py                   18     11    39%   12-18, 111-112, 116-117, 121-122, 126-127
+smartcash/ui/dataset/downloader/handlers/config_handler.py                    178    160    10%   17-19, 23, 27, 31-52, 56-86, 90-158, 162-201, 210-246, 250-254, 258-292, 301-329
+smartcash/ui/dataset/downloader/handlers/config_updater.py                     69     63     9%   10-79, 84-102, 107-131, 136-143, 148-180
 smartcash/ui/dataset/downloader/handlers/defaults.py                           18     18     0%   6-85
 smartcash/ui/dataset/downloader/handlers/download_handler.py                  220    220     0%   6-372
 smartcash/ui/dataset/downloader/utils/__init__.py                               0      0   100%
 smartcash/ui/dataset/downloader/utils/backend_utils.py                         59     59     0%   6-156
 smartcash/ui/dataset/downloader/utils/button_manager.py                        52     52     0%   6-82
-smartcash/ui/dataset/downloader/utils/colab_secrets.py                         76     76     0%   6-210
+smartcash/ui/dataset/downloader/utils/colab_secrets.py                         76     67    12%   19-49, 61-78, 87-121, 138-165, 177-198
 smartcash/ui/dataset/downloader/utils/dialog_utils.py                          85     85     0%   6-170
 smartcash/ui/dataset/downloader/utils/progress_utils.py                        19     19     0%   6-31
 smartcash/ui/dataset/downloader/utils/ui_utils.py                             117    117     0%   6-229
 smartcash/ui/dataset/downloader/utils/validation_utils.py                      55     55     0%   6-163
-smartcash/ui/dataset/preprocessing/__init__.py                                  2      2     0%   6-8
-smartcash/ui/dataset/preprocessing/components/__init__.py                       3      3     0%   6-9
-smartcash/ui/dataset/preprocessing/components/input_options.py                 44     44     0%   6-171
-smartcash/ui/dataset/preprocessing/components/ui_components.py                 27     27     0%   6-177
-smartcash/ui/dataset/preprocessing/handlers/__init__.py                         6      6     0%   6-12
-smartcash/ui/dataset/preprocessing/handlers/config_extractor.py                40     40     0%   6-121
-smartcash/ui/dataset/preprocessing/handlers/config_handler.py                 116    116     0%   6-170
-smartcash/ui/dataset/preprocessing/handlers/config_updater.py                  71     71     0%   6-110
-smartcash/ui/dataset/preprocessing/handlers/defaults.py                         8      8     0%   6-82
-smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py         270    270     0%   6-485
-smartcash/ui/dataset/preprocessing/preprocessing_initializer.py                25     25     0%   6-89
-smartcash/ui/dataset/preprocessing/utils/__init__.py                            2      2     0%   6-20
-smartcash/ui/dataset/preprocessing/utils/ui_utils.py                           84     84     0%   6-131
-smartcash/ui/dataset/split/__init__.py                                          5      5     0%   6-28
+smartcash/ui/dataset/preprocessing/__init__.py                                  2      0   100%
+smartcash/ui/dataset/preprocessing/components/__init__.py                       3      0   100%
+smartcash/ui/dataset/preprocessing/components/input_options.py                 44     41     7%   11-171
+smartcash/ui/dataset/preprocessing/components/ui_components.py                 27     24    11%   11-177
+smartcash/ui/dataset/preprocessing/handlers/__init__.py                         6      0   100%
+smartcash/ui/dataset/preprocessing/handlers/config_extractor.py                40     37     8%   10-90, 94-121
+smartcash/ui/dataset/preprocessing/handlers/config_handler.py                 116     80    31%   22-26, 30-34, 41-43, 56-67, 71-87, 91-107, 111-122, 126-135, 139-145, 154-156, 162-166, 170
+smartcash/ui/dataset/preprocessing/handlers/config_updater.py                  71     67     6%   10-79, 83-88, 92-110
+smartcash/ui/dataset/preprocessing/handlers/defaults.py                         8      0   100%
+smartcash/ui/dataset/preprocessing/handlers/preprocessing_handlers.py         270    245     9%   23-37, 44-78, 85-100, 106-123, 127-153, 157-174, 180-213, 217-257, 263-310, 314-331, 335-348, 354-374, 380-398, 402-430, 436-439, 443-446, 450-452, 456-458, 462, 466, 470-476, 480-485
+smartcash/ui/dataset/preprocessing/preprocessing_initializer.py                25      5    80%   35, 38, 75-76, 89
+smartcash/ui/dataset/preprocessing/utils/__init__.py                            2      0   100%
+smartcash/ui/dataset/preprocessing/utils/ui_utils.py                           84     52    38%   18-41, 45-48, 52-55, 59, 63-67, 71-75, 79-81, 85-90, 94-99, 103-108, 115, 118-119
+smartcash/ui/dataset/split/__init__.py                                          6      1    83%   26
 smartcash/ui/dataset/split/components/__init__.py                               0      0   100%
-smartcash/ui/dataset/split/components/ui_form.py                               30     30     0%   8-203
-smartcash/ui/dataset/split/components/ui_layout.py                             13     13     0%   8-84
+smartcash/ui/dataset/split/components/ui_form.py                               37     27    27%   42, 55-58, 77-170, 182-193, 208-215
+smartcash/ui/dataset/split/components/ui_layout.py                             16     10    38%   41, 60-98
 smartcash/ui/dataset/split/handlers/__init__.py                                 0      0   100%
-smartcash/ui/dataset/split/handlers/config_extractor.py                        11     11     0%   6-102
-smartcash/ui/dataset/split/handlers/config_updater.py                          27     27     0%   6-74
-smartcash/ui/dataset/split/handlers/defaults.py                                12     12     0%   6-66
+smartcash/ui/dataset/split/handlers/config_extractor.py                        11      6    45%   13-30
+smartcash/ui/dataset/split/handlers/config_handler.py                          35     20    43%   27, 38, 47, 55, 66-78, 87, 100, 113-116
+smartcash/ui/dataset/split/handlers/config_updater.py                          27     22    19%   12-55, 60-69
+smartcash/ui/dataset/split/handlers/defaults.py                                12      6    50%   11, 52-53, 59-61
+smartcash/ui/dataset/split/handlers/event_handlers.py                          49     49     0%   7-137
 smartcash/ui/dataset/split/handlers/slider_handlers.py                         31     31     0%   6-58
-smartcash/ui/dataset/split/split_init.py                                       85     85     0%   10-263
-smartcash/ui/dataset/visualization/__init__.py                                  2      2     0%   7-9
+smartcash/ui/dataset/split/split_init.py                                       49     33    33%   52-62, 66, 75-91, 95-107, 123-153
+smartcash/ui/dataset/visualization/__init__.py                                 21     21     0%   7-63
 smartcash/ui/dataset/visualization/visualization_components.py                 65     65     0%   6-164
 smartcash/ui/handlers/__init__.py                                               0      0   100%
-smartcash/ui/handlers/config_handlers.py                                      159    159     0%   6-303
+smartcash/ui/handlers/config_handlers.py                                      137     97    29%   24, 29, 33-46, 50, 54-72, 77-87, 91-102, 106-108, 112, 116-118, 122, 126-145, 151-152, 156-157, 161-162, 166-167, 171-172, 176-177, 182-190, 194-214, 218, 223, 227, 231, 235, 242, 247
 smartcash/ui/handlers/error_handler.py                                        133    133     0%   6-318
 smartcash/ui/helpers/__init__.py                                                0      0   100%
 smartcash/ui/hyperparameters/__init__.py                                        2      2     0%   4-6
@@ -363,8 +414,8 @@ smartcash/ui/info_boxes/training_info.py                                        
 smartcash/ui/info_boxes/training_strategy_info.py                              19     19     0%   7-218
 smartcash/ui/initializers/__init__.py                                           0      0   100%
 smartcash/ui/initializers/blank_initializer.py                                 49     49     0%   6-104
-smartcash/ui/initializers/common_initializer.py                               104    104     0%   18-326
-smartcash/ui/initializers/config_cell_initializer.py                          173    128    26%   120, 125-127, 136, 148, 171-190, 194-217, 249-257, 264-295, 306-323, 355-412, 420-441, 445-467, 485-496
+smartcash/ui/initializers/common_initializer.py                               108     41    62%   75, 95, 100-108, 156, 160, 167-171, 195, 202-206, 220, 230, 248-252, 274-295, 306-317
+smartcash/ui/initializers/config_cell_initializer.py                          184    146    21%   72-107, 115-127, 131-143, 147-178, 187-207, 212-214, 223, 235, 245, 256-312, 317-329, 333-353, 367-435, 444-445, 450-452, 464, 468-493
 smartcash/ui/initializers/visualization_initializer.py                        112    112     0%   6-226
 smartcash/ui/pretrained/__init__.py                                             2      2     0%   6-8
 smartcash/ui/pretrained/components/__init__.py                                  2      2     0%   6-8
@@ -383,13 +434,13 @@ smartcash/ui/pretrained/utils/model_utils.py                                  11
 smartcash/ui/setup/__init__.py                                                  3      3     0%   6-9
 smartcash/ui/setup/dependency/__init__.py                                      30     30     0%   9-70
 smartcash/ui/setup/dependency/components/__init__.py                            4      4     0%   7-17
-smartcash/ui/setup/dependency/components/ui_components.py                      30     30     0%   6-177
-smartcash/ui/setup/dependency/components/ui_package_selector.py                50     50     0%   7-214
-smartcash/ui/setup/dependency/dependency_initializer.py                        75     75     0%   5-184
+smartcash/ui/setup/dependency/components/ui_components.py                      39     39     0%   6-191
+smartcash/ui/setup/dependency/components/ui_package_selector.py                51     51     0%   7-270
+smartcash/ui/setup/dependency/dependency_initializer.py                        43     43     0%   8-127
 smartcash/ui/setup/dependency/handlers/__init__.py                              9      9     0%   9-37
 smartcash/ui/setup/dependency/handlers/analysis_handler.py                    148    148     0%   11-287
 smartcash/ui/setup/dependency/handlers/config_extractor.py                    132    132     0%   11-399
-smartcash/ui/setup/dependency/handlers/config_handler.py                      135    135     0%   10-369
+smartcash/ui/setup/dependency/handlers/config_handler.py                      223    223     0%   17-462
 smartcash/ui/setup/dependency/handlers/config_updater.py                       82     82     0%   10-130
 smartcash/ui/setup/dependency/handlers/defaults.py                             45     45     0%   10-209
 smartcash/ui/setup/dependency/handlers/dependency_handler.py                  112    112     0%   14-277
@@ -444,15 +495,15 @@ smartcash/ui/strategy/handlers/strategy_handlers.py                           17
 smartcash/ui/strategy/strategy_init.py                                         62     62     0%   6-140
 smartcash/ui/strategy/utils/__init__.py                                         2      2     0%   6-13
 smartcash/ui/strategy/utils/form_helpers.py                                    65     65     0%   6-123
-smartcash/ui/utils/__init__.py                                                  0      0   100%
+smartcash/ui/utils/__init__.py                                                  2      0   100%
 smartcash/ui/utils/buffered_logger.py                                          31     31     0%   4-85
-smartcash/ui/utils/constants.py                                                13      4    69%   170-192, 258
+smartcash/ui/utils/constants.py                                                15      4    73%   170-192, 258
 smartcash/ui/utils/defaults_template.py                                         4      4     0%   6-43
-smartcash/ui/utils/fallback_utils.py                                          171    171     0%   6-352
+smartcash/ui/utils/fallback_utils.py                                          171    123    28%   28-29, 41-48, 54, 58-59, 62-64, 67-69, 72-74, 77-78, 82-85, 90-94, 99-102, 107-122, 151-200, 205, 216-224, 249-273, 278-281, 286-294, 304-313, 318-326, 332-341
 smartcash/ui/utils/file_utils.py                                              247    247     0%   6-660
 smartcash/ui/utils/info_utils.py                                               34     34     0%   6-142
-smartcash/ui/utils/logger_bridge.py                                           245    209    15%   13-33, 53-71, 81-122, 133-154, 158-166, 170-192, 196-204, 208-219, 223-229, 233, 237, 241-248, 252, 257-278, 282, 286-296, 301-377, 381-427, 432-443, 449-452, 456-461, 465, 469
-smartcash/ui/utils/logging_utils.py                                           139    106    24%   38-39, 46-57, 66-71, 80-108, 112-158, 162-172, 182-183, 187-196, 205-211, 218-222, 226-230, 234-238
+smartcash/ui/utils/logger_bridge.py                                           245    192    22%   13-33, 54, 62-63, 67-68, 85-122, 133-154, 158-166, 170-192, 196-204, 208-219, 223-229, 233, 237, 241-248, 252, 257-278, 282, 286-296, 301-377, 384-389, 399-427, 432-443, 449-452, 456-461, 469
+smartcash/ui/utils/logging_utils.py                                           142     94    34%   44-45, 86-114, 118-164, 168-178, 188-189, 193-202, 211-217, 224-228, 232-236, 240-244
 smartcash/ui/utils/metric_utils.py                                             34     34     0%   6-127
 smartcash/ui/utils/responsive_styling.py                                       10     10     0%   4-96
 smartcash/ui/utils/restart_runtime_helper.py                                   69     69     0%   6-136
@@ -462,8 +513,9 @@ smartcash/ui/utils/simple_logger.py                                            3
 smartcash/ui/utils/ui_logger.py                                               100    100     0%   6-185
 smartcash/ui/utils/ui_logger_namespace.py                                      56     56     0%   6-268
 smartcash/ui/utils/validator_utils.py                                         141    141     0%   6-269
+smartcash/ui/utils/widget_utils.py                                             19     15    21%   17-34, 50-52
 ---------------------------------------------------------------------------------------------------------
-TOTAL                                                                       26838  25965     3%
+TOTAL                                                                       27028  25509     6%
 =========================== short test summary info ============================
-FAILED tests/ui/initializers/test_config_cell_initializer.py::TestConfigCellInitializerDisplay::test_initialize_returns_widgets
-========================= 1 failed, 1 warning in 3.41s =========================
+FAILED tests/ui/dataset/preprocessing/test_preprocessing_initializer.py::TestPreprocessingInitializerLogging::test_ui_components_structure
+======================== 1 failed, 3 warnings in 4.09s =========================

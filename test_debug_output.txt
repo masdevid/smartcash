@@ -1,0 +1,39 @@
+Traceback (most recent call last):
+  File "/Users/masdevid/Projects/smartcash/tests/ui/initializers/test_config_cell_initializer.py", line 514, in test_component_registration
+    mock_registry.register_component.assert_called_once_with(
+  File "/opt/anaconda3/lib/python3.12/unittest/mock.py", line 955, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected 'register_component' to be called once. Called 0 times.
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Users/masdevid/Projects/smartcash/tests/ui/initializers/test_config_cell_initializer.py", line 514, in test_component_registration
+    mock_registry.register_component.assert_called_once_with(
+  File "/opt/anaconda3/lib/python3.12/unittest/mock.py", line 955, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected 'register_component' to be called once. Called 0 times.
+
+=== Starting test_component_registration ===
+Test config: {'test': 'config'}
+Parent ID: test_parent
+Component ID: test_component
+Full component ID: test_parent.test_component
+Created test UI components
+Creating mock registry...
+Patching component_registry...
+Creating TestInitializer instance...
+Setting up test data...
+Creating mock parent component...
+Configuring mock registry to return parent component...
+Calling _register_component()...
+_register_component() completed
+
+=== Verifying register_component calls ===
+All calls to mock registry:
+
+Checking register_component call...
+
+!!! Test failed with error: Expected 'register_component' to be called once. Called 0 times.
+
+Restoring original component_registry...
+=== End of test_component_registration ===
+

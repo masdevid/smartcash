@@ -261,8 +261,8 @@ class ConfigCellInitializer(Generic[T], ABC):
             if self._suppress_output:
                 self._setup_output_suppression()
             
-            # Create the handler
-            self.handler = self.create_handler()
+            # Create the handler using the protected attribute directly
+            self._handler = self.create_handler()
             
             # Create UI components using the parent component system
             self._setup_ui_components()
@@ -279,13 +279,32 @@ class ConfigCellInitializer(Generic[T], ABC):
             # Mark as initialized
             self._is_initialized = True
             
-            # Return the container widget from parent component
-            return self.parent_component.container
+            # Ensure the parent component's container is properly initialized
+            if not hasattr(self.parent_component, 'container') or self.parent_component.container is None:
+                # If no container exists, create a default one
+                self.parent_component.container = widgets.VBox()
+                if hasattr(self.parent_component, 'content_area') and self.parent_component.content_area is not None:
+                    self.parent_component.container.children = (self.parent_component.content_area,)
+            
+            # Get the container widget from parent component
+            container = self.parent_component.container
+            
+            # Ensure we're returning a widget
+            if not isinstance(container, widgets.Widget):
+                error_msg = f"Expected a widget but got {type(container).__name__}"
+                self._logger.error(error_msg)
+                return create_error_response("Initialization Error", error_msg)
+                
+            return container
             
         except Exception as e:
             error_msg = f"Failed to initialize {self.__class__.__name__}: {str(e)}"
             self._logger.error(error_msg, exc_info=True)
-            return create_error_response(error_msg, str(e))
+            error_widget = create_error_response("Initialization Error", error_msg)
+            if not isinstance(error_widget, widgets.Widget):
+                # If create_error_response didn't return a widget, create a basic one
+                return widgets.HTML(f"<div style='color: red; padding: 10px;'>{error_msg}</div>")
+            return error_widget
             
         finally:
             # Restore output settings if they were suppressed

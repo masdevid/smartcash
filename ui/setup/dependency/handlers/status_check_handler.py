@@ -125,51 +125,60 @@ class StatusCheckHandler:
             'handle_package_status_check': self.handle_package_status_check
         }
     
-    @with_button_context(self.ui, 'system_report_button')
     def handle_system_report(self) -> None:
         """Generate and display a comprehensive system report."""
-        try:
-            self._update_status("🔍 Collecting system information...", "info")
-            show_progress_tracker_safe(self.ui, "System Analysis")
-            
-            self.logger.info("🔍 Generating system compatibility report...")
-            
-            # Collect system information
-            self._update_progress(20, "Collecting system info")
-            system_info = get_comprehensive_system_info()
-            
-            # Generate compatibility report
-            self._update_progress(50, "Checking compatibility")
-            compatibility_report = generate_system_compatibility_report(system_info)
-            
-            # Log and finalize report
-            self._update_progress(80, "Generating report")
-            self._log_system_report(system_info, compatibility_report)
-            
-            # Show completion
-            self._update_progress(100, "Report completed")
-            summary = self._generate_report_summary(system_info, compatibility_report)
-            complete_operation_with_message(self.ui, f"✅ {summary}")
-            self.logger.info(f"📊 System report completed: {summary}")
-            
-        except Exception as e:
-            self._handle_error("System report", e)
+        # Create a decorator instance with the current UI components
+        system_report_decorator = with_button_context(self.ui, 'system_report_button')
+        
+        @system_report_decorator
+        def _generate_report():
+            try:
+                self._update_status("🔍 Collecting system information...", "info")
+                show_progress_tracker_safe(self.ui, "System Analysis")
+                self.logger.info("🔍 Generating system compatibility report...")
+                
+                # Collect system information
+                self._update_progress(20, "Collecting system info")
+                system_info = get_comprehensive_system_info()
+                
+                # Generate compatibility report
+                self._update_progress(50, "Checking compatibility")
+                compatibility_report = generate_system_compatibility_report(system_info)
+                
+                # Log and finalize report
+                self._update_progress(80, "Generating report")
+                self._log_system_report(system_info, compatibility_report)
+                
+                # Show completion
+                self._update_progress(100, "Report completed")
+                summary = self._generate_report_summary(system_info, compatibility_report)
+                complete_operation_with_message(self.ui, f"✅ {summary}")
+                self.logger.info(f"📊 System report completed: {summary}")
+                
+            except Exception as e:
+                self._handle_error("System report", e)
+        
+        # Call the decorated function
+        _generate_report()
     
-    @with_button_context(self.ui, 'check_button')
     def handle_package_status_check(self) -> None:
         """Check and display the status of selected packages."""
-        try:
-            selected_packages = get_selected_packages(self.ui.get('package_selector', {}))
-            
-            if not selected_packages:
-                self._update_status("⚠️ No packages selected", "warning")
-                return
-            
-            self._update_status(f"🔍 Checking status of {len(selected_packages)} packages...", "info")
-            show_progress_tracker_safe(self.ui, "Package Status Check")
-            self.logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
-            
+        # Create a decorator instance with the current UI components
+        check_button_decorator = with_button_context(self.ui, 'check_button')
+        
+        @check_button_decorator
+        def _check_packages():
             try:
+                selected_packages = get_selected_packages(self.ui.get('package_selector', {}))
+                
+                if not selected_packages:
+                    self._update_status("⚠️ No packages selected", "warning")
+                    return
+                
+                self._update_status(f"🔍 Checking status of {len(selected_packages)} packages...", "info")
+                show_progress_tracker_safe(self.ui, "Package Status Check")
+                self.logger.info(f"🔍 Checking status of {len(selected_packages)} packages...")
+                
                 # Check packages status
                 results = self._check_packages_status_batch(selected_packages)
                 
@@ -189,8 +198,8 @@ class StatusCheckHandler:
             except Exception as e:
                 self._handle_error("Package status check", e)
         
-        except Exception as e:
-            self._handle_error("Status check", e)
+        # Call the decorated function
+        _check_packages()
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
         """Update the status panel with a message.

@@ -102,21 +102,17 @@ class CommonInitializer(ABC):
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
             self.logger.warning(f"Failed to initialize logger bridge: {str(e)}")
     
-    def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Dict[str, Any]:
-        """Initialize the UI module with the given configuration.
+    def initialize(self, config: Dict[str, Any] = None, **kwargs) -> None:
+        """Initialize and display the UI module with the given configuration.
         
         This is the main entry point that orchestrates the initialization process.
-        It follows a strict sequence of operations and ensures proper error handling
-        and resource cleanup.
+        It follows a strict sequence of operations, ensures proper error handling,
+        and displays the UI directly.
         
         Args:
             config: Optional configuration dictionary. If None, will attempt to load
                    configuration using the configured config handler.
             **kwargs: Additional keyword arguments that may be required by subclasses.
-            
-        Returns:
-            dict: A dictionary containing at least a 'ui' key with the root UI component.
-                  May also include a 'container' key if the UI is wrapped in a container.
                   
         Raises:
             ValueError: If required UI components are missing or invalid.
@@ -125,9 +121,10 @@ class CommonInitializer(ABC):
             
         Example:
             >>> initializer = MyInitializer()
-            >>> result = initializer.initialize()
-            >>> display(result['ui'])  # Display the initialized UI
+            >>> initializer.initialize()  # UI will be displayed automatically
         """
+        from IPython.display import display
+        
         # Suppress all outputs during initialization
         suppress_all_outputs()
         try:
@@ -160,18 +157,15 @@ class CommonInitializer(ABC):
             
             self.logger.info(f"✅ {self.module_name} initialized successfully")
             
-            # Return both the root UI and container if available
-            result = {'ui': root_ui}
-            if 'container' in ui_components:
-                result['container'] = ui_components['container']
-            return result
+            # Display the root UI component directly
+            display(root_ui)
             
         except Exception as e:
             error_msg = f"❌ Failed to initialize {self.module_name}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
             restore_stdout()  # Restore output before showing error UI
             error_ui = self._create_error_ui(error_msg)
-            return {'ui': error_ui} if error_ui else {'ui': str(error_msg)}
+            display(error_ui if error_ui else str(error_msg))
         finally:
             # Ensure output is restored in case of any other exceptions
             restore_stdout()

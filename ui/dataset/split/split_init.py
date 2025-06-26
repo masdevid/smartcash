@@ -86,17 +86,44 @@ class SplitConfigInitializer(ConfigCellInitializer[SplitConfigHandler]):
         return SplitConfigHandler()
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create and return UI components for split configuration."""
+        """Create and return UI components for split configuration.
+        
+        Args:
+            config: Configuration dictionary
+            
+        Returns:
+            Dict containing UI components with 'container' as the root widget
+        """
+        # Create UI components
         ui_components = create_split_config_ui(config or {})
         
-        # Style the container
-        if 'container' in ui_components:
-            ui_components['container'].layout = widgets.Layout(
-                width='100%',
-                padding='10px',
-                border='1px solid #e0e0e0',
-                margin='5px 0'
-            )
+        # Get the main container from components or create a new one
+        main_container = ui_components.get('main_container')
+        if not isinstance(main_container, widgets.Widget):
+            main_container = widgets.VBox()
+            
+        # Style the main container
+        main_container.layout = widgets.Layout(
+            width='100%',
+            padding='10px',
+            border='1px solid #e0e0e0',
+            margin='5px 0',
+            display='flex',
+            flex_flow='column',
+            align_items='stretch',
+            overflow='visible'
+        )
+        
+        # Ensure all children are valid widgets
+        if hasattr(main_container, 'children'):
+            valid_children = [
+                child for child in main_container.children 
+                if isinstance(child, widgets.Widget)
+            ]
+            main_container.children = valid_children
+        
+        # Update the container in ui_components
+        ui_components['container'] = main_container
             
         return ui_components
     

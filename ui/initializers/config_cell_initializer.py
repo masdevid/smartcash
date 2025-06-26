@@ -2,223 +2,218 @@
 File: smartcash/ui/initializers/config_cell_initializer.py
 Deskripsi: Config cell initializer with shared state and YAML persistence
 
-This module implements a robust system for initializing and managing configuration UI cells
-in Jupyter notebooks, featuring shared state management and YAML persistence.
-
-Initialization Flow:
-1. Configuration Loading:
-   - Load from provided config dict if specified
-   - Otherwise, load from YAML file if exists
-   - Fall back to default configuration
-
-2. UI Component Creation:
-   - Create widgets based on current config
-   - Set up change observers to update config
-   - Initialize with current values
-
-3. Handler Setup:
-   - Create or retrieve shared handler instance
-   - Register with parent if nested
-   - Set up config change listeners
-
-Shared Handler Behavior:
-- Parent-Child Relationship:
-  - Child configs are namespaced under parent
-  - Shared state is synchronized automatically
-  - Changes propagate up the hierarchy
-
-- Orphan Configs:
-  - Operate independently
-  - No parent namespace
-  - Self-contained state
-  - Can be adopted later
-
-Configuration Persistence:
-- Automatic YAML serialization
-- Per-module config files
-- Hierarchical config merging
-- Change tracking and validation
+This module provides the ConfigCellInitializer class which serves as the orchestration layer
+for configuration UIs. It handles initialization, lifecycle management, and component
+registration while delegating UI component creation to the components module.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type, Callable, List, TypeVar, Generic
-import ipywidgets as widgets
-import traceback
-from pathlib import Path
-import os
+from __future__ import annotations
 
+# Standard library
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Generic, Optional, TypeVar
+
+# Third-party
+import ipywidgets as widgets
+
+# SmartCash - Core
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.logger_bridge import UILoggerBridge, create_ui_logger_bridge
+
+# SmartCash - UI Components
+from smartcash.ui.config_cell.components import component_registry
+from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
+from smartcash.ui.config_cell.handlers.error_handler import create_error_response
+from smartcash.ui.utils.logger_bridge import UILoggerBridge
 from smartcash.ui.utils.logging_utils import (
-    suppress_all_outputs,
     restore_stdout,
     setup_aggressive_log_suppression
 )
-from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 
-# Type variable for the handler class
+# Type variables
 T = TypeVar('T', bound=ConfigCellHandler)
 
+# Logger setup
+logger = get_logger(__name__)
+
 class ConfigCellInitializer(Generic[T], ABC):
-    """Base class for initializing configuration cells with shared state and YAML persistence.
+    """Orchestrates the initialization and lifecycle of configuration cells.
     
-    This abstract base class provides a structured approach to creating configuration UI components
-    that can be embedded in Jupyter notebooks. It handles configuration loading/saving, UI state
-    management, and error handling in a consistent way.
+    This abstract base class handles the core initialization flow, component registration,
+    and lifecycle management of configuration UIs. It delegates UI component creation
+    to the components module and focuses on orchestration.
     
-    Key Features:
-        - Type-safe configuration handling with YAML persistence
-        - Automatic UI state management
-        - Built-in error handling and recovery
-        - Support for nested configuration hierarchies
-        - Thread-safe component management
-        
     Type Parameters:
         T: Type of the configuration handler, must be a subclass of ConfigCellHandler
         
     Subclasses must implement:
         - create_handler(): Create and return a configuration handler instance
         - create_ui_components(): Create and return UI components dictionary
-        
-    Example:
-        ```python
-        class MyConfigInitializer(ConfigCellInitializer[MyConfigHandler]):
-            def create_handler(self) -> MyConfigHandler:
-                return MyConfigHandler()
-                
-            def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-                return {
-                    'input': widgets.Text(value=config.get('value', '')),
-                    'container': widgets.VBox()
-                }
-        ```
     """
     
-    def __init__(self, module_name: str, config_filename: str, parent_module: Optional[str] = None):
-        """Initialize a new configuration cell initializer.
-        
-        This sets up the basic infrastructure for configuration management including
-        logging, state tracking, and handler initialization.
+    def __init__(
+        self, 
+        module_name: str, 
+        config_filename: str, 
+        parent_module: Optional[str] = None,
+        is_container: bool = False,
+        **kwargs
+    ):
+        """Initialize the configuration cell.
         
         Args:
-            module_name: Unique identifier for this configuration module.
-                        Used for logging and configuration namespacing.
-            config_filename: Base filename (without extension) for configuration
-                           persistence. Will be saved as '{config_filename}.yaml'.
-            parent_module: Optional parent module identifier for creating nested
-                         configuration hierarchies. If provided, configurations will
-                         be namespaced under this parent.
-                         
-        Attributes:
-            module_name (str): The name of this configuration module.
-            config_filename (str): Base filename for configuration storage.
-            parent_module (Optional[str]): Parent module identifier if nested.
-            logger: Configured logger instance for this module.
-            ui_components (Dict[str, Any]): Dictionary to store UI components.
-            _handler (Optional[T]): Cached instance of the config handler.
+            module_name: Unique identifier for this module (e.g., 'split', 'strategy').
+            config_filename: Base filename for configuration persistence.
+            parent_module: Optional parent module path (e.g., 'dataset' for 'dataset.split').
+            is_container: If True, this component can contain other child components.
+            **kwargs: Additional keyword arguments for future extension.
+            
+        Note:
+            - The module hierarchy is separate from UI component hierarchy.
+            - Use parent_module to define module relationships (e.g., 'dataset.split').
+            - Use is_container to indicate if this component can contain other components.
         """
         self.module_name = module_name
         self.config_filename = config_filename
         self.parent_module = parent_module
+        self.is_container = is_container
         
-        # Initialize with basic logger first
-        self._logger_bridge = None
-        self.logger = get_logger(f"smartcash.ui.{module_name}")
+        # Setup logging and component registry
+        self._setup_logging()
+        self._setup_component_registry()
         
-        # Setup aggressive log suppression
-        setup_aggressive_log_suppression()
-        
-        self.ui_components: Dict[str, Any] = {}
+        # Initialize handler lazily
         self._handler: Optional[T] = None
+    
+    def _setup_logging(self) -> None:
+        """Initialize logging infrastructure."""
+        self.ui_components = {}
+        self._logger_bridge = UILoggerBridge(
+            self.ui_components, 
+            f"smartcash.ui.{self.module_name}"
+        )
+        self.logger = self._logger_bridge.logger
+        setup_aggressive_log_suppression()
+    
+    def _setup_component_registry(self) -> None:
+        """Register this component in the component registry.
+        
+        Registers the component with its full module path and sets up parent-child
+        relationships if a parent_module is specified.
+        """
+        # Create component ID using module hierarchy (e.g., 'dataset.split')
+        self._component_id = (
+            f"{self.parent_module}.{self.module_name}" 
+            if self.parent_module 
+            else self.module_name
+        )
+        
+        # Register with component registry
+        component_registry.register_component(
+            component_id=self._component_id,
+            component=self.ui_components,
+            parent_id=self.parent_module
+        )
+        
+        # Set up container if needed
+        if self.is_container:
+            self._initialize_as_container()
     
     @property
     def handler(self) -> T:
-        """Get the configuration handler instance, creating it if necessary.
-        
-        This property implements lazy initialization of the configuration handler.
-        The handler is created on first access using the create_handler() method.
-        
-        Returns:
-            T: An instance of the configuration handler.
-            
-        Note:
-            The handler is cached after creation. To force recreation, set
-            _handler to None before accessing this property.
-        """
+        """Lazy initialization of the configuration handler."""
         if self._handler is None:
             self._handler = self.create_handler()
         return self._handler
     
     @abstractmethod
     def create_handler(self) -> T:
-        """Create and return a new configuration handler instance.
-        
-        This method must be implemented by subclasses to provide a properly
-        configured handler for the specific configuration type.
+        """Create and return a configuration handler instance.
         
         Returns:
-            T: A new instance of a ConfigCellHandler subclass.
-            
-        Raises:
-            RuntimeError: If the handler cannot be created due to missing
-                        dependencies or configuration.
-                        
-        Example:
-            def create_handler(self) -> MyConfigHandler:
-                return MyConfigHandler(
-                    config_file=Path('configs') / f'{self.config_filename}.yaml',
-                    default_config={
-                        'setting1': 'default',
-                        'setting2': 42
-                    }
-                )
+            An instance of a ConfigCellHandler subclass.
         """
         pass
-    
+        
     @abstractmethod
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create and return UI components for the configuration interface.
-        
-        This method must be implemented by subclasses to define the user interface
-        for configuring the module. The UI should reflect the current configuration
-        state and update the configuration when user interactions occur.
+        """Create and return UI components based on the provided config.
         
         Args:
-            config: Current configuration dictionary containing all settings.
-                   This should be used to initialize the UI component states.
-                   
-        Returns:
-            Dict[str, Any]: A dictionary mapping string identifiers to UI components.
-                          Must include at least a 'container' key with the root
-                          widget that contains all other UI elements.
-                          
-        Note:
-            - The returned dictionary is stored in the ui_components attribute.
-            - All widgets should update the handler's config when changed.
-            - Use ipywidgets for interactive elements.
+            config: Current configuration values
             
-        Example:
-            def create_ui_components(self, config):
-                input_widget = widgets.Text(
-                    value=config.get('name', ''),
-                    description='Name:',
-                    layout={'width': '400px'}
-                )
-                
-                def on_change(change):
-                    self.handler.update_config({'name': change['new']})
-                    
-                input_widget.observe(on_change, names='value')
-                
-                return {
-                    'input': input_widget,
-                    'container': widgets.VBox([
-                        widgets.HTML('<h3>Configuration</h3>'),
-                        input_widget
-                    ])
-                }
+        Returns:
+            Dictionary of UI components with at least a 'container' widget.
         """
         pass
+        
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Initialize the configuration cell UI with the given config.
+        
+        This method orchestrates the entire initialization process:
+        1. Creates or retrieves the configuration handler
+        2. Loads or validates the provided configuration
+        3. Delegates UI component creation to the components module
+        4. Sets up event handlers and callbacks
+        5. Returns the UI components dictionary
+        
+        Args:
+            config: Optional initial configuration. If not provided, the handler's
+                   load_config() method will be used to load the configuration.
+                   
+        Returns:
+            Dictionary of UI components that can be displayed or further customized.
+            The dictionary will always contain a 'container' widget as the root element.
+            
+        Raises:
+            RuntimeError: If initialization fails due to configuration errors
+        """
+        try:
+            # Update handler with provided config
+            if config is not None:
+                self.handler.update(config)
+            
+            # Delegate UI creation to components module
+            ui_components = self.create_ui_components(self.handler.config)
+            self.ui_components.update(ui_components)
+            
+            # Ensure container exists
+            if 'container' not in self.ui_components:
+                self.ui_components['container'] = widgets.VBox()
+            
+            self.logger.info(f"Successfully initialized {self.module_name} UI")
+            return self.ui_components
+            
+        except Exception as e:
+            error_msg = f"Failed to initialize {self.module_name} UI: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return self._create_error_ui(error_msg)
+        
+    def connect_to_parent(self) -> None:
+        """Connect this component to its parent in the component hierarchy."""
+        if not self.parent_module:
+            self.logger.debug("No parent module specified, skipping parent connection")
+            return
+            
+        parent_id = f"{self.parent_module}.parent"
+        parent = component_registry.get_component(parent_id)
+        
+        if not parent:
+            error_msg = f"Parent component {parent_id} not found in registry"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+            
+        try:
+            # Add this component to the parent's content area
+            if hasattr(parent, 'add_child'):
+                parent.add_child(self.ui_components['container'])
+                self.logger.debug(f"Connected {self._component_id} to parent {parent_id}")
+            else:
+                self.logger.warning(f"Parent {parent_id} does not support add_child")
+                
+        except Exception as e:
+            error_msg = f"Failed to connect to parent {parent_id}: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
     def setup_handlers(self) -> None:
         """Set up event handlers and callbacks for UI components.
@@ -227,14 +222,20 @@ class ConfigCellInitializer(Generic[T], ABC):
         to set up any additional event handlers, observers, or callbacks needed
         for the UI to function properly.
         
+        The default implementation sets up cleanup handlers for when the UI is closed
+        or refreshed.
+        
         Note:
             - This method is called automatically during initialization.
-            - The default implementation does nothing.
             - Access UI components through self.ui_components.
             - Connect widgets to handler methods as needed.
+            - Override this method to add custom handlers, but make sure to call super().setup_handlers()
             
         Example:
             def setup_handlers(self):
+                # Call parent implementation
+                super().setup_handlers()
+                
                 # Connect a button click to a handler method
                 self.ui_components['save_button'].on_click(self._on_save_clicked)
                 
@@ -244,38 +245,81 @@ class ConfigCellInitializer(Generic[T], ABC):
                     names='value'
                 )
         """
-        pass
+        try:
+            # Register cleanup function for when the cell is re-executed
+            self._register_cleanup()
+            
+            # Log that handlers have been set up
+            self.logger.debug(f"UI event handlers set up for {self.module_name}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to set up UI handlers: {str(e)}", exc_info=True)
     
-    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
+    def _register_cleanup(self) -> None:
+        """Register cleanup function for when the cell is re-executed.
+        
+        This ensures that resources are properly cleaned up when the UI is refreshed.
+        """
+        try:
+            from IPython import get_ipython
+            ipython = get_ipython()
+            
+            if ipython is not None:
+                # Register cleanup function to run before cell execution
+                def cleanup():
+                    try:
+                        self.logger.debug(f"Cleaning up {self.module_name} resources")
+                        
+                        # Clean up logger bridge if it exists
+                        if hasattr(self, '_logger_bridge') and self._logger_bridge:
+                            if hasattr(self._logger_bridge, 'cleanup'):
+                                self._logger_bridge.cleanup()
+                            
+                        # Restore stdout/stderr
+                        if hasattr(sys, '_original_stdout_saved'):
+                            sys.stdout = sys._original_stdout_saved
+                            del sys._original_stdout_saved
+                        if hasattr(sys, '_original_stderr_saved'):
+                            sys.stderr = sys._original_stderr_saved
+                            del sys._original_stderr_saved
+                            
+                    except Exception as e:
+                        # Use print as logging might not be available during cleanup
+                        print(f"Error during cleanup: {str(e)}")
+                
+                # Register the cleanup function
+                ipython.events.register('pre_run_cell', lambda: cleanup())
+                
+        except Exception as e:
+            self.logger.warning(f"Failed to register cleanup function: {str(e)}", exc_info=True)
+    
+    def _initialize_logger_bridge(self) -> None:
         """Initialize the logger bridge for UI logging.
         
         This sets up a bridge between the Python logging system and the UI,
         allowing log messages to be displayed in the application's log panel.
         
-        Args:
-            ui_components: Dictionary containing UI components, which should include
-                         a log output component if UI logging is desired.
+        The logger bridge is already initialized in __init__, this method
+        configures it with the current UI components.
         """
-        try:
-            # Create and store the logger bridge
-            self._logger_bridge = create_ui_logger_bridge(
-                ui_components=ui_components,
-                logger_name=f"smartcash.ui.{self.module_name}"
+        if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
+            self.logger.warning("Logger bridge not initialized, creating a new one")
+            self._logger_bridge = UILoggerBridge(
+                self.ui_components,
+                f"smartcash.ui.{self.module_name}"
             )
-            
-            # Update the logger to use the bridge
+        
+        try:
+            # Update the logger instance to use the bridge
             self.logger = self._logger_bridge.logger
             
-            # Mark UI as ready to flush any buffered logs
-            if hasattr(self._logger_bridge, 'set_ui_ready'):
-                self._logger_bridge.set_ui_ready(True)
-                
+            # Log a test message to verify logging is working
             self.logger.debug(f"Logger bridge initialized for {self.module_name}")
             
         except Exception as e:
             # Fallback to basic logging if bridge initialization fails
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
-            self.logger.warning(f"Failed to initialize logger bridge: {str(e)}")
+            self.logger.warning(f"Failed to configure logger bridge: {str(e)}", exc_info=True)
             
     def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Initialize the configuration cell with the given configuration.
@@ -314,11 +358,17 @@ class ConfigCellInitializer(Generic[T], ABC):
             if config:
                 self.handler.update_config(config)
             
-            # Create UI components using current config (without logging)
+            # Create UI components using current config
             self.ui_components = self.create_ui_components(self.handler.config)
             
-            # Initialize logger bridge after UI components are created
-            self._initialize_logger_bridge(self.ui_components)
+            # Update logger bridge with the new UI components
+            self._logger_bridge.ui_components = self.ui_components
+            
+            # Initialize logger bridge with the UI components
+            self._initialize_logger_bridge()
+            
+            # Mark UI as ready to flush any buffered logs
+            self._logger_bridge.set_ui_ready(True)
             
             # Setup any additional event handlers
             self.setup_handlers()
@@ -333,233 +383,78 @@ class ConfigCellInitializer(Generic[T], ABC):
             return result
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize {self.module_name}: {str(e)}")
-            self.logger.debug(traceback.format_exc())
-            return self._create_error_ui(str(e))
+            error_msg = f"Failed to initialize {self.module_name}: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return self._create_error_ui(error_msg)
             
         finally:
             restore_stdout()
     
-    def _create_error_ui(self, error_message: str) -> Dict[str, Any]:
-        """Create a fallback UI component to display error messages."""
-        from smartcash.ui.components import create_error_component
-        return create_error_component(
-            f"{self.module_name} Initialization Error",
-            error_message,
-            traceback.format_exc(),
-            "error"
+    def _initialize_as_container(self) -> None:
+        """Initialize this component as a container for other components.
+        
+        Creates and registers a container widget that can hold child components.
+        The container is registered with a '.container' suffix in the component registry.
+        """
+        from smartcash.ui.config_cell.components.ui_factory import create_container
+        
+        self.logger.debug(f"Initializing container for {self._component_id}")
+        
+        # Create container using the factory
+        container_ui = create_container(
+            title=f"{self.module_name} Configuration",
+            container_id=self._component_id
         )
-
-# Shared state registry for config handlers (legacy support)
-_shared_handlers: Dict[str, ConfigCellHandler] = {}
-
-def get_shared_handler(module_name: str, parent_module: Optional[str] = None) -> ConfigCellHandler:
-    """Get or create a shared config handler for the given module.
-    
-    Args:
-        module_name: Name of the module
-        parent_module: Optional parent module name for namespacing
         
-    Returns:
-        ConfigCellHandler: Shared handler instance for the module
-    """
-    key = f"{parent_module}.{module_name}" if parent_module else module_name
-    if key not in _shared_handlers:
-        _shared_handlers[key] = ConfigCellHandler(module_name, parent_module)
-    return _shared_handlers[key]
-
-def create_error_fallback(
-    error_message: str, 
-    traceback: Optional[str] = None
-) -> Dict[str, Any]:
-    """Create a fallback UI component to display error messages.
-    
-    Args:
-        error_message: The main error message to display
-        traceback: Optional detailed traceback information
+        # Update UI components with container
+        self.ui_components.update(container_ui)
         
-    Returns:
-        Dict[str, Any]: Dictionary containing the error UI component
-    """
-    from smartcash.ui.components import create_error_component
-    return create_error_component("Config Cell Initialization Error", error_message, traceback)
-
-def _update_status(
-    ui_components: Dict[str, Any], 
-    message: str, 
-    status_type: str = "info"
-) -> None:
-    """Update the status bar with a message and apply appropriate styling.
-    
-    Args:
-        ui_components: Dictionary containing UI components
-        message: Status message to display
-        status_type: Type of status ('info', 'success', 'warning', 'error')
-    """
-    from smartcash.ui.components.status_panel import update_status_panel
-    
-    # Use status_panel if available, fall back to status_bar for backward compatibility
-    if 'status_panel' in ui_components:
-        update_status_panel(ui_components['status_panel'], message, status_type)
-    elif 'status_bar' in ui_components and hasattr(ui_components['status_bar'], 'value'):
-        # Fallback for legacy status_bar
-        status_bar = ui_components['status_bar']
-        status_bar.value = message
-        
-        # Apply color coding based on status type
-        status_colors = {
-            'info': 'blue',
-            'success': 'green',
-            'warning': 'orange',
-            'error': 'red'
-        }
-        status_bar.style.text_color = status_colors.get(status_type.lower(), 'black')
-    
-    # Log the status message using the appropriate log level
-    logger = get_logger(__name__)
-    log_method = getattr(logger, status_type, logger.info)
-    log_method(f"[{status_type.upper()}] {message}")
-
-
-def create_config_cell(
-    module_name: str,
-    config_filename: str,
-    env: Optional[Dict[str, Any]] = None,
-    config: Optional[Dict[str, Any]] = None,
-    parent_module: Optional[str] = None,
-    config_handler_class: Optional[Type] = None,
-    **kwargs
-) -> None:
-    """Create and immediately display a configuration cell UI.
-    
-    Args:
-        module_name: Name of the module
-        config_filename: Base name for the config file
-        env: Environment configuration (unused, for backward compatibility)
-        config: Initial configuration
-        parent_module: Optional parent module name
-        config_handler_class: Optional custom config handler class
-        **kwargs: Additional keyword arguments
-    """
-    from IPython.display import display
-    logger = get_logger(__name__)
-    
-    # Suppress output during initialization
-    suppress_all_outputs()
-    
-    try:
-        # Get or create config handler
-        if config_handler_class:
-            handler = config_handler_class(config or {})
-        else:
-            handler = ConfigCellHandler(module_name, parent_module)
-            if config:
-                handler.update_config(config)
-        
-        # Create UI components
-        ui_components = {}
-        
-        # Add container for the config cell
-        container = widgets.VBox()
-        ui_components['container'] = container
-        
-        # Store the handler for later use
-        ui_components['_config_handler'] = handler
-        
-        # Add status bar
-        status_bar = widgets.HTML()
-        ui_components['status_bar'] = status_bar
-        
-        # Add the status bar to the container
-        container.children = [status_bar]
-        
-        # Display the container
-        display(container)
-        
-        # Update status
-        _update_status(ui_components, f"Initialized {module_name} configuration", 'info')
-        
-        # Store UI components in global registry for access if needed
-        global _ui_registry
-        _ui_registry = ui_components
-        
-    except Exception as e:
-        error_msg = f"Failed to create config cell: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        
-        # Display error UI
-        error_ui = create_error_fallback(
-            f"Failed to initialize {module_name} configuration",
-            error_msg
+        # Register container in the registry
+        container_id = f"{self._component_id}.container"
+        component_registry.register_component(
+            component_id=container_id,
+            component=container_ui,
+            parent_id=self._component_id
         )
-        display(error_ui['widget'] if 'widget' in error_ui else error_ui)
-    finally:
-        restore_stdout()  # Always restore output
         
-    return None  # Explicitly return None to indicate no dictionary return
-
-def connect_config_to_parent(
-    ui_components: Dict[str, Any],
-    parent_components: Dict[str, Any],
-    module_name: str,
-    parent_module: Optional[str] = None
-) -> None:
-    """Connect child config UI components to a parent UI container.
+        self.logger.info(f"Initialized container {container_id}")
     
-    This function establishes the parent-child relationship between UI components,
-    allowing for proper nesting and state sharing. It handles both the visual
-    connection of containers and the sharing of configuration state.
-    
-    Args:
-        ui_components: Dictionary of child UI components to connect
-        parent_components: Dictionary of parent UI components
-        module_name: Name of the child module (for namespacing)
-        parent_module: Optional parent module name (for hierarchical configs)
-        
-    Example:
-        ```python
-        # In a parent component
-        def initialize_parent_ui():
-            parent_ui = {}
-            # ... setup parent UI ...
+    def cleanup(self) -> None:
+        """Release all resources and unregister components."""
+        try:
+            self.logger.debug(f"Cleaning up {self.module_name} resources")
             
-            # Create and connect child config
-            child_ui = initialize_config_cell(
-                module_name="child_config",
-                config_filename="child_config"
-            )
-            connect_config_to_parent(
-                ui_components=child_ui,
-                parent_components=parent_ui,
-                module_name="child_config"
-            )
-            return parent_ui
-        ```
-    """
-    try:
-        # Connect container widgets if both parent and child have them
-        if 'container' in parent_components and 'container' in ui_components:
-            parent_container = parent_components['container']
-            child_container = ui_components['container']
+            # Clean up logger bridge if it exists
+            if hasattr(self, '_logger_bridge'):
+                self._logger_bridge.cleanup()
             
-            # Preserve existing children and append the new one
-            parent_container.children = tuple(list(parent_container.children) + [child_container])
+            # Unregister components from the registry
+            if hasattr(self, '_component_id'):
+                component_registry.unregister_component(self._component_id)
+                if self.is_parent:
+                    component_registry.unregister_component(f"{self._component_id}.parent")
             
-            # Add a small margin between components
-            if hasattr(child_container, 'layout') and hasattr(child_container.layout, 'margin'):
-                child_container.layout.margin = '0 0 10px 0'
-        
-        # Share config handler if parent expects it
-        if '_config_handler' in ui_components and 'config' in parent_components:
-            parent_components['_config_handler'] = ui_components['_config_handler']
-            
-            # If parent has a method to handle config updates, call it
-            if hasattr(parent_components, 'on_config_connected'):
-                parent_components.on_config_connected(ui_components['_config_handler'])
+            # Clean up handler if it exists
+            if hasattr(self, '_handler') and hasattr(self._handler, 'cleanup'):
+                self._handler.cleanup()
                 
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"Failed to connect config to parent: {str(e)}")
-        logger.debug(traceback.format_exc())
-
-    # Callback management with parent module support
+            self.logger.info(f"Cleaned up resources for {self.module_name}")
+            
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
+        finally:
+            restore_stdout()
+    
+    def _create_error_ui(
+        self, 
+        error_message: str, 
+        details: Optional[str] = None,
+        title: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a fallback UI for error conditions."""
+        error_title = title or f"Error in {self.module_name}"
+        return create_error_response(
+            error_message=error_message,
+            title=error_title,
+            include_traceback=bool(details)
+        )

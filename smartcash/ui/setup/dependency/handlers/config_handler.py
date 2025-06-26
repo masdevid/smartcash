@@ -74,18 +74,85 @@ class DependencyConfigHandler(ConfigHandler):
             safe_log_to_ui(self._ui_components, error_msg, "error")
     
     def _initialize_default_config(self) -> None:
-        """Initialize default config if it doesn't exist."""
+        """Initialize default config if it doesn't exist or is invalid."""
         try:
             config_path = self.config_manager.get_config_path(self.config_filename)
+            needs_update = False
+            
+            # Get default config with all required fields
+            default_config = self.get_default_config()
+            
             if not config_path.exists():
-                default_config = self.get_default_config()
+                needs_update = True
+                self.logger.info(f"ℹ️ Config file not found at {config_path}, creating default...")
+            else:
+                # Check if existing config has all required fields
+                try:
+                    existing_config = self.config_manager.load_config(self.config_filename) or {}
+                    required_fields = ['dependencies', 'install_options']
+                    missing_fields = [field for field in required_fields if field not in existing_config]
+                    
+                    if missing_fields:
+                        self.logger.warning(f"⚠️ Missing required fields in config: {missing_fields}")
+                        # Merge existing config with defaults, preserving existing values
+                        merged_config = self._merge_configs(default_config, existing_config)
+                        default_config = merged_config
+                        needs_update = True
+                        
+                except Exception as load_error:
+                    self.logger.error(f"❌ Error loading existing config: {str(load_error)}", exc_info=True)
+                    needs_update = True
+            
+            if needs_update:
+                # Ensure the directory exists before saving
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Save the config
                 success = self.config_manager.save_config(default_config, self.config_filename)
                 if success:
-                    self.logger.info(f"✅ Created default config at {config_path}")
+                    self.logger.info(f"✅ {'Created' if not config_path.exists() else 'Updated'} config at {config_path}")
+                    # Verify the config was saved correctly
+                    saved_config = self.config_manager.load_config(self.config_filename)
+                    if not saved_config:
+                        self.logger.error("❌ Failed to verify saved config - file may be empty")
                 else:
-                    self.logger.warning(f"⚠️ Failed to create default config at {config_path}")
+                    self.logger.error(f"❌ Failed to save config to {config_path}")
+                    # Try one more time with direct file write as fallback
+                    self._save_config_fallback(config_path, default_config)
+                    
         except Exception as e:
-            self.logger.error(f"Error initializing default config: {str(e)}", exc_info=True)
+            self.logger.error(f"❌ Critical error in _initialize_default_config: {str(e)}", exc_info=True)
+            # Try fallback save even if there was an error
+            try:
+                self._save_config_fallback(self.config_manager.get_config_path(self.config_filename), default_config)
+            except Exception as fallback_error:
+                self.logger.error(f"❌ Fallback save also failed: {str(fallback_error)}")
+    
+    def _save_config_fallback(self, config_path: str, config: Dict[str, Any]) -> bool:
+        """Fallback method to save config using direct file operations."""
+        try:
+            import yaml
+            import json
+            from pathlib import Path
+            
+            # Ensure directory exists
+            Path(config_path).parent.mkdir(parents=True, exist_ok=True)
+            
+            # Try YAML first, fall back to JSON if that fails
+            try:
+                with open(config_path, 'w') as f:
+                    yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False)
+            except Exception as yaml_error:
+                self.logger.warning(f"YAML save failed, trying JSON: {str(yaml_error)}")
+                with open(config_path, 'w') as f:
+                    json.dump(config, f, indent=2)
+            
+            self.logger.info(f"✅ Used fallback method to save config to {config_path}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Fallback save failed for {config_path}: {str(e)}")
+            return False
         
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract configuration from UI components.
@@ -197,13 +264,13 @@ class DependencyConfigHandler(ConfigHandler):
             return ['torch', 'torchvision', 'numpy', 'pandas']
     
     def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """Load config with inheritance handling.
+        """Load config with inheritance handling and required fields validation.
         
         Args:
             config_filename: Optional custom config filename
             
         Returns:
-            Loaded configuration dictionary
+            Loaded configuration dictionary with all required fields
         """
         try:
             # Get the full config path
@@ -214,22 +281,55 @@ class DependencyConfigHandler(ConfigHandler):
             self.logger.info(f"🔍 Looking for config at: {config_path}")
             
             # Load the config
-            config = self.config_manager.load_config(filename)
+            config = self.config_manager.load_config(filename) or {}
             
-            if not config:
-                msg = f"⚠️ Config is empty at {config_path}, using default"
-                safe_log_to_ui(self._ui_components, msg, "warning")
-                self.logger.warning(msg)
-                return self.get_default_config()
+            # Check for required fields
+            required_fields = ['dependencies', 'install_options']
+            missing_fields = [field for field in required_fields if field not in config]
             
-            # Handle inheritance
+            if not config or missing_fields:
+                # Get default config to ensure we have all required fields
+                default_config = self.get_default_config()
+                
+                if not config:
+                    msg = f"⚠️ Config is empty at {config_path}, using default"
+                    safe_log_to_ui(self._ui_components, msg, "warning")
+                    self.logger.warning(msg)
+                    return default_config
+                else:
+                    # Merge with defaults to ensure all required fields exist
+                    msg = f"⚠️ Config missing required fields {missing_fields}, merging with defaults"
+                    safe_log_to_ui(self._ui_components, msg, "warning")
+                    self.logger.warning(msg)
+                    
+                    # Only merge missing fields, preserving existing values
+                    for field in required_fields:
+                        if field not in config and field in default_config:
+                            config[field] = default_config[field]
+                    
+                    # Save the fixed config for next time
+                    try:
+                        self.config_manager.save_config(config, filename)
+                    except Exception as save_error:
+                        self.logger.error(f"Failed to save fixed config: {str(save_error)}")
+            
+            # Handle inheritance after ensuring required fields exist
             if '_base_' in config:
-                base_config = self.config_manager.load_config(config['_base_']) or {}
-                merged_config = self._merge_configs(base_config, config)
-                msg = f"📂 Config loaded from {config_path} with inheritance"
-                safe_log_to_ui(self._ui_components, msg, "info")
-                self.logger.info(msg)
-                return merged_config
+                try:
+                    base_config = self.config_manager.load_config(config['_base_']) or {}
+                    # Ensure base config has required fields
+                    for field in required_fields:
+                        if field not in base_config and field in self.get_default_config():
+                            base_config[field] = self.get_default_config()[field]
+                    
+                    merged_config = self._merge_configs(base_config, config)
+                    msg = f"📂 Config loaded from {config_path} with inheritance"
+                    safe_log_to_ui(self._ui_components, msg, "info")
+                    self.logger.info(msg)
+                    return merged_config
+                except Exception as inherit_error:
+                    self.logger.error(f"Error processing inherited config: {str(inherit_error)}", exc_info=True)
+                    # Continue with current config if inheritance fails
             
             msg = f"📂 Config loaded from {config_path}"
             safe_log_to_ui(self._ui_components, msg, "info")

@@ -165,11 +165,7 @@ def create_split_form(config: Dict[str, Any]) -> Dict[str, Any]:
     }
     
     # Reuse existing shared components
-    save_reset_buttons = create_save_reset_buttons(
-        save_tooltip="Simpan konfigurasi split dan sinkronkan ke Google Drive",
-        reset_tooltip="Reset konfigurasi ke nilai default",
-        with_sync_info=True
-    )
+    save_reset_buttons = create_save_reset_buttons()
     
     
     return form_components

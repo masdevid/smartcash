@@ -48,43 +48,37 @@ class CommonInitializer(ABC):
         """
         try:
             suppress_all_outputs()
-            self.logger.info(f"🚀 Starting {self.module_name} initialization")
             
             # 1. Load and validate config
             config = self._load_config(config)
-            if not config:
-                raise ValueError("Failed to load configuration")
-                
-            # 2. Create UI components (including log accordion)
-            ui_components = self._create_ui_components(config, **kwargs)
-            if not ui_components:
-                raise ValueError("Failed to create UI components")
-                
-            # 3. Add logger bridge
-            self._add_logger_bridge(ui_components)
-                
-            # 4. Setup handlers if implemented
+            
+            # 2. Create UI components
+            ui_components = self._create_ui_components(config, **kwargs) or {}
+            
+            # 3. Set up handlers if method exists
             if hasattr(self, '_setup_handlers'):
                 ui_components = self._setup_handlers(ui_components, config, **kwargs) or ui_components
                 
-            # 5. Get the root UI component
+            # 4. Get the root UI component
             root_ui = self._get_ui_root(ui_components)
             if not root_ui:
                 raise ValueError("No root UI component found")
             
-            # 6. Run pre-initialization checks (after everything is set up)
-            try:
-                self._pre_initialize_checks(**kwargs)
-                self.logger.info(f"✅ {self.module_name} initialized successfully")
-                return root_ui
-            except Exception as e:
-                error_msg = f"Initialization failed: {str(e)}"
-                self.logger.error(error_msg)
-                return self._create_error_ui(error_msg)
+            # 5. Run pre-initialization checks (after everything is set up)
+            self._pre_initialize_checks(**kwargs)
+            self.logger.info(f"✅ {self.module_name} initialized successfully")
+            
+            # Return the container widget which holds the UI
+            if 'container' in ui_components:
+                return ui_components['container']
+            elif 'ui' in ui_components:
+                return ui_components['ui']
+            return root_ui
             
         except Exception as e:
-            self.logger.error(f"❌ Failed to initialize {self.module_name}: {str(e)}\n{traceback.format_exc()}")
-            return self._create_error_ui(str(e))
+            error_msg = f"❌ Failed to initialize {self.module_name}: {str(e)}"
+            self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
+            return self._create_error_ui(error_msg)
     
     def _load_config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Load and validate configuration"""
@@ -192,29 +186,17 @@ class CommonInitializer(ABC):
             self.logger.warning(f"⚠️ Failed to setup logger bridge: {str(e)}")
             
     def _create_error_ui(self, error_message: str) -> Any:
-        """
-        Create an error UI component using the shared ErrorComponent.
-        
-        Args:
-            error_message: Error message to display
-            
-        Returns:
-            Error UI component
-        """
+        """Create a fallback UI component to display error messages."""
         try:
-            from smartcash.ui.components.error.error_component import create_error_component
+            from smartcash.ui.components import create_error_component
             import traceback
             
             error_components = create_error_component(
+                title=f"{self.module_name} Initialization Error",
                 error_message=error_message,
                 traceback=traceback.format_exc(),
-                title=f"❌ {self.module_name} Initialization Error",
-                error_type="error",
-                show_traceback=True,
-                width='100%'
+                error_type="error"
             )
-            return error_components['widget']
-            
+            return error_components['widget'] if 'widget' in error_components else str(error_components)
         except Exception as e:
-            # Fallback to simple error message if component creation fails
             return f"Error initializing {self.module_name}: {error_message}\n{str(e)}"

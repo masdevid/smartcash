@@ -1,28 +1,25 @@
 """
 File: smartcash/ui/dataset/downloader/downloader_initializer.py
-Deskripsi: Downloader initializer yang mewarisi CommonInitializer dengan clean dependency
+Deskripsi: Downloader initializer yang mengimplementasikan CommonInitializer
 """
 
-from typing import Dict, Any, List, Optional, Type
+from typing import Dict, Any, List, Optional
 from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
 from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
-from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
 
 class DownloaderInitializer(CommonInitializer):
     """
-    Downloader initializer with complete UI and backend service integration.
+    Initializer untuk modul downloader yang mengimplementasikan CommonInitializer.
     
-    This initializer handles the setup of the downloader UI components and their
-    associated handlers, following the CommonInitializer pattern.
+    Menangani inisialisasi UI downloader dan integrasi dengan backend service.
     """
     
     def __init__(self, parent_module: str = 'dataset'):
         """
-        Initialize the downloader initializer.
+        Inisialisasi downloader initializer.
         
         Args:
-            parent_module: The parent module name (default: 'dataset')
+            parent_module: Nama modul induk (default: 'dataset')
         """
         self.parent_module = parent_module
         super().__init__(
@@ -32,95 +29,69 @@ class DownloaderInitializer(CommonInitializer):
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
-        Create and return downloader UI components.
+        Buat komponen UI untuk downloader.
         
         Args:
-            config: Configuration dictionary
-            **kwargs: Additional arguments (may include 'env' for environment)
+            config: Konfigurasi untuk inisialisasi UI
+            **kwargs: Argumen tambahan (mengandung 'env' untuk environment)
             
         Returns:
-            Dictionary of UI components
+            Dictionary berisi komponen UI
         """
-        env = kwargs.get('env')
+        from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
+        
         ui_components = create_downloader_main_ui(config)
         
-        # Add metadata and configuration to UI components
+        # Tambahkan metadata dan konfigurasi ke UI components
         ui_components.update({
-            'downloader_initialized': True,
-            'module_name': 'downloader',
+            'module_name': self.module_name.split('.')[-1],
             'parent_module': self.parent_module,
             'data_dir': config.get('data', {}).get('dir', 'data'),
             'target_dir': config.get('download', {}).get('target_dir', 'data'),
-            'env': env
+            'env': kwargs.get('env')
         })
         
         return ui_components
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
-        Set up the downloader handlers.
+        Setup event handlers untuk komponen UI.
         
         Args:
-            ui_components: Dictionary of UI components
-            config: Configuration dictionary
-            **kwargs: Additional arguments (may include 'env' for environment)
+            ui_components: Dictionary berisi komponen UI
+            config: Konfigurasi yang digunakan
+            **kwargs: Argumen tambahan
             
         Returns:
-            Updated dictionary of UI components with handlers attached
+            Dictionary komponen UI yang telah diupdate dengan handlers
         """
-        env = kwargs.get('env')
-        return setup_download_handlers(ui_components, config, env)
+        from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
+        return setup_download_handlers(ui_components, config, kwargs.get('env'))
     
     def _get_default_config(self) -> Dict[str, Any]:
         """
-        Get the default configuration for the downloader.
+        Dapatkan konfigurasi default untuk modul downloader.
         
         Returns:
-            Default configuration dictionary
+            Dictionary berisi konfigurasi default
+            
+        Raises:
+            ImportError: Jika modul default config tidak ditemukan
         """
         from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
         return get_default_downloader_config()
     
-    def _get_critical_components(self) -> List[str]:
-        """
-        Get the list of critical component names that must be present in the UI.
-        
-        Returns:
-            List of critical component names
-        """
-        return [
-            'ui', 'download_button', 'check_button', 'cleanup_button',
-            'save_button', 'reset_button', 'log_output', 'status_panel',
-            'progress_tracker', 'progress_container', 'show_for_operation', 
-            'update_progress', 'complete_operation', 'error_operation', 'reset_all'
-        ]
-    
-    def _pre_initialize_checks(self, **kwargs) -> None:
-        """
-        Perform any pre-initialization checks.
-        
-        Args:
-            **kwargs: Additional arguments that might be needed for checks
-            
-        Raises:
-            Exception: If any pre-initialization check fails
-        """
-        # Add any specific pre-initialization checks here
-        pass
 
-# Global instance and public API
-_downloader_initializer = DownloaderInitializer()
-
-def initialize_downloader_ui(env=None, config=None, **kwargs):
+def initialize_downloader_ui(env: Optional[Dict[str, Any]] = None, config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
     """
-    Initialize and return the downloader UI.
+    Inisialisasi UI untuk modul downloader.
     
     Args:
-        env: Optional environment configuration
-        config: Optional configuration overrides
-        **kwargs: Additional arguments passed to the initializer
+        env: Konfigurasi environment opsional
+        config: Konfigurasi opsional untuk inisialisasi
+        **kwargs: Argumen tambahan yang akan diteruskan ke initializer
         
     Returns:
-        The root UI component or error UI if initialization fails
+        Komponen UI utama
     """
-    return _downloader_initializer.initialize(env=env, config=config, **kwargs)
+    return DownloaderInitializer().initialize(env=env, config=config, **kwargs)

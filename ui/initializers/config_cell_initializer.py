@@ -3,11 +3,11 @@ File: smartcash/ui/initializers/config_cell_initializer.py
 Deskripsi: Config cell initializer with shared state and YAML persistence
 
 This module provides functionality to initialize and manage configuration cells
-with shared state across notebook environments. It handles UI creation, state
-management, and YAML-based persistence.
+with shared state and YAML persistence.
 """
 
-from typing import Dict, Any, Optional, Type, Callable, List
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, Type, Callable, List, TypeVar, Generic
 import ipywidgets as widgets
 import traceback
 from pathlib import Path
@@ -15,13 +15,114 @@ import os
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.logging_utils import suppress_all_outputs, restore_stdout
-
-# Import components
-from smartcash.ui.config_cell.components.ui_components import create_config_cell_ui
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
-from smartcash.ui.config_cell.utils.error_utils import create_error_fallback
 
-# Shared state registry for config handlers
+# Type variable for the handler class
+T = TypeVar('T', bound=ConfigCellHandler)
+
+class ConfigCellInitializer(Generic[T], ABC):
+    """Abstract base class for config cell initializers.
+    
+    This class provides common functionality for initializing configuration cells,
+    including output suppression, error handling, and UI component management.
+    """
+    
+    def __init__(self, module_name: str, config_filename: str, parent_module: Optional[str] = None):
+        """Initialize the config cell initializer.
+        
+        Args:
+            module_name: Name of the module
+            config_filename: Base name for the config file
+            parent_module: Optional parent module name for namespacing
+        """
+        self.module_name = module_name
+        self.config_filename = config_filename
+        self.parent_module = parent_module
+        self.logger = get_logger(f"smartcash.ui.{module_name}")
+        self.ui_components: Dict[str, Any] = {}
+        self._handler: Optional[T] = None
+    
+    @property
+    def handler(self) -> T:
+        """Get the config handler instance."""
+        if self._handler is None:
+            self._handler = self.create_handler()
+        return self._handler
+    
+    @abstractmethod
+    def create_handler(self) -> T:
+        """Create and return a config handler instance.
+        
+        Returns:
+            An instance of a ConfigHandler subclass
+        """
+        pass
+    
+    @abstractmethod
+    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Create and return UI components.
+        
+        Args:
+            config: Current configuration
+            
+        Returns:
+            Dictionary of UI components
+        """
+        pass
+    
+    def setup_handlers(self) -> None:
+        """Setup event handlers for UI components."""
+        pass
+    
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Initialize the config cell with the given configuration.
+        
+        Args:
+            config: Optional initial configuration
+            
+        Returns:
+            Dictionary containing UI components and handlers
+        """
+        suppress_all_outputs()
+        try:
+            # Initialize handler with config
+            if config:
+                self.handler.update_config(config)
+            
+            # Create UI components
+            self.ui_components = self.create_ui_components(self.handler.config)
+            
+            # Setup event handlers
+            self.setup_handlers()
+            
+            # Add common UI elements
+            if 'container' not in self.ui_components:
+                self.ui_components['container'] = widgets.VBox()
+            
+            # Store the handler for later use
+            self.ui_components['_config_handler'] = self.handler
+            
+            return self.ui_components
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize {self.module_name}: {str(e)}")
+            self.logger.debug(traceback.format_exc())
+            return self._create_error_ui(str(e))
+            
+        finally:
+            restore_stdout()
+    
+    def _create_error_ui(self, error_message: str) -> Dict[str, Any]:
+        """Create a fallback UI component to display error messages."""
+        from smartcash.ui.components import create_error_component
+        return create_error_component(
+            f"{self.module_name} Initialization Error",
+            error_message,
+            traceback.format_exc(),
+            "error"
+        )
+
+# Shared state registry for config handlers (legacy support)
 _shared_handlers: Dict[str, ConfigCellHandler] = {}
 
 def get_shared_handler(module_name: str, parent_module: Optional[str] = None) -> ConfigCellHandler:
@@ -67,7 +168,13 @@ def _update_status(
         message: Status message to display
         status_type: Type of status ('info', 'success', 'warning', 'error')
     """
-    if 'status_bar' in ui_components and hasattr(ui_components['status_bar'], 'value'):
+    from smartcash.ui.components.status_panel import update_status_panel
+    
+    # Use status_panel if available, fall back to status_bar for backward compatibility
+    if 'status_panel' in ui_components:
+        update_status_panel(ui_components['status_panel'], message, status_type)
+    elif 'status_bar' in ui_components and hasattr(ui_components['status_bar'], 'value'):
+        # Fallback for legacy status_bar
         status_bar = ui_components['status_bar']
         status_bar.value = message
         
@@ -111,6 +218,9 @@ def create_config_cell(
     """
     logger = get_logger(__name__)
     
+    # Suppress output during initialization
+    suppress_all_outputs()
+    
     try:
         # Get or create config handler
         if config_handler_class:
@@ -140,14 +250,18 @@ def create_config_cell(
         # Update status
         _update_status(ui_components, f"Initialized {module_name} configuration", 'info')
         
+        # Restore output before returning
+        restore_stdout()
         return ui_components
         
     except Exception as e:
-        logger.error(f"Failed to create config cell: {str(e)}")
+        error_msg = f"Failed to create config cell: {str(e)}"
+        logger.error(error_msg)
         logger.debug(traceback.format_exc())
+        restore_stdout()  # Ensure output is restored even on error
         return create_error_fallback(
             f"Failed to initialize {module_name} configuration",
-            str(e)
+            error_msg
         )
 
 def connect_config_to_parent(

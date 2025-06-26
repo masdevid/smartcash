@@ -5,7 +5,7 @@ Deskripsi: Updated strategy initializer sesuai dengan handlers dan UI structure
 
 from typing import Dict, Any, Optional, Type, Union
 from IPython.display import display
-from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer, create_config_cell
+from smartcash.ui.initializers.config_cell_initializer import ConfigCellHandler, create_config_cell
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)

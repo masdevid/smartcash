@@ -67,9 +67,10 @@ class AnalysisHandler:
     def _setup_handlers(self) -> None:
         """Setup UI event handlers."""
         if button := self.ui.get('analyze_button'):
-            button.on_click(lambda _: self.handle_analysis())
+            # Create a decorated version of handle_analysis with the button context
+            decorated_handle = with_button_context(self.ui, 'analyze_button')(self.handle_analysis)
+            button.on_click(lambda _: decorated_handle())
     
-    @with_button_context(self.ui, 'analyze_button')
     def handle_analysis(self) -> None:
         """Handle package analysis with progress tracking."""
         try:

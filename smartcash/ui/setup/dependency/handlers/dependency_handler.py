@@ -17,9 +17,6 @@ from typing import Dict, List, Callable, Any, Optional, TypedDict
 
 # Local imports
 from smartcash.ui.setup.dependency.utils.types import UIComponents, HandlerMap
-from smartcash.ui.setup.dependency.handlers.installation_handler import setup_installation_handler as setup_install_handler
-from smartcash.ui.setup.dependency.handlers.analysis_handler import setup_analysis_handler
-from smartcash.ui.setup.dependency.handlers.status_check_handler import setup_status_check_handler as setup_status_handler
 
 # Initialize module logger
 logger = logging.getLogger('smartcash.ui.setup.dependency.handlers')

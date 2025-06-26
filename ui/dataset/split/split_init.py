@@ -3,19 +3,18 @@ File: smartcash/ui/dataset/split/split_init.py
 Deskripsi: Independent configuration cell for dataset split configuration with defaults integration
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Type, cast
 from pathlib import Path
 import yaml
 import ipywidgets as widgets
 
 from smartcash.common.logger import get_logger
-from smartcash.ui.initializers.config_cell_initializer import create_config_cell
+from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 from smartcash.ui.dataset.split.handlers.defaults import get_default_split_config
 from smartcash.ui.dataset.split.handlers.config_extractor import extract_split_config
 from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui, reset_ui_to_defaults
 from smartcash.ui.utils.logging_utils import suppress_all_outputs, restore_stdout
-
 
 class SplitConfigHandler(ConfigCellHandler):
     """Handler for split configuration with integrated defaults and validation"""
@@ -84,11 +83,11 @@ class SplitConfigHandler(ConfigCellHandler):
             raise
 
 
-def create_split_config_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def create_split_config_ui(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create and return the split configuration UI components.
     
     Args:
-        config: Optional configuration dictionary
+        config: Configuration dictionary
         
     Returns:
         Dictionary of UI components
@@ -124,55 +123,49 @@ def create_split_config_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
         return error_fallback
 
 
-def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create an independent split configuration cell
+class SplitConfigInitializer(ConfigCellInitializer[SplitConfigHandler]):
+    """Initializer for split configuration UI with integrated defaults and validation."""
+    
+    def __init__(self):
+        super().__init__(
+            module_name="split_config",
+            config_filename="split_config"
+        )
+    
+    def create_handler(self) -> SplitConfigHandler:
+        """Create and return a SplitConfigHandler instance."""
+        return SplitConfigHandler()
+    
+    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Create and return the split configuration UI components."""
+        # Create the main UI components
+        ui_components = create_split_config_ui(config)
+        
+        # Ensure we have a container
+        if 'container' not in ui_components:
+            ui_components['container'] = widgets.VBox()
+        
+        return ui_components
+    
+    def setup_handlers(self) -> None:
+        """Setup event handlers for the UI components."""
+        if 'reset_button' in self.ui_components:
+            def on_reset_clicked(b):
+                self.handler.reset_to_defaults()
+                reset_ui_to_defaults(self.ui_components)
+                self.handler.update_config(self.handler.config)
+            
+            self.ui_components['reset_button'].on_click(on_reset_clicked)
+
+
+def create_split_config_cell(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Create an independent split configuration cell.
     
     Args:
-        config: Optional initial configuration (merged with defaults)
+        config: Configuration dictionary (merged with defaults)
         
     Returns:
         Dictionary containing UI components and handlers
     """
-    logger = get_logger('smartcash.ui.dataset.split')
-    
-    try:
-        # Create handler with default config and update with provided values
-        handler = SplitConfigHandler(config)
-        
-        # Initialize the config cell
-        ui_components = create_config_cell(
-            module_name="split_config",
-            config_filename="split_config",
-            config_handler_class=lambda c=handler.config: SplitConfigHandler(c),
-            config=handler.config  # Use handler.config directly since it's now inherited
-        )
-        
-        # Create the split config UI with the current config
-        split_ui = create_split_config_ui(handler.config)
-        
-        # Connect the UI to the config handler
-        ui_components.update(split_ui)
-        
-        # Add reset handler if reset button exists
-        if 'reset_button' in ui_components:
-            def on_reset_clicked(b):
-                handler.reset_to_defaults()
-                reset_ui_to_defaults(ui_components)
-                ui_components['_config_handler'].update_config(handler.config)
-            
-            ui_components['reset_button'].on_click(on_reset_clicked)
-        
-        return ui_components
-        
-    except Exception as e:
-        restore_stdout()  # Ensure output is restored even on error
-        error_fallback = _create_error_fallback(str(e))
-        if 'container' in error_fallback:
-            return error_fallback['container']
-        return error_fallback
-
-def _create_error_fallback(error_message: str, traceback: Optional[str] = None) -> widgets.VBox:
-    """Create a fallback UI component to display error messages."""
-    from smartcash.ui.components import create_error_component
-    return create_error_component("Initialization Error", error_message, traceback)
-        
+    initializer = SplitConfigInitializer()
+    return initializer.initialize(config)

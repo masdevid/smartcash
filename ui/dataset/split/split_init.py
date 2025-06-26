@@ -16,6 +16,7 @@ import logging
 
 # Initializers
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer
+from smartcash.ui.config_cell.components.component_registry import component_registry
 
 # Local components
 from smartcash.ui.dataset.split.components.ui_form import create_split_form
@@ -24,20 +25,18 @@ from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandle
 
 logger = logging.getLogger(__name__)
 
+# Constants
+MODULE_NAME = "split_config"
+
 class SplitConfigInitializer(ConfigCellInitializer):
     """Initialize the dataset split configuration UI components."""
     
-    def __init__(self, parent_module: str = None):
-        """Initialize the split config initializer.
-        
-        Args:
-            parent_module: Optional parent module name for component registration
-        """
+    def __init__(self):
+        """Initialize the split config initializer."""
         super().__init__(
-            module_name="dataset_split",
-            config_filename="dataset_split_config",
-            parent_module=parent_module,
-            is_container=True  # Mark as container to avoid default UI components
+            module_name=MODULE_NAME,
+            config_filename=MODULE_NAME,
+            is_container=False  
         )
         
     def create_handler(self, config: Optional[Dict[str, Any]] = None) -> SplitConfigHandler:
@@ -55,20 +54,19 @@ class SplitConfigInitializer(ConfigCellInitializer):
         """Create the UI components for the dataset split configuration.
         
         Returns:
-            Dictionary containing the UI components with 'container' as the root widget
+            Dictionary containing the UI components. The parent class will handle
+            container creation and component registration.
         """
         # Create form components
         ui_components = create_split_form(config or {})
         
-        # Create the main layout
+        # Create the main layout - this should not include a container
         layout_components = create_split_layout(ui_components)
         ui_components.update(layout_components)
         
-        # Ensure container is properly set up
-        if 'container' not in ui_components:
-            ui_components['container'] = widgets.VBox()
+        # Remove any container-related components as they're handled by parent
+        ui_components.pop('container', None)
         
-        # Parent class will handle component registration and error handling
         return ui_components
     
     def setup_handlers(self) -> None:
@@ -115,8 +113,15 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None) -> Dict[st
         # The handler will be created internally by the initializer
         result = initializer.initialize(config or {})
         
-        # direct display
-        return safe_display(result)
+        # Get the container from the component registry
+        container_id = f"{MODULE_NAME}.container"
+        container = component_registry.get_component(container_id)
+        
+        if not container:
+            raise RuntimeError("Failed to initialize split configuration container")
+            
+        # Direct display of the container
+        return safe_display(container)
         
     except Exception as e:
         error_msg = f"Failed to create split config cell: {str(e)}"

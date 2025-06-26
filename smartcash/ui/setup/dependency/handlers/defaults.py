@@ -191,6 +191,20 @@ PACKAGE_CATEGORIES: List[PackageCategory] = [
     }
 ]
 
+def get_default_dependencies() -> Dict[str, Dict[str, Any]]:
+    """Generate default dependencies configuration from PACKAGE_CATEGORIES."""
+    dependencies = {}
+    for category in PACKAGE_CATEGORIES:
+        for pkg in category.get('packages', []):
+            key = pkg.get('key', pkg.get('name', '').lower())
+            if key:  # Only add if we have a valid key
+                dependencies[key] = {
+                    'required': pkg.get('required', False),
+                    'version': pkg.get('pip_name', '').split('>=')[-1] if '>=' in pkg.get('pip_name', '') else 'latest',
+                    'default': pkg.get('default', False)
+                }
+    return dependencies
+
 # Default configuration that aligns with dependency_config.yaml
 DEFAULT_CONFIG: Dict[str, Any] = {
     'module_name': 'dependency',
@@ -199,30 +213,31 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     'created_by': 'SmartCash',
     'description': 'Dependency installer configuration untuk SmartCash project',
     
-    # Package selections
-    'selected_packages': [pkg['key'] for cat in PACKAGE_CATEGORIES for pkg in cat['packages'] if pkg.get('default', False)],
-    'custom_packages': '',
-    'auto_analyze': True,
-    
-    # Installation settings
-    'installation': {
-        'parallel_workers': 3,
-        'force_reinstall': False,
-        'use_cache': True,
-        'timeout': DEFAULT_TIMEOUT,
-        'max_retries': 2,
-        'retry_delay': 1.0,
-        'package_manager': DEFAULT_PACKAGE_MANAGER,
-        'python_path': DEFAULT_PYTHON_PATH,
+    # Required fields for validation
+    'dependencies': get_default_dependencies(),
+    'install_options': {
+        'use_venv': True,
         'venv_path': DEFAULT_VENV_PATH,
+        'python_path': DEFAULT_PYTHON_PATH,
+        'package_manager': DEFAULT_PACKAGE_MANAGER,
         'upgrade_strategy': DEFAULT_UPGRADE_STRATEGY,
-        'max_workers': DEFAULT_MAX_WORKERS,
+        'timeout': DEFAULT_TIMEOUT,
+        'retries': 2,
         'http_retries': DEFAULT_HTTP_RETRIES,
         'prefer_binary': False,
         'trusted_hosts': DEFAULT_TRUSTED_HOSTS,
         'extra_index_urls': [],
-        'constraints': []
+        'constraints': [],
+        'parallel_workers': 3,
+        'force_reinstall': False,
+        'use_cache': True,
+        'max_workers': DEFAULT_MAX_WORKERS
     },
+    
+    # Package selections
+    'selected_packages': [pkg['key'] for cat in PACKAGE_CATEGORIES for pkg in cat['packages'] if pkg.get('default', False)],
+    'custom_packages': '',
+    'auto_analyze': True,
     
     # Analysis settings
     'analysis': {

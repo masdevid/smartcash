@@ -1,26 +1,64 @@
 # File: smartcash/configs/dependency_config.yaml
 # Deskripsi: Konfigurasi default untuk dependency installer SmartCash
+# Versi: 2.0.0
+# 
+# Struktur baru:
+# - dependencies: Daftar dependensi yang diperlukan
+# - install_options: Opsi instalasi
+# - selected_packages: Daftar paket yang dipilih
+# - analysis: Pengaturan analisis
+# - ui_settings: Pengaturan antarmuka pengguna
+# - advanced: Pengaturan lanjutan
 
 module_name: dependency
-version: "1.0.0"
+version: "2.0.0"
+schema_version: "1.0.0"
 created_by: SmartCash
 description: "Dependency installer configuration untuk SmartCash project"
 
-# Package selections
-selected_packages: []
-custom_packages: ""
-auto_analyze: true
+# Dependencies configuration
+dependencies:
+  # Dependencies akan diisi secara otomatis dari defaults.py
+  # Format:
+  # package_name:
+  #   required: true/false
+  #   version: "semver"
+  #   default: true/false
 
-# Installation settings
-installation:
+# Installation options
+install_options:
+  # Virtual environment settings
+  use_venv: true
+  venv_path: ".venv"
+  python_path: "python"
+  
+  # Package manager settings
+  package_manager: "pip"
+  upgrade_strategy: "eager"
+  prefer_binary: false
+  
+  # Network settings
+  timeout: 300  # 5 minutes
+  retries: 2
+  http_retries: 3
+  trusted_hosts:
+    - "pypi.org"
+    - "files.pythonhosted.org"
+  extra_index_urls: []
+  constraints: []
+  
+  # Performance settings
   parallel_workers: 3
   force_reinstall: false
   use_cache: true
-  timeout: 300
-  max_retries: 2
-  retry_delay: 1.0
+  max_workers: 4  # Will be adjusted based on CPU count
 
-# Analysis settings  
+# Package selections
+selected_packages: []  # Will be populated with default selections
+custom_packages: ""
+auto_analyze: true
+
+# Analysis settings
 analysis:
   check_compatibility: true
   include_dev_deps: false
@@ -31,7 +69,8 @@ analysis:
 ui_settings:
   auto_analyze_on_render: true
   show_progress: true
-  log_level: info
+  log_level: "info"
+  log_file: "dependency_installer.log"
   compact_view: false
 
 # Advanced settings
@@ -40,3 +79,12 @@ advanced:
   environment_variables: {}
   pre_install_commands: []
   post_install_commands: []
+
+# Legacy settings (for backward compatibility)
+installation: &legacy_installation
+  parallel_workers: 3
+  force_reinstall: false
+  use_cache: true
+  timeout: 300
+  max_retries: 2
+  retry_delay: 1.0

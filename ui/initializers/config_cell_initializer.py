@@ -13,7 +13,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from ast import Return
 from typing import Any, Dict, Generic, Optional, TypeVar
-import sys
 # Third-party
 import ipywidgets as widgets
 
@@ -302,6 +301,7 @@ class ConfigCellInitializer(Generic[T], ABC):
                 # Register cleanup function to run before cell execution
                 def cleanup():
                     try:
+                        import sys
                         self.logger.debug(f"Cleaning up {self.module_name} resources")
                         
                         # Clean up logger bridge if it exists

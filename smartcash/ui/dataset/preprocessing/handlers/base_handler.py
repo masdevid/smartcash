@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Callable, List
 from smartcash.ui.utils import with_error_handling, ErrorHandler
 from smartcash.ui.dataset.preprocessing import utils as ui_utils
+from smartcash.ui.dataset.preprocessing.utils.ui_utils import update_status_panel_enhanced
 
 class BasePreprocessingHandler(ABC):
     """Base class untuk handlers dengan proper progress tracker integration"""
@@ -253,11 +254,15 @@ class BasePreprocessingHandler(ABC):
             danger_mode=danger_mode
         )
     
-    def update_status_panel(self, message: str, status_type: str) -> None:
-        """Update status panel"""
-        status_panel = self.ui_components.get('status_panel')
-        if status_panel and hasattr(status_panel, 'update_status'):
-            status_panel.update_status(message, status_type)
+    def update_status_panel(self, message: str, status_type: str, force_update: bool = True) -> None:
+        """Enhanced status panel update with force refresh
+        
+        Args:
+            message: Message to display
+            status_type: Type of status ('success', 'info', 'warning', 'error')
+            force_update: Whether to force UI refresh (default: True)
+        """
+        update_status_panel_enhanced(self.ui_components, message, status_type, force_update)
     
     def handle_operation_cancel(self, operation: str, flag_key: str) -> None:
         """Generic operation cancellation handler"""
@@ -265,7 +270,7 @@ class BasePreprocessingHandler(ABC):
         self.logger.info(f"❌ {operation.title()} dibatalkan")
         
         ui_utils.enable_buttons(self.ui_components)
-        self.update_status_panel(f"{operation.title()} dibatalkan", 'warning')
+        self.update_status_panel(f"{operation.title()} dibatalkan", 'warning', force_update=True)
         
         if operation == 'cleanup':
             from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area

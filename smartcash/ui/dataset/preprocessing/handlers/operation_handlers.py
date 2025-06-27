@@ -1,17 +1,20 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/operation_handlers.py
-Deskripsi: Silent operation handlers dengan complete output suppression
+Deskripsi: Enhanced operation handlers dengan log accordion control dan proper status management
 """
 
 from typing import Dict, Any
 from .base_handler import BasePreprocessingHandler
-from smartcash.ui.dataset.preprocessing import utils as ui_utils
+from smartcash.ui.dataset.preprocessing.utils.ui_utils import (
+    start_operation_flow, complete_operation_flow,
+    reset_and_expand_log_accordion, update_status_panel_enhanced
+)
 
 class OperationHandler(BasePreprocessingHandler):
-    """Handler untuk operations dengan complete output suppression"""
+    """Enhanced handler untuk operations dengan log accordion control"""
     
     def setup_handlers(self) -> Dict[str, Any]:
-        """Setup operation button handlers - silent"""
+        """Setup operation button handlers dengan enhanced UI control"""
         handlers = {}
         
         # Setup handlers tanpa init logs
@@ -36,65 +39,71 @@ class OperationHandler(BasePreprocessingHandler):
         return handlers
     
     def _handle_preprocess_operation(self) -> None:
-        """Handle preprocessing operation - silent"""
-        ui_utils.clear_outputs(self.ui_components)
+        """Handle preprocessing operation dengan enhanced flow"""
+        # Reset dan expand log accordion
+        reset_and_expand_log_accordion(self.ui_components)
         
         if self.is_confirmation_pending():
             self.log_warning("⚠️ Ada operasi konfirmasi yang sedang menunggu")
+            update_status_panel_enhanced(self.ui_components, "⚠️ Konfirmasi pending", 'warning')
             return
         
         self._show_preprocessing_confirmation()
     
     def _handle_check_operation(self) -> None:
-        """Handle dataset check operation - silent"""
-        self.log_info("🔍 Memeriksa dataset...")
-        ui_utils.clear_outputs(self.ui_components)
-        
-        config = self.extract_config()
-        if not config:
-            raise ValueError("Konfigurasi tidak valid")
-        
-        progress_callback = self.create_progress_callback()
-        ui_utils.setup_progress(self.ui_components, "🔍 Memeriksa dataset...")
-        
-        # Suppress output selama API call
-        from smartcash.ui.utils.logging_utils import suppress_all_outputs
-        suppress_all_outputs()
+        """Handle dataset check operation dengan enhanced flow"""
+        # Start operation flow dengan log accordion control
+        start_operation_flow(self.ui_components, "Dataset Check")
         
         try:
+            config = self.extract_config()
+            if not config:
+                raise ValueError("Konfigurasi tidak valid")
+            
+            progress_callback = self.create_progress_callback()
+            
+            # Suppress output selama API call
+            from smartcash.ui.utils.logging_utils import suppress_all_outputs
+            suppress_all_outputs()
+            
             from smartcash.dataset.preprocessor.api import get_preprocessing_status
             result = get_preprocessing_status(config=config)
             
             self.process_operation_result(result, 'check')
-            self.update_status_panel("Pemeriksaan selesai", 'success')
-        finally:
-            # Keep suppression active
-            pass
+            complete_operation_flow(self.ui_components, "Dataset Check", True, "Pemeriksaan selesai")
+            
+        except Exception as e:
+            error_msg = f"Gagal memeriksa dataset: {str(e)}"
+            self.log_error(error_msg)
+            complete_operation_flow(self.ui_components, "Dataset Check", False, error_msg)
     
     def _handle_cleanup_operation(self) -> None:
-        """Handle cleanup operation - silent"""
-        ui_utils.clear_outputs(self.ui_components)
+        """Handle cleanup operation dengan enhanced flow"""
+        # Reset dan expand log accordion
+        reset_and_expand_log_accordion(self.ui_components)
         
         if self.is_confirmation_pending():
             self.log_warning("⚠️ Ada operasi konfirmasi yang sedang menunggu")
+            update_status_panel_enhanced(self.ui_components, "⚠️ Konfirmasi pending", 'warning')
             return
         
         self._show_cleanup_confirmation()
     
     def _show_preprocessing_confirmation(self) -> None:
-        """Show preprocessing confirmation - silent"""
+        """Show preprocessing confirmation dengan status update"""
         self.show_confirmation_dialog(
             title="Konfirmasi Preprocessing",
             message="Proses dataset dengan YOLO normalization?",
             on_confirm=self._set_preprocessing_confirmed,
-            on_cancel=lambda: self.handle_operation_cancel('preprocessing', '_preprocessing_confirmed'),
+            on_cancel=lambda: self._handle_operation_cancel('preprocessing'),
             confirm_text="Ya, Proses",
             cancel_text="Batal"
         )
         self.log_info("⏳ Menunggu konfirmasi preprocessing...")
+        update_status_panel_enhanced(self.ui_components, "⏳ Menunggu konfirmasi...", 'info')
     
     def _show_cleanup_confirmation(self) -> None:
-        """Show cleanup confirmation - silent"""
+        """Show cleanup confirmation dengan target info dan status update"""
         config = self.extract_config()
         cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
         
@@ -109,41 +118,44 @@ class OperationHandler(BasePreprocessingHandler):
             title="🧹 Konfirmasi Cleanup",
             message=f"Hapus {target_desc}?\n\nTindakan ini akan menghapus file yang sudah diproses.",
             on_confirm=self._set_cleanup_confirmed,
-            on_cancel=lambda: self.handle_operation_cancel('cleanup', '_cleanup_confirmed'),
+            on_cancel=lambda: self._handle_operation_cancel('cleanup'),
             confirm_text="Ya, Hapus",
             cancel_text="Batal",
             danger_mode=True
         )
         self.log_info(f"⏳ Konfirmasi cleanup: {target_desc}")
+        update_status_panel_enhanced(self.ui_components, f"⏳ Konfirmasi cleanup...", 'info')
     
     def _set_preprocessing_confirmed(self) -> None:
-        """Confirm dan execute preprocessing - silent"""
-        self.log_info("✅ Mulai preprocessing...")
+        """Confirm dan execute preprocessing dengan enhanced flow"""
         self.ui_components['_preprocessing_confirmed'] = True
+        
+        # Start operation flow
+        start_operation_flow(self.ui_components, "Preprocessing")
+        
         self._execute_preprocessing_with_api()
     
     def _set_cleanup_confirmed(self) -> None:
-        """Confirm dan execute cleanup - silent"""
-        self.log_info("✅ Mulai cleanup...")
+        """Confirm dan execute cleanup dengan enhanced flow"""
         self.ui_components['_cleanup_confirmed'] = True
+        
+        # Start operation flow
+        start_operation_flow(self.ui_components, "Cleanup")
+        
         self._execute_cleanup_with_api()
         
         from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area
         clear_dialog_area(self.ui_components)
     
     def _execute_preprocessing_with_api(self) -> None:
-        """Execute preprocessing dengan complete output suppression"""
-        self.log_info("🚀 Memulai preprocessing...")
-        ui_utils.disable_buttons(self.ui_components)
-        ui_utils.setup_progress(self.ui_components, "🚀 Preprocessing...")
-        
-        # Complete output suppression selama API call
-        from smartcash.ui.utils.logging_utils import suppress_all_outputs
-        suppress_all_outputs()
-        
+        """Execute preprocessing dengan enhanced error handling"""
         try:
             config = self.extract_config()
             progress_callback = self.create_progress_callback()
+            
+            # Suppress output selama API call
+            from smartcash.ui.utils.logging_utils import suppress_all_outputs
+            suppress_all_outputs()
             
             from smartcash.dataset.preprocessor.api import preprocess_dataset
             result = preprocess_dataset(
@@ -153,21 +165,15 @@ class OperationHandler(BasePreprocessingHandler):
             )
             
             self.process_operation_result(result, 'preprocessing')
+            complete_operation_flow(self.ui_components, "Preprocessing", True, "Preprocessing berhasil")
             
-        finally:
-            ui_utils.enable_buttons(self.ui_components)
-            # Keep suppression active - jangan restore stdout
+        except Exception as e:
+            error_msg = f"Gagal preprocessing: {str(e)}"
+            self.log_error(error_msg)
+            complete_operation_flow(self.ui_components, "Preprocessing", False, error_msg)
     
     def _execute_cleanup_with_api(self) -> None:
-        """Execute cleanup dengan complete output suppression"""
-        self.log_info("🧹 Memulai cleanup...")
-        ui_utils.disable_buttons(self.ui_components)
-        ui_utils.setup_progress(self.ui_components, "🗑️ Cleanup...")
-        
-        # Complete output suppression selama API call
-        from smartcash.ui.utils.logging_utils import suppress_all_outputs
-        suppress_all_outputs()
-        
+        """Execute cleanup dengan enhanced error handling"""
         try:
             config = self.extract_config()
             cleanup_config = config.get('preprocessing', {}).get('cleanup', {})
@@ -177,6 +183,10 @@ class OperationHandler(BasePreprocessingHandler):
             data_dir = config.get('data', {}).get('dir', 'data')
             
             progress_callback = self.create_progress_callback()
+            
+            # Suppress output selama API call
+            from smartcash.ui.utils.logging_utils import suppress_all_outputs
+            suppress_all_outputs()
             
             from smartcash.dataset.preprocessor.api.cleanup_api import cleanup_preprocessing_files
             result = cleanup_preprocessing_files(
@@ -189,13 +199,31 @@ class OperationHandler(BasePreprocessingHandler):
             )
             
             self.process_operation_result(result, 'cleanup')
+            complete_operation_flow(self.ui_components, "Cleanup", True, "Cleanup berhasil")
             
-        finally:
-            ui_utils.enable_buttons(self.ui_components)
-            # Keep suppression active - jangan restore stdout
+        except Exception as e:
+            error_msg = f"Gagal cleanup: {str(e)}"
+            self.log_error(error_msg)
+            complete_operation_flow(self.ui_components, "Cleanup", False, error_msg)
+    
+    def _handle_operation_cancel(self, operation: str) -> None:
+        """Handle operation cancellation dengan proper cleanup"""
+        flag_key = f'_{operation}_confirmed'
+        self.ui_components[flag_key] = False
+        
+        cancel_msg = f"{operation.title()} dibatalkan"
+        self.log_info(f"❌ {cancel_msg}")
+        
+        # Update status panel dengan enhanced method
+        update_status_panel_enhanced(self.ui_components, f"❌ {cancel_msg}", 'warning', force_update=True)
+        
+        # Clear dialog untuk cleanup
+        if operation == 'cleanup':
+            from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area
+            clear_dialog_area(self.ui_components)
 
 # Factory function
 def setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup operation handlers - silent"""
+    """Setup operation handlers dengan enhanced control"""
     handler = OperationHandler(ui_components)
     return handler.setup_handlers()

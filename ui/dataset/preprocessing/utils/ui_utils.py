@@ -1,13 +1,182 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/ui_utils.py
-Deskripsi: Refactored UI utilities dengan DRY principles dan better error handling
+Deskripsi: Enhanced UI utilities dengan log accordion control dan proper status updates
 """
 
 from typing import Dict, Any, Optional, List, Callable
 from IPython.display import display, HTML
 import datetime
 
-# === CORE UI UTILITIES ===
+# === LOG ACCORDION CONTROL ===
+
+def reset_and_expand_log_accordion(ui_components: Dict[str, Any]) -> None:
+    """Reset dan expand log accordion untuk operation baru"""
+    log_accordion = ui_components.get('log_accordion')
+    if not log_accordion:
+        return
+    
+    try:
+        # Reset content di log output
+        log_output = ui_components.get('log_output')
+        if log_output and hasattr(log_output, 'clear_output'):
+            with log_output:
+                log_output.clear_output(wait=True)
+        
+        # Force expand accordion untuk show logs
+        if hasattr(log_accordion, 'selected_index'):
+            log_accordion.selected_index = 0  # Expand first (dan satu-satunya) tab
+        
+        # Alternative approach untuk accordion expansion
+        if hasattr(log_accordion, 'children') and log_accordion.children:
+            first_child = log_accordion.children[0]
+            if hasattr(first_child, 'layout'):
+                first_child.layout.visibility = 'visible'
+                first_child.layout.display = 'flex'
+        
+        logger_bridge = get_logger_bridge(ui_components)
+        if logger_bridge:
+            logger_bridge.debug("🔄 Log accordion direset dan diperluas")
+            
+    except Exception as e:
+        logger_bridge = get_logger_bridge(ui_components)
+        if logger_bridge:
+            logger_bridge.debug(f"🔍 Log accordion reset warning: {str(e)}")
+
+def disable_log_accordion(ui_components: Dict[str, Any]) -> None:
+    """Disable log accordion selama proses berjalan"""
+    log_accordion = ui_components.get('log_accordion')
+    if not log_accordion or not hasattr(log_accordion, 'disabled'):
+        return
+    
+    try:
+        log_accordion.disabled = True
+        logger_bridge = get_logger_bridge(ui_components)
+        if logger_bridge:
+            logger_bridge.debug("⏸️ Log accordion dinonaktifkan selama proses")
+    except Exception:
+        pass
+
+def enable_log_accordion(ui_components: Dict[str, Any]) -> None:
+    """Enable log accordion setelah proses selesai"""
+    log_accordion = ui_components.get('log_accordion')
+    if not log_accordion or not hasattr(log_accordion, 'disabled'):
+        return
+    
+    try:
+        log_accordion.disabled = False
+        logger_bridge = get_logger_bridge(ui_components)
+        if logger_bridge:
+            logger_bridge.debug("▶️ Log accordion diaktifkan kembali")
+    except Exception:
+        pass
+
+# === ENHANCED STATUS PANEL UPDATES ===
+
+def update_status_panel_enhanced(ui_components: Dict[str, Any], message: str, 
+                                status_type: str, force_update: bool = True) -> None:
+    """Enhanced status panel update dengan force refresh"""
+    status_panel = ui_components.get('status_panel')
+    if not status_panel:
+        return
+    
+    try:
+        # Method 1: Direct update_status method
+        if hasattr(status_panel, 'update_status'):
+            status_panel.update_status(message, status_type)
+        
+        # Method 2: Direct value update jika method tidak ada
+        elif hasattr(status_panel, 'value'):
+            color_map = {
+                'success': '#28a745', 'info': '#007bff', 
+                'warning': '#ffc107', 'error': '#dc3545'
+            }
+            color = color_map.get(status_type, '#495057')
+            
+            icon_map = {
+                'success': '✅', 'info': 'ℹ️', 
+                'warning': '⚠️', 'error': '❌'
+            }
+            icon = icon_map.get(status_type, 'ℹ️')
+            
+            status_panel.value = f"""
+            <div style="padding: 8px 12px; background-color: {color}; color: white; 
+                       border-radius: 4px; margin: 5px 0; font-weight: 500;">
+                {icon} {message}
+            </div>
+            """
+        
+        # Force refresh jika diperlukan
+        if force_update and hasattr(status_panel, 'hold_sync'):
+            status_panel.hold_sync()
+            status_panel.sync()
+        
+        logger_bridge = get_logger_bridge(ui_components)
+        if logger_bridge:
+            logger_bridge.debug(f"📊 Status panel diperbarui: {status_type} - {message}")
+            
+    except Exception as e:
+        logger_bridge = get_logger_bridge(ui_components)
+        if logger_bridge:
+            logger_bridge.debug(f"🔍 Status panel update warning: {str(e)}")
+
+# === ENHANCED OPERATION FLOW ===
+
+def start_operation_flow(ui_components: Dict[str, Any], operation_name: str) -> None:
+    """Start operation flow dengan proper UI state management"""
+    logger_bridge = get_logger_bridge(ui_components)
+    if logger_bridge:
+        logger_bridge.info(f"🚀 Memulai {operation_name}...")
+    
+    # 1. Clear semua outputs
+    clear_outputs(ui_components)
+    
+    # 2. Reset dan expand log accordion
+    reset_and_expand_log_accordion(ui_components)
+    
+    # 3. Disable buttons
+    disable_buttons(ui_components)
+    
+    # 4. Disable log accordion
+    disable_log_accordion(ui_components)
+    
+    # 5. Update status panel
+    update_status_panel_enhanced(ui_components, f"🚀 {operation_name} dimulai...", 'info')
+    
+    # 6. Setup progress
+    setup_progress(ui_components, f"🚀 {operation_name}...")
+
+def complete_operation_flow(ui_components: Dict[str, Any], operation_name: str, 
+                          success: bool, message: str) -> None:
+    """Complete operation flow dengan proper cleanup"""
+    status_type = 'success' if success else 'error'
+    icon = '✅' if success else '❌'
+    
+    logger_bridge = get_logger_bridge(ui_components)
+    if logger_bridge:
+        log_method = logger_bridge.success if success else logger_bridge.error
+        log_method(f"{icon} {operation_name}: {message}")
+    
+    # 1. Complete progress
+    if success:
+        complete_progress(ui_components, f"{icon} {message}")
+    else:
+        error_progress(ui_components, f"{icon} {message}")
+    
+    # 2. Update status panel dengan force refresh
+    update_status_panel_enhanced(ui_components, f"{icon} {message}", status_type, force_update=True)
+    
+    # 3. Enable buttons
+    enable_buttons(ui_components)
+    
+    # 4. Enable log accordion
+    enable_log_accordion(ui_components)
+    
+    # 5. Clear confirmation flags
+    confirmation_flags = ['_preprocessing_confirmed', '_cleanup_confirmed']
+    for flag in confirmation_flags:
+        ui_components.pop(flag, None)
+
+# === EXISTING UTILITIES ===
 
 def get_logger_bridge(ui_components: Dict[str, Any]) -> Optional[Any]:
     """Get logger bridge dengan safe validation"""
@@ -78,26 +247,14 @@ def hide_confirmation_area(ui_components: Dict[str, Any]) -> None:
     """Hide confirmation area dengan proper validation"""
     confirmation_area = ui_components.get('confirmation_area')
     update_widget_visibility(confirmation_area, False, '0px')
-    
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.debug("Menyembunyikan area konfirmasi")
 
 def show_confirmation_area(ui_components: Dict[str, Any]) -> None:
     """Show confirmation area dengan proper validation"""
     confirmation_area = ui_components.get('confirmation_area')
     update_widget_visibility(confirmation_area, True, 'auto')
-    
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.debug("Menampilkan area konfirmasi")
 
 def clear_outputs(ui_components: Dict[str, Any]) -> None:
     """Clear outputs dan hide confirmation area"""
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.debug("Membersihkan output dan menyembunyikan area konfirmasi")
-    
     hide_confirmation_area(ui_components)
 
 # === BUTTON STATE MANAGEMENT ===
@@ -124,21 +281,17 @@ def update_buttons_state(ui_components: Dict[str, Any], disabled: bool,
 
 def disable_buttons(ui_components: Dict[str, Any]) -> None:
     """Disable operation buttons during processing"""
-    logger_bridge = get_logger_bridge(ui_components)
-    
     updated_count = update_buttons_state(ui_components, True)
-    
+    logger_bridge = get_logger_bridge(ui_components)
     if logger_bridge:
-        logger_bridge.debug(f"Menonaktifkan {updated_count} tombol operasi")
+        logger_bridge.debug(f"⏸️ {updated_count} tombol dinonaktifkan")
 
 def enable_buttons(ui_components: Dict[str, Any]) -> None:
     """Enable operation buttons after processing"""
-    logger_bridge = get_logger_bridge(ui_components)
-    
     updated_count = update_buttons_state(ui_components, False)
-    
+    logger_bridge = get_logger_bridge(ui_components)
     if logger_bridge:
-        logger_bridge.debug(f"Mengaktifkan {updated_count} tombol operasi")
+        logger_bridge.debug(f"▶️ {updated_count} tombol diaktifkan")
 
 # === PROGRESS MANAGEMENT ===
 
@@ -163,26 +316,14 @@ def update_progress_state(ui_components: Dict[str, Any], bar_style: str,
 
 def setup_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Setup progress tracker untuk operation"""
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.debug(f"Menyiapkan progress tracker: {message}")
-    
     update_progress_state(ui_components, '', 0, message)
 
 def complete_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Complete progress tracker dengan success message"""
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.debug(f"Menyelesaikan progress tracker: {message}")
-    
     update_progress_state(ui_components, 'success', 100, message)
 
 def error_progress(ui_components: Dict[str, Any], message: str) -> None:
     """Set error state pada progress tracker"""
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.error(f"Error pada progress tracker: {message}")
-    
     update_progress_state(ui_components, 'danger', 0, f"Error: {message}")
 
 # === ERROR HANDLING ===
@@ -203,85 +344,15 @@ def handle_error(ui_components: Dict[str, Any], error_msg: str,
     error_progress(ui_components, error_msg)
     
     # Enable buttons untuk ensure UI tidak terkunci
-    _safe_enable_buttons(ui_components, logger_bridge)
-    
-    # Update status panel jika tersedia
-    _update_status_panel(ui_components, f"Error: {error_msg}", 'error')
-
-def _safe_enable_buttons(ui_components: Dict[str, Any], logger_bridge: Optional[Any]) -> None:
-    """Safe button enabling dengan error handling"""
-    try:
-        enable_buttons(ui_components)
-        if logger_bridge:
-            logger_bridge.debug("Tombol operasi diaktifkan ulang setelah error")
-    except Exception as btn_error:
-        error_msg = f"Gagal mengaktifkan tombol setelah error: {str(btn_error)}"
-        if logger_bridge:
-            logger_bridge.error(error_msg)
-        else:
-            print(f"[ERROR] {error_msg}")
-
-def _update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str) -> None:
-    """Update status panel dengan message"""
-    status_panel = ui_components.get('status_panel')
-    if status_panel and hasattr(status_panel, 'update_status'):
-        try:
-            status_panel.update_status(message, status_type)
-        except Exception:
-            pass  # Silent fail untuk compatibility
-
-# === UI STATE MANAGEMENT ===
-
-def reset_ui_state(ui_components: Dict[str, Any]) -> None:
-    """Reset UI ke initial state setelah operation"""
-    logger_bridge = get_logger_bridge(ui_components)
-    if logger_bridge:
-        logger_bridge.debug("🔄 Mereset UI state ke kondisi awal")
-    
-    # Enable buttons
     enable_buttons(ui_components)
     
-    # Hide confirmation area
-    hide_confirmation_area(ui_components)
+    # Enable log accordion
+    enable_log_accordion(ui_components)
     
-    # Clear confirmation flags
-    confirmation_flags = ['_preprocessing_confirmed', '_cleanup_confirmed']
-    for flag in confirmation_flags:
-        ui_components.pop(flag, None)
-    
-    # Reset progress ke idle state
-    update_progress_state(ui_components, '', 0, "Siap untuk operasi")
-
-def show_error_ui(ui_components: Dict[str, Any], error_msg: str) -> None:
-    """Show error di UI dengan proper formatting"""
-    handle_error(ui_components, error_msg)
-
-# === ACCORDION LOGGING (Legacy Support) ===
-
-def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = "info") -> None:
-    """Fallback log function untuk accordion output (legacy support)"""
-    logger_bridge = get_logger_bridge(ui_components)
-    
-    # Primary: gunakan logger bridge
-    if logger_bridge:
-        log_method = getattr(logger_bridge, level.lower(), logger_bridge.info)
-        log_method(f"[Accordion] {message}")
-        return
-    
-    # Fallback: direct accordion logging
-    accordion = ui_components.get('log_accordion')
-    if accordion and hasattr(accordion, 'children') and accordion.children:
-        log_output = accordion.children[0]
-        if hasattr(log_output, 'append_stdout'):
-            log_output.append_stdout(f"[{level.upper()}] {message}\n")
+    # Update status panel dengan force refresh
+    update_status_panel_enhanced(ui_components, f"❌ {error_msg}", 'error', force_update=True)
 
 # === ONE-LINER UTILITIES ===
-
-# Quick access functions dengan one-liner pattern
-get_confirmation_area = lambda ui_components: ui_components.get('confirmation_area')
-get_status_panel = lambda ui_components: ui_components.get('status_panel')
-get_progress_widget = lambda ui_components: ui_components.get('progress')
-get_action_buttons = lambda ui_components: ui_components.get('action_buttons', {})
 
 # Status shortcuts
 log_info = lambda ui_components, msg: log_to_ui(ui_components, msg, 'info')
@@ -293,3 +364,7 @@ log_error = lambda ui_components, msg: log_to_ui(ui_components, msg, 'error')
 start_progress = lambda ui_components, msg: setup_progress(ui_components, msg)
 finish_progress = lambda ui_components, msg: complete_progress(ui_components, msg)
 fail_progress = lambda ui_components, msg: error_progress(ui_components, msg)
+
+# Enhanced operation flow shortcuts
+start_operation = lambda ui_components, op_name: start_operation_flow(ui_components, op_name)
+complete_operation = lambda ui_components, op_name, success, msg: complete_operation_flow(ui_components, op_name, success, msg)

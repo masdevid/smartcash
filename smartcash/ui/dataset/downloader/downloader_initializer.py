@@ -173,11 +173,17 @@ class DownloaderInitializer(CommonInitializer):
             from pathlib import Path
             
             env_manager = get_environment_manager()
-            # Use downloads directory for downloader
-            download_dir = Path(env_manager.get_downloads_dir())
+            # Use data directory for downloader
+            data_dir = Path(env_manager.get_data_path())
+            if not data_dir.exists():
+                data_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"✅ Created data directory: {data_dir}")
+                
+            # Create a downloads subdirectory
+            download_dir = data_dir / 'downloads'
             if not download_dir.exists():
                 download_dir.mkdir(parents=True, exist_ok=True)
-                self.logger.info(f"✅ Created download directory: {download_dir}")
+                self.logger.info(f"✅ Created downloads directory: {download_dir}")
                 
         except Exception as e:
             self.logger.warning(f"⚠️ Environment check warning: {str(e)}")

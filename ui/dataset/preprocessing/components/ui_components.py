@@ -56,6 +56,15 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         button_width='180px'
     )
     
+    # Debug: Print structure
+    print(f"[DEBUG] action_components: {action_components}")
+    if action_components and 'secondary_buttons' in action_components:
+        print(f"[DEBUG] secondary_buttons: {action_components['secondary_buttons']}")
+    
+    # Extract buttons correctly
+    secondary_buttons = action_components.get('secondary_buttons', [])
+    check_button = secondary_buttons[0] if secondary_buttons else None
+    
     # Progress tracker
     progress_tracker = create_dual_progress_tracker(
         operation="Dataset Preprocessing",
@@ -138,10 +147,8 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'ui': ui,
         'preprocess_button': (action_components.get('preprocess_btn') or 
                              action_components.get('primary_button') or
-                             action_components.get('download_button')),  # Fallback options
-        'check_button': (action_components.get('check_btn') or
-                        action_components.get('secondary_button') or
-                        action_components.get('info_button')),  # Fallback options
+                             action_components.get('download_button')),
+        'check_button': check_button,
         'cleanup_button': action_components.get('cleanup_btn'),
         'save_button': save_reset_components.get('save_button'),
         'reset_button': save_reset_components.get('reset_button'),

@@ -23,8 +23,9 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Header
     header = create_header(
-        f"{get_icon('download', '📥')} Dataset Downloader", 
-        "Download dataset Roboflow untuk SmartCash training dengan UUID renaming otomatis"
+        "Dataset Downloader", 
+        "Download dataset Roboflow untuk SmartCash training dengan UUID renaming otomatis",
+        "📥"
     )
     
     # Status panel
@@ -110,35 +111,78 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     help_panel.set_title(0, "💡 Info Download")
     help_panel.selected_index = None
     
-    # Section headers
-    config_header = widgets.HTML(f"""
-        <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 8px 0; font-size: 16px;'>
-            {get_icon('settings', '⚙️')} Konfigurasi Download
-        </h4>
-    """)
+    # Section headers with consistent styling
+    config_header = widgets.HTML(
+        "<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>"
+        "⚙️ Konfigurasi Download"
+        "</div>"
+    )
     
-    action_header = widgets.HTML(f"""
-    <h4 style='color: {get_color('dark', '#333')}; margin: 15px 0 10px 0; font-size: 16px; 
-               border-bottom: 2px solid {get_color('primary', '#007bff')}; padding-bottom: 6px;'>
-        {get_icon('play', '▶️')} Actions
-    </h4>
-    """)
+    action_header = widgets.HTML(
+        "<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>"
+        "🚀 Actions"
+        "</div>"
+    )
     
-    # Main UI assembly dengan confirmation area yang visible
-    ui = widgets.VBox([
-        header, 
-        status_panel, 
-        config_header, 
-        input_options, 
-        save_reset_buttons['container'], 
-        action_header, 
+    # === LAYOUT SECTIONS ===
+    
+    # Config section with save/reset buttons
+    config_section = widgets.VBox([
+        widgets.Box([save_reset_buttons['container']], 
+            layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
+    ], layout=widgets.Layout(margin='8px 0'))
+    
+    # Action section with confirmation area
+    action_section = widgets.VBox([
+        action_header,
         action_buttons['container'],
-        confirmation_area,  # Visible confirmation area di bawah action buttons
-        progress_tracker.container, 
-        log_components['log_accordion'], 
-        create_divider(), 
+        widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Status:</strong></div>"),
+        confirmation_area
+    ], layout=widgets.Layout(
+        width='100%', 
+        margin='10px 0', 
+        padding='12px',
+        border='1px solid #e0e0e0', 
+        border_radius='8px',
+        background_color='#f9f9f9'
+    ))
+    
+    # Help section
+    help_section = widgets.VBox([
         help_panel
-    ], layout=widgets.Layout(width='100%', padding='8px', overflow='hidden'))
+    ], layout=widgets.Layout(
+        width='100%',
+        margin='10px 0 0 0'
+    ))
+    
+    # Main UI assembly with consistent styling
+    ui = widgets.VBox([
+        # Header section
+        header,
+        status_panel,
+        
+        # Config section
+        input_options,
+        config_section,
+        
+        # Action section with confirmation area
+        action_section,
+        
+        # Progress tracker
+        progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([]),
+        
+        # Logs and help sections
+        log_components['log_accordion'],
+        help_section
+    ], layout=widgets.Layout(
+        width='100%',
+        max_width='1200px',
+        margin='0 auto',
+        padding='15px',
+        border='1px solid #e0e0e0',
+        border_radius='8px',
+        box_shadow='0 2px 4px rgba(0,0,0,0.05)'
+    ))
     
     # Compile components
     ui_components = {

@@ -26,7 +26,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     
     # Header
     header = create_header(
-        "🔧 Dataset Preprocessing", 
+        "Dataset Preprocessing", 
         "Preprocessing dataset dengan YOLO normalization dan real-time progress",
         "🚀"
     )

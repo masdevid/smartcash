@@ -106,9 +106,20 @@ def update_status_panel_enhanced(ui_components: Dict[str, Any], message: str,
             """
         
         # Force refresh jika diperlukan
-        if force_update and hasattr(status_panel, 'hold_sync'):
-            status_panel.hold_sync()
-            status_panel.sync()
+        if force_update:
+            # Check for both hold_sync and sync methods before calling
+            has_hold_sync = hasattr(status_panel, 'hold_sync') and callable(getattr(status_panel, 'hold_sync'))
+            has_sync = hasattr(status_panel, 'sync') and callable(getattr(status_panel, 'sync'))
+            
+            if has_hold_sync and has_sync:
+                try:
+                    status_panel.hold_sync()
+                    status_panel.sync()
+                except Exception as sync_err:
+                    # Log the sync error but don't fail the status update
+                    logger_bridge = get_logger_bridge(ui_components)
+                    if logger_bridge:
+                        logger_bridge.debug(f"⚠️ Failed to sync status panel: {str(sync_err)}")
         
         logger_bridge = get_logger_bridge(ui_components)
         if logger_bridge:

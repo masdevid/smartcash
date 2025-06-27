@@ -82,6 +82,10 @@ def show_confirmation_dialog(
             on_confirm()
         return
     
+    # Ensure dialog area is visible
+    if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
+        dialog_area.layout.display = 'block'
+    
     # Clear existing content
     with dialog_area:
         clear_output(wait=True)
@@ -90,12 +94,16 @@ def show_confirmation_dialog(
     def handle_confirm(btn):
         with dialog_area:
             clear_output(wait=True)
+            if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
+                dialog_area.layout.display = 'none'
         if on_confirm:
             on_confirm()
     
     def handle_cancel(btn):
         with dialog_area:
             clear_output(wait=True)
+            if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
+                dialog_area.layout.display = 'none'
         if on_cancel:
             on_cancel()
     

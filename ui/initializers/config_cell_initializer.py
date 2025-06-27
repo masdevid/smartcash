@@ -724,6 +724,56 @@ class ConfigCellInitializer(Generic[T], ABC):
             self.update_status(f"❌ Error: {str(e)}", "error")
             self._logger.error(f"Reset failed: {str(e)}", exc_info=True)
             
+    def _setup_shared_config(self) -> None:
+        """Initialize shared configuration manager and set up subscription.
+        
+        This method is called during initialization to set up the shared config
+        manager and subscribe to configuration updates.
+        """
+        try:
+            from smartcash.ui.config_cell.managers.shared_config_manager import get_shared_config_manager
+            
+            # Get shared config manager for this component's parent
+            parent_module = self.parent_id.split('.')[0] if self.parent_id else 'global'
+            self._shared_config_manager = get_shared_config_manager(parent_module)
+            
+            # Subscribe to config updates
+            self._unsubscribe_func = self._shared_config_manager.subscribe(
+                self.component_id,
+                self._on_shared_config_update
+            )
+            
+            self._logger.debug(f"✅ Initialized shared config for {self.component_id}")
+            
+        except Exception as e:
+            self._logger.warning(f"⚠️ Failed to setup shared config: {e}", exc_info=True)
+            self._shared_config_manager = None
+            self._unsubscribe_func = None
+            
+    def _on_shared_config_update(self, config: Dict[str, Any]) -> None:
+        """Handle updates from shared configuration.
+        
+        Args:
+            config: New configuration data
+        """
+        if not config:
+            return
+            
+        try:
+            self._logger.info("🔄 Updating from shared configuration...")
+            
+            # Update local config
+            self.config.update(config)
+            
+            # Update UI components if initialized
+            if self._is_initialized and hasattr(self.handler, 'update_ui_from_config'):
+                self.handler.update_ui_from_config(self.ui_components, config)
+                self.update_status("✅ Configuration updated from shared source", "success")
+                
+        except Exception as e:
+            self._logger.error(f"❌ Failed to apply shared config: {e}", exc_info=True)
+            self.update_status(f"❌ Failed to apply shared config: {e}", "error")
+    
     def _get_shared_config(self) -> Optional[Dict[str, Any]]:
         """Get configuration from shared manager if available.
         

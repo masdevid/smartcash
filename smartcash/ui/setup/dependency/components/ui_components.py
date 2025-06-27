@@ -23,7 +23,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Create header with icon and description
     header = create_header(
         title="📦 Dependency Management",
-        subtitle="Install, update, and manage Python packages",
+        description="Install, update, and manage Python packages",
         icon="🔌"
     )
     

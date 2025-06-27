@@ -147,22 +147,47 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     tabs.set_title(0, '📦 Packages')
     tabs.set_title(1, '➕ Custom')
     
-    # Create main container with responsive layout
-    main_container = widgets.VBox(
-        [
-            header,
-            status_panel,
-            tabs,
-            widgets.HBox([
-                action_components,
-                save_status
-            ], layout=widgets.Layout(
+    # Validate all components before creating VBox
+    children = []
+    
+    # Add header if it exists
+    if header:
+        children.append(header)
+    
+    # Add status panel if it exists
+    if status_panel:
+        children.append(status_panel)
+    
+    # Add tabs if they exist
+    if tabs:
+        children.append(tabs)
+    
+    # Create action buttons row
+    action_buttons = []
+    if hasattr(action_components, 'buttons') and isinstance(action_components.buttons, dict):
+        for btn_id in ['install_btn', 'check_updates_btn', 'uninstall_btn', 'save_btn', 'reset_btn']:
+            if btn_id in action_components.buttons:
+                action_buttons.append(action_components.buttons[btn_id])
+    
+    # Add action buttons and save status in an HBox
+    if action_buttons or save_status:
+        button_row = widgets.HBox(
+            children=[*action_buttons, save_status] if save_status else action_buttons,
+            layout=widgets.Layout(
                 justify_content='space-between',
                 align_items='center',
                 margin='15px 0'
-            )),
-            log_accordion
-        ],
+            )
+        )
+        children.append(button_row)
+    
+    # Add log accordion if it exists
+    if log_accordion:
+        children.append(log_accordion)
+    
+    # Create main container with validated children
+    main_container = widgets.VBox(
+        children=children,
         layout=widgets.Layout(
             width='100%',
             max_width='1200px',

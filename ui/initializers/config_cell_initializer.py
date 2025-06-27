@@ -454,15 +454,17 @@ class ConfigCellInitializer(Generic[T], ABC):
             
             # Create main container dengan struktur konsisten
             children = []
-            if header:
+            if header and isinstance(header, widgets.Widget):
                 children.append(header)
-            if status_panel:
+            if status_panel and isinstance(status_panel, widgets.Widget):
                 children.append(status_panel)
-            if child_container:
+            if child_container and isinstance(child_container, widgets.Widget):
                 children.append(child_container)
-            if log_accordion:
+            if log_accordion and isinstance(log_accordion, widgets.Widget):
                 children.append(log_accordion)
-            if info_accordion:
+            elif 'log_accordion' in self.parent_components and isinstance(self.parent_components['log_accordion'], widgets.Widget):
+                children.append(self.parent_components['log_accordion'])
+            if info_accordion and isinstance(info_accordion, widgets.Widget):
                 children.append(info_accordion)
 
             main_container = widgets.VBox(

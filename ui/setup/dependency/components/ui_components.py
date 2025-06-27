@@ -15,10 +15,11 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     get_icon = lambda key, fallback="📦": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
     
-    # Header
+    # Header with consistent styling
     header = create_header(
-        f"{get_icon('download', '📦')} Dependency Installer", 
-        "Setup packages yang diperlukan untuk SmartCash"
+        "Dependency Installer",
+        "Setup packages yang diperlukan untuk SmartCash",
+        "📦"
     )
     
     # Status panel
@@ -115,19 +116,61 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Log accordion
     log_accordion = create_log_accordion()
     
-    # Create main UI components - ensure we're not duplicating the package selector container
+    # Create section headers with consistent styling
+    package_header = widgets.HTML(
+        "<div style='font-weight:bold;color:#28a745;margin:15px 0 8px 0;'>📦 Package Selection</div>"
+    )
+    custom_header = widgets.HTML(
+        "<div style='font-weight:bold;color:#28a745;margin:15px 0 8px 0;'>➕ Custom Packages</div>"
+    )
+    
+    # Create main UI components with proper containers
     main_ui_children = [
         header,
         status_panel,
-        widgets.HTML(value="<h4>📦 Package Selection</h4>"),
-        package_selector.get('container', widgets.VBox()),
-        widgets.HTML(value="<h4>➕ Custom Packages</h4>"),
-        custom_packages,
-        widgets.HTML('<hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">'),
-        action_container,
-        save_reset_container,
-        widgets.HTML('<hr style="margin: 12px 0; border: 0; border-top: 1px solid #eee;">'),
-        progress_tracker.ui_manager.container
+        
+        # Package selection section
+        widgets.VBox([
+            package_header,
+            package_selector.get('container', widgets.VBox())
+        ], layout=widgets.Layout(
+            width='100%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9',
+            margin='0 0 15px 0'
+        )),
+        
+        # Custom packages section
+        widgets.VBox([
+            custom_header,
+            custom_packages
+        ], layout=widgets.Layout(
+            width='100%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9',
+            margin='0 0 15px 0'
+        )),
+        
+        # Action section
+        widgets.VBox([
+            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin:0 0 10px 0;'>🚀 Actions</div>"),
+            action_container,
+            save_reset_container
+        ], layout=widgets.Layout(
+            width='100%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9',
+            margin='0 0 15px 0'
+        )),
+        
+        # Progress tracker
+        progress_tracker.ui_manager.container if hasattr(progress_tracker.ui_manager, 'container') else widgets.VBox([])
     ]
     
     # Remove any duplicate package selector containers that might exist
@@ -151,20 +194,28 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Filter out None values
     main_ui_children = [c for c in main_ui_children if c is not None]
     
-    # Create main container
+    # Filter out None values and ensure all children are visible
+    main_ui_children = [c for c in main_ui_children if c is not None]
+    
+    # Create main container with consistent styling
     main_ui = widgets.VBox(
         main_ui_children,
         layout=widgets.Layout(
-            display='flex',
-            flex_direction='column',
-            align_items='stretch',
             width='100%',
-            padding='12px',
-            gap='12px',
-            overflow='hidden',
-            box_sizing='border-box'
+            max_width='1200px',
+            margin='0 auto',
+            padding='15px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            box_shadow='0 2px 4px rgba(0,0,0,0.05)'
         )
     )
+    
+    # Ensure all children are visible
+    for child in main_ui_children:
+        if hasattr(child, 'layout') and hasattr(child.layout, 'display'):
+            child.layout.display = 'flex'
+            child.layout.visibility = 'visible'
     
     # Prepare components dictionary
     components = {

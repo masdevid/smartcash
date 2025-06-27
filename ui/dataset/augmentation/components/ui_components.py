@@ -56,10 +56,11 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     """Main UI dengan live preview integration dan cleanup target update"""
     
 
-    # Header dan status panel
+    # Header and status panel with consistent styling
     header = create_header(
-        f"{ICONS.get('augmentation', '🔄')} Dataset Augmentation", 
-        "Pipeline augmentasi dengan live preview dan backend integration"
+        "Dataset Augmentation",
+        "Pipeline augmentasi dengan live preview dan backend integration",
+        "🔄"
     )
     status_panel = create_status_panel("✅ Pipeline augmentasi siap", "success")
     
@@ -146,61 +147,100 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')
     
-    # 2x2 Grid dengan live preview
+    # 2x2 Grid with consistent styling
     row1 = widgets.HBox([
-        styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic', '47%'),
-        styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced', '47%')
+        widgets.VBox([
+            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>📋 Opsi Dasar</div>"),
+            basic_options['container']
+        ], layout=widgets.Layout(
+            width='48%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9'
+        )),
+        widgets.VBox([
+            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>⚙️ Parameter Lanjutan</div>"),
+            advanced_options['container']
+        ], layout=widgets.Layout(
+            width='48%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9'
+        ))
     ], layout=widgets.Layout(
-        width='100%', max_width='100%', display='flex',
-        flex_flow='row wrap', justify_content='space-between',
-        align_items='stretch', gap='6px', margin='8px 0',
-        overflow='hidden', box_sizing='border-box'
+        width='100%',
+        justify_content='space-between',
+        margin='0 0 15px 0'
     ))
     
     row2 = widgets.HBox([
-        styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types', '47%'),
-        styled_container(live_preview['container'], "🎬 Live Preview", 'normalization', '47%')  # CHANGED
-    ], layout=widgets.Layout(
-        width='100%', max_width='100%', display='flex',
-        flex_flow='row wrap', justify_content='space-between',
-        align_items='stretch', gap='6px', margin='8px 0',
-        overflow='hidden', box_sizing='border-box'
-    ))
-    
-    # Action section dengan confirmation area
-    action_section = widgets.VBox([
-        _create_section_header("🚀 Pipeline Operations", "#667eea"),
-        button_container,
-        widgets.HTML("<div style='margin: 5px 0;'><strong>📋 Status & Konfirmasi:</strong></div>"),
-        confirmation_area
+        widgets.VBox([
+            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🔄 Jenis Augmentasi</div>"),
+            augmentation_types['container']
+        ], layout=widgets.Layout(
+            width='48%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9'
+        )),
+        widgets.VBox([
+            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🎬 Live Preview</div>"),
+            live_preview['container']
+        ], layout=widgets.Layout(
+            width='48%',
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9'
+        ))
     ], layout=widgets.Layout(
         width='100%',
-        margin='10px 0',
-        padding='10px',
-        border='1px solid #e0e0e0',
+        justify_content='space-between',
+        margin='0 0 15px 0'
+    ))
+    
+    # Action section with confirmation area - consistent with other UIs
+    action_section = widgets.VBox([
+        widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
+        button_container,
+        widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Status:</strong></div>"),
+        confirmation_area
+    ], layout=widgets.Layout(
+        width='100%', 
+        margin='10px 0', 
+        padding='12px',
+        border='1px solid #e0e0e0', 
         border_radius='8px',
         background_color='#f9f9f9'
     ))
     
-    # Config section
+    # Config section with consistent styling
     config_section = widgets.VBox([
         widgets.Box([config_buttons['container']], 
             layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
-    ])
+    ], layout=widgets.Layout(margin='8px 0'))
     
-    # Main UI assembly dengan urutan yang benar
+    # Main UI assembly with consistent styling
     ui = widgets.VBox([
-        header, 
-        status_panel, 
-        row1, 
-        row2, 
+        header,
+        status_panel,
+        row1,
+        row2,
         config_section,
         action_section,
-        progress_tracker.container,
+        progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([]),
         log_components['log_accordion']
     ], layout=widgets.Layout(
-        width='100%', max_width='100%', display='flex',
-        flex_flow='column', align_items='stretch'
+        width='100%',
+        max_width='1200px',
+        margin='0 auto',
+        padding='15px',
+        border='1px solid #e0e0e0',
+        border_radius='8px',
+        box_shadow='0 2px 4px rgba(0,0,0,0.05)'
     ))
     
     # Component mapping dengan live preview integration

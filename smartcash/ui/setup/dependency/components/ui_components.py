@@ -68,8 +68,8 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'custom_section': custom_section, 
         'action_section': action_section,
         'progress_tracker': progress_tracker, 
-        'log_components': log_components['log_accordion'],
-        'log_output': log_components['log_accordion']  # Alias
+        'log_components': log_components,  # Keep the full log_components dictionary
+        'log_output': log_components.get('log_output')  # Ensure log_output is properly referenced
     }
     
     # Add action buttons if action_components is a widget with children

@@ -94,7 +94,7 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
             description=kwargs.get('description', ''),
             tooltip=kwargs.get('tooltip', ''),
             style={'description_width': '140px'},
-            layout=LAYOUTS['responsive_dropdown'].copy()
+            layout=widgets.Layout(**{k: v for k, v in LAYOUTS['responsive_dropdown'].get_state().items() if k != 'comm_id'})
         )
     
     elif element_type == 'checkbox':
@@ -103,7 +103,7 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
             description=kwargs.get('description', ''),
             tooltip=kwargs.get('tooltip', ''),
             style={'description_width': '200px'},
-            layout=LAYOUTS['responsive_dropdown'].copy()
+            layout=widgets.Layout(**{k: v for k, v in LAYOUTS['responsive_dropdown'].get_state().items() if k != 'comm_id'})
         )
     
     elif element_type == 'text_input':
@@ -113,7 +113,7 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
             placeholder=kwargs.get('placeholder', ''),
             tooltip=kwargs.get('tooltip', ''),
             style={'description_width': '140px'},
-            layout=LAYOUTS['responsive_dropdown'].copy()
+            layout=widgets.Layout(**{k: v for k, v in LAYOUTS['responsive_dropdown'].get_state().items() if k != 'comm_id'})
         )
     
     elif element_type == 'log_slider':

@@ -170,12 +170,19 @@ class DownloaderInitializer(CommonInitializer):
         # Check environment compatibility
         try:
             from smartcash.common.environment import get_environment_manager
+            from pathlib import Path
+            
             env_manager = get_environment_manager()
-            # Use get_data_path() instead of get_downloads_path()
-            if not env_manager.get_data_path().exists():
-                self.logger.warning("⚠️ Data path tidak ditemukan, akan dibuat otomatis")
+            # Use downloads directory for downloader
+            download_dir = Path(env_manager.get_downloads_dir())
+            if not download_dir.exists():
+                download_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"✅ Created download directory: {download_dir}")
+                
         except Exception as e:
             self.logger.warning(f"⚠️ Environment check warning: {str(e)}")
+            # Don't fail if there's an environment check warning
+            # The downloader can still function with default paths
     
     def _after_init_checks(self, ui_components: Dict[str, Any], **kwargs) -> None:
         """Post-initialization validation dan health checks

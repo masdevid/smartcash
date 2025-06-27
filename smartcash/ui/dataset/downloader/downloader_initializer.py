@@ -135,20 +135,36 @@ class DownloaderInitializer(CommonInitializer):
         except ImportError as e:
             raise RuntimeError(f"Dependencies downloader tidak lengkap: {str(e)}") from e
         
-        # Check for Roboflow API key in environment
-        import os
-        roboflow_api_key = os.environ.get('ROBOFLOW_API_KEY')
-        if not roboflow_api_key:
-            self.logger.warning("⚠️ ROBOFLOW_API_KEY tidak ditemukan di environment variables")
-            self.logger.warning("   Silakan set environment variable dengan perintah:")
-            self.logger.warning("   %env ROBOFLOW_API_KEY=your_api_key_here  # Untuk Jupyter/Colab")
-            self.logger.warning("   Atau di terminal: export ROBOFLOW_API_KEY=your_api_key_here")
+        # Check for Roboflow API key in Colab secrets
+        try:
+            from google.colab import userdata  # Will raise ImportError if not in Colab
             
-            # Only raise error if we're not in a test environment
-            if not os.environ.get('PYTEST_CURRENT_TEST'):
+            # Try to get Roboflow API key from Colab secrets
+            try:
+                roboflow_api_key = userdata.get('ROBOFLOW_API_KEY')
+                if not roboflow_api_key:
+                    raise RuntimeError(
+                        "Roboflow API key tidak ditemukan di Colab secrets.\n"
+                        "Silakan tambahkan API key Anda di Colab secrets dengan nama 'ROBOFLOW_API_KEY'"
+                    )
+                # Set the API key in environment for any code that might need it
+                import os
+                os.environ['ROBOFLOW_API_KEY'] = roboflow_api_key
+                
+            except userdata.Error as e:
                 raise RuntimeError(
-                    "Roboflow API key tidak ditemukan. "
-                    "Silakan set ROBOFLOW_API_KEY di environment variables."
+                    "Gagal mengakses Colab secrets. "
+                    "Pastikan Anda sudah login ke akun Google Colab dan "
+                    f"sudah menambahkan Roboflow API key ke Colab secrets. Error: {str(e)}"
+                )
+                
+        except ImportError:
+            # Not in Colab, check environment variable as fallback
+            import os
+            if not os.environ.get('ROBOFLOW_API_KEY'):
+                self.logger.warning(
+                    "⚠️ ROBOFLOW_API_KEY tidak ditemukan. "
+                    "Silakan set environment variable ROBOFLOW_API_KEY"
                 )
         
         # Check environment compatibility

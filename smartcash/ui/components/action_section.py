@@ -2,7 +2,7 @@
 File: smartcash/ui/components/action_section.py
 Deskripsi: Shared component for action sections with consistent styling and layout
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 import ipywidgets as widgets
 
 def create_action_section(

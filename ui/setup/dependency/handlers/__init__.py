@@ -1,64 +1,43 @@
-"""
-File: smartcash/ui/setup/dependency/handlers/__init__.py
-Deskripsi: Dependency handlers module exports
+# =============================================================================
+# File: smartcash/ui/setup/dependency/handlers/__init__.py - UPDATED
+# Deskripsi: Complete handlers module exports untuk dependency management
+# =============================================================================
 
-This module provides a clean interface to all dependency management functionality,
-including configuration handling, UI updates, and package management.
-"""
+# Main coordinator
+from .event_handlers import setup_all_handlers
 
-from smartcash.ui.setup.dependency.handlers.installation_handler import setup_installation_handler
+# Base class
+from .base_handler import BaseDependencyHandler
 
-from smartcash.ui.setup.dependency.handlers.config_extractor import (
-    extract_dependency_config,
-    validate_extracted_config,
-    get_config_summary
-)
-from smartcash.ui.setup.dependency.handlers.config_updater import (
-    update_dependency_ui,
-    reset_dependency_ui,
-    apply_config_to_ui
-)
-from smartcash.ui.setup.dependency.handlers.defaults import (
-    DEFAULT_CONFIG,
-    PACKAGE_CATEGORIES,
-)
-from smartcash.ui.setup.dependency.handlers.dependency_handler import (
-    setup_dependency_handlers,
-    extract_current_config,
-    apply_config_to_ui,
-    reset_ui_to_defaults,
-    validate_ui_components,
-    get_handlers_status
-)
-from smartcash.ui.setup.dependency.handlers.installation_handler import setup_installation_handler
-from smartcash.ui.setup.dependency.handlers.analysis_handler import setup_analysis_handler
-from smartcash.ui.setup.dependency.handlers.status_check_handler import setup_status_check_handler
+# SRP handlers dengan base class pattern
+from .config_event_handlers import setup_config_handlers, ConfigEventHandler
+from .operation_handlers import setup_operation_handlers, OperationHandler
+from .selection_handlers import setup_selection_handlers, SelectionHandler
+
+# Config management
+from .config_handler import DependencyConfigHandler
+from .config_extractor import extract_dependency_config
+from .config_updater import update_dependency_ui, reset_dependency_ui
+from .defaults import get_default_dependency_config, get_all_packages, get_package_by_key
 
 __all__ = [
-    # Configuration
-    'DEFAULT_CONFIG',
-    'PACKAGE_CATEGORIES',
+    # Main coordinator
+    'setup_all_handlers',
+    
+    # Base class
+    'BaseDependencyHandler',
+    
+    # SRP handlers dengan base class
+    'setup_config_handlers', 'ConfigEventHandler',
+    'setup_operation_handlers', 'OperationHandler',
+    'setup_selection_handlers', 'SelectionHandler',
+    
+    # Config management
+    'DependencyConfigHandler',
     'extract_dependency_config',
     'update_dependency_ui',
     'reset_dependency_ui',
-    'get_minimal_config',
-    
-    # Main handler setup
-    'setup_dependency_handlers',
-    'extract_current_config',
-    'apply_config_to_ui',
-    'reset_ui_to_defaults',
-    'validate_ui_components',
-    'get_handlers_status',
-    
-    # Individual handlers
-    'setup_installation_handler',
-    'setup_analysis_handler', 
-    'setup_status_check_handler',
-    
-    # Validation
-    'validate_extracted_config',
-    'validate_ui_components',
-    'get_config_summary',
-    'get_handlers_status'
+    'get_default_dependency_config',
+    'get_all_packages',
+    'get_package_by_key'
 ]

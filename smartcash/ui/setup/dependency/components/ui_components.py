@@ -111,14 +111,14 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         reset_tooltip="Reset ke konfigurasi default"
     )
     
-    # Wrap in a container with the desired layout
-    save_reset = widgets.HBox(
-        [save_reset_buttons['button_container']],
-        layout=widgets.Layout(
-            margin='10px 0',
-            justify_content='flex-end',
-            width='100%'
-        )
+    # Use the container from save_reset_buttons
+    save_reset = save_reset_buttons['container']
+    
+    # Update the container's layout
+    save_reset.layout = widgets.Layout(
+        margin='10px 0',
+        justify_content='flex-end',
+        width='100%'
     )
     
     log_accordion = create_log_accordion(

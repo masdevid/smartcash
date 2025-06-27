@@ -2,9 +2,7 @@
 Test cases for the categories section component in dependency management UI.
 """
 import unittest
-import ipywidgets as widgets
 from unittest.mock import MagicMock, patch, ANY
-from typing import Dict, Any, List
 
 class TestCategoriesSection(unittest.TestCase):
     """Test cases for the categories section component."""
@@ -17,10 +15,6 @@ class TestCategoriesSection(unittest.TestCase):
             return_value={'categories': []}
         )
         self.mock_get_default_config = self.default_config_patch.start()
-        
-        # Import the function after patching
-        from smartcash.ui.setup.dependency.components.ui_components import _create_categories_section
-        self.create_categories_section = _create_categories_section
         
         # Create test data
         self.test_config = {
@@ -47,20 +41,19 @@ class TestCategoriesSection(unittest.TestCase):
             ]
         }
         
-        # Mock the widgets
-        self.mock_checkbox = MagicMock()
-        self.mock_vbox = MagicMock()
-        self.mock_html = MagicMock()
-        
         # Patch the widget constructors
-        self.checkbox_patch = patch('ipywidgets.Checkbox', return_value=self.mock_checkbox)
-        self.vbox_patch = patch('ipywidgets.VBox', return_value=self.mock_vbox)
-        self.html_patch = patch('ipywidgets.HTML', return_value=self.mock_html)
+        self.checkbox_patch = patch('ipywidgets.Checkbox')
+        self.vbox_patch = patch('ipywidgets.VBox')
+        self.html_patch = patch('ipywidgets.HTML')
         
         # Start the patches
-        self.checkbox_patch.start()
-        self.vbox_patch.start()
-        self.html_patch.start()
+        self.mock_checkbox = self.checkbox_patch.start()
+        self.mock_vbox = self.vbox_patch.start()
+        self.mock_html = self.html_patch.start()
+        
+        # Import the function after patching
+        from smartcash.ui.setup.dependency.components.ui_components import _create_categories_section
+        self.create_categories_section = _create_categories_section
     
     def tearDown(self):
         """Tear down test fixtures after each test method."""
@@ -73,7 +66,7 @@ class TestCategoriesSection(unittest.TestCase):
         """Test creating categories section with provided config."""
         # Setup mock return values
         mock_vbox = MagicMock()
-        self.vbox_patch.return_value = mock_vbox
+        self.mock_vbox.return_value = mock_vbox
         
         # Call the function with test config
         result = self.create_categories_section(self.test_config)
@@ -82,21 +75,48 @@ class TestCategoriesSection(unittest.TestCase):
         self.assertIsInstance(result, MagicMock)  # Mocked VBox
         
         # Verify HTML was created for the category header
-        from ipywidgets import HTML
-        self.assertTrue(HTML.called)
+        self.assertTrue(self.mock_html.called)
         
         # Verify checkbox was created for the package
-        from ipywidgets import Checkbox
-        self.assertTrue(Checkbox.called)
+        self.assertTrue(self.mock_checkbox.called)
         
-        # Verify VBox was called with correct arguments
-        self.assertTrue(self.vbox_patch.called)
+        # Verify VBox was called
+        self.assertTrue(self.mock_vbox.called)
+        
+        # Verify the result is the mock VBox
+        self.assertEqual(result, mock_vbox)
     
     def test_create_categories_section_without_config(self):
         """Test creating categories section without config (uses default)."""
         # Setup mock return values
         mock_vbox = MagicMock()
-        self.vbox_patch.return_value = mock_vbox
+        self.mock_vbox.return_value = mock_vbox
+        
+        # Setup default config mock
+        default_config = {
+            'categories': [
+                {
+                    'name': 'Default Category',
+                    'description': 'Default Description',
+                    'icon': '📦',
+                    'packages': [
+                        {
+                            'name': 'default-package',
+                            'description': 'Default package',
+                            'key': 'default-pkg',
+                            'pip_name': 'default-package',
+                            'required': True,
+                            'installed': False,
+                            'version': '1.0.0',
+                            'latest_version': '1.0.0',
+                            'update_available': False,
+                            'dependencies': []
+                        }
+                    ]
+                }
+            ]
+        }
+        self.mock_get_default_config.return_value = default_config
         
         # Call the function without config
         result = self.create_categories_section({})
@@ -108,13 +128,16 @@ class TestCategoriesSection(unittest.TestCase):
         self.mock_get_default_config.assert_called_once()
         
         # Verify VBox was called
-        self.assertTrue(self.vbox_patch.called)
+        self.assertTrue(self.mock_vbox.called)
+        
+        # Verify the result is the mock VBox
+        self.assertEqual(result, mock_vbox)
     
     def test_create_categories_section_empty(self):
         """Test creating categories section with empty categories."""
         # Setup mock return values
         mock_html = MagicMock()
-        self.html_patch.return_value = mock_html
+        self.mock_html.return_value = mock_html
         
         # Call the function with empty categories
         result = self.create_categories_section({'categories': []})
@@ -123,12 +146,14 @@ class TestCategoriesSection(unittest.TestCase):
         self.assertIsInstance(result, MagicMock)  # Mocked HTML
         
         # Verify HTML was created for the empty message
-        from ipywidgets import HTML
-        self.assertTrue(HTML.called)
+        self.assertTrue(self.mock_html.called)
         
         # Check if the correct message is in the HTML call
-        html_call_args = HTML.call_args[0][0]
-        self.assertIn("Tidak ada package yang tersedia", html_call_args)
+        html_call_args = self.mock_html.call_args[0][0]
+        self.assertIn("Tidak ada kategori package yang tersedia", html_call_args)
+        
+        # Verify the result is the mock HTML
+        self.assertEqual(result, mock_html)
 
 if __name__ == '__main__':
     unittest.main()

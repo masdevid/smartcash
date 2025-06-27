@@ -144,7 +144,12 @@ class DependencyInitializer(CommonInitializer):
             return self._logger_bridge
         except Exception as e:
             raise RuntimeError(f"Gagal menginisialisasi logger bridge: {str(e)}") from e
-        
+    
+    def _get_timestamp(self) -> str:
+        """Get current timestamp untuk tracking"""
+        from datetime import datetime
+        return datetime.now().isoformat()
+    
     def initialize_ui(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Initialize the dependency management UI dengan error handling yang komprehensif
         

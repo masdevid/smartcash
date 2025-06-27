@@ -94,35 +94,81 @@ class SmartCashLogger:
         except Exception:
             pass  # Silent fail untuk UI logging
     
-    def _log_both(self, level_name: str, message: str):
-        """Log ke both standard logger dan UI"""
+    def _log_both(self, level_name: str, message: str, **kwargs):
+        """Log ke both standard logger dan UI
+        
+        Args:
+            level_name: Nama level log (debug, info, warning, error, critical)
+            message: Pesan log
+            **kwargs: Additional logging parameters (exc_info, stack_info, etc.)
+        """
         # Normalize level untuk standard logger
         level_int = normalize_log_level(level_name)
         
         # Log ke standard logger
-        self.logger.log(level_int, message)
+        self.logger.log(level_int, message, **kwargs)
         
-        # Log ke UI
+        # Log ke UI (exclude exc_info from UI logging)
         self._log_to_ui(message, level_name)
     
     # Public logging methods
-    def debug(self, message: str):
-        self._log_both('debug', message)
+    def debug(self, message: str, **kwargs):
+        """Log debug message
         
-    def info(self, message: str):
-        self._log_both('info', message)
+        Args:
+            message: Debug message to log
+            **kwargs: Additional logging parameters:
+                - exc_info: Exception info tuple or True to capture current exception
+                - stack_info: Add stack info if True
+        """
+        self._log_both('debug', message, **kwargs)
         
-    def warning(self, message: str):
-        self._log_both('warning', message)
+    def info(self, message: str, **kwargs):
+        """Log info message
+        
+        Args:
+            message: Info message to log
+            **kwargs: Additional logging parameters:
+                - exc_info: Exception info tuple or True to capture current exception
+                - stack_info: Add stack info if True
+        """
+        self._log_both('info', message, **kwargs)
+        
+    def warning(self, message: str, **kwargs):
+        """Log warning message
+        
+        Args:
+            message: Warning message to log
+            **kwargs: Additional logging parameters:
+                - exc_info: Exception info tuple or True to capture current exception
+                - stack_info: Add stack info if True
+        """
+        self._log_both('warning', message, **kwargs)
         
     def warn(self, message: str):  # Alias
         self.warning(message)
         
-    def error(self, message: str):
-        self._log_both('error', message)
+    def error(self, message: str, **kwargs):
+        """Log error message with optional exception info
         
-    def critical(self, message: str):
-        self._log_both('critical', message)
+        Args:
+            message: Error message to log
+            **kwargs: Additional logging parameters:
+                - exc_info: Exception info tuple or True to capture current exception
+                - stack_info: Add stack info if True
+        """
+        self._log_both('error', message, **kwargs)
+        
+    def critical(self, message: str, **kwargs):
+        """Log critical message with optional exception info
+        
+        Args:
+            message: Critical message to log
+            **kwargs: Additional logging parameters:
+                - exc_info: Exception info tuple or True to capture current exception
+                - stack_info: Add stack info if True
+        """
+        self._log_both('critical', message, **kwargs)
         
     def fatal(self, message: str):  # Alias
         self.critical(message)

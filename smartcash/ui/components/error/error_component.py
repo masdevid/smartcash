@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/error/error_component.py
-Deskripsi: Enhanced error component dengan modern glassmorphism design dan smooth animations
+Deskripsi: Simplified error component dengan traceback toggle yang reliable
 """
 
 import ipywidgets as widgets
@@ -8,14 +8,12 @@ from typing import Optional, Dict, Any
 from IPython.display import display, HTML
 
 class ErrorComponent:
-    """✨ Modern error component dengan glassmorphism design dan smooth animations"""
+    """🚨 Clean error component dengan reliable traceback toggle"""
     
     def __init__(self, title: str = "🚨 Error", width: str = '100%'):
-        """Initialize error component dengan modern styling"""
         self.title = title
         self.width = width
         self._components = {}
-        self._is_expanded = False
         
     def create(
         self,
@@ -26,7 +24,7 @@ class ErrorComponent:
         **kwargs
     ) -> Dict[str, Any]:
         """
-        🎨 Create modern error widget dengan expandable design
+        Create error widget dengan simple traceback toggle
         
         Args:
             error_message: Pesan error utama
@@ -37,328 +35,195 @@ class ErrorComponent:
         Returns:
             Dictionary berisi widget dan komponen lainnya
         """
-        # 🎨 Modern style definitions dengan glassmorphism
-        styles = self._get_modern_styles()
+        # Color schemes
+        styles = self._get_styles()
         style = styles.get(error_type.lower(), styles["error"])
         
-        # 📱 Create main error display
+        # Create main error display
         error_display = self._create_main_error_display(error_message, style, traceback is not None and show_traceback)
         
-        # 🔍 Create expandable traceback section
+        # Create traceback section if needed
         if traceback and show_traceback:
-            traceback_section = self._create_traceback_section(traceback, style)
-            container = widgets.VBox([error_display, traceback_section], 
+            traceback_widget = self._create_traceback_section(traceback)
+            container = widgets.VBox([error_display, traceback_widget], 
                 layout=widgets.Layout(width=self.width, margin='10px 0'))
         else:
             container = error_display
         
-        # 💾 Store components untuk reuse
+        # Store components
         self._components = {
             'widget': container,
             'container': container,
             'error_widget': error_display,
             'message_widget': error_display,
-            'traceback_widget': getattr(self, '_traceback_widget', None),
-            'toggle_button': getattr(self, '_toggle_button', None)
+            'traceback_widget': getattr(self, '_traceback_widget', None)
         }
         
         return self._components
     
-    def _get_modern_styles(self) -> Dict[str, Dict[str, str]]:
-        """🎨 Modern glassmorphism color schemes"""
+    def _get_styles(self) -> Dict[str, Dict[str, str]]:
+        """Glassmorphism color schemes"""
         return {
             "error": {
                 "bg": "linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, rgba(244, 67, 54, 0.05) 100%)",
                 "border": "rgba(244, 67, 54, 0.3)",
                 "color": "#d32f2f",
-                "icon": "🚨",
-                "shadow": "0 8px 32px rgba(244, 67, 54, 0.1)",
-                "accent": "#f44336"
+                "icon": "🚨"
             },
             "warning": {
                 "bg": "linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%)",
                 "border": "rgba(255, 193, 7, 0.3)",
                 "color": "#ff8f00",
-                "icon": "⚠️",
-                "shadow": "0 8px 32px rgba(255, 193, 7, 0.1)",
-                "accent": "#ffc107"
+                "icon": "⚠️"
             },
             "info": {
                 "bg": "linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%)",
                 "border": "rgba(33, 150, 243, 0.3)",
                 "color": "#1565c0",
-                "icon": "ℹ️",
-                "shadow": "0 8px 32px rgba(33, 150, 243, 0.1)",
-                "accent": "#2196f3"
+                "icon": "ℹ️"
             },
             "success": {
                 "bg": "linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(76, 175, 80, 0.05) 100%)",
                 "border": "rgba(76, 175, 80, 0.3)",
                 "color": "#2e7d32",
-                "icon": "✅",
-                "shadow": "0 8px 32px rgba(76, 175, 80, 0.1)",
-                "accent": "#4caf50"
+                "icon": "✅"
             }
         }
     
     def _create_main_error_display(self, message: str, style: Dict[str, str], has_traceback: bool) -> widgets.HTML:
-        """📱 Create main error display dengan modern design"""
-        expand_hint = "🔽 Klik untuk detail" if has_traceback else ""
+        """Create main error display dengan toggle button"""
+        toggle_button = f"""
+        <button onclick="toggleTraceback()" style="
+            background: {style['color']};
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 8px;
+        ">
+            📋 Detail
+        </button>
+        """ if has_traceback else ""
         
         html_content = f"""
-        <div id="error-container" style="
+        <div style="
             background: {style['bg']};
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid {style['border']};
-            border-radius: 16px;
-            padding: 15px;
+            border-radius: 12px;
+            padding: 16px;
             margin: 10px 0;
-            box-shadow: {style['shadow']};
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: {'pointer' if has_traceback else 'default'};
-            position: relative;
-            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
             max-width: 100%;
             box-sizing: border-box;
-        " {'onclick="toggleTraceback()"' if has_traceback else ''}>
-            
-            {self._create_background_pattern(style['accent'])}
-            
-            <div style="position: relative; z-index: 2;">
-                <div style="
-                    display: flex; 
-                    align-items: center; 
-                    margin-bottom: 12px;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                ">
-                    <span style="font-size: 20px; flex-shrink: 0;">{style['icon']}</span>
-                    <h3 style="
-                        color: {style['color']}; 
-                        margin: 0; 
-                        font-size: clamp(14px, 4vw, 18px);
-                        font-weight: 600;
-                        flex: 1;
-                        min-width: 0;
-                        word-break: break-word;
-                    ">{self.title}</h3>
-                    {f'<span style="color: {style["color"]}; font-size: 11px; opacity: 0.7; flex-shrink: 0;">{expand_hint}</span>' if has_traceback else ''}
-                </div>
-                
-                <div style="
+        ">
+            <div style="
+                display: flex; 
+                align-items: center; 
+                margin-bottom: 12px;
+                flex-wrap: wrap;
+                gap: 8px;
+            ">
+                <span style="font-size: 18px; flex-shrink: 0;">{style['icon']}</span>
+                <h3 style="
                     color: {style['color']}; 
-                    font-size: clamp(12px, 3vw, 14px); 
-                    line-height: 1.6;
-                    margin-bottom: 12px;
-                    font-weight: 500;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                    hyphens: auto;
-                ">{message}</div>
-                
-                <div style="
-                    color: rgba(102, 102, 102, 0.8); 
-                    font-size: clamp(10px, 2.5vw, 12px); 
-                    font-style: italic;
-                    border-top: 1px solid rgba(255, 255, 255, 0.1);
-                    padding-top: 12px;
-                    margin-top: 12px;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                ">
-                    💡 Cobalah refresh cell atau periksa dependencies
-                    {('<br>🔍 ' + expand_hint) if has_traceback else ''}
-                </div>
+                    margin: 0; 
+                    font-size: 16px;
+                    font-weight: 600;
+                    flex: 1;
+                    min-width: 0;
+                    word-break: break-word;
+                ">{self.title}</h3>
+                {toggle_button}
+            </div>
+            
+            <div style="
+                color: {style['color']}; 
+                font-size: 14px; 
+                line-height: 1.5;
+                margin-bottom: 12px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            ">{message}</div>
+            
+            <div style="
+                color: #666; 
+                font-size: 12px; 
+                font-style: italic;
+                border-top: 1px solid {style['border']};
+                padding-top: 8px;
+                margin-top: 8px;
+                word-wrap: break-word;
+            ">
+                💡 Cobalah refresh cell atau periksa dependencies
             </div>
         </div>
         
-        {self._get_toggle_script() if has_traceback else ''}
+        <script>
+        function toggleTraceback() {{
+            const traceback = document.getElementById('traceback-section');
+            if (traceback) {{
+                traceback.style.display = traceback.style.display === 'none' ? 'block' : 'none';
+            }}
+        }}
+        </script>
         """
         
         return widgets.HTML(value=html_content, layout=widgets.Layout(width=self.width))
     
-    def _create_traceback_section(self, traceback: str, style: Dict[str, str]) -> widgets.VBox:
-        """🔍 Create expandable traceback section dengan modern styling"""
-        # Modern traceback container
-        traceback_container = widgets.HTML(
+    def _create_traceback_section(self, traceback: str) -> widgets.HTML:
+        """Create simple traceback section"""
+        traceback_widget = widgets.HTML(
             value=f"""
             <div id="traceback-section" style="
                 display: none;
-                background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(40, 40, 40, 0.9) 100%);
-                backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
-                margin-top: 10px;
-                padding: 0;
+                background: linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(248, 249, 250, 0.8) 100%);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(0, 0, 0, 0.1);
+                border-radius: 8px;
+                margin-top: 8px;
                 overflow: hidden;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                max-height: 400px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
                 max-width: 100%;
                 box-sizing: border-box;
             ">
                 <div style="
-                    padding: 12px 16px;
-                    background: rgba(255, 255, 255, 0.05);
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    flex-wrap: wrap;
-                    gap: 8px;
+                    padding: 8px 12px;
+                    background: #e9ecef;
+                    border-bottom: 1px solid #dee2e6;
+                    font-weight: 600;
+                    font-size: 13px;
+                    color: #495057;
                 ">
-                    <span style="
-                        color: #ffffff; 
-                        font-weight: 600; 
-                        font-size: clamp(12px, 3vw, 14px);
-                        flex: 1;
-                        min-width: 120px;
-                    ">
-                        🔍 Stack Trace Details
-                    </span>
-                    <button onclick="copyTraceback()" style="
-                        background: rgba(255, 255, 255, 0.1);
-                        border: 1px solid rgba(255, 255, 255, 0.2);
-                        border-radius: 6px;
-                        color: #ffffff;
-                        padding: 6px 12px;
-                        font-size: clamp(10px, 2.5vw, 12px);
-                        cursor: pointer;
-                        transition: all 0.2s ease;
-                        flex-shrink: 0;
-                        white-space: nowrap;
-                    " onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'" 
-                       onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
-                        📋 Copy
-                    </button>
+                    🔍 Stack Trace Details
                 </div>
-                <pre id="traceback-content" style="
+                <pre style="
                     margin: 0;
-                    padding: 16px;
-                    color: #e0e0e0;
+                    padding: 12px;
+                    color: #212529;
                     background: transparent;
-                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
-                    font-size: clamp(10px, 2.5vw, 12px);
+                    font-family: 'Courier New', monospace;
+                    font-size: 11px;
                     line-height: 1.4;
-                    overflow-x: auto;
                     white-space: pre-wrap;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
-                    max-height: 280px;
+                    max-height: 300px;
                     overflow-y: auto;
                     box-sizing: border-box;
                     width: 100%;
                 ">{traceback}</pre>
             </div>
-            
-            <script>
-            function copyTraceback() {{
-                const content = document.getElementById('traceback-content').textContent;
-                navigator.clipboard.writeText(content).then(() => {{
-                    const button = event.target;
-                    const originalText = button.textContent;
-                    button.textContent = '✅ Copied!';
-                    button.style.background = 'rgba(76, 175, 80, 0.3)';
-                    setTimeout(() => {{
-                        button.textContent = originalText;
-                        button.style.background = 'rgba(255, 255, 255, 0.1)';
-                    }}, 2000);
-                }});
-            }}
-            </script>
             """,
             layout=widgets.Layout(width='100%')
         )
         
-        # Store untuk reference
-        self._traceback_widget = traceback_container
-        
-        return widgets.VBox([traceback_container], layout=widgets.Layout(width='100%'))
-    
-    def _create_background_pattern(self, accent_color: str) -> str:
-        """🎨 Create subtle background pattern"""
-        return f"""
-        <div style="
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, {accent_color}10 0%, transparent 70%);
-            opacity: 0.3;
-            z-index: 1;
-        "></div>
-        """
-    
-    def _get_toggle_script(self) -> str:
-        """⚡ JavaScript untuk smooth toggle animation"""
-        return """
-        <script>
-        let tracebackVisible = false;
-        
-        function toggleTraceback() {
-            const container = document.getElementById('error-container');
-            const traceback = document.getElementById('traceback-section');
-            
-            if (!traceback) return;
-            
-            tracebackVisible = !tracebackVisible;
-            
-            if (tracebackVisible) {
-                // Show dengan smooth animation
-                traceback.style.display = 'block';
-                traceback.style.opacity = '0';
-                traceback.style.transform = 'translateY(-20px)';
-                
-                // Trigger animation
-                setTimeout(() => {
-                    traceback.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-                    traceback.style.opacity = '1';
-                    traceback.style.transform = 'translateY(0)';
-                }, 10);
-                
-                // Update container hover effect
-                container.style.transform = 'translateY(-2px)';
-                container.style.boxShadow = '0 12px 48px rgba(0, 0, 0, 0.15)';
-                
-            } else {
-                // Hide dengan smooth animation
-                traceback.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-                traceback.style.opacity = '0';
-                traceback.style.transform = 'translateY(-20px)';
-                
-                setTimeout(() => {
-                    traceback.style.display = 'none';
-                }, 300);
-                
-                // Reset container
-                container.style.transform = 'translateY(0)';
-                container.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
-            }
-        }
-        
-        // Add hover effects
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.getElementById('error-container');
-            if (container && container.style.cursor === 'pointer') {
-                container.addEventListener('mouseenter', () => {
-                    if (!tracebackVisible) {
-                        container.style.transform = 'translateY(-2px)';
-                        container.style.boxShadow = '0 12px 48px rgba(0, 0, 0, 0.15)';
-                    }
-                });
-                
-                container.addEventListener('mouseleave', () => {
-                    if (!tracebackVisible) {
-                        container.style.transform = 'translateY(0)';
-                        container.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
-                    }
-                });
-            }
-        });
-        </script>
-        """
+        self._traceback_widget = traceback_widget
+        return traceback_widget
 
 def create_error_component(
     error_message: str,
@@ -370,7 +235,7 @@ def create_error_component(
     **kwargs
 ) -> Dict[str, Any]:
     """
-    🚀 Factory function untuk membuat modern error component
+    Factory function untuk membuat error component
     
     Args:
         error_message: Pesan error utama
@@ -379,7 +244,6 @@ def create_error_component(
         error_type: Tipe error (error, warning, info, success)
         show_traceback: Tampilkan toggle traceback
         width: Lebar component
-        **kwargs: Additional arguments
         
     Returns:
         Dictionary berisi widget dan komponen lainnya

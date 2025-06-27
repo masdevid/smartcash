@@ -47,8 +47,8 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         with_sync_info=False
     )
     
-    # Action buttons with new API
-    action_buttons = create_action_buttons(
+    # Action components with new API
+    action_components = create_action_buttons(
         primary_button={
             "label": "🚀 Mulai Preprocessing",
             "style": "success",
@@ -69,11 +69,11 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         ]
     )
     
-    # Get buttons from the new action buttons component
-    preprocess_button = action_buttons.get('primary')
-    check_button = action_buttons.get('secondary_0')
-    cleanup_button = action_buttons.get('secondary_1')
-    button_container = action_buttons['container']
+    # Get buttons from the action components
+    preprocess_button = action_components.get('primary')
+    check_button = action_components.get('secondary_0')
+    cleanup_button = action_components.get('secondary_1')
+    button_container = action_components['container']
     
     # Progress tracker
     progress_tracker = create_dual_progress_tracker(
@@ -106,7 +106,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     # Action section dengan confirmation area
     action_section = widgets.VBox([
         widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
-        action_components['container'],
+        button_container,
         widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Konfirmasi & Status:</strong></div>"),
         confirmation_area
     ], layout=widgets.Layout(
@@ -148,22 +148,32 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         except (AttributeError, TypeError):
             return fallback
     
-    # Debug: Print action_components structure untuk debugging
+    # Debug: Print action_components structure for debugging
     print(f"[DEBUG] action_components keys: {list(action_components.keys()) if action_components else 'None'}")
     
-    # Build UI components dictionary
-    # Make sure we have all required buttons
-    preprocess_button = (action_components.get('preprocess_btn') or 
-                        action_components.get('primary_button') or
-                        action_components.get('download_button') or
-                        action_components.get('primary_button'))
+    # Get buttons from action_components
+    preprocess_button = action_components.get('primary')
+    check_button = action_components.get('secondary_0')
+    cleanup_button = action_components.get('secondary_1')
     
-    # Ensure buttons are properly initialized
+    # Fallback button creation if any button is missing
     if preprocess_button is None:
         print("[WARNING] Preprocess button not found, creating fallback")
         preprocess_button = widgets.Button(description='🚀 Mulai Preprocessing')
         preprocess_button.style.button_color = '#4CAF50'
         preprocess_button.layout = widgets.Layout(width='180px')
+    
+    if check_button is None:
+        print("[WARNING] Check button not found, creating fallback")
+        check_button = widgets.Button(description='🔍 Check Dataset')
+        check_button.style.button_color = '#f0f0f0'
+        check_button.layout = widgets.Layout(width='140px')
+    
+    if cleanup_button is None:
+        print("[WARNING] Cleanup button not found, creating fallback")
+        cleanup_button = widgets.Button(description='🗑️ Bersihkan Dataset', 
+                                     button_style='warning')
+        cleanup_button.layout = widgets.Layout(width='160px')
     
     ui_components.update({
         # CRITICAL COMPONENTS (required by CommonInitializer)  

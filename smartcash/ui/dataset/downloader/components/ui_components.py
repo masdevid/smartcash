@@ -155,10 +155,11 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
         
         # Action buttons
-        'action_buttons': action_buttons,
-        'download_button': action_buttons['download_button'],
-        'check_button': action_buttons['check_button'],
-        'cleanup_button': action_buttons.get('cleanup_button'),
+        'action_buttons': action_buttons_dict,
+        'download_button': download_button,
+        'check_button': check_button,
+        'cleanup_button': cleanup_button,
+        'container': button_container,
         
         # Confirmation area - IMPORTANT!
         'confirmation_area': confirmation_area,

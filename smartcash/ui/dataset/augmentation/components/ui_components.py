@@ -129,7 +129,10 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     
     # Update action_buttons for backward compatibility
     action_buttons = {
-        'container': action_components.get('container', widgets.HBox([augment_button, check_button])),
+        'container': button_container,
+        'primary': augment_button,
+        'secondary_0': check_button,
+        'secondary_1': cleanup_button,
         'augment_button': augment_button,
         'check_button': check_button,
         'cleanup_button': cleanup_button,
@@ -166,7 +169,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Action section dengan confirmation area
     action_section = widgets.VBox([
         _create_section_header("🚀 Pipeline Operations", "#667eea"),
-        action_buttons['container'],
+        button_container,
         widgets.HTML("<div style='margin: 5px 0;'><strong>📋 Status & Konfirmasi:</strong></div>"),
         confirmation_area
     ], layout=widgets.Layout(

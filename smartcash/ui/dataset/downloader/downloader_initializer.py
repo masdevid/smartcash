@@ -135,14 +135,23 @@ class DownloaderInitializer(CommonInitializer):
         except ImportError as e:
             raise RuntimeError(f"Dependencies downloader tidak lengkap: {str(e)}") from e
         
-        # Check for required configuration
-        config = kwargs.get('config', {})
-        download_config = config.get('download', {})
-        
-        # Check colab_secret_key in config
-        if not download_config.get('colab_secret_key'):
-            raise RuntimeError("colab_secret_key tidak ditemukan di konfigurasi download. "
-                           "Silakan perbarui konfigurasi dengan kunci yang valid.")
+        # Check if running in Colab environment
+        try:
+            import os
+            from google.colab import userdata  # Will raise ImportError if not in Colab
+            
+            # Try to get the secret key
+            try:
+                secret_key = userdata.get('COLAB_SECRET_KEY')
+                if not secret_key:
+                    raise RuntimeError("Colab secret key tidak ditemukan. "
+                                   "Silakan set COLAB_SECRET_KEY di Colab secrets.")
+            except userdata.Error as e:
+                raise RuntimeError(f"Gagal mengakses Colab secret key: {str(e)}")
+                
+        except ImportError:
+            # Not in Colab, log a warning but don't fail
+            self.logger.warning("⚠️ Tidak berjalan di Google Colab, lewati pengecekan secret key")
         
         # Check environment compatibility
         try:

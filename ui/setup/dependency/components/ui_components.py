@@ -55,7 +55,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Main container
     main_container = create_responsive_container([
         header, status_panel, categories_section, custom_section,
-        action_section, progress_tracker.container, log_components['accordion']
+        action_section, progress_tracker.container, log_components['log_accordion']
     ])
     
     # Create logger bridge untuk dependency management

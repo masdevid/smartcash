@@ -6,7 +6,7 @@ Deskripsi: Exports untuk preprocessing UI utilities
 from .ui_utils import (
     log_to_ui, hide_confirmation_area, show_confirmation_area,
     clear_outputs, disable_buttons, enable_buttons, handle_error,
-    setup_progress, complete_progress, error_progress, log_to_accordion
+    setup_progress, complete_progress, error_progress
 )
 
 __all__ = [
@@ -19,6 +19,5 @@ __all__ = [
     'handle_error',
     'setup_progress',
     'complete_progress',
-    'error_progress',
-    'log_to_accordion'
+    'error_progress'
 ]

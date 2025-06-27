@@ -147,59 +147,51 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')
     
-    # Helper function to create styled containers consistently
-    def create_styled_container(content, title, container_type='normal', width='48%'):
-        # Map container types to colors
-        colors = {
-            'types': '#667eea',  # Blue for Augmentation Types
-            'normal': '#28a745', # Green for normal sections
-            'basic': '#17a2b8',  # Cyan for basic options
-            'advanced': '#6f42c1' # Purple for advanced options
-        }
-        color = colors.get(container_type, '#28a745')  # Default to green
-        
-        return widgets.VBox([
-            _create_section_header(title, color),
-            content
-        ], layout=widgets.Layout(
-            width=width,
-            padding='12px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            background_color='#f9f9f9',
-            margin='0 0 10px 0'
-        ))
-
-    # 2x2 Grid with consistent styling
+    # Import style utilities
+    from smartcash.ui.dataset.augmentation.utils.style_utils import styled_container
+    
+    # 2x2 Grid with original styling and gradients
     row1 = widgets.HBox([
-        create_styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic'),
-        create_styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced')
+        styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic', '48%'),
+        styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced', '48%')
     ], layout=widgets.Layout(
         width='100%',
+        display='flex',
+        flex_flow='row wrap',
         justify_content='space-between',
-        margin='0 0 15px 0'
+        align_items='stretch',
+        gap='15px',
+        margin='8px 0',
+        overflow='hidden',
+        box_sizing='border-box'
     ))
     
     row2 = widgets.HBox([
-        create_styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types'),
-        create_styled_container(live_preview['container'], "🎬 Live Preview")
+        styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types', '48%'),
+        styled_container(live_preview['container'], "🎬 Live Preview", 'normalization', '48%')
     ], layout=widgets.Layout(
         width='100%',
+        display='flex',
+        flex_flow='row wrap',
         justify_content='space-between',
-        margin='0 0 15px 0'
+        align_items='stretch',
+        gap='15px',
+        margin='8px 0',
+        overflow='hidden',
+        box_sizing='border-box'
     ))
     
-    # Action section with confirmation area - consistent with other UIs
+    # Action section dengan confirmation area
     action_section = widgets.VBox([
-        widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
+        _create_section_header("🚀 Pipeline Operations", "#667eea"),
         button_container,
-        widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Status:</strong></div>"),
+        widgets.HTML("<div style='margin: 5px 0;'><strong>📋 Status & Konfirmasi:</strong></div>"),
         confirmation_area
     ], layout=widgets.Layout(
-        width='100%', 
-        margin='10px 0', 
-        padding='12px',
-        border='1px solid #e0e0e0', 
+        width='100%',
+        margin='10px 0',
+        padding='10px',
+        border='1px solid #e0e0e0',
         border_radius='8px',
         background_color='#f9f9f9'
     ))

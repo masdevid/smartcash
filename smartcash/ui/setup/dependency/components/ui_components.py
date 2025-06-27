@@ -102,9 +102,18 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     )
     
     # Create save/reset buttons with consistent styling
-    save_reset = create_save_reset_buttons(
+    save_reset_buttons = create_save_reset_buttons(
         save_label="💾 Simpan Konfigurasi",
         reset_label="🔄 Reset",
+        button_width='auto',
+        container_width='100%',
+        save_tooltip="Simpan konfigurasi dependensi",
+        reset_tooltip="Reset ke konfigurasi default"
+    )
+    
+    # Wrap in a container with the desired layout
+    save_reset = widgets.HBox(
+        [save_reset_buttons['button_container']],
         layout=widgets.Layout(
             margin='10px 0',
             justify_content='flex-end',

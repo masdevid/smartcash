@@ -275,17 +275,18 @@ def show_confirmation_dialog(
         display(HTML(
             f"""
             <script>
+            var areaId = '{0}';
             document.getElementById('confirmBtn').onclick = function() {{
                 var kernel = IPython.notebook.kernel;
                 kernel.execute('from IPython.display import display, clear_output; ' +
-                             'with ({(dialog_area._repr_mimebundle_()["text/plain"])}): ' +
+                             'with ("' + areaId.replace(/"/g, '\\\\"') + '"): ' +
                              'clear_output(wait=True)');
                 {handle_confirm.__code__.co_consts[0]};
             }};
             document.getElementById('cancelBtn').onclick = function() {{
                 var kernel = IPython.notebook.kernel;
                 kernel.execute('from IPython.display import display, clear_output; ' +
-                             'with ({(dialog_area._repr_mimebundle_()["text/plain"]).replace("'", "\\'")}): ' +
+                             'with ("' + areaId.replace(/"/g, '\\\\"') + '"): ' +
                              'clear_output(wait=True)');
                 {handle_cancel.__code__.co_consts[0]};
             }};

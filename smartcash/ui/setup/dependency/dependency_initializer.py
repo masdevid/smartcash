@@ -156,7 +156,7 @@ class DependencyInitializer(CommonInitializer):
         except Exception as e:
             raise RuntimeError(f"Gagal menginisialisasi logger bridge: {str(e)}") from e
     
-    def initialize_ui(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def initialize_ui(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """Initialize the dependency management UI dengan error handling yang komprehensif
         
         Args:
@@ -164,7 +164,7 @@ class DependencyInitializer(CommonInitializer):
             **kwargs: Argumen tambahan
             
         Returns:
-            Dictionary berisi komponen UI yang telah diinisialisasi
+            Root UI component yang siap ditampilkan
             
         Raises:
             RuntimeError: Jika inisialisasi gagal
@@ -186,7 +186,8 @@ class DependencyInitializer(CommonInitializer):
             # Log successful initialization
             self._logger_bridge.info("✅ Dependency management UI berhasil diinisialisasi")
             
-            return ui_components
+            # Return the root UI component
+            return self._get_ui_root(ui_components)
             
         except Exception as e:
             error_msg = f"❌ Gagal menginisialisasi dependency UI: {str(e)}"

@@ -35,3 +35,38 @@ class DependencyInitializer(CommonInitializer):
         """Return default dependency configuration"""
         from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependency_config
         return get_default_dependency_config()
+        
+    def initialize_ui(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Initialize the dependency management UI
+        
+        Args:
+            config: Optional configuration dictionary
+            
+        Returns:
+            Dictionary containing UI components
+        """
+        # Load default config if none provided
+        if config is None:
+            config = self._get_default_config()
+            
+        # Create UI components
+        ui_components = self._create_ui_components(config)
+        
+        # Setup event handlers
+        from smartcash.ui.setup.dependency.handlers.event_handlers import setup_all_handlers
+        handlers = setup_all_handlers(ui_components, config, self.config_handler)
+        ui_components['_handlers'] = handlers
+        
+        # Initialize logger bridge if not present
+        if 'logger_bridge' not in ui_components:
+            from smartcash.ui.utils.logger_bridge import LoggerBridge
+            ui_components['logger_bridge'] = LoggerBridge(
+                log_output=ui_components.get('log_output'),
+                summary_output=ui_components.get('status_panel'),
+                module_name='dependency'
+            )
+            
+        # Log successful initialization
+        ui_components['logger_bridge'].info("✅ Dependency management UI initialized")
+        
+        return ui_components

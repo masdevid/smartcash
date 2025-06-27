@@ -136,6 +136,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         'augment_button': augment_button,
         'check_button': check_button,
         'cleanup_button': cleanup_button,
+        'download_button': augment_button,  # For backward compatibility
         'buttons': [augment_button, check_button, cleanup_button] if cleanup_button else [augment_button, check_button]
     }
     
@@ -212,9 +213,10 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         **advanced_options['widgets'],
         **augmentation_types['widgets'], 
         **live_preview['widgets'],  # CHANGED: Live preview widgets
-        'augment_button': action_buttons['download_button'],
-        'check_button': action_buttons['check_button'],
-        'cleanup_button': action_buttons.get('cleanup_button'),
+        'augment_button': augment_button,
+        'check_button': check_button,
+        'cleanup_button': cleanup_button,
+        'download_button': augment_button,  # For backward compatibility
         'save_button': config_buttons['save_button'],
         'reset_button': config_buttons['reset_button'],
         'progress_tracker': progress_tracker,

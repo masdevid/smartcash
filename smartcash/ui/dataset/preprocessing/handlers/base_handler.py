@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/base_handler.py
-Deskripsi: Base handler class untuk DRY implementation dan consistent error handling
+Deskripsi: Fixed base handler dengan proper button access dan suppressed init logs
 """
 
 from abc import ABC, abstractmethod
@@ -9,7 +9,7 @@ from smartcash.ui.utils import with_error_handling, ErrorHandler
 from smartcash.ui.dataset.preprocessing import utils as ui_utils
 
 class BasePreprocessingHandler(ABC):
-    """Base class untuk semua preprocessing handlers dengan DRY utilities"""
+    """Base class untuk handlers dengan proper button mapping dan minimal logging"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -26,12 +26,39 @@ class BasePreprocessingHandler(ABC):
         """Setup handlers specific untuk handler type ini"""
         pass
     
-    # === COMMON UTILITIES ===
+    # === FIXED BUTTON ACCESS ===
     
     def get_button(self, button_id: str) -> Optional[Any]:
-        """Get button dengan fallback ke action_buttons"""
+        """Get button dengan proper fallback mapping"""
+        # Primary: direct access
+        if button := self.ui_components.get(button_id):
+            return button
+        
+        # Secondary: action_buttons mapping
         action_buttons = self.ui_components.get('action_buttons', {})
-        return action_buttons.get(button_id) or self.ui_components.get(button_id)
+        if button := action_buttons.get(button_id):
+            return button
+        
+        # Tertiary: original create_action_buttons result
+        action_components = self.ui_components.get('action_components', {})
+        if button := action_components.get(button_id):
+            return button
+        
+        # Button mapping untuk different naming conventions
+        button_mappings = {
+            'preprocess_btn': ['preprocess_button', 'primary', 'mulai_preprocessing'],
+            'check_btn': ['check_button', 'secondary_0', 'check_dataset'],
+            'cleanup_btn': ['cleanup_button', 'secondary_1', 'cleanup'],
+            'save_button': ['save_btn'],
+            'reset_button': ['reset_btn']
+        }
+        
+        # Check aliases
+        for alias in button_mappings.get(button_id, []):
+            if button := (self.ui_components.get(alias) or action_buttons.get(alias)):
+                return button
+        
+        return None
     
     def clear_button_handlers(self, button: Any) -> None:
         """Clear button handlers dengan safe approach"""
@@ -45,10 +72,12 @@ class BasePreprocessingHandler(ABC):
     
     def setup_button_handler(self, button_id: str, handler_func: Callable, 
                            error_operation: str) -> Optional[Callable]:
-        """Generic button handler setup dengan error handling"""
+        """Setup button handler dengan proper mapping dan minimal logging"""
         button = self.get_button(button_id)
         if not button:
-            self.logger.warning(f"⚠️ Button {button_id} tidak ditemukan")
+            # SUPPRESSED: hanya log jika debug mode
+            if getattr(self.logger, 'level', 20) <= 10:  # DEBUG level
+                self.logger.debug(f"🔍 Button {button_id} tidak ditemukan")
             return None
         
         self.clear_button_handlers(button)
@@ -80,7 +109,7 @@ class BasePreprocessingHandler(ABC):
                                on_confirm: Callable, on_cancel: Callable,
                                confirm_text: str = "Ya", cancel_text: str = "Batal",
                                danger_mode: bool = False) -> None:
-        """Generic confirmation dialog dengan consistent styling"""
+        """Generic confirmation dialog"""
         from smartcash.ui.components.dialog.confirmation_dialog import show_confirmation_dialog
         
         show_confirmation_dialog(
@@ -116,17 +145,20 @@ class BasePreprocessingHandler(ABC):
                     method = getattr(progress_tracker, method_name)
                     method(progress_percent, message)
                 
-                if level in ['overall', 'current']:
+                # MINIMAL LOGGING: hanya overall dan current
+                if level in ['overall', 'current'] and current % 10 == 0:  # Every 10%
                     log_message = f"{message} ({progress_percent}%)" if message else f"Progress: {progress_percent}%"
                     self.logger.info(log_message)
                     
             except Exception as e:
-                self.logger.warning(f"⚠️ Progress callback error: {str(e)}")
+                # SUPPRESSED: minimal error logging
+                if getattr(self.logger, 'level', 20) <= 10:
+                    self.logger.debug(f"🔍 Progress callback error: {str(e)}")
         
         return progress_callback
     
     def update_status_panel(self, message: str, status_type: str) -> None:
-        """Update status panel dengan message"""
+        """Update status panel"""
         status_panel = self.ui_components.get('status_panel')
         if status_panel and hasattr(status_panel, 'update_status'):
             status_panel.update_status(message, status_type)
@@ -144,7 +176,7 @@ class BasePreprocessingHandler(ABC):
             clear_dialog_area(self.ui_components)
     
     def process_operation_result(self, result: Dict[str, Any], operation: str) -> None:
-        """Generic result processor untuk operations"""
+        """Process operation results"""
         if not result.get('success', False):
             error_msg = result.get('message', f'{operation} failed')
             raise RuntimeError(f"{operation} failed: {error_msg}")
@@ -165,7 +197,7 @@ class BasePreprocessingHandler(ABC):
         processed_count = overview.get('total_files', 0)
         success_rate = overview.get('success_rate', '100%')
         
-        success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files diproses dalam {processing_time:.1f}s (Success rate: {success_rate})"
+        success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files dalam {processing_time:.1f}s (Success: {success_rate})"
         ui_utils.complete_progress(self.ui_components, success_msg)
         self.logger.success(success_msg)
     
@@ -175,7 +207,7 @@ class BasePreprocessingHandler(ABC):
         files_removed = stats.get('files_removed', 0)
         splits_cleaned = stats.get('splits_cleaned', [])
         
-        success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dihapus dari {len(splits_cleaned)} splits"
+        success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dari {len(splits_cleaned)} splits"
         ui_utils.complete_progress(self.ui_components, success_msg)
         self.logger.success(success_msg)
     
@@ -184,7 +216,7 @@ class BasePreprocessingHandler(ABC):
         if result.get('service_ready', False):
             file_stats = result.get('file_statistics', {})
             total_files = sum(split_stats.get('raw_images', 0) for split_stats in file_stats.values())
-            self.logger.info(f"📊 Dataset status: {total_files:,} raw images ditemukan")
+            self.logger.info(f"📊 Dataset: {total_files:,} raw images ditemukan")
         else:
             self.logger.warning("⚠️ Service belum siap atau dataset tidak ditemukan")
         
@@ -193,21 +225,18 @@ class BasePreprocessingHandler(ABC):
     # === LOGGING SHORTCUTS ===
     
     def log_info(self, message: str) -> None:
-        """Log info message"""
         self.logger.info(message)
     
     def log_success(self, message: str) -> None:
-        """Log success message"""
         self.logger.success(message)
     
     def log_warning(self, message: str) -> None:
-        """Log warning message"""
         self.logger.warning(message)
     
     def log_error(self, message: str) -> None:
-        """Log error message"""
         self.logger.error(message)
     
     def log_debug(self, message: str) -> None:
-        """Log debug message"""
-        self.logger.debug(message)
+        """SUPPRESSED: hanya log jika debug mode aktif"""
+        if getattr(self.logger, 'level', 20) <= 10:
+            self.logger.debug(message)

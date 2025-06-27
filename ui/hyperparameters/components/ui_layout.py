@@ -1,221 +1,115 @@
-# File: smartcash/ui/hyperparameters/components/ui_layout.py
-# Deskripsi: Layout UI responsive dengan flex dan color-coded groups
+"""
+File: smartcash/ui/hyperparameters/components/ui_layout.py
+Deskripsi: Layout arrangement untuk hyperparameters dengan grid responsif dan tidak ada horizontal scrollbar
+"""
 
-import ipywidgets as widgets
 from typing import Dict, Any
-
-from smartcash.common.logger import get_logger
-from smartcash.ui.components import create_save_reset_buttons
-from smartcash.ui.utils.responsive_styling import create_group_container, apply_mobile_breakpoints
-
-logger = get_logger(__name__)
+import ipywidgets as widgets
+from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.hyperparameters.utils.form_helpers import create_section_card, create_responsive_grid_layout
 
 
 def create_hyperparameters_layout(form_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Buat layout responsive dengan flex dan color-coded groups 🎨"""
+    """Create layout dengan section cards dan responsive grid untuk mencegah horizontal scrollbar"""
     
-    # Training Parameters Group - Green theme
-    training_group = create_group_container(
-        "🏋️ Training Parameters",
-        "#4CAF50",
-        "linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%)",
-        [
-            widgets.HBox([
-                form_components['epochs'],
-                form_components['batch_size']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            )),
-            widgets.HBox([
-                form_components['learning_rate'],
-                form_components['image_size']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            )),
-            form_components['workers']
-        ]
+    # Training parameters section
+    training_section = create_section_card(
+        "📊 Parameter Training", [
+            form_components['epochs_slider'],
+            form_components['batch_size_slider'],
+            form_components['learning_rate_slider'],
+            form_components['image_size_slider'],
+            form_components['mixed_precision_checkbox']
+        ], '#2196f3'
     )
     
-    # Optimizer Settings Group - Blue theme
-    optimizer_group = create_group_container(
-        "⚙️ Optimizer Settings",
-        "#2196F3", 
-        "linear-gradient(135deg, #f0f8ff 0%, #e3f2fd 100%)",
-        [
-            form_components['optimizer_type'],
-            widgets.HBox([
-                form_components['weight_decay'],
-                form_components['momentum']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            ))
-        ]
+    # Optimizer & scheduler section
+    optimizer_section = create_section_card(
+        "⚙️ Optimizer & Scheduler", [
+            form_components['optimizer_dropdown'],
+            form_components['weight_decay_slider'],
+            form_components['momentum_slider'],
+            widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
+            form_components['scheduler_dropdown'],
+            form_components['warmup_epochs_slider']
+        ], '#9c27b0'
     )
     
-    # Scheduler Configuration Group - Orange theme
-    scheduler_group = create_group_container(
-        "📈 Learning Rate Scheduler",
-        "#FF9800",
-        "linear-gradient(135deg, #fff8f0 0%, #fff3e0 100%)",
-        [
-            form_components['scheduler_type'],
-            widgets.HBox([
-                form_components['warmup_epochs'],
-                form_components['min_lr']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            ))
-        ]
+    # Advanced parameters section
+    advanced_section = create_section_card(
+        "🔧 Parameter Lanjutan", [
+            widgets.HTML("<b style='color: #666; font-size: 12px;'>LOSS WEIGHTS</b>"),
+            form_components['box_loss_gain_slider'],
+            form_components['cls_loss_gain_slider'],
+            form_components['obj_loss_gain_slider'],
+            widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
+            widgets.HTML("<b style='color: #666; font-size: 12px;'>TRAINING CONTROL</b>"),
+            form_components['gradient_accumulation_slider'],
+            form_components['gradient_clipping_slider']
+        ], '#ff9800'
     )
     
-    # Loss Configuration Group - Purple theme
-    loss_group = create_group_container(
-        "🎯 Loss Configuration",
-        "#9C27B0",
-        "linear-gradient(135deg, #faf4ff 0%, #f3e5f5 100%)",
-        [
-            widgets.HBox([
-                form_components['box_loss_gain'],
-                form_components['cls_loss_gain']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            )),
-            form_components['obj_loss_gain']
-        ]
+    # Control & checkpoint section
+    control_section = create_section_card(
+        "🛑 Early Stopping & Checkpoint", [
+            form_components['early_stopping_checkbox'],
+            form_components['patience_slider'],
+            form_components['min_delta_slider'],
+            widgets.HTML("<hr style='margin: 8px 0; border: 0; border-top: 1px solid #eee;'>"),
+            form_components['save_best_checkbox'],
+            form_components['checkpoint_metric_dropdown']
+        ], '#4caf50'
     )
     
-    # Control Parameters Group - Red theme
-    control_group = create_group_container(
-        "⏹️ Early Stopping & Checkpoint",
-        "#F44336",
-        "linear-gradient(135deg, #fff5f5 0%, #ffebee 100%)",
-        [
-            widgets.HBox([
-                form_components['early_stopping_enabled'],
-                form_components['patience']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            )),
-            widgets.HBox([
-                form_components['save_best'],
-                form_components['save_interval']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            ))
-        ]
-    )
-    
-    # Model Inference Group - Blue-grey theme
-    inference_group = create_group_container(
-        "🔍 Model Inference",
-        "#607D8B",
-        "linear-gradient(135deg, #f8f9fa 0%, #eceff1 100%)",
-        [
-            widgets.HBox([
-                form_components['conf_thres'],
-                form_components['iou_thres']
-            ], layout=widgets.Layout(
-                display='flex', 
-                flex_flow='row wrap', 
-                justify_content='space-between'
-            )),
-            form_components['max_det']
-        ]
-    )
-    
-    # Save & Reset buttons
-    save_reset_buttons = create_save_reset_buttons()
-    
-    # Responsive CSS
-    responsive_css = apply_mobile_breakpoints()
-    
-    # Header HTML
-    header_html = widgets.HTML(
-        value="<div class='hyperparams-container'><h2 style='text-align: center; color: #333; margin-bottom: 30px; font-size: 24px;'>🎛️ Hyperparameters Configuration</h2></div>"
-    )
-    
-    # Two-column layouts
-    medium_groups_hbox = widgets.HBox([
-        optimizer_group,
-        scheduler_group
+    # Create responsive grid layout dengan max 2 columns untuk parameter cards
+    params_grid = widgets.HBox([
+        training_section,
+        optimizer_section
     ], layout=widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        justify_content='space-between',
-        align_items='flex-start',
-        gap='15px'
+        width='100%', display='flex', flex_flow='row wrap',
+        justify_content='space-between', align_items='stretch',
+        gap='10px', overflow='hidden'
     ))
     
-    smaller_groups_hbox = widgets.HBox([
-        loss_group,
-        control_group
+    advanced_grid = widgets.HBox([
+        advanced_section,
+        control_section
     ], layout=widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        justify_content='space-between',
-        align_items='flex-start',
-        gap='15px'
+        width='100%', display='flex', flex_flow='row wrap',
+        justify_content='space-between', align_items='stretch',
+        gap='10px', overflow='hidden'
     ))
     
-    # Centered buttons
-    buttons_hbox = widgets.HBox([save_reset_buttons], layout=widgets.Layout(
-        justify_content='center',
-        margin='30px 0 20px 0'
-    ))
+    # Header component
+    header = create_header(
+        title="Konfigurasi Hyperparameter",
+        description="Pengaturan parameter pelatihan untuk optimasi model deteksi mata uang",
+        icon=ICONS.get('settings', '⚙️')
+    )
     
-    # Main content VBox
-    content_vbox = widgets.VBox([
-        training_group,
-        medium_groups_hbox,
-        smaller_groups_hbox,
-        inference_group,
-        buttons_hbox
-    ], layout=widgets.Layout(
-        display='flex',
-        flex_direction='column',
-        width='100%',
-        max_width='1200px',
-        margin='0 auto',
-        padding='0 15px'
-    ))
-    
-    # Main responsive layout
+    # Main container dengan layout yang tidak overflow
     main_container = widgets.VBox([
-        responsive_css,
-        header_html,
-        content_vbox
+        header,
+        form_components['status_panel'],
+        form_components['summary_cards'],
+        params_grid,
+        advanced_grid,
+        form_components['button_container']
     ], layout=widgets.Layout(
-        display='flex',
-        flex_direction='column',
-        width='100%',
-        min_height='100vh'
+        width='100%', max_width='100%', padding='10px',
+        overflow='hidden'
     ))
-        
-    components = {
-        'main_layout': main_container,
-        'training_group': training_group,
-        'optimizer_group': optimizer_group,
-        'scheduler_group': scheduler_group,
-        'loss_group': loss_group,
-        'control_group': control_group,
-        'inference_group': inference_group,
-        'save_button': save_reset_buttons.children[0],
-        'reset_button': save_reset_buttons.children[1]
+    
+    # Return components dengan required keys untuk ConfigCellInitializer
+    return {
+        'main_container': main_container,
+        'save_button': form_components['save_button'],
+        'reset_button': form_components['reset_button'],
+        'status_panel': form_components['status_panel'],
+        'summary_cards': form_components['summary_cards'],
+        'header': header,
+        'params_grid': params_grid,
+        'advanced_grid': advanced_grid,
+        **form_components  # Include all form components
     }
-    from smartcash.ui.utils.logging_utils import log_missing_components
-    log_missing_components(components)
-    return components

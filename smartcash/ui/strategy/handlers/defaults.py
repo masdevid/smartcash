@@ -1,35 +1,47 @@
-
 """
 File: smartcash/ui/strategy/handlers/defaults.py
-Deskripsi: Default configuration untuk strategy module
+Deskripsi: Default values untuk strategy (bukan hyperparameters)
 """
 
 from typing import Dict, Any
-from smartcash.common.logger import get_logger
-
-logger = get_logger(__name__)
 
 
 def get_default_strategy_config() -> Dict[str, Any]:
-    """Get default strategy configuration 🎯 - aligned dengan strategy_config.yaml"""
+    """Default strategy config fokus pada non-hyperparameters"""
     return {
+        # Validation strategy
         'validation': {
             'frequency': 1,
             'iou_thres': 0.6,
             'conf_thres': 0.001,
             'max_detections': 300
         },
+        
+        # Training utilities
         'training_utils': {
-            'experiment_name': 'efficient_optimized_single',
+            'experiment_name': 'efficient_optimized_single',  # Dynamic: {model_type}_{layer_mode}
             'checkpoint_dir': '/content/runs/train/checkpoints',
             'tensorboard': True,
-            'log_metrics': 10,
-            'visualize_batch': 100,
+            'log_metrics_every': 10,
+            'visualize_batch_every': 100,
+            'gradient_clipping': 1.0,
             'layer_mode': 'single'
         },
+        
+        # Multi-scale training
         'multi_scale': {
             'enabled': True,
             'img_size_min': 320,
-            'img_size_max': 640
-        }
+            'img_size_max': 640,
+            'step_size': 32
+        },
+        
+        # Model info untuk dynamic experiment name
+        'model': {
+            'model_type': 'efficient_optimized'
+        },
+        
+        # Metadata
+        'config_version': '2.0',
+        'description': 'Strategy config untuk training utilities dan validation'
     }

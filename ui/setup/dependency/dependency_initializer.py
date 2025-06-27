@@ -76,7 +76,7 @@ class DependencyInitializer(CommonInitializer):
             
         except Exception as e:
             error_msg = f"Gagal membuat komponen UI: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            self.logger.error(f"{error_msg}\n{str(e)}")
             return self.create_error_response(error_msg, e)
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -174,16 +174,16 @@ class DependencyInitializer(CommonInitializer):
             if config is None:
                 config = self._get_default_config()
                 
-            # Create UI components
+            # Buat komponen UI
             ui_components = self._create_ui_components(config, **kwargs)
             
-            # Initialize logger bridge
+            # Inisialisasi logger bridge
             self._initialize_logger_bridge(ui_components)
             
-            # Setup handlers
+            # Setup event handlers
             ui_components = self._setup_handlers(ui_components, config, **kwargs)
             
-            # Log successful initialization
+            # Log sukses
             self._logger_bridge.info("✅ Dependency management UI berhasil diinisialisasi")
             
             # Return the root UI component
@@ -192,5 +192,5 @@ class DependencyInitializer(CommonInitializer):
         except Exception as e:
             error_msg = f"❌ Gagal menginisialisasi dependency UI: {str(e)}"
             if hasattr(self, '_logger_bridge') and self._logger_bridge:
-                self._logger_bridge.error(error_msg, exc_info=True)
+                self._logger_bridge.error(f"{error_msg}\n{str(e)}")
             raise RuntimeError(error_msg) from e

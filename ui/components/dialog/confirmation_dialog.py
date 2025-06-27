@@ -197,12 +197,27 @@ def show_confirmation_dialog(
         return
     
     try:
-        # Pastikan dialog area visible dan bersihkan konten yang ada
-        if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
-            dialog_area.layout.display = 'flex'
-        
+        # Ensure the confirmation area is properly shown
+        dialog_area = ui_components.get('confirmation_area')
+        if not dialog_area:
+            print(f"⚠️ {title}: {message}")
+            if on_confirm:
+                on_confirm()
+            return
+            
+        # Clear any existing content
         with dialog_area:
             clear_output(wait=True)
+            
+        # Make sure the dialog area is visible
+        dialog_area.layout.visibility = 'visible'
+        dialog_area.layout.display = 'flex'
+        dialog_area.layout.height = 'auto'
+        dialog_area.layout.margin = '10px 0'
+        dialog_area.layout.overflow = 'visible'
+        
+        # Force show the confirmation area in the UI
+        show_confirmation_area(ui_components)
         
         # Buat callback untuk tombol dengan error handling
         def handle_confirm(btn):
@@ -445,11 +460,22 @@ def show_info_dialog(
         print(f"ℹ️ {title}: {message}")
 
 def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
-    """Clear dialog area"""
+    """Clear dialog area and reset its visibility"""
     dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
-    if dialog_area:
-        with dialog_area:
-            clear_output(wait=True)
+    if not dialog_area:
+        return
+        
+    # Clear the content
+    with dialog_area:
+        clear_output(wait=True)
+    
+    # Reset the layout
+    if hasattr(dialog_area, 'layout'):
+        dialog_area.layout.visibility = 'hidden'
+        dialog_area.layout.display = 'none'
+        dialog_area.layout.height = '0px'
+        dialog_area.layout.margin = '0'
+        dialog_area.layout.overflow = 'hidden'
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
     """Periksa apakah dialog sedang terlihat"""

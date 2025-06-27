@@ -85,6 +85,30 @@ class SplitConfigInitializer(ConfigCellInitializer):
             layout_components = create_split_layout(ui_components)
             ui_components.update(layout_components)
             
+            # Pastikan ada container utama
+            if 'container' not in ui_components:
+                # Buat container menggunakan shared components
+                from smartcash.ui.components import create_responsive_container
+                main_container = create_responsive_container()
+                
+                # Tambahkan semua widget ke container
+                widgets_to_add = [
+                    widget for key, widget in ui_components.items()
+                    if isinstance(widget, widgets.Widget)
+                ]
+                
+                if widgets_to_add:
+                    main_container.children = tuple(widgets_to_add)
+                else:
+                    # Fallback placeholder
+                    placeholder = widgets.HTML(
+                        "<div style='padding: 20px; text-align: center; color: #666;'>"
+                        "📦 Komponen split dataset sedang dimuat...</div>"
+                    )
+                    main_container.children = (placeholder,)
+                
+                ui_components['container'] = main_container
+            
             self._logger.debug("✅ Berhasil membuat komponen UI")
             return ui_components
             

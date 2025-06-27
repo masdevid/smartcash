@@ -1,10 +1,10 @@
 """
 File: smartcash/ui/initializers/config_cell_initializer.py
-Deskripsi: Config cell initializer with shared state and YAML persistence
+Deskripsi: Config cell initializer dengan shared state dan YAML persistence
 
-This module provides the ConfigCellInitializer class which serves as the orchestration layer
-for configuration UIs. It handles initialization, lifecycle management, and component
-registration while delegating UI component creation to the components module.
+Modul ini menyediakan class ConfigCellInitializer yang berfungsi sebagai lapisan orkestrasi
+untuk UI konfigurasi. Menangani inisialisasi, lifecycle management, dan registrasi komponen
+sambil mendelegasikan pembuatan komponen UI ke modul components.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from __future__ import annotations
 # Standard library
 import logging
 from abc import ABC, abstractmethod
-from ast import Return
 from typing import Any, Dict, Generic, Optional, TypeVar, Union, List
 # Third-party
 import ipywidgets as widgets
@@ -34,18 +33,18 @@ T = TypeVar('T', bound=ConfigCellHandler)
 logger = logging.getLogger(__name__)
 
 class ConfigCellInitializer(Generic[T], ABC):
-    """Orchestrates the initialization and lifecycle of configuration cells.
+    """🎯 Orkestrasi inisialisasi dan lifecycle configuration cell.
     
-    This abstract base class handles the core initialization flow, component registration,
-    and lifecycle management of configuration UIs. It delegates UI component creation
-    to the components module and focuses on orchestration.
+    Abstract base class ini menangani core initialization flow, registrasi komponen,
+    dan lifecycle management UI konfigurasi. Mendelegasikan pembuatan komponen UI
+    ke modul components dan fokus pada orkestrasi.
     
     Type Parameters:
-        T: Type of the configuration handler, must be a subclass of ConfigCellHandler
+        T: Type dari configuration handler, harus subclass dari ConfigCellHandler
         
-    Subclasses must implement:
-        - create_handler(): Create and return a configuration handler instance
-        - create_ui_components(): Create and return UI components dictionary
+    Subclass harus mengimplementasikan:
+        - create_handler(): Membuat dan return instance configuration handler
+        - create_ui_components(): Membuat dan return dictionary komponen UI
     """
     
     def __init__(
@@ -58,41 +57,41 @@ class ConfigCellInitializer(Generic[T], ABC):
         children: Optional[List[Dict[str, Any]]] = None,
         **kwargs
     ) -> None:
-        """Initialize the config cell with optional config and parent ID.
+        """🚀 Inisialisasi config cell dengan config dan parent ID opsional.
         
         Args:
-            config: Configuration dictionary
-            parent_id: Optional parent component ID for hierarchical relationships
-            component_id: Optional unique identifier for this component
-            logger_bridge: Optional logger bridge for UI logging
-            title: Optional title for the component
-            children: Optional list of child component configurations
-            **kwargs: Additional configuration parameters
+            config: Dictionary konfigurasi
+            parent_id: ID parent component opsional untuk relasi hierarkis
+            component_id: Identifier unik opsional untuk komponen ini
+            logger_bridge: Logger bridge opsional untuk UI logging
+            title: Judul opsional untuk komponen
+            children: List konfigurasi child component opsional
+            **kwargs: Parameter konfigurasi tambahan
         """
         self.config = config or {}
         self.parent_id = parent_id
         self.component_id = component_id or self.__class__.__name__
         self.title = title or self.component_id
         
-        # Initialize UI components dictionary
+        # Inisialisasi dictionary komponen UI
         self.ui_components: Dict[str, Any] = {}
         
-        # Store the logger bridge if provided, will be initialized after UI components are created
+        # Store logger bridge jika provided, akan diinisialisasi setelah komponen UI dibuat
         self._logger_bridge = logger_bridge
-        self._handler: Optional[T] = None  # Initialize the protected attribute
+        self._handler: Optional[T] = None  # Inisialisasi atribut protected
         self._is_initialized = False
         self._suppress_output = False
         self._original_stdout = None
         self._original_stderr = None
         self._logger = logger.getChild(self.component_id)
         
-        # Initialize parent component manager
+        # Inisialisasi parent component manager
         self.parent_component = ParentComponentManager(
             parent_id=self.component_id,
             title=self.title
         )
         
-        # Initialize logger bridge after parent component is created
+        # Inisialisasi logger bridge setelah parent component dibuat
         if self._logger_bridge is None:
             self._logger_bridge = UILoggerBridge(
                 ui_components={
@@ -102,50 +101,46 @@ class ConfigCellInitializer(Generic[T], ABC):
                 logger_name=f"{self.__class__.__name__.lower()}_bridge"
             )
         
-        # Store children configurations for lazy initialization
+        # Store konfigurasi children untuk lazy initialization
         self._children_config = children or []
         self._children: List[Any] = []
     
     def _setup_output_suppression(self) -> None:
-        """Set up output suppression using the project's logging utilities.
-        
-        This method uses the centralized logging utilities to suppress output
-        during initialization, preventing cluttering the notebook with unnecessary messages.
-        """
+        """⚡ Setup output suppression menggunakan logging utilities proyek."""
         from smartcash.ui.utils.logging_utils import (
             setup_aggressive_log_suppression,
             setup_stdout_suppression
         )
         
-        # Set up aggressive log suppression for known noisy libraries
+        # Setup aggressive log suppression untuk library yang berisik
         setup_aggressive_log_suppression()
         
-        # Set up stdout/stderr suppression if we have UI components
+        # Setup stdout/stderr suppression jika ada UI components
         if hasattr(self, 'ui_components') and self.ui_components:
             setup_stdout_suppression()
             
-        self._logger.debug("Output suppression enabled")
+        self._logger.debug("✅ Output suppression enabled")
         
     def _restore_output(self) -> None:
-        """Restore the original output settings using the project's logging utilities."""
+        """🔄 Restore original output settings menggunakan logging utilities proyek."""
         from smartcash.ui.utils.logging_utils import (
             restore_stdout,
             allow_tqdm_display
         )
         
-        # Restore stdout/stderr if they were suppressed
+        # Restore stdout/stderr jika disuppress
         if hasattr(self, 'ui_components') and self.ui_components:
             restore_stdout()
             
-        # Ensure tqdm is allowed to display progress bars
+        # Pastikan tqdm bisa menampilkan progress bars
         allow_tqdm_display()
         
-        self._logger.debug("Output settings restored")
+        self._logger.debug("✅ Output settings restored")
 
     def _setup_logging(self) -> None:
-        """Initialize logging infrastructure and redirect all logs to parent's log accordion."""
+        """📝 Inisialisasi infrastructure logging dan redirect semua log ke parent's log accordion."""
         try:
-            # Initialize logger bridge with parent's UI components if available
+            # Inisialisasi logger bridge dengan parent's UI components jika available
             parent_components = {}
             if self.parent_id:
                 from smartcash.ui.config_cell.components.component_registry import component_registry
@@ -153,44 +148,40 @@ class ConfigCellInitializer(Generic[T], ABC):
                 if parent and hasattr(parent, 'get'):
                     parent_components = parent
             
-            # Use parent's UI components if available, otherwise use our own
+            # Gunakan parent's UI components jika available, otherwise gunakan milik kita
             ui_components = parent_components.get('ui_components', {}) or self.ui_components
             
-            # Initialize logger bridge
+            # Inisialisasi logger bridge
             self._logger_bridge = UILoggerBridge(
                 ui_components=ui_components,
                 logger_name=f"smartcash.ui.{self.component_id}"
             )
             
-            # Set up the logger
+            # Setup logger
             self._logger = self._logger_bridge.logger
             
-            # Mark UI as ready to flush any buffered logs
+            # Mark UI sebagai ready untuk flush buffered logs
             if hasattr(self._logger_bridge, 'set_ui_ready'):
                 self._logger_bridge.set_ui_ready(True)
                 
-            self._logger.debug(f"Logging initialized for {self.component_id}")
+            self._logger.debug(f"✅ Logging initialized untuk {self.component_id}")
             
         except Exception as e:
-            # Fallback to basic logging if UI logging setup fails
+            # Fallback ke basic logging jika UI logging setup gagal
             import logging
             self._logger = logging.getLogger(f"smartcash.ui.{self.component_id}")
-            self._logger.warning(f"Failed to initialize UI logging: {str(e)}", exc_info=True)
+            self._logger.warning(f"⚠️ Failed to initialize UI logging: {str(e)}", exc_info=True)
     
     def _setup_component_registry(self) -> None:
-        """Register this component in the component registry.
-        
-        Registers the component with its full module path and sets up parent-child
-        relationships if a parent_id is specified.
-        """
-        # Create component ID using module hierarchy (e.g., 'dataset.split')
+        """📋 Register komponen ini di component registry."""
+        # Buat component ID menggunakan module hierarchy (e.g., 'dataset.split')
         self._component_id = (
             f"{self.parent_id}.{self.component_id}" 
             if self.parent_id 
             else self.component_id
         )
         
-        # Only register if not already registered
+        # Hanya register jika belum terdaftar
         if not component_registry.get_component(self._component_id):
             component_registry.register_component(
                 component_id=self._component_id,
@@ -202,147 +193,152 @@ class ConfigCellInitializer(Generic[T], ABC):
                 parent_id=self.parent_id
             )
             
-            # Set up children if any
+            # Setup children jika ada
             if self._children_config:
                 self._initialize_children()
     
     @property
     def handler(self) -> T:
-        """Lazy initialization of the configuration handler."""
+        """🔧 Lazy initialization dari configuration handler."""
         if self._handler is None:
             self._handler = self.create_handler()
         return self._handler
     
     @abstractmethod
     def create_handler(self) -> T:
-        """Create and return a configuration handler instance.
+        """🏭 Membuat dan return instance configuration handler.
         
         Returns:
-            An instance of a ConfigCellHandler subclass.
+            Instance dari ConfigCellHandler subclass.
         """
         pass
         
     @abstractmethod
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create and return UI components based on the provided config.
+        """🎨 Membuat dan return komponen UI berdasarkan config yang diberikan.
         
         Args:
-            config: Current configuration values
+            config: Nilai konfigurasi saat ini
             
         Returns:
-            Dictionary of UI components with at least a 'container' widget.
+            Dictionary komponen UI.
         """
         pass
         
-    @abstractmethod
     def setup_handlers(self) -> None:
-        """Set up event handlers for the UI components.
+        """⚡ Setup event handler untuk komponen UI.
         
-        This method should be implemented by subclasses to set up any
-        event handlers, observers, or callbacks needed for the UI to function.
-        The parent class's implementation should be called first using super().
+        Method ini bisa dioverride oleh subclass untuk setup
+        event handler, observer, atau callback yang diperlukan UI.
+        Implementasi parent class harus dipanggil terlebih dahulu menggunakan super().
         """
+        # Default implementation - bisa dioverride oleh subclass
+        self._logger.debug("🔗 Setting up base event handlers")
         pass
         
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> 'widgets.Widget':
-        """Initialize the UI components and return the root widget.
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> widgets.Widget:
+        """🚀 Inisialisasi komponen UI dan return root widget.
         
         Args:
-            config: Optional configuration to override the initial config
+            config: Konfigurasi opsional untuk override initial config
             
         Returns:
-            The root widget containing the initialized UI
+            Root widget yang berisi UI yang diinisialisasi
         """
         if config is not None:
             self.config = config
             
         try:
-            # Set up output suppression if needed
+            # Setup output suppression jika diperlukan
             if self._suppress_output:
                 self._setup_output_suppression()
             
-            # Create the handler using the protected attribute directly
+            # Buat handler menggunakan protected attribute secara langsung
             self._handler = self.create_handler()
             
-            # Create UI components using the parent component system
+            # Buat komponen UI menggunakan parent component system
             self._setup_ui_components()
             
-            # Initialize child components if any
+            # Inisialisasi child components jika ada
             self._initialize_children()
             
-            # Set up event handlers
+            # Setup event handlers
             self.setup_handlers()
             
-            # Register the component
+            # Register komponen
             self._register_component()
             
-            # Mark as initialized
+            # Mark sebagai initialized
             self._is_initialized = True
             
-            # Ensure the parent component's container is properly initialized
+            # Pastikan parent component's container terinisialisasi dengan benar
             if not hasattr(self.parent_component, 'container') or self.parent_component.container is None:
-                # If no container exists, create a default one
-                self.parent_component.container = widgets.VBox()
-                if hasattr(self.parent_component, 'content_area') and self.parent_component.content_area is not None:
-                    self.parent_component.container.children = (self.parent_component.content_area,)
+                self._logger.error("❌ Parent component container tidak terinisialisasi")
+                raise RuntimeError("Parent component container tidak terinisialisasi")
             
-            # Get the container widget from parent component
+            # Dapatkan container widget dari parent component
             container = self.parent_component.container
             
-            # Ensure we're returning a widget
+            # Pastikan kita return widget
             if not isinstance(container, widgets.Widget):
-                error_msg = f"Expected a widget but got {type(container).__name__}"
+                error_msg = f"❌ Expected widget tapi dapat {type(container).__name__}"
                 self._logger.error(error_msg)
                 return create_error_response("Initialization Error", error_msg)
                 
+            self._logger.info(f"✅ {self.__class__.__name__} berhasil diinisialisasi")
             return container
             
         except Exception as e:
-            error_msg = f"Failed to initialize {self.__class__.__name__}: {str(e)}"
+            error_msg = f"❌ Gagal menginisialisasi {self.__class__.__name__}: {str(e)}"
             self._logger.error(error_msg, exc_info=True)
             error_widget = create_error_response("Initialization Error", error_msg)
             if not isinstance(error_widget, widgets.Widget):
-                # If create_error_response didn't return a widget, create a basic one
-                return widgets.HTML(f"<div style='color: red; padding: 10px;'>{error_msg}</div>")
+                # Jika create_error_response tidak return widget, buat basic widget
+                return widgets.HTML(f"<div style='color: red; padding: 10px; border: 1px solid red; border-radius: 4px;'>{error_msg}</div>")
             return error_widget
             
         finally:
-            # Restore output settings if they were suppressed
+            # Restore output settings jika disuppress
             if self._suppress_output:
                 self._restore_output()
                 
     def _setup_ui_components(self) -> None:
-        """Set up UI components using the parent component system."""
-        # Create the main UI components
+        """🎨 Setup komponen UI menggunakan parent component system."""
+        # Buat komponen UI utama
         self.ui_components = self.create_ui_components(self.config)
         
-        # Add main components to the parent component
+        # Tambahkan komponen utama ke parent component
         if 'container' in self.ui_components:
-            # If the component provides its own container, use it as the main content
+            # Jika komponen menyediakan container sendiri, gunakan sebagai main content
             self.parent_component.content_area.children = (self.ui_components['container'],)
         else:
-            # Otherwise, add all components to the content area
+            # Otherwise, tambahkan semua komponen ke content area
             widgets_to_add = [
                 widget for key, widget in self.ui_components.items()
                 if isinstance(widget, widgets.Widget)
             ]
-            self.parent_component.content_area.children = tuple(widgets_to_add)
+            if widgets_to_add:
+                self.parent_component.content_area.children = tuple(widgets_to_add)
+            else:
+                # Jika tidak ada widget, buat placeholder
+                placeholder = widgets.HTML("<div style='padding: 20px; text-align: center; color: #666;'>📦 Komponen UI sedang dimuat...</div>")
+                self.parent_component.content_area.children = (placeholder,)
     
     def _initialize_children(self) -> None:
-        """Initialize child components if any are configured."""
+        """👶 Inisialisasi child components jika ada yang dikonfigurasi."""
         if not self._children_config:
             return
             
         for child_config in self._children_config:
             try:
-                # Create child component using the factory function
+                # Buat child component menggunakan factory function
                 child = create_parent_component(
                     parent_id=f"{self.component_id}.{child_config['id']}",
                     **{k: v for k, v in child_config.items() if k != 'id'}
                 )
                 self._children.append(child)
                 
-                # Add child to the parent component
+                # Tambahkan child ke parent component
                 self.parent_component.add_child_component(
                     child_id=child_config['id'],
                     component=child,
@@ -351,143 +347,61 @@ class ConfigCellInitializer(Generic[T], ABC):
                 
             except Exception as e:
                 self._logger.error(
-                    f"Failed to initialize child component {child_config.get('id')}: {str(e)}",
+                    f"❌ Gagal menginisialisasi child component {child_config.get('id')}: {str(e)}",
                     exc_info=True
                 )
     
     def _register_component(self) -> None:
-        """Register this component with the component registry and set up parent-child relationships.
-        
-        This method handles:
-        1. Registering the component with a unique ID
-        2. Setting up parent-child relationships in the UI hierarchy
-        3. Registering all child components recursively
-        """
-        # Generate the full component ID with parent prefix if parent exists
+        """📋 Register komponen ini dengan component registry dan setup parent-child relationships."""
+        # Generate full component ID dengan parent prefix jika parent exists
         full_component_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
         
-        # Prepare component data with container and content area
+        # Siapkan component data dengan container dan content area
         component_data = {
             **getattr(self, 'ui_components', {}),
-            'container': getattr(self, 'container', None),
-            'content_area': getattr(self, 'content_area', None)
+            'container': self.parent_component.container,
+            'content_area': self.parent_component.content_area,
+            'initializer': self  # Referensi ke initializer untuk akses programmatic
         }
         
-        # Register the main component
+        # Register komponen utama
         component_registry.register_component(
             component_id=full_component_id,
             component=component_data,
             parent_id=self.parent_id
         )
         
-        # If this is a child component (has a parent_id), add to parent's content area
-        if self.parent_id:
-            # Get the parent component from the registry
-            parent_component = component_registry.get_component(self.parent_id)
-            
-            if parent_component and 'content_area' in parent_component:
-                parent_content = parent_component['content_area']
-                
-                if parent_content and hasattr(parent_content, 'children'):
-                    current_children = list(parent_content.children)
-                    
-                    # Add the current component's container to the parent's content area
-                    if hasattr(self, 'container') and self.container and self.container not in current_children:
-                        parent_content.children = tuple(current_children + [self.container])
-        
-        # Register all children components
-        for child in getattr(self, '_children', []):
-            if not (hasattr(child, 'component_id') and hasattr(child, 'parent_component')):
-                continue
-                
-            child_parent_id = full_component_id
-            child_component_id = f"{child_parent_id}.{child.component_id}"
-            
-            # Ensure child has ui_components attribute
-            if not hasattr(child, 'ui_components'):
-                child.ui_components = {}
-                
-            # Create component data for the child
-            child_component = {
-                **child.ui_components,
-                'container': getattr(child, 'container', None),
-                'content_area': getattr(child, 'content_area', None)
-            }
-            
-            # Register the child component
-            component_registry.register_component(
-                component_id=child_component_id,
-                component=child_component,
-                parent_id=child_parent_id
-            )
-            
-            # Add child's container to the current component's content area
-            if (hasattr(self, 'content_area') and 
-                hasattr(child, 'container') and 
-                child.container is not None):
-                
-                current_children = list(self.content_area.children)
-                if child.container not in current_children:
-                    self.content_area.children = tuple(current_children + [child.container])
-            
-            # Recursively register any children of this child
-            if hasattr(child, '_register_component'):
-                child._register_component()
+        self._logger.debug(f"📋 Component {full_component_id} berhasil didaftarkan")
     
-    def get_container(self) -> 'widgets.Widget':
-        """Get the root container widget.
+    def get_container(self) -> widgets.Widget:
+        """📦 Dapatkan root container widget.
         
         Returns:
-            The root container widget from the parent component
+            Root container widget dari parent component
         """
-        # Register the component before returning the container
-        self._register_component()
+        # Register komponen sebelum return container
+        if not self._is_initialized:
+            self._register_component()
         return self.parent_component.container
 
-@property
-def handler(self) -> T:
-    """Lazy initialization of the configuration handler."""
-    if self._handler is None:
-        self._handler = self.create_handler()
-    return self._handler
-
-@abstractmethod
-def create_handler(self) -> T:
-    """Create and return a configuration handler instance.
-    
-    This method must be implemented by subclasses to create and return
-    an instance of the appropriate configuration handler.
-    
-    Returns:
-        An instance of a ConfigCellHandler subclass.
-    """
-    pass
-
-def cleanup(self) -> None:
-    """Release all resources and unregister components."""
-    try:
-        self._logger.debug(f"Cleaning up {self.component_id} resources")
-        
-        # Clean up logger bridge if it exists
-        if hasattr(self, '_logger_bridge'):
-            self._logger_bridge.cleanup()
-        
-        # Unregister components from the registry
-        if hasattr(self, '_component_id'):
-            component_registry.unregister_component(self._component_id)
+    def cleanup(self) -> None:
+        """🧹 Release semua resource dan unregister komponen."""
+        try:
+            # Unregister from component registry
+            full_component_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
+            component_registry.unregister_component(full_component_id)
             
-            # Unregister all child components
+            # Cleanup children
             for child in self._children:
-                if hasattr(child, 'component_id'):
-                    component_registry.unregister_component(child.component_id)
-        
-        # Clean up handler if it exists
-        if hasattr(self, '_handler') and hasattr(self._handler, 'cleanup'):
-            self._handler.cleanup()
+                if hasattr(child, 'cleanup'):
+                    child.cleanup()
             
-        self._logger.info(f"Cleaned up resources for {self.component_id}")
-        
-    except Exception as e:
-        self._logger.error(f"Error during cleanup: {str(e)}", exc_info=True)
-    finally:
-        restore_stdout()
+            # Reset state
+            self._is_initialized = False
+            self._handler = None
+            self.ui_components.clear()
+            
+            self._logger.debug(f"🧹 {self.__class__.__name__} cleaned up successfully")
+            
+        except Exception as e:
+            self._logger.error(f"❌ Error during cleanup: {str(e)}", exc_info=True)

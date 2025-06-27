@@ -1,21 +1,28 @@
 """
-UI Component Factory for Config Cell
+File: smartcash/ui/config_cell/components/ui_factory.py
+Deskripsi: UI Component Factory untuk Config Cell dengan shared components
 
-This module provides factory functions for creating standardized UI components
-used throughout the config cell interface.
+Modul ini menyediakan factory functions untuk membuat komponen UI standar
+yang digunakan di seluruh interface config cell menggunakan shared components.
 """
 from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
 
 from smartcash.common.logger import get_logger
+from smartcash.ui.config_cell.constants import StatusType
+from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
+
+# Import shared components
 from smartcash.ui.components import (
     create_header,
     create_status_panel,
     create_info_accordion,
     create_log_accordion,
+    create_responsive_container,
+    create_section_title,
+    create_divider,
+    create_error_card
 )
-from smartcash.ui.config_cell.constants import StatusType
-from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 
 __all__ = [
     'create_config_summary_panel',
@@ -28,44 +35,43 @@ __all__ = [
 logger = get_logger(__name__)
 
 def create_container(title: str = None, container_id: str = None) -> Dict[str, Any]:
-    """Create a styled container for grouping related UI components.
+    """🏗️ Membuat styled container menggunakan shared components.
     
     Args:
-        title: Optional title displayed at the top of the container
-        container_id: Optional unique identifier for the container
+        title: Judul opsional yang ditampilkan di bagian atas container
+        container_id: Identifier unik opsional untuk container
         
     Returns:
-        Dictionary containing:
-        - 'container': The VBox container widget
-        - 'content_area': The VBox where child components should be added
+        Dictionary berisi:
+        - 'container': Widget VBox container
+        - 'content_area': VBox dimana child components harus ditambahkan
     """
-    container = widgets.VBox(
-        layout=widgets.Layout(
-            width='100%',
-            border='1px solid #e0e0e0',
-            border_radius='4px',
-            padding='10px',
-            margin='5px 0',
-            overflow='hidden'
-        )
-    )
+    # Gunakan create_responsive_container dari shared components
+    container = create_responsive_container()
     
-    # Add ID for easier debugging and testing
+    # Tambahkan styling khusus untuk config cell
+    container.layout.border = '1px solid #e0e0e0'
+    container.layout.border_radius = '8px'
+    container.layout.padding = '15px'
+    container.layout.margin = '10px 0'
+    container.layout.box_shadow = '0 2px 4px rgba(0,0,0,0.1)'
+    
+    # Tambahkan ID untuk debugging dan testing
     if container_id:
         container.add_class(f'container-{container_id}')
     
     content_area = widgets.VBox(
-        layout={
-            'margin': '5px 0 0 0',
-            'width': '100%'
-        }
+        layout=widgets.Layout(
+            margin='10px 0 0 0',
+            width='100%'
+        )
     )
     
     if title:
-        header = widgets.HTML(
-            f"<h3 style='margin: 0 0 10px 0; color: #333;'>{title}</h3>"
-        )
-        container.children = [header, content_area]
+        # Gunakan create_section_title dari shared components
+        header = create_section_title(title)
+        divider = create_divider()
+        container.children = [header, divider, content_area]
     else:
         container.children = [content_area]
     
@@ -76,174 +82,242 @@ def create_container(title: str = None, container_id: str = None) -> Dict[str, A
 
 
 def create_config_summary_panel() -> widgets.VBox:
-    """Create a config summary panel.
+    """📋 Membuat panel summary konfigurasi menggunakan shared components.
     
     Returns:
-        widgets.VBox: The configured summary panel
+        widgets.VBox: Panel summary yang dikonfigurasi
     """
-    return widgets.VBox(
-        layout=widgets.Layout(
-            width='100%',
-            margin='10px 0',
-            padding='10px',
-            border='1px dashed #e0e0e0',
-            border_radius='4px',
-            display='none'  # Hidden by default
-        )
-    )
+    summary_container = create_responsive_container()
+    summary_container.layout.border = '1px dashed #e0e0e0'
+    summary_container.layout.border_radius = '4px'
+    summary_container.layout.padding = '10px'
+    summary_container.layout.margin = '10px 0'
+    summary_container.layout.display = 'none'  # Hidden by default
+    
+    return summary_container
+
 
 def create_log_components(module_name: str) -> Dict[str, Any]:
-    """Create log components for the UI.
+    """📝 Membuat komponen log menggunakan shared components.
     
     Args:
-        module_name: Name of the module
+        module_name: Nama module
         
     Returns:
-        Dict[str, Any]: Dictionary containing log components
-    """
-    return create_log_accordion(
-        module_name=module_name,
-        height='200px',
-        width='100%',
-        show_timestamps=True,
-        auto_scroll=True,
-        enable_deduplication=True
-    )
-
-
-def _get_default_info_content(module_name: str) -> str:
-    """Generate default info content for a module.
-    
-    Args:
-        module_name: Name of the module
-        
-    Returns:
-        str: HTML content for the info box
-    """
-    return (
-        f"<div class='info-content'>"
-        f"<h4>{module_name.replace('_', ' ').title()}</h4>"
-        f"<p>This panel displays configuration options and information about the {module_name} module.</p>"
-        "<p>Use the controls above to customize your settings.</p>"
-        "</div>"
-    )
-
-def create_info_components(module_name: str) -> Dict[str, Any]:
-    """Create info components for the UI.
-    
-    This is the main entry point for creating info components. It handles both
-    custom module info and fallback to default content.
-    
-    Args:
-        module_name: Name of the module
-        
-    Returns:
-        Dict[str, Any]: Dictionary containing info components
+        Dictionary berisi komponen log
     """
     try:
-        # Try to import module-specific info
-        module = __import__(f'smartcash.ui.info_boxes.{module_name.lower()}_info', fromlist=[''])
-        if info_func := getattr(module, f'get_{module_name.lower()}_info', None):
-            info_content = info_func()
-        else:
-            info_content = _get_default_info_content(module_name)
-    except (ImportError, AttributeError):
-        info_content = _get_default_info_content(module_name)
+        # Gunakan create_log_accordion dari shared components
+        log_accordion = create_log_accordion(module_name)
+        
+        # Extract output widget jika tersedia
+        log_output = None
+        if hasattr(log_accordion, 'children') and len(log_accordion.children) > 0:
+            # Cari output widget di dalam accordion
+            for child in log_accordion.children:
+                if hasattr(child, 'children'):
+                    for grandchild in child.children:
+                        if isinstance(grandchild, widgets.Output):
+                            log_output = grandchild
+                            break
+        
+        # Fallback jika tidak ditemukan
+        if log_output is None:
+            log_output = widgets.Output(
+                layout=widgets.Layout(
+                    width='100%',
+                    max_height='300px',
+                    border='1px solid #ddd',
+                    overflow='auto'
+                )
+            )
+        
+        return {
+            'log_accordion': log_accordion,
+            'log_output': log_output,
+            'entries_container': widgets.VBox()  # Container untuk log entries
+        }
+        
     except Exception as e:
-        logger.warning(f"Error loading module info for {module_name}: {e}")
-        info_content = _get_default_info_content(module_name)
+        logger.error(f"❌ Gagal membuat komponen log untuk {module_name}: {str(e)}")
+        
+        # Fallback ke komponen basic
+        fallback_output = widgets.Output(
+            layout=widgets.Layout(
+                width='100%',
+                max_height='300px',
+                border='1px solid #ff6b6b'
+            )
+        )
+        
+        fallback_accordion = widgets.Accordion(
+            children=[fallback_output],
+            titles=[f"📝 {module_name} Logs (Fallback)"]
+        )
+        
+        return {
+            'log_accordion': fallback_accordion,
+            'log_output': fallback_output,
+            'entries_container': widgets.VBox()
+        }
+
+
+def create_info_components(module_name: str) -> Dict[str, Any]:
+    """ℹ️ Membuat komponen info menggunakan shared components.
     
-    return create_info_accordion(
-        title=f"{module_name.replace('_', ' ').title()} Information",
-        content=info_content,
-        icon='info',
-        open_by_default=False
-    )
+    Args:
+        module_name: Nama module
+        
+    Returns:
+        Dictionary berisi komponen info
+    """
+    try:
+        # Gunakan create_info_accordion dari shared components
+        info_accordion = create_info_accordion(module_name)
+        
+        # Extract content widget jika tersedia
+        info_content = None
+        if hasattr(info_accordion, 'children') and len(info_accordion.children) > 0:
+            info_content = info_accordion.children[0]
+        
+        # Fallback jika tidak ditemukan
+        if info_content is None:
+            info_content = widgets.HTML(
+                value=f"<div style='padding: 10px;'>ℹ️ Info untuk {module_name}</div>"
+            )
+        
+        return {
+            'accordion': info_accordion,
+            'content': info_content
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Gagal membuat komponen info untuk {module_name}: {str(e)}")
+        
+        # Fallback ke komponen basic
+        fallback_content = widgets.HTML(
+            value=f"<div style='padding: 10px; color: #ff6b6b;'>⚠️ Error loading info untuk {module_name}</div>"
+        )
+        
+        fallback_accordion = widgets.Accordion(
+            children=[fallback_content],
+            titles=[f"ℹ️ {module_name} Info (Fallback)"]
+        )
+        
+        return {
+            'accordion': fallback_accordion,
+            'content': fallback_content
+        }
 
 
 def create_config_cell_ui(
-    module_name: str,
+    module: str,
     handler: ConfigCellHandler,
-    parent_module: Optional[str] = None
+    parent_module: Optional[str] = None,
+    config: Optional[Dict[str, Any]] = None,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Create and configure all UI components for the config cell.
+    """🏭 Factory function untuk membuat config cell UI lengkap.
     
     Args:
-        module_name: Name of the module
-        handler: Config handler instance
-        parent_module: Optional parent module name
+        module: Nama module
+        handler: Instance config handler
+        parent_module: Nama parent module opsional
+        config: Dictionary konfigurasi opsional
+        **kwargs: Argumen tambahan
         
     Returns:
-        Dict[str, Any]: Dictionary containing all UI components
+        Dictionary berisi semua komponen UI
     """
     ui_components: Dict[str, Any] = {}
     
     try:
-        # Create child UI components
-        child_components = handler.create_ui_components(handler.config)
+        config = config or {}
         
-        # Get child content container with fallback
+        # Buat child UI components jika handler mendukung
+        child_components = {}
+        if hasattr(handler, 'create_ui_components'):
+            child_components = handler.create_ui_components(config)
+        
+        # Dapatkan child content container dengan fallback
         child_content = child_components.get('container', widgets.VBox())
         
-        # Setup header with overridable defaults
+        # Setup header dengan overridable defaults menggunakan shared components
         header_title = child_components.get(
             'header_title',
-            module_name.replace('_', ' ').title()
+            module.replace('_', ' ').title()
         )
         header_description = child_components.get(
             'header_description',
-            f"Configuration for {module_name}"
+            f"Konfigurasi untuk {module}"
         )
         header_icon = child_components.get('header_icon', "⚙️")
         
-        # Create header and status panel
+        # Buat komponen menggunakan shared components
         ui_components.update({
             'header': create_header(header_title, header_description, header_icon),
-            'status_panel': create_status_panel("Ready", StatusType.INFO),
+            'status_panel': create_status_panel("Siap", "info"),
             'child_components': child_components,
             'child_content': child_content,
             'config_summary_panel': create_config_summary_panel()
         })
         
-        # Create log components
-        log_components = create_log_components(module_name)
+        # Buat komponen log menggunakan shared components
+        log_components = create_log_components(module)
         ui_components.update({
             'log_output': log_components['log_output'],
             'log_accordion': log_components['log_accordion'],
             'log_entries_container': log_components.get('entries_container')
         })
         
-        # Create info components
-        info_components = create_info_components(module_name)
+        # Buat komponen info menggunakan shared components
+        info_components = create_info_components(module)
         ui_components.update({
             'info_box': info_components['content'],
             'info_accordion': info_components['accordion']
         })
         
-        # Create main container
-        ui_components['container'] = widgets.VBox(
-            [
-                ui_components['header'],
-                ui_components['status_panel'],
-                ui_components['config_summary_panel'],
-                child_content,
-                ui_components['log_accordion'],
-                ui_components['info_accordion']
-            ],
-            layout=widgets.Layout(
-                width='100%',
-                padding='15px',
-                border='1px solid #e0e0e0',
-                border_radius='8px',
-                margin='10px 0',
-                display='flex',
-                flex_flow='column',
-                align_items='stretch'
-            )
-        )
+        # Buat main container menggunakan shared components
+        main_container = create_responsive_container()
+        main_container.layout.border = '1px solid #e0e0e0'
+        main_container.layout.border_radius = '8px'
+        main_container.layout.padding = '15px'
+        main_container.layout.margin = '10px 0'
+        main_container.layout.box_shadow = '0 2px 4px rgba(0,0,0,0.1)'
+        
+        # Arrange komponen
+        components_to_add = [
+            ui_components['header'],
+            ui_components['status_panel'],
+            ui_components['config_summary_panel'],
+            child_content,
+            ui_components['log_accordion'],
+            ui_components['info_accordion']
+        ]
+        
+        # Filter out None components
+        valid_components = [comp for comp in components_to_add if comp is not None]
+        main_container.children = tuple(valid_components)
+        
+        ui_components['container'] = main_container
         
         return ui_components
         
     except Exception as e:
-        logger.error(f"Failed to create UI components for {module_name}: {str(e)}")
-        raise
+        error_msg = f"Gagal membuat komponen UI untuk {module}: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        
+        # Return error container menggunakan shared component
+        error_card = create_error_card(
+            title="Configuration Error",
+            value=module,
+            description=error_msg
+        )
+        
+        return {
+            'container': error_card,
+            'error': error_msg,
+            'header': widgets.HTML(f"<div style='color: #ff6b6b;'>❌ Error: {module}</div>"),
+            'status_panel': create_status_panel(f"Error: {error_msg}", "error"),
+            'child_content': error_card
+        }

@@ -165,7 +165,7 @@ def restore_stdout(ui_components: Dict[str, Any]) -> None:
 def _register_current_ui_logger(logger: UILogger) -> None: 
     global _current_ui_logger; _current_ui_logger = logger
 
-def get_current_ui_logger() -> Optional[UILogger]: 
+def get_ui_logger() -> Optional[UILogger]: 
     return _current_ui_logger
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
@@ -182,4 +182,4 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
         with widget: display(HTML(html))
 
 # Backward compatibility exports
-__all__ = ['UILogger', 'create_ui_logger', 'get_current_ui_logger', 'log_to_ui', 'intercept_stdout_to_ui', 'restore_stdout']
+__all__ = ['UILogger', 'create_ui_logger', 'get_ui_logger', 'log_to_ui', 'intercept_stdout_to_ui', 'restore_stdout']

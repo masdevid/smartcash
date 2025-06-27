@@ -36,15 +36,9 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Create summary panel
     summary_panel = create_summary_panel()
     
-    # Create progress tracker
+    # Create progress tracker with operation description
     progress_tracker = create_dual_progress_tracker(
-        total_steps=100,
-        current_step=0,
-        descriptions={
-            'overall': 'Overall Progress',
-            'current': 'Current Operation',
-            'details': 'Preparing...'
-        }
+        operation='Dependency Management'
     )
     
     # Create collapsible categories section
@@ -121,8 +115,10 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     action_components = create_action_buttons(action_buttons)
     
-    # Progress tracker
-    progress_tracker = create_dual_progress_tracker("Overall Progress", "Current Operation")
+    # Progress tracker for installation progress
+    progress_tracker = create_dual_progress_tracker(
+        operation="Dependency Installation"
+    )
     
     # Create log accordion for installation logs
     log_accordion = create_log_accordion(

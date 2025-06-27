@@ -57,12 +57,8 @@ class PreprocessingInitializer(CommonInitializer):
         if missing:
             raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
         
-        # Add metadata untuk tracking
-        ui_components.update({
-            'module_name': self.module_name,
-            'config_handler': self.config_handler,
-            'initialization_timestamp': self._get_timestamp()
-        })
+        # Add config handler reference
+        ui_components['config_handler'] = self.config_handler
         
         return ui_components
     
@@ -167,10 +163,6 @@ class PreprocessingInitializer(CommonInitializer):
             except Exception as e:
                 self.logger.warning(f"⚠️ Logger bridge test warning: {str(e)}")
     
-    def _get_timestamp(self) -> str:
-        """Get current timestamp untuk tracking"""
-        from datetime import datetime
-        return datetime.now().isoformat()
 
 def initialize_preprocessing_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
     """Factory function untuk inisialisasi preprocessing UI

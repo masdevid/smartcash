@@ -58,16 +58,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         action_section, progress_tracker.container, log_components['log_accordion']
     ])
     
-    # Create logger bridge untuk dependency management
-    logger_bridge = UILoggerBridge(
-        ui_components={
-            'log_output': log_components['log_output'],
-            'status_output': status_panel
-        },
-        logger_name='dependency_ui'
-    )
-    
-    # Return components dengan logger_bridge
+    # Return components - logger_bridge will be initialized by CommonInitializer
     ui_components = {
         'ui': main_container, 
         'container': main_container, 
@@ -77,9 +68,8 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'custom_section': custom_section, 
         'action_section': action_section,
         'progress_tracker': progress_tracker, 
-        'log_components': log_components,
-        'log_output': log_components['log_output'],  # Add log_output for compatibility
-        'logger_bridge': logger_bridge
+        'log_components': log_components['log_accordion'],
+        'log_output': log_components['log_accordion']  # Alias
     }
     
     # Add action buttons if action_components is a widget with children

@@ -39,34 +39,45 @@ class DependencyInitializer(CommonInitializer):
         Returns:
             Dictionary berisi komponen UI yang valid
             
-        Raises:
-            ValueError: Jika UI components tidak valid atau kosong
+        Note:
+            Jika terjadi error, akan mengembalikan dictionary dengan kunci 'error'
+            yang berisi widget error untuk ditampilkan
         """
-        from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
-        
-        # Create UI components dengan immediate validation
-        ui_components = create_dependency_main_ui(config)
-        
-        if not isinstance(ui_components, dict):
-            raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
-                
-        if not ui_components:
-            raise ValueError("UI components tidak boleh kosok")
-        
-        # Validate critical components exist
-        required_components = ['ui', 'log_output', 'status_panel']
-        missing = [comp for comp in required_components if comp not in ui_components]
-        if missing:
-            raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
-        
-        # Add metadata untuk tracking
-        ui_components.update({
-            'module_name': self.module_name,
-            'config_handler': self.config_handler,
-            'initialization_timestamp': self._get_timestamp()
-        })
-        
-        return ui_components
+        try:
+            from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
+            
+            # Create UI components dengan error handling
+            ui_components = create_dependency_main_ui(config)
+            
+            # Validasi tipe return
+            if not isinstance(ui_components, dict):
+                error_msg = f"UI components harus berupa dictionary, dapat: {type(ui_components)}"
+                self.logger.error(error_msg)
+                return self.create_error_response(error_msg)
+                    
+            # Validasi komponen tidak kosong
+            if not ui_components:
+                error_msg = "UI components tidak boleh kosong"
+                self.logger.error(error_msg)
+                return self.create_error_response(error_msg)
+            
+            # Validasi komponen kritis
+            required_components = ['ui', 'log_output', 'status_panel']
+            missing = [comp for comp in required_components if comp not in ui_components]
+            if missing:
+                error_msg = f"Komponen UI kritis tidak ditemukan: {missing}"
+                self.logger.error(error_msg)
+                return self.create_error_response(error_msg)
+            
+            # Add config handler reference
+            ui_components['config_handler'] = self.config_handler
+            
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"Gagal membuat komponen UI: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return self.create_error_response(error_msg, e)
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Setup event handlers dengan proper logger bridge integration
@@ -144,11 +155,6 @@ class DependencyInitializer(CommonInitializer):
             return self._logger_bridge
         except Exception as e:
             raise RuntimeError(f"Gagal menginisialisasi logger bridge: {str(e)}") from e
-    
-    def _get_timestamp(self) -> str:
-        """Get current timestamp untuk tracking"""
-        from datetime import datetime
-        return datetime.now().isoformat()
     
     def initialize_ui(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Initialize the dependency management UI dengan error handling yang komprehensif

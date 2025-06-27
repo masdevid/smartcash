@@ -18,23 +18,23 @@ class BaseDependencyHandler:
     
     def log_info(self, message: str) -> None:
         """Log info message"""
-        if self.logger_bridge:
-            self.logger_bridge(message, 'info')
+        if self.logger_bridge and hasattr(self.logger_bridge, 'info'):
+            self.logger_bridge.info(message)
     
     def log_success(self, message: str) -> None:
         """Log success message"""
-        if self.logger_bridge:
-            self.logger_bridge(message, 'success')
+        if self.logger_bridge and hasattr(self.logger_bridge, 'success'):
+            self.logger_bridge.success(message)
     
     def log_warning(self, message: str) -> None:
         """Log warning message"""  
-        if self.logger_bridge:
-            self.logger_bridge(message, 'warning')
+        if self.logger_bridge and hasattr(self.logger_bridge, 'warning'):
+            self.logger_bridge.warning(message)
     
     def log_error(self, message: str) -> None:
         """Log error message"""
-        if self.logger_bridge:
-            self.logger_bridge(message, 'error')
+        if self.logger_bridge and hasattr(self.logger_bridge, 'error'):
+            self.logger_bridge.error(message)
     
     @safe_ui_operation
     def disable_ui_during_operation(self) -> None:

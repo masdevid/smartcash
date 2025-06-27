@@ -57,11 +57,9 @@ class DownloaderInitializer(CommonInitializer):
         if missing:
             raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
         
-        # Add metadata untuk tracking
+        # Add module-specific metadata
         ui_components.update({
-            'module_name': self.module_name,
             'config_handler': self.config_handler,
-            'initialization_timestamp': self._get_timestamp(),
             'data_dir': config.get('data', {}).get('dir', 'data'),
             'target_dir': config.get('download', {}).get('target_dir', 'data'),
             'env': kwargs.get('env')
@@ -217,10 +215,6 @@ class DownloaderInitializer(CommonInitializer):
             except Exception as e:
                 self.logger.warning(f"⚠️ Logger bridge test warning: {str(e)}")
     
-    def _get_timestamp(self) -> str:
-        """Get current timestamp untuk tracking"""
-        from datetime import datetime
-        return datetime.now().isoformat()
 
 
 def initialize_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:

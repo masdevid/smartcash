@@ -57,14 +57,12 @@ class AugmentationInitializer(CommonInitializer):
         if missing:
             raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
         
-        # Add metadata untuk tracking
+        # Add module-specific metadata
         ui_components.update({
-            'module_name': self.module_name,
             'data_dir': config.get('data', {}).get('dir', 'data'),
             'env': kwargs.get('env'),
             'backend_ready': True,
-            'service_integration': True,
-            'initialization_timestamp': self._get_timestamp()
+            'service_integration': True
         })
         
         return ui_components
@@ -161,14 +159,6 @@ class AugmentationInitializer(CommonInitializer):
             self.logger.error("Gagal memuat konfigurasi default", exc_info=True)
             raise RuntimeError(f"Gagal memuat konfigurasi default: {str(e)}") from e
             
-    def _get_timestamp(self) -> str:
-        """Generate timestamp string untuk tracking inisialisasi
-        
-        Returns:
-            String timestamp dalam format ISO 8601
-        """
-        from datetime import datetime
-        return datetime.now().isoformat(timespec='seconds')
 
 def initialize_augmentation_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
     """Factory function untuk inisialisasi augmentation UI

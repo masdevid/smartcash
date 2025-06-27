@@ -95,11 +95,15 @@ class CommonInitializer(ABC):
             from smartcash.ui.utils.logging_utils import setup_stdout_suppression
             setup_stdout_suppression()
             
-            self._logger_bridge = create_ui_logger_bridge(
+            # Initialize logger bridge with UI components
+            self._logger_bridge = UILoggerBridge(
                 ui_components=ui_components,
                 logger_name=f"smartcash.ui.{self.module_name}"
             )
             self.logger = self._logger_bridge
+            
+            # Store logger bridge in ui_components for handlers to use
+            ui_components['logger_bridge'] = self._logger_bridge
             
             if hasattr(self._logger_bridge, 'set_ui_ready'):
                 self._logger_bridge.set_ui_ready(True)
@@ -147,7 +151,13 @@ class CommonInitializer(ABC):
             ui_components = self._create_ui_components(config, **kwargs) or {}
             self._ui_components = ui_components
             
-            # 3. Initialize logger bridge SETELAH UI ready
+            # 3. Add metadata for tracking
+            ui_components.update({
+                'module_name': self.module_name,
+                'initialization_timestamp': self._get_timestamp()
+            })
+            
+            # 4. Initialize logger bridge SETELAH UI ready
             self._initialize_logger_bridge(ui_components)
             
             # 4. Pre-initialization checks (optional) - silent
@@ -176,8 +186,8 @@ class CommonInitializer(ABC):
         except Exception as e:
             error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
             
-            # Pass the exception to _create_error_ui for better error reporting
-            return self._create_error_ui(error_msg, e)
+            # Pass the exception to create_error_response for better error reporting
+            return self.create_error_response(error_msg, e)
         finally:
             # Keep suppression active - hanya restore jika benar-benar diperlukan
             pass
@@ -243,9 +253,17 @@ class CommonInitializer(ABC):
             ui_components: Dictionary of UI components
             
         Returns:
-            The root UI component or None if not found
+            The root UI component or error component if available
+            
+        Note:
+            If the components dictionary contains an 'error' key, it will return
+            the error component if available.
         """
-        # Try common root component names
+        # Check for error component first
+        if ui_components.get('error') and 'ui' in ui_components:
+            return ui_components['ui']
+            
+        # Default to 'ui' key if no error
         for key in ['ui', 'container', 'widget', 'root']:
             if key in ui_components:
                 return ui_components[key]
@@ -298,15 +316,31 @@ class CommonInitializer(ABC):
         except Exception as e:
             self.logger.warning(f"⚠️ Failed to setup logger bridge: {str(e)}")
             
-    def _create_error_ui(self, error_message: str, error: Optional[Exception] = None) -> Any:
+    def _get_timestamp(self) -> str:
+        """Get current timestamp for tracking purposes.
+        
+        Returns:
+            ISO formatted timestamp string
+        """
+        from datetime import datetime
+        return datetime.now().isoformat()
+        
+    def create_error_response(self, error_message: str, error: Optional[Exception] = None) -> Dict[str, Any]:
         """Create a fallback UI component to display error messages.
+        
+        This method creates a consistent error UI that can be used across all initializers.
+        It returns a dictionary with the error component and placeholders for other UI elements.
         
         Args:
             error_message: The error message to display
             error: Optional exception for traceback
             
         Returns:
-            A widget that displays the error message. Always returns a widget.
+            Dictionary containing:
+            - 'ui': The main error widget
+            - 'log_output': None (placeholder for log output)
+            - 'status_panel': None (placeholder for status panel)
+            - 'error': Boolean flag indicating this is an error state
         """
         import traceback
         from smartcash.ui.components.error.error_component import create_error_component
@@ -315,20 +349,23 @@ class CommonInitializer(ABC):
         tb_text = None
         if error is not None:
             try:
-                tb_text = traceback.format_exc()
-                if tb_text.strip() == "NoneType: None":
-                    tb_text = None
+                tb_text = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
             except Exception:
                 tb_text = None
         
-        # Use standard error component with consistent styling
+        # Create error component
         error_component = create_error_component(
-            error_message=str(error_message),  # Ensure it's a string
-            title=f"🚨 {self.module_name} Initialization Error",
+            error_message=str(error_message),
+            title=f"🚨 {self.module_name} Error",
             traceback=tb_text,
             error_type="error",
             show_traceback=bool(tb_text)
         )
         
-        # Return the container widget which is the main display
-        return error_component.get('container', error_component)
+        # Return in the expected format
+        return {
+            'ui': error_component.get('container', error_component),
+            'log_output': None,
+            'status_panel': None,
+            'error': True
+        }

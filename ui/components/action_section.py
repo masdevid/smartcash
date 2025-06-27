@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import ipywidgets as widgets
 
 def create_action_section(
-    action_buttons: Dict[str, Any],
+    action_buttons: Union[Dict[str, Any], widgets.Widget],
     confirmation_area: widgets.Widget,
     title: str = "🚀 Operations",
     status_label: str = "📋 Status & Konfirmasi:",
@@ -16,7 +16,7 @@ def create_action_section(
     Create a standardized action section with buttons and confirmation area
     
     Args:
-        action_buttons: Dictionary containing the action buttons container
+        action_buttons: Either a dictionary containing the action buttons container or a widget
         confirmation_area: Widget for confirmation dialogs
         title: Section title (default: "🚀 Operations")
         status_label: Label for the status section (default: "📋 Status & Konfirmasi:")
@@ -52,9 +52,12 @@ def create_action_section(
             )
         ]
     
+    # Get the buttons container from either dict or widget
+    buttons_container = action_buttons['container'] if isinstance(action_buttons, dict) else action_buttons
+    
     # Create the action section
     action_section = widgets.VBox(
-        [title_widget, action_buttons['container']] + status_section,
+        [title_widget, buttons_container] + status_section,
         layout=widgets.Layout(
             display='flex',
             flex_direction='column',

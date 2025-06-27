@@ -45,7 +45,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Action section dengan shared component
     action_section = create_action_section(
-        action_buttons={'container': action_components},
+        action_buttons=action_components,  # action_components is already a container widget
         confirmation_area=confirmation_area,
         title="🚀 Dependency Operations",
         status_label="📋 Operation Status:",

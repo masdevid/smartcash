@@ -3,17 +3,28 @@ File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
 Deskripsi: Preprocessing initializer yang mengimplementasikan CommonInitializer
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Type
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import PreprocessingConfigHandler
+from smartcash.ui.handlers.config_handlers import ConfigHandler
 
 class PreprocessingInitializer(CommonInitializer):
     """Initializer untuk modul preprocessing yang mengimplementasikan CommonInitializer"""
     
-    def __init__(self):
+    def __init__(self, module_name: str = 'preprocessing', 
+                 config_handler_class: Type[ConfigHandler] = PreprocessingConfigHandler,
+                 **kwargs):
+        """Initialize the preprocessing initializer.
+        
+        Args:
+            module_name: Nama modul (default: 'preprocessing')
+            config_handler_class: Kelas handler konfigurasi
+            **kwargs: Argumen tambahan untuk parent class
+        """
         super().__init__(
-            module_name='preprocessing',
-            config_handler_class=PreprocessingConfigHandler
+            module_name=module_name,
+            config_handler_class=config_handler_class,
+            **kwargs
         )
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -29,6 +40,7 @@ class PreprocessingInitializer(CommonInitializer):
         """
         from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
         
+        # Create UI components
         ui_components = create_preprocessing_main_ui(config)
         
         if not isinstance(ui_components, dict):

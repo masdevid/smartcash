@@ -57,8 +57,14 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
     
     elif element_type == 'container':
         children, container_type = content, kwargs.get('container_type', 'vbox')
-        layout = LAYOUTS[container_type].copy()
-        layout.update({k: v for k, v in kwargs.items() if k in layout.keys()})
+        # Create a new Layout with the same properties as the template
+        template_layout = LAYOUTS[container_type]
+        layout_kwargs = {k: v for k, v in template_layout.get_state().items() 
+                        if not k.startswith('_') and k != 'comm'}
+        # Update with any overrides from kwargs
+        layout_kwargs.update({k: v for k, v in kwargs.items() 
+                            if not k.startswith('_') and k != 'comm'})
+        layout = widgets.Layout(**layout_kwargs)
         
         if container_type == 'hbox':
             return widgets.HBox(children, layout=layout)

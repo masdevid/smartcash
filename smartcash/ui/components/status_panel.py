@@ -62,18 +62,25 @@ def create_status_panel(message: str = "", status_type: str = "info", layout: Op
         # Buat konten HTML
         html_content = f"""
         <div style="
-            padding: 10px;
+            padding: 6px 10px;
             background-color: {bg_color};
             color: {text_color};
-            border-radius: 4px;
-            margin: 5px 0;
-            border-left: 4px solid {text_color};
+            border-radius: 6px;
+            margin: 3px 0;
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            font-size: 13px;
+            line-height: 1.4;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         ">
-            <p style="margin: 5px 0">{filtered_message}</p>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">{icon}</span>
+                <span style="flex: 1;">{filtered_message}</span>
+            </div>
         </div>"""
         
         # Setup layout
-        default_layout = {'width': '100%', 'margin': '10px 0'}
+        default_layout = {'width': '100%', 'margin': '4px 0'}
         if layout:
             default_layout.update(layout)
             
@@ -82,8 +89,25 @@ def create_status_panel(message: str = "", status_type: str = "info", layout: Op
     except Exception as e:
         # Fallback minimal jika terjadi error
         return widgets.HTML(
-            value=f'<div style="padding:10px;background:#f8f9fa;border-left:4px solid #6c757d;margin:5px 0;border-radius:4px;">ℹ️ {message}</div>',
-            layout=widgets.Layout(width='100%', margin='10px 0')
+            value=f'''
+            <div style="
+                padding: 6px 10px;
+                background: #f8f9fa;
+                color: #495057;
+                border-radius: 6px;
+                margin: 4px 0;
+                border: 1px solid rgba(0,0,0,0.08);
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                font-size: 13px;
+                line-height: 1.4;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            ">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 14px;">ℹ️</span>
+                    <span style="flex: 1;">{filtered_message}</span>
+                </div>
+            </div>''',
+            layout=widgets.Layout(width='100%', margin='4px 0')
         )
 
 def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "info") -> None:
@@ -108,17 +132,24 @@ def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "i
         # Filter pesan untuk memastikan hanya satu emoji
         filtered_message = _filter_emoji(f"{icon} {message}")
         
-        # Update konten HTML
+        # Buat konten HTML
         html_content = f"""
         <div style="
-            padding: 10px;
+            padding: 6px 10px;
             background-color: {bg_color};
             color: {text_color};
-            border-radius: 4px;
-            margin: 5px 0;
-            border-left: 4px solid {text_color};
+            border-radius: 6px;
+            margin: 3px 0;
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            font-size: 13px;
+            line-height: 1.4;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         ">
-            <p style="margin: 5px 0">{filtered_message}</p>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">{icon}</span>
+                <span style="flex: 1;">{filtered_message}</span>
+            </div>
         </div>"""
         
         panel.value = html_content
@@ -134,5 +165,5 @@ def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "i
             margin: 5px 0;
             border-left: 4px solid #6c757d;
         ">
-            <p style="margin: 5px 0">ℹ️ {message}</p>
+            <p style="margin: 5px 0">ℹ️ {filtered_message}</p>
         </div>'''

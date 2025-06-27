@@ -124,7 +124,7 @@ class DownloaderInitializer(CommonInitializer):
             **kwargs: Arguments untuk validasi
             
         Raises:
-            RuntimeError: Jika dependencies tidak memenuhi syarat
+            RuntimeError: Jika dependencies tidak memenuhi syarat atau konfigurasi tidak valid
         """
         # Check critical imports
         try:
@@ -134,6 +134,15 @@ class DownloaderInitializer(CommonInitializer):
             # Only check for required packages
         except ImportError as e:
             raise RuntimeError(f"Dependencies downloader tidak lengkap: {str(e)}") from e
+        
+        # Check for required configuration
+        config = kwargs.get('config', {})
+        download_config = config.get('download', {})
+        
+        # Check colab_secret_key in config
+        if not download_config.get('colab_secret_key'):
+            raise RuntimeError("colab_secret_key tidak ditemukan di konfigurasi download. "
+                           "Silakan perbarui konfigurasi dengan kunci yang valid.")
         
         # Check environment compatibility
         try:

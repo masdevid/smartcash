@@ -9,12 +9,17 @@ import ipywidgets as widgets
 class ActionButtonConfig:
     """Konfigurasi button dengan validasi dan defaults"""
     
-    def __init__(self, label: str, icon: str = "", style: str = "primary", 
+    def __init__(self, label: Union[str, tuple], icon: str = "", style: str = "primary", 
                  tooltip: str = "", width: str = "auto", variant: str = "contained"):
-        self.label = label
+        # Handle case where label might be a tuple
+        if isinstance(label, (tuple, list)) and len(label) > 0:
+            self.label = str(label[0]) if label else "Button"
+        else:
+            self.label = str(label) if label is not None else "Button"
+            
         self.icon = self._validate_icon(icon)
         self.style = self._validate_style(style)
-        self.tooltip = tooltip or f"Klik untuk {label.lower()}"
+        self.tooltip = tooltip or f"Klik untuk {self.label.lower()}"
         self.width = width
         self.variant = variant
     

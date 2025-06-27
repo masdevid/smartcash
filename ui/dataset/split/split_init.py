@@ -73,7 +73,7 @@ class SplitConfigInitializer(ConfigCellInitializer):
         config: Optional[Dict[str, Any]] = None,
         parent_id: Optional[str] = None,
         component_id: str = MODULE_NAME,
-        title: str = "📊 Dataset Split Configuration",
+        title: str = "Dataset Split Configuration",  # Emoji is handled by icon parameter
         description: str = "Konfigurasi pembagian dataset untuk training, validation, dan testing",
         **kwargs
     ):
@@ -102,7 +102,7 @@ class SplitConfigInitializer(ConfigCellInitializer):
             component_id=component_id,
             title=title,
             description=description,
-            icon="📊",  # Icon untuk header
+            icon="📊",  # Single emoji for the header
             **kwargs
         )
         

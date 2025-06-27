@@ -164,7 +164,14 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Create action buttons row
     action_buttons = []
-    if hasattr(action_components, 'buttons') and isinstance(action_components.buttons, dict):
+    # Check if action_components is a widget with children
+    if hasattr(action_components, 'children') and isinstance(action_components.children, (list, tuple)):
+        # Extract all button widgets from children
+        for child in action_components.children:
+            if isinstance(child, widgets.Button):
+                action_buttons.append(child)
+    # Fallback to dictionary access if available
+    elif hasattr(action_components, 'buttons') and isinstance(action_components.buttons, dict):
         for btn_id in ['install_btn', 'check_updates_btn', 'uninstall_btn', 'save_btn', 'reset_btn']:
             if btn_id in action_components.buttons:
                 action_buttons.append(action_components.buttons[btn_id])

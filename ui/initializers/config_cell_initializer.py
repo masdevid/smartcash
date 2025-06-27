@@ -456,16 +456,52 @@ class ConfigCellInitializer(Generic[T], ABC):
             children = []
             if header and isinstance(header, widgets.Widget):
                 children.append(header)
+                
+            # Add status panel with proper spacing
             if status_panel and isinstance(status_panel, widgets.Widget):
-                children.append(status_panel)
+                status_container = widgets.VBox(
+                    [status_panel],
+                    layout=widgets.Layout(
+                        margin='0 0 10px 0',
+                        padding='5px',
+                        border='1px solid #e0e0e0',
+                        border_radius='4px',
+                        background='#f9f9f9'
+                    )
+                )
+                children.append(status_container)
+            
+            # Add child container with proper spacing
             if child_container and isinstance(child_container, widgets.Widget):
                 children.append(child_container)
+                
+            # Add log accordion if available
+            log_widget = None
             if log_accordion and isinstance(log_accordion, widgets.Widget):
-                children.append(log_accordion)
+                log_widget = log_accordion
             elif 'log_accordion' in self.parent_components and isinstance(self.parent_components['log_accordion'], widgets.Widget):
-                children.append(self.parent_components['log_accordion'])
+                log_widget = self.parent_components['log_accordion']
+                
+            if log_widget:
+                log_container = widgets.VBox(
+                    [log_widget],
+                    layout=widgets.Layout(
+                        margin='10px 0 0 0',
+                        width='100%'
+                    )
+                )
+                children.append(log_container)
+                
+            # Add info accordion if available
             if info_accordion and isinstance(info_accordion, widgets.Widget):
-                children.append(info_accordion)
+                info_container = widgets.VBox(
+                    [info_accordion],
+                    layout=widgets.Layout(
+                        margin='10px 0 0 0',
+                        width='100%'
+                    )
+                )
+                children.append(info_container)
 
             main_container = widgets.VBox(
                 children=children,

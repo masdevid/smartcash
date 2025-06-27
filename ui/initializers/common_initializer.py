@@ -176,8 +176,8 @@ class CommonInitializer(ABC):
         except Exception as e:
             error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
             
-            # SILENT error handling - no stdout output
-            return self._create_error_ui(error_msg)
+            # Pass the exception to _create_error_ui for better error reporting
+            return self._create_error_ui(error_msg, e)
         finally:
             # Keep suppression active - hanya restore jika benar-benar diperlukan
             pass
@@ -298,23 +298,36 @@ class CommonInitializer(ABC):
         except Exception as e:
             self.logger.warning(f"⚠️ Failed to setup logger bridge: {str(e)}")
             
-    def _create_error_ui(self, error_message: str) -> Any:
+    def _create_error_ui(self, error_message: str, error: Optional[Exception] = None) -> Any:
         """Create a fallback UI component to display error messages.
         
         Args:
             error_message: The error message to display
+            error: Optional exception for traceback
             
         Returns:
             A widget that displays the error message. Always returns a widget.
         """
+        import traceback
         from smartcash.ui.components.error.error_component import create_error_component
         
-        # Create error component with the module name in the title
+        # Get traceback if error is provided
+        tb_text = None
+        if error is not None:
+            try:
+                tb_text = traceback.format_exc()
+                if tb_text.strip() == "NoneType: None":
+                    tb_text = None
+            except Exception:
+                tb_text = None
+        
+        # Use standard error component with consistent styling
         error_component = create_error_component(
-            error_message=error_message,
-            title=f"Error in {self.module_name}",
+            error_message=str(error_message),  # Ensure it's a string
+            title=f"🚨 {self.module_name} Initialization Error",
+            traceback=tb_text,
             error_type="error",
-            show_traceback=False
+            show_traceback=bool(tb_text)
         )
         
         # Return the container widget which is the main display

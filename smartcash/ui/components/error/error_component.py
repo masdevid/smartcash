@@ -42,13 +42,84 @@ class ErrorComponent:
         # Create main error display
         error_display = self._create_main_error_display(error_message, style, traceback is not None and show_traceback)
         
+        # Create a container with max width and center alignment
+        container_style = """
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 0;
+            padding: 0 16px;
+            box-sizing: border-box;
+        """
+        
+        content_style = """
+            max-width: 1200px;
+            width: 100%;
+            margin: 10px 0;
+        """
+        
         # Create traceback section if needed
         if traceback and show_traceback:
             traceback_widget = self._create_traceback_section(traceback)
-            container = widgets.VBox([error_display, traceback_widget], 
-                layout=widgets.Layout(width=self.width, margin='10px 0'))
+            
+            # Create a VBox for the error and traceback
+            content = widgets.VBox(
+                [error_display, traceback_widget],
+                layout=widgets.Layout(
+                    width='100%',
+                    margin='0',
+                    padding='0',
+                    _css={
+                        'max-width': '1200px',
+                        'width': '100%',
+                        'margin': '10px 0'
+                    }
+                )
+            )
+            
+            # Create the outer container
+            container = widgets.VBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    margin='0',
+                    padding='0 16px',
+                    _css={
+                        'display': 'flex',
+                        'justify-content': 'center',
+                        'box-sizing': 'border-box'
+                    }
+                )
+            )
+            
+            # Add the content to the container
+            container.children = [content]
+            
         else:
-            container = error_display
+            # For single error display without traceback
+            error_display.layout = widgets.Layout(
+                width='100%',
+                margin='10px 0',
+                _css={
+                    'max-width': '1200px',
+                    'width': '100%'
+                }
+            )
+            
+            container = widgets.VBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    margin='0',
+                    padding='0 16px',
+                    _css={
+                        'display': 'flex',
+                        'justify-content': 'center',
+                        'box-sizing': 'border-box'
+                    }
+                )
+            )
+            
+            # Add the error display to the container
+            container.children = [error_display]
         
         # Store components
         self._components = {

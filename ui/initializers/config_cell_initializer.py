@@ -173,7 +173,7 @@ class ConfigCellInitializer(Generic[T], ABC):
             return self.get_container()
             
         except Exception as e:
-            self._logger.error(f"❌ Gagal menginisialisasi {self.__class__.__name__}: {str(e)}", exc_info=True)
+            self._logger.error(f"❌ Gagal menginisialisasi {self.__class__.__name__}: {str(e)}")
             
             # Create error widget dengan context
             error_widget = create_error_response(
@@ -240,8 +240,7 @@ class ConfigCellInitializer(Generic[T], ABC):
                 
             except Exception as e:
                 self._logger.error(
-                    f"❌ Gagal menginisialisasi child component {child_config.get('id')}: {str(e)}",
-                    exc_info=True
+                    f"❌ Gagal menginisialisasi child component {child_config.get('id')}: {str(e)}"
                 )
     
     def _register_component(self) -> None:
@@ -302,7 +301,7 @@ class ConfigCellInitializer(Generic[T], ABC):
             self._logger.debug(f"🧹 {self.__class__.__name__} cleaned up successfully")
             
         except Exception as e:
-            self._logger.error(f"❌ Error during cleanup: {str(e)}", exc_info=True)
+            self._logger.error(f"❌ Error during cleanup: {str(e)}")
     
     def _restore_output_settings(self) -> None:
         """📺 Restore stdout/stderr settings setelah UI initialization.
@@ -351,7 +350,7 @@ class ConfigCellInitializer(Generic[T], ABC):
             # Fallback ke basic logging jika UI logging setup gagal
             import logging
             self._logger = logging.getLogger(f"smartcash.ui.{self.component_id}")
-            self._logger.warning(f"⚠️ Failed to initialize UI logging: {str(e)}", exc_info=True)
+            self._logger.warning(f"⚠️ Failed to initialize UI logging: {str(e)}")
     
     def _setup_component_registry(self) -> None:
         """📋 Register komponen ini di component registry."""
@@ -404,7 +403,7 @@ class ConfigCellInitializer(Generic[T], ABC):
                 self._logger.info(f"✅ Config updated dan UI refreshed untuk {self.component_id}")
             
         except Exception as e:
-            self._logger.error(f"❌ Gagal update config: {str(e)}", exc_info=True)
+            self._logger.error(f"❌ Gagal update config: {str(e)}")
             raise
     
     def __repr__(self) -> str:

@@ -73,15 +73,11 @@ class SplitConfigInitializer(ConfigCellInitializer[SplitConfigHandler]):
             penambahan komponen-komponen ini ke container.
         """
         try:
-            # Buat form component
-            form_components = create_split_form(self._handler, config)
+            # Buat form component - create_split_form hanya menerima config
+            form_components = create_split_form(config)
             
             # Buat layout component dengan form
-            layout_components = create_split_layout(
-                handler=self._handler,
-                form_components=form_components,
-                config=config
-            )
+            layout_components = create_split_layout(form_components)
             
             # Return semua komponen
             return {
@@ -90,7 +86,7 @@ class SplitConfigInitializer(ConfigCellInitializer[SplitConfigHandler]):
             }
             
         except Exception as e:
-            logger.error(f"❌ Gagal membuat UI components: {str(e)}", exc_info=True)
+            logger.error(f"❌ Gagal membuat UI components: {str(e)}")
             # Fail-fast: raise exception untuk di-handle oleh parent
             raise
 
@@ -118,7 +114,7 @@ def display_split_config(config: Optional[Dict[str, Any]] = None, **kwargs) -> N
         
     except Exception as e:
         error_msg = f"❌ Gagal menampilkan split config UI: {str(e)}"
-        logger.error(error_msg, exc_info=True)
+        logger.error(error_msg)
         
         # Display error widget
         from smartcash.ui.config_cell.handlers.error_handler import create_error_response
@@ -162,7 +158,7 @@ def create_split_config_ui(config: Optional[Dict[str, Any]] = None, **kwargs) ->
         
     except Exception as e:
         error_msg = f"❌ Gagal membuat komponen split config: {str(e)}"
-        logger.error(error_msg, exc_info=True)
+        logger.error(error_msg)
         
         # Kembalikan error widget
         from smartcash.ui.config_cell.handlers.error_handler import create_error_response

@@ -23,6 +23,7 @@ from smartcash.ui.components.layout.layout_components import (
 
 # Now import other components that might depend on layout components
 from smartcash.ui.components.action_buttons import create_action_buttons
+from smartcash.ui.components.action_section import create_action_section
 from smartcash.ui.components.status_panel import create_status_panel, update_status_panel
 
 # Import widgets with lazy loading to avoid circular imports
@@ -110,6 +111,7 @@ __all__ = [
     # Core components
     'create_card',
     'create_action_buttons',
+    'create_action_section',
     'create_info_card',
     'create_success_card',
     'create_warning_card',

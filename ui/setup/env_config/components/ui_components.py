@@ -100,10 +100,10 @@ def create_env_config_ui() -> Dict[str, Any]:
     # 6. Setup Summary
     setup_summary = create_setup_summary()
     
-    # 7. Environment & Colab Info Panel
+    # 6. Environment & Colab Info Panel
     env_info_panel = create_env_info_panel()
     
-    # 8. Tips & Requirements (2 kolom)
+    # 7. Tips & Requirements (2 kolom)
     tips_requirements = create_tips_requirements()
     
     # Assemble main UI

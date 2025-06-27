@@ -57,13 +57,31 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     )
     
     # Debug: Print structure
-    print(f"[DEBUG] action_components: {action_components}")
-    if action_components and 'secondary_buttons' in action_components:
-        print(f"[DEBUG] secondary_buttons: {action_components['secondary_buttons']}")
+    print(f"[DEBUG] action_components keys: {list(action_components.keys())}")
     
-    # Extract buttons correctly
-    secondary_buttons = action_components.get('secondary_buttons', [])
-    check_button = secondary_buttons[0] if secondary_buttons else None
+    # Extract check button - handle different possible structures
+    check_button = None
+    
+    # Try different possible locations for the check button
+    if 'check_button' in action_components:
+        check_button = action_components['check_button']
+    elif 'secondary_buttons' in action_components and action_components['secondary_buttons']:
+        # If secondary_buttons is a list of buttons
+        if isinstance(action_components['secondary_buttons'], list):
+            if len(action_components['secondary_buttons']) > 0:
+                check_button = action_components['secondary_buttons'][0]
+        # If secondary_buttons is a dictionary
+        elif isinstance(action_components['secondary_buttons'], dict):
+            check_button = action_components['secondary_buttons'].get('check_button')
+    
+    # If still no check button found, create a fallback button
+    if check_button is None:
+        print("[WARNING] Check button not found in action_components, creating fallback")
+        check_button = widgets.Button(description='🔍 Check Dataset')
+        check_button.style.button_color = '#f0f0f0'
+        check_button.layout = widgets.Layout(width='180px')
+    
+    print(f"[DEBUG] Using check_button: {check_button}")
     
     # Progress tracker
     progress_tracker = create_dual_progress_tracker(
@@ -142,12 +160,23 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     print(f"[DEBUG] action_components keys: {list(action_components.keys()) if action_components else 'None'}")
     
     # Build UI components dictionary
+    # Make sure we have all required buttons
+    preprocess_button = (action_components.get('preprocess_btn') or 
+                        action_components.get('primary_button') or
+                        action_components.get('download_button') or
+                        action_components.get('primary_button'))
+    
+    # Ensure buttons are properly initialized
+    if preprocess_button is None:
+        print("[WARNING] Preprocess button not found, creating fallback")
+        preprocess_button = widgets.Button(description='🚀 Mulai Preprocessing')
+        preprocess_button.style.button_color = '#4CAF50'
+        preprocess_button.layout = widgets.Layout(width='180px')
+    
     ui_components.update({
         # CRITICAL COMPONENTS (required by CommonInitializer)  
         'ui': ui,
-        'preprocess_button': (action_components.get('preprocess_btn') or 
-                             action_components.get('primary_button') or
-                             action_components.get('download_button')),
+        'preprocess_button': preprocess_button,
         'check_button': check_button,
         'cleanup_button': action_components.get('cleanup_btn'),
         'save_button': save_reset_components.get('save_button'),

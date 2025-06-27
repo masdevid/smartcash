@@ -428,13 +428,15 @@ class ConfigCellInitializer(Generic[T], ABC):
             # === 4. ASSEMBLE FINAL STRUCTURE ===
             self._logger.debug("Assembling UI structure...")
             
-            # Get child container atau create default
-            child_container = self.child_components.get('container')
-            if child_container is None:
-                # Auto-create container dari individual widgets
+            # Get child container or create default
+            child_container = None
+            if 'container' in self.child_components and isinstance(self.child_components['container'], widgets.Widget):
+                child_container = self.child_components['container']
+            else:
+                # Auto-create container from individual widgets
                 child_widgets = [
-                    widget for key, widget in self.child_components.items()
-                    if isinstance(widget, widgets.Widget) and key != 'container'
+                    widget for widget in self.child_components.values()
+                    if isinstance(widget, widgets.Widget)
                 ]
                 if child_widgets:
                     child_container = widgets.VBox(
@@ -451,19 +453,28 @@ class ConfigCellInitializer(Generic[T], ABC):
                     )
             
             # Create main container dengan struktur konsisten
-            main_container = widgets.VBox([
-                header,
-                status_panel,
-                child_container,
-                log_accordion,
-                info_accordion
-            ], layout=widgets.Layout(
-                width='100%',
-                padding='15px',
-                gap='10px',
-                border='1px solid #ddd',
-                border_radius='8px'
-            ))
+            children = []
+            if header:
+                children.append(header)
+            if status_panel:
+                children.append(status_panel)
+            if child_container:
+                children.append(child_container)
+            if log_accordion:
+                children.append(log_accordion)
+            if info_accordion:
+                children.append(info_accordion)
+
+            main_container = widgets.VBox(
+                children=children,
+                layout=widgets.Layout(
+                    width='100%',
+                    padding='15px',
+                    gap='10px',
+                    border='1px solid #ddd',
+                    border_radius='8px'
+                )
+            )
             
             # === 5. COMBINE ALL COMPONENTS ===
             self.ui_components = {

@@ -135,23 +135,21 @@ class DownloaderInitializer(CommonInitializer):
         except ImportError as e:
             raise RuntimeError(f"Dependencies downloader tidak lengkap: {str(e)}") from e
         
-        # Check if running in Colab environment
-        try:
-            import os
-            from google.colab import userdata  # Will raise ImportError if not in Colab
+        # Check for Roboflow API key in environment
+        import os
+        roboflow_api_key = os.environ.get('ROBOFLOW_API_KEY')
+        if not roboflow_api_key:
+            self.logger.warning("⚠️ ROBOFLOW_API_KEY tidak ditemukan di environment variables")
+            self.logger.warning("   Silakan set environment variable dengan perintah:")
+            self.logger.warning("   %env ROBOFLOW_API_KEY=your_api_key_here  # Untuk Jupyter/Colab")
+            self.logger.warning("   Atau di terminal: export ROBOFLOW_API_KEY=your_api_key_here")
             
-            # Try to get the secret key
-            try:
-                secret_key = userdata.get('COLAB_SECRET_KEY')
-                if not secret_key:
-                    raise RuntimeError("Colab secret key tidak ditemukan. "
-                                   "Silakan set COLAB_SECRET_KEY di Colab secrets.")
-            except userdata.Error as e:
-                raise RuntimeError(f"Gagal mengakses Colab secret key: {str(e)}")
-                
-        except ImportError:
-            # Not in Colab, log a warning but don't fail
-            self.logger.warning("⚠️ Tidak berjalan di Google Colab, lewati pengecekan secret key")
+            # Only raise error if we're not in a test environment
+            if not os.environ.get('PYTEST_CURRENT_TEST'):
+                raise RuntimeError(
+                    "Roboflow API key tidak ditemukan. "
+                    "Silakan set ROBOFLOW_API_KEY di environment variables."
+                )
         
         # Check environment compatibility
         try:

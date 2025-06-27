@@ -25,6 +25,7 @@ from smartcash.ui.components.layout.layout_components import (
 from smartcash.ui.components.action_buttons import create_action_buttons
 from smartcash.ui.components.action_section import create_action_section
 from smartcash.ui.components.status_panel import create_status_panel, update_status_panel
+from smartcash.ui.components.summary_panel import create_summary_panel, update_summary_panel
 
 # Import widgets with lazy loading to avoid circular imports
 def __getattr__(name):

@@ -107,6 +107,7 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
             value=kwargs.get('value', False),
             description=kwargs.get('description', ''),
             tooltip=kwargs.get('tooltip', ''),
+            disabled=kwargs.get('disabled', False),
             style={'description_width': '200px'},
             layout=widgets.Layout(
                 width='100%',

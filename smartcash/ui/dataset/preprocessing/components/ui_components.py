@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Fixed UI components dengan proper button mapping dan suppressed init logs
+Deskripsi: Fixed UI components dengan proper progress tracker integration dan button mapping
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create preprocessing UI dengan API integration dan proper button mapping"""
+    """Create preprocessing UI dengan fixed progress tracker dan proper button mapping"""
     config = config or {}
     
     # Initialize UI components dictionary
@@ -68,11 +68,15 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         ]
     )
     
-    # Progress tracker
+    # Progress tracker - FIXED: Proper initialization
     progress_tracker = create_dual_progress_tracker(
         operation="Dataset Preprocessing",
         auto_hide=False
     )
+    
+    # CRITICAL: Show progress tracker initially untuk ensure proper attachment
+    if hasattr(progress_tracker, 'show'):
+        progress_tracker.show()
     
     # Log components
     log_components = create_log_accordion(
@@ -106,7 +110,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         background_color='#f9f9f9'
     ))
     
-    # === MAIN UI ASSEMBLY ===
+    # === MAIN UI ASSEMBLY dengan Progress Tracker ===
     
     ui = widgets.VBox([
         header,
@@ -114,6 +118,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         input_options,
         config_section,
         action_section,
+        # FIXED: Ensure progress tracker container exists dan visible
         progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([]),
         log_components['log_accordion']
     ], layout=widgets.Layout(
@@ -159,8 +164,9 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'action_section': action_section,
         'confirmation_area': confirmation_area,
         
-        # PROGRESS & LOG
+        # PROGRESS & LOG - FIXED: Proper progress tracker attachment
         'progress_tracker': progress_tracker,
+        'progress': progress_tracker,  # Alias untuk compatibility
         'log_accordion': log_components.get('log_accordion'),
         
         # ACTION COMPONENTS

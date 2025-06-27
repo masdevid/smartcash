@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/base_handler.py
-Deskripsi: Fixed base handler dengan proper button access dan suppressed init logs
+Deskripsi: Fixed base handler dengan proper progress tracker integration dan API callback compatibility
 """
 
 from abc import ABC, abstractmethod
@@ -9,7 +9,7 @@ from smartcash.ui.utils import with_error_handling, ErrorHandler
 from smartcash.ui.dataset.preprocessing import utils as ui_utils
 
 class BasePreprocessingHandler(ABC):
-    """Base class untuk handlers dengan proper button mapping dan minimal logging"""
+    """Base class untuk handlers dengan proper progress tracker integration"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
@@ -26,7 +26,77 @@ class BasePreprocessingHandler(ABC):
         """Setup handlers specific untuk handler type ini"""
         pass
     
-    # === FIXED BUTTON ACCESS ===
+    # === FIXED PROGRESS TRACKER ACCESS ===
+    
+    def get_progress_tracker(self) -> Optional[Any]:
+        """Get progress tracker dengan multiple fallback paths"""
+        # Primary: direct access
+        tracker = self.ui_components.get('progress_tracker')
+        if tracker and hasattr(tracker, 'update_overall'):
+            return tracker
+        
+        # Secondary: alias access
+        tracker = self.ui_components.get('progress')
+        if tracker and hasattr(tracker, 'update_overall'):
+            return tracker
+        
+        # Tertiary: nested access
+        if 'progress_components' in self.ui_components:
+            tracker = self.ui_components['progress_components'].get('tracker')
+            if tracker and hasattr(tracker, 'update_overall'):
+                return tracker
+        
+        return None
+    
+    def create_progress_callback(self) -> Callable[[str, int, int, str], None]:
+        """Create API-compatible progress callback dengan proper tracker integration"""
+        def progress_callback(level: str, current: int, total: int, message: str = "") -> None:
+            try:
+                progress_tracker = self.get_progress_tracker()
+                if not progress_tracker or total <= 0:
+                    # Fallback ke log only jika tracker tidak ada
+                    if current % 20 == 0:  # Log setiap 20%
+                        progress_percent = int((current / total) * 100) if total > 0 else 0
+                        self.logger.info(f"📊 {message} ({progress_percent}%)")
+                    return
+                
+                progress_percent = max(0, min(100, int((current / total) * 100)))
+                
+                # Map level ke method yang sesuai
+                level_method_map = {
+                    'overall': 'update_overall',
+                    'current': 'update_current',
+                    'step': 'update_step',
+                    'batch': 'update_current',  # Map batch ke current
+                    'operation': 'update_overall',  # Map operation ke overall
+                    'phase': 'update_overall'  # Map phase ke overall
+                }
+                
+                method_name = level_method_map.get(level, 'update_overall')
+                
+                if hasattr(progress_tracker, method_name):
+                    method = getattr(progress_tracker, method_name)
+                    method(progress_percent, message)
+                    
+                    # Show tracker jika belum visible
+                    if hasattr(progress_tracker, 'show') and not getattr(progress_tracker, 'is_visible', True):
+                        progress_tracker.show()
+                
+                # Log milestone progress
+                if progress_percent % 25 == 0 and progress_percent > 0:  # Log setiap 25%
+                    log_message = f"{message} ({progress_percent}%)" if message else f"Progress: {progress_percent}%"
+                    self.logger.info(f"📊 {log_message}")
+                    
+            except Exception as e:
+                # Fallback logging jika progress tracker error
+                self.logger.debug(f"🔍 Progress callback error: {str(e)}")
+                if current % 25 == 0:  # Minimal fallback logging
+                    progress_percent = int((current / total) * 100) if total > 0 else 0
+                    self.logger.info(f"📊 {message} ({progress_percent}%)")
+        
+        return progress_callback
+    
+    # === BUTTON ACCESS ===
     
     def get_button(self, button_id: str) -> Optional[Any]:
         """Get button dengan proper fallback mapping"""
@@ -37,11 +107,6 @@ class BasePreprocessingHandler(ABC):
         # Secondary: action_buttons mapping
         action_buttons = self.ui_components.get('action_buttons', {})
         if button := action_buttons.get(button_id):
-            return button
-        
-        # Tertiary: original create_action_buttons result
-        action_components = self.ui_components.get('action_components', {})
-        if button := action_components.get(button_id):
             return button
         
         # Button mapping untuk different naming conventions
@@ -60,27 +125,17 @@ class BasePreprocessingHandler(ABC):
         
         return None
     
-    def clear_button_handlers(self, button: Any) -> None:
-        """Clear button handlers dengan safe approach"""
-        if not button or not hasattr(button, 'on_click'):
-            return
-        try:
-            if hasattr(button, '_click_handlers'):
-                button._click_handlers.callbacks.clear()
-        except Exception:
-            pass
-    
     def setup_button_handler(self, button_id: str, handler_func: Callable, 
                            error_operation: str) -> Optional[Callable]:
-        """Setup button handler dengan proper mapping dan minimal logging"""
+        """Setup button handler dengan proper mapping"""
         button = self.get_button(button_id)
         if not button:
-            # SUPPRESSED: hanya log jika debug mode
-            if getattr(self.logger, 'level', 20) <= 10:  # DEBUG level
-                self.logger.debug(f"🔍 Button {button_id} tidak ditemukan")
+            self.logger.debug(f"🔍 Button {button_id} tidak ditemukan")
             return None
         
-        self.clear_button_handlers(button)
+        # Clear existing handlers
+        if hasattr(button, '_click_handlers') and hasattr(button._click_handlers, 'callbacks'):
+            button._click_handlers.callbacks.clear()
         
         @button.on_click
         @with_error_handling(
@@ -92,6 +147,81 @@ class BasePreprocessingHandler(ABC):
             handler_func()
         
         return wrapped_handler
+    
+    # === OPERATION RESULT PROCESSING ===
+    
+    def process_operation_result(self, result: Dict[str, Any], operation: str) -> None:
+        """Process operation results dengan progress tracker completion"""
+        if not result.get('success', False):
+            error_msg = result.get('message', f'{operation} failed')
+            
+            # Set error state pada progress tracker
+            progress_tracker = self.get_progress_tracker()
+            if progress_tracker and hasattr(progress_tracker, 'error'):
+                progress_tracker.error(error_msg)
+            
+            raise RuntimeError(f"{operation} failed: {error_msg}")
+        
+        # Complete progress tracker
+        progress_tracker = self.get_progress_tracker()
+        if progress_tracker and hasattr(progress_tracker, 'complete'):
+            success_msg = self._format_success_message(result, operation)
+            progress_tracker.complete(success_msg)
+        
+        # Process berdasarkan operation type
+        if operation == 'preprocessing':
+            self._process_preprocessing_result(result)
+        elif operation == 'cleanup':
+            self._process_cleanup_result(result)
+        elif operation == 'check':
+            self._process_check_result(result)
+    
+    def _format_success_message(self, result: Dict[str, Any], operation: str) -> str:
+        """Format success message berdasarkan operation type"""
+        if operation == 'preprocessing':
+            stats = result.get('stats', {})
+            overview = stats.get('overview', {})
+            processed_count = overview.get('total_files', 0)
+            return f"Preprocessing completed: {processed_count:,} files processed"
+        elif operation == 'cleanup':
+            stats = result.get('stats', {})
+            files_removed = stats.get('files_removed', 0)
+            return f"Cleanup completed: {files_removed:,} files removed"
+        elif operation == 'check':
+            return "Dataset check completed"
+        else:
+            return f"{operation.title()} completed successfully"
+    
+    def _process_preprocessing_result(self, result: Dict[str, Any]) -> None:
+        """Process preprocessing results"""
+        stats = result.get('stats', {})
+        processing_time = result.get('processing_time', 0)
+        overview = stats.get('overview', {})
+        processed_count = overview.get('total_files', 0)
+        success_rate = overview.get('success_rate', '100%')
+        
+        success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files dalam {processing_time:.1f}s (Success: {success_rate})"
+        self.logger.success(success_msg)
+    
+    def _process_cleanup_result(self, result: Dict[str, Any]) -> None:
+        """Process cleanup results"""
+        stats = result.get('stats', {})
+        files_removed = stats.get('files_removed', 0)
+        splits_cleaned = stats.get('splits_cleaned', [])
+        
+        success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dari {len(splits_cleaned)} splits"
+        self.logger.success(success_msg)
+    
+    def _process_check_result(self, result: Dict[str, Any]) -> None:
+        """Process check results"""
+        if result.get('service_ready', False):
+            file_stats = result.get('file_statistics', {})
+            total_files = sum(split_stats.get('raw_images', 0) for split_stats in file_stats.values())
+            self.logger.info(f"📊 Dataset: {total_files:,} raw images ditemukan")
+        else:
+            self.logger.warning("⚠️ Service belum siap atau dataset tidak ditemukan")
+    
+    # === UTILITY METHODS ===
     
     def extract_config(self) -> Dict[str, Any]:
         """Extract config dengan fallback"""
@@ -123,40 +253,6 @@ class BasePreprocessingHandler(ABC):
             danger_mode=danger_mode
         )
     
-    def create_progress_callback(self) -> Callable[[str, int, int, str], None]:
-        """Create standardized progress callback"""
-        def progress_callback(level: str, current: int, total: int, message: str = "") -> None:
-            try:
-                progress_tracker = self.ui_components.get('progress_tracker')
-                if not progress_tracker or total <= 0:
-                    return
-                
-                progress_percent = max(0, min(100, int((current / total) * 100)))
-                
-                method_map = {
-                    'overall': 'update_overall',
-                    'current': 'update_current',
-                    'step': 'update_step', 
-                    'batch': 'update_batch'
-                }
-                
-                method_name = method_map.get(level)
-                if method_name and hasattr(progress_tracker, method_name):
-                    method = getattr(progress_tracker, method_name)
-                    method(progress_percent, message)
-                
-                # MINIMAL LOGGING: hanya overall dan current
-                if level in ['overall', 'current'] and current % 10 == 0:  # Every 10%
-                    log_message = f"{message} ({progress_percent}%)" if message else f"Progress: {progress_percent}%"
-                    self.logger.info(log_message)
-                    
-            except Exception as e:
-                # SUPPRESSED: minimal error logging
-                if getattr(self.logger, 'level', 20) <= 10:
-                    self.logger.debug(f"🔍 Progress callback error: {str(e)}")
-        
-        return progress_callback
-    
     def update_status_panel(self, message: str, status_type: str) -> None:
         """Update status panel"""
         status_panel = self.ui_components.get('status_panel')
@@ -175,60 +271,16 @@ class BasePreprocessingHandler(ABC):
             from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area
             clear_dialog_area(self.ui_components)
     
-    def process_operation_result(self, result: Dict[str, Any], operation: str) -> None:
-        """Process operation results"""
-        if not result.get('success', False):
-            error_msg = result.get('message', f'{operation} failed')
-            raise RuntimeError(f"{operation} failed: {error_msg}")
-        
-        # Process berdasarkan operation type
-        if operation == 'preprocessing':
-            self._process_preprocessing_result(result)
-        elif operation == 'cleanup':
-            self._process_cleanup_result(result)
-        elif operation == 'check':
-            self._process_check_result(result)
-    
-    def _process_preprocessing_result(self, result: Dict[str, Any]) -> None:
-        """Process preprocessing results"""
-        stats = result.get('stats', {})
-        processing_time = result.get('processing_time', 0)
-        overview = stats.get('overview', {})
-        processed_count = overview.get('total_files', 0)
-        success_rate = overview.get('success_rate', '100%')
-        
-        success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files dalam {processing_time:.1f}s (Success: {success_rate})"
-        ui_utils.complete_progress(self.ui_components, success_msg)
-        self.logger.success(success_msg)
-    
-    def _process_cleanup_result(self, result: Dict[str, Any]) -> None:
-        """Process cleanup results"""
-        stats = result.get('stats', {})
-        files_removed = stats.get('files_removed', 0)
-        splits_cleaned = stats.get('splits_cleaned', [])
-        
-        success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dari {len(splits_cleaned)} splits"
-        ui_utils.complete_progress(self.ui_components, success_msg)
-        self.logger.success(success_msg)
-    
-    def _process_check_result(self, result: Dict[str, Any]) -> None:
-        """Process check results"""
-        if result.get('service_ready', False):
-            file_stats = result.get('file_statistics', {})
-            total_files = sum(split_stats.get('raw_images', 0) for split_stats in file_stats.values())
-            self.logger.info(f"📊 Dataset: {total_files:,} raw images ditemukan")
-        else:
-            self.logger.warning("⚠️ Service belum siap atau dataset tidak ditemukan")
-        
-        ui_utils.complete_progress(self.ui_components, "Status check selesai")
-    
     # === LOGGING SHORTCUTS ===
     
     def log_info(self, message: str) -> None:
         self.logger.info(message)
     
     def log_success(self, message: str) -> None:
-        self.logger.success(message)
+        if hasattr(self.logger, 'success'):
+            self.logger.success(message)
+        else:
+            self.logger.info(f"✅ {message}")
     
     def log_warning(self, message: str) -> None:
         self.logger.warning(message)
@@ -237,6 +289,4 @@ class BasePreprocessingHandler(ABC):
         self.logger.error(message)
     
     def log_debug(self, message: str) -> None:
-        """SUPPRESSED: hanya log jika debug mode aktif"""
-        if getattr(self.logger, 'level', 20) <= 10:
-            self.logger.debug(message)
+        self.logger.debug(message)

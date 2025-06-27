@@ -81,16 +81,24 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
         style = kwargs.get('style', {'description_width': '140px', 'handle_color': '#4CAF50'})
         
         if isinstance(value, int) and isinstance(step, int):
+            # Create a new Layout with the same properties as responsive_dropdown
+            dropdown_layout = LAYOUTS['responsive_dropdown']
+            layout_kwargs = {k: v for k, v in dropdown_layout.get_state().items() 
+                           if not k.startswith('_') and k != 'comm'}
             return widgets.IntSlider(
                 value=value, min=min_val, max=max_val, step=step,
                 description=description, tooltip=tooltip, style=style,
-                layout=LAYOUTS['responsive_dropdown'].copy()
+                layout=widgets.Layout(**layout_kwargs)
             )
         else:
+            # Create a new Layout with the same properties as responsive_dropdown
+            dropdown_layout = LAYOUTS['responsive_dropdown']
+            layout_kwargs = {k: v for k, v in dropdown_layout.get_state().items() 
+                           if not k.startswith('_') and k != 'comm'}
             return widgets.FloatSlider(
                 value=value, min=min_val, max=max_val, step=step,
                 description=description, tooltip=tooltip, style=style,
-                layout=LAYOUTS['responsive_dropdown'].copy()
+                layout=widgets.Layout(**layout_kwargs)
             )
     
     elif element_type == 'dropdown':
@@ -139,6 +147,10 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
         )
     
     elif element_type == 'log_slider':
+        # Create a new Layout with the same properties as responsive_dropdown
+        dropdown_layout = LAYOUTS['responsive_dropdown']
+        layout_kwargs = {k: v for k, v in dropdown_layout.get_state().items() 
+                       if not k.startswith('_') and k != 'comm'}
         return widgets.FloatLogSlider(
             value=kwargs.get('value', 0.001),
             min=kwargs.get('min_val', -5),
@@ -147,7 +159,7 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
             description=kwargs.get('description', ''),
             tooltip=kwargs.get('tooltip', ''),
             style={'description_width': '140px'},
-            layout=LAYOUTS['responsive_dropdown'].copy()
+            layout=widgets.Layout(**layout_kwargs)
         )
     
     elif element_type == 'two_column':
@@ -187,15 +199,25 @@ def create_element(element_type: str, content: Union[str, list] = "", **kwargs) 
 # Fungsi bantuan responsif
 def get_responsive_config(widget_type: str, **kwargs) -> Dict[str, Any]:
     """Dapatkan konfigurasi responsif untuk berbagai tipe widget"""
+    
+    def create_layout_from_template(template_name: str) -> widgets.Layout:
+        """Create a new Layout from a template in LAYOUTS"""
+        template = LAYOUTS[template_name]
+        layout_kwargs = {k: v for k, v in template.get_state().items() 
+                       if not k.startswith('_') and k != 'comm'}
+        return widgets.Layout(**layout_kwargs)
+    
     configs = {
-        'button': {'layout': LAYOUTS['responsive_button'].copy()},
+        'button': {'layout': create_layout_from_template('responsive_button')},
         'dropdown': {
-            'layout': LAYOUTS['responsive_dropdown'].copy(),
+            'layout': create_layout_from_template('responsive_dropdown'),
             'style': {'description_width': kwargs.get('description_width', '80px')}
         },
-        'input': {'layout': LAYOUTS['responsive_dropdown'].copy()}
+        'input': {'layout': create_layout_from_template('no_scroll')}
     }
-    config = configs.get(widget_type, {'layout': LAYOUTS['no_scroll'].copy()})
+    # Create a new default layout if widget_type is not found
+    default_layout = create_layout_from_template('no_scroll')
+    config = configs.get(widget_type, {'layout': default_layout})
     
     # Terapkan override yang diberikan
     if 'layout' in config:

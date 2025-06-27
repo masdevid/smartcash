@@ -30,7 +30,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Create status panel for system messages
     status_panel = create_status_panel(
         message="✅ Ready to manage dependencies",
-        status="info"
+        status_type="info"
     )
     
     # Create summary panel

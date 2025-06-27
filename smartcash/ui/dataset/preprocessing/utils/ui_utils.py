@@ -81,8 +81,8 @@ def update_status_panel_enhanced(ui_components: Dict[str, Any], message: str,
     
     try:
         # Method 1: Direct update_status method
-        if hasattr(status_panel, 'update_status'):
-            status_panel.update_status(message, status_type)
+        if hasattr(status_panel, 'update_status_panel'):
+            status_panel.update_status_panel(message, status_type)
         
         # Method 2: Direct value update jika method tidak ada
         elif hasattr(status_panel, 'value'):

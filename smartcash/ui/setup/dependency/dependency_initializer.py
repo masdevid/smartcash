@@ -194,3 +194,25 @@ class DependencyInitializer(CommonInitializer):
             if hasattr(self, '_logger_bridge') and self._logger_bridge:
                 self._logger_bridge.error(f"{error_msg}\n{str(e)}")
             raise RuntimeError(error_msg) from e
+
+
+def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+    """Initialize and return the dependency management UI.
+    
+    This is a convenience function that creates a DependencyInitializer instance
+    and initializes the UI with the provided configuration.
+    
+    Args:
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments passed to DependencyInitializer
+        
+    Returns:
+        The initialized UI component
+        
+    Example:
+        >>> from smartcash.ui.setup.dependency import initialize_dependency_ui
+        >>> ui = initialize_dependency_ui()
+        >>> display(ui)
+    """
+    initializer = DependencyInitializer(**kwargs)
+    return initializer.initialize_ui(config=config)

@@ -258,9 +258,10 @@ def _create_package_item(
         Widget containing the package item
     """
     checkbox = create_package_checkbox(
-        value=is_checked,
-        description=package.get('name', ''),
-        tooltip=package.get('description', '')
+        package_name=package.get('name', ''),
+        version=package.get('version', ''),
+        is_installed=is_checked,
+        on_change=lambda name, checked: on_select(package['key'], checked) if on_select else None
     )
     
     if on_select:

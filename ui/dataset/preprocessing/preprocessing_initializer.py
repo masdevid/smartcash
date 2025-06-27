@@ -40,21 +40,41 @@ class PreprocessingInitializer(CommonInitializer):
         """
         from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
         
-        # Create UI components
-        ui_components = create_preprocessing_main_ui(config)
-        
-        if not isinstance(ui_components, dict):
-            raise ValueError("UI components harus berupa dictionary")
+        try:
+            # Create UI components
+            ui_components = create_preprocessing_main_ui(config)
             
-        if not ui_components:
-            raise ValueError("UI components tidak boleh kosong")
+            if not isinstance(ui_components, dict):
+                raise ValueError("UI components harus berupa dictionary")
+                
+            if not ui_components:
+                raise ValueError("UI components tidak boleh kosong")
             
-        ui_components.update({
-            'module_name': self.module_name,
-            'config_handler': self.config_handler
-        })
-        
-        return ui_components
+            # Initialize logger bridge
+            self._initialize_logger_bridge(ui_components)
+            
+            # Add required components
+            ui_components.update({
+                'module_name': self.module_name,
+                'config_handler': self.config_handler,
+                'logger_bridge': self._logger_bridge
+            })
+            
+            # Log successful initialization
+            if self._logger_bridge:
+                self._logger_bridge.info(f"✅ UI components berhasil diinisialisasi untuk {self.module_name}")
+            
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"❌ Gagal membuat UI components: {str(e)}"
+            if hasattr(self, '_logger_bridge') and self._logger_bridge:
+                self._logger_bridge.error(error_msg, exc_info=True)
+            else:
+                print(error_msg)
+                import traceback
+                traceback.print_exc()
+            raise
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """
@@ -67,12 +87,44 @@ class PreprocessingInitializer(CommonInitializer):
             
         Returns:
             Dictionary komponen UI yang telah diupdate dengan handlers
+            
+        Raises:
+            ValueError: Jika logger bridge belum diinisialisasi dengan benar
         """
-        from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import setup_preprocessing_handlers
-        
-        handlers = setup_preprocessing_handlers(ui_components, config, self.config_handler)
-        ui_components['handlers'] = handlers
-        return ui_components
+        try:
+            # Pastikan logger bridge sudah diinisialisasi
+            if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
+                self._initialize_logger_bridge(ui_components)
+                
+            # Pastikan logger bridge tersedia di ui_components
+            if 'logger_bridge' not in ui_components or not ui_components['logger_bridge']:
+                ui_components['logger_bridge'] = self._logger_bridge
+                
+            from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import setup_preprocessing_handlers
+            
+            # Setup handlers dengan logger bridge yang sudah diinisialisasi
+            handlers = setup_preprocessing_handlers(ui_components, config, self.config_handler)
+            
+            if not handlers:
+                raise ValueError("Gagal menginisialisasi preprocessing handlers")
+                
+            ui_components['handlers'] = handlers
+            
+            # Log successful handler setup
+            if self._logger_bridge:
+                self._logger_bridge.info("✅ Preprocessing handlers berhasil diinisialisasi")
+                
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"❌ Gagal setup preprocessing handlers: {str(e)}"
+            if hasattr(self, '_logger_bridge') and self._logger_bridge:
+                self._logger_bridge.error(error_msg, exc_info=True)
+            else:
+                print(error_msg)
+                import traceback
+                traceback.print_exc()
+            raise ValueError(error_msg) from e
     
     def _get_default_config(self) -> Dict[str, Any]:
         """

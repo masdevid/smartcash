@@ -7,7 +7,7 @@ from typing import Dict, Any, Type, Optional
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.setup.dependency.handlers.config_handler import DependencyConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.logger_bridge import LoggerBridge
+from smartcash.ui.utils.logger_bridge import UILoggerBridge, create_ui_logger_bridge
 
 class DependencyInitializer(CommonInitializer):
     """Initializer untuk dependency management dengan pattern terbaru"""
@@ -115,27 +115,35 @@ class DependencyInitializer(CommonInitializer):
         except Exception as e:
             raise RuntimeError(f"Gagal memuat konfigurasi default: {str(e)}") from e
     
-    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> LoggerBridge:
+    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> UILoggerBridge:
         """Initialize logger bridge untuk dependency module
         
         Args:
             ui_components: Dictionary berisi komponen UI
             
         Returns:
-            Instance LoggerBridge yang telah diinisialisasi
+            Instance UILoggerBridge yang telah diinisialisasi
             
         Raises:
             ValueError: Jika komponen UI yang diperlukan tidak ditemukan
         """
-        if 'log_output' not in ui_components or 'status_panel' not in ui_components:
-            raise ValueError("Komponen UI yang diperlukan untuk logger bridge tidak ditemukan")
-            
-        self._logger_bridge = LoggerBridge(
-            log_output=ui_components.get('log_output'),
-            summary_output=ui_components.get('status_panel'),
-            module_name=self.module_name
-        )
-        return self._logger_bridge
+        required_components = ['log_output', 'status_panel']
+        missing = [comp for comp in required_components if comp not in ui_components]
+        if missing:
+            raise ValueError(f"Komponen UI yang diperlukan untuk logger bridge tidak ditemukan: {missing}")
+        
+        try:
+            # Gunakan factory function untuk membuat logger bridge
+            self._logger_bridge = create_ui_logger_bridge(
+                ui_components={
+                    'log_output': ui_components.get('log_output'),
+                    'status_panel': ui_components.get('status_panel')
+                },
+                logger_name=f"{self.module_name}.ui"
+            )
+            return self._logger_bridge
+        except Exception as e:
+            raise RuntimeError(f"Gagal menginisialisasi logger bridge: {str(e)}") from e
         
     def initialize_ui(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """Initialize the dependency management UI dengan error handling yang komprehensif

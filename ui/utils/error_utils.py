@@ -246,10 +246,46 @@ def _safe_call(func: Callable, fallback: Any = None) -> Any:
     except Exception:
         return fallback
 
+def safe_ui_operation(component: str = "ui", operation: str = "unknown"):
+    """
+    Decorator untuk menjalankan operasi UI dengan error handling yang aman
+    
+    Args:
+        component: Nama komponen yang menggunakan decorator
+        operation: Nama operasi yang di-wrap
+        
+    Returns:
+        Decorated function with error handling
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                error_msg = f"Error in {component}.{operation}: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                
+                # Get UI components from args or kwargs
+                ui_components = kwargs.get('ui_components') or \
+                              next((arg for arg in args if isinstance(arg, dict) and 'logger_bridge' in arg), None)
+                
+                if ui_components and 'logger_bridge' in ui_components:
+                    ui_components['logger_bridge'].error(error_msg)
+                
+                # Return None or re-raise based on context
+                if kwargs.get('silent', False):
+                    return None
+                raise
+        return wrapper
+    return decorator
+
 # Export untuk backward compatibility
 __all__ = [
     'create_error_context',
-    'error_handler_scope', 
+    'error_handler_scope',
+    'safe_ui_operation', 
     'with_error_handling',
     'log_errors',
     'safe_create_context',

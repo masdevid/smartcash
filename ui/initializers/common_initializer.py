@@ -63,34 +63,38 @@ class CommonInitializer(ABC):
     """
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):
-        """Initialize tanpa premature suppression
+        """Initialize dengan complete output suppression hingga UI ready
         
         Args:
             module_name: Nama module (used for logging)
             config_handler_class: Optional ConfigHandler class for config management
         """
+        # Immediate suppression untuk prevent early logs
+        setup_aggressive_log_suppression()
+        
         self.module_name = module_name
         self._ui_components = {}
         self._logger_bridge = None
         self.config_handler = config_handler_class() if config_handler_class else None
         
-        # Initialize basic logger TANPA suppression
+        # Initialize silent logger
         self.logger = get_logger(f"smartcash.ui.{module_name}")
         if hasattr(self.logger, 'set_level'):
-            self.logger.set_level(logging.INFO)  # Allow normal logging
+            self.logger.set_level(logging.CRITICAL)  # Silent until UI ready
         else:
-            self.logger.setLevel(logging.INFO)
+            self.logger.setLevel(logging.CRITICAL)
     
     def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
-        """Setup logger bridge AFTER UI components created
-        
-        This method creates a bridge between the Python logging system and the UI,
-        allowing log messages to be displayed in the application's log panel.
+        """Setup logger bridge AFTER UI components created dan suppress semua stdout
         
         Args:
             ui_components: Dictionary of UI components that may be needed for logging
         """
         try:
+            # Additional stdout suppression untuk ensure tidak ada log yang leak
+            from smartcash.ui.utils.logging_utils import setup_stdout_suppression
+            setup_stdout_suppression()
+            
             self._logger_bridge = create_ui_logger_bridge(
                 ui_components=ui_components,
                 logger_name=f"smartcash.ui.{self.module_name}"
@@ -100,13 +104,18 @@ class CommonInitializer(ABC):
             if hasattr(self._logger_bridge, 'set_ui_ready'):
                 self._logger_bridge.set_ui_ready(True)
             
-            self.logger.debug(f"Logger bridge initialized for {self.module_name}")
+            # ONLY log to UI, tidak ke stdout
+            # self.logger.debug(f"Logger bridge initialized for {self.module_name}")
         except Exception as e:
+            # Fallback silent logger - NO stdout output
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
-            self.logger.warning(f"Failed to initialize logger bridge: {str(e)}")
+            if hasattr(self.logger, 'set_level'):
+                self.logger.set_level(logging.CRITICAL)
+            else:
+                self.logger.setLevel(logging.CRITICAL)
     
     def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Any:
-        """Initialize dan return UI module dengan proper sequence
+        """Initialize dan return UI module dengan complete output suppression
         
         This is the main entry point that orchestrates the initialization process.
         It follows a strict sequence of operations and ensures proper error handling.
@@ -126,18 +135,22 @@ class CommonInitializer(ABC):
             >>> display(ui)  # Explicitly display the UI
         """
         
+        # Suppress ALL output until UI is completely ready
+        from smartcash.ui.utils.logging_utils import suppress_all_outputs
+        suppress_all_outputs()
+        
         try:
-            # 1. Load config TANPA suppression
+            # 1. Load config - silent
             config = self._load_config(config)
             
-            # 2. Create UI components TANPA suppression
+            # 2. Create UI components - silent  
             ui_components = self._create_ui_components(config, **kwargs) or {}
             self._ui_components = ui_components
             
             # 3. Initialize logger bridge SETELAH UI ready
             self._initialize_logger_bridge(ui_components)
             
-            # 4. Pre-initialization checks (optional)
+            # 4. Pre-initialization checks (optional) - silent
             if hasattr(self, '_pre_initialize_checks'):
                 self._pre_initialize_checks(config=config, **kwargs)
             
@@ -150,28 +163,24 @@ class CommonInitializer(ABC):
             if not root_ui:
                 raise ValueError("No root UI component found")
             
-            # 7. Post-initialization checks (optional)
+            # 7. Post-initialization checks (optional) - silent
             if hasattr(self, '_after_init_checks'):
                 self._after_init_checks(ui_components=ui_components, config=config, **kwargs)
             
-            # 8. Log success SETELAH everything ready
-            self.logger.info(f"✅ {self.module_name} initialized successfully")
+            # 8. SUCCESS: Log ONLY to UI setelah everything ready
+            if hasattr(self.logger, 'info'):
+                self.logger.info(f"✅ {self.module_name} siap digunakan")
             
             return root_ui
             
         except Exception as e:
-            error_msg = f"❌ Failed to initialize {self.module_name}: {str(e)}"
+            error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
             
-            # Use basic logger jika logger bridge belum ready
-            if hasattr(self, '_logger_bridge') and self._logger_bridge:
-                self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
-            else:
-                print(f"{error_msg}\n{traceback.format_exc()}")
-            
+            # SILENT error handling - no stdout output
             return self._create_error_ui(error_msg)
         finally:
-            # Ensure output is restored jika ada suppression
-            restore_stdout()
+            # Keep suppression active - hanya restore jika benar-benar diperlukan
+            pass
     
     def _load_config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Load and validate the configuration for the module.

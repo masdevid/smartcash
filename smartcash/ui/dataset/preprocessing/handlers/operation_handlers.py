@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/operation_handlers.py
-Deskripsi: Operation handlers dengan minimal logging dan proper button handling
+Deskripsi: Silent operation handlers dengan complete output suppression
 """
 
 from typing import Dict, Any
@@ -8,13 +8,13 @@ from .base_handler import BasePreprocessingHandler
 from smartcash.ui.dataset.preprocessing import utils as ui_utils
 
 class OperationHandler(BasePreprocessingHandler):
-    """Handler untuk main operations dengan minimal init logging"""
+    """Handler untuk operations dengan complete output suppression"""
     
     def setup_handlers(self) -> Dict[str, Any]:
-        """Setup operation button handlers"""
+        """Setup operation button handlers - silent"""
         handlers = {}
         
-        # Setup handlers dengan minimal logging
+        # Setup handlers tanpa init logs
         preprocess_handler = self.setup_button_handler(
             'preprocess_btn', self._handle_preprocess_operation, 'preprocess'
         )
@@ -33,14 +33,10 @@ class OperationHandler(BasePreprocessingHandler):
         if cleanup_handler:
             handlers['cleanup'] = cleanup_handler
         
-        # SUPPRESSED: minimal success logging
-        if handlers:
-            self.log_debug("Operation handlers ready")
-        
         return handlers
     
     def _handle_preprocess_operation(self) -> None:
-        """Handle preprocessing operation"""
+        """Handle preprocessing operation - silent"""
         ui_utils.clear_outputs(self.ui_components)
         
         if self.is_confirmation_pending():
@@ -50,7 +46,7 @@ class OperationHandler(BasePreprocessingHandler):
         self._show_preprocessing_confirmation()
     
     def _handle_check_operation(self) -> None:
-        """Handle dataset check operation"""
+        """Handle dataset check operation - silent"""
         self.log_info("🔍 Memeriksa dataset...")
         ui_utils.clear_outputs(self.ui_components)
         
@@ -61,14 +57,22 @@ class OperationHandler(BasePreprocessingHandler):
         progress_callback = self.create_progress_callback()
         ui_utils.setup_progress(self.ui_components, "🔍 Memeriksa dataset...")
         
-        from smartcash.dataset.preprocessor.api import get_preprocessing_status
-        result = get_preprocessing_status(config=config)
+        # Suppress output selama API call
+        from smartcash.ui.utils.logging_utils import suppress_all_outputs
+        suppress_all_outputs()
         
-        self.process_operation_result(result, 'check')
-        self.update_status_panel("Pemeriksaan selesai", 'success')
+        try:
+            from smartcash.dataset.preprocessor.api import get_preprocessing_status
+            result = get_preprocessing_status(config=config)
+            
+            self.process_operation_result(result, 'check')
+            self.update_status_panel("Pemeriksaan selesai", 'success')
+        finally:
+            # Keep suppression active
+            pass
     
     def _handle_cleanup_operation(self) -> None:
-        """Handle cleanup operation"""
+        """Handle cleanup operation - silent"""
         ui_utils.clear_outputs(self.ui_components)
         
         if self.is_confirmation_pending():
@@ -78,7 +82,7 @@ class OperationHandler(BasePreprocessingHandler):
         self._show_cleanup_confirmation()
     
     def _show_preprocessing_confirmation(self) -> None:
-        """Show preprocessing confirmation"""
+        """Show preprocessing confirmation - silent"""
         self.show_confirmation_dialog(
             title="Konfirmasi Preprocessing",
             message="Proses dataset dengan YOLO normalization?",
@@ -90,7 +94,7 @@ class OperationHandler(BasePreprocessingHandler):
         self.log_info("⏳ Menunggu konfirmasi preprocessing...")
     
     def _show_cleanup_confirmation(self) -> None:
-        """Show cleanup confirmation"""
+        """Show cleanup confirmation - silent"""
         config = self.extract_config()
         cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
         
@@ -113,13 +117,13 @@ class OperationHandler(BasePreprocessingHandler):
         self.log_info(f"⏳ Konfirmasi cleanup: {target_desc}")
     
     def _set_preprocessing_confirmed(self) -> None:
-        """Confirm dan execute preprocessing"""
+        """Confirm dan execute preprocessing - silent"""
         self.log_info("✅ Mulai preprocessing...")
         self.ui_components['_preprocessing_confirmed'] = True
         self._execute_preprocessing_with_api()
     
     def _set_cleanup_confirmed(self) -> None:
-        """Confirm dan execute cleanup"""
+        """Confirm dan execute cleanup - silent"""
         self.log_info("✅ Mulai cleanup...")
         self.ui_components['_cleanup_confirmed'] = True
         self._execute_cleanup_with_api()
@@ -128,10 +132,14 @@ class OperationHandler(BasePreprocessingHandler):
         clear_dialog_area(self.ui_components)
     
     def _execute_preprocessing_with_api(self) -> None:
-        """Execute preprocessing dengan minimal progress logs"""
-        self.log_info("🚀 Starting preprocessing...")
+        """Execute preprocessing dengan complete output suppression"""
+        self.log_info("🚀 Memulai preprocessing...")
         ui_utils.disable_buttons(self.ui_components)
         ui_utils.setup_progress(self.ui_components, "🚀 Preprocessing...")
+        
+        # Complete output suppression selama API call
+        from smartcash.ui.utils.logging_utils import suppress_all_outputs
+        suppress_all_outputs()
         
         try:
             config = self.extract_config()
@@ -148,12 +156,17 @@ class OperationHandler(BasePreprocessingHandler):
             
         finally:
             ui_utils.enable_buttons(self.ui_components)
+            # Keep suppression active - jangan restore stdout
     
     def _execute_cleanup_with_api(self) -> None:
-        """Execute cleanup dengan minimal progress logs"""
-        self.log_info("🧹 Starting cleanup...")
+        """Execute cleanup dengan complete output suppression"""
+        self.log_info("🧹 Memulai cleanup...")
         ui_utils.disable_buttons(self.ui_components)
         ui_utils.setup_progress(self.ui_components, "🗑️ Cleanup...")
+        
+        # Complete output suppression selama API call
+        from smartcash.ui.utils.logging_utils import suppress_all_outputs
+        suppress_all_outputs()
         
         try:
             config = self.extract_config()
@@ -179,9 +192,10 @@ class OperationHandler(BasePreprocessingHandler):
             
         finally:
             ui_utils.enable_buttons(self.ui_components)
+            # Keep suppression active - jangan restore stdout
 
 # Factory function
 def setup_operation_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Setup operation handlers"""
+    """Setup operation handlers - silent"""
     handler = OperationHandler(ui_components)
     return handler.setup_handlers()

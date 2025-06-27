@@ -222,25 +222,36 @@ def _create_category_section(
         for pkg in category.get('packages', [])
     ]
     
-    return create_card(
-        title=f"{category.get('icon', '')} {category.get('name', '')}",
-        content=widgets.VBox(
-            package_items,
-            layout=widgets.Layout(
-                padding='10px',
-                width='100%',
-                margin='5px 0'
-            )
-        ),
-        description=category.get('description', ''),
+    # Create a container for the category content
+    category_content = widgets.VBox(
+        package_items,
+        layout=widgets.Layout(
+            padding='10px',
+            width='100%',
+            margin='5px 0'
+        )
+    )
+    
+    # Create a custom card using VBox with similar styling
+    card = widgets.VBox(
+        [
+            widgets.HTML(
+                f"<h4 style='margin: 0 0 10px 0; padding: 0;'>{category.get('icon', '')} {category.get('name', '')}</h4>"
+            ),
+            category_content,
+            widgets.HTML(f"<div style='color: #666; font-size: 0.9em; margin-top: 10px;'>{category.get('description', '')}</div>")
+        ],
         layout=widgets.Layout(
             margin='10px 0',
             width='100%',
             border='1px solid #e0e0e0',
             border_radius='6px',
-            padding='10px'
+            padding='15px',
+            background='#ffffff'
         )
     )
+    
+    return card
 
 def _create_package_item(
     package: Dict[str, Any],

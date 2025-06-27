@@ -129,13 +129,20 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         except (AttributeError, TypeError):
             return fallback
     
+    # Debug: Print action_components structure untuk debugging
+    print(f"[DEBUG] action_components keys: {list(action_components.keys()) if action_components else 'None'}")
+    
     # Build UI components dictionary
     ui_components.update({
-        # CRITICAL COMPONENTS (required by CommonInitializer)
+        # CRITICAL COMPONENTS (required by CommonInitializer)  
         'ui': ui,
-        'preprocess_button': action_components.get('primary_button'),
-        'check_button': action_components.get('secondary_buttons', [{}])[0].get('button') if action_components.get('secondary_buttons') else None,
-        'cleanup_button': action_components.get('cleanup_button'),
+        'preprocess_button': (action_components.get('preprocess_btn') or 
+                             action_components.get('primary_button') or
+                             action_components.get('download_button')),  # Fallback options
+        'check_button': (action_components.get('check_btn') or
+                        action_components.get('secondary_button') or
+                        action_components.get('info_button')),  # Fallback options
+        'cleanup_button': action_components.get('cleanup_btn'),
         'save_button': save_reset_components.get('save_button'),
         'reset_button': save_reset_components.get('reset_button'),
         'log_output': log_components.get('log_output'),

@@ -60,7 +60,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Create logger bridge untuk dependency management
     logger_bridge = UILoggerBridge(
-        log_output=log_components['output'],
+        log_output=log_components['log_output'],
         summary_output=status_panel,
         module_name='dependency'
     )

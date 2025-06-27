@@ -130,7 +130,8 @@ class DownloaderInitializer(CommonInitializer):
         try:
             import ipywidgets
             import requests
-            from smartcash.dataset.downloader import api as downloader_api
+            # Downloader doesn't have an api module like preprocessing
+            # Only check for required packages
         except ImportError as e:
             raise RuntimeError(f"Dependencies downloader tidak lengkap: {str(e)}") from e
         
@@ -138,8 +139,9 @@ class DownloaderInitializer(CommonInitializer):
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
-            if not env_manager.get_downloads_path().exists():
-                self.logger.warning("⚠️ Download path tidak ditemukan, akan dibuat otomatis")
+            # Use get_data_path() instead of get_downloads_path()
+            if not env_manager.get_data_path().exists():
+                self.logger.warning("⚠️ Data path tidak ditemukan, akan dibuat otomatis")
         except Exception as e:
             self.logger.warning(f"⚠️ Environment check warning: {str(e)}")
     

@@ -1,10 +1,51 @@
 """
 File: smartcash/ui/initializers/config_cell_initializer.py
-Deskripsi: Config cell initializer dengan shared state dan YAML persistence
+Deskripsi: Base class untuk config cell yang menyediakan parent components dan mengelola lifecycle
 
-Modul ini menyediakan class ConfigCellInitializer yang berfungsi sebagai lapisan orkestrasi
-untuk UI konfigurasi. Menangani inisialisasi, lifecycle management, dan registrasi komponen
-sambil mendelegasikan pembuatan komponen UI ke modul components.
+ARCHITECTURE OVERVIEW:
+===================
+ConfigCellInitializer adalah base class yang mengimplementasikan Template Method Pattern
+untuk membuat UI configuration cells dengan struktur yang konsisten. Class ini:
+
+1. MENYEDIAKAN komponen parent yang WAJIB ada di SEMUA config cells:
+   - Header (judul + deskripsi + icon)
+   - Status Panel (untuk menampilkan status operasi)
+   - Log Accordion (untuk menampilkan log messages)
+   - Info Accordion (untuk informasi/dokumentasi)
+   - Container structure yang konsisten
+
+2. MENGELOLA lifecycle dan infrastructure:
+   - Logger bridge untuk centralized logging
+   - Component registry untuk tracking
+   - Event handler setup
+   - Error handling
+   - Resource cleanup
+
+3. MENDELEGASIKAN ke child class:
+   - Pembuatan form/UI components spesifik (create_child_components)
+   - Pembuatan handler spesifik (create_handler)
+   - Content info accordion spesifik (get_info_content)
+
+DESIGN PATTERN:
+==============
+Template Method Pattern dimana parent class mendefinisikan skeleton algoritma
+(struktur UI dan lifecycle), sementara child class mengisi detail spesifik.
+
+HIERARCHY:
+=========
+ConfigCellInitializer (this class)
+    ├── Membuat: Header, Status Panel, Log Accordion, Info Accordion
+    ├── Mengelola: Logger Bridge, Registry, Lifecycle
+    └── Child Classes (e.g., SplitConfigInitializer)
+        └── Membuat: Form components spesifik saja
+
+IMPORTANT RULES:
+===============
+1. Child class TIDAK BOLEH membuat ulang parent components
+2. Child class HANYA membuat form/UI components spesifik
+3. Parent components SELALU dibuat oleh ConfigCellInitializer
+4. Semua logging HARUS melalui logger bridge
+5. Status updates HARUS melalui status panel yang disediakan parent
 """
 
 from __future__ import annotations
@@ -18,13 +59,23 @@ import ipywidgets as widgets
 
 # SmartCash - UI Components
 from smartcash.ui.config_cell.components import component_registry
-from smartcash.ui.config_cell.components.ui_parent_components import ParentComponentManager, create_parent_component
+from smartcash.ui.config_cell.components.ui_parent_components import ParentComponentManager
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
 from smartcash.ui.config_cell.handlers.error_handler import create_error_response
 from smartcash.ui.utils.logger_bridge import UILoggerBridge
 from smartcash.ui.utils.logging_utils import (
+    setup_aggressive_log_suppression,
+    setup_stdout_suppression,
     restore_stdout,
     allow_tqdm_display
+)
+
+# Import shared components untuk parent
+from smartcash.ui.components import (
+    create_header,
+    create_status_panel,
+    create_log_accordion,
+    create_info_accordion
 )
 
 # Type variables
@@ -34,18 +85,51 @@ T = TypeVar('T', bound=ConfigCellHandler)
 logger = logging.getLogger(__name__)
 
 class ConfigCellInitializer(Generic[T], ABC):
-    """🎯 Orkestrasi inisialisasi dan lifecycle configuration cell.
+    """🎯 Base class untuk config cell yang menyediakan parent components.
     
-    Abstract base class ini menangani core initialization flow, registrasi komponen,
-    dan lifecycle management UI konfigurasi. Mendelegasikan pembuatan komponen UI
-    ke modul components dan fokus pada orkestrasi.
+    WHAT THIS CLASS DOES:
+    ====================
+    1. Membuat dan mengelola SEMUA parent components (header, status, log, info)
+    2. Setup infrastructure (logger bridge, registry, event handlers)
+    3. Mengelola lifecycle (initialization, cleanup)
+    4. Menyediakan template untuk child classes
     
-    Type Parameters:
-        T: Type dari configuration handler, harus subclass dari ConfigCellHandler
-        
-    Subclass harus mengimplementasikan:
-        - create_handler(): Membuat dan return instance configuration handler
-        - create_ui_components(): Membuat dan return dictionary komponen UI
+    WHAT CHILD CLASSES DO:
+    =====================
+    1. Implement create_handler() - membuat handler spesifik
+    2. Implement create_child_components() - HANYA form/UI spesifik
+    3. Optional: Override get_info_content() - custom info content
+    4. Optional: Override setup_handlers() - custom event handlers (MUST call super())
+    
+    PARENT COMPONENTS (dibuat otomatis oleh class ini):
+    ==================================================
+    - Header: Judul, deskripsi, dan icon
+    - Status Panel: Menampilkan status operasi real-time
+    - Log Accordion: Menampilkan semua log messages
+    - Info Accordion: Dokumentasi/informasi tambahan
+    
+    USAGE EXAMPLE:
+    =============
+    ```python
+    class MyConfigInitializer(ConfigCellInitializer):
+        def create_handler(self):
+            return MyConfigHandler(self.config)
+            
+        def create_child_components(self, config):
+            # HANYA buat form components, JANGAN buat header/status/log/info!
+            return {
+                'my_input': widgets.Text(value=config.get('value', '')),
+                'my_button': widgets.Button(description='Process')
+            }
+    ```
+    
+    ANTI-PATTERNS (JANGAN LAKUKAN):
+    ==============================
+    1. ❌ Child class membuat header sendiri
+    2. ❌ Child class membuat status panel sendiri
+    3. ❌ Child class membuat log accordion sendiri
+    4. ❌ Child class bypass logger bridge
+    5. ❌ Child class mengabaikan parent lifecycle
     """
     
     def __init__(
@@ -53,364 +137,573 @@ class ConfigCellInitializer(Generic[T], ABC):
         config: Optional[Dict[str, Any]] = None,
         parent_id: Optional[str] = None,
         component_id: Optional[str] = None,
-        logger_bridge: Optional[UILoggerBridge] = None,
         title: Optional[str] = None,
-        children: Optional[List[Dict[str, Any]]] = None,
+        description: Optional[str] = None,
+        icon: Optional[str] = None,
         **kwargs
     ) -> None:
-        """🚀 Inisialisasi config cell dengan config dan parent ID opsional.
+        """🚀 Inisialisasi config cell dengan parent components.
         
         Args:
-            config: Dictionary konfigurasi opsional
-            parent_id: ID parent component (untuk nested components)
-            component_id: ID unik untuk komponen ini
-            logger_bridge: Logger bridge untuk UI logging (internal use)
-            title: Judul untuk parent component
-            children: List konfigurasi child component
-            **kwargs: Argumen tambahan untuk ekstensibilitas
+            config: Dictionary konfigurasi untuk handler dan UI
+            parent_id: ID parent component untuk relasi hierarkis
+            component_id: Identifier unik untuk komponen ini (default: class name)
+            title: Judul untuk header (default: component_id)
+            description: Deskripsi untuk header (default: auto-generated)
+            icon: Icon emoji untuk header (default: ⚙️)
+            **kwargs: Parameter tambahan untuk extensibility
+            
+        Note:
+            Constructor ini HANYA setup state awal. Actual UI creation
+            terjadi di initialize() method untuk mendukung lazy loading.
         """
-        # Core state
         self.config = config or {}
         self.parent_id = parent_id
-        self.component_id = component_id or self.__class__.__name__.replace('Initializer', '').lower()
-        self.title = title or f"⚙️ {self.component_id.replace('_', ' ').title()}"
+        self.component_id = component_id or self.__class__.__name__
+        self.title = title or self.component_id.replace('_', ' ').title()
+        self.description = description or f"Configuration for {self.title}"
+        self.icon = icon or "⚙️"
         
-        # Children configuration
-        self._children_config = children or []
-        self._children: List[Any] = []
+        # Component dictionaries
+        self.ui_components: Dict[str, Any] = {}      # Semua UI components
+        self.parent_components: Dict[str, Any] = {}  # Parent components saja
+        self.child_components: Dict[str, Any] = {}   # Child components saja
         
-        # UI Components placeholder
-        self.ui_components: Dict[str, Any] = {}
-        self.parent_component: Optional[ParentComponentManager] = None
-        
-        # Handler akan diinisialisasi nanti
+        # Handler dan state
         self._handler: Optional[T] = None
-        
-        # Logging infrastructure
-        self._logger_bridge = logger_bridge
-        self._logger = logger  # Default logger, akan diupdate di _setup_logging
-        
-        # Initialization state tracking
         self._is_initialized = False
+        self._logger = logger.getChild(self.component_id)
         
-        # Store additional kwargs untuk extensibility
-        self._kwargs = kwargs
+        # Setup parent component manager
+        self.parent_component = ParentComponentManager(
+            parent_id=self.component_id,
+            title=self.title
+        )
+        
+        # Initialize logger bridge dengan container kosong dulu
+        self._logger_bridge = UILoggerBridge(
+            ui_components={'parent': self.parent_component},
+            logger_name=f"{self.component_id}_bridge"
+        )
+        
+    @property
+    def handler(self) -> T:
+        """🔧 Get configuration handler dengan lazy initialization.
+        
+        Returns:
+            Configuration handler instance
+            
+        Note:
+            Handler dibuat on-demand saat pertama kali diakses.
+            Ini memungkinkan child class setup state sebelum handler creation.
+        """
+        if self._handler is None:
+            self._handler = self.create_handler()
+            # Inject logger bridge ke handler jika support
+            if hasattr(self._handler, 'set_logger_bridge'):
+                self._handler.set_logger_bridge(self._logger_bridge)
+        return self._handler
     
     @abstractmethod
     def create_handler(self) -> T:
-        """🔧 Membuat dan mengembalikan instance configuration handler.
+        """🏭 Create configuration handler instance.
         
-        Subclass harus mengimplementasikan ini untuk menyediakan handler spesifik mereka.
+        MUST BE IMPLEMENTED BY CHILD CLASS.
         
         Returns:
-            Instance dari configuration handler
+            Instance dari ConfigCellHandler subclass yang sesuai
+            
+        Example:
+            ```python
+            def create_handler(self):
+                return MySpecificConfigHandler(self.config)
+            ```
+            
+        Note:
+            - Method ini dipanggil lazy saat handler pertama kali diakses
+            - Handler HARUS extend ConfigCellHandler
+            - Logger bridge akan di-inject otomatis setelah creation
         """
         pass
-    
-    @abstractmethod
-    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """🎨 Membuat dan mengembalikan dictionary komponen UI.
         
-        Subclass harus mengimplementasikan ini untuk menyediakan UI components spesifik.
-        Handler instance dapat diakses melalui self._handler.
+    @abstractmethod
+    def create_child_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """🎨 Create child-specific UI components.
+        
+        MUST BE IMPLEMENTED BY CHILD CLASS.
+        
+        IMPORTANT:
+        =========
+        Method ini HANYA membuat form/UI components spesifik untuk functionality
+        child class. JANGAN membuat header, status panel, log accordion, atau
+        info accordion karena sudah dibuat oleh parent class.
         
         Args:
-            config: Dictionary konfigurasi
+            config: Current configuration values untuk initialize UI
             
         Returns:
-            Dictionary berisi komponen UI (widgets)
+            Dictionary berisi HANYA child UI components, contoh:
+            {
+                'input_field': widgets.Text(...),
+                'slider': widgets.FloatSlider(...),
+                'checkbox': widgets.Checkbox(...),
+                'container': widgets.VBox([...])  # Optional container
+            }
+            
+        Best Practices:
+            1. Gunakan config untuk set initial values
+            2. Beri nama descriptive untuk setiap component
+            3. Group related components dalam container
+            4. JANGAN membuat parent components (header, status, etc)
+            
+        Example:
+            ```python
+            def create_child_components(self, config):
+                return {
+                    'name_input': widgets.Text(
+                        value=config.get('name', ''),
+                        placeholder='Enter name'
+                    ),
+                    'save_button': widgets.Button(
+                        description='Save',
+                        button_style='success'
+                    )
+                }
+            ```
         """
         pass
-    
-    def initialize(self) -> widgets.Widget:
-        """🚀 Entry point utama untuk inisialisasi komponen UI.
         
-        Menjalankan full initialization flow dan mengembalikan root container widget.
-        Method ini mengorkestrasi semua langkah inisialisasi dengan error handling.
+    def get_info_content(self) -> Optional[widgets.Widget]:
+        """📚 Get content untuk info accordion.
+        
+        OPTIONAL - Override untuk custom info content.
         
         Returns:
-            Root container widget yang siap ditampilkan
+            Widget untuk info content atau None untuk default
+            
+        Example:
+            ```python
+            def get_info_content(self):
+                return widgets.HTML('''
+                    <h4>How to use this configuration</h4>
+                    <ul>
+                        <li>Step 1: Enter values</li>
+                        <li>Step 2: Click save</li>
+                    </ul>
+                ''')
+            ```
+            
+        Note:
+            Jika return None, info accordion akan use generic content.
+            Best practice: Provide helpful documentation untuk users.
+        """
+        return None
+        
+    def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """🎨 Template method yang orchestrate UI creation.
+        
+        INTERNAL METHOD - JANGAN OVERRIDE DI CHILD CLASS!
+        
+        Method ini mengimplementasikan template untuk UI creation:
+        1. Membuat parent components (header, status, log, info)
+        2. Memanggil create_child_components() untuk child-specific UI
+        3. Menyusun semua components dalam struktur yang konsisten
+        4. Setup logger bridge dengan semua components
+        
+        Args:
+            config: Configuration dictionary
+            
+        Returns:
+            Complete UI components dictionary dengan struktur:
+            {
+                # Parent components (dibuat oleh method ini)
+                'header': Header widget,
+                'status_panel': Status panel widget,
+                'log_accordion': Log accordion widget,
+                'info_accordion': Info accordion widget,
+                
+                # Child components (dari create_child_components)
+                'child_container': Container untuk child components,
+                ...child specific components...
+                
+                # Infrastructure
+                'logger_bridge': UILoggerBridge instance,
+                'container': Root container dengan semua components
+            }
             
         Raises:
-            Exception: Jika inisialisasi gagal (error akan di-handle dan ditampilkan)
+            Exception: Jika child component creation gagal
         """
         try:
-            # Prevent double initialization
-            if self._is_initialized:
-                self._logger.warning(f"⚠️ {self.component_id} sudah diinisialisasi, skip re-initialization")
-                return self.get_container()
+            # === 1. CREATE PARENT COMPONENTS ===
+            self._logger.debug("Creating parent components...")
             
-            # Step 1: Buat parent component PERTAMA
-            self.parent_component = ParentComponentManager(
-                parent_id=self.component_id,
-                title=self.title
+            # Header
+            header = create_header(
+                title=self.title,
+                description=self.description,
+                icon=self.icon
             )
             
-            # Step 2: Setup logging infrastructure
-            self._setup_logging()
+            # Status panel
+            status_panel = create_status_panel(
+                message=f"✅ {self.title} ready",
+                status_type="info"
+            )
             
-            # Step 3: Inisialisasi handler
-            self._handler = self.create_handler()
-            self._logger.debug(f"✅ Handler {type(self._handler).__name__} berhasil dibuat")
+            # Log accordion
+            log_accordion = create_log_accordion(
+                module_name=self.component_id.lower(),
+                height='200px'
+            )
             
-            # Step 4: Buat dan setup UI components
-            self._initialize_ui()
+            # Info accordion
+            info_content = self.get_info_content()
+            if info_content is None:
+                # Default info content
+                info_content = widgets.HTML(f"""
+                    <div style='padding: 10px;'>
+                        <p>{self.description}</p>
+                        <p style='color: #666; font-size: 0.9em;'>
+                            Component ID: {self.component_id}<br>
+                            Parent ID: {self.parent_id or 'None'}
+                        </p>
+                    </div>
+                """)
             
-            # Step 5: Inisialisasi children jika ada
-            self._initialize_children()
+            info_accordion = create_info_accordion(
+                content=info_content,
+                title=f"ℹ️ About {self.title}"
+            )
             
-            # Step 6: Registrasi komponen
+            # Store parent components
+            self.parent_components = {
+                'header': header,
+                'status_panel': status_panel,
+                'log_accordion': log_accordion,
+                'info_accordion': info_accordion
+            }
+            
+            # === 2. CREATE CHILD COMPONENTS ===
+            self._logger.debug("Creating child components...")
+            self.child_components = self.create_child_components(config)
+            
+            # === 3. UPDATE LOGGER BRIDGE ===
+            # Update logger bridge dengan semua components
+            all_components = {
+                **self.parent_components,
+                **self.child_components,
+                'parent': self.parent_component
+            }
+            self._logger_bridge.update_ui_components(all_components)
+            
+            # === 4. ASSEMBLE FINAL STRUCTURE ===
+            self._logger.debug("Assembling UI structure...")
+            
+            # Get child container atau create default
+            child_container = self.child_components.get('container')
+            if child_container is None:
+                # Auto-create container dari individual widgets
+                child_widgets = [
+                    widget for key, widget in self.child_components.items()
+                    if isinstance(widget, widgets.Widget) and key != 'container'
+                ]
+                if child_widgets:
+                    child_container = widgets.VBox(
+                        children=child_widgets,
+                        layout=widgets.Layout(
+                            width='100%',
+                            padding='10px',
+                            gap='10px'
+                        )
+                    )
+                else:
+                    child_container = widgets.HTML(
+                        "<p style='padding: 20px; color: #666;'>No child components defined</p>"
+                    )
+            
+            # Create main container dengan struktur konsisten
+            main_container = widgets.VBox([
+                header,
+                status_panel,
+                child_container,
+                log_accordion,
+                info_accordion
+            ], layout=widgets.Layout(
+                width='100%',
+                padding='15px',
+                gap='10px',
+                border='1px solid #ddd',
+                border_radius='8px'
+            ))
+            
+            # === 5. COMBINE ALL COMPONENTS ===
+            self.ui_components = {
+                **self.parent_components,
+                **self.child_components,
+                'child_container': child_container,
+                'container': main_container,
+                'logger_bridge': self._logger_bridge
+            }
+            
+            self._logger.debug("✅ UI components created successfully")
+            return self.ui_components
+            
+        except Exception as e:
+            self._logger.error(f"❌ Failed to create UI components: {str(e)}", exc_info=True)
+            raise
+            
+    def setup_handlers(self) -> None:
+        """⚡ Setup event handlers untuk UI components.
+        
+        OVERRIDE CAREFULLY - ALWAYS CALL super().setup_handlers() FIRST!
+        
+        Base implementation:
+        1. Setup basic handlers untuk parent components
+        2. Connect logger bridge
+        3. Setup error handling
+        
+        Child class bisa override untuk add custom handlers:
+        ```python
+        def setup_handlers(self):
+            super().setup_handlers()  # WAJIB!
+            # Add custom handlers here
+            self.ui_components['my_button'].on_click(self._on_button_click)
+        ```
+        
+        Note:
+            - SELALU call super().setup_handlers() di awal override
+            - Akses components via self.ui_components dictionary
+            - Use self._logger_bridge untuk logging
+        """
+        self._logger.debug("Setting up base event handlers...")
+        
+        # Setup save/reset handlers jika ada
+        if 'save_button' in self.ui_components:
+            self.ui_components['save_button'].on_click(
+                lambda b: self._on_save_click()
+            )
+            
+        if 'reset_button' in self.ui_components:
+            self.ui_components['reset_button'].on_click(
+                lambda b: self._on_reset_click()
+            )
+            
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> widgets.Widget:
+        """🚀 Initialize UI dan return root container.
+        
+        PUBLIC METHOD - Called untuk create dan display UI.
+        
+        Process:
+        1. Setup output suppression
+        2. Create UI components (parent + child)
+        3. Setup event handlers
+        4. Register di component registry
+        5. Return root container
+        
+        Args:
+            config: Optional config override (default: use self.config)
+            
+        Returns:
+            Root container widget ready untuk display
+            
+        Raises:
+            Exception: Jika initialization gagal
+            
+        Usage:
+            ```python
+            initializer = MyConfigInitializer(config)
+            container = initializer.initialize()
+            display(container)
+            ```
+        """
+        if self._is_initialized:
+            self._logger.warning("Already initialized, returning existing container")
+            return self.get_container()
+            
+        try:
+            self._logger.info(f"🚀 Initializing {self.component_id}...")
+            
+            # Use provided config or default
+            if config is not None:
+                self.config = config
+                
+            # Setup output suppression
+            self._setup_output_suppression()
+            
+            # Create all UI components
+            self._create_ui_components()
+            
+            # Setup event handlers
+            self.setup_handlers()
+            
+            # Register component
             self._register_component()
             
-            # Step 7: Restore output settings
-            self._restore_output_settings()
-            
-            # Mark sebagai initialized
+            # Mark as initialized
             self._is_initialized = True
             
-            self._logger.info(f"✅ {self.__class__.__name__} berhasil diinisialisasi")
+            # Restore output
+            self._restore_output()
+            
+            self._logger.info(f"✅ {self.component_id} initialized successfully")
             
             return self.get_container()
             
         except Exception as e:
-            self._logger.error(f"❌ Gagal menginisialisasi {self.__class__.__name__}: {str(e)}")
+            self._logger.error(f"❌ Initialization failed: {str(e)}", exc_info=True)
+            self._restore_output()
             
-            # Create error widget dengan context
-            error_widget = create_error_response(
-                error_message=f"Initialization failed: {str(e)}",
+            # Return error container
+            return create_error_response(
+                error_message=str(e),
                 error=e,
-                title=f"🚨 Error in {self.title}",
-                include_traceback=True
+                title=f"Failed to initialize {self.title}"
             )
             
-            # Ensure we have a container
-            if not self.parent_component:
-                self.parent_component = ParentComponentManager(
-                    parent_id=f"{self.component_id}_error",
-                    title=f"❌ {self.title} (Error)"
-                )
-            
-            # Set error widget as content
-            self.parent_component.content_area.children = (error_widget,)
-            
-            return self.parent_component.container
-    
-    def _initialize_ui(self) -> None:
-        """🎨 Inisialisasi komponen UI dan tambahkan ke parent component."""
-        # Buat komponen UI utama
+    def _create_ui_components(self) -> None:
+        """🎨 Internal method untuk create UI components.
+        
+        INTERNAL - Jangan call langsung atau override!
+        """
+        # Create components via template method
         self.ui_components = self.create_ui_components(self.config)
         
-        # Tambahkan komponen utama ke parent component
+        # Update parent component dengan UI
         if 'container' in self.ui_components:
-            # Jika komponen menyediakan container sendiri, gunakan sebagai main content
-            self.parent_component.content_area.children = (self.ui_components['container'],)
-        else:
-            # Otherwise, tambahkan semua komponen ke content area
-            widgets_to_add = [
-                widget for key, widget in self.ui_components.items()
-                if isinstance(widget, widgets.Widget)
-            ]
-            if widgets_to_add:
-                self.parent_component.content_area.children = tuple(widgets_to_add)
-            else:
-                # Jika tidak ada widget, buat placeholder
-                placeholder = widgets.HTML("<div style='padding: 20px; text-align: center; color: #666;'>📦 Komponen UI sedang dimuat...</div>")
-                self.parent_component.content_area.children = (placeholder,)
-    
-    def _initialize_children(self) -> None:
-        """👶 Inisialisasi child components jika ada yang dikonfigurasi."""
-        if not self._children_config:
-            return
-            
-        for child_config in self._children_config:
-            try:
-                # Buat child component menggunakan factory function
-                child = create_parent_component(
-                    parent_id=f"{self.component_id}.{child_config['id']}",
-                    **{k: v for k, v in child_config.items() if k != 'id'}
-                )
-                self._children.append(child)
-                
-                # Tambahkan child ke parent component
-                self.parent_component.add_child_component(
-                    child_id=child_config['id'],
-                    component=child,
-                    config=child_config.get('config', {})
-                )
-                
-            except Exception as e:
-                self._logger.error(
-                    f"❌ Gagal menginisialisasi child component {child_config.get('id')}: {str(e)}"
-                )
-    
-    def _register_component(self) -> None:
-        """📋 Register komponen ini dengan component registry dan setup parent-child relationships."""
-        # Generate full component ID dengan parent prefix jika parent exists
-        full_component_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
-        
-        # Siapkan component data dengan container dan content area
-        component_data = {
-            **getattr(self, 'ui_components', {}),
-            'container': self.parent_component.container,
-            'content_area': self.parent_component.content_area,
-            'initializer': self  # Referensi ke initializer untuk akses programmatic
-        }
-        
-        # Register komponen utama
-        component_registry.register_component(
-            component_id=full_component_id,
-            component=component_data,
-            parent_id=self.parent_id
-        )
-        
-        self._logger.debug(f"📋 Component {full_component_id} berhasil didaftarkan")
-    
-    def get_container(self) -> widgets.Widget:
-        """📦 Dapatkan root container widget.
-        
-        Returns:
-            Root container widget dari parent component
-        """
-        # Ensure parent component exists
-        if not self.parent_component:
-            raise RuntimeError(f"❌ Parent component belum diinisialisasi untuk {self.component_id}")
-        
-        # Register komponen jika belum
-        if not self._is_initialized:
-            self._register_component()
-            
-        return self.parent_component.container
-
-    def cleanup(self) -> None:
-        """🧹 Release semua resource dan unregister komponen."""
-        try:
-            # Unregister from component registry
-            full_component_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
-            component_registry.unregister_component(full_component_id)
-            
-            # Cleanup children
-            for child in self._children:
-                if hasattr(child, 'cleanup'):
-                    child.cleanup()
-            
-            # Reset state
-            self._is_initialized = False
-            self._handler = None
-            self.ui_components.clear()
-            
-            self._logger.debug(f"🧹 {self.__class__.__name__} cleaned up successfully")
-            
-        except Exception as e:
-            self._logger.error(f"❌ Error during cleanup: {str(e)}")
-    
-    def _restore_output_settings(self) -> None:
-        """📺 Restore stdout/stderr settings setelah UI initialization.
-        
-        UI components mungkin suppress output selama initialization,
-        method ini memastikan output normal dikembalikan.
-        """
-        # Restore stdout/stderr jika disuppress
-        if hasattr(self, 'ui_components') and self.ui_components:
-            restore_stdout()
-            
-        # Pastikan tqdm bisa menampilkan progress bars
-        allow_tqdm_display()
-        
-        self._logger.debug("✅ Output settings restored")
-
-    def _setup_logging(self) -> None:
-        """📝 Inisialisasi infrastructure logging dan redirect semua log ke parent's log accordion."""
-        try:
-            # Inisialisasi logger bridge dengan parent's UI components jika available
-            parent_components = {}
-            if self.parent_id:
-                parent = component_registry.get_component(self.parent_id)
-                if parent and hasattr(parent, 'get'):
-                    parent_components = parent
-            
-            # Gunakan parent's UI components jika available, otherwise gunakan milik kita
-            ui_components = parent_components.get('ui_components', {}) or self.ui_components
-            
-            # Inisialisasi logger bridge
-            self._logger_bridge = UILoggerBridge(
-                ui_components=ui_components,
-                logger_name=f"smartcash.ui.{self.component_id}"
+            self.parent_component.content_area.children = (
+                self.ui_components['container'],
             )
             
-            # Setup logger
-            self._logger = self._logger_bridge.logger
-            
-            # Mark UI sebagai ready untuk flush buffered logs
-            if hasattr(self._logger_bridge, 'set_ui_ready'):
-                self._logger_bridge.set_ui_ready(True)
-                
-            self._logger.debug(f"✅ Logging initialized untuk {self.component_id}")
-            
-        except Exception as e:
-            # Fallback ke basic logging jika UI logging setup gagal
-            import logging
-            self._logger = logging.getLogger(f"smartcash.ui.{self.component_id}")
-            self._logger.warning(f"⚠️ Failed to initialize UI logging: {str(e)}")
-    
-    def _setup_component_registry(self) -> None:
-        """📋 Register komponen ini di component registry."""
-        # Buat component ID menggunakan module hierarchy (e.g., 'dataset.split')
-        self._component_id = (
-            f"{self.parent_id}.{self.component_id}" 
-            if self.parent_id 
-            else self.component_id
-        )
+    def _setup_output_suppression(self) -> None:
+        """⚡ Setup output suppression untuk clean UI.
         
-        # Register di component registry dengan handler
+        INTERNAL - Suppress noisy library outputs.
+        """
+        setup_aggressive_log_suppression()
+        if self.ui_components:
+            setup_stdout_suppression()
+        self._logger.debug("Output suppression enabled")
+        
+    def _restore_output(self) -> None:
+        """🔄 Restore output settings.
+        
+        INTERNAL - Restore normal output behavior.
+        """
+        restore_stdout()
+        allow_tqdm_display()
+        self._logger.debug("Output restored")
+        
+    def _register_component(self) -> None:
+        """📋 Register component di registry.
+        
+        INTERNAL - Setup component tracking.
+        """
+        full_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
+        
         component_registry.register_component(
-            component_id=self._component_id,
+            component_id=full_id,
             component={
-                'handler': self._handler,
-                'initializer': self,
-                'config': self.config,
-                'ui_components': getattr(self, 'ui_components', {})
+                **self.ui_components,
+                'initializer': self
             },
             parent_id=self.parent_id
         )
         
-        self._logger.debug(f"📋 Component {self._component_id} registered in registry")
-    
-    def get_handler(self) -> Optional[T]:
-        """🔧 Dapatkan instance configuration handler.
+        self._logger.debug(f"Registered component: {full_id}")
+        
+    def get_container(self) -> widgets.Widget:
+        """📦 Get root container widget.
         
         Returns:
-            Configuration handler instance atau None jika belum diinisialisasi
+            Root container widget
+            
+        Note:
+            Safe to call multiple times, akan return same container.
         """
-        return self._handler
-    
-    def update_config(self, new_config: Dict[str, Any]) -> None:
-        """🔄 Update konfigurasi dan refresh UI.
+        if not self._is_initialized:
+            raise RuntimeError(f"{self.component_id} not initialized. Call initialize() first.")
+        return self.ui_components.get('container', self.parent_component.container)
+        
+    def update_status(self, message: str, status_type: str = "info") -> None:
+        """📊 Update status panel dengan message.
+        
+        PUBLIC METHOD - Gunakan untuk update status dari handlers.
         
         Args:
-            new_config: Dictionary konfigurasi baru
+            message: Status message untuk display
+            status_type: Type ('success', 'info', 'warning', 'error')
+            
+        Example:
+            ```python
+            self.update_status("Processing...", "info")
+            self.update_status("✅ Complete!", "success")
+            self.update_status("❌ Failed", "error")
+            ```
+        """
+        if 'status_panel' in self.ui_components:
+            from smartcash.ui.components import update_status_panel
+            update_status_panel(
+                self.ui_components['status_panel'],
+                message,
+                status_type
+            )
+            
+    def _on_save_click(self) -> None:
+        """💾 Default save button handler.
+        
+        INTERNAL - Override setup_handlers() untuk custom behavior.
         """
         try:
-            # Update config
-            self.config.update(new_config)
+            self.update_status("💾 Saving configuration...", "info")
+            success = self.handler.save_config(self.ui_components)
+            if success:
+                self.update_status("✅ Configuration saved", "success")
+            else:
+                self.update_status("❌ Save failed", "error")
+        except Exception as e:
+            self.update_status(f"❌ Error: {str(e)}", "error")
+            self._logger.error(f"Save failed: {str(e)}", exc_info=True)
             
-            # Update handler config jika ada
-            if self._handler and hasattr(self._handler, 'update_config'):
-                self._handler.update_config(new_config)
+    def _on_reset_click(self) -> None:
+        """🔄 Default reset button handler.
+        
+        INTERNAL - Override setup_handlers() untuk custom behavior.
+        """
+        try:
+            self.update_status("🔄 Resetting to defaults...", "info")
+            self.handler.reset_ui(self.ui_components)
+            self.update_status("✅ Reset to defaults", "success")
+        except Exception as e:
+            self.update_status(f"❌ Error: {str(e)}", "error")
+            self._logger.error(f"Reset failed: {str(e)}", exc_info=True)
             
-            # Re-initialize UI dengan config baru
-            if self._is_initialized:
-                self._initialize_ui()
-                self._logger.info(f"✅ Config updated dan UI refreshed untuk {self.component_id}")
+    def cleanup(self) -> None:
+        """🧹 Cleanup resources dan unregister component.
+        
+        PUBLIC METHOD - Call saat component tidak digunakan lagi.
+        
+        Cleanup process:
+        1. Unregister dari component registry
+        2. Clear semua component dictionaries
+        3. Reset state
+        
+        Note:
+            Ini TIDAK menghapus widgets dari display.
+            Hanya cleanup internal state dan references.
+        """
+        try:
+            full_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
+            component_registry.unregister_component(full_id)
+            
+            self.ui_components.clear()
+            self.parent_components.clear()
+            self.child_components.clear()
+            
+            self._is_initialized = False
+            self._handler = None
+            
+            self._logger.debug(f"✅ Cleanup completed for {self.component_id}")
             
         except Exception as e:
-            self._logger.error(f"❌ Gagal update config: {str(e)}")
-            raise
-    
-    def __repr__(self) -> str:
-        """String representasi untuk debugging."""
-        return (
-            f"{self.__class__.__name__}("
-            f"component_id='{self.component_id}', "
-            f"parent_id='{self.parent_id}', "
-            f"initialized={self._is_initialized})"
-        )
+            self._logger.error(f"❌ Cleanup error: {str(e)}", exc_info=True)

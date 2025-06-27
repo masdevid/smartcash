@@ -1,11 +1,53 @@
 
-# =============================================================================
-# File: smartcash/ui/setup/dependency/handlers/event_handlers.py - FIXED
-# Deskripsi: Event handlers dengan import yang benar
-# =============================================================================
+"""
+Event handlers for dependency management UI.
+
+This module contains functions to set up and manage event handlers for the dependency management UI.
+"""
 
 from typing import Dict, Any, Optional
 from smartcash.ui.handlers.config_handlers import ConfigHandler
+
+
+def setup_event_handlers(ui_components: Dict[str, Any]) -> None:
+    """Setup event handlers for UI components.
+    
+    Args:
+        ui_components: Dictionary containing all UI components
+    """
+    if not ui_components:
+        return
+    
+    # Setup logger bridge if available
+    logger_bridge = ui_components.get('logger_bridge')
+    
+    # Setup operation handlers
+    from .operation_handlers import setup_operation_handlers
+    
+    try:
+        # Setup operation handlers
+        operation_handlers = setup_operation_handlers(ui_components, {})
+        
+        # Store reference to handlers if needed
+        ui_components['_operation_handlers'] = operation_handlers
+        
+        if logger_bridge:
+            logger_bridge.info("✅ Operation handlers berhasil disetup")
+    except Exception as e:
+        if logger_bridge:
+            logger_bridge.error(f"❌ Gagal setup operation handlers: {str(e)}")
+    
+    # Setup logger bridge for components that need it
+    if logger_bridge:
+        if 'log_accordion' in ui_components and ui_components['log_accordion']:
+            ui_components['log_accordion'].logger_bridge = logger_bridge
+        
+        if 'progress_tracker' in ui_components and ui_components['progress_tracker']:
+            ui_components['progress_tracker'].logger_bridge = logger_bridge
+    
+    # Initialize save status
+    if 'update_save_status' in ui_components and callable(ui_components['update_save_status']):
+        ui_components['update_save_status']()
 
 
 def setup_all_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], 

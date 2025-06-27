@@ -24,5 +24,3 @@ __all__ = [
     'DependencyInitializer',
     'initialize_dependency_ui'
 ]
-
-__all__ = ['DependencyInitializer']

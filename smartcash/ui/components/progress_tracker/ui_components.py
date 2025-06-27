@@ -69,7 +69,7 @@ class UIComponentsManager:
             [self.header_widget, self.status_widget] + progress_widgets,
             layout=widgets.Layout(
                 display='none', width='100%', margin='10px 0', padding='15px',
-                border='1px solid #28a745', border_radius='8px', 
+                border='1px solid #e0e0e0', border_radius='8px', 
                 background_color='#f8fff8', min_height=self.config.get_container_height(),
                 max_height='400px', overflow='hidden', box_sizing='border-box'
             )

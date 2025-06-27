@@ -205,18 +205,24 @@ def show_confirmation_dialog(
                 on_confirm()
             return
             
+        # First, make sure the dialog area is visible and has proper layout
+        if hasattr(dialog_area, 'layout'):
+            dialog_area.layout.visibility = 'visible'
+            dialog_area.layout.display = 'flex'
+            dialog_area.layout.height = 'auto'
+            dialog_area.layout.margin = '10px 0'
+            dialog_area.layout.padding = '10px'
+            dialog_area.layout.overflow = 'visible'
+            dialog_area.layout.border = '1px solid #e0e0e0'
+            dialog_area.layout.border_radius = '5px'
+            dialog_area.layout.background = 'rgba(255, 255, 255, 0.95)'
+        
         # Clear any existing content
         with dialog_area:
             clear_output(wait=True)
             
-        # Make sure the dialog area is visible
-        dialog_area.layout.visibility = 'visible'
-        dialog_area.layout.display = 'flex'
-        dialog_area.layout.height = 'auto'
-        dialog_area.layout.margin = '10px 0'
-        dialog_area.layout.overflow = 'visible'
-        
         # Force show the confirmation area in the UI
+        from smartcash.ui.dataset.preprocessing.utils.ui_utils import show_confirmation_area
         show_confirmation_area(ui_components)
         
         # Buat callback untuk tombol dengan error handling
@@ -464,18 +470,34 @@ def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
     dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
     if not dialog_area:
         return
-        
-    # Clear the content
-    with dialog_area:
-        clear_output(wait=True)
     
-    # Reset the layout
-    if hasattr(dialog_area, 'layout'):
-        dialog_area.layout.visibility = 'hidden'
-        dialog_area.layout.display = 'none'
-        dialog_area.layout.height = '0px'
-        dialog_area.layout.margin = '0'
-        dialog_area.layout.overflow = 'hidden'
+    try:
+        # Clear the content first
+        with dialog_area:
+            clear_output(wait=True)
+        
+        # Reset the layout properties
+        if hasattr(dialog_area, 'layout'):
+            dialog_area.layout.visibility = 'hidden'
+            dialog_area.layout.display = 'none'
+            dialog_area.layout.height = '0px'
+            dialog_area.layout.width = 'auto'
+            dialog_area.layout.margin = '0'
+            dialog_area.layout.padding = '0'
+            dialog_area.layout.border = 'none'
+            dialog_area.layout.background = 'transparent'
+            
+            # Reset any flex properties
+            if hasattr(dialog_area.layout, 'flex_flow'):
+                dialog_area.layout.flex_flow = 'column'
+            if hasattr(dialog_area.layout, 'align_items'):
+                dialog_area.layout.align_items = 'stretch'
+                
+    except Exception as e:
+        # Log the error but don't crash
+        logger = ui_components.get('logger_bridge')
+        if logger:
+            logger.debug(f"Error clearing dialog area: {str(e)}")
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
     """Periksa apakah dialog sedang terlihat"""

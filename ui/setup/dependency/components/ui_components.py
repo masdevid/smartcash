@@ -11,7 +11,7 @@ from smartcash.ui.components import (
     create_text_input, create_checkbox, create_card, create_confirmation_area,
     create_action_section
 )
-from smartcash.ui.utils.logger_bridge import LoggerBridge
+from smartcash.ui.utils.logger_bridge import UILoggerBridge
 
 def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create dependency management UI dengan logger_bridge pattern"""

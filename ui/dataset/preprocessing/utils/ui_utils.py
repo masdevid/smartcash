@@ -174,7 +174,7 @@ def complete_operation_flow(ui_components: Dict[str, Any], operation_name: str,
         error_progress(ui_components, f"{icon} {message}")
     
     # 2. Update status panel dengan force refresh
-    update_status_panel_enhanced(ui_components, f"{icon} {message}", status_type, force_update=True)
+    update_status_panel_enhanced(ui_components, f"{message}", status_type, force_update=True)
     
     # 3. Enable buttons
     enable_buttons(ui_components)

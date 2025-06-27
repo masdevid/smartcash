@@ -1,137 +1,239 @@
 """
 File: smartcash/ui/dataset/split/handlers/event_handlers.py
-
-Event handlers for the dataset split configuration UI.
+Deskripsi: Event handlers untuk split UI dengan integrasi parent component
 """
 
-import logging
-from typing import Dict, Any, Callable
+from typing import Dict, Any, TYPE_CHECKING
 import ipywidgets as widgets
 
-from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
-from smartcash.ui.dataset.split.handlers.config_updater import update_split_ui, reset_ui_to_defaults
+if TYPE_CHECKING:
+    from smartcash.ui.dataset.split.split_init import SplitConfigInitializer
 
-logger = logging.getLogger(__name__)
-
-
-def setup_event_handlers(initializer, ui_components: Dict[str, Any]) -> None:
-    """Set up event handlers for the UI components.
+def setup_event_handlers(initializer: 'SplitConfigInitializer', ui_components: Dict[str, Any]) -> None:
+    """Setup event handlers untuk split UI dengan logger bridge integration.
     
     Args:
-        initializer: The SplitConfigInitializer instance
-        ui_components: Dictionary of UI components
+        initializer: Instance SplitConfigInitializer dengan akses ke parent component
+        ui_components: Dictionary berisi komponen UI
     """
-    # Connect slider changes to update the total
-    for slider in ['train_slider', 'valid_slider', 'test_slider']:
-        if slider in ui_components:
-            ui_components[slider].observe(
-                lambda change, ui=ui_components: on_slider_change(initializer, ui),
-                names='value'
-            )
+    # Get logger bridge dari initializer
+    logger_bridge = initializer._logger_bridge
     
-    # Connect save button
+    # Get handler
+    handler = initializer.handler
+    
+    # Setup save/reset button handlers
+    _setup_save_reset_handlers(handler, ui_components, logger_bridge)
+    
+    # Setup slider handlers
+    _setup_slider_handlers(ui_components, logger_bridge)
+    
+    # Setup checkbox handlers
+    _setup_checkbox_handlers(ui_components, logger_bridge)
+    
+    logger_bridge.debug("✅ Event handlers berhasil di-setup")
+
+
+def _setup_save_reset_handlers(handler, ui_components: Dict[str, Any], logger_bridge) -> None:
+    """Setup handlers untuk save/reset buttons."""
+    
     save_reset = ui_components.get('save_reset_buttons', {})
-    if 'save_button' in save_reset:
-        save_reset['save_button'].on_click(
-            lambda b, ui=ui_components: on_save_clicked(initializer, ui)
-        )
+    save_btn = save_reset.get('save_button')
+    reset_btn = save_reset.get('reset_button')
     
-    # Connect reset button
-    if 'reset_button' in save_reset:
-        save_reset['reset_button'].on_click(
-            lambda b, ui=ui_components: on_reset_clicked(initializer, ui)
-        )
-
-
-def on_slider_change(initializer, ui_components: Dict[str, Any]) -> None:
-    """Handle slider value changes and update the total.
+    if save_btn:
+        def on_save_click(btn):
+            """Handle save button click dengan status updates."""
+            try:
+                # Update button state
+                save_btn.disabled = True
+                save_btn.description = "💾 Menyimpan..."
+                
+                # Update status panel via parent
+                _update_status_panel(ui_components, "💾 Menyimpan konfigurasi...", "info")
+                
+                # Save config
+                success = handler.save_config(ui_components)
+                
+                if success:
+                    logger_bridge.info("✅ Konfigurasi berhasil disimpan")
+                    _update_status_panel(ui_components, "✅ Konfigurasi berhasil disimpan", "success")
+                else:
+                    raise Exception("Gagal menyimpan konfigurasi")
+                    
+            except Exception as e:
+                error_msg = f"❌ Error: {str(e)}"
+                logger_bridge.error(error_msg)
+                _update_status_panel(ui_components, error_msg, "error")
+                
+            finally:
+                # Restore button state
+                save_btn.disabled = False
+                save_btn.description = "💾 Simpan"
+        
+        save_btn.on_click(on_save_click)
+        logger_bridge.debug("✅ Save button handler attached")
     
-    Args:
-        initializer: The SplitConfigInitializer instance
-        ui_components: Dictionary of UI components
-    """
-    try:
-        train = ui_components['train_slider'].value
-        valid = ui_components['valid_slider'].value
-        test = ui_components['test_slider'].value
+    if reset_btn:
+        def on_reset_click(btn):
+            """Handle reset button click dengan konfirmasi."""
+            try:
+                # Log action
+                logger_bridge.info("🔄 Reset konfigurasi ke default...")
+                
+                # Update status
+                _update_status_panel(ui_components, "🔄 Mereset konfigurasi...", "info")
+                
+                # Reset UI
+                handler.reset_ui(ui_components)
+                
+                # Update total label
+                _update_total_label(ui_components)
+                
+                logger_bridge.info("✅ Konfigurasi berhasil di-reset")
+                _update_status_panel(ui_components, "✅ Konfigurasi di-reset ke default", "success")
+                
+            except Exception as e:
+                error_msg = f"❌ Error reset: {str(e)}"
+                logger_bridge.error(error_msg)
+                _update_status_panel(ui_components, error_msg, "error")
         
-        # Validate the ratios using the handler
-        is_valid = initializer.handler.validate_split_ratios(train, valid, test)
-        
-        # Update the total label
-        if 'total_label' in ui_components:
-            color = "#28a745" if is_valid else "#dc3545"
-            total = train + valid + test
-            ui_components['total_label'].value = (
-                f"<div style='padding: 10px; color: {color}; font-weight: bold;'>"
-                f"Total: {total:.2f} {'✓' if is_valid else '✗'}</div>"
-            )
-            
-    except Exception as e:
-        logger.error(f"Error updating slider total: {e}")
+        reset_btn.on_click(on_reset_click)
+        logger_bridge.debug("✅ Reset button handler attached")
 
 
-def on_save_clicked(initializer, ui_components: Dict[str, Any]) -> None:
-    """Handle save button click.
+def _setup_slider_handlers(ui_components: Dict[str, Any], logger_bridge) -> None:
+    """Setup handlers untuk ratio sliders dengan real-time updates."""
     
-    Args:
-        initializer: The SplitConfigInitializer instance
-        ui_components: Dictionary of UI components
-    """
-    try:
-        # Validate the split ratios using the handler
-        train = ui_components['train_slider'].value
-        valid = ui_components['valid_slider'].value
-        test = ui_components['test_slider'].value
-        
-        if not initializer.handler.validate_split_ratios(train, valid, test):
-            initializer._update_status(ui_components, "Error: Split ratios must sum to 1.0", "danger")
+    train_slider = ui_components.get('train_slider')
+    valid_slider = ui_components.get('valid_slider')
+    test_slider = ui_components.get('test_slider')
+    
+    if not all([train_slider, valid_slider, test_slider]):
+        logger_bridge.warning("⚠️ Tidak semua slider ditemukan")
+        return
+    
+    def on_ratio_change(change):
+        """Handle perubahan ratio dengan normalisasi otomatis."""
+        if change['name'] != 'value':
             return
             
-        # Update the config
-        initializer.handler.update_config({
-            'data': {
-                'split_ratios': {
-                    'train': ui_components['train_slider'].value,
-                    'valid': ui_components['valid_slider'].value,
-                    'test': ui_components['test_slider'].value
-                },
-                'stratified_split': ui_components['stratified_checkbox'].value,
-                'random_seed': ui_components['random_seed'].value
-            },
-            'split_settings': {
-                'backup_before_split': ui_components['backup_checkbox'].value,
-                'dataset_path': ui_components['dataset_path'].value,
-                'preprocessed_path': ui_components['preprocessed_path'].value,
-                'backup_dir': ui_components['backup_dir'].value
-            }
-        })
-        
-        # Save the config
-        initializer.handler.save_config()
-        initializer._update_status(ui_components, "Configuration saved successfully!", "success")
-        
-    except Exception as e:
-        logger.error(f"Error saving configuration: {e}")
-        initializer._update_status(ui_components, f"Error saving configuration: {str(e)}", "danger")
+        try:
+            # Get current values
+            total = train_slider.value + valid_slider.value + test_slider.value
+            
+            if abs(total - 1.0) > 0.001:  # Tolerance untuk floating point
+                # Normalize ratios
+                if total > 0:
+                    train_slider.value = round(train_slider.value / total, 2)
+                    valid_slider.value = round(valid_slider.value / total, 2)
+                    test_slider.value = round(1.0 - train_slider.value - valid_slider.value, 2)
+                    
+                    logger_bridge.debug(f"📊 Ratios normalized - Train: {train_slider.value}, Valid: {valid_slider.value}, Test: {test_slider.value}")
+            
+            # Update total label
+            _update_total_label(ui_components)
+            
+        except Exception as e:
+            logger_bridge.error(f"❌ Error updating ratios: {str(e)}")
+    
+    # Attach handlers
+    train_slider.observe(on_ratio_change, names='value')
+    valid_slider.observe(on_ratio_change, names='value')
+    test_slider.observe(on_ratio_change, names='value')
+    
+    logger_bridge.debug("✅ Slider handlers attached")
 
 
-def on_reset_clicked(initializer, ui_components: Dict[str, Any]) -> None:
-    """Handle reset button click.
+def _setup_checkbox_handlers(ui_components: Dict[str, Any], logger_bridge) -> None:
+    """Setup handlers untuk checkboxes dengan dependent field management."""
+    
+    # Backup checkbox handler
+    backup_checkbox = ui_components.get('backup_checkbox')
+    backup_fields = ['backup_dir', 'backup_count', 'auto_backup']
+    
+    if backup_checkbox:
+        def on_backup_change(change):
+            enabled = change['new']
+            for field_name in backup_fields:
+                field = ui_components.get(field_name)
+                if field and hasattr(field, 'disabled'):
+                    field.disabled = not enabled
+            
+            status = "aktif" if enabled else "nonaktif"
+            logger_bridge.debug(f"💾 Backup {status}")
+            
+        backup_checkbox.observe(on_backup_change, names='value')
+        # Trigger initial state
+        on_backup_change({'new': backup_checkbox.value})
+    
+    # Validation checkbox handler
+    validation_checkbox = ui_components.get('validation_enabled')
+    validation_fields = ['fix_issues', 'move_invalid', 'invalid_dir', 'visualize_issues']
+    
+    if validation_checkbox:
+        def on_validation_change(change):
+            enabled = change['new']
+            for field_name in validation_fields:
+                field = ui_components.get(field_name)
+                if field and hasattr(field, 'disabled'):
+                    field.disabled = not enabled
+                    
+            status = "aktif" if enabled else "nonaktif"
+            logger_bridge.debug(f"✅ Validasi {status}")
+            
+        validation_checkbox.observe(on_validation_change, names='value')
+        # Trigger initial state
+        on_validation_change({'new': validation_checkbox.value})
+        
+    logger_bridge.debug("✅ Checkbox handlers attached")
+
+
+def _update_total_label(ui_components: Dict[str, Any]) -> None:
+    """Update total ratio label dengan visual feedback."""
+    
+    total_label = ui_components.get('total_label')
+    if not total_label:
+        return
+        
+    train = ui_components.get('train_slider', {}).value or 0
+    valid = ui_components.get('valid_slider', {}).value or 0  
+    test = ui_components.get('test_slider', {}).value or 0
+    
+    total = train + valid + test
+    
+    # Format dengan warna berdasarkan validitas
+    if abs(total - 1.0) < 0.001:
+        color = "green"
+        icon = "✅"
+    else:
+        color = "red"
+        icon = "❌"
+        
+    total_label.value = f'<span style="color: {color}; font-weight: bold;">{icon} Total: {total:.2f}</span>'
+
+
+def _update_status_panel(ui_components: Dict[str, Any], message: str, status_type: str) -> None:
+    """Update status panel melalui parent component.
     
     Args:
-        initializer: The SplitConfigInitializer instance
-        ui_components: Dictionary of UI components
+        ui_components: UI components dictionary
+        message: Status message
+        status_type: Type of status (success, error, info, warning)
     """
-    try:
-        # Reset to default values
-        reset_ui_to_defaults(ui_components)
-        
-        # Update the UI with the default values
-        update_split_ui(ui_components, initializer.handler.get_default_config())
-        
-        initializer._update_status(ui_components, "Reset to default values", "info")
-        
-    except Exception as e:
-        logger.error(f"Error resetting to defaults: {e}")
-        initializer._update_status(ui_components, f"Error resetting to defaults: {str(e)}", "danger")
+    # Try to find status panel
+    status_panel = ui_components.get('status_panel')
+    
+    # Try from parent if available
+    if not status_panel and 'parent' in ui_components:
+        parent = ui_components['parent']
+        if hasattr(parent, 'status_panel'):
+            status_panel = parent.status_panel
+            
+    if status_panel:
+        try:
+            from smartcash.ui.components import update_status_panel
+            update_status_panel(status_panel, message, status_type)
+        except Exception:
+            # Don't fail main operation if status update fails
+            pass

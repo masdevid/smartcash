@@ -152,9 +152,9 @@ def _create_package_checkbox(package: Dict[str, Any], selected_packages: List[st
     is_required = package.get('required', False)
     
     checkbox = create_checkbox(
-        f"pkg_{package.get('key', '')}", 
-        package.get('name', 'Unknown Package'), 
-        is_selected, 
+        name=f"pkg_{package.get('key', '')}",
+        value=is_selected,
+        description=package.get('name', 'Unknown Package'),
         disabled=is_required
     )
     

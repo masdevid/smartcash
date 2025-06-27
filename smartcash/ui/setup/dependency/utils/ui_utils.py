@@ -488,6 +488,78 @@ def create_text_input(
     )
 
 
+def create_package_checkbox(
+    package_name: str,
+    version: str = "",
+    is_installed: bool = False,
+    on_change: Optional[Callable[[str, bool], None]] = None,
+    **style
+) -> widgets.HBox:
+    """Create a styled package checkbox with version and status indicator.
+    
+    Args:
+        package_name: Name of the package
+        version: Package version (optional)
+        is_installed: Whether the package is installed
+        on_change: Callback when checkbox state changes
+        **style: Additional style parameters
+        
+    Returns:
+        widgets.HBox containing the package checkbox with version and status
+    """
+    # Create the main checkbox
+    checkbox = widgets.Checkbox(
+        value=is_installed,
+        indent=False,
+        layout=widgets.Layout(width='20px', margin='0 8px 0 0')
+    )
+    
+    # Create version label
+    version_text = f" ({version})" if version else ""
+    version_label = widgets.HTML(
+        f"<span style='color: #666; font-size: 0.9em;'>{version_text}</span>",
+        layout=widgets.Layout(margin='0 8px 0 0')
+    )
+    
+    # Create status indicator
+    status_emoji = "✅" if is_installed else "❌"
+    status_tooltip = "Terinstall" if is_installed else "Belum terinstall"
+    status = widgets.HTML(
+        f"<span title='{status_tooltip}'>{status_emoji}</span>",
+        layout=widgets.Layout(margin='0 8px 0 0', width='20px')
+    )
+    
+    # Package name label
+    name_label = widgets.HTML(
+        f"<span style='font-family: monospace;'>{package_name}</span>"
+    )
+    
+    # Create the container
+    container = widgets.HBox(
+        [checkbox, name_label, version_label, status],
+        layout=widgets.Layout(
+            margin='4px 0',
+            padding='4px 8px',
+            border_radius='4px',
+            border='1px solid #e0e0e0',
+            width='100%',
+            **style.get('container', {})
+        )
+    )
+    
+    # Add hover effect
+    container.add_class('package-checkbox-container')
+    
+    # Handle checkbox changes
+    def on_checkbox_change(change):
+        if on_change:
+            on_change(package_name, change['new'])
+    
+    checkbox.observe(on_checkbox_change, names='value')
+    
+    return container
+
+
 def create_dropdown(
     options: List[Union[str, Tuple[str, str]]],
     value: Optional[str] = None,

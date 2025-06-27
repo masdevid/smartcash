@@ -1,11 +1,11 @@
 """
 File: smartcash/ui/dataset/split/split_init.py
 
-This module implements the dataset split configuration UI by extending ConfigCellInitializer.
-It follows the template method pattern where the parent class handles common initialization,
-component registration, and error handling, while this class implements specific UI components
-and business logic for dataset splitting. All errors are handled through the parent's
-centralized error handling system for consistent user feedback.
+Modul ini mengimplementasikan UI konfigurasi split dataset dengan memperluas ConfigCellInitializer.
+Mengikuti pola template method dimana parent class menangani inisialisasi umum,
+registrasi komponen, dan error handling, sementara class ini mengimplementasikan
+komponen UI spesifik dan logika bisnis untuk dataset splitting.
+Semua error ditangani melalui sistem error handling terpusat dari parent class.
 """
 
 from typing import Dict, Any, Optional, List
@@ -27,28 +27,28 @@ logger = logging.getLogger(__name__)
 MODULE_NAME = "split_config"
 
 class SplitConfigInitializer(ConfigCellInitializer):
-    """Initialize the dataset split configuration UI components."""
+    """🎯 Inisialisasi komponen UI konfigurasi dataset split."""
     
     def __init__(
         self, 
         config: Optional[Dict[str, Any]] = None,
         parent_id: Optional[str] = None,
         component_id: str = MODULE_NAME,
-        title: str = "Dataset Split Configuration",
+        title: str = "📊 Dataset Split Configuration",
         children: Optional[List[Dict[str, Any]]] = None,
         **kwargs
     ):
-        """Initialize the split config initializer.
+        """Inisialisasi split config initializer.
         
         Args:
-            config: Optional configuration dictionary
-            parent_id: Optional parent component ID
-            component_id: Unique identifier for this component
-            title: Display title for the component
-            children: Optional list of child component configurations
-            **kwargs: Additional keyword arguments passed to parent class
+            config: Dictionary konfigurasi opsional
+            parent_id: ID parent component opsional
+            component_id: Identifier unik untuk komponen ini
+            title: Judul tampilan untuk komponen
+            children: List konfigurasi child component opsional
+            **kwargs: Argumen keyword tambahan untuk parent class
         """
-        # Initialize the parent class first
+        # Inisialisasi parent class terlebih dahulu
         super().__init__(
             config=config or {},
             parent_id=parent_id,
@@ -58,96 +58,134 @@ class SplitConfigInitializer(ConfigCellInitializer):
             **kwargs
         )
         
-        # Initialize the handler using the parent's _handler attribute
+        # Inisialisasi handler menggunakan atribut _handler dari parent
         self._handler = None
         
     def create_handler(self) -> SplitConfigHandler:
-        """Create and return a SplitConfigHandler instance."""
+        """🔧 Membuat dan mengembalikan instance SplitConfigHandler."""
         return SplitConfigHandler(self.config)
     
     def create_ui_components(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Create the UI components for the dataset split configuration.
+        """🎨 Membuat komponen UI untuk konfigurasi dataset split.
+        
+        Args:
+            config: Dictionary konfigurasi
         
         Returns:
-            Dictionary containing the UI components. The parent class will handle
-            adding these to the container.
+            Dictionary berisi komponen UI. Parent class akan menangani
+            penambahan komponen-komponen ini ke container.
         """
         try:
-            self._logger.debug("Creating UI components for dataset split configuration")
+            self._logger.debug("🚀 Membuat komponen UI untuk konfigurasi dataset split")
             
-            # Create form components
+            # Membuat komponen form
             ui_components = create_split_form(config or {})
             
-            # Create the main layout
+            # Membuat layout utama
             layout_components = create_split_layout(ui_components)
             ui_components.update(layout_components)
             
-            self._logger.debug("Successfully created UI components")
+            self._logger.debug("✅ Berhasil membuat komponen UI")
             return ui_components
             
         except Exception as e:
-            self._logger.error(f"Failed to create UI components: {str(e)}", exc_info=True)
-            # Return empty dict to let parent handle the error
+            self._logger.error(f"❌ Gagal membuat komponen UI: {str(e)}", exc_info=True)
+            # Kembalikan dict kosong untuk membiarkan parent menangani error
             return {}
     
     def setup_handlers(self) -> None:
-        """Set up event handlers for the UI components."""
+        """⚡ Setup event handler untuk komponen UI."""
         try:
-            # Call parent implementation first
+            # Panggil implementasi parent terlebih dahulu
             super().setup_handlers()
             
-            # Set up our custom event handlers
-            from .handlers.event_handlers import setup_event_handlers
+            # Setup custom event handler kita
+            from smartcash.ui.dataset.split.handlers.event_handlers import setup_event_handlers
             setup_event_handlers(self, self.ui_components)
             
-            self._logger.debug("Successfully set up event handlers for dataset split UI")
+            self._logger.debug("✅ Berhasil setup event handler untuk dataset split UI")
             
         except Exception as e:
-            self._logger.error(f"Failed to set up event handlers: {str(e)}", exc_info=True)
+            self._logger.error(f"❌ Gagal setup event handler: {str(e)}", exc_info=True)
             raise
 
-def create_split_config_cell(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """Create and display a standalone split configuration container.
+
+def create_split_config_cell(config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+    """🎯 Membuat dan menampilkan container konfigurasi split yang mandiri.
     
-    This function initializes the split configuration UI and displays it in the notebook.
-    The returned UI components dictionary includes all interactive elements and can be
-    used to programmatically interact with the UI.
+    Fungsi ini menginisialisasi UI konfigurasi split dan menampilkannya di notebook.
+    Fungsi ini tidak mengembalikan dictionary UI components, tetapi hanya menampilkan UI.
+    Untuk akses programmatik ke komponen UI, gunakan get_split_config_components().
     
     Args:
-        config: Optional configuration dictionary to override defaults.
-        **kwargs: Additional arguments to pass to the initializer.
-               
-    Returns:
-        Dictionary containing the UI components for programmatic access.
+        config: Dictionary konfigurasi opsional untuk override defaults.
+        **kwargs: Argumen tambahan untuk diteruskan ke initializer.
     """
     try:
-        # Initialize the split config with the provided config and kwargs
+        # Inisialisasi split config dengan config dan kwargs yang diberikan
         initializer = SplitConfigInitializer(config=config, **kwargs)
         
-        # Initialize the UI (this will also register components and set up handlers)
+        # Inisialisasi UI (ini juga akan mendaftarkan komponen dan setup handler)
         container = initializer.initialize()
         
-        # Display the container
+        # Tampilkan container
         display(container)
         
-        # Return the UI components for programmatic access
-        return {
-            **initializer.ui_components,
-            'container': initializer.parent_component.container,
-            'content_area': initializer.parent_component.content_area
-        }
+        logger.info("✅ Split config cell berhasil dibuat dan ditampilkan")
         
     except Exception as e:
-        error_msg = f"Failed to create split config cell: {str(e)}"
+        error_msg = f"❌ Gagal membuat split config cell: {str(e)}"
         logger.error(error_msg, exc_info=True)
         
-        # Use the parent class's error handler for consistent error display
+        # Gunakan error handler dari parent class untuk tampilan error yang konsisten
         from smartcash.ui.config_cell.handlers.error_handler import create_error_response
         error_widget = create_error_response(
             error_message=error_msg,
             error=e,
-            title="Error in Dataset Split Configuration",
+            title="🚨 Error in Dataset Split Configuration",
             include_traceback=True
         )
         display(error_widget)
+
+
+def get_split_config_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """📦 Membuat dan mengembalikan komponen UI split config untuk akses programmatik.
+    
+    Fungsi ini membuat UI konfigurasi split dan mengembalikan dictionary komponen
+    untuk akses programmatik tanpa menampilkan UI di notebook.
+    
+    Args:
+        config: Dictionary konfigurasi opsional untuk override defaults.
+        **kwargs: Argumen tambahan untuk diteruskan ke initializer.
+               
+    Returns:
+        Dictionary berisi komponen UI untuk akses programmatik.
+    """
+    try:
+        # Inisialisasi split config dengan config dan kwargs yang diberikan
+        initializer = SplitConfigInitializer(config=config, **kwargs)
+        
+        # Inisialisasi UI (ini juga akan mendaftarkan komponen dan setup handler)
+        container = initializer.initialize()
+        
+        # Kembalikan komponen UI untuk akses programmatik
+        return {
+            **initializer.ui_components,
+            'container': initializer.parent_component.container,
+            'content_area': initializer.parent_component.content_area,
+            'initializer': initializer
+        }
+        
+    except Exception as e:
+        error_msg = f"❌ Gagal membuat komponen split config: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        
+        # Kembalikan error widget
+        from smartcash.ui.config_cell.handlers.error_handler import create_error_response
+        error_widget = create_error_response(
+            error_message=error_msg,
+            error=e,
+            title="🚨 Error in Dataset Split Configuration",
+            include_traceback=True
+        )
         return {'error': error_widget}

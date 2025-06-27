@@ -3,34 +3,54 @@ File: smartcash/ui/dataset/split/__init__.py
 Deskripsi: Ekspor utilitas dan fungsi split dataset
 """
 
-from .split_init import (
+from smartcash.ui.dataset.split.split_init import (
     create_split_config_cell,
-    SplitConfigHandler
+    get_split_config_components,
+    SplitConfigInitializer
 )
+from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
 
-# For backward compatibility
+# Untuk backward compatibility
 create_split_config_ui = create_split_config_cell
 
 # Public API
 def initialize_split_ui(config=None):
-    """Initialize the split dataset UI with optional configuration.
+    """🎯 Inisialisasi UI split dataset dengan konfigurasi opsional.
     
-    This is the main entry point for the split dataset functionality.
+    Ini adalah entry point utama untuk fungsionalitas split dataset.
+    Menampilkan UI di notebook tanpa mengembalikan komponen.
     
     Args:
-        config: Optional configuration dictionary
+        config: Dictionary konfigurasi opsional
+    """
+    create_split_config_cell(config)
+
+
+def get_split_ui_components(config=None):
+    """📦 Mendapatkan komponen UI split dataset untuk akses programmatik.
+    
+    Fungsi ini mengembalikan dictionary komponen UI untuk manipulasi programmatik
+    tanpa menampilkan UI di notebook.
+    
+    Args:
+        config: Dictionary konfigurasi opsional
         
     Returns:
-        Dictionary of UI components
+        Dictionary komponen UI
     """
-    return create_split_config_cell(config)
+    return get_split_config_components(config)
 
+
+# Alias untuk backward compatibility
 create_split_init = create_split_config_cell
 
 __all__ = [
     'initialize_split_ui',
+    'get_split_ui_components',
     'create_split_init',
     'create_split_config_ui',  # Backward compatibility
     'create_split_config_cell',
+    'get_split_config_components',
+    'SplitConfigInitializer',
     'SplitConfigHandler'
 ]

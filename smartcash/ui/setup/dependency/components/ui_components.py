@@ -69,20 +69,28 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Return components dengan logger_bridge
     ui_components = {
-        'ui': main_container, 'container': main_container, 'header': header,
-        'status_panel': status_panel, 'categories_section': categories_section,
-        'custom_section': custom_section, 'action_section': action_section,
-        'confirmation_area': confirmation_area,
-        'install_btn': action_components.children[0],
-        'check_updates_btn': action_components.children[1], 
-        'uninstall_btn': action_components.children[2],
-        'main_progress': progress_tracker['main_progress'], 
-        'step_progress': progress_tracker['step_progress'],
-        'log_accordion': log_components['accordion'], 
-        'log_output': log_components['output'],
-        'summary_output': status_panel, 'logger_bridge': logger_bridge,
-        'module_name': 'dependency', 'ui_initialized': True
+        'ui': main_container, 
+        'container': main_container, 
+        'header': header,
+        'status_panel': status_panel, 
+        'categories_section': categories_section,
+        'custom_section': custom_section, 
+        'action_section': action_section,
+        'progress_tracker': progress_tracker, 
+        'log_components': log_components,
+        'logger_bridge': logger_bridge
     }
+    
+    # Add action buttons if action_components is a widget with children
+    if hasattr(action_components, 'children') and len(action_components.children) >= 3:
+        ui_components.update({
+            'install_btn': action_components.children[0],
+            'check_updates_btn': action_components.children[1],
+            'uninstall_btn': action_components.children[2]
+        })
+    # If action_components is a dict, add its contents
+    elif isinstance(action_components, dict):
+        ui_components.update(action_components)
     
     # Add extracted components
     ui_components.update(_extract_category_components(categories_section))

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Enhanced UI components dengan dialog integration dan progress tracking
+Deskripsi: Complete UI components dengan proper initialization dan dialog integration
 """
 
 import ipywidgets as widgets
@@ -9,6 +9,9 @@ from typing import Dict, Any, Optional
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create preprocessing UI dengan API integration dan dialog support"""
     config = config or {}
+    
+    # Initialize UI components dictionary first
+    ui_components = {}
     
     # Import dengan error handling
     from smartcash.ui.components import (
@@ -44,10 +47,6 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         with_sync_info=False
     )
     
-    # Store save/reset buttons in ui_components
-    ui_components['save_button'] = save_reset_components.get('save_button')
-    ui_components['reset_button'] = save_reset_components.get('reset_button')
-    
     # Action buttons
     action_components = create_action_buttons(
         primary_label="🚀 Mulai Preprocessing",
@@ -57,9 +56,6 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         button_width='180px'
     )
     
-    # Store action buttons in ui_components
-    ui_components['action_buttons'] = action_components
-    
     # Progress tracker
     progress_tracker = create_dual_progress_tracker(
         operation="Dataset Preprocessing",
@@ -68,6 +64,8 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     
     # Get container from tracker
     progress_container = progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([])
+    
+    # Log components
     log_components = create_log_accordion(
         module_name='preprocessing',
         height='200px'
@@ -75,7 +73,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     
     # === DIALOG AREA ===
     
-    # Gunakan shared confirmation area component
+    # Confirmation area component
     confirmation_area, _ = create_confirmation_area()
     
     # === LAYOUT SECTIONS ===
@@ -91,7 +89,7 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
         action_components['container'],
         widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Konfirmasi & Status:</strong></div>"),
-        confirmation_area  # NOW PROPERLY INCLUDED
+        confirmation_area
     ], layout=widgets.Layout(
         width='100%', 
         margin='10px 0', 
@@ -132,11 +130,11 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             return fallback
     
     # Build UI components dictionary
-    ui_components = {
+    ui_components.update({
         # CRITICAL COMPONENTS (required by CommonInitializer)
         'ui': ui,
-        'preprocess_button': action_components.get('download_button'),  # primary button
-        'check_button': action_components.get('check_button'),
+        'preprocess_button': action_components.get('primary_button'),
+        'check_button': action_components.get('secondary_buttons', [{}])[0].get('button') if action_components.get('secondary_buttons') else None,
         'cleanup_button': action_components.get('cleanup_button'),
         'save_button': save_reset_components.get('save_button'),
         'reset_button': save_reset_components.get('reset_button'),
@@ -148,8 +146,8 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'input_options': input_options,
         'config_section': config_section,
         'action_section': action_section,
-        'confirmation_area': confirmation_area,  # Dialog area
-        'dialog_area': confirmation_area,        # Alias untuk compatibility
+        'confirmation_area': confirmation_area,
+        'dialog_area': confirmation_area,  # Alias untuk compatibility
         
         # PROGRESS TRACKING
         'progress_tracker': progress_tracker,
@@ -157,6 +155,10 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         
         # LOG COMPONENTS
         'log_accordion': log_components.get('log_accordion'),
+        
+        # ACTION COMPONENTS
+        'action_buttons': action_components,
+        'save_reset_buttons': save_reset_components,
         
         # INPUT FORM COMPONENTS
         'resolution_dropdown': safe_extract(input_options, 'resolution_dropdown'),
@@ -177,7 +179,10 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         'api_integration': True,
         'dialog_support': True,
         'progress_tracking': True
-    }
+    })
+    
+    # Log missing components for debugging
     from smartcash.ui.utils.logging_utils import log_missing_components
     log_missing_components(ui_components)
+    
     return ui_components

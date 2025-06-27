@@ -147,28 +147,33 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')
     
+    # Helper function to create styled containers consistently
+    def create_styled_container(content, title, container_type='normal', width='48%'):
+        # Map container types to colors
+        colors = {
+            'types': '#667eea',  # Blue for Augmentation Types
+            'normal': '#28a745', # Green for normal sections
+            'basic': '#17a2b8',  # Cyan for basic options
+            'advanced': '#6f42c1' # Purple for advanced options
+        }
+        color = colors.get(container_type, '#28a745')  # Default to green
+        
+        return widgets.VBox([
+            _create_section_header(title, color),
+            content
+        ], layout=widgets.Layout(
+            width=width,
+            padding='12px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            background_color='#f9f9f9',
+            margin='0 0 10px 0'
+        ))
+
     # 2x2 Grid with consistent styling
     row1 = widgets.HBox([
-        widgets.VBox([
-            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>📋 Opsi Dasar</div>"),
-            basic_options['container']
-        ], layout=widgets.Layout(
-            width='48%',
-            padding='12px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            background_color='#f9f9f9'
-        )),
-        widgets.VBox([
-            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>⚙️ Parameter Lanjutan</div>"),
-            advanced_options['container']
-        ], layout=widgets.Layout(
-            width='48%',
-            padding='12px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            background_color='#f9f9f9'
-        ))
+        create_styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic'),
+        create_styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced')
     ], layout=widgets.Layout(
         width='100%',
         justify_content='space-between',
@@ -176,26 +181,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     ))
     
     row2 = widgets.HBox([
-        widgets.VBox([
-            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🔄 Jenis Augmentasi</div>"),
-            augmentation_types['container']
-        ], layout=widgets.Layout(
-            width='48%',
-            padding='12px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            background_color='#f9f9f9'
-        )),
-        widgets.VBox([
-            widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🎬 Live Preview</div>"),
-            live_preview['container']
-        ], layout=widgets.Layout(
-            width='48%',
-            padding='12px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            background_color='#f9f9f9'
-        ))
+        create_styled_container(augmentation_types['container'], "🔄 Jenis Augmentasi", 'types'),
+        create_styled_container(live_preview['container'], "🎬 Live Preview")
     ], layout=widgets.Layout(
         width='100%',
         justify_content='space-between',

@@ -81,23 +81,32 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     )
     
     # Action buttons with new API
-    action_components = create_action_buttons(
-        primary_label="Jalankan Augmentasi",
-        primary_icon="🚀",
+    action_buttons = create_action_buttons(
+        primary_button={
+            "label": "🚀 Jalankan Augmentasi",
+            "style": "success",
+            "width": "220px"
+        },
         secondary_buttons=[
-            ("Cek Data", "🔍", "info"),
-        ],
-        cleanup_enabled=True,
-        cleanup_label="Bersihkan Hasil",
-        cleanup_tooltip="Hapus hasil augmentasi sebelumnya",
-        button_width='220px',
-        primary_style='success'
+            {
+                "label": "🔍 Cek Data",
+                "style": "info",
+                "width": "220px"
+            },
+            {
+                "label": "🗑️ Bersihkan Hasil",
+                "style": "warning",
+                "tooltip": "Hapus hasil augmentasi sebelumnya",
+                "width": "220px"
+            }
+        ]
     )
     
-    # Get buttons using new API
-    augment_button = action_components.get('primary_button')
-    check_button = action_components.get('secondary_buttons', [None])[0] if action_components.get('secondary_buttons') else None
-    cleanup_button = action_components.get('cleanup_button')
+    # Get buttons from the new action buttons component
+    augment_button = action_buttons.get('primary')
+    check_button = action_buttons.get('secondary_0')
+    cleanup_button = action_buttons.get('secondary_1')
+    button_container = action_buttons['container']
     
     # Fallback button creation if any button is missing
     if augment_button is None:

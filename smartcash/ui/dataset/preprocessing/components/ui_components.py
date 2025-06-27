@@ -48,42 +48,32 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     )
     
     # Action buttons with new API
-    action_components = create_action_buttons(
-        primary_label="Mulai Preprocessing",
-        primary_icon="🚀",
+    action_buttons = create_action_buttons(
+        primary_button={
+            "label": "🚀 Mulai Preprocessing",
+            "style": "success",
+            "width": "180px"
+        },
         secondary_buttons=[
-            ("Check Dataset", "🔍", "info"),
-        ],
-        cleanup_enabled=True,
-        cleanup_label="Bersihkan Dataset",
-        cleanup_tooltip="Hapus dataset yang sudah ada",
-        button_width='180px',
-        primary_style='success'
+            {
+                "label": "🔍 Check Dataset",
+                "style": "info",
+                "width": "180px"
+            },
+            {
+                "label": "🗑️ Bersihkan Dataset",
+                "style": "warning",
+                "tooltip": "Hapus dataset yang sudah ada",
+                "width": "180px"
+            }
+        ]
     )
     
-    # Get buttons using new API
-    preprocess_button = action_components.get('primary_button')
-    check_button = action_components.get('secondary_buttons', [None])[0] if action_components.get('secondary_buttons') else None
-    cleanup_button = action_components.get('cleanup_button')
-    
-    # Fallback button creation if any button is missing
-    if check_button is None:
-        print("[WARNING] Check button not found, creating fallback")
-        check_button = widgets.Button(description='🔍 Check Dataset')
-        check_button.style.button_color = '#f0f0f0'
-        check_button.layout = widgets.Layout(width='180px')
-    
-    if preprocess_button is None:
-        print("[WARNING] Preprocess button not found, creating fallback")
-        preprocess_button = widgets.Button(description='🚀 Mulai Preprocessing', 
-                                         button_style='success')
-        preprocess_button.layout = widgets.Layout(width='180px')
-    
-    if cleanup_button is None:
-        print("[WARNING] Cleanup button not found, creating fallback")
-        cleanup_button = widgets.Button(description='🗑️ Bersihkan Dataset',
-                                      button_style='warning')
-        cleanup_button.layout = widgets.Layout(width='180px')
+    # Get buttons from the new action buttons component
+    preprocess_button = action_buttons.get('primary')
+    check_button = action_buttons.get('secondary_0')
+    cleanup_button = action_buttons.get('secondary_1')
+    button_container = action_buttons['container']
     
     # Progress tracker
     progress_tracker = create_dual_progress_tracker(

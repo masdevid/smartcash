@@ -112,45 +112,60 @@ class ErrorComponent:
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid {style['border']};
             border-radius: 16px;
-            padding: 20px;
+            padding: 15px;
             margin: 10px 0;
             box-shadow: {style['shadow']};
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: {'pointer' if has_traceback else 'default'};
             position: relative;
             overflow: hidden;
+            max-width: 100%;
+            box-sizing: border-box;
         " {'onclick="toggleTraceback()"' if has_traceback else ''}>
             
             {self._create_background_pattern(style['accent'])}
             
             <div style="position: relative; z-index: 2;">
-                <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                    <span style="font-size: 24px; margin-right: 12px;">{style['icon']}</span>
+                <div style="
+                    display: flex; 
+                    align-items: center; 
+                    margin-bottom: 12px;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                ">
+                    <span style="font-size: 20px; flex-shrink: 0;">{style['icon']}</span>
                     <h3 style="
                         color: {style['color']}; 
                         margin: 0; 
-                        font-size: 18px;
+                        font-size: clamp(14px, 4vw, 18px);
                         font-weight: 600;
                         flex: 1;
+                        min-width: 0;
+                        word-break: break-word;
                     ">{self.title}</h3>
-                    {f'<span style="color: {style["color"]}; font-size: 12px; opacity: 0.7;">{expand_hint}</span>' if has_traceback else ''}
+                    {f'<span style="color: {style["color"]}; font-size: 11px; opacity: 0.7; flex-shrink: 0;">{expand_hint}</span>' if has_traceback else ''}
                 </div>
                 
                 <div style="
                     color: {style['color']}; 
-                    font-size: 14px; 
+                    font-size: clamp(12px, 3vw, 14px); 
                     line-height: 1.6;
                     margin-bottom: 12px;
                     font-weight: 500;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    hyphens: auto;
                 ">{message}</div>
                 
                 <div style="
                     color: rgba(102, 102, 102, 0.8); 
-                    font-size: 12px; 
+                    font-size: clamp(10px, 2.5vw, 12px); 
                     font-style: italic;
                     border-top: 1px solid rgba(255, 255, 255, 0.1);
                     padding-top: 12px;
                     margin-top: 12px;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
                 ">
                     💡 Cobalah refresh cell atau periksa dependencies
                     {('<br>🔍 ' + expand_hint) if has_traceback else ''}
@@ -180,16 +195,26 @@ class ErrorComponent:
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
                 transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
                 max-height: 400px;
+                max-width: 100%;
+                box-sizing: border-box;
             ">
                 <div style="
-                    padding: 16px 20px;
+                    padding: 12px 16px;
                     background: rgba(255, 255, 255, 0.05);
                     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
+                    flex-wrap: wrap;
+                    gap: 8px;
                 ">
-                    <span style="color: #ffffff; font-weight: 600; font-size: 14px;">
+                    <span style="
+                        color: #ffffff; 
+                        font-weight: 600; 
+                        font-size: clamp(12px, 3vw, 14px);
+                        flex: 1;
+                        min-width: 120px;
+                    ">
                         🔍 Stack Trace Details
                     </span>
                     <button onclick="copyTraceback()" style="
@@ -197,10 +222,12 @@ class ErrorComponent:
                         border: 1px solid rgba(255, 255, 255, 0.2);
                         border-radius: 6px;
                         color: #ffffff;
-                        padding: 4px 12px;
-                        font-size: 12px;
+                        padding: 6px 12px;
+                        font-size: clamp(10px, 2.5vw, 12px);
                         cursor: pointer;
                         transition: all 0.2s ease;
+                        flex-shrink: 0;
+                        white-space: nowrap;
                     " onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'" 
                        onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
                         📋 Copy
@@ -208,17 +235,20 @@ class ErrorComponent:
                 </div>
                 <pre id="traceback-content" style="
                     margin: 0;
-                    padding: 20px;
+                    padding: 16px;
                     color: #e0e0e0;
                     background: transparent;
-                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-                    font-size: 12px;
-                    line-height: 1.5;
+                    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+                    font-size: clamp(10px, 2.5vw, 12px);
+                    line-height: 1.4;
                     overflow-x: auto;
                     white-space: pre-wrap;
                     word-wrap: break-word;
-                    max-height: 300px;
+                    overflow-wrap: break-word;
+                    max-height: 280px;
                     overflow-y: auto;
+                    box-sizing: border-box;
+                    width: 100%;
                 ">{traceback}</pre>
             </div>
             

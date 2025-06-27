@@ -72,35 +72,31 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
     )
             
     # Action buttons with new API - using secondary_buttons for additional actions
-    action_components = create_action_buttons(
-        primary_label="Download & Sync Models",
-        primary_icon="📥",
+    action_buttons = create_action_buttons(
+        primary_button={
+            "label": "📥 Download & Sync Models",
+            "style": "primary",
+            "width": "200px"
+        },
         secondary_buttons=[
-            ("Simpan Config", "💾", "success"),
-            ("Reset", "🔄", "warning")
-        ],
-        button_width='200px',
-        primary_style='primary'
+            {
+                "label": "💾 Simpan Config",
+                "style": "success",
+                "width": "160px"
+            },
+            {
+                "label": "🔄 Reset",
+                "style": "warning",
+                "width": "120px"
+            }
+        ]
     )
     
-    # Get buttons using new API
-    download_button = action_components.get('primary_button')
-    secondary_buttons = action_components.get('secondary_buttons', [])
-    save_button = secondary_buttons[0] if len(secondary_buttons) > 0 else None
-    reset_button = secondary_buttons[1] if len(secondary_buttons) > 1 else None
-    
-    # Fallback button creation if any button is missing
-    if download_button is None:
-        print("[WARNING] Download button not found, creating fallback")
-        download_button = widgets.Button(description='📥 Download & Sync Models',
-                                      button_style='primary')
-        download_button.layout = widgets.Layout(width='200px')
-    
-    if save_button is None:
-        print("[WARNING] Save button not found, creating fallback")
-        save_button = widgets.Button(description='💾 Simpan Config',
-                                  button_style='success')
-        save_button.layout = widgets.Layout(width='150px')
+    # Get buttons from the new action buttons component
+    download_button = action_buttons.get('primary')
+    save_button = action_buttons.get('secondary_0')
+    reset_button = action_buttons.get('secondary_1')
+    button_container = action_buttons['container']
     
     if reset_button is None:
         print("[WARNING] Reset button not found, creating fallback")

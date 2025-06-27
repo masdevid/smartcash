@@ -4,17 +4,14 @@ Deskripsi: Ekspor utilitas dan fungsi split dataset
 """
 
 from smartcash.ui.dataset.split.split_init import (
-    create_split_config_cell,
-    get_split_config_components,
+    display_split_config,
+    create_split_config_ui,
     SplitConfigInitializer
 )
 from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
 
-# Untuk backward compatibility
-create_split_config_ui = create_split_config_cell
-
-# Public API
-def initialize_split_ui(config=None):
+# Public API dengan nama yang konsisten
+def initialize_split_ui(config=None, **kwargs):
     """🎯 Inisialisasi UI split dataset dengan konfigurasi opsional.
     
     Ini adalah entry point utama untuk fungsionalitas split dataset.
@@ -22,11 +19,12 @@ def initialize_split_ui(config=None):
     
     Args:
         config: Dictionary konfigurasi opsional
+        **kwargs: Argumen tambahan untuk initializer
     """
-    create_split_config_cell(config)
+    display_split_config(config, **kwargs)
 
 
-def get_split_ui_components(config=None):
+def get_split_ui_components(config=None, **kwargs):
     """📦 Mendapatkan komponen UI split dataset untuk akses programmatik.
     
     Fungsi ini mengembalikan dictionary komponen UI untuk manipulasi programmatik
@@ -34,23 +32,32 @@ def get_split_ui_components(config=None):
     
     Args:
         config: Dictionary konfigurasi opsional
+        **kwargs: Argumen tambahan untuk initializer
         
     Returns:
         Dictionary komponen UI
     """
-    return get_split_config_components(config)
+    return create_split_config_ui(config, **kwargs)
 
 
-# Alias untuk backward compatibility
-create_split_init = create_split_config_cell
+# Alias untuk backward compatibility dan convenience
+create_split_config_cell = display_split_config
+get_split_config_components = create_split_config_ui
+create_split_init = display_split_config
 
 __all__ = [
+    # Main API
     'initialize_split_ui',
     'get_split_ui_components',
-    'create_split_init',
-    'create_split_config_ui',  # Backward compatibility
+    
+    # Direct exports
+    'display_split_config',
+    'create_split_config_ui',
+    'SplitConfigInitializer',
+    'SplitConfigHandler',
+    
+    # Backward compatibility aliases
     'create_split_config_cell',
     'get_split_config_components',
-    'SplitConfigInitializer',
-    'SplitConfigHandler'
+    'create_split_init'
 ]

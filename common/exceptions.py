@@ -2,13 +2,45 @@
 File: smartcash/common/exceptions.py
 Deskripsi: Definisi hierarki exception terpadu untuk seluruh komponen SmartCash
 """
+from typing import Any, Dict, Optional, Type, Union
+from dataclasses import dataclass
+
+@dataclass
+class ErrorContext:
+    """Context information for better error handling and reporting."""
+    component: str = ""
+    operation: str = ""
+    details: Optional[Dict[str, Any]] = None
+    ui_components: Optional[Dict[str, Any]] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert context to dictionary for logging."""
+        return {
+            'component': self.component,
+            'operation': self.operation,
+            'details': self.details or {}
+        }
 
 # Exception Classes Dasar
 class SmartCashError(Exception):
-    """Exception dasar untuk semua error SmartCash"""
-    def __init__(self, message="Terjadi error pada sistem SmartCash"):
+    """Base exception for all SmartCash errors with context support."""
+    def __init__(
+        self, 
+        message: str = "Terjadi error pada sistem SmartCash",
+        error_code: Optional[str] = None,
+        context: Optional[ErrorContext] = None
+    ):
         self.message = message
+        self.error_code = error_code
+        self.context = context or ErrorContext()
         super().__init__(self.message)
+        
+    def with_context(self, **kwargs) -> 'SmartCashError':
+        """Add context to the error and return self for chaining."""
+        for key, value in kwargs.items():
+            if hasattr(self.context, key):
+                setattr(self.context, key, value)
+        return self
 
 # Exception Config
 class ConfigError(SmartCashError):
@@ -18,23 +50,96 @@ class ConfigError(SmartCashError):
 
 # Exception Dataset
 class DatasetError(SmartCashError):
-    """Error dasar terkait dataset"""
-    def __init__(self, message="Error pada dataset"):
-        super().__init__(message)
+    """Base exception for dataset-related errors."""
+    def __init__(
+        self, 
+        message: str = "Error pada dataset",
+        error_code: Optional[str] = None,
+        context: Optional[ErrorContext] = None,
+        dataset_path: Optional[str] = None
+    ):
+        context = context or ErrorContext()
+        if dataset_path:
+            context.details = {**(context.details or {}), 'dataset_path': dataset_path}
+        super().__init__(message, error_code, context)
 
 class DatasetFileError(DatasetError):
-    """Error file dataset"""
-    def __init__(self, message="Error pada file dataset"):
-        super().__init__(message)
+    """Error related to dataset file operations."""
+    def __init__(
+        self,
+        message: str = "Error pada file dataset",
+        file_path: Optional[str] = None,
+        **kwargs
+    ):
+        context = kwargs.pop('context', ErrorContext())
+        if file_path:
+            context.details = {**(context.details or {}), 'file_path': file_path}
+        super().__init__(message, **kwargs, context=context)
 
 class DatasetValidationError(DatasetError):
-    """Error validasi dataset"""
-    def __init__(self, message="Error validasi dataset"):
-        super().__init__(message)
+    """Error during dataset validation."""
+    def __init__(
+        self,
+        message: str = "Error validasi dataset",
+        validation_errors: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ):
+        context = kwargs.pop('context', ErrorContext())
+        if validation_errors:
+            context.details = {**(context.details or {}), 'validation_errors': validation_errors}
+        super().__init__(message, **kwargs, context=context)
         
 class DatasetProcessingError(DatasetError):
-    """Error pemrosesan dataset"""
-    def __init__(self, message="Error saat memproses dataset"):
+    """Error during dataset processing."""
+    def __init__(
+        self,
+        message: str = "Error saat memproses dataset",
+        processing_stage: Optional[str] = None,
+        **kwargs
+    ):
+        context = kwargs.pop('context', ErrorContext())
+        if processing_stage:
+            context.details = {**(context.details or {}), 'processing_stage': processing_stage}
+        super().__init__(message, **kwargs, context=context)
+
+# UI Exceptions
+class UIError(SmartCashError):
+    """Base exception for UI-related errors."""
+    def __init__(
+        self,
+        message: str = "Terjadi kesalahan pada antarmuka pengguna",
+        component: str = "unknown",
+        **kwargs
+    ):
+        context = kwargs.pop('context', ErrorContext())
+        context.component = component or context.component or "unknown"
+        super().__init__(message, **kwargs, context=context)
+
+class UIComponentError(UIError):
+    """Error related to UI component initialization or operation."""
+    def __init__(
+        self,
+        message: str = "Kesalahan komponen antarmuka",
+        component_type: Optional[str] = None,
+        **kwargs
+    ):
+        context = kwargs.pop('context', ErrorContext())
+        if component_type:
+            context.details = {**(context.details or {}), 'component_type': component_type}
+        super().__init__(message, **kwargs, context=context)
+
+class UIActionError(UIError):
+    """Error during UI action execution."""
+    def __init__(
+        self,
+        message: str = "Gagal menjalankan aksi",
+        action: Optional[str] = None,
+        **kwargs
+    ):
+        context = kwargs.pop('context', ErrorContext())
+        if action:
+            context.operation = action
+        super().__init__(message, **kwargs, context=context)
         super().__init__(message)
 
 class DatasetCompatibilityError(DatasetError):

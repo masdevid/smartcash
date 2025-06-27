@@ -39,11 +39,14 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     
     # Save/Reset buttons
     save_reset_components = create_save_reset_buttons(
-        save_label="💾 Simpan",
-        reset_label="🔄 Reset", 
-        with_sync_info=True,
-        sync_message="Konfigurasi akan disinkronkan dengan API"
+        save_label="Simpan",
+        reset_label="Reset", 
+        with_sync_info=False
     )
+    
+    # Store save/reset buttons in ui_components
+    ui_components['save_button'] = save_reset_components.get('save_button')
+    ui_components['reset_button'] = save_reset_components.get('reset_button')
     
     # Action buttons
     action_components = create_action_buttons(
@@ -53,6 +56,9 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
         cleanup_enabled=True,
         button_width='180px'
     )
+    
+    # Store action buttons in ui_components
+    ui_components['action_buttons'] = action_components
     
     # Progress tracker
     progress_tracker = create_dual_progress_tracker(

@@ -4,15 +4,26 @@ Deskripsi: Handlers untuk preprocessing dengan proper error handling dan button 
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.preprocessing.utils import (
-    hide_confirmation_area as _hide_confirmation_area,
-    show_confirmation_area as _show_confirmation_area,
-    clear_outputs as _clear_outputs,
-    disable_buttons as _disable_buttons,
-    enable_buttons as _enable_buttons,
-    setup_progress as _setup_progress,
-    complete_progress as _complete_progress,
-    error_progress as _error_progress
+from functools import wraps
+
+from smartcash.common.exceptions import ErrorContext, UIError
+from smartcash.ui.utils import (
+    ErrorHandler,
+    create_error_context,
+    with_error_handling
+)
+from smartcash.dataset.preprocessor.api import get_preprocessing_status
+
+# Import UI utility functions under a single namespace
+from smartcash.ui.dataset.preprocessing import utils as ui_utils
+
+# Initialize error handler
+error_handler = ErrorHandler()
+
+# Import shared dialog components
+from smartcash.ui.components.dialog.confirmation_dialog import (
+    show_confirmation_dialog,
+    clear_dialog_area
 )
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
@@ -46,240 +57,307 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], config: Dict[str
 
 # === CONFIG HANDLERS ===
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="setup_config_handlers"
+)
 def _setup_config_handlers(ui_components: Dict[str, Any]) -> None:
     """Setup save/reset handlers dengan UI logging integration
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components including buttons and logger
     """
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
+    logger = ui_components.get('logger_bridge')
+    if not logger:
+        raise ValueError("Logger bridge not initialized. Make sure to use PreprocessingInitializer")
     
-    try:
-        # Get save and reset buttons
-        save_btn = ui_components.get('save_config_btn')
-        reset_btn = ui_components.get('reset_config_btn')
+    # Get buttons from ui_components
+    save_btn = ui_components.get('save_button')
+    reset_btn = ui_components.get('reset_button')
+    
+    if not save_btn or not reset_btn:
+        logger.warning("Save/Reset buttons not found in UI components")
+        return
+    
+    # Setup save handler
+    @save_btn.on_click
+    @with_error_handling(
+        error_handler=error_handler,
+        component="preprocessing_handlers",
+        operation="save_config"
+    )
+    def on_save():
+        """Handle save button click with config validation and saving"""
+        if logger:
+            logger.info("Saving preprocessing configuration...")
         
-        if not save_btn or not reset_btn:
-            logger_bridge.warning("Save or reset button not found in UI components")
-            return
-            
-        # Clear existing handlers to prevent duplicates
-        if hasattr(save_btn, '_click_handlers'):
-            save_btn._click_handlers.callbacks.clear()
-        if hasattr(reset_btn, '_click_handlers'):
-            reset_btn._click_handlers.callbacks.clear()
-            
-        # Setup save handler
-        @save_btn.on_click
-        def on_save():
-            """Handle save button click"""
-            try:
-                logger_bridge.info("Saving preprocessing configuration...")
-                # Get config from UI
-                config = _extract_config(ui_components)
-                # Save config
-                config_handler = PreprocessingConfigHandler()
-                config_handler.ui_components = ui_components
-                config_handler.logger_bridge = logger_bridge
-                config_handler.save_config(config)
-                logger_bridge.success("Preprocessing configuration saved successfully!")
-            except Exception as e:
-                error_msg = f"Error saving config: {str(e)}"
-                logger_bridge.error(error_msg)
-                _handle_error(e, ui_components, logger_bridge)
-                
-        # Setup reset handler
-        @reset_btn.on_click
-        def on_reset():
-            """Handle reset button click"""
-            try:
-                logger_bridge.info("Resetting preprocessing configuration...")
-                # Reset UI to default values
-                config_handler = PreprocessingConfigHandler()
-                config_handler.ui_components = ui_components
-                config_handler.logger_bridge = logger_bridge
-                config_handler.reset_ui()
-                logger_bridge.success("Preprocessing configuration reset successfully!")
-            except Exception as e:
-                error_msg = f"Error resetting config: {str(e)}"
-                logger_bridge.error(error_msg)
-                _handle_error(e, ui_components, logger_bridge)
-                
-    except Exception as e:
-        logger_bridge.error(f"Error setting up config handlers: {str(e)}")
-        _handle_error(e, ui_components, logger_bridge)
+        # Get and validate config
+        config = _extract_config(ui_components)
+        if not config:
+            raise ValueError("Invalid configuration. Please check your inputs.")
+        
+        # Save config
+        config_handler = PreprocessingConfigHandler()
+        config_handler.ui_components = ui_components
+        config_handler.logger_bridge = logger
+        config_handler.save_config(config)
+        
+        if logger:
+            logger.success("Configuration saved successfully!")
+    
+    # Setup reset handler
+    @reset_btn.on_click
+    @with_error_handling(
+        error_handler=error_handler,
+        component="preprocessing_handlers",
+        operation="reset_config"
+    )
+    def on_reset():
+        """Handle reset button click with confirmation"""
+        if logger:
+            logger.info("Resetting configuration to defaults...")
+        
+        # Reset UI to default values
+        config_handler = PreprocessingConfigHandler()
+        config_handler.ui_components = ui_components
+        config_handler.logger_bridge = logger
+        config_handler.reset_ui()
+        
+        if logger:
+            logger.success("Configuration reset to defaults")
 
 # === OPERATION HANDLERS ===
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="setup_operation_handlers"
+)
 def _setup_operation_handlers(ui_components: Dict[str, Any]) -> None:
-    """Setup operation handlers dengan API integration
+    """Setup operation handlers for preprocessing UI components.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components including buttons and logger
     """
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
+    logger = ui_components.get('logger_bridge')
+    if not logger:
+        raise ValueError("Logger bridge not initialized. Make sure to use PreprocessingInitializer")
     
-    try:
-        # Get operation buttons
-        preprocess_btn = ui_components.get('preprocess_btn')
-        check_btn = ui_components.get('check_btn')
-        cleanup_btn = ui_components.get('cleanup_btn')
+    # Get action buttons from ui_components
+    action_components = ui_components.get('action_buttons', {})
+    if not action_components:
+        logger.warning("Action buttons not found in UI components")
+        return
+    
+    # Get individual buttons
+    preprocess_btn = action_components.get('preprocess_btn')
+    check_btn = action_components.get('check_btn')
+    cleanup_btn = action_components.get('cleanup_btn')
+    
+    # Clear any existing handlers using a safer approach
+    def clear_button_handlers(button):
+        """Safely clear all click handlers from a button.
         
-        if not all([preprocess_btn, check_btn, cleanup_btn]):
-            logger_bridge.warning("Beberapa tombol operasi tidak ditemukan")
+        Args:
+            button: The button widget to clear handlers from
+        """
+        if not button:
             return
             
-        # Clear existing handlers
-        for btn in [preprocess_btn, check_btn, cleanup_btn]:
-            if hasattr(btn, '_click_handlers'):
-                btn._click_handlers.callbacks.clear()
-                
-        # Setup preprocessing handler
+        # Try different methods to clear handlers based on widget type
+        if hasattr(button, 'on_click') and callable(getattr(button, 'on_click', None)):
+            # For ipywidgets buttons
+            button.on_click = None
+        elif hasattr(button, 'click') and hasattr(button.click, 'clear'):
+            # For buttons with a click manager
+            button.click.clear()
+        elif hasattr(button, '_click_handlers') and hasattr(button._click_handlers, 'callbacks'):
+            # Fallback to direct access (less preferred)
+            button._click_handlers.callbacks.clear()
+    
+    # Clear handlers for all buttons
+    for btn in [preprocess_btn, check_btn, cleanup_btn]:
+        clear_button_handlers(btn)
+    
+    # Setup preprocessing handler
+    if preprocess_btn:
         @preprocess_btn.on_click
-        def on_preprocess():
+        def on_preprocess(_):
             _handle_preprocessing_operation(ui_components)
-            
-        # Setup check handler
+    else:
+        logger.warning("Preprocess button not found in UI components")
+    
+    # Setup check handler
+    if check_btn:
         @check_btn.on_click
-        def on_check():
+        def on_check(_):
             _handle_check_operation(ui_components)
-            
-        # Setup cleanup handler
+    else:
+        logger.warning("Check button not found in UI components")
+    
+    # Setup cleanup handler
+    if cleanup_btn:
         @cleanup_btn.on_click
-        def on_cleanup():
+        def on_cleanup(_):
             _handle_cleanup_operation(ui_components)
-            
-    except Exception as e:
-        error_msg = f"Error setting up operation handlers: {str(e)}"
-        logger.error(error_msg)
-        _handle_error(ui_components, error_msg, logger)
+    else:
+        logger.warning("Cleanup button not found in UI components")
+    
+    logger.debug("Operation handlers setup completed")
+    
+    if logger:
+        logger.debug("Operation handlers setup completed")
 
 # === OPERATION IMPLEMENTATIONS ===
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="handle_preprocessing"
+)
 def _handle_preprocessing_operation(ui_components: Dict[str, Any]) -> None:
-    """Handle preprocessing dengan confirmation dan proper error handling
+    """Handle preprocessing operation with confirmation and proper error handling.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components including logger and buttons
     """
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
+    logger = ui_components.get('logger_bridge')
+    if logger:
+        logger.debug("Starting preprocessing operation...")
     
-    try:
-        # Check if confirmation is pending
-        if _is_confirmation_pending(ui_components):
-            logger_bridge.warning("Ada operasi konfirmasi yang sedang menunggu")
-            return
-            
-        # Show confirmation dialog
-        _show_preprocessing_confirmation(ui_components)
-        
-        # If confirmed, execute preprocessing
-        if _should_execute_preprocessing(ui_components):
-            _execute_preprocessing_with_api(ui_components)
-            
-    except Exception as e:
-        error_msg = f"Error in preprocessing operation: {str(e)}"
-        logger.error(error_msg)
-        _handle_error(ui_components, error_msg, logger)
-        return False
+    # Check if there's already a pending confirmation
+    if _is_confirmation_pending(ui_components):
+        if logger:
+            logger.warning("Ada operasi konfirmasi yang sedang menunggu")
+        return
+    
+    # Show confirmation dialog
+    _show_preprocessing_confirmation(ui_components)
+    
+    # If confirmed, execute preprocessing
+    if _should_execute_preprocessing(ui_components):
+        _execute_preprocessing_with_api(ui_components)
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="handle_check_operation"
+)
 def _handle_check_operation(ui_components: Dict[str, Any]) -> None:
-    """Handle dataset check dengan preprocessing API dan error handling
+    """Handle dataset check operation with proper error handling and logging.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
     """
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        # Clear previous outputs
-        _clear_outputs(ui_components)
-        
-        # Show loading state
-        _setup_progress(ui_components, "Memeriksa dataset...")
-        
-        # Get config from UI
-        config = _extract_config(ui_components)
-        
-        # Call preprocessing API to check dataset
-        from smartcash.api.preprocessing import check_dataset
-        
-        logger_bridge.info("🔍 Memeriksa dataset...")
-        
-        # Execute with progress callback
-        progress_callback = _create_progress_callback(ui_components)
-        result = check_dataset(
-            config=config,
-            progress_callback=progress_callback
-        )
-        
-        # Process and display results
-        _process_status_result(ui_components, result)
-        logger_bridge.success("✅ Pemeriksaan dataset selesai")
-        
-    except Exception as e:
-        error_msg = f"Error saat memeriksa dataset: {str(e)}"
-        logger.error(error_msg)
-        _handle_error(ui_components, error_msg, logger)
-        return False
+    logger = ui_components.get('logger_bridge')
+    if logger:
+        logger.info("🔍 Memulai pemeriksaan dataset...")
+    
+    # Clear previous outputs
+    ui_utils.clear_outputs(ui_components)
+    
+    # Get config with error handling
+    config = _extract_config(ui_components)
+    if not config:
+        raise ValueError("Konfigurasi tidak valid atau kosong")
+    
+    # Setup progress tracking
+    progress_callback = _create_progress_callback(ui_components)
+    
+    # Call the API with proper error handling
+    result = get_preprocessing_status(
+        config=config
+    )
+    # Add progress callback if supported in the future
+    if progress_callback:
+        progress_callback(1, 1, "Pemeriksaan selesai")
+    
+    # Process and display results
+    _process_status_result(ui_components, result)
+    
+    # Log success
+    if logger:
+        logger.success("✅ Pemeriksaan dataset selesai")
+    
+    # Update status panel
+    status_panel = ui_components.get('status_panel')
+    if status_panel and hasattr(status_panel, 'update_status'):
+        status_panel.update_status("Pemeriksaan dataset selesai", 'success')
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="handle_cleanup_operation"
+)
 def _handle_cleanup_operation(ui_components: Dict[str, Any]) -> None:
-    """Handle cleanup operation dengan proper error handling
+    """Handle cleanup operation with proper error handling and logging.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
     """
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        # Clear outputs
-        _clear_outputs(ui_components)
-        
-        # Check if confirmation is pending
-        if _is_confirmation_pending(ui_components):
-            logger_bridge.warning("Ada operasi konfirmasi yang sedang menunggu")
-            return
-            
-        # Show confirmation dialog
-        _show_cleanup_confirmation(ui_components)
-        
-        # If confirmed, execute cleanup
-        if _should_execute_cleanup(ui_components):
-            _execute_cleanup_with_api(ui_components)
-            
-    except Exception as e:
-        error_msg = f"Error in cleanup operation: {str(e)}"
-        logger.error(error_msg)
-        _handle_error(ui_components, error_msg, logger)
-        return False
+    logger = ui_components.get('logger_bridge')
+    if logger:
+        logger.debug("Memulai operasi cleanup...")
+    
+    # Clear outputs before starting
+    ui_utils.clear_outputs(ui_components)
+    
+    # Check if there's already a pending confirmation
+    if _is_confirmation_pending(ui_components):
+        if logger:
+            logger.warning("Ada operasi konfirmasi yang sedang menunggu")
+        return
+    
+    # Show confirmation dialog
+    _show_cleanup_confirmation(ui_components)
+    
+    # If confirmed, execute cleanup
+    if _should_execute_cleanup(ui_components):
+        _execute_cleanup_with_api(ui_components)
 
 # === API EXECUTION FUNCTIONS ===
 
-def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
-    """Execute preprocessing dengan proper error handling dan button management"""
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="execute_preprocessing"
+)
+def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> None:
+    """Execute preprocessing with proper error handling and progress tracking.
+    
+    Args:
+        ui_components: Dictionary containing UI components
+    """
+    logger_bridge = ui_components.get('logger_bridge')
+    if logger_bridge:
+        logger_bridge.info("🚀 Starting preprocessing pipeline...")
+    
+    # Disable UI buttons during processing
+    ui_utils.disable_buttons(ui_components)
+    
+    # Setup progress tracking
+    ui_utils.setup_progress(ui_components, "🚀 Starting preprocessing...")
+    
     try:
-        _disable_buttons(ui_components)
-        _setup_progress(ui_components, "🚀 Memulai preprocessing dengan API baru...")
-        
-        # Import preprocessing API
-        from smartcash.dataset.preprocessor import preprocess_dataset
-        
+        # Get configuration
         config = _extract_config(ui_components)
+        if not config:
+            raise ValueError("Invalid or empty configuration")
+        
+        # Create progress callback
         progress_callback = _create_progress_callback(ui_components)
         
-        _log_to_ui(ui_components, "🔧 Starting YOLO preprocessing pipeline...", "info")
+        # Log start of preprocessing
+        if logger_bridge:
+            logger_bridge.info("🔧 Starting YOLO preprocessing pipeline...")
         
-        # Execute preprocessing dengan API baru
+        # Update status panel
+        status_panel = ui_components.get('status_panel')
+        if status_panel and hasattr(status_panel, 'update_status'):
+            status_panel.update_status("Starting preprocessing...", 'info')
+        
+        # Execute preprocessing
         result = preprocess_dataset(
             config=config,
             progress_callback=progress_callback,
@@ -289,24 +367,39 @@ def _execute_preprocessing_with_api(ui_components: Dict[str, Any]) -> bool:
         # Handle results
         if result.get('success', False):
             _process_success_result(ui_components, result)
+            if logger_bridge:
+                logger_bridge.success("✅ Preprocessing completed successfully")
+            if status_panel and hasattr(status_panel, 'update_status'):
+                status_panel.update_status("Preprocessing completed", 'success')
         else:
             error_msg = result.get('message', 'Preprocessing failed')
-            _error_progress(ui_components, error_msg)
-            _log_to_ui(ui_components, f"❌ {error_msg}", "error")
-            return False
+            raise RuntimeError(f"Preprocessing failed: {error_msg}")
             
-        _enable_buttons(ui_components)
-        return True
-        
-    except Exception as e:
-        _handle_error(ui_components, f"❌ API preprocessing error: {str(e)}")
-        return False
+    finally:
+        # Always re-enable buttons when done
+        ui_utils.enable_buttons(ui_components)
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="execute_cleanup"
+)
 def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
-    """Execute cleanup dengan proper error handling dan button management"""
+    """Execute cleanup with proper error handling and button management
+    
+    Args:
+        ui_components: Dictionary containing UI components including logger
+        
+    Returns:
+        bool: True if cleanup was successful, False otherwise
+    """
     try:
-        _disable_buttons(ui_components)
-        _setup_progress(ui_components, "🗑️ Memulai cleanup dengan API baru...")
+        logger_bridge = ui_components.get('logger_bridge')
+        if not logger_bridge:
+            raise ValueError("Logger bridge not initialized in UI components")
+        
+        ui_utils.disable_buttons(ui_components)
+        ui_utils.setup_progress(ui_components, "🗑️ Starting cleanup with new API...")
         
         # Import cleanup API  
         from smartcash.dataset.preprocessor.api.cleanup_api import cleanup_preprocessing_files
@@ -318,9 +411,9 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
         
         progress_callback = _create_progress_callback(ui_components)
         
-        _log_to_ui(ui_components, f"🧹 Cleaning up {cleanup_target} files...", "info")
+        logger_bridge.info(f"🧹 Cleaning up {cleanup_target} files...")
         
-        # Execute cleanup dengan API baru
+        # Execute cleanup with new API
         result = cleanup_preprocessing_files(
             data_dir=data_dir,
             target=cleanup_target,
@@ -329,30 +422,21 @@ def _execute_cleanup_with_api(ui_components: Dict[str, Any]) -> bool:
             progress_callback=progress_callback,
             ui_components=ui_components
         )
-        
+            
         # Handle results
         if result.get('success', False):
             _process_cleanup_result(ui_components, result)
+            logger_bridge.success("✅ Cleanup completed successfully")
+            return True
         else:
             error_msg = result.get('message', 'Cleanup failed')
-            _error_progress(ui_components, error_msg)
-            _log_to_ui(ui_components, f"❌ {error_msg}", "error")
+            ui_utils.error_progress(ui_components, error_msg)
+            logger_bridge.error(f"❌ {error_msg}")
             return False
             
-        _enable_buttons(ui_components)
-        return True
-        
-    except Exception as e:
-        error_msg = f"Gagal memproses hasil status: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
-        return
-        
-    # Log layer analysis jika ada
-    if 'layer_analysis' in file_stats:
-        layer_info = file_stats['layer_analysis']
-        main_objects = layer_info.get('l1_main', {}).get('objects', 0)
-        logger_bridge.info(f"🏦 Main banknotes detected: {main_objects:,} objects")
+    finally:
+        # Always re-enable buttons when done
+        ui_utils.enable_buttons(ui_components)
 
 def _process_success_result(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
     """Process dan display success results
@@ -376,7 +460,7 @@ def _process_success_result(ui_components: Dict[str, Any], result: Dict[str, Any
         
         success_msg = f"✅ Preprocessing berhasil: {processed_count:,} files diproses dalam {processing_time:.1f}s (Success rate: {success_rate})"
         
-        _complete_progress(ui_components, success_msg)
+        ui_utils.complete_progress(ui_components, success_msg)
         logger_bridge.success(success_msg)
         
         # Log banknote analysis jika ada
@@ -388,7 +472,7 @@ def _process_success_result(ui_components: Dict[str, Any], result: Dict[str, Any
     except Exception as e:
         error_msg = f"Gagal memproses hasil sukses: {str(e)}"
         logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
+        ui_utils.show_error_ui(ui_components, error_msg)
 
 def _process_cleanup_result(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
     """Process dan display cleanup results
@@ -408,7 +492,7 @@ def _process_cleanup_result(ui_components: Dict[str, Any], result: Dict[str, Any
         
         success_msg = f"✅ Cleanup berhasil: {files_removed:,} files dihapus dari {len(splits_cleaned)} splits"
         
-        _complete_progress(ui_components, success_msg)
+        ui_utils.complete_progress(ui_components, success_msg)
         logger_bridge.success(success_msg)
         
         # Log detail per split jika ada
@@ -420,223 +504,291 @@ def _process_cleanup_result(ui_components: Dict[str, Any], result: Dict[str, Any
     except Exception as e:
         error_msg = f"Gagal memproses hasil cleanup: {str(e)}"
         logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
+        ui_utils.show_error_ui(ui_components, error_msg)
 
 # === PROGRESS CALLBACK ===
 
-def _create_progress_callback(ui_components: Dict[str, Any]):
-    """Create progress callback untuk preprocessing API
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="create_progress_callback"
+)
+def _create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[str, int, int, str], None]:
+    """Create a progress callback for preprocessing API with error handling.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
         
     Returns:
-        Fungsi callback untuk melaporkan progress
+        Callback function to report progress
     """
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
+    if logger_bridge:
+        logger_bridge.debug("Creating progress callback")
     
-    def progress_callback(level: str, current: int, total: int, message: str):
-        """Callback untuk melaporkan progress operasi
+    def progress_callback(level: str, current: int, total: int, message: str = "") -> None:
+        """Callback function to report operation progress.
         
         Args:
-            level: Level progress (overall, current, step, batch)
-            current: Nilai progress saat ini
-            total: Total nilai progress
-            message: Pesan progress opsional
+            level: Progress level (overall, current, step, batch)
+            current: Current progress value
+            total: Total progress value
+            message: Optional progress message
         """
         try:
             progress_tracker = ui_components.get('progress_tracker')
             if not progress_tracker:
+                if logger_bridge:
+                    logger_bridge.warning("Progress tracker not found in UI components")
                 return
             
-            # Calculate percentage
-            progress_percent = int((current / total) * 100) if total > 0 else 0
+            # Validate inputs
+            if total <= 0:
+                if logger_bridge:
+                    logger_bridge.warning(f"Invalid total progress value: {total}")
+                return
+                
+            # Calculate percentage with bounds checking
+            progress_percent = max(0, min(100, int((current / total) * 100)))
             
-            # Map API level ke tracker method sesuai dokumentasi
-            if level == 'overall' and hasattr(progress_tracker, 'update_overall'):
-                progress_tracker.update_overall(progress_percent, message)
-            elif level == 'current' and hasattr(progress_tracker, 'update_current'):
-                progress_tracker.update_current(progress_percent, message)
-            elif level in ['step', 'batch'] and hasattr(progress_tracker, 'update_current'):
-                progress_tracker.update_current(progress_percent, message)
+            # Log progress updates at appropriate levels
+            if logger_bridge and logger_bridge.isEnabledFor("DEBUG"):
+                logger_bridge.debug(f"Progress update - Level: {level}, Current: {current}, "
+                            f"Total: {total}, Percent: {progress_percent}%, Message: {message}")
             
-            # Log progress updates
-            if message and progress_percent < 100:
-                logger_bridge.info(f"⏳ {message}")
+            # Map API level to tracker methods
+            method_map = {
+                'overall': 'update_overall',
+                'current': 'update_current',
+                'step': 'update_step',
+                'batch': 'update_batch'
+            }
+            
+            method_name = method_map.get(level)
+            if method_name and hasattr(progress_tracker, method_name):
+                method = getattr(progress_tracker, method_name)
+                method(progress_percent, message)
+            elif logger_bridge:
+                logger_bridge.warning(f"No handler for progress level: {level}")
+                
+            # Log important progress updates at INFO level
+            if logger_bridge and level in ['overall', 'current']:
+                log_message = f"{message} ({progress_percent}%)" if message else f"Progress: {progress_percent}%"
+                logger_bridge.info(log_message)
+                
+                # Update status panel for major progress updates
+                status_panel = ui_components.get('status_panel')
+                if status_panel and hasattr(status_panel, 'update_status'):
+                    status_panel.update_status(log_message, 'info')
                 
         except Exception as e:
-            error_msg = f"Gagal memperbarui progress: {str(e)}"
-            logger_bridge.warning(error_msg)
-            
+            error_context = create_error_context(
+                component="progress_callback",
+                operation=level,
+                current=current,
+                total=total,
+                message=message
+            )
+            error_handler.handle_error(
+                e,
+                context=error_context,
+                ui_components=ui_components,
+                log_level="warning"  # Use warning level to avoid spamming errors for progress updates
+            )
+    
     return progress_callback
 
 # === CONFIRMATION HANDLERS ===
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="show_preprocessing_confirmation"
+)
 def _show_preprocessing_confirmation(ui_components: Dict[str, Any]) -> None:
-    """Show preprocessing confirmation dengan API info
+    """Show preprocessing confirmation dialog with API info
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
     """
+    # Show confirmation dialog using the imported function
+    show_confirmation_dialog(
+        ui_components=ui_components,
+        title="Konfirmasi Preprocessing",
+        message="Apakah Anda yakin ingin memproses dataset?",
+        on_confirm=lambda: _set_preprocessing_confirmed(ui_components),
+        on_cancel=lambda: _handle_preprocessing_cancel(ui_components),
+        confirm_text="Ya, Proses",
+        cancel_text="Batal"
+    )
+    
+    # Log the confirmation dialog display
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        # Show confirmation area
-        _show_confirmation_area(ui_components)
-        
-        # Get confirmation components
-        confirm_title = ui_components.get('confirm_title')
-        confirm_message = ui_components.get('confirm_message')
-        confirm_btn = ui_components.get('confirm_btn')
-        cancel_btn = ui_components.get('cancel_btn')
-        
-        if not all([confirm_title, confirm_message, confirm_btn, cancel_btn]):
-            logger_bridge.warning("Komponen konfirmasi tidak ditemukan")
-            return
-            
-        # Update confirmation UI
-        confirm_title.value = "Konfirmasi Preprocessing"
-        confirm_message.value = "Apakah Anda yakin ingin memproses dataset?"
-        
-        # Clear previous handlers
-        confirm_btn.on_click(lambda _: _set_preprocessing_confirmed(ui_components))
-        cancel_btn.on_click(lambda _: _handle_preprocessing_cancel(ui_components))
-        
+    if logger_bridge:
         logger_bridge.info("⏳ Menunggu konfirmasi preprocessing...")
-        
-    except Exception as e:
-        error_msg = f"Gagal menampilkan konfirmasi preprocessing: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="show_cleanup_confirmation"
+)
 def _show_cleanup_confirmation(ui_components: Dict[str, Any]) -> None:
-    """Show cleanup confirmation dengan preview info
+    """Show cleanup confirmation dialog with preview info
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
     """
+    # Get cleanup target from config
+    config = _extract_config(ui_components)
+    cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
+    
+    target_descriptions = {
+        'preprocessed': 'file preprocessing (pre_*.npy + pre_*.txt)',
+        'samples': 'sample images (sample_*.jpg)',
+        'both': 'file preprocessing dan sample images'
+    }
+    
+    target_desc = target_descriptions.get(cleanup_target, cleanup_target)
+    
+    # Show confirmation dialog using the imported function
+    show_confirmation_dialog(
+        ui_components=ui_components,
+        title="🧹 Konfirmasi Cleanup",
+        message=f"Hapus {target_desc}?\n\nTindakan ini akan menghapus file-file yang sudah diproses.",
+        on_confirm=lambda: _set_cleanup_confirmed(ui_components),
+        on_cancel=lambda: _handle_cleanup_cancel(ui_components),
+        confirm_text="Ya, Hapus",
+        cancel_text="Batal",
+        danger_mode=True
+    )
+    
+    # Log the confirmation dialog display
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        # Show confirmation area
-        _show_confirmation_area(ui_components)
-        
-        # Get confirmation components
-        confirm_title = ui_components.get('confirm_title')
-        confirm_message = ui_components.get('confirm_message')
-        confirm_btn = ui_components.get('confirm_btn')
-        cancel_btn = ui_components.get('cancel_btn')
-        
-        if not all([confirm_title, confirm_message, confirm_btn, cancel_btn]):
-            logger_bridge.warning("Komponen konfirmasi tidak ditemukan")
-            return
-            
-        # Get cleanup target from config
-        config = _extract_config(ui_components)
-        cleanup_target = config.get('preprocessing', {}).get('cleanup', {}).get('target', 'preprocessed')
-        
-        target_descriptions = {
-            'preprocessed': 'file preprocessing (pre_*.npy + pre_*.txt)',
-            'samples': 'sample images (sample_*.jpg)',
-            'both': 'file preprocessing dan sample images'
-        }
-        
-        target_desc = target_descriptions.get(cleanup_target, cleanup_target)
-            
-        # Update confirmation UI
-        confirm_title.value = "🧹 Konfirmasi Cleanup"
-        confirm_message.value = f"Hapus {target_desc}?\n\nTindakan ini akan menghapus file-file yang sudah diproses."
-        
-        # Clear previous handlers
-        confirm_btn.on_click(lambda _: _set_cleanup_confirmed(ui_components))
-        cancel_btn.on_click(lambda _: _handle_cleanup_cancel(ui_components))
-        
+    if logger_bridge:
         logger_bridge.info(f"⏳ Menunggu konfirmasi cleanup untuk: {target_desc}...")
-        
-    except Exception as e:
-        error_msg = f"Gagal menampilkan konfirmasi cleanup: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
 
 # === CONFIRMATION STATE MANAGEMENT ===
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="set_preprocessing_confirmed"
+)
 def _set_preprocessing_confirmed(ui_components: Dict[str, Any]) -> None:
-    """Set preprocessing confirmation flag dan trigger execution
+    """Set preprocessing confirmation flag and trigger execution.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
     """
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        ui_components['_preprocessing_confirmed'] = True
+    if logger_bridge:
         logger_bridge.info("✅ Konfirmasi diterima, memulai preprocessing...")
+    
+    # Set confirmation flag
+    ui_components['_preprocessing_confirmed'] = True
+    
+    try:
+        # Execute preprocessing with error handling
         _execute_preprocessing_with_api(ui_components)
     except Exception as e:
-        error_msg = f"Gagal memproses konfirmasi preprocessing: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
+        # Create rich error context
+        error_context = create_error_context(
+            component="preprocessing_handlers",
+            operation="execute_preprocessing",
+            details={
+                'step': 'preprocessing_confirmed',
+                'ui_components': list(ui_components.keys())
+            }
+        )
+        raise UIError("Gagal memproses konfirmasi preprocessing", context=error_context) from e
 
-def _set_cleanup_confirmed(ui_components: Dict[str, Any]):
-    """Set cleanup confirmation flag dan trigger execution"""
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        ui_components['_cleanup_confirmed'] = True
-        logger_bridge.info("✅ Konfirmasi diterima, memulai cleanup...")
-        _execute_cleanup_with_api(ui_components)
-    except Exception as e:
-        error_msg = f"Gagal memproses konfirmasi cleanup: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
-    _hide_confirmation_area(ui_components)
-    _execute_cleanup_with_api(ui_components)
-
-def _handle_preprocessing_cancel(ui_components: Dict[str, Any]) -> None:
-    """Handle preprocessing cancellation dengan proper cleanup
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="set_cleanup_confirmed"
+)
+def _set_cleanup_confirmed(ui_components: Dict[str, Any]) -> None:
+    """Set cleanup confirmation flag and trigger execution.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
     """
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
+    if logger_bridge:
+        logger_bridge.info("✅ Konfirmasi cleanup diterima, memulai pembersihan...")
+    
+    # Set confirmation flag
+    ui_components['_cleanup_confirmed'] = True
+    
     try:
-        _hide_confirmation_area(ui_components)
-        logger_bridge.warning("❌ Preprocessing dibatalkan")
+        # Execute cleanup with error handling
+        _execute_cleanup_with_api(ui_components)
     except Exception as e:
-        error_msg = f"Gagal menangani pembatalan preprocessing: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
-    _enable_buttons(ui_components)  # Enable buttons after cancel
+        # Create rich error context
+        error_context = create_error_context(
+            component="preprocessing_handlers",
+            operation="execute_cleanup",
+            details={
+                'step': 'cleanup_confirmed',
+                'ui_components': list(ui_components.keys())
+            }
+        )
+        raise UIError("Gagal memproses konfirmasi cleanup", context=error_context) from e
+    finally:
+        # Ensure confirmation area is hidden after operation
+        clear_dialog_area(ui_components)
 
-def _handle_cleanup_cancel(ui_components: Dict[str, Any]):
-    """Handle cleanup cancellation dengan proper cleanup"""
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="handle_preprocessing_cancel"
+)
+def _handle_preprocessing_cancel(ui_components: Dict[str, Any]) -> None:
+    """Handle preprocessing cancellation
+    
+    Args:
+        ui_components: Dictionary containing UI components
+    """
+    # Update UI state
+    ui_components['_preprocessing_confirmed'] = False
+    
+    # Log the cancellation
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        _hide_confirmation_area(ui_components)
-        logger_bridge.warning("❌ Cleanup dibatalkan")
-    except Exception as e:
-        error_msg = f"Gagal menangani pembatalan cleanup: {str(e)}"
-        logger_bridge.error(error_msg)
-        _show_error_ui(ui_components, error_msg)
-    _clear_outputs(ui_components)
-    _log_to_ui(ui_components, "🚫 Cleanup dibatalkan oleh user", "info")
-    _enable_buttons(ui_components)
+    if logger_bridge:
+        logger_bridge.info("❌ Preprocessing dibatalkan")
+    
+    # Reset UI to initial state
+    ui_utils.reset_ui_state(ui_components)
+
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="handle_cleanup_cancel"
+)
+def _handle_cleanup_cancel(ui_components: Dict[str, Any]) -> None:
+    """Handle cleanup cancellation with proper UI state reset.
+    
+    Args:
+        ui_components: Dictionary containing UI components
+    """
+    # Clear the confirmation flag
+    ui_components['_cleanup_confirmed'] = False
+    
+    # Log the cancellation
+    logger_bridge = ui_components.get('logger_bridge')
+    if logger_bridge:
+        logger_bridge.warning("🚫 Cleanup dibatalkan")
+    
+    # Clear any existing dialog
+    clear_dialog_area(ui_components)
+    
+    # Update status panel if available
+    status_panel = ui_components.get('status_panel')
+    if status_panel and hasattr(status_panel, 'update_status'):
+        status_panel.update_status("Cleanup dibatalkan", 'warning')
+    
+    # Reset UI state
+    ui_utils.enable_buttons(ui_components)
 
 def _should_execute_preprocessing(ui_components: Dict[str, Any]) -> bool:
     """Check if preprocessing should execute (consume confirmation flag)
@@ -684,58 +836,58 @@ def _should_execute_cleanup(ui_components: Dict[str, Any]) -> bool:
         logger_bridge.error(error_msg)
         return False
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="is_confirmation_pending"
+)
 def _is_confirmation_pending(ui_components: Dict[str, Any]) -> bool:
-    """Check if confirmation dialog is pending
+    """Check if any confirmation dialog is pending.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
         
     Returns:
-        bool: True jika ada konfirmasi yang sedang menunggu, False jika tidak
+        bool: True if any confirmation is pending, False otherwise
     """
+    # Check for pending confirmation flags
+    pending = any(key in ui_components for key in ['_preprocessing_confirmed', '_cleanup_confirmed'])
+    
+    # Log the status if we have a logger
     logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        pending = any(key in ui_components for key in ['_preprocessing_confirmed', '_cleanup_confirmed'])
-        if pending:
-            logger_bridge.debug(f"Status konfirmasi: {'pending' if pending else 'tidak ada'}")
-        return pending
-    except Exception as e:
-        error_msg = f"Gagal memeriksa status konfirmasi: {str(e)}"
-        logger_bridge.error(error_msg)
-        return False
+    if logger_bridge and logger_bridge.isEnabledFor("DEBUG"):
+        logger_bridge.debug(f"Status konfirmasi: {'pending' if pending else 'tidak ada'}")
+    
+    return pending
 
+@with_error_handling(
+    error_handler=error_handler,
+    component="preprocessing_handlers",
+    operation="extract_config"
+)
 def _extract_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract config dari UI components dengan fallback
+    """Safely extract config from UI components with fallback.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary containing UI components
         
     Returns:
         Dict[str, Any]: Konfigurasi yang telah diekstrak
         
-    Raises:
-        ValueError: Jika logger bridge belum diinisialisasi
     """
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi. Pastikan PreprocessingInitializer digunakan")
-        
-    try:
-        config_handler = ui_components.get('config_handler')
-        if config_handler and hasattr(config_handler, 'get_config'):
-            config = config_handler.get_config()
-            logger_bridge.debug("Konfigurasi berhasil diekstrak dari config handler")
-            return config
-            
-        config = ui_components.get('config', {})
-        if not config:
-            logger_bridge.warning("Menggunakan konfigurasi kosong karena tidak ada config handler atau config yang valid")
+    # Try to get config from config handler first
+    config_handler = ui_components.get('config_handler')
+    if config_handler and hasattr(config_handler, 'config'):
+        return config_handler.config
+    
+    # Fallback to direct config from UI components
+    config = ui_components.get('config')
+    if config is not None:
         return config
-        
-    except Exception as e:
-        error_msg = f"Gagal mengekstrak konfigurasi: {str(e)}"
-        logger_bridge.error(error_msg)
-        return {}
+    
+    # Log warning if no config found
+    logger_bridge = ui_components.get('logger_bridge')
+    if logger_bridge:
+        logger_bridge.warning("Config not found in UI components, using empty config")
+    
+    return {}

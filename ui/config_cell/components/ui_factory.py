@@ -18,11 +18,10 @@ from smartcash.ui.components import (
     create_status_panel,
     create_info_accordion,
     create_log_accordion,
-    create_responsive_container,
     create_section_title,
-    create_divider,
-    create_error_card
+    create_divider
 )
+from smartcash.ui.components.error import create_error_component
 
 __all__ = [
     'create_config_summary_panel',
@@ -35,7 +34,7 @@ __all__ = [
 logger = get_logger(__name__)
 
 def create_container(title: str = None, container_id: str = None) -> Dict[str, Any]:
-    """🏗️ Membuat styled container menggunakan shared components.
+    """🏗️ Membuat styled container menggunakan manual VBox.
     
     Args:
         title: Judul opsional yang ditampilkan di bagian atas container
@@ -46,15 +45,19 @@ def create_container(title: str = None, container_id: str = None) -> Dict[str, A
         - 'container': Widget VBox container
         - 'content_area': VBox dimana child components harus ditambahkan
     """
-    # Gunakan create_responsive_container dari shared components
-    container = create_responsive_container()
-    
-    # Tambahkan styling khusus untuk config cell
-    container.layout.border = '1px solid #e0e0e0'
-    container.layout.border_radius = '8px'
-    container.layout.padding = '15px'
-    container.layout.margin = '10px 0'
-    container.layout.box_shadow = '0 2px 4px rgba(0,0,0,0.1)'
+    # Buat container manual karena create_responsive_container butuh children parameter
+    container = widgets.VBox(
+        layout=widgets.Layout(
+            width='100%',
+            max_width='100%',
+            padding='15px',
+            overflow='hidden',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            margin='10px 0',
+            box_shadow='0 2px 4px rgba(0,0,0,0.1)'
+        )
+    )
     
     # Tambahkan ID untuk debugging dan testing
     if container_id:
@@ -82,17 +85,23 @@ def create_container(title: str = None, container_id: str = None) -> Dict[str, A
 
 
 def create_config_summary_panel() -> widgets.VBox:
-    """📋 Membuat panel summary konfigurasi menggunakan shared components.
+    """📋 Membuat panel summary konfigurasi menggunakan manual VBox.
     
     Returns:
         widgets.VBox: Panel summary yang dikonfigurasi
     """
-    summary_container = create_responsive_container()
-    summary_container.layout.border = '1px dashed #e0e0e0'
-    summary_container.layout.border_radius = '4px'
-    summary_container.layout.padding = '10px'
-    summary_container.layout.margin = '10px 0'
-    summary_container.layout.display = 'none'  # Hidden by default
+    summary_container = widgets.VBox(
+        layout=widgets.Layout(
+            width='100%',
+            max_width='100%',
+            padding='10px',
+            overflow='hidden',
+            border='1px dashed #e0e0e0',
+            border_radius='4px',
+            margin='10px 0',
+            display='none'  # Hidden by default
+        )
+    )
     
     return summary_container
 
@@ -277,13 +286,19 @@ def create_config_cell_ui(
             'info_accordion': info_components['accordion']
         })
         
-        # Buat main container menggunakan shared components
-        main_container = create_responsive_container()
-        main_container.layout.border = '1px solid #e0e0e0'
-        main_container.layout.border_radius = '8px'
-        main_container.layout.padding = '15px'
-        main_container.layout.margin = '10px 0'
-        main_container.layout.box_shadow = '0 2px 4px rgba(0,0,0,0.1)'
+        # Buat main container manual
+        main_container = widgets.VBox(
+            layout=widgets.Layout(
+                width='100%',
+                max_width='100%',
+                padding='15px',
+                overflow='hidden',
+                border='1px solid #e0e0e0',
+                border_radius='8px',
+                margin='10px 0',
+                box_shadow='0 2px 4px rgba(0,0,0,0.1)'
+            )
+        )
         
         # Arrange komponen
         components_to_add = [
@@ -307,17 +322,17 @@ def create_config_cell_ui(
         error_msg = f"Gagal membuat komponen UI untuk {module}: {str(e)}"
         logger.error(f"❌ {error_msg}")
         
-        # Return error container menggunakan shared component
-        error_card = create_error_card(
+        # Use standard error component - fail fast
+        error_ui = create_error_component(
+            error_message=error_msg,
             title="Configuration Error",
-            value=module,
-            description=error_msg
+            error_type="error"
         )
         
         return {
-            'container': error_card,
+            'container': error_ui['container'],
             'error': error_msg,
-            'header': widgets.HTML(f"<div style='color: #ff6b6b;'>❌ Error: {module}</div>"),
+            'header': widgets.HTML(f"<div style='color: #c33;'>❌ Error: {module}</div>"),
             'status_panel': create_status_panel(f"Error: {error_msg}", "error"),
-            'child_content': error_card
+            'child_content': error_ui['container']
         }

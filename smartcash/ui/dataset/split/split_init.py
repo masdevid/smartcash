@@ -87,9 +87,15 @@ class SplitConfigInitializer(ConfigCellInitializer):
             
             # Pastikan ada container utama
             if 'container' not in ui_components:
-                # Buat container menggunakan shared components
-                from smartcash.ui.components import create_responsive_container
-                main_container = create_responsive_container()
+                # Buat container manual karena create_responsive_container butuh children
+                main_container = widgets.VBox(
+                    layout=widgets.Layout(
+                        width='100%',
+                        max_width='100%',
+                        padding='10px',
+                        overflow='hidden'
+                    )
+                )
                 
                 # Tambahkan semua widget ke container
                 widgets_to_add = [

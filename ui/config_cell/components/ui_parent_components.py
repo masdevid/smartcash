@@ -16,15 +16,10 @@ from smartcash.ui.config_cell.handlers.error_handler import handle_ui_errors
 
 # Import shared components
 from smartcash.ui.components import (
-    create_responsive_container,
     create_section_title,
-    create_divider,
-    create_error_card,
-    create_header,
-    create_status_panel,
-    create_log_accordion,
-    create_info_accordion
+    create_divider
 )
+from smartcash.ui.components.error import create_error_component
 
 logger = get_logger(__name__)
 T = TypeVar('T', bound=ConfigCellHandler)
@@ -41,15 +36,19 @@ def create_container(title: str = None, container_id: str = None) -> Dict[str, A
         - 'container': Widget VBox container
         - 'content_area': VBox dimana child components harus ditambahkan
     """
-    # Gunakan create_responsive_container dari shared components
-    container = create_responsive_container()
-    
-    # Tambahkan styling khusus untuk config cell
-    container.layout.border = '1px solid #e0e0e0'
-    container.layout.border_radius = '8px'
-    container.layout.padding = '15px'
-    container.layout.margin = '10px 0'
-    container.layout.box_shadow = '0 2px 4px rgba(0,0,0,0.1)'
+    # Buat container manual karena create_responsive_container butuh children parameter
+    container = widgets.VBox(
+        layout=widgets.Layout(
+            width='100%',
+            max_width='100%',
+            padding='15px',
+            overflow='hidden',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            margin='10px 0',
+            box_shadow='0 2px 4px rgba(0,0,0,0.1)'
+        )
+    )
     
     # Tambahkan ID untuk debugging dan testing yang lebih mudah
     if container_id:
@@ -109,13 +108,16 @@ class ParentComponentManager:
             
         except Exception as e:
             logger.error(f"❌ Gagal menginisialisasi container untuk {self.parent_id}: {str(e)}")
-            # Fallback ke basic container menggunakan shared components
-            self.container = create_responsive_container()
-            self.container.layout.border = '1px solid #ff6b6b'
-            self.container.layout.border_radius = '4px'
-            self.container.layout.padding = '10px'
-            self.container.layout.margin = '5px 0'
-            
+            # Fallback ke basic container tanpa shared components yang bermasalah
+            self.container = widgets.VBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    border='1px solid #ff6b6b',
+                    border_radius='4px',
+                    padding='10px',
+                    margin='5px 0'
+                )
+            )
             self.content_area = widgets.VBox()
             
             error_header = widgets.HTML(f"<div style='color: #ff6b6b; font-weight: bold;'>⚠️ {self.title}</div>")
@@ -187,12 +189,13 @@ class ParentComponentManager:
             error_msg = f"❌ Gagal menambahkan child component {child_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
             
-            # Buat error widget menggunakan shared component
-            error_card = create_error_card(
+            # Use standard error component - fail fast
+            error_ui = create_error_component(
+                error_message=error_msg,
                 title="Component Error",
-                value=f"Child {child_id}",
-                description=error_msg
+                error_type="error"
             )
+            error_card = error_ui['container']
             
             current_children = list(self.content_area.children)
             current_children.append(error_card)
@@ -375,8 +378,15 @@ def create_config_cell_ui(
             child_components = handler.create_ui_components(config)
             ui_components.update(child_components)
         
-        # Buat main container menggunakan shared components
-        main_container = create_responsive_container()
+        # Buat main container manual karena create_responsive_container butuh children
+        main_container = widgets.VBox(
+            layout=widgets.Layout(
+                width='100%',
+                max_width='100%',
+                padding='10px',
+                overflow='hidden'
+            )
+        )
         
         # Arrange components
         components_to_add = [
@@ -398,15 +408,15 @@ def create_config_cell_ui(
     except Exception as e:
         logger.error(f"❌ Gagal membuat config cell UI untuk {module}: {str(e)}")
         
-        # Return error container menggunakan shared component
-        error_card = create_error_card(
+        # Use standard error component - fail fast
+        error_ui = create_error_component(
+            error_message=f"Failed to create UI: {str(e)}",
             title="Configuration Error",
-            value=module,
-            description=f"Failed to create UI: {str(e)}"
+            error_type="error"
         )
         
         return {
-            'container': error_card,
+            'container': error_ui['container'],
             'error': str(e)
         }
 

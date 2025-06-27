@@ -28,20 +28,40 @@ class TestDependencyUIComponents(unittest.TestCase):
         self.mock_logger_instance = MagicMock()
         self.mock_logger_bridge.return_value = self.mock_logger_instance
 
-        # Mock other UI components
-        self.mock_header = MagicMock()
-        self.mock_status_panel = MagicMock()
-        self.mock_action_buttons = MagicMock()
-        self.mock_progress_tracker = MagicMock(container=MagicMock())
+        # Create proper widget mocks that implement the ipywidgets interface
+        def create_widget_mock(**kwargs):
+            mock = MagicMock()
+            mock.layout = MagicMock()
+            for k, v in kwargs.items():
+                setattr(mock, k, v)
+            return mock
+            
+        # Mock other UI components with proper widget mocks
+        self.mock_header = create_widget_mock()
+        self.mock_status_panel = create_widget_mock()
+        self.mock_action_buttons = create_widget_mock()
+        self.mock_progress_tracker = create_widget_mock(container=create_widget_mock())
+        
+        # Create a proper mock for the log components that will be returned by create_log_accordion
+        self.mock_log_output = MagicMock(spec=widgets.Output)
+        self.mock_entries_container = MagicMock(spec=widgets.VBox)
+        self.mock_log_accordion = MagicMock(spec=widgets.Accordion)
+        
+        # Set up the children structure
+        self.mock_entries_container.children = [self.mock_log_output]
+        self.mock_log_accordion.children = [self.mock_entries_container]
+        
+        # Create the log components dictionary with proper widget mocks
         self.mock_log_components = {
-            'log_output': MagicMock(),
-            'log_accordion': MagicMock(),
-            'entries_container': MagicMock()
+            'log_output': self.mock_log_output,
+            'log_accordion': self.mock_log_accordion,
+            'entries_container': self.mock_entries_container
         }
-        self.mock_custom_section = MagicMock()
-        self.mock_categories_section = MagicMock()
-        self.mock_action_section = MagicMock()
-        self.mock_confirmation_area = MagicMock()
+        
+        self.mock_custom_section = create_widget_mock()
+        self.mock_categories_section = create_widget_mock()
+        self.mock_action_section = create_widget_mock()
+        self.mock_confirmation_area = create_widget_mock()
 
         # Patch the component creation functions
         self.header_patch = patch(
@@ -60,9 +80,19 @@ class TestDependencyUIComponents(unittest.TestCase):
             'smartcash.ui.components.create_dual_progress_tracker',
             return_value=self.mock_progress_tracker
         )
+        # Patch create_log_accordion to return our mock components
+        def mock_create_log_accordion(*args, **kwargs):
+            return self.mock_log_components
+            
         self.log_accordion_patch = patch(
             'smartcash.ui.components.create_log_accordion',
-            return_value=self.mock_log_components
+            side_effect=mock_create_log_accordion
+        )
+        
+        # Patch the module-level import as well
+        self.module_log_accordion_patch = patch(
+            'smartcash.ui.setup.dependency.components.ui_components.create_log_accordion',
+            side_effect=mock_create_log_accordion
         )
         self.responsive_container_patch = patch(
             'smartcash.ui.components.create_responsive_container',
@@ -106,6 +136,7 @@ class TestDependencyUIComponents(unittest.TestCase):
         self.action_buttons_patch.start()
         self.progress_tracker_patch.start()
         self.log_accordion_patch.start()
+        self.module_log_accordion_patch.start()
         self.responsive_container_patch.start()
         self.custom_section_patch.start()
         self.confirmation_area_patch.start()
@@ -113,6 +144,10 @@ class TestDependencyUIComponents(unittest.TestCase):
         self.checkbox_patch.start()
         self.html_patch.start()
         self.vbox_patch.start()
+        
+        # Configure the action buttons mock to return a proper widget with children
+        mock_buttons = [MagicMock() for _ in range(3)]
+        self.mock_action_buttons.children = mock_buttons
         
         # Patch the helper functions
         self.categories_section_patch = patch(
@@ -136,27 +171,36 @@ class TestDependencyUIComponents(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures after each test method."""
-        # Stop all patches
-        self.logger_patch.stop()
-        self.header_patch.stop()
-        self.status_panel_patch.stop()
-        self.action_buttons_patch.stop()
-        self.progress_tracker_patch.stop()
-        self.log_accordion_patch.stop()
-        self.responsive_container_patch.stop()
-        self.custom_section_patch.stop()
-        self.confirmation_area_patch.stop()
+        # Stop all patches in reverse order
+        self.vbox_patch.stop()
+        self.html_patch.stop()
+        self.checkbox_patch.stop()
         self.action_section_patch.stop()
-        self.categories_section_patch.stop()
-        self.custom_section_func_patch.stop()
+        self.confirmation_area_patch.stop()
+        self.custom_section_patch.stop()
+        self.responsive_container_patch.stop()
+        self.module_log_accordion_patch.stop()
+        self.log_accordion_patch.stop()
+        self.progress_tracker_patch.stop()
+        self.action_buttons_patch.stop()
+        self.status_panel_patch.stop()
+        self.header_patch.stop()
+        self.logger_patch.stop()
+        
+        # Stop any other patches that might have been started
+        if hasattr(self, 'categories_section_patch'):
+            self.categories_section_patch.stop()
+        if hasattr(self, 'custom_section_func_patch'):
+            self.custom_section_func_patch.stop()
+        if hasattr(self, 'default_config_patch'):
+            self.default_config_patch.stop()
 
     def test_create_dependency_main_ui(self):
         """Test creating the main dependency management UI."""
         from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
         
-        # Call the function with a test config
+        # Create a test config with required structure
         test_config = {
-            'test_key': 'test_value',
             'categories': [
                 {
                     'name': 'Test Category',
@@ -164,31 +208,76 @@ class TestDependencyUIComponents(unittest.TestCase):
                     'icon': '📦',
                     'packages': [
                         {
-                            'name': 'test-package', 
+                            'name': 'test-package',
                             'description': 'Test package',
                             'key': 'test-pkg',
                             'pip_name': 'test-package',
-                            'required': False
+                            'required': True,
+                            'installed': False,
+                            'version': '1.0.0',
+                            'latest_version': '1.0.0',
+                            'update_available': False,
+                            'dependencies': []
                         }
                     ]
                 }
             ]
         }
         
-        # Reset mocks to track calls in this test
+        # Reset all mocks to ensure clean state
         self.mock_logger_instance.reset_mock()
         self.mock_status_panel.reset_mock()
         self.mock_action_buttons.reset_mock()
         self.mock_progress_tracker.reset_mock()
-        self.mock_log_components['log_output'].reset_mock()
-        self.mock_log_components['log_accordion'].reset_mock()
-        self.mock_log_components['entries_container'].reset_mock()
+        self.mock_log_output.reset_mock()
+        self.mock_log_accordion.reset_mock()
+        self.mock_entries_container.reset_mock()
         self.mock_action_section.reset_mock()
+        self.mock_header.reset_mock()
         
-        # Call the function
+        # Reset any layout mocks
+        for widget in [self.mock_header, self.mock_status_panel, self.mock_action_buttons,
+                      self.mock_progress_tracker, self.mock_log_output, self.mock_log_accordion,
+                      self.mock_entries_container, self.mock_action_section]:
+            if hasattr(widget, 'layout'):
+                widget.layout.reset_mock()
+        
+        # Create proper button mocks with the expected attributes
+        self.mock_install_btn = MagicMock()
+        self.mock_check_updates_btn = MagicMock()
+        self.mock_uninstall_btn = MagicMock()
+        
+        # Create a proper HBox mock for action buttons with children
+        self.mock_action_buttons = MagicMock(spec=widgets.HBox)
+        self.mock_action_buttons.children = [
+            self.mock_install_btn,
+            self.mock_check_updates_btn,
+            self.mock_uninstall_btn
+        ]
+        
+        # Make the action_buttons_patch return our mock HBox
+        self.action_buttons_patch.return_value = self.mock_action_buttons
+        
+        # Mock the create_action_buttons to return a dictionary with the buttons
+        # This matches the actual implementation in the UI components
+        self.action_buttons_patch.return_value = {
+            'buttons': [
+                self.mock_install_btn,
+                self.mock_check_updates_btn,
+                self.mock_uninstall_btn
+            ],
+            'count': 3,
+            'layout_style': 'flex',
+            'primary': self.mock_install_btn,
+            'install_btn': self.mock_install_btn,
+            'check_updates_btn': self.mock_check_updates_btn,
+            'uninstall_btn': self.mock_uninstall_btn
+        }
+        
+        # Call the function with test config
         result = create_dependency_main_ui(test_config)
         
-        # Verify the result contains expected keys
+        # Verify the result contains all expected keys
         expected_keys = [
             'ui', 'container', 'header', 'status_panel', 'categories_section',
             'custom_section', 'action_section', 'progress_tracker',
@@ -204,14 +293,9 @@ class TestDependencyUIComponents(unittest.TestCase):
         call_args = self.mock_logger_bridge.call_args[1]  # Get kwargs
         
         # Verify the logger bridge was called with the correct parameters
-        self.assertIn('log_output', call_args)
-        self.assertIn('status_output', call_args)
+        self.assertIn('ui_components', call_args)
         self.assertIn('logger_name', call_args)
         self.assertEqual(call_args.get('logger_name'), 'dependency_ui')
-        
-        # Verify the log_output and status_output are the ones we expect
-        self.assertIsInstance(call_args.get('log_output'), MagicMock)
-        self.assertIsInstance(call_args.get('status_output'), MagicMock)
         
         # Verify the UI components were created with correct parameters
         self.status_panel_patch.assert_called_once_with(
@@ -225,6 +309,28 @@ class TestDependencyUIComponents(unittest.TestCase):
             ("check_updates_btn", "🔍 Check Updates", "info", False),
             ("uninstall_btn", "🗑️ Uninstall", "danger", False)
         ])
+        
+        # Verify the progress tracker was created
+        self.progress_tracker_patch.assert_called_once_with(
+            "Overall Progress", "Current Operation"
+        )
+        
+        # Verify the log accordion was created with correct parameters
+        self.log_accordion_patch.assert_called_once_with("Operation Logs", height="300px")
+        
+        # Verify the responsive container was called with correct children
+        self.assertTrue(self.responsive_container_patch.called)
+        
+        # Verify the action section was created with correct parameters
+        self.action_section_patch.assert_called_once()
+        
+        # Verify the logger bridge instance was stored in the result
+        self.assertEqual(result['logger_bridge'], self.mock_logger_instance)
+        
+        # Verify the action buttons are properly set in the result
+        self.assertEqual(result['install_btn'], mock_buttons[0])
+        self.assertEqual(result['check_updates_btn'], mock_buttons[1])
+        self.assertEqual(result['uninstall_btn'], mock_buttons[2])
         
         # Verify the progress tracker was created with correct parameters
         self.progress_tracker_patch.assert_called_once_with(

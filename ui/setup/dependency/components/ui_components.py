@@ -78,6 +78,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'action_section': action_section,
         'progress_tracker': progress_tracker, 
         'log_components': log_components,
+        'log_output': log_components['log_output'],  # Add log_output for compatibility
         'logger_bridge': logger_bridge
     }
     

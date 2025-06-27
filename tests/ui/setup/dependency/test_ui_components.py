@@ -243,9 +243,9 @@ class TestDependencyUIComponents(unittest.TestCase):
                 widget.layout.reset_mock()
         
         # Create proper button mocks with the expected attributes
-        self.mock_install_btn = MagicMock()
-        self.mock_check_updates_btn = MagicMock()
-        self.mock_uninstall_btn = MagicMock()
+        self.mock_install_btn = MagicMock(description='install_btn')
+        self.mock_check_updates_btn = MagicMock(description='check_updates_btn')
+        self.mock_uninstall_btn = MagicMock(description='uninstall_btn')
         
         # Create a proper HBox mock for action buttons with children
         self.mock_action_buttons = MagicMock(spec=widgets.HBox)
@@ -255,12 +255,8 @@ class TestDependencyUIComponents(unittest.TestCase):
             self.mock_uninstall_btn
         ]
         
-        # Make the action_buttons_patch return our mock HBox
-        self.action_buttons_patch.return_value = self.mock_action_buttons
-        
-        # Mock the create_action_buttons to return a dictionary with the buttons
-        # This matches the actual implementation in the UI components
-        self.action_buttons_patch.return_value = {
+        # Create the action components dictionary that matches the actual implementation
+        action_components = {
             'buttons': [
                 self.mock_install_btn,
                 self.mock_check_updates_btn,
@@ -271,7 +267,79 @@ class TestDependencyUIComponents(unittest.TestCase):
             'primary': self.mock_install_btn,
             'install_btn': self.mock_install_btn,
             'check_updates_btn': self.mock_check_updates_btn,
-            'uninstall_btn': self.mock_uninstall_btn
+            'uninstall_btn': self.mock_uninstall_btn,
+            'container': self.mock_action_buttons  # Add container reference
+        }
+        
+        # Mock the action buttons to return our action components
+        self.action_buttons_patch.return_value = action_components
+        
+        # Mock the logger bridge
+        self.mock_logger_instance = MagicMock()
+        self.mock_logger_bridge.return_value = self.mock_logger_instance
+        
+        # Mock the progress tracker
+        self.mock_progress_tracker = MagicMock()
+        self.mock_progress_tracker.container = MagicMock()
+        self.progress_tracker_patch.return_value = self.mock_progress_tracker
+        
+        # Mock the log accordion
+        self.mock_log_output = MagicMock()
+        self.mock_log_accordion = MagicMock()
+        self.log_components = {
+            'log_accordion': self.mock_log_accordion,
+            'log_output': self.mock_log_output
+        }
+        self.log_accordion_patch.return_value = self.log_components
+        
+        # Mock the responsive container
+        self.mock_container = MagicMock()
+        self.responsive_container_patch.return_value = self.mock_container
+        
+        # Mock the confirmation area
+        self.mock_confirmation_area = MagicMock()
+        self.confirmation_area_patch.return_value = (self.mock_confirmation_area, MagicMock())
+        
+        # Mock the action section
+        self.mock_action_section = MagicMock()
+        self.action_section_patch.return_value = self.mock_action_section
+        
+        # Mock the categories section
+        self.mock_categories_section = MagicMock()
+        self.categories_section_patch.return_value = self.mock_categories_section
+        
+        # Mock the custom section
+        self.mock_custom_section = MagicMock()
+        self.custom_section_patch.return_value = self.mock_custom_section
+        
+        # Mock the header
+        self.mock_header = MagicMock()
+        self.header_patch.return_value = self.mock_header
+        
+        # Mock the status panel
+        self.mock_status_panel = MagicMock()
+        self.status_panel_patch.return_value = self.mock_status_panel
+        
+        # Configure the action_buttons_patch to return our action components
+        # Make sure the mock returns a widget with children for the action buttons
+        self.mock_action_buttons = MagicMock(spec=widgets.HBox)
+        self.mock_action_buttons.children = [
+            self.mock_install_btn,
+            self.mock_check_updates_btn,
+            self.mock_uninstall_btn
+        ]
+        
+        # The actual return value should be a widget with children
+        self.action_buttons_patch.return_value = self.mock_action_buttons
+        
+        # Also patch the action_components to be accessible for assertions
+        self.action_components = {
+            'buttons': [
+                self.mock_install_btn,
+                self.mock_check_updates_btn,
+                self.mock_uninstall_btn
+            ],
+            'container': self.mock_action_buttons
         }
         
         # Call the function with test config
@@ -281,12 +349,63 @@ class TestDependencyUIComponents(unittest.TestCase):
         expected_keys = [
             'ui', 'container', 'header', 'status_panel', 'categories_section',
             'custom_section', 'action_section', 'progress_tracker',
-            'log_components', 'logger_bridge', 'install_btn', 'check_updates_btn',
-            'uninstall_btn'
+            'log_components', 'logger_bridge'
         ]
         
+        # Check for required keys
+        print("\n=== Checking required keys ===")
+        print(f"Available keys in result: {list(result.keys())}")
+        print(f"Expected keys: {expected_keys}")
+        
         for key in expected_keys:
-            self.assertIn(key, result, f"Expected key '{key}' not found in result")
+            print(f"\nChecking key: {key}")
+            print(f"Key exists: {key in result}")
+            if key not in result:
+                print(f"Key '{key}' not found in result")
+                print(f"Available keys: {list(result.keys())}")
+            self.assertIn(key, result, f"Expected key '{key}' not found in result. Available keys: {list(result.keys())}")
+        print("All required keys found")
+        
+        # Verify action buttons are in the result
+        print("\n=== Checking action buttons ===")
+        buttons = ['install_btn', 'check_updates_btn', 'uninstall_btn']
+        print(f"Available keys in result: {list(result.keys())}")
+        print(f"Looking for buttons: {buttons}")
+        
+        for btn in buttons:
+            print(f"\nChecking button: {btn}")
+            print(f"Button exists: {btn in result}")
+            if btn not in result:
+                print(f"Button '{btn}' not found in result")
+                print(f"Available keys: {list(result.keys())}")
+            self.assertIn(btn, result, f"Button '{btn}' not found in result. Available keys: {list(result.keys())}")
+        print("All action buttons found")
+        
+        # Verify the UI components are correctly set
+        print("\n=== Debug: Verifying UI components ===")
+        print(f"Result keys: {list(result.keys())}")
+        
+        # Check each component with debug info
+        components_to_check = [
+            ('ui', self.mock_container),
+            ('container', self.mock_container),
+            ('header', self.mock_header),
+            ('status_panel', self.mock_status_panel),
+            ('categories_section', self.mock_categories_section),
+            ('custom_section', self.mock_custom_section),
+            ('action_section', self.mock_action_section),
+            ('progress_tracker', self.mock_progress_tracker),
+            ('log_components', self.log_components),
+            ('logger_bridge', self.mock_logger_instance)
+        ]
+        
+        for key, expected in components_to_check:
+            actual = result.get(key, 'KEY_NOT_FOUND')
+            print(f"\nChecking {key}:")
+            print(f"  Expected: {expected}")
+            print(f"  Actual:   {actual}")
+            print(f"  Type:     {type(actual)}")
+            self.assertEqual(actual, expected, f"Mismatch for {key}")
         
         # Verify the logger bridge was created with correct parameters
         self.mock_logger_bridge.assert_called_once()
@@ -309,6 +428,11 @@ class TestDependencyUIComponents(unittest.TestCase):
             ("check_updates_btn", "🔍 Check Updates", "info", False),
             ("uninstall_btn", "🗑️ Uninstall", "danger", False)
         ])
+        
+        # Verify the action buttons were added to the UI components
+        self.assertIn('install_btn', result)
+        self.assertIn('check_updates_btn', result)
+        self.assertIn('uninstall_btn', result)
         
         # Verify the progress tracker was created
         self.progress_tracker_patch.assert_called_once_with(

@@ -174,7 +174,7 @@ class DownloaderInitializer(CommonInitializer):
             
             env_manager = get_environment_manager()
             # Use data directory for downloader
-            data_dir = Path(env_manager.get_data_path())
+            data_dir = env_manager._resolve_data_path()
             if not data_dir.exists():
                 data_dir.mkdir(parents=True, exist_ok=True)
                 self.logger.info(f"✅ Created data directory: {data_dir}")

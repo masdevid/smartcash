@@ -245,9 +245,9 @@ class SplitConfigInitializer(ConfigCellInitializer):
             setup_event_handlers(self, self.ui_components)
             
             # Update status untuk indicate ready
-            self.update_status("✅ Split configuration ready", "success")
+            self.update_status("Split configuration ready", "success")
             
-            self._logger.debug("✅ Custom event handlers setup completed")
+            self._logger.debug("Custom event handlers setup completed")
             
         except Exception as e:
             self._logger.error(f"❌ Failed to setup custom handlers: {str(e)}", exc_info=True)

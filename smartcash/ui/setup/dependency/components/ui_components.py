@@ -70,7 +70,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         custom_packages_list.observe(lambda _: update_save_status(), names='children')
     
     # Create action buttons with icons and tooltips
-    action_buttons = create_action_buttons([
+    action_buttons_config = [
         {
             'id': 'install_btn',
             'label': '📦 Install',
@@ -111,9 +111,10 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
             'icon': 'fa-undo',
             'disabled': False
         }
-    ])
+    ]
     
-    action_components = create_action_buttons(action_buttons)
+    # Create action components first
+    action_components = create_action_buttons(action_buttons_config)
     
     # Progress tracker for installation progress
     progress_tracker = create_dual_progress_tracker(
@@ -132,12 +133,13 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Create a tabbed interface for better organization
     tabs = widgets.Tab()
+    # Create tabs with action components
     tabs.children = [
         widgets.VBox([
             widgets.HTML("<h3 style='margin-top: 0;'>Package Categories</h3>"),
             categories_section,
             widgets.HTML("<div style='margin: 10px 0;'></div>"),
-            action_buttons
+            action_components  # Use action_components directly
         ]),
         widgets.VBox([
             widgets.HTML("<h3 style='margin-top: 0;'>Custom Packages</h3>"),
@@ -163,23 +165,23 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         children.append(tabs)
     
     # Create action buttons row
-    action_buttons = []
+    action_buttons_list = []
     # Check if action_components is a widget with children
     if hasattr(action_components, 'children') and isinstance(action_components.children, (list, tuple)):
         # Extract all button widgets from children
         for child in action_components.children:
             if isinstance(child, widgets.Button):
-                action_buttons.append(child)
+                action_buttons_list.append(child)
     # Fallback to dictionary access if available
     elif hasattr(action_components, 'buttons') and isinstance(action_components.buttons, dict):
         for btn_id in ['install_btn', 'check_updates_btn', 'uninstall_btn', 'save_btn', 'reset_btn']:
             if btn_id in action_components.buttons:
-                action_buttons.append(action_components.buttons[btn_id])
+                action_buttons_list.append(action_components.buttons[btn_id])
     
     # Add action buttons and save status in an HBox
-    if action_buttons or save_status:
+    if action_buttons_list or save_status:
         button_row = widgets.HBox(
-            children=[*action_buttons, save_status] if save_status else action_buttons,
+            children=[*action_buttons_list, save_status] if save_status else action_buttons_list,
             layout=widgets.Layout(
                 justify_content='space-between',
                 align_items='center',

@@ -6,9 +6,7 @@
 
 from typing import Dict, Any, Optional
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.ui_logger import get_ui_logger
 
-logger = get_ui_logger(__name__)
 
 def setup_all_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], 
                       config_handler: Optional[ConfigHandler] = None) -> Dict[str, Any]:

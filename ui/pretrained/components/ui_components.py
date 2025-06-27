@@ -71,15 +71,51 @@ def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **k
         secondary_label="Drive Sync"
     )
             
-    # Action buttons
-    button_configs = [
-        {'name': 'download_sync', 'label': '📥 Download & Sync Models', 'style': 'primary'},
-        {'name': 'save', 'label': '💾 Simpan Config', 'style': 'success'},
-        {'name': 'reset', 'label': '🔄 Reset', 'style': 'warning'}
-    ]
-    buttons = create_action_buttons(button_configs)
-    for button_config in button_configs:
-        ui_components[f"{button_config['name']}_button"] = buttons[button_config['name']]
+    # Action buttons with new API - using secondary_buttons for additional actions
+    action_components = create_action_buttons(
+        primary_label="Download & Sync Models",
+        primary_icon="📥",
+        secondary_buttons=[
+            ("Simpan Config", "💾", "success"),
+            ("Reset", "🔄", "warning")
+        ],
+        button_width='200px',
+        primary_style='primary'
+    )
+    
+    # Get buttons using new API
+    download_button = action_components.get('primary_button')
+    secondary_buttons = action_components.get('secondary_buttons', [])
+    save_button = secondary_buttons[0] if len(secondary_buttons) > 0 else None
+    reset_button = secondary_buttons[1] if len(secondary_buttons) > 1 else None
+    
+    # Fallback button creation if any button is missing
+    if download_button is None:
+        print("[WARNING] Download button not found, creating fallback")
+        download_button = widgets.Button(description='📥 Download & Sync Models',
+                                      button_style='primary')
+        download_button.layout = widgets.Layout(width='200px')
+    
+    if save_button is None:
+        print("[WARNING] Save button not found, creating fallback")
+        save_button = widgets.Button(description='💾 Simpan Config',
+                                  button_style='success')
+        save_button.layout = widgets.Layout(width='150px')
+    
+    if reset_button is None:
+        print("[WARNING] Reset button not found, creating fallback")
+        reset_button = widgets.Button(description='🔄 Reset',
+                                   button_style='warning')
+        reset_button.layout = widgets.Layout(width='120px')
+    
+    # Update UI components with buttons for backward compatibility
+    ui_components['download_sync_button'] = download_button
+    ui_components['save_button'] = save_button
+    ui_components['reset_button'] = reset_button
+    
+    # Store the container for layout
+    ui_components['action_buttons_container'] = action_components.get('container', 
+                                                                   widgets.HBox([download_button, save_button, reset_button]))
             
     # Log accordion
     ui_components['log_accordion'] = create_log_accordion()

@@ -40,35 +40,67 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         )
     )
     
-    # Action buttons
-    action_buttons = create_action_buttons(
+    # Action buttons with new API
+    action_components = create_action_buttons(
         primary_label="Install",
-        primary_icon='download',
+        primary_icon="📥",
         secondary_buttons=[
-            ('Analyze', 'search', 'info'),
-            ('Status Check', 'check-circle', 'info'),
-            ('System Report', 'info', 'info')
+            ("Analyze", "🔍", "info"),
+            ("Status Check", "✅", "info"),
+            ("System Report", "📊", "info")
         ],
-        button_width='120px'
+        button_width='120px',
+        primary_style='primary'
     )
     
-    # Map button names for backward compatibility
-    action_buttons['status_check_button'] = action_buttons['check_button']
+    # Get buttons using new API
+    install_button = action_components.get('primary_button')
+    secondary_buttons = action_components.get('secondary_buttons', [])
+    analyze_button = secondary_buttons[0] if len(secondary_buttons) > 0 else None
+    status_check_button = secondary_buttons[1] if len(secondary_buttons) > 1 else None
+    system_report_button = secondary_buttons[2] if len(secondary_buttons) > 2 else None
     
-    # Action buttons container
-    action_container = widgets.HBox([
-        action_buttons['download_button'],
-        action_buttons['status_check_button'],
-        action_buttons['cleanup_button']
-    ], layout=widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        align_items='center',
-        justify_content='flex-start',
-        width='100%',
-        gap='8px',
-        overflow='hidden'
-    ))
+    # Fallback button creation if any button is missing
+    if install_button is None:
+        print("[WARNING] Install button not found, creating fallback")
+        install_button = widgets.Button(description='📥 Install', 
+                                     button_style='primary')
+        install_button.layout = widgets.Layout(width='120px')
+    
+    if analyze_button is None:
+        print("[WARNING] Analyze button not found, creating fallback")
+        analyze_button = widgets.Button(description='🔍 Analyze')
+        analyze_button.style.button_color = '#f0f0f0'
+        analyze_button.layout = widgets.Layout(width='120px')
+    
+    if status_check_button is None:
+        print("[WARNING] Status Check button not found, creating fallback")
+        status_check_button = widgets.Button(description='✅ Status Check')
+        status_check_button.style.button_color = '#f0f0f0'
+        status_check_button.layout = widgets.Layout(width='120px')
+    
+    if system_report_button is None:
+        print("[WARNING] System Report button not found, creating fallback")
+        system_report_button = widgets.Button(description='📊 System Report')
+        system_report_button.style.button_color = '#f0f0f0'
+        system_report_button.layout = widgets.Layout(width='140px')
+    
+    # For backward compatibility
+    action_buttons = {
+        'download_button': install_button,
+        'check_button': status_check_button,
+        'analyze_button': analyze_button,
+        'system_report_button': system_report_button,
+        'status_check_button': status_check_button,  # Alias for backward compatibility
+        'primary_button': install_button,  # For consistency with new API
+        'secondary_buttons': [analyze_button, status_check_button, system_report_button],
+        'container': action_components.get('container', 
+                                         widgets.HBox([install_button, analyze_button, 
+                                                     status_check_button, system_report_button]))
+    }
+    
+    # Action buttons container with proper layout
+    action_container = action_buttons['container']
     
     # Save/reset buttons
     save_reset_buttons = create_save_reset_buttons(

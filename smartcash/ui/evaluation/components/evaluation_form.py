@@ -177,14 +177,34 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         )
     }
     
-    # Action buttons untuk menjalankan evaluasi sesuai skenario
-    action_buttons = create_action_buttons(
+    # Action buttons for evaluation using the new API
+    action_components = create_action_buttons(
         primary_label="Jalankan Evaluasi",
-        primary_icon="play",
-        secondary_buttons=[("Cek Checkpoint", "check", "")],
+        primary_icon="▶️",
+        secondary_buttons=[
+            ("Cek Checkpoint", "🔍", "info"),
+        ],
         cleanup_enabled=False,
+        button_width='180px',
         primary_style='success'
     )
+    
+    # Get buttons using new API
+    evaluate_button = action_components.get('primary_button')
+    check_button = action_components.get('secondary_buttons', [None])[0] if action_components.get('secondary_buttons') else None
+    
+    # Fallback button creation if any button is missing
+    if evaluate_button is None:
+        print("[WARNING] Evaluate button not found, creating fallback")
+        evaluate_button = widgets.Button(description='▶️ Jalankan Evaluasi', 
+                                      button_style='success')
+        evaluate_button.layout = widgets.Layout(width='180px')
+    
+    if check_button is None:
+        print("[WARNING] Check button not found, creating fallback")
+        check_button = widgets.Button(description='🔍 Cek Checkpoint')
+        check_button.style.button_color = '#f0f0f0'
+        check_button.layout = widgets.Layout(width='180px')
     
     # Buat checkpoint_selector container untuk mengelompokkan elemen-elemen terkait checkpoint
     checkpoint_selector = widgets.VBox([
@@ -193,11 +213,14 @@ def create_evaluation_form(config: Dict[str, Any]) -> Dict[str, Any]:
         widgets.HBox([components['validation_metrics_select']])
     ], layout=widgets.Layout(margin='10px 0px'))
     
-    # Merge dengan action buttons dan tambahkan checkpoint_selector
+    # Update components with buttons and container
     components.update({
-        **action_buttons,
-        'evaluate_button': action_buttons['download_button'],  # Tombol utama untuk evaluasi (menggunakan download_button sebagai primary)
-        'cancel_button': action_buttons['check_button'],  # Tombol untuk membatalkan evaluasi (menggunakan check_button sebagai secondary)
+        'evaluate_button': evaluate_button,
+        'check_button': check_button,
+        'action_buttons_container': action_components.get('container', 
+                                                       widgets.HBox([evaluate_button, check_button])),
+        'primary_button': evaluate_button,  # For backward compatibility
+        'secondary_buttons': [check_button] if check_button else [],  # For backward compatibility
         'checkpoint_selector': checkpoint_selector  # Tambahkan checkpoint_selector sebagai komponen tunggal
     })
     

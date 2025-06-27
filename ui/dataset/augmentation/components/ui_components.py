@@ -69,20 +69,65 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     augmentation_types = _create_augmentation_types_group()
     live_preview = _create_live_preview_group()  # CHANGED: Menggantikan normalization
     
-    # Progress tracker dan buttons
+    # Progress tracker and buttons
     progress_tracker = create_dual_progress_tracker("Augmentation Pipeline", auto_hide=True)
+    
+    # Save/Reset buttons
     config_buttons = create_save_reset_buttons(
-        save_label="Simpan", reset_label="Reset",
-        with_sync_info=True, sync_message="Konfigurasi disinkronkan dengan backend"
-    )
-    action_buttons = create_action_buttons(
-        primary_label="🚀 Jalankan Augmentasi", primary_icon="play",
-        secondary_buttons=[("🔍 Cek Data", "search", "info")],
-        cleanup_enabled=True, 
-        button_width="220px"
+        save_label="Simpan", 
+        reset_label="Reset",
+        with_sync_info=True, 
+        sync_message="Konfigurasi disinkronkan dengan backend"
     )
     
-    # Confirmation area untuk dialog integration
+    # Action buttons with new API
+    action_components = create_action_buttons(
+        primary_label="Jalankan Augmentasi",
+        primary_icon="🚀",
+        secondary_buttons=[
+            ("Cek Data", "🔍", "info"),
+        ],
+        cleanup_enabled=True,
+        cleanup_label="Bersihkan Hasil",
+        cleanup_tooltip="Hapus hasil augmentasi sebelumnya",
+        button_width='220px',
+        primary_style='success'
+    )
+    
+    # Get buttons using new API
+    augment_button = action_components.get('primary_button')
+    check_button = action_components.get('secondary_buttons', [None])[0] if action_components.get('secondary_buttons') else None
+    cleanup_button = action_components.get('cleanup_button')
+    
+    # Fallback button creation if any button is missing
+    if augment_button is None:
+        print("[WARNING] Augment button not found, creating fallback")
+        augment_button = widgets.Button(description='🚀 Jalankan Augmentasi', 
+                                     button_style='success')
+        augment_button.layout = widgets.Layout(width='220px')
+    
+    if check_button is None:
+        print("[WARNING] Check button not found, creating fallback")
+        check_button = widgets.Button(description='🔍 Cek Data')
+        check_button.style.button_color = '#f0f0f0'
+        check_button.layout = widgets.Layout(width='220px')
+    
+    if cleanup_button is None:
+        print("[WARNING] Cleanup button not found, creating fallback")
+        cleanup_button = widgets.Button(description='🗑️ Bersihkan Hasil',
+                                      button_style='warning')
+        cleanup_button.layout = widgets.Layout(width='220px')
+    
+    # Update action_buttons for backward compatibility
+    action_buttons = {
+        'container': action_components.get('container', widgets.HBox([augment_button, check_button])),
+        'augment_button': augment_button,
+        'check_button': check_button,
+        'cleanup_button': cleanup_button,
+        'buttons': [augment_button, check_button, cleanup_button] if cleanup_button else [augment_button, check_button]
+    }
+    
+    # Confirmation area for dialog integration
     confirmation_area, _ = create_confirmation_area()  # Unpack the tuple, we only need the widget
     
     # Log accordion

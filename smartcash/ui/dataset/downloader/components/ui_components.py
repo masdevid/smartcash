@@ -33,14 +33,52 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Input options
     input_options = create_downloader_input_options(config)
     
-    # Action buttons
-    action_buttons = create_action_buttons(
+    # Action buttons with new API
+    action_components = create_action_buttons(
         primary_label="Download Dataset",
-        primary_icon="download",
-        secondary_buttons=[("Check Dataset", "search", "info")],
+        primary_icon="📥",
+        secondary_buttons=[
+            ("Check Dataset", "🔍", "info"),
+        ],
         cleanup_enabled=True,
-        button_width='130px'
+        cleanup_label="Bersihkan Dataset",
+        cleanup_tooltip="Hapus dataset yang sudah didownload",
+        button_width='140px',
+        primary_style='primary'
     )
+    
+    # Get buttons using new API
+    download_button = action_components.get('primary_button')
+    check_button = action_components.get('secondary_buttons', [None])[0] if action_components.get('secondary_buttons') else None
+    cleanup_button = action_components.get('cleanup_button')
+    
+    # Fallback button creation if any button is missing
+    if download_button is None:
+        print("[WARNING] Download button not found, creating fallback")
+        download_button = widgets.Button(description='📥 Download Dataset', 
+                                      button_style='primary')
+        download_button.layout = widgets.Layout(width='140px')
+    
+    if check_button is None:
+        print("[WARNING] Check button not found, creating fallback")
+        check_button = widgets.Button(description='🔍 Check Dataset')
+        check_button.style.button_color = '#f0f0f0'
+        check_button.layout = widgets.Layout(width='140px')
+    
+    if cleanup_button is None:
+        print("[WARNING] Cleanup button not found, creating fallback")
+        cleanup_button = widgets.Button(description='🗑️ Bersihkan Dataset',
+                                      button_style='warning')
+        cleanup_button.layout = widgets.Layout(width='140px')
+    
+    # Update action_buttons for backward compatibility
+    action_buttons = {
+        'container': action_components.get('container', widgets.HBox([download_button, check_button])),
+        'download_button': download_button,
+        'check_button': check_button,
+        'cleanup_button': cleanup_button,
+        'buttons': [download_button, check_button, cleanup_button] if cleanup_button else [download_button, check_button]
+    }
     # Confirmation area - VISIBLE dan di bawah action buttons seperti preprocessing
     confirmation_area, _ = create_confirmation_area()
     

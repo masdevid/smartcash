@@ -180,11 +180,19 @@ class ConfigCellInitializer(Generic[T], ABC):
             title=self.title
         )
         
-        # Initialize logger bridge dengan container kosong dulu
-        self._logger_bridge = UILoggerBridge(
-            ui_components={'parent': self.parent_component},
-            logger_name=f"{self.component_id}_bridge"
-        )
+        # Setup shared configuration manager
+        self._shared_config_manager = None
+        self._unsubscribe_func = None
+        self._setup_shared_config()
+        try:
+            self._logger_bridge = UILoggerBridge(
+                ui_components={'parent': self.parent_component},
+                logger_name=f"{self.component_id}_bridge"
+            )
+        except Exception as e:
+            # Fallback jika UILoggerBridge gagal
+            self._logger.warning(f"Failed to create UILoggerBridge: {e}")
+            self._logger_bridge = None
         
     @property
     def handler(self) -> T:
@@ -200,7 +208,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         if self._handler is None:
             self._handler = self.create_handler()
             # Inject logger bridge ke handler jika support
-            if hasattr(self._handler, 'set_logger_bridge'):
+            if hasattr(self._handler, 'set_logger_bridge') and hasattr(self, '_logger_bridge'):
                 self._handler.set_logger_bridge(self._logger_bridge)
         return self._handler
     
@@ -389,13 +397,33 @@ class ConfigCellInitializer(Generic[T], ABC):
             self.child_components = self.create_child_components(config)
             
             # === 3. UPDATE LOGGER BRIDGE ===
-            # Update logger bridge dengan semua components
-            all_components = {
-                **self.parent_components,
-                **self.child_components,
-                'parent': self.parent_component
-            }
-            self._logger_bridge.update_ui_components(all_components)
+            # Logger bridge perlu di-reinitialize dengan semua components
+            self._logger.debug("Updating logger bridge with all components...")
+            
+            if self._logger_bridge is not None:
+                # Collect all components
+                all_components = {
+                    **self.parent_components,
+                    **self.child_components,
+                    'parent': self.parent_component,
+                    'log_accordion': self.parent_components.get('log_accordion'),
+                    'log_output': self.parent_components.get('log_accordion')  # Fallback
+                }
+                
+                try:
+                    # Create new logger bridge dengan complete UI components
+                    self._logger_bridge = UILoggerBridge(
+                        ui_components=all_components,
+                        logger_name=f"{self.component_id}_bridge"
+                    )
+                    
+                    # Re-assign logger if needed
+                    if hasattr(self._logger_bridge, 'logger'):
+                        self._logger = self._logger_bridge.logger
+                except Exception as e:
+                    self._logger.warning(f"Failed to update logger bridge: {e}")
+            else:
+                self._logger.debug("Logger bridge not available, skipping update")
             
             # === 4. ASSEMBLE FINAL STRUCTURE ===
             self._logger.debug("Assembling UI structure...")
@@ -524,9 +552,16 @@ class ConfigCellInitializer(Generic[T], ABC):
         try:
             self._logger.info(f"🚀 Initializing {self.component_id}...")
             
-            # Use provided config or default
+            # Use provided config or check shared config or default
             if config is not None:
                 self.config = config
+            else:
+                # Try get from shared config first
+                shared_config = self._get_shared_config()
+                if shared_config:
+                    self.config = shared_config
+                    self._logger.info(f"📡 Loaded config from shared manager")
+                # Else use existing self.config
                 
             # Setup output suppression
             self._setup_output_suppression()
@@ -650,17 +685,28 @@ class ConfigCellInitializer(Generic[T], ABC):
             )
             
     def _on_save_click(self) -> None:
-        """💾 Default save button handler.
+        """💾 Default save button handler dengan config sharing.
         
         INTERNAL - Override setup_handlers() untuk custom behavior.
         """
         try:
             self.update_status("💾 Saving configuration...", "info")
+            
+            # Extract current config
+            current_config = self.handler.extract_config(self.ui_components)
+            
+            # Save config
             success = self.handler.save_config(self.ui_components)
+            
             if success:
                 self.update_status("✅ Configuration saved", "success")
+                
+                # Broadcast to other components
+                self.broadcast_config_change(current_config)
+                
             else:
                 self.update_status("❌ Save failed", "error")
+                
         except Exception as e:
             self.update_status(f"❌ Error: {str(e)}", "error")
             self._logger.error(f"Save failed: {str(e)}", exc_info=True)
@@ -678,30 +724,69 @@ class ConfigCellInitializer(Generic[T], ABC):
             self.update_status(f"❌ Error: {str(e)}", "error")
             self._logger.error(f"Reset failed: {str(e)}", exc_info=True)
             
+    def _get_shared_config(self) -> Optional[Dict[str, Any]]:
+        """Get configuration from shared manager if available.
+        
+        Returns:
+            Shared configuration or None
+        """
+        if self._shared_config_manager:
+            try:
+                return self._shared_config_manager.get_config(self.component_id)
+            except Exception as e:
+                self._logger.debug(f"Could not get shared config: {e}")
+        return None
+    
+    def refresh_from_shared_config(self) -> None:
+        """PUBLIC METHOD - Manually refresh configuration from shared storage.
+        
+        Use this to sync with changes from other cells.
+        """
+        if not self._is_initialized:
+            self._logger.warning("Cannot refresh - component not initialized")
+            return
+            
+        shared_config = self._get_shared_config()
+        if shared_config:
+            self._on_shared_config_update(shared_config)
+            self._logger.info("🔄 Refreshed from shared configuration")
+        else:
+            self._logger.info("No shared configuration found")
+    
     def cleanup(self) -> None:
         """🧹 Cleanup resources dan unregister component.
         
         PUBLIC METHOD - Call saat component tidak digunakan lagi.
         
         Cleanup process:
-        1. Unregister dari component registry
-        2. Clear semua component dictionaries
-        3. Reset state
+        1. Unsubscribe from shared config
+        2. Unregister dari component registry
+        3. Clear semua component dictionaries
+        4. Reset state
         
         Note:
             Ini TIDAK menghapus widgets dari display.
             Hanya cleanup internal state dan references.
         """
         try:
+            # Unsubscribe from shared config
+            if self._unsubscribe_func:
+                self._unsubscribe_func()
+                self._unsubscribe_func = None
+            
+            # Unregister from component registry
             full_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
             component_registry.unregister_component(full_id)
             
+            # Clear components
             self.ui_components.clear()
             self.parent_components.clear()
             self.child_components.clear()
             
+            # Reset state
             self._is_initialized = False
             self._handler = None
+            self._shared_config_manager = None
             
             self._logger.debug(f"✅ Cleanup completed for {self.component_id}")
             

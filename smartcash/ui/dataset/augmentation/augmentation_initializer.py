@@ -160,6 +160,15 @@ class AugmentationInitializer(CommonInitializer):
         except Exception as e:
             self.logger.error("Gagal memuat konfigurasi default", exc_info=True)
             raise RuntimeError(f"Gagal memuat konfigurasi default: {str(e)}") from e
+            
+    def _get_timestamp(self) -> str:
+        """Generate timestamp string untuk tracking inisialisasi
+        
+        Returns:
+            String timestamp dalam format ISO 8601
+        """
+        from datetime import datetime
+        return datetime.now().isoformat(timespec='seconds')
 
 def initialize_augmentation_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
     """Factory function untuk inisialisasi augmentation UI

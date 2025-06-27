@@ -195,6 +195,11 @@ def show_confirmation_dialog(
         if on_confirm:
             on_confirm()
         return
+        
+    # Ensure the confirmation area is visible
+    if hasattr(dialog_area, 'layout'):
+        dialog_area.layout.display = 'flex'  # Make sure it's visible
+        dialog_area.layout.visibility = 'visible'  # Make sure it's visible
     
     try:
         # Ensure the confirmation area is properly shown

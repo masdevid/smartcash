@@ -96,19 +96,33 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
             layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
     ], layout=widgets.Layout(margin='8px 0'))
     
-    # Action section
+    # Action section with flex layout
     action_section = widgets.VBox([
         widgets.HTML("<div style='font-weight:bold;color:#28a745;margin-bottom:8px;'>🚀 Operations</div>"),
         action_components['container'],
         widgets.HTML("<div style='margin:8px 0 4px 0;font-size:13px;color:#666;'><strong>📋 Status:</strong></div>"),
-        confirmation_area
+        widgets.Box(
+            [confirmation_area],
+            layout=widgets.Layout(
+                display='flex',
+                flex_flow='row wrap',
+                justify_content='space-between',
+                align_items='center',
+                width='100%',
+                margin='0',
+                padding='0'
+            )
+        )
     ], layout=widgets.Layout(
-        width='100%', 
-        margin='10px 0', 
+        display='flex',
+        flex_direction='column',
+        width='100%',
+        margin='10px 0',
         padding='12px',
-        border='1px solid #e0e0e0', 
+        border='1px solid #e0e0e0',
         border_radius='8px',
-        background_color='#f9f9f9'
+        background_color='#f9f9f9',
+        overflow='hidden'
     ))
     
     # === MAIN UI ASSEMBLY dengan Progress Tracker ===

@@ -7,8 +7,13 @@ import re
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
-def _filter_emoji(message: str) -> str:
-    """Filter pesan untuk menghapus semua emoji kecuali yang pertama"""
+def _filter_emoji(message: str) -> tuple[str, str]:
+    """
+    Ekstrak emoji pertama dari pesan jika ada.
+    
+    Returns:
+        tuple: (emoji, cleaned_message) - Emoji pertama yang ditemukan dan pesan yang sudah dibersihkan
+    """
     # Regex untuk mendeteksi emoji (mencocokkan sebagian besar emoji Unicode)
     emoji_pattern = re.compile(
         r'[\U0001F1E0-\U0001F1FF]|'  # bendera
@@ -28,14 +33,14 @@ def _filter_emoji(message: str) -> str:
     # Temukan semua emoji dalam pesan
     emojis = emoji_pattern.findall(message)
     
-    # Jika ada emoji, hapus semua kecuali yang pertama
+    # Jika ada emoji, ambil yang pertama dan bersihkan pesan
     if emojis:
         first_emoji = emojis[0]
         # Hapus semua emoji dari pesan
         cleaned = emoji_pattern.sub('', message).strip()
-        # Kembalikan emoji pertama diikuti pesan yang sudah dibersihkan
-        return f"{first_emoji} {cleaned}"
-    return message
+        return first_emoji, cleaned
+    
+    return "", message.strip()
 
 def create_status_panel(message: str = "", status_type: str = "info", layout: Optional[Dict[str, Any]] = None) -> widgets.HTML:
     """Buat status panel dengan single emoji consistency
@@ -56,27 +61,40 @@ def create_status_panel(message: str = "", status_type: str = "info", layout: Op
         text_color = style_info['text_color']
         icon = style_info['icon']
         
-        # Filter pesan untuk memastikan hanya satu emoji
-        filtered_message = _filter_emoji(f"{icon} {message}")
+        # Ekstrak emoji dari pesan atau gunakan default
+        custom_emoji, cleaned_message = _filter_emoji(message)
+        display_emoji = custom_emoji or icon
         
-        # Buat konten HTML
+        # Tentukan gradient berdasarkan tipe status
+        gradients = {
+            'success': 'linear-gradient(135deg, #28a745, #34ce57)',
+            'info': 'linear-gradient(135deg, #007bff, #17a2b8)',
+            'warning': 'linear-gradient(135deg, #ffc107, #fd7e14)',
+            'error': 'linear-gradient(135deg, #dc3545, #c82333)'
+        }
+        gradient = gradients.get(status_type, f'linear-gradient(135deg, {bg_color}, {bg_color})')
+        
+        # Buat konten HTML dengan gradient background
         html_content = f"""
         <div style="
-            padding: 6px 10px;
-            background-color: {bg_color};
-            color: {text_color};
-            border-radius: 6px;
-            margin: 3px 0;
-            border: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            font-size: 13px;
-            line-height: 1.4;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 8px 12px;
+            background: {gradient};
+            color: white;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background-size: 200% 200%;
+            animation: gradient 3s ease infinite;
         ">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 14px;">{icon}</span>
-                <span style="flex: 1;">{filtered_message}</span>
-            </div>
+            {display_emoji} {cleaned_message}
+            <style>
+                @keyframes gradient {{
+                    0% {{ background-position: 0% 50%; }}
+                    50% {{ background-position: 100% 50%; }}
+                    100% {{ background-position: 0% 50%; }}
+                }}
+            </style>
         </div>"""
         
         # Setup layout
@@ -88,24 +106,21 @@ def create_status_panel(message: str = "", status_type: str = "info", layout: Op
         
     except Exception as e:
         # Fallback minimal jika terjadi error
+        custom_emoji, cleaned_message = _filter_emoji(message)
+        display_emoji = custom_emoji or 'ℹ️'
+        
         return widgets.HTML(
             value=f'''
             <div style="
-                padding: 6px 10px;
-                background: #f8f9fa;
-                color: #495057;
-                border-radius: 6px;
-                margin: 4px 0;
-                border: 1px solid rgba(0,0,0,0.08);
-                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                font-size: 13px;
-                line-height: 1.4;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                padding: 8px 12px;
+                background: linear-gradient(135deg, #007bff, #17a2b8);
+                color: white;
+                border-radius: 4px;
+                margin: 5px 0;
+                font-weight: 500;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             ">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 14px;">ℹ️</span>
-                    <span style="flex: 1;">{filtered_message}</span>
-                </div>
+                {display_emoji} {cleaned_message}
             </div>''',
             layout=widgets.Layout(width='100%', margin='4px 0')
         )
@@ -129,41 +144,58 @@ def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "i
         text_color = style_info['text_color']
         icon = style_info['icon']
         
-        # Filter pesan untuk memastikan hanya satu emoji
-        filtered_message = _filter_emoji(f"{icon} {message}")
+        # Ekstrak emoji dari pesan atau gunakan default
+        custom_emoji, cleaned_message = _filter_emoji(message)
+        display_emoji = custom_emoji or icon
         
-        # Buat konten HTML
+        # Tentukan gradient berdasarkan tipe status
+        gradients = {
+            'success': 'linear-gradient(135deg, #28a745, #34ce57)',
+            'info': 'linear-gradient(135deg, #007bff, #17a2b8)',
+            'warning': 'linear-gradient(135deg, #ffc107, #fd7e14)',
+            'error': 'linear-gradient(135deg, #dc3545, #c82333)'
+        }
+        gradient = gradients.get(status_type, f'linear-gradient(135deg, {bg_color}, {bg_color})')
+        
+        # Buat konten HTML dengan gradient background
         html_content = f"""
         <div style="
-            padding: 6px 10px;
-            background-color: {bg_color};
-            color: {text_color};
-            border-radius: 6px;
-            margin: 3px 0;
-            border: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            font-size: 13px;
-            line-height: 1.4;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 8px 12px;
+            background: {gradient};
+            color: white;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background-size: 200% 200%;
+            animation: gradient 3s ease infinite;
         ">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 14px;">{icon}</span>
-                <span style="flex: 1;">{filtered_message}</span>
-            </div>
+            {display_emoji} {cleaned_message}
+            <style>
+                @keyframes gradient {{
+                    0% {{ background-position: 0% 50%; }}
+                    50% {{ background-position: 100% 50%; }}
+                    100% {{ background-position: 0% 50%; }}
+                }}
+            </style>
         </div>"""
         
         panel.value = html_content
         
     except Exception as e:
         # Fallback minimal jika terjadi error
+        custom_emoji, cleaned_message = _filter_emoji(message)
+        display_emoji = custom_emoji or 'ℹ️'
+        
         panel.value = f'''
         <div style="
-            padding: 10px;
-            background-color: #f8f9fa;
-            color: #212529;
+            padding: 8px 12px;
+            background: linear-gradient(135deg, #007bff, #17a2b8);
+            color: white;
             border-radius: 4px;
             margin: 5px 0;
-            border-left: 4px solid #6c757d;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         ">
-            <p style="margin: 5px 0">ℹ️ {filtered_message}</p>
+            {display_emoji} {cleaned_message}
         </div>'''

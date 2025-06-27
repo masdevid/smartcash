@@ -74,36 +74,20 @@ def enable_log_accordion(ui_components: Dict[str, Any]) -> None:
 
 def update_status_panel_enhanced(ui_components: Dict[str, Any], message: str, 
                                 status_type: str, force_update: bool = True) -> None:
-    """Enhanced status panel update dengan force refresh"""
+    """Enhanced status panel update dengan force refresh
+    
+    Menggunakan fungsi update_status_panel dari status_panel.py untuk konsistensi tampilan.
+    """
     status_panel = ui_components.get('status_panel')
     if not status_panel:
         return
     
     try:
-        # Method 1: Direct update_status method
-        if hasattr(status_panel, 'update_status_panel'):
-            status_panel.update_status_panel(message, status_type)
+        # Import fungsi update_status_panel
+        from smartcash.ui.components.status_panel import update_status_panel
         
-        # Method 2: Direct value update jika method tidak ada
-        elif hasattr(status_panel, 'value'):
-            color_map = {
-                'success': '#28a745', 'info': '#007bff', 
-                'warning': '#ffc107', 'error': '#dc3545'
-            }
-            color = color_map.get(status_type, '#495057')
-            
-            icon_map = {
-                'success': '✅', 'info': 'ℹ️', 
-                'warning': '⚠️', 'error': '❌'
-            }
-            icon = icon_map.get(status_type, 'ℹ️')
-            
-            status_panel.value = f"""
-            <div style="padding: 8px 12px; background-color: {color}; color: white; 
-                       border-radius: 4px; margin: 5px 0; font-weight: 500;">
-                {icon} {message}
-            </div>
-            """
+        # Update status panel menggunakan fungsi yang sudah ada
+        update_status_panel(status_panel, message, status_type)
         
         # Force refresh jika diperlukan
         if force_update:
@@ -128,7 +112,7 @@ def update_status_panel_enhanced(ui_components: Dict[str, Any], message: str,
     except Exception as e:
         logger_bridge = get_logger_bridge(ui_components)
         if logger_bridge:
-            logger_bridge.debug(f"🔍 Status panel update warning: {str(e)}")
+            logger_bridge.debug(f"⚠️ Peringatan pembaruan status panel: {str(e)}")
 
 # === ENHANCED OPERATION FLOW ===
 

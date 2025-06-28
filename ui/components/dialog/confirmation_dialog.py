@@ -101,7 +101,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             width: 80%;
             margin: 0 auto;
             padding: 0;
-            overflow-x: hidden;
+            overflow: auto;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }}
         

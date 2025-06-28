@@ -52,19 +52,56 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
             ]
         )
         
-        # Get individual button references
-        download_btn = action_buttons.get('download_sync', action_buttons.get('buttons', {}).get('download_sync'))
-        save_btn = action_buttons.get('save', action_buttons.get('buttons', {}).get('save'))
-        reset_btn = action_buttons.get('reset', action_buttons.get('buttons', {}).get('reset'))
+        # Initialize button references
+        download_btn = None
+        save_btn = None
+        reset_btn = None
         
-        # Ensure we have all buttons
-        if not all([download_btn, save_btn, reset_btn]):
-            # Fallback to first three buttons if direct access fails
-            all_buttons = action_buttons.get('buttons', [])
-            if isinstance(all_buttons, dict):
-                all_buttons = list(all_buttons.values())
-            if len(all_buttons) >= 3:
-                download_btn, save_btn, reset_btn = all_buttons[:3]
+        # Handle different action_buttons return types
+        if isinstance(action_buttons, dict):
+            # Try to get buttons by their expected keys
+            download_btn = action_buttons.get('primary')
+            
+            # Get secondary buttons
+            if 'secondary_0' in action_buttons:
+                save_btn = action_buttons.get('secondary_0')
+            if 'secondary_1' in action_buttons:
+                reset_btn = action_buttons.get('secondary_1')
+                
+            # Try alternative keys
+            if not save_btn:
+                save_btn = action_buttons.get('save_button')
+            if not reset_btn:
+                reset_btn = action_buttons.get('reset_button')
+                
+            # Try to get from buttons list/dict
+            buttons = action_buttons.get('buttons', [])
+            if isinstance(buttons, dict):
+                buttons = list(buttons.values())
+                
+            if isinstance(buttons, list) and buttons:
+                if not download_btn and len(buttons) > 0:
+                    download_btn = buttons[0]
+                if not save_btn and len(buttons) > 1:
+                    save_btn = buttons[1]
+                if not reset_btn and len(buttons) > 2:
+                    reset_btn = buttons[2]
+        elif isinstance(action_buttons, (list, tuple)) and action_buttons:
+            # Handle case where action_buttons is a list
+            if len(action_buttons) > 0:
+                download_btn = action_buttons[0]
+            if len(action_buttons) > 1:
+                save_btn = action_buttons[1]
+            if len(action_buttons) > 2:
+                reset_btn = action_buttons[2]
+                
+        # Create fallback buttons if any are missing
+        if not download_btn:
+            download_btn = widgets.Button(description='📥 Download & Sync', button_style='primary')
+        if not save_btn:
+            save_btn = widgets.Button(description='💾 Save Config', button_style='success')
+        if not reset_btn:
+            reset_btn = widgets.Button(description='🔄 Reset', button_style='warning')
         
         # Progress tracker
         progress_tracker = create_dual_progress_tracker()

@@ -60,6 +60,9 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     
     # Create confirmation area first with ui_components
     confirmation_area = create_confirmation_area(ui_components=ui_components)
+    # Ensure confirmation_area is properly initialized
+    if not confirmation_area or not isinstance(confirmation_area, widgets.Output):
+        confirmation_area = widgets.Output()
     ui_components['confirmation_area'] = confirmation_area  # Store reference in ui_components
     
     # Header and status panel with consistent styling
@@ -150,8 +153,11 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Initialize UI components dictionary
     ui_components = {}
     
-    # Get confirmation area from ui_components
+    # Get confirmation area from ui_components with validation
     confirmation_area = ui_components.get('confirmation_area')
+    if not confirmation_area or not isinstance(confirmation_area, widgets.Output):
+        confirmation_area = widgets.Output()
+        ui_components['confirmation_area'] = confirmation_area
     
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')
@@ -202,14 +208,19 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             layout=widgets.Layout(justify_content='flex-end', width='100%')
         )
     
-    # Create action section using shared component
-    action_section = create_action_section(
-        action_buttons=button_container,  # Langsung kirim container widget-nya
-        confirmation_area=confirmation_area,
-        title="🚀 Operations",
-        status_label="📋 Status & Konfirmasi:",
-        show_status=True
-    )
+    # Create action section using shared component with validation
+    try:
+        action_section = create_action_section(
+            action_buttons=button_container if button_container is not None else widgets.HBox(),
+            confirmation_area=confirmation_area,
+            title="🚀 Operations",
+            status_label="📋 Status & Konfirmasi:",
+            show_status=bool(confirmation_area)  # Only show status if we have a valid confirmation_area
+        )
+    except Exception as e:
+        print(f"Error creating action section: {str(e)}")
+        # Fallback to a simple container if action section creation fails
+        action_section = widgets.VBox()
     
     # Config section with consistent styling
     config_section = widgets.VBox([

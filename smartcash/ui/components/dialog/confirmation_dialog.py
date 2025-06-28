@@ -76,8 +76,8 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         <style>
         .smartcash-dialog-{dialog_id} {{
             position: relative;
-            max-width: 1200px;
-            width: 100%;
+            max-width: 80%;
+            width: 80%;
             margin: 0 auto;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

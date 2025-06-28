@@ -80,8 +80,9 @@ class PreprocessingInitializer(CommonInitializer):
                 if hasattr(handler, 'setup_with_initializer'):
                     handler.setup_with_initializer(self)
             
-            # Store handlers for later use
+            # Store handlers for later use and add to ui_components
             self._handlers = handlers
+            ui_components['handlers'] = handlers
             
             # Store UI components reference for error handling
             self._ui_components = ui_components

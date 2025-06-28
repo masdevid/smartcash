@@ -36,7 +36,7 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         # Header
         header = create_header(
             title="🤖 Pretrained Models Configuration",
-            subtitle="Setup YOLOv5s untuk currency detection",
+            description="Setup YOLOv5s untuk currency detection",
             icon="🎯"
         )
         

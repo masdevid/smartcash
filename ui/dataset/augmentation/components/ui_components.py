@@ -55,7 +55,12 @@ def _create_live_preview_group() -> Dict[str, Any]:
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Main UI dengan live preview integration dan cleanup target update"""
     
-
+    # Initialize ui_components dictionary
+    ui_components = {}
+    
+    # Create confirmation area first
+    confirmation_area = create_confirmation_area(ui_components)
+    
     # Header and status panel with consistent styling
     header = create_header(
         "Dataset Augmentation",
@@ -141,8 +146,12 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         'buttons': [augment_button, check_button, cleanup_button] if cleanup_button else [augment_button, check_button]
     }
     
+    # Initialize UI components dictionary
+    ui_components = {}
+    
     # Confirmation area for dialog integration
-    confirmation_area, _ = create_confirmation_area()  # Unpack the tuple, we only need the widget
+    confirmation_area, _ = create_confirmation_area(ui_components)  # Pass ui_components to create_confirmation_area
+    ui_components['confirmation_area'] = confirmation_area  # Store reference in ui_components
     
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')
@@ -190,7 +199,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         confirmation_area=confirmation_area,
         title="🚀 Operations",
         status_label="📋 Status & Konfirmasi:",
-        show_status=True
+        show_status=True,
+        ui_components=ui_components
     )
     
     # Config section with consistent styling
@@ -219,35 +229,48 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         box_shadow='0 2px 4px rgba(0,0,0,0.05)'
     ))
     
-    # Component mapping dengan live preview integration
-    components = {
+    # Update ui_components with all components
+    ui_components.update({
         'ui': ui, 
         'header': header, 
         'status_panel': status_panel,
         'confirmation_area': confirmation_area,
-        **basic_options['widgets'], 
-        **advanced_options['widgets'],
-        **augmentation_types['widgets'], 
-        **live_preview['widgets'],  # CHANGED: Live preview widgets
+        **basic_options.get('widgets', {}), 
+        **advanced_options.get('widgets', {}),
+        **augmentation_types.get('widgets', {}), 
+        **live_preview.get('widgets', {}),  # Live preview widgets
         'augment_button': augment_button,
         'check_button': check_button,
         'cleanup_button': cleanup_button,
         'download_button': augment_button,  # For backward compatibility
-        'save_button': config_buttons['save_button'],
-        'reset_button': config_buttons['reset_button'],
+        'save_button': config_buttons.get('save_button'),
+        'reset_button': config_buttons.get('reset_button'),
         'progress_tracker': progress_tracker,
-        'log_output': log_components['log_output'],
-        'status': log_components['log_output'],
+        'log_accordion': log_components.get('log_accordion'),
+        'log_output': log_components.get('log_output'),
+        'status': log_components.get('log_output'),
         'backend_ready': True, 
         'service_integration': True,
         'module_name': 'augmentation',
         'logger_namespace': 'smartcash.ui.dataset.augmentation',
         'augmentation_initialized': True,
         'config': config or {}
-    }
-
+    })
+    
+    # Make sure confirmation area is properly initialized
+    if 'confirmation_area' not in ui_components:
+        ui_components['confirmation_area'] = confirmation_area
+    
+    # Add action buttons to ui_components
+    ui_components.update({
+        'augment_button': action_buttons.get('primary_button'),
+        'check_button': next((btn for btn in action_buttons.get('secondary_buttons', []) if btn.get('label') == '🔍 Cek Data'), None),
+        'cleanup_button': next((btn for btn in action_buttons.get('secondary_buttons', []) if btn.get('label') == '🗑️ Bersihkan Hasil'), None),
+        'download_button': action_buttons.get('primary_button')  # For backward compatibility
+    })
+    
     from smartcash.ui.utils.logging_utils import log_missing_components
-    log_missing_components(components)
-    return components
-
-
+    log_missing_components(ui_components)
+    
+    return ui_components
+    return ui_components

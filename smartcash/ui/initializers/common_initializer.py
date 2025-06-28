@@ -30,12 +30,7 @@ from smartcash.ui.utils.logging_utils import (
     suppress_data_logs
 )
 
-# Setup aggressive suppression at module level
-setup_aggressive_log_suppression()
-setup_stdout_suppression()
-suppress_ml_logs()
-suppress_viz_logs()
-suppress_data_logs()
+
 
 # Import other modules
 import contextlib
@@ -72,7 +67,12 @@ class CommonInitializer(ABC):
     def _initialize_suppression(cls):
         """Class method to ensure suppression is initialized"""
         if not cls._suppression_initialized:
-            # Suppression is already handled at module level
+            # Setup aggressive suppression at module level
+            setup_aggressive_log_suppression()
+            setup_stdout_suppression()
+            suppress_ml_logs()
+            suppress_viz_logs()
+            suppress_data_logs()
             cls._suppression_initialized = True
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):

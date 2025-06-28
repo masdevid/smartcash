@@ -45,9 +45,15 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         # Ensure confirmation area exists
         confirmation_area = create_confirmation_area(ui_components)
         
-        # Show confirmation area
+        # Show confirmation area with animation
         confirmation_area.layout.display = 'block'
         confirmation_area.layout.visibility = 'visible'
+        confirmation_area.layout.height = '350px'  # Slightly more than content for padding
+        confirmation_area.layout.min_height = '350px'
+        confirmation_area.layout.max_height = '350px'
+        confirmation_area.layout.padding = '20px 0'
+        confirmation_area.layout.margin = '10px 0'
+        confirmation_area.layout.overflow = 'hidden'
         
         # Generate unique IDs untuk buttons
         dialog_id = f"dialog_{uuid.uuid4().hex[:8]}"
@@ -92,13 +98,13 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             box-shadow: 
                 0 4px 16px 0 rgba(31, 38, 135, 0.1),
                 inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            padding: 12px 16px;
-            max-height: 160px;
-            overflow: hidden;
-            transition: all 0.2s ease;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
             text-align: center;
             position: relative;
@@ -127,13 +133,18 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         
         .dialog-message-{dialog_id} {{
             color: #4a5568;
-            font-size: 0.85rem;
-            line-height: 1.4;
-            margin: 0 0 12px 0;
-            padding: 0 2px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin: 10px 0 20px 0;
+            padding: 0 10px;
             white-space: pre-line;
-            max-height: 50px;
+            max-height: 180px;
             overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
         }}
         
         .dialog-actions-{dialog_id} {{
@@ -316,8 +327,13 @@ except Exception as e:
                     const card = document.querySelector('.glass-card-{dialog_id}');
                     if (card) {{
                         card.style.animation = 'none';
-                        card.style.transition = 'opacity 0.2s ease';
+                        card.style.transition = 'all 0.3s ease';
                         card.style.opacity = '0';
+                        card.style.transform = 'scale(0.95)';
+                        card.style.margin = '0';
+                        card.style.padding = '0';
+                        card.style.border = 'none';
+                        card.style.height = '0';
                     }}
                     
                     setTimeout(() => {{
@@ -328,7 +344,16 @@ try:
     callback = ui_components.get('_cancel_callback_{cancel_id}')
     if callback:
         callback()
-    ui_components.get('confirmation_area').layout.display = 'none'
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area:
+        confirmation_area.layout.display = 'none'
+        confirmation_area.layout.visibility = 'hidden'
+        confirmation_area.layout.height = '0'
+        confirmation_area.layout.min_height = '0'
+        confirmation_area.layout.max_height = '0'
+        confirmation_area.layout.padding = '0'
+        confirmation_area.layout.margin = '0'
+        confirmation_area.layout.overflow = 'hidden'
     ui_components.pop('_confirm_callback_{confirm_id}', None)
     ui_components.pop('_cancel_callback_{cancel_id}', None)
 except Exception as e:
@@ -336,7 +361,7 @@ except Exception as e:
 `;
                             window.jupyter.notebook.kernel.execute(code);
                         }}
-                    }}, 200);
+                    }}, 300);
                 }} catch (e) {{
                     console.error('Error in cancel handler:', e);
                 }}

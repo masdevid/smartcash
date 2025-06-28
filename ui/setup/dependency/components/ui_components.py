@@ -347,10 +347,13 @@ def _create_package_item(
         )
     )
     
-    # Add custom class for styling
-    package_container.add_class('package-item')
+    # Apply styles using the style attribute
     if is_checked:
-        package_container.add_style('background-color: #f0f7ff; border-color: #cce5ff;')
+        package_container.style = {
+            'background_color': '#f0f7ff',
+            'border': '1px solid #cce5ff',
+            'border_radius': '3px'
+        }
     
     # Create the checkbox with better styling
     checkbox = create_package_checkbox(

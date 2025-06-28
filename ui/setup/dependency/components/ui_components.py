@@ -25,6 +25,7 @@ from smartcash.ui.setup.dependency.utils.ui_utils import create_package_checkbox
 # Local component imports
 from smartcash.ui.setup.dependency.components.summary_panel import DependencySummaryPanel
 
+
 # ======================== MAIN UI ========================
 
 def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -36,125 +37,116 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     Returns:
         Dictionary containing UI components and state
     """
-    logger = get_logger(__name__)
+    config = config or {}
+    ui_components = {}
     
-    try:
-        config = config or {}
-        ui_components = {}
-        
-        # === CORE COMPONENTS ===
-        header = create_header(
-            title="📦 Manajemen Dependensi",
-            description="Kelola dependensi Python untuk proyek SmartCash",
-            icon="settings"
+    # === CORE COMPONENTS ===
+    header = create_header(
+        title="📦 Manajemen Dependensi",
+        description="Kelola dependensi Python untuk proyek SmartCash",
+        icon="settings"
+    )
+    
+    # Status panel
+    status_panel = create_status_panel()
+    
+    # Create action buttons with consistent styling
+    action_buttons = create_action_buttons(
+        primary_button={"label": "⚙️ Install Dependensi", "style": "primary"},
+        secondary_buttons=[
+            {"label": "🔄 Periksa Pembaruan", "style": "info"},
+            {"label": "🗑️ Hapus Terpilih", "style": "danger"}
+        ]
+    )
+    
+    # Initialize button references with fallbacks
+    install_btn = action_buttons.get('primary')
+    check_updates_btn = action_buttons.get('secondary_0')
+    uninstall_btn = action_buttons.get('secondary_1')
+    
+    # Fallback button creation if any are missing
+    if not install_btn:
+        install_btn = widgets.Button(
+            description='⚙️ Install Dependensi',
+            button_style='primary',
+            layout=widgets.Layout(width='auto')
         )
-        
-        # Status panel
-        status_panel = create_status_panel()
-        
-        # Create action buttons with consistent styling
-        action_buttons = create_action_buttons(
-            primary_button={"label": "⚙️ Install Dependensi", "style": "primary"},
-            secondary_buttons=[
-                {"label": "🔄 Periksa Pembaruan", "style": "info"},
-                {"label": "🗑️ Hapus Terpilih", "style": "danger"}
-            ]
+    
+    # Create main content sections
+    categories = create_categories_section(config)
+    custom_packages = create_custom_packages_section()
+    
+    # Create tab layout
+    tabs = widgets.Tab(children=[categories, custom_packages])
+    tabs.set_title(0, "📦 Paket")
+    tabs.set_title(1, "➕ Kustom")
+    tabs.selected_index = 0
+    tabs.layout = widgets.Layout(width='100%', margin='10px 0')
+    
+    # Create save/reset buttons
+    save_reset_buttons = create_save_reset_buttons()
+    save_btn = save_reset_buttons.get('save_button')
+    reset_btn = save_reset_buttons.get('reset_button')
+    
+    # Create button containers
+    action_buttons_container = widgets.HBox(
+        [install_btn, check_updates_btn, uninstall_btn],
+        layout=widgets.Layout(
+            justify_content='flex-end',
+            margin='10px 0',
+            width='100%'
         )
-        
-        # Initialize button references with fallbacks
-        install_btn = action_buttons.get('primary')
-        check_updates_btn = action_buttons.get('secondary_0')
-        uninstall_btn = action_buttons.get('secondary_1')
-        
-        # Fallback button creation if any are missing
-        if not install_btn:
-            install_btn = widgets.Button(
-                description='⚙️ Install Dependensi',
-                button_style='primary',
-                layout=widgets.Layout(width='auto')
-            )
-        
-        # Create main content sections
-        categories = create_categories_section(config)
-        custom_packages = create_custom_packages_section()
-        
-        # Create tab layout
-        tabs = widgets.Tab(children=[categories, custom_packages])
-        tabs.set_title(0, "📦 Paket")
-        tabs.set_title(1, "➕ Kustom")
-        tabs.selected_index = 0
-        tabs.layout = widgets.Layout(width='100%', margin='10px 0')
-        
-        # Create save/reset buttons
-        save_reset_buttons = create_save_reset_buttons()
-        save_btn = save_reset_buttons.get('save_button')
-        reset_btn = save_reset_buttons.get('reset_button')
-        
-        # Create button containers
-        action_buttons_container = widgets.HBox(
-            [install_btn, check_updates_btn, uninstall_btn],
-            layout=widgets.Layout(
-                justify_content='flex-end',
-                margin='10px 0',
-                width='100%'
-            )
+    )
+    
+    save_reset_container = widgets.HBox(
+        [save_btn, reset_btn],
+        layout=widgets.Layout(
+            justify_content='flex-end',
+            margin='10px 0',
+            width='100%'
         )
-        
-        save_reset_container = widgets.HBox(
-            [save_btn, reset_btn],
-            layout=widgets.Layout(
-                justify_content='flex-end',
-                margin='10px 0',
-                width='100%'
-            )
-        )
-        
-        # Create log accordion
-        log_components = create_log_accordion()
-        log_accordion = log_components.get('accordion')
-        
-        # Main content layout
-        content = widgets.VBox([
-            header,
-            status_panel,
-            widgets.HTML('<hr style="margin: 10px 0; border: 0.5px solid #e0e0e0;">'),
-            tabs,
-            widgets.HTML('<hr style="margin: 15px 0; border: 0.5px solid #e0e0e0;">'),
-            action_buttons_container,
-            save_reset_container
-        ], layout=widgets.Layout(width='100%'))
-        
-        # Combine main content and logs
-        layout = widgets.VBox([
-            content,
-            log_accordion
-        ], layout=widgets.Layout(width='100%'))
-        
-        # Store all components
-        ui_components.update({
-            'ui': layout,
-            'log_output': log_components.get('log_output'),
-            'log_accordion': log_accordion,
-            'header': header,
-            'status_panel': status_panel,
-            'tabs': tabs,
-            'install_button': install_btn,
-            'check_updates_button': check_updates_btn,
-            'uninstall_button': uninstall_btn,
-            'save_button': save_btn,
-            'reset_button': reset_btn,
-            'action_buttons_container': action_buttons_container,
-            'save_reset_container': save_reset_container
-        })
-        
-        # Initialize confirmation area
-        ui_components['confirmation_area'] = create_confirmation_area(ui_components)
-        
-        return ui_components
-        
-    except Exception as e:
-        logger.error(f"Error creating dependency UI: {str(e)}", exc_info=True)
-        raise
+    )
+    
+    # Create log accordion
+    log_components = create_log_accordion()
+    log_accordion = log_components.get('accordion')
+    
+    # Main content layout
+    content = widgets.VBox([
+        header,
+        status_panel,
+        widgets.HTML('<hr style="margin: 10px 0; border: 0.5px solid #e0e0e0;">'),
+        tabs,
+        widgets.HTML('<hr style="margin: 15px 0; border: 0.5px solid #e0e0e0;">'),
+        action_buttons_container,
+        save_reset_container
+    ], layout=widgets.Layout(width='100%'))
+    
+    # Combine main content and logs
+    layout = widgets.VBox([
+        content,
+        log_accordion
+    ], layout=widgets.Layout(width='100%'))
+    
+    # Store all components
+    ui_components.update({
+        'ui': layout,
+        'log_output': log_components.get('log_output'),
+        'log_accordion': log_accordion,
+        'header': header,
+        'status_panel': status_panel,
+        'tabs': tabs,
+        'install_button': install_btn,
+        'check_updates_button': check_updates_btn,
+        'uninstall_button': uninstall_btn,
+        'save_button': save_btn,
+        'reset_button': reset_btn,
+        'action_buttons_container': action_buttons_container,
+        'save_reset_container': save_reset_container,
+        'confirmation_area': create_confirmation_area(ui_components)
+    })
+    
+    return ui_components
 
 # ======================== CATEGORIES ========================
 

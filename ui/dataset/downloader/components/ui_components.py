@@ -17,6 +17,8 @@ from .input_options import create_downloader_input_options
 
 def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Create main downloader UI dengan visible confirmation area"""
+    # Initialize ui_components dictionary to store all UI components
+    ui_components = {}
     
     get_icon = lambda key, fallback="📥": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
     get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
@@ -62,17 +64,20 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     cleanup_button = action_buttons.get('secondary_1')
     button_container = action_buttons['container']
     
-    # Maintain backward compatibility
-    action_buttons_dict = {
-        'container': button_container,
+    # Store action buttons in ui_components
+    ui_components.update({
+        'action_buttons': action_buttons,
         'download_button': download_button,
         'check_button': check_button,
         'cleanup_button': cleanup_button,
+        'button_container': button_container,
         'buttons': [download_button, check_button, cleanup_button] if cleanup_button else [download_button, check_button]
-    }
+    })
+    
     # Initialize confirmation area using the dialog manager
     # This creates or gets the confirmation area with proper layout and behavior
     confirmation_area = create_confirmation_area(ui_components)
+    ui_components['confirmation_area'] = confirmation_area
     
     # Save & reset buttons
     save_reset_buttons = create_save_reset_buttons(
@@ -138,7 +143,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Create action section using shared component
     action_section = create_action_section(
-        action_buttons=action_buttons,
+        action_buttons=ui_components['action_buttons'],
         confirmation_area=confirmation_area,
         title="🚀 Operations",
         status_label="📋 Status & Konfirmasi:",
@@ -182,13 +187,20 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         box_shadow='0 2px 4px rgba(0,0,0,0.05)'
     ))
     
-    # Compile components
-    ui_components = {
+    # Update ui_components with remaining components
+    ui_components.update({
         # Main UI
-        'ui': ui, 'header': header, 'status_panel': status_panel,
+        'ui': ui,
+        'header': header,
+        'status_panel': status_panel,
+        'input_options': input_options,
+        'config_section': config_section,
+        'action_section': action_section,
+        'help_section': help_section,
+        'help_panel': help_panel,
+        'module_name': 'downloader',
         
         # Input components
-        'input_options': input_options,
         'workspace_input': getattr(input_options, 'workspace_input', None),
         'project_input': getattr(input_options, 'project_input', None), 
         'version_input': getattr(input_options, 'version_input', None),
@@ -196,40 +208,26 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'validate_checkbox': getattr(input_options, 'validate_checkbox', None),
         'backup_checkbox': getattr(input_options, 'backup_checkbox', None),
         
-        # Action buttons
-        'action_buttons': action_buttons_dict,
-        'download_button': download_button,
-        'check_button': check_button,
-        'cleanup_button': cleanup_button,
-        'container': button_container,
-        
-        # Confirmation area - IMPORTANT!
-        'confirmation_area': confirmation_area,
-        
         # Save/reset buttons
         'save_reset_buttons': save_reset_buttons,
-        'save_button': save_reset_buttons['save_button'],
-        'reset_button': save_reset_buttons['reset_button'],
+        'save_button': save_reset_buttons.get('save_button'),
+        'reset_button': save_reset_buttons.get('reset_button'),
         
         # Progress components
         'progress_tracker': progress_tracker,
-        'progress_container': progress_tracker.container,
-        'show_for_operation': progress_tracker.show,
-        'update_progress': progress_tracker.update,
-        'complete_operation': progress_tracker.complete,
-        'error_operation': progress_tracker.error,
-        'reset_all': progress_tracker.reset,
+        'progress_container': progress_tracker.container if hasattr(progress_tracker, 'container') else None,
+        'show_for_operation': getattr(progress_tracker, 'show', None),
+        'update_progress': getattr(progress_tracker, 'update', None),
+        'complete_operation': getattr(progress_tracker, 'complete', None),
+        'error_operation': getattr(progress_tracker, 'error', None),
+        'reset_all': getattr(progress_tracker, 'reset', None),
         
         # Log components
         'log_components': log_components,
-        'log_accordion': log_components['log_accordion'],
-        'log_output': log_components['log_output'],
-        'status': log_components['log_output'],
-        
-        # UI info
-        'help_panel': help_panel,
-        'module_name': 'downloader'
-    }
+        'log_accordion': log_components.get('log_accordion'),
+        'log_output': log_components.get('log_output'),
+        'status': log_components.get('log_output')
+    })
     from smartcash.ui.utils.logging_utils import log_missing_components
     log_missing_components(ui_components)
     return ui_components

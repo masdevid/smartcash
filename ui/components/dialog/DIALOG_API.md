@@ -151,13 +151,16 @@ Membuat area konfirmasi yang dapat digunakan untuk menampilkan dialog. Area ini 
 from smartcash.ui.components.dialog import create_confirmation_area
 
 # Membuat area konfirmasi kustom
-confirmation_area, layout = create_confirmation_area(
+# create_confirmation_area mengembalikan single widgets.Output object
+confirmation_area = create_confirmation_area(
+    ui_components=ui_components,  # Wajib: dictionary untuk menyimpan komponen UI
+    # Parameter opsional untuk menimpa gaya default
     width='90%',
     min_height='100px',
     max_height='600px',
     margin='20px auto',
     padding='15px',
-    border='1px solid #d1d5db',
+    border='1px solid #d1d5db'
     border_radius='8px',
     background_color='#ffffff',
     overflow='auto',

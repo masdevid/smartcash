@@ -60,6 +60,7 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     
     # Create confirmation area first with ui_components
     confirmation_area = create_confirmation_area(ui_components=ui_components)
+    ui_components['confirmation_area'] = confirmation_area  # Store reference in ui_components
     
     # Header and status panel with consistent styling
     header = create_header(
@@ -149,9 +150,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Initialize UI components dictionary
     ui_components = {}
     
-    # Confirmation area for dialog integration
-    confirmation_area, _ = create_confirmation_area(ui_components)  # Pass ui_components to create_confirmation_area
-    ui_components['confirmation_area'] = confirmation_area  # Store reference in ui_components
+    # Get confirmation area from ui_components
+    confirmation_area = ui_components.get('confirmation_area')
     
     # Log accordion
     log_components = create_log_accordion('augmentation', '250px')

@@ -54,26 +54,27 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         progress_tracker = create_dual_progress_tracker()
         
         # Log output
-        log_output = create_log_accordion()
+        log_components = create_log_accordion()
+        log_output = log_components['ui']
         
-        # Main UI layout
-        ui_container = widgets.VBox([
+        # Create main layout
+        main_ui = widgets.VBox([
             header,
             input_options['ui'],
             action_buttons['ui'],
             status_panel['ui'],
             progress_tracker['ui'],
-            log_output['ui']
+            log_output
         ])
         
-        # Compile all components
+        # Store all components in dictionary with required 'ui' key
         ui_components = {
-            'ui': ui_container,
+            'ui': main_ui,  # Main UI component
             'header': header,
             'status_panel': status_panel,
             'action_buttons': action_buttons,
             'progress_tracker': progress_tracker,
-            'log_output': log_output['output'],
+            'log_output': log_components.get('output'),
             'log_accordion': log_output,
             
             # Input components

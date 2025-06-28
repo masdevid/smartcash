@@ -43,12 +43,28 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         # Status panel
         status_panel = create_status_panel()
         
-        # Action buttons
-        action_buttons = create_action_buttons([
-            {'name': 'download_sync', 'label': '📥 Download & Sync', 'style': 'primary'},
-            {'name': 'save', 'label': '💾 Save Config', 'style': 'success'},
-            {'name': 'reset', 'label': '🔄 Reset', 'style': 'warning'}
-        ])
+        # Create action buttons container
+        action_buttons = create_action_buttons(
+            primary_button={"label": "📥 Download & Sync", "style": "primary"},
+            secondary_buttons=[
+                {"label": "💾 Save Config", "style": "success"},
+                {"label": "🔄 Reset", "style": "warning"}
+            ]
+        )
+        
+        # Get individual button references
+        download_btn = action_buttons.get('download_sync', action_buttons.get('buttons', {}).get('download_sync'))
+        save_btn = action_buttons.get('save', action_buttons.get('buttons', {}).get('save'))
+        reset_btn = action_buttons.get('reset', action_buttons.get('buttons', {}).get('reset'))
+        
+        # Ensure we have all buttons
+        if not all([download_btn, save_btn, reset_btn]):
+            # Fallback to first three buttons if direct access fails
+            all_buttons = action_buttons.get('buttons', [])
+            if isinstance(all_buttons, dict):
+                all_buttons = list(all_buttons.values())
+            if len(all_buttons) >= 3:
+                download_btn, save_btn, reset_btn = all_buttons[:3]
         
         # Progress tracker
         progress_tracker = create_dual_progress_tracker()
@@ -71,9 +87,9 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         main_ui = widgets.VBox([
             header,
             input_options['ui'],
-            action_buttons['ui'],
-            status_panel['ui'],
-            progress_tracker['ui'],
+            action_buttons['container'],
+            status_panel,
+            progress_tracker['ui'] if isinstance(progress_tracker, dict) else progress_tracker,
             log_output
         ])
         
@@ -84,20 +100,20 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
             'status_panel': status_panel,
             'action_buttons': action_buttons,
             'progress_tracker': progress_tracker,
-            'log_output': log_components.get('output'),
-            'log_accordion': log_output,
+            'log_output': log_output,
+            'log_accordion': log_accordion,
             
             # Input components
             **input_options,
             
             # Action button references
-            'download_sync_button': action_buttons['buttons']['download_sync'],
-            'save_button': action_buttons['buttons']['save'],
-            'reset_button': action_buttons['buttons']['reset'],
+            'download_sync_button': download_btn,
+            'save_button': save_btn,
+            'reset_button': reset_btn,
             
             # Status components
-            'status': status_panel['status'],
-            'confirmation_area': status_panel['confirmation_area'],
+            'status': status_panel.get('status', status_panel),
+            'confirmation_area': status_panel.get('confirmation_area'),
             
             # Progress components
             'main_progress': progress_tracker['main_progress'],

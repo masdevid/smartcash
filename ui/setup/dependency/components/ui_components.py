@@ -17,6 +17,7 @@ from smartcash.ui.components.status_panel import create_status_panel
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.card import create_card
+from smartcash.ui.components.dialog import create_confirmation_area
 
 # Local components for package-specific UIs
 from smartcash.ui.setup.dependency.utils.ui_utils import create_package_checkbox
@@ -159,15 +160,21 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         'log_output': log_components.get('log_output'),
         'log_accordion': log_accordion,
         'header': header,
-        'status_panel': status_panel,
+        'status_panel': status_panel,  # This is the main status panel widget
         'tabs': tabs,
         'action_buttons': action_components,
         'save_button': save_reset_buttons['save_button'],
         'reset_button': save_reset_buttons['reset_button'],
-        'save_reset': save_reset,
-        'status': status_panel.get('status', None),
-        'confirmation_area': status_panel.get('confirmation_area', None)
+        'save_reset': save_reset
     })
+    
+    # Initialize confirmation area if needed
+    if 'confirmation_area' not in ui_components:
+        ui_components['confirmation_area'] = create_confirmation_area(ui_components)
+        
+    # Ensure status panel is properly initialized
+    from smartcash.ui.components.status_panel import update_status_panel
+    update_status_panel(status_panel, "Siap mengelola dependensi", "success")
     
     return ui_components
 

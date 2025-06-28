@@ -221,43 +221,29 @@ class PretrainedInitializer(CommonInitializer):
 
 
 def initialize_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
-    """🚀 Factory function untuk inisialisasi pretrained UI
+    """Factory function untuk inisialisasi pretrained UI
     
     Args:
         config: Konfigurasi opsional untuk inisialisasi
         **kwargs: Parameter tambahan yang akan diteruskan ke initializer
         
     Returns:
-        Widget UI utama yang siap ditampilkan
+        Widget UI utama yang siap ditampilkan atau dictionary dengan 'ui' key
         
     Example:
         ```python
         ui = initialize_pretrained_ui(config=my_config)
-        display(ui)  # Langsung bisa di-display
+        display(ui)  # or display(ui['ui']) if it's a dict
         ```
     """
     try:
         initializer = PretrainedInitializer()
-        result = initializer.initialize(config or {}, **kwargs)
+        result = initializer.initialize(config=config, **kwargs)
         
-        # CommonInitializer.initialize() already returns the root UI component
-        # or an error component if something went wrong
+        # Handle error response
+        if isinstance(result, dict) and result.get('error'):
+            return result['ui']
         return result
-        
     except Exception as e:
         error_msg = f"❌ Gagal menginisialisasi pretrained UI: {str(e)}"
-        error_component = create_error_component(
-            error_message=error_msg,
-            traceback=str(e),
-            title="Pretrained Model Error"
-        )
-        
-        # The error component returns a dict with 'ui' key containing the widget
-        if isinstance(error_component, dict):
-            if 'ui' in error_component:
-                return error_component['ui']
-            elif 'widget' in error_component:
-                return error_component['widget']
-        
-        # If we get here, return the component as is
-        return error_component
+        return {'ui': create_error_component(error_msg, str(e), "Pretrained Model Error"), 'error': True}

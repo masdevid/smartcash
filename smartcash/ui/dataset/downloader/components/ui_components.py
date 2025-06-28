@@ -70,8 +70,9 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         'cleanup_button': cleanup_button,
         'buttons': [download_button, check_button, cleanup_button] if cleanup_button else [download_button, check_button]
     }
-    # Confirmation area - VISIBLE dan di bawah action buttons seperti preprocessing
-    confirmation_area, _ = create_confirmation_area()
+    # Initialize confirmation area using the dialog manager
+    # This creates or gets the confirmation area with proper layout and behavior
+    confirmation_area = create_confirmation_area(ui_components)
     
     # Save & reset buttons
     save_reset_buttons = create_save_reset_buttons(

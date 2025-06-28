@@ -9,6 +9,7 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import PreprocessingConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.common.logger import get_logger
+from smartcash.ui.components.error.error_component import create_error_component
 
 class PreprocessingInitializer(CommonInitializer):
     """Enhanced PreprocessingInitializer with proper error handling"""
@@ -29,27 +30,37 @@ class PreprocessingInitializer(CommonInitializer):
             **kwargs: Argumen tambahan
             
         Returns:
-            Dictionary berisi komponen UI yang valid
+            Dictionary berisi komponen UI yang valid dengan minimal keys:
+            - 'ui': Komponen UI utama
+            - 'log_output': Output log widget
+            - 'status_panel': Panel status
             
         Raises:
-            ValueError: Jika UI components tidak valid atau kosong
+            ValueError: Jika UI components tidak valid atau komponen penting tidak ada
         """
-        from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
-        
-        # Create UI components dengan immediate validation
-        ui_components = create_preprocessing_main_ui(config)
-        
-        if not isinstance(ui_components, dict):
-            raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
+        try:
+            from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
+            
+            # Create UI components dengan immediate validation
+            ui_components = create_preprocessing_main_ui(config)
+            
+            if not isinstance(ui_components, dict):
+                raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
+                    
+            if not ui_components:
+                raise ValueError("UI components tidak boleh kosong")
+            
+            # Validate critical components exist
+            required_components = ['ui', 'log_output', 'status_panel']
+            missing = [comp for comp in required_components if comp not in ui_components]
+            if missing:
+                raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
                 
-        if not ui_components:
-            raise ValueError("UI components tidak boleh kosong")
-        
-        # Validate critical components exist
-        required_components = ['ui', 'log_output', 'status_panel']
-        missing = [comp for comp in required_components if comp not in ui_components]
-        if missing:
-            raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
+            return ui_components
+            
+        except Exception as e:
+            self.logger.error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
+            raise
         
         # Add config handler reference
         ui_components['config_handler'] = self.config_handler
@@ -159,7 +170,22 @@ def initialize_preprocessing_ui(config: Optional[Dict[str, Any]] = None, **kwarg
         **kwargs: Argumen tambahan yang akan diteruskan ke initializer
         
     Returns:
-        Komponen UI utama yang siap ditampilkan
+        Widget UI utama yang siap ditampilkan atau dictionary dengan 'ui' key
+        
+    Example:
+        ```python
+        ui = initialize_preprocessing_ui(config=my_config)
+        display(ui)  # or display(ui['ui']) if it's a dict
+        ```
     """
-    initializer = PreprocessingInitializer()
-    return initializer.initialize(config=config, **kwargs)
+    try:
+        initializer = PreprocessingInitializer()
+        result = initializer.initialize(config=config, **kwargs)
+        
+        # Handle error response
+        if isinstance(result, dict) and result.get('error'):
+            return result['ui']
+        return result
+    except Exception as e:
+        error_msg = f"❌ Gagal menginisialisasi preprocessing UI: {str(e)}"
+        return {'ui': create_error_component(error_msg, str(e), "Preprocessing Error"), 'error': True}

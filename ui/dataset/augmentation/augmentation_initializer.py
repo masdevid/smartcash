@@ -7,6 +7,8 @@ from typing import Dict, Any, Optional, Type
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.augmentation.handlers.config_handler import AugmentationConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.components.error.error_component import create_error_component
+from smartcash.common.logger import get_logger
 
 class AugmentationInitializer(CommonInitializer):
     """Augmentation initializer dengan pattern terbaru dari CommonInitializer"""
@@ -27,27 +29,37 @@ class AugmentationInitializer(CommonInitializer):
             **kwargs: Argumen tambahan
             
         Returns:
-            Dictionary berisi komponen UI yang valid
+            Dictionary berisi komponen UI yang valid dengan minimal keys:
+            - 'ui': Komponen UI utama
+            - 'log_output': Output log widget
+            - 'status_panel': Panel status
             
         Raises:
-            ValueError: Jika UI components tidak valid atau kosong
+            ValueError: Jika UI components tidak valid atau komponen penting tidak ada
         """
-        from smartcash.ui.dataset.augmentation.components.ui_components import create_augmentation_main_ui
-        
-        # Create UI components dengan immediate validation
-        ui_components = create_augmentation_main_ui(config)
-        
-        if not isinstance(ui_components, dict):
-            raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
+        try:
+            from smartcash.ui.dataset.augmentation.components.ui_components import create_augmentation_main_ui
+            
+            # Create UI components dengan immediate validation
+            ui_components = create_augmentation_main_ui(config)
+            
+            if not isinstance(ui_components, dict):
+                raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
+                    
+            if not ui_components:
+                raise ValueError("UI components tidak boleh kosong")
+            
+            # Validate critical components exist
+            required_components = ['ui', 'log_output', 'status_panel']
+            missing = [comp for comp in required_components if comp not in ui_components]
+            if missing:
+                raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
                 
-        if not ui_components:
-            raise ValueError("UI components tidak boleh kosong")
-        
-        # Validate critical components exist
-        required_components = ['ui', 'log_output', 'status_panel']
-        missing = [comp for comp in required_components if comp not in ui_components]
-        if missing:
-            raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
+            return ui_components
+            
+        except Exception as e:
+            self.logger.error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
+            raise
         
         # Add module-specific metadata
         ui_components.update({
@@ -160,22 +172,22 @@ def initialize_augmentation_ui(config: Optional[Dict[str, Any]] = None, **kwargs
         **kwargs: Argumen tambahan yang akan diteruskan ke initializer
         
     Returns:
-        Komponen UI utama yang siap ditampilkan
+        Widget UI utama yang siap ditampilkan atau dictionary dengan 'ui' key
         
     Example:
         ```python
         ui = initialize_augmentation_ui(config=my_config)
-        display(ui['ui'])
+        display(ui)  # or display(ui['ui']) if it's a dict
         ```
     """
     try:
         initializer = AugmentationInitializer()
-        return initializer.initialize(config=config, **kwargs)
+        result = initializer.initialize(config=config, **kwargs)
+        
+        # Handle error response
+        if isinstance(result, dict) and result.get('error'):
+            return result['ui']
+        return result
     except Exception as e:
-        # Log the error and re-raise with a more user-friendly message
-        import logging
-        logging.error("Gagal menginisialisasi UI augmentasi", exc_info=True)
-        raise RuntimeError(
-            "Gagal menginisialisasi UI augmentasi. "
-            "Pastikan semua dependensi terinstall dengan benar."
-        ) from e
+        error_msg = f"❌ Gagal menginisialisasi augmentation UI: {str(e)}"
+        return {'ui': create_error_component(error_msg, str(e), "Augmentation Error"), 'error': True}

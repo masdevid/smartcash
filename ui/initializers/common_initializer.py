@@ -21,36 +21,25 @@ Key Features:
 - Comprehensive error handling
 """
 
-# Setup aggressive log suppression at the very top
-import sys
-import os
-import warnings
-import logging
+# Import logging utilities first
+from smartcash.ui.utils.logging_utils import (
+    setup_aggressive_log_suppression,
+    setup_stdout_suppression,
+    suppress_ml_logs,
+    suppress_viz_logs,
+    suppress_data_logs
+)
 
-# Suppress warnings before any other imports
-warnings.filterwarnings('ignore')
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
+# Setup aggressive suppression at module level
+setup_aggressive_log_suppression()
+setup_stdout_suppression()
+suppress_ml_logs()
+suppress_viz_logs()
+suppress_data_logs()
 
-# Setup aggressive logging suppression
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.CRITICAL)
-root_logger.handlers = []
-root_logger.addHandler(logging.NullHandler())
-
-# Suppress common loggers
-for logger_name in [''] + logging.root.manager.loggerDict.keys():
-    try:
-        logger = logging.getLogger(logger_name)
-        logger.setLevel(logging.CRITICAL)
-        logger.handlers = []
-        logger.propagate = False
-    except Exception:
-        pass
-
-# Now import other modules
+# Import other modules
 import contextlib
+import logging
 from typing import Dict, Any, Optional, Type, Callable
 from abc import ABC, abstractmethod
 import traceback
@@ -85,28 +74,10 @@ class CommonInitializer(ABC):
     
     @classmethod
     def _initialize_suppression(cls):
-        """Class method to initialize additional log suppression"""
+        """Class method to ensure suppression is initialized"""
         if not cls._suppression_initialized:
-            try:
-                # Additional suppression for specific loggers
-                for logger_name in ['smartcash', 'urllib3', 'matplotlib', 'PIL']:
-                    try:
-                        logger = logging.getLogger(logger_name)
-                        logger.setLevel(logging.CRITICAL)
-                        logger.handlers = []
-                        logger.propagate = False
-                    except Exception:
-                        pass
-                
-                # Suppress specific warnings that might still appear
-                warnings.filterwarnings('ignore', category=RuntimeWarning)
-                warnings.filterwarnings('ignore', category=ImportWarning)
-                
-                # Mark as initialized
-                cls._suppression_initialized = True
-            except Exception:
-                # If anything fails, just continue without suppression
-                pass
+            # Suppression is already handled at module level
+            cls._suppression_initialized = True
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):
         """Initialize dengan complete output suppression hingga UI ready

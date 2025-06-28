@@ -246,7 +246,18 @@ def initialize_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) 
         
     except Exception as e:
         error_msg = f"❌ Gagal menginisialisasi pretrained UI: {str(e)}"
-        error_component = create_error_component(error_msg, str(e), "Pretrained Model Error")
-        if isinstance(error_component, dict) and 'ui' in error_component:
-            return error_component['ui']
+        error_component = create_error_component(
+            error_message=error_msg,
+            traceback=str(e),
+            title="Pretrained Model Error"
+        )
+        
+        # The error component returns a dict with 'ui' key containing the widget
+        if isinstance(error_component, dict):
+            if 'ui' in error_component:
+                return error_component['ui']
+            elif 'widget' in error_component:
+                return error_component['widget']
+        
+        # If we get here, return the component as is
         return error_component

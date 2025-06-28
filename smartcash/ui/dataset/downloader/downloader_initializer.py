@@ -11,21 +11,13 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler
 class DownloaderInitializer(CommonInitializer):
     """Downloader initializer dengan pattern terbaru dari CommonInitializer"""
     
-    def __init__(self, module_name: str = 'downloader', 
-                 config_handler_class: Type[ConfigHandler] = DownloaderConfigHandler,
-                 **kwargs):
-        """Initialize downloader initializer dengan fail-fast validation
+    def __init__(self, config_handler_class: Type[ConfigHandler] = DownloaderConfigHandler):
+        """Initialize downloader initializer with proper configuration
         
         Args:
-            module_name: Nama modul (default: 'downloader')
-            config_handler_class: Kelas handler konfigurasi
-            **kwargs: Argumen tambahan untuk parent class
+            config_handler_class: Optional ConfigHandler class (defaults to DownloaderConfigHandler)
         """
-        super().__init__(
-            module_name=module_name,
-            config_handler_class=config_handler_class,
-            **kwargs
-        )
+        super().__init__(module_name='downloader', config_handler_class=config_handler_class)
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation

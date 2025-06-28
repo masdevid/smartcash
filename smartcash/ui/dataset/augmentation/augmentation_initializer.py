@@ -11,21 +11,13 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler
 class AugmentationInitializer(CommonInitializer):
     """Augmentation initializer dengan pattern terbaru dari CommonInitializer"""
     
-    def __init__(self, module_name: str = 'augmentation', 
-                 config_handler_class: Type[ConfigHandler] = AugmentationConfigHandler,
-                 **kwargs):
-        """Initialize augmentation initializer dengan fail-fast validation
+    def __init__(self, config_handler_class: Type[ConfigHandler] = AugmentationConfigHandler):
+        """Initialize augmentation initializer with proper configuration
         
         Args:
-            module_name: Nama modul (default: 'augmentation')
-            config_handler_class: Kelas handler konfigurasi
-            **kwargs: Argumen tambahan untuk parent class
+            config_handler_class: Optional ConfigHandler class (defaults to AugmentationConfigHandler)
         """
-        super().__init__(
-            module_name=module_name,
-            config_handler_class=config_handler_class,
-            **kwargs
-        )
+        super().__init__(module_name='augmentation', config_handler_class=config_handler_class)
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation

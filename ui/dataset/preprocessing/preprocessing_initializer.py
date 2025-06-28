@@ -13,6 +13,14 @@ from smartcash.common.logger import get_logger
 class PreprocessingInitializer(CommonInitializer):
     """Enhanced PreprocessingInitializer with proper error handling"""
     
+    def __init__(self, config_handler_class: Type[ConfigHandler] = PreprocessingConfigHandler):
+        """Initialize preprocessing initializer with proper configuration
+        
+        Args:
+            config_handler_class: Optional ConfigHandler class (defaults to PreprocessingConfigHandler)
+        """
+        super().__init__(module_name='preprocessing', config_handler_class=config_handler_class)
+    
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation
         

@@ -61,14 +61,15 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         confirmation_area = create_confirmation_area(ui_components)
         
         # Show confirmation area with animation
-        confirmation_area.layout.display = 'block'
+        confirmation_area.layout.display = 'flex'
         confirmation_area.layout.visibility = 'visible'
-        confirmation_area.layout.height = '250px'  # Set to 250px as requested
-        confirmation_area.layout.min_height = '250px'
-        confirmation_area.layout.max_height = '250px'
-        confirmation_area.layout.padding = '10px 0'  # Reduced padding for more compact look
+        confirmation_area.layout.height = 'auto'  # Allow height to adjust to content
+        confirmation_area.layout.min_height = '200px'  # Minimum height
+        confirmation_area.layout.max_height = '300px'  # Maximum height before scrolling
+        confirmation_area.layout.padding = '10px 15px'  # Add horizontal padding
         confirmation_area.layout.margin = '5px 0'  # Reduced margin
         confirmation_area.layout.overflow = 'hidden'
+        confirmation_area.layout.flex = '0 0 auto'  # Don't grow or shrink
         
         # Generate unique IDs untuk buttons
         dialog_id = f"dialog_{uuid.uuid4().hex[:8]}"
@@ -97,26 +98,31 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         <style>
         .smartcash-dialog-{dialog_id} {{
             position: relative;
-            max-width: 80%;
-            width: 80%;
+            max-width: 100%;
+            width: 100%;
             margin: 0 auto;
             padding: 0;
-            overflow: auto;
+            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }}
         
         .glass-card-{dialog_id} {{
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-radius: 12px;
+            border-radius: 8px;
             border: 1px solid {card_border};
             box-shadow: 
                 0 4px 16px 0 rgba(31, 38, 135, 0.1),
                 inset 0 1px 0 rgba(255, 255, 255, 0.2);
             padding: 20px;
-            height: 300px;
+            height: 100%;
+            max-height: 300px;
             overflow-y: auto;
+            overflow-x: hidden;
             transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
@@ -124,6 +130,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             align-items: center;
             text-align: center;
             position: relative;
+            box-sizing: border-box;
         }}
         
         .glass-card-{dialog_id}::before {{
@@ -134,7 +141,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             right: 0;
             bottom: 0;
             background: {card_accent};
-            border-radius: 20px;
+            border-radius: 8px;
             z-index: -1;
         }}
         
@@ -167,7 +174,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         
         .glass-btn-{dialog_id} {{
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             padding: 8px 16px;
             font-size: 0.8rem;
             font-weight: 500;

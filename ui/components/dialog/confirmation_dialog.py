@@ -1,518 +1,543 @@
 """
 File: smartcash/ui/components/dialog/confirmation_dialog.py
-Deskripsi: Komponen dialog modern dengan glass morphism untuk konfirmasi dan interaksi pengguna
+Deskripsi: Komponen dialog modern dengan glass morphism yang responsive dan optimized untuk show/hide behavior
 """
 
 from typing import Dict, Any, Callable, Optional, Tuple
 import ipywidgets as widgets
-from IPython.display import display, clear_output
+from IPython.display import display, clear_output, HTML
 
-# CSS untuk glass morphism effect
-GLASS_STYLE = """
-.glass-card {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-    padding: 20px;
-    transition: all 0.3s ease;
+# Modern glass morphism CSS dengan optimasi responsif
+GLASS_MORPHISM_CSS = """
+<style>
+.smartcash-dialog-container {
+    position: relative;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    z-index: 1000;
 }
 
-.glass-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.2);
-}
-
-.dialog-title {
-    color: #2d3748;
-    font-size: 1.4em;
-    font-weight: 600;
-    margin: 0 0 12px 0;
+.glass-confirmation-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 
+        0 8px 32px 0 rgba(31, 38, 135, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    padding: 24px;
+    max-width: 100%;
+    max-height: 200px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     text-align: center;
+}
+
+.glass-confirmation-card.danger {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    box-shadow: 
+        0 8px 32px 0 rgba(239, 68, 68, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.dialog-header {
+    color: #1a202c;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
 }
 
 .dialog-message {
     color: #4a5568;
-    font-size: 1em;
+    font-size: 0.95rem;
     line-height: 1.5;
     margin: 0 0 20px 0;
-    text-align: center;
+    white-space: pre-line;
+    max-height: 60px;
+    overflow-y: auto;
 }
 
-.dialog-button {
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
+.dialog-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.glass-btn {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-size: 0.9rem;
     font-weight: 500;
-    padding: 10px 20px;
-    transition: all 0.2s ease;
-    min-width: 100px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    min-width: 90px;
     text-align: center;
+    user-select: none;
+    outline: none;
 }
 
-.dialog-button.primary {
-    background: #4f46e5;
+.glass-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.glass-btn:active {
+    transform: translateY(0);
+}
+
+.glass-btn.primary {
+    background: rgba(79, 70, 229, 0.8);
     color: white;
+    border-color: rgba(79, 70, 229, 0.9);
 }
 
-.dialog-button.primary:hover {
-    background: #4338ca;
-    transform: translateY(-1px);
+.glass-btn.primary:hover {
+    background: rgba(79, 70, 229, 0.9);
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
 }
 
-.dialog-button.secondary {
-    background: rgba(255, 255, 255, 0.7);
-    color: #4f46e5;
-    border: 1px solid #e2e8f0;
-}
-
-.dialog-button.secondary:hover {
-    background: rgba(255, 255, 255, 0.9);
-    transform: translateY(-1px);
-}
-
-.dialog-button.danger {
-    background: #ef4444;
+.glass-btn.danger {
+    background: rgba(239, 68, 68, 0.8);
     color: white;
+    border-color: rgba(239, 68, 68, 0.9);
 }
 
-.dialog-button.danger:hover {
-    background: #dc2626;
-    transform: translateY(-1px);
+.glass-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.9);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+.glass-btn.secondary {
+    background: rgba(107, 114, 128, 0.1);
+    color: #374151;
+    border-color: rgba(107, 114, 128, 0.3);
 }
 
-.dialog-container {
-    animation: fadeIn 0.3s ease-out;
-    max-width: 100%;
-    width: 450px;
-    margin: 0 auto;
+.glass-btn.secondary:hover {
+    background: rgba(107, 114, 128, 0.2);
+    color: #1f2937;
 }
 
-@media (max-width: 480px) {
-    .dialog-container {
-        width: 90%;
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes slideOutUp {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+}
+
+.dialog-show {
+    animation: slideInDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.dialog-hide {
+    animation: slideOutUp 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .smartcash-dialog-container {
+        max-width: 95%;
         padding: 0 10px;
     }
     
-    .dialog-button {
+    .glass-confirmation-card {
+        padding: 20px 16px;
+        border-radius: 16px;
+    }
+    
+    .dialog-header {
+        font-size: 1.1rem;
+    }
+    
+    .dialog-message {
+        font-size: 0.9rem;
+    }
+    
+    .glass-btn {
         padding: 8px 16px;
+        font-size: 0.85rem;
         min-width: 80px;
     }
-}
-"""
-
-# Inject the CSS
-widgets.HTML(f"""
-<style>
-{GLASS_STYLE}
-</style>
-""")
-
-def create_confirmation_area(
-    width: str = '100%',
-    min_height: str = '0px',
-    max_height: str = '90vh',
-    margin: str = '10px 0',
-    padding: str = '20px',
-    border_radius: str = '16px',
-    background_color: str = 'rgba(255, 255, 255, 0.15)',
-    backdrop_filter: str = 'blur(12px)',
-    border: str = '1px solid rgba(255, 255, 255, 0.18)',
-    box_shadow: str = '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-    overflow: str = 'auto',
-    visibility: str = 'hidden'
-) -> Tuple[widgets.Output, Dict[str, str]]:
-    """
-    Membuat area konfirmasi modern dengan glass morphism effect.
     
-    Args:
-        width: Lebar area konfirmasi (contoh: '100%', '500px')
-        min_height: Tinggi minimum area
-        max_height: Tinggi maksimum area (contoh: '80vh', '600px')
-        margin: Margin area (contoh: '10px 0', '20px auto')
-        padding: Padding area
-        border_radius: Sudut border untuk efek rounded corner
-        background_color: Warna latar belakang dengan transparansi
-        backdrop_filter: Filter untuk efek glass (contoh: 'blur(12px)')
-        border: Gaya border dengan transparansi
-        box_shadow: Bayangan untuk efek kedalaman
-        overflow: Pengaturan overflow
-        visibility: Visibilitas awal ('hidden' atau 'visible')
-        overflow: Pengaturan overflow
-        visibility: Visibilitas awal ('hidden' atau 'visible')
-        
-    Returns:
-        Tuple berisi:
-        - Widget Output yang dapat digunakan untuk menampilkan konten
-        - Dictionary berisi layout yang digunakan (untuk referensi)
-    """
-    layout = {
-        'width': width,
-        'min_height': min_height,
-        'max_height': max_height,
-        'margin': margin,
-        'padding': padding,
-        'border': border,
-        'border_radius': border_radius,
-        'background_color': background_color,
-        'overflow': overflow,
-        'visibility': visibility
+    .dialog-actions {
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .glass-confirmation-card {
+        padding: 16px 12px;
+        max-height: 180px;
     }
     
-    confirmation_area = widgets.Output(
-        layout=widgets.Layout(**{
-            k: v for k, v in layout.items() 
-            if k not in ['visibility']  # visibility diatur melalui display property
-        })
-    )
+    .dialog-actions {
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
     
-    # Set initial visibility
-    confirmation_area.layout.display = 'none' if visibility == 'hidden' else 'flex'
-    
-    return confirmation_area, layout
+    .glass-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+}
 
-def show_confirmation_dialog(
-    ui_components: Dict[str, Any],
-    title: str,
-    message: str,
-    on_confirm: Callable = None,
-    on_cancel: Callable = None,
-    confirm_text: str = "Ya",
-    cancel_text: str = "Batal",
-    danger_mode: bool = False
-) -> None:
-    """Tampilkan dialog konfirmasi dengan desain glass morphism modern"""
-    dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
-    if not dialog_area:
-        print(f"⚠️ {title}: {message}")
-        if on_confirm:
-            on_confirm()
-        return
-        
-    # Ensure the confirmation area is visible
-    if hasattr(dialog_area, 'layout'):
-        dialog_area.layout.display = 'flex'  # Make sure it's visible
-        dialog_area.layout.visibility = 'visible'  # Make sure it's visible
+/* Hide scrollbars but keep functionality */
+.dialog-message::-webkit-scrollbar {
+    width: 3px;
+}
+
+.dialog-message::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dialog-message::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+}
+
+.dialog-message::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+</style>
+"""
+
+class GlassDialogManager:
+    """Manager untuk glass morphism dialog dengan state management yang robust"""
     
-    try:
-        # Ensure the confirmation area is properly shown
-        dialog_area = ui_components.get('confirmation_area')
-        if not dialog_area:
-            print(f"⚠️ {title}: {message}")
-            if on_confirm:
-                on_confirm()
-            return
+    def __init__(self):
+        self.current_dialog = None
+        self.is_visible = False
+        self._ensure_css_loaded()
+    
+    def _ensure_css_loaded(self):
+        """Ensure CSS is loaded hanya sekali"""
+        if not hasattr(self, '_css_loaded'):
+            display(HTML(GLASS_MORPHISM_CSS))
+            self._css_loaded = True
+    
+    def create_confirmation_area(self, ui_components: Dict[str, Any]) -> widgets.Output:
+        """Buat area konfirmasi yang optimized untuk show/hide behavior"""
+        
+        if 'confirmation_area' not in ui_components:
+            confirmation_area = widgets.Output(
+                layout=widgets.Layout(
+                    width='100%',
+                    min_height='0px',
+                    max_height='250px',
+                    margin='10px 0',
+                    padding='0',
+                    overflow='visible',
+                    display='none'  # Initially hidden
+                )
+            )
+            ui_components['confirmation_area'] = confirmation_area
+        
+        return ui_components['confirmation_area']
+    
+    def show_dialog(self, 
+                   ui_components: Dict[str, Any],
+                   title: str,
+                   message: str,
+                   on_confirm: Optional[Callable] = None,
+                   on_cancel: Optional[Callable] = None,
+                   confirm_text: str = "Konfirmasi",
+                   cancel_text: str = "Batal",
+                   danger_mode: bool = False) -> None:
+        """Show glass morphism dialog dengan improved state management"""
+        
+        try:
+            # Ensure confirmation area exists
+            confirmation_area = self.create_confirmation_area(ui_components)
             
-        # First, make sure the dialog area is visible and has proper layout
-        if hasattr(dialog_area, 'layout'):
-            dialog_area.layout.visibility = 'visible'
-            dialog_area.layout.display = 'flex'
-            dialog_area.layout.height = 'auto'
-            dialog_area.layout.margin = '10px 0'
-            dialog_area.layout.padding = '10px'
-            dialog_area.layout.overflow = 'visible'
-            dialog_area.layout.border = '1px solid #e0e0e0'
-            dialog_area.layout.border_radius = '5px'
-            dialog_area.layout.background = 'rgba(255, 255, 255, 0.95)'
-        
-        # Clear any existing content
-        with dialog_area:
-            clear_output(wait=True)
+            # Force clear dan reset layout
+            self._reset_dialog_area(confirmation_area)
             
-        # Force show the confirmation area in the UI
-        from smartcash.ui.dataset.preprocessing.utils.ui_utils import show_confirmation_area
-        show_confirmation_area(ui_components)
-        
-        # Buat callback untuk tombol dengan error handling
-        def handle_confirm(btn):
-            try:
-                with dialog_area:
-                    clear_output(wait=True)
-                    if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
-                        dialog_area.layout.display = 'none'
-                if on_confirm:
-                    on_confirm()
-            except Exception as e:
-                print(f"Error in confirm handler: {str(e)}")
-        
-        def handle_cancel(btn):
-            try:
-                with dialog_area:
-                    clear_output(wait=True)
-                    if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
-                        dialog_area.layout.display = 'none'
-                if on_cancel:
-                    on_cancel()
-            except Exception as e:
-                print(f"Error in cancel handler: {str(e)}")
-        
-        # Tentukan gaya tombol berdasarkan mode
-        confirm_btn_class = 'danger' if danger_mode else 'primary'
-        
-        # Buat HTML untuk dialog
-        dialog_html = f"""
-        <div class="dialog-container">
-            <div class="glass-card">
-                <h3 class="dialog-title">{title}</h3>
-                <div class="dialog-message">{message}</div>
-                <div style="display: flex; justify-content: center; gap: 12px; margin-top: 20px;">
-                    <button class="dialog-button {confirm_btn_class}" id="confirmBtn">{confirm_text}</button>
-                    <button class="dialog-button secondary" id="cancelBtn">{cancel_text}</button>
+            # Setup button handlers dengan proper cleanup
+            def handle_confirm():
+                self._handle_button_click(confirmation_area, on_confirm)
+            
+            def handle_cancel():
+                self._handle_button_click(confirmation_area, on_cancel)
+            
+            # Generate unique button IDs untuk avoid conflicts
+            import uuid
+            confirm_id = f"confirm_btn_{uuid.uuid4().hex[:8]}"
+            cancel_id = f"cancel_btn_{uuid.uuid4().hex[:8]}"
+            
+            # Determine button classes
+            confirm_class = "glass-btn danger" if danger_mode else "glass-btn primary"
+            card_class = "glass-confirmation-card danger" if danger_mode else "glass-confirmation-card"
+            
+            # Build HTML dengan improved structure
+            dialog_html = f"""
+            <div class="smartcash-dialog-container">
+                <div class="{card_class} dialog-show">
+                    <div class="dialog-header">{title}</div>
+                    <div class="dialog-message">{message}</div>
+                    <div class="dialog-actions">
+                        <button id="{confirm_id}" class="{confirm_class}">
+                            {confirm_text}
+                        </button>
+                        <button id="{cancel_id}" class="glass-btn secondary">
+                            {cancel_text}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-        """
-        
-        # Buat widget HTML
-        dialog = widgets.HTML(dialog_html)
-        
-        # Tambahkan event handlers
-        display(HTML(
-            f"""
-            <script>
-            document.getElementById('confirmBtn').addEventListener('click', function(e) {{
-                var kernel = IPython.notebook.kernel;
-                kernel.execute('confirm_clicked = True');
-            }});
-            document.getElementById('cancelBtn').addEventListener('click', function(e) {{
-                var kernel = IPython.notebook.kernel;
-                kernel.execute('cancel_clicked = True');
-            }});
-            </script>
-            """
-        ))
-        
-        # Tampilkan dialog
-        with dialog_area:
-            display(dialog)
             
-        # Simpan referensi ke fungsi handler
-        dialog._confirm_handler = handle_confirm
-        dialog._cancel_handler = handle_cancel
-        
-        # Atur event handler untuk tombol
-        display(HTML(
-            f"""
             <script>
-            var areaId = '{0}';
-            document.getElementById('confirmBtn').onclick = function() {{
-                var kernel = IPython.notebook.kernel;
-                kernel.execute('from IPython.display import display, clear_output; ' +
-                             'with ("' + areaId.replace(/"/g, '\\\\"') + '"): ' +
-                             'clear_output(wait=True)');
-                {handle_confirm.__code__.co_consts[0]};
-            }};
-            document.getElementById('cancelBtn').onclick = function() {{
-                var kernel = IPython.notebook.kernel;
-                kernel.execute('from IPython.display import display, clear_output; ' +
-                             'with ("' + areaId.replace(/"/g, '\\\\"') + '"): ' +
-                             'clear_output(wait=True)');
-                {handle_cancel.__code__.co_consts[0]};
-            }};
+            (function() {{
+                // Setup event listeners dengan error handling
+                const confirmBtn = document.getElementById('{confirm_id}');
+                const cancelBtn = document.getElementById('{cancel_id}');
+                
+                if (confirmBtn) {{
+                    confirmBtn.onclick = function() {{
+                        try {{
+                            // Add hide animation
+                            const card = confirmBtn.closest('.glass-confirmation-card');
+                            if (card) {{
+                                card.classList.remove('dialog-show');
+                                card.classList.add('dialog-hide');
+                            }}
+                            
+                            // Trigger Python callback setelah animation
+                            setTimeout(() => {{
+                                window.dispatchEvent(new CustomEvent('smartcash_confirm_clicked'));
+                            }}, 200);
+                        }} catch (e) {{
+                            console.error('Error in confirm handler:', e);
+                            window.dispatchEvent(new CustomEvent('smartcash_confirm_clicked'));
+                        }}
+                    }};
+                }}
+                
+                if (cancelBtn) {{
+                    cancelBtn.onclick = function() {{
+                        try {{
+                            // Add hide animation
+                            const card = cancelBtn.closest('.glass-confirmation-card');
+                            if (card) {{
+                                card.classList.remove('dialog-show');
+                                card.classList.add('dialog-hide');
+                            }}
+                            
+                            // Trigger Python callback setelah animation
+                            setTimeout(() => {{
+                                window.dispatchEvent(new CustomEvent('smartcash_cancel_clicked'));
+                            }}, 200);
+                        }} catch (e) {{
+                            console.error('Error in cancel handler:', e);
+                            window.dispatchEvent(new CustomEvent('smartcash_cancel_clicked'));
+                        }}
+                    }};
+                }}
+            }})();
             </script>
             """
-        ))
-        
-    except Exception as e:
-        print(f"Error showing confirmation dialog: {str(e)}")
-        # Fallback ke print sederhana jika dialog gagal
-        print(f"⚠️ {title}: {message} [Confirm: {confirm_text} / {cancel_text}]")
-
-def show_info_dialog(
-    ui_components: Dict[str, Any],
-    title: str,
-    message: str,
-    on_close: Callable = None,
-    close_text: str = "Tutup",
-    dialog_type: str = "info"
-) -> None:
-    """Tampilkan dialog info dengan desain glass morphism modern"""
-    """Show info dialog with consistent styling and better state management"""
-    dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
-    if not dialog_area:
-        print(f"ℹ️ {title}: {message}")
-        if on_close:
-            on_close()
-        return
+            
+            # Display dialog dengan proper timing
+            with confirmation_area:
+                clear_output(wait=True)
+                display(HTML(dialog_html))
+            
+            # Show confirmation area dengan improved visibility
+            self._show_confirmation_area(confirmation_area)
+            
+            # Store handlers untuk cleanup
+            self.current_handlers = {
+                'confirm': handle_confirm,
+                'cancel': handle_cancel
+            }
+            self.is_visible = True
+            
+            # Setup JavaScript event listeners
+            self._setup_js_listeners(handle_confirm, handle_cancel)
+            
+        except Exception as e:
+            print(f"⚠️ Error showing dialog: {str(e)}")
+            # Fallback ke simple print confirmation
+            response = input(f"{title}: {message} (y/N): ").lower().strip()
+            if response in ['y', 'yes', 'ya'] and on_confirm:
+                on_confirm()
+            elif on_cancel:
+                on_cancel()
     
-    try:
-        # Ensure dialog area is visible
-        if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
-            dialog_area.layout.display = 'flex'
+    def _reset_dialog_area(self, dialog_area: widgets.Output) -> None:
+        """Reset dialog area dengan proper state cleanup"""
+        if hasattr(dialog_area, 'layout'):
+            dialog_area.layout.display = 'block'
+            dialog_area.layout.visibility = 'visible'
+            dialog_area.layout.height = 'auto'
+            dialog_area.layout.overflow = 'visible'
         
-        def handle_close(btn):
-            try:
-                with dialog_area:
-                    clear_output(wait=True)
-                    if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
-                        dialog_area.layout.display = 'none'
-                if on_close:
-                    on_close()
-            except Exception as e:
-                print(f"Error in close handler: {str(e)}")
-        
-        # Modern color scheme with better contrast
-        colors = {
-            'info': '#3b82f6',    # blue-500
-            'success': '#10b981', # emerald-500
-            'warning': '#f59e0b', # amber-500
-            'error': '#ef4444'    # red-500
-        }
-        
-        # Icons for each dialog type
-        icons = {
-            'info': 'ℹ️',
-            'success': '✅',
-            'warning': '⚠️',
-            'error': '❌'
-        }
-        
-        color = colors.get(dialog_type.lower(), '#3b82f6')
-        icon = icons.get(dialog_type.lower(), 'ℹ️')
-        
-        # Create styled close button with hover effect
-        close_btn = widgets.Button(
-            description=close_text,
-            layout=widgets.Layout(
-                width='120px',
-                margin='10px 0 0 0',
-                padding='8px 16px',
-                border_radius='6px',
-                border='none',
-                background_color=color,
-                font_weight='500',
-                cursor='pointer',
-                color='white',
-                box_shadow='0 2px 4px rgba(0,0,0,0.1)'
-            )
-        )
-        close_btn.on_click(handle_close)
-        
-        # Add hover effect using CSS
-        close_btn.add_class('dialog-button')
-        
-        # Create dialog with glass morphism effect
-        dialog = widgets.VBox([
-            widgets.HTML(f"""
-                <div style='text-align:center; margin-bottom:12px; font-size:2.5em; color:{color};'>{icon}</div>
-                <h3 style='color:{color}; text-align:center; margin:0 0 12px 0; font-size:1.4em;'>{title}</h3>
-                <div style='color:#4b5563; text-align:center; line-height:1.5;'>{message}</div>
-            """),
-            widgets.HBox([close_btn], layout=widgets.Layout(justify_content='center'))
-        ], layout=widgets.Layout(
-            padding='24px',
-            border_radius='12px',
-            margin='10px auto',
-            width='auto',
-            max_width='500px',
-            background='rgba(255, 255, 255, 0.9)',
-            backdrop_filter='blur(10px)',
-            box_shadow='0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-            border=f'1px solid rgba(255, 255, 255, 0.2)'
-        ))
-        
-        # Add responsive styles and effects
-        display(HTML(f"""
-        <style>
-            .dialog-button {{
-                transition: all 0.2s ease;
-            }}
-            .dialog-button:hover {{
-                opacity: 0.9;
-                transform: translateY(-1px);
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
-            }}
-            .dialog-button:active {{
-                transform: translateY(0);
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-            }}
+        self.is_visible = False
+        self.current_handlers = None
+    
+    def _show_confirmation_area(self, confirmation_area: widgets.Output) -> None:
+        """Show confirmation area dengan proper layout management"""
+        if hasattr(confirmation_area, 'layout'):
+            confirmation_area.layout.display = 'block'
+            confirmation_area.layout.visibility = 'visible'
+            confirmation_area.layout.height = 'auto'
+            confirmation_area.layout.max_height = '250px'
+            confirmation_area.layout.overflow = 'visible'
+    
+    def _handle_button_click(self, dialog_area: widgets.Output, callback: Optional[Callable]) -> None:
+        """Handle button click dengan proper cleanup"""
+        try:
+            # Hide dialog area
+            self.hide_dialog(dialog_area)
             
-            /* Responsive adjustments */
-            @media (max-width: 600px) {{
-                .p-Widget {{
-                    max-width: 95% !important;
-                    margin: 10px auto !important;
+            # Execute callback jika ada
+            if callback:
+                callback()
+                
+        except Exception as e:
+            print(f"⚠️ Error in button handler: {str(e)}")
+    
+    def _setup_js_listeners(self, confirm_handler: Callable, cancel_handler: Callable):
+        """Setup JavaScript event listeners untuk dialog buttons"""
+        try:
+            from IPython.display import Javascript
+            
+            js_code = f"""
+            // Clean up existing listeners
+            window.removeEventListener('smartcash_confirm_clicked', window.smartcash_confirm_handler);
+            window.removeEventListener('smartcash_cancel_clicked', window.smartcash_cancel_handler);
+            
+            // Setup new listeners
+            window.smartcash_confirm_handler = function() {{
+                // Trigger Python callback
+                if (window.jupyter && window.jupyter.notebook) {{
+                    window.jupyter.notebook.kernel.execute('_handle_confirm_from_js()');
                 }}
-                .p-Widget h3 {{
-                    font-size: 1.2em !important;
-                    margin-bottom: 8px !important;
+            }};
+            
+            window.smartcash_cancel_handler = function() {{
+                // Trigger Python callback  
+                if (window.jupyter && window.jupyter.notebook) {{
+                    window.jupyter.notebook.kernel.execute('_handle_cancel_from_js()');
                 }}
-                .p-Widget .p-Widget {{
-                    padding: 16px !important;
-                }}
-            }}
+            }};
             
-            /* Animation for dialog appearance */
-            @keyframes dialogFadeIn {{
-                from {{ opacity: 0; transform: translateY(20px); }}
-                to {{ opacity: 1; transform: translateY(0); }}
-            }}
+            window.addEventListener('smartcash_confirm_clicked', window.smartcash_confirm_handler);
+            window.addEventListener('smartcash_cancel_clicked', window.smartcash_cancel_handler);
+            """
             
-            .p-Widget > div[data-mime-type="application/vnd.jupyter.widget-view+json"] {{
-                animation: dialogFadeIn 0.3s ease-out forwards;
-            }}
-        </style>
-        """))
-        
-        with dialog_area:
-            clear_output(wait=True)
-            display(dialog)
+            display(Javascript(js_code))
             
-    except Exception as e:
-        print(f"Error showing info dialog: {str(e)}")
-        # Fallback to simple print if dialog fails
-        print(f"ℹ️ {title}: {message}")
+            # Store handlers in global namespace untuk JavaScript access
+            import __main__
+            __main__._handle_confirm_from_js = confirm_handler
+            __main__._handle_cancel_from_js = cancel_handler
+            
+        except Exception as e:
+            print(f"⚠️ Warning: JS listeners setup failed: {str(e)}")
+    
+    def hide_dialog(self, dialog_area: widgets.Output) -> None:
+        """Hide dialog dengan proper cleanup"""
+        try:
+            if hasattr(dialog_area, 'layout'):
+                dialog_area.layout.display = 'none'
+                dialog_area.layout.visibility = 'hidden'
+            
+            # Clear content
+            with dialog_area:
+                clear_output(wait=True)
+            
+            self.is_visible = False
+            self.current_handlers = None
+            
+        except Exception as e:
+            print(f"⚠️ Error hiding dialog: {str(e)}")
+    
+    def clear_dialog_area(self, ui_components: Dict[str, Any]) -> None:
+        """Clear dialog area dengan improved cleanup"""
+        confirmation_area = ui_components.get('confirmation_area')
+        if confirmation_area:
+            self.hide_dialog(confirmation_area)
+
+# Global dialog manager instance
+dialog_manager = GlassDialogManager()
+
+def show_confirmation_dialog(ui_components: Dict[str, Any],
+                           title: str,
+                           message: str,
+                           on_confirm: Optional[Callable] = None,
+                           on_cancel: Optional[Callable] = None,
+                           confirm_text: str = "Konfirmasi",
+                           cancel_text: str = "Batal",
+                           danger_mode: bool = False) -> None:
+    """Show glass morphism confirmation dialog dengan optimized behavior"""
+    dialog_manager.show_dialog(
+        ui_components=ui_components,
+        title=title,
+        message=message,
+        on_confirm=on_confirm,
+        on_cancel=on_cancel,
+        confirm_text=confirm_text,
+        cancel_text=cancel_text,
+        danger_mode=danger_mode
+    )
+
+def show_info_dialog(ui_components: Dict[str, Any],
+                    title: str,
+                    message: str,
+                    on_ok: Optional[Callable] = None,
+                    ok_text: str = "OK") -> None:
+    """Show glass morphism info dialog"""
+    dialog_manager.show_dialog(
+        ui_components=ui_components,
+        title=title,
+        message=message,
+        on_confirm=on_ok,
+        on_cancel=None,
+        confirm_text=ok_text,
+        cancel_text="",
+        danger_mode=False
+    )
 
 def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
-    """Clear dialog area and reset its visibility"""
-    dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
-    if not dialog_area:
-        return
-    
-    try:
-        # Clear the content first
-        with dialog_area:
-            clear_output(wait=True)
-        
-        # Reset the layout properties
-        if hasattr(dialog_area, 'layout'):
-            dialog_area.layout.visibility = 'hidden'
-            dialog_area.layout.display = 'none'
-            dialog_area.layout.height = '0px'
-            dialog_area.layout.width = 'auto'
-            dialog_area.layout.margin = '0'
-            dialog_area.layout.padding = '0'
-            dialog_area.layout.border = 'none'
-            dialog_area.layout.background = 'transparent'
-            
-            # Reset any flex properties
-            if hasattr(dialog_area.layout, 'flex_flow'):
-                dialog_area.layout.flex_flow = 'column'
-            if hasattr(dialog_area.layout, 'align_items'):
-                dialog_area.layout.align_items = 'stretch'
-                
-    except Exception as e:
-        # Log the error but don't crash
-        logger = ui_components.get('logger_bridge')
-        if logger:
-            logger.debug(f"Error clearing dialog area: {str(e)}")
+    """Clear dialog area menggunakan dialog manager"""
+    dialog_manager.clear_dialog_area(ui_components)
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
-    """Periksa apakah dialog sedang terlihat"""
-    dialog_area = ui_components.get('confirmation_area') or ui_components.get('dialog_area')
-    if not dialog_area:
-        return False
-    
-    try:
-        if hasattr(dialog_area, 'layout') and hasattr(dialog_area.layout, 'display'):
-            return dialog_area.layout.display != 'none' and dialog_area.layout.display is not None
-    except Exception:
-        pass
-    return False
+    """Check apakah dialog sedang visible"""
+    return dialog_manager.is_visible
+
+def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
+    """Create atau get existing confirmation area"""
+    return dialog_manager.create_confirmation_area(ui_components)

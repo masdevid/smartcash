@@ -31,6 +31,24 @@ class PretrainedInitializer(CommonInitializer):
             **kwargs
         )
     
+    def _get_default_config(self) -> Dict[str, Any]:
+        """Return default configuration for pretrained models
+        
+        Returns:
+            Dictionary berisi konfigurasi default untuk pretrained models
+        """
+        return {
+            'model_name': 'yolov5s',
+            'version': 'latest',
+            'device': 'cuda:0',  # Default to GPU if available
+            'conf_threshold': 0.25,
+            'iou_threshold': 0.45,
+            'classes': None,  # None means all classes
+            'max_detections': 1000,
+            'agnostic_nms': False,
+            'augment': False
+        }
+    
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation
         

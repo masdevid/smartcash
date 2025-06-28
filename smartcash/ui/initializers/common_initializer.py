@@ -47,11 +47,7 @@ import ipywidgets as widgets
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.logger_bridge import UILoggerBridge, create_ui_logger_bridge
-from smartcash.ui.utils.logging_utils import (
-    restore_stdout,
-    setup_aggressive_log_suppression
-)
+from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
 
 class CommonInitializer(ABC):
     """Enhanced base class for initializing UI modules with comprehensive lifecycle management.
@@ -148,8 +144,8 @@ class CommonInitializer(ABC):
             from smartcash.ui.utils.logging_utils import setup_stdout_suppression
             setup_stdout_suppression()
             
-            # Initialize logger bridge with UI components
-            self._logger_bridge = UILoggerBridge(
+            # Initialize logger bridge with UI components using factory function
+            self._logger_bridge = create_ui_logger_bridge(
                 ui_components=ui_components,
                 logger_name=f"smartcash.ui.{self.module_name}"
             )

@@ -4,19 +4,23 @@ Deskripsi: Fixed base handler dengan proper progress tracker integration dan API
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Callable, List
+import traceback
+from typing import Dict, Any, Optional, Callable, List, Type, Union
 from smartcash.ui.utils import with_error_handling, ErrorHandler
 from smartcash.ui.dataset.preprocessing import utils as ui_utils
 from smartcash.ui.dataset.preprocessing.utils.ui_utils import update_status_panel_enhanced
+from smartcash.common.logger import get_logger
 
 class BasePreprocessingHandler(ABC):
     """Base class untuk handlers dengan proper progress tracker integration"""
     
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
-        self.logger = ui_components.get('logger_bridge')
+        self.logger = ui_components.get('logger_bridge', get_logger(self.__class__.__name__))
         self.error_handler = ErrorHandler()
+        self.initializer = None  # Will be set by CommonInitializer
         
+        # Ensure we have required components
         if not self.logger:
             raise ValueError("Logger bridge required in UI components")
     
@@ -26,6 +30,34 @@ class BasePreprocessingHandler(ABC):
     def setup_handlers(self) -> Dict[str, Any]:
         """Setup handlers specific untuk handler type ini"""
         pass
+    
+    # === ERROR HANDLING ===
+    
+    def _handle_error(self, error: Exception, context: str = "Operation failed") -> None:
+        """Handle and propagate errors to CommonInitializer
+        
+        Args:
+            error: The exception that was raised
+            context: Context about where the error occurred
+        """
+        error_msg = f"{context}: {str(error)}"
+        
+        # Log the error with traceback
+        self.logger.error(error_msg, exc_info=True)
+        
+        # Update UI status
+        update_status_panel_enhanced(self.ui_components, f"❌ {context}", 'error')
+        
+        # If we have access to the initializer, let it handle the error
+        if hasattr(self, 'initializer') and self.initializer:
+            self.initializer.handle_error(error, context=context)
+        else:
+            # Otherwise, re-raise to propagate up
+            raise error
+    
+    def setup_with_initializer(self, initializer):
+        """Set the initializer for error propagation"""
+        self.initializer = initializer
     
     # === FIXED PROGRESS TRACKER ACCESS ===
     

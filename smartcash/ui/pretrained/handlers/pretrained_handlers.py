@@ -267,6 +267,12 @@ def _enable_buttons(ui_components: Dict[str, Any]):
 
 def _show_confirmation_area(ui_components: Dict[str, Any]):
     """Show confirmation area"""
+    # Ensure confirmation area exists
+    if 'confirmation_area' not in ui_components:
+        from smartcash.ui.components.dialog.confirmation_dialog import create_confirmation_area
+        ui_components['confirmation_area'] = create_confirmation_area(ui_components)
+    
+    # Show the confirmation area
     if confirmation_area := ui_components.get('confirmation_area'):
         confirmation_area.layout.display = 'block'
 

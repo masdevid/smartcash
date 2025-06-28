@@ -3,29 +3,15 @@ File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
 Deskripsi: Preprocessing initializer dengan CommonInitializer pattern terbaru dan fail-fast approach
 """
 
-from typing import Dict, Any, Optional, Type
+import traceback
+from typing import Dict, Any, Optional, Type, Callable
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import PreprocessingConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.common.logger import get_logger
 
 class PreprocessingInitializer(CommonInitializer):
-    """Preprocessing initializer dengan pattern terbaru dari CommonInitializer"""
-    
-    def __init__(self, module_name: str = 'preprocessing', 
-                 config_handler_class: Type[ConfigHandler] = PreprocessingConfigHandler,
-                 **kwargs):
-        """Initialize preprocessing initializer dengan fail-fast validation
-        
-        Args:
-            module_name: Nama modul (default: 'preprocessing')
-            config_handler_class: Kelas handler konfigurasi
-            **kwargs: Argumen tambahan untuk parent class
-        """
-        super().__init__(
-            module_name=module_name,
-            config_handler_class=config_handler_class,
-            **kwargs
-        )
+    """Enhanced PreprocessingInitializer with proper error handling"""
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation
@@ -62,37 +48,30 @@ class PreprocessingInitializer(CommonInitializer):
         
         return ui_components
     
-    def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Setup event handlers dengan proper logger bridge integration
+    def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Setup handlers dengan proper error handling dan initializer connection"""
+        from smartcash.ui.dataset.preprocessing.handlers.event_handlers import setup_all_handlers
         
-        Args:
-            ui_components: Dictionary berisi komponen UI
-            config: Konfigurasi yang digunakan
-            **kwargs: Argumen tambahan
+        try:
+            # Setup all handlers using the centralized setup function
+            handlers = setup_all_handlers(ui_components, config, self.config_handler)
             
-        Returns:
-            Dictionary komponen UI yang telah diupdate dengan handlers
+            # Connect handlers to this initializer for error propagation
+            for handler in handlers.values():
+                if hasattr(handler, 'setup_with_initializer'):
+                    handler.setup_with_initializer(self)
             
-        Raises:
-            ValueError: Jika handler setup gagal
-        """
-        # Ensure logger bridge is available before setting up handlers
-        if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
-            raise ValueError("Logger bridge belum diinisialisasi sebelum setup handlers")
-                
-        # Add logger bridge to ui_components untuk akses handlers
-        ui_components['logger_bridge'] = self._logger_bridge
-        
-        from smartcash.ui.dataset.preprocessing.handlers import setup_all_handlers
-        
-        # Setup handlers dengan error handling
-        handlers = setup_all_handlers(ui_components, config, self.config_handler)
-        
-        if not handlers:
-            raise ValueError("Gagal menginisialisasi preprocessing handlers")
+            # Store handlers for later use
+            self._handlers = handlers
             
-        ui_components['handlers'] = handlers
-        return ui_components
+            # Store UI components reference for error handling
+            self._ui_components = ui_components
+            
+        except Exception as e:
+            error_msg = "Failed to initialize handlers"
+            self.logger.error(f"{error_msg}: {str(e)}", exc_info=True)
+            # Re-raise to let the parent class handle it
+            raise RuntimeError(f"{error_msg}: {str(e)}") from e
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default config dengan fallback handling

@@ -53,15 +53,19 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         # Progress tracker
         progress_tracker = create_dual_progress_tracker()
         
-        # Log output
-        log_accordion = create_log_accordion()
-        log_output = log_accordion  # Langsung gunakan widget accordion
+        # Create log accordion and get its components
+        log_components = create_log_accordion(
+            module_name="Pretrained Models",
+            height="200px"
+        )
+        log_accordion = log_components['log_accordion']
+        log_output = log_components['log_output']
         
-        # Create log components dictionary
-        log_components = {
-            'ui': log_output,
-            'output': log_output.children[0]  # Output widget is the first child
-        }
+        # Update log_components with the correct references
+        log_components.update({
+            'ui': log_accordion,
+            'output': log_output
+        })
         
         # Create main layout
         main_ui = widgets.VBox([

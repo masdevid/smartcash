@@ -193,14 +193,20 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Import shared action section component
     from smartcash.ui.components.action_section import create_action_section
     
+    # Prepare action_buttons in the expected format for create_action_section
+    action_buttons_for_section = {
+        'container': action_buttons.get('container'),
+        'primary': action_buttons.get('primary'),
+        'secondary': [b for b in action_buttons.get('buttons', []) if b != action_buttons.get('primary')]
+    }
+    
     # Create action section using shared component
     action_section = create_action_section(
-        action_buttons=action_buttons,
+        action_buttons=action_buttons_for_section,
         confirmation_area=confirmation_area,
         title="🚀 Operations",
         status_label="📋 Status & Konfirmasi:",
-        show_status=True,
-        ui_components=ui_components
+        show_status=True
     )
     
     # Config section with consistent styling

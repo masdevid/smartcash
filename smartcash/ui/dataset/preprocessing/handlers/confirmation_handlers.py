@@ -39,7 +39,7 @@ class ConfirmationHandler(BasePreprocessingHandler):
         return handlers
     
     def _show_preprocessing_confirmation_safe(self) -> None:
-        """Show preprocessing confirmation dengan enhanced validation"""
+        """Show preprocessing confirmation dengan simple HTML dialog"""
         try:
             # Validate state sebelum showing dialog
             if self.is_confirmation_pending():
@@ -69,7 +69,11 @@ class ConfirmationHandler(BasePreprocessingHandler):
             
             message = "\n".join(message_parts)
             
-            self.show_confirmation_dialog(
+            # Import simple dialog
+            from smartcash.ui.components.dialog.confirmation_dialog import show_confirmation_dialog
+            
+            show_confirmation_dialog(
+                ui_components=self.ui_components,
                 title="🚀 Konfirmasi Preprocessing Dataset",
                 message=message,
                 on_confirm=self._set_preprocessing_confirmed_safe,
@@ -85,7 +89,7 @@ class ConfirmationHandler(BasePreprocessingHandler):
             self._handle_dialog_error("preprocessing", e)
     
     def _show_cleanup_confirmation_safe(self) -> None:
-        """Show cleanup confirmation dengan enhanced target info"""
+        """Show cleanup confirmation dengan simple HTML dialog"""
         try:
             if self.is_confirmation_pending():
                 self.log_warning("⚠️ Dialog confirmation lain masih aktif, clearing state...")
@@ -105,7 +109,11 @@ class ConfirmationHandler(BasePreprocessingHandler):
 ⚠️ Tindakan ini akan menghapus file-file yang sudah diproses.
 Pastikan Anda sudah backup data penting sebelum melanjutkan."""
             
-            self.show_confirmation_dialog(
+            # Import simple dialog
+            from smartcash.ui.components.dialog.confirmation_dialog import show_confirmation_dialog
+            
+            show_confirmation_dialog(
+                ui_components=self.ui_components,
                 title="🧹 Konfirmasi Cleanup Dataset",
                 message=message,
                 on_confirm=self._set_cleanup_confirmed_safe,
@@ -246,7 +254,8 @@ Pastikan Anda sudah backup data penting sebelum melanjutkan."""
             
             # Clear all confirmation related keys
             keys_to_clear = [k for k in self.ui_components.keys() 
-                           if k.endswith('_confirmed') or k.startswith('_dialog_')]
+                           if k.endswith('_confirmed') or k.startswith('_dialog_') or 
+                           k.startswith('_confirm_callback_') or k.startswith('_cancel_callback_')]
             
             for key in keys_to_clear:
                 self.ui_components.pop(key, None)
@@ -289,7 +298,7 @@ Pastikan Anda sudah backup data penting sebelum melanjutkan."""
             self._reset_dialog_state()
             
             # Update status dengan error
-            from smartcash.ui.utils.status_utils import update_status_panel_enhanced
+            from smartcash.ui.dataset.preprocessing.utils.ui_utils import update_status_panel_enhanced
             update_status_panel_enhanced(
                 self.ui_components,
                 f"Error {operation}: {str(error)}",

@@ -126,7 +126,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         module_name="Dependency Management",
         height="300px"
     )
-    log_accordion = log_components['ui']
+    log_accordion = log_components['log_accordion']
     
     # Main layout with consistent spacing
     layout = widgets.VBox(
@@ -150,7 +150,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     # Store components
     ui_components.update({
         'layout': layout,
-        'log_output': log_components.get('output'),
+        'log_output': log_components.get('log_output'),
         'log_accordion': log_accordion,
         'header': header,
         'status_panel': status_panel,

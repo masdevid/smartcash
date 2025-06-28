@@ -470,19 +470,12 @@ class ConfigCellInitializer(Generic[T], ABC):
             if header and isinstance(header, widgets.Widget):
                 children.append(header)
                 
-            # Add status panel with proper spacing
+            # Add status panel directly without container
             if status_panel and isinstance(status_panel, widgets.Widget):
-                status_container = widgets.VBox(
-                    [status_panel],
-                    layout=widgets.Layout(
-                        margin='0 0 10px 0',
-                        padding='5px',
-                        border='1px solid #e0e0e0',
-                        border_radius='4px',
-                        background='#f9f9f9'
-                    )
-                )
-                children.append(status_container)
+                # Apply styles directly to the status panel
+                if hasattr(status_panel, 'layout'):
+                    status_panel.layout.margin = '0 0 10px 0'
+                children.append(status_panel)
             
             # Add child container with proper spacing
             if child_container and isinstance(child_container, widgets.Widget):
@@ -494,16 +487,29 @@ class ConfigCellInitializer(Generic[T], ABC):
                 log_widget = log_accordion
             elif 'log_accordion' in self.parent_components and isinstance(self.parent_components['log_accordion'], widgets.Widget):
                 log_widget = self.parent_components['log_accordion']
-                
+            
+            # Ensure log widget is properly added to UI components
             if log_widget:
+                # Store in UI components if not already there
+                if 'log_accordion' not in self.ui_components:
+                    self.ui_components['log_accordion'] = log_widget
+                
+                # Add to layout with proper styling
                 log_container = widgets.VBox(
                     [log_widget],
                     layout=widgets.Layout(
                         margin='10px 0 0 0',
-                        width='100%'
+                        width='100%',
+                        border='1px solid #e0e0e0',
+                        border_radius='4px',
+                        overflow='hidden'  # Ensure content stays within border
                     )
                 )
                 children.append(log_container)
+                
+                # Make sure logger bridge knows about the log widget
+                if self._logger_bridge is not None and hasattr(self._logger_bridge, 'ui_components'):
+                    self._logger_bridge.ui_components['log_accordion'] = log_widget
                 
             # Add info accordion if available
             if info_accordion and isinstance(info_accordion, widgets.Widget):

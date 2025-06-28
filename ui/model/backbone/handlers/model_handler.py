@@ -269,3 +269,28 @@ class BackboneModelHandler:
             self.logger_bridge.success("✅ Configuration reset to defaults")
         except Exception as e:
             self.logger_bridge.error(f"❌ Failed to reset: {str(e)}")
+    
+    def reset_ui(self, ui_components: Optional[Dict[str, Any]] = None) -> None:
+        """Reset UI components to their default state
+        
+        Args:
+            ui_components: Dictionary of UI components. If None, uses the instance's ui_components.
+        """
+        target_components = ui_components or self.ui_components
+        self.logger_bridge.info("🔄 Resetting UI components...")
+        
+        try:
+            # Reset the model UI using the existing utility function
+            reset_model_ui(target_components)
+            
+            # Update the config summary if available
+            if 'config_summary' in target_components:
+                from smartcash.ui.model.backbone.components.config_summary import update_config_summary
+                config = self.extract_model_config(target_components)
+                update_config_summary(target_components['config_summary'], config)
+                
+            self.logger_bridge.success("✅ UI reset to default state")
+            return True
+        except Exception as e:
+            self.logger_bridge.error(f"❌ Failed to reset UI: {str(e)}")
+            return False

@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-Komponen dialog yang reusable untuk confirmation, info, dan user interaction dengan callback support.
+Modern, type-safe dialog component with improved state management and error handling. Provides confirmation dialogs, info dialogs, and custom dialogs with a clean, consistent API.
 
 ## 🚀 Basic Usage
 
@@ -11,21 +11,22 @@ Komponen dialog yang reusable untuk confirmation, info, dan user interaction den
 ```python
 from smartcash.ui.components.dialog import show_confirmation_dialog
 
-def handle_confirm():
+def on_confirm():
     print("✅ User confirmed!")
     # Execute your operation here
 
-def handle_cancel():
+def on_cancel():
     print("🚫 User cancelled")
 
 show_confirmation_dialog(
-    ui_components,
+    ui_components={},
     title="Konfirmasi Operasi",
     message="Apakah Anda yakin ingin melanjutkan?",
-    on_confirm=handle_confirm,
-    on_cancel=handle_cancel,
+    on_confirm=on_confirm,
+    on_cancel=on_cancel,
     confirm_text="Ya, Lanjutkan",
-    cancel_text="Batal"
+    cancel_text="Batal",
+    danger_mode=False
 )
 ```
 
@@ -34,43 +35,55 @@ show_confirmation_dialog(
 ```python
 from smartcash.ui.components.dialog import show_info_dialog
 
-def handle_close():
+def on_ok():
     print("ℹ️ Dialog closed")
 
 show_info_dialog(
-    ui_components,
+    ui_components={},
     title="Informasi",
     message="Operasi telah selesai dengan sukses!",
-    on_close=handle_close,
-    close_text="Tutup",
-    dialog_type="success"  # 'info', 'success', 'warning', 'error'
+    on_ok=on_ok,
+    ok_text="Mengerti"
 )
 ```
 
 ## 📋 API Reference
 
+### Dialog Types
+
+The dialog component supports different types for styling:
+
+```python
+from smartcash.ui.components.dialog import DialogType
+
+DialogType.CONFIRM   # Blue (default for confirm dialogs)
+DialogType.INFO      # Blue (info dialogs)
+DialogType.WARNING   # Yellow (warning dialogs)
+DialogType.ERROR     # Red (error dialogs)
+```
+
 ### `show_confirmation_dialog()`
 
-Menampilkan dialog konfirmasi dengan dua tombol (confirm/cancel).
+Displays a confirmation dialog with confirm and cancel buttons.
 
 **Parameters:**
-- `ui_components: Dict[str, Any]` - Dictionary UI components yang berisi 'confirmation_area' atau 'dialog_area'
-- `title: str` - Judul dialog
-- `message: str` - Pesan dialog (mendukung HTML)
-- `on_confirm: Callable = None` - Callback untuk tombol konfirmasi
-- `on_cancel: Callable = None` - Callback untuk tombol batal
-- `confirm_text: str = "Ya"` - Text tombol konfirmasi
-- `cancel_text: str = "Batal"` - Text tombol batal
-- `danger_mode: bool = False` - Menggunakan style merah untuk operasi berbahaya
+- `ui_components: Dict[str, Any]` - Dictionary containing UI components
+- `title: str` - Dialog title
+- `message: str` - Dialog message (supports HTML)
+- `on_confirm: Optional[Callable[[], None]]` - Callback for confirm button
+- `on_cancel: Optional[Callable[[], None]]` - Callback for cancel button
+- `confirm_text: str = "Konfirmasi"` - Confirm button text
+- `cancel_text: str = "Batal"` - Cancel button text
+- `danger_mode: bool = False` - Use danger styling (red) for destructive actions
 
 **Example:**
 ```python
 show_confirmation_dialog(
-    ui_components,
+    ui_components={},
     title="⚠️ Hapus Data",
     message="Data yang dihapus tidak dapat dikembalikan!",
     on_confirm=lambda: delete_data(),
-    on_cancel=lambda: print("Penghapusan dibatalkan"),
+    on_cancel=lambda: print("Dibatalkan"),
     confirm_text="Ya, Hapus",
     cancel_text="Batal",
     danger_mode=True
@@ -79,25 +92,117 @@ show_confirmation_dialog(
 
 ### `show_info_dialog()`
 
-Menampilkan dialog informasi dengan satu tombol close.
+Displays an information dialog with a single OK button.
 
 **Parameters:**
-- `ui_components: Dict[str, Any]` - Dictionary UI components
-- `title: str` - Judul dialog
-- `message: str` - Pesan dialog
-- `on_close: Callable = None` - Callback untuk tombol close
-- `close_text: str = "Tutup"` - Text tombol close
-- `dialog_type: str = "info"` - Type dialog untuk styling
-
-**Dialog Types:**
-- `'info'` - Biru (informasi)
-- `'success'` - Hijau (sukses)
-- `'warning'` - Kuning (peringatan)
-- `'error'` - Merah (error)
+- `ui_components: Dict[str, Any]` - Dictionary containing UI components
+- `title: str` - Dialog title
+- `message: str` - Dialog message
+- `on_ok: Optional[Callable[[], None]]` - Callback for OK button
+- `ok_text: str = "OK"` - OK button text
 
 **Example:**
 ```python
 show_info_dialog(
+    ui_components={},
+    title="✅ Berhasil",
+    message="Data telah disimpan dengan sukses!",
+    on_ok=lambda: print("Dialog ditutup"),
+    ok_text="Mengerti"
+)
+```
+
+### `clear_dialog_area()`
+
+Clears any currently displayed dialog.
+
+**Parameters:**
+- `ui_components: Dict[str, Any]` - Dictionary containing UI components
+
+**Example:**
+```python
+clear_dialog_area(ui_components)
+```
+
+### `is_dialog_visible()`
+
+Checks if a dialog is currently visible.
+
+**Parameters:**
+- `ui_components: Dict[str, Any]` - Dictionary containing UI components
+
+**Returns:**
+- `bool` - True if a dialog is currently visible
+
+**Example:**
+```python
+if is_dialog_visible(ui_components):
+    print("Dialog sedang ditampilkan")
+```
+
+## 🔧 Advanced Usage
+
+### Custom Dialogs
+
+For more complex dialogs, you can use the `DialogManager` directly:
+
+```python
+from smartcash.ui.components.dialog import DialogManager, DialogButton
+
+def on_button1():
+    print("Button 1 clicked")
+
+def on_button2():
+    print("Button 2 clicked")
+
+manager = DialogManager(ui_components={})
+manager.show_dialog(
+    title="Dialog Kustom",
+    message="Ini adalah dialog kustom dengan banyak tombol",
+    buttons=[
+        DialogButton(
+            text="Tombol 1",
+            callback=on_button1,
+            is_primary=True
+        ),
+        DialogButton(
+            text="Tombol 2",
+            callback=on_button2,
+            is_danger=True
+        )
+    ],
+    dialog_type=DialogType.INFO
+)
+```
+
+### DialogButton Configuration
+
+The `DialogButton` class allows for flexible button configuration:
+
+```python
+from smartcash.ui.components.dialog import DialogButton
+
+button = DialogButton(
+    text="Click Me",
+    callback=lambda: print("Button clicked"),
+    is_primary=True,  # Use primary styling
+    is_danger=False,  # Use danger (red) styling
+    button_class=""    # Additional CSS classes
+)
+```
+
+## 🎨 Styling
+
+The dialog component uses CSS for styling. You can customize the appearance by overriding these CSS classes:
+
+- `.smartcash-dialog` - Main dialog container
+- `.dialog-content` - Dialog content area
+- `.dialog-title` - Dialog title
+- `.dialog-message` - Dialog message
+- `.dialog-actions` - Container for action buttons
+- `.dialog-button` - Base button style
+- `.primary` - Primary button style
+- `.danger` - Danger button style
     ui_components,
     title="✅ Berhasil",
     message="Preprocessing selesai: 1,234 gambar diproses",

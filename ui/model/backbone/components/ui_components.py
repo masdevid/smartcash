@@ -45,6 +45,9 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
         width='100%',
         align_items='stretch'
     ))
+    
+    # Store the main section without adding it to the components yet
+    # to prevent duplicate display
     child_components['model_config_section'] = model_config_section
     
     # === CONFIG SECTION ===
@@ -140,14 +143,14 @@ def get_layout_sections(child_components: Dict[str, Any]) -> list:
     """
     sections = []
     
-    # Add sections in order
-    if 'model_config_section' in child_components:
+    # Add sections in order, but only if they're not already in a parent container
+    if 'model_config_section' in child_components and not hasattr(child_components['model_config_section'], 'parent'):
         sections.append(child_components['model_config_section'])
     
-    if 'config_section' in child_components:
+    if 'config_section' in child_components and not hasattr(child_components['config_section'], 'parent'):
         sections.append(child_components['config_section'])
     
-    if 'action_section' in child_components:
+    if 'action_section' in child_components and not hasattr(child_components['action_section'], 'parent'):
         sections.append(child_components['action_section'])
     
     return sections

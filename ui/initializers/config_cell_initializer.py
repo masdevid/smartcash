@@ -174,16 +174,13 @@ class ConfigCellInitializer(Generic[T], ABC):
         self._is_initialized = False
         self._logger = logger.getChild(self.component_id)
         
-        # Setup parent component manager
+        # Setup parent component manager first
         self.parent_component = ParentComponentManager(
             parent_id=self.component_id,
             title=self.title
         )
         
-        # Setup shared configuration manager
-        self._shared_config_manager = None
-        self._unsubscribe_func = None
-        self._setup_shared_config()
+        # Setup logger bridge after parent component is ready
         try:
             self._logger_bridge = UILoggerBridge(
                 ui_components={'parent': self.parent_component},
@@ -193,6 +190,22 @@ class ConfigCellInitializer(Generic[T], ABC):
             # Fallback jika UILoggerBridge gagal
             self._logger.warning(f"Failed to create UILoggerBridge: {e}")
             self._logger_bridge = None
+        
+        # Setup shared configuration manager
+        self._shared_config_manager = None
+        self._unsubscribe_func = None
+        self._setup_shared_config()
+        
+    @property
+    def logger(self):
+        """Get the logger instance to use for logging.
+        
+        Returns:
+            The logger bridge if available, otherwise the module logger
+        """
+        if hasattr(self, '_logger_bridge') and self._logger_bridge:
+            return self._logger_bridge
+        return self._logger
         
     @property
     def handler(self) -> T:

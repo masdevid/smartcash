@@ -1,0 +1,12 @@
+model:
+  backbone: efficientnet_b4
+  detection_layers:
+  - banknote
+  device: auto
+  feature_optimization:
+    enabled: false
+  img_size: 640
+  layer_mode: single
+  mixed_precision: true
+  model_name: smartcash_yolov5
+  num_classes: 7

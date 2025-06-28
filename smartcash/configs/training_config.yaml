@@ -1,104 +1,41 @@
-# File: configs/training_config.yaml
-# Deskripsi: Training config bersih tanpa overlap dengan strategy_config.yaml
+# SmartCash Training Configuration
+# Minimal configuration that matches the actual codebase structure
 
-# Inherit dari base config
-_base_: 'base_config.yaml'
-
-# ========================================
-# CORE TRAINING PARAMETERS (from hyperparameters)
-# ========================================
 training:
+  # Core training parameters
   epochs: 100
   batch_size: 16
-  learning_rate: 0.01
-  image_size: 640              # Fixed size (strategy punya multi-scale)
-  device: 'auto'
-  workers: 4
-  patience: 15
-  gradient_clipping: 1.0       # Only here, removed from strategy
-
-# ========================================
-# OPTIMIZER (from hyperparameters)
-# ========================================
-optimizer:
-  type: 'SGD'
+  learning_rate: 0.001
   weight_decay: 0.0005
-  momentum: 0.937
-  nesterov: true
-
-# ========================================
-# SCHEDULER (from hyperparameters)
-# ========================================
-scheduler:
-  type: 'cosine'
-  warmup_epochs: 3
-  min_lr: 0.0001
-  T_max: 100
-
-# ========================================
-# LOSS CONFIGURATION (from hyperparameters)
-# ========================================
-loss:
-  box_loss_gain: 0.05
-  cls_loss_gain: 0.5
-  obj_loss_gain: 1.0
-  label_smoothing: 0.0
-
-# ========================================
-# EARLY STOPPING (from hyperparameters)
-# ========================================
-early_stopping:
-  enabled: true
-  patience: 15
-  min_delta: 0.001
-  metric: 'mAP_0.5'
-
-# ========================================
-# CHECKPOINT (from hyperparameters)
-# ========================================
-checkpoint:
-  save_best: true
-  save_interval: 10
-  metric: 'mAP_0.5'
-  mode: 'max'
-
-# ========================================
-# MODEL INFERENCE (from hyperparameters)
-# ========================================
-model:
-  conf_thres: 0.25
-  iou_thres: 0.45
-  max_det: 1000
-  agnostic_nms: false
-
-# ========================================
-# DATA AUGMENTATION (from hyperparameters)
-# ========================================
-augmentation:
-  hsv_h: 0.015
-  hsv_s: 0.7
-  hsv_v: 0.4
-  degrees: 0.0
-  translate: 0.1
-  scale: 0.5
-  shear: 0.0
-  perspective: 0.0
-  flipud: 0.0
-  fliplr: 0.5
-  mosaic: 1.0
-  mixup: 0.0
-
-# ========================================
-# METADATA
-# ========================================
-config_version: '2.1'
-description: 'Training config fokus hyperparameters, tanpa overlap strategy'
-module_name: 'training'
-
-# ========================================
-# REMOVED - Now in strategy_config.yaml
-# ========================================
-# validation: moved to strategy_config.yaml
-# training_utils: moved to strategy_config.yaml  
-# multi_scale: moved to strategy_config.yaml
-# experiment_name: moved to strategy_config.yaml
+  
+  # Optimizer settings
+  optimizer: adam  # Supported: adam, adamw, sgd, rmsprop
+  scheduler: cosine  # Supported: cosine, step, plateau, exponential, multistep, cyclic, none
+  warmup_epochs: 3  # Optional warmup period
+  mixed_precision: true  # Enable mixed precision training
+  gradient_clip: 10.0  # Clip gradients to this value, 0 to disable
+  
+  # Data loading configuration
+  data:
+    num_workers: 4  # Number of data loading workers
+    pin_memory: true  # Pin memory for faster GPU transfer
+    persistent_workers: true  # Keep workers alive between epochs
+    prefetch_factor: 2  # Number of batches to prefetch per worker
+    drop_last: true  # Drop last incomplete batch
+  
+    mixed_precision: true
+  # Loss function configuration
+  loss:
+    box_weight: 0.05  # Bounding box loss weight
+    obj_weight: 1.0    # Objectness loss weight
+    cls_weight: 0.5    # Classification loss weight
+    focal_loss: false  # Use focal loss if true
+    label_smoothing: 0.0  # Label smoothing epsilon
+  
+  # Early stopping configuration
+  early_stopping:
+    enabled: true
+    patience: 15  # Epochs to wait before stopping
+    metric: val_map50  # Metric to monitor (e.g., val_loss, val_map50)
+    mode: max  # One of: min, max
+    min_delta: 0.001  # Minimum change to qualify as improvement

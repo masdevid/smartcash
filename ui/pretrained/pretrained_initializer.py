@@ -4,11 +4,12 @@ File: smartcash/ui/pretrained/pretrained_initializer.py
 Deskripsi: Pretrained initializer dengan CommonInitializer pattern terbaru dan fail-fast approach
 """
 
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, Union
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.common.logger import get_logger
+from smartcash.ui.components.error.error_component import create_error_component
 
 logger = get_logger(__name__)
 
@@ -57,24 +58,38 @@ class PretrainedInitializer(CommonInitializer):
             **kwargs: Argumen tambahan
             
         Returns:
-            Dictionary berisi komponen UI yang valid
+            Dictionary berisi komponen UI yang valid dengan minimal keys:
+            - 'ui': Komponen UI utama
+            - 'log_output': Output log widget
+            - 'status_panel': Panel status
             
         Raises:
-            ValueError: Jika UI components tidak valid atau kosong
+            ValueError: Jika UI components tidak valid atau komponen penting tidak ada
         """
-        from smartcash.ui.pretrained.components.ui_components import create_pretrained_main_ui
-        
-        # Create UI components dengan immediate validation
-        ui_components = create_pretrained_main_ui(config, **kwargs)
-        
-        if not ui_components or not isinstance(ui_components, dict):
-            raise ValueError(f"❌ Gagal membuat UI components untuk {self.module_name}")
-        
-        # Mark sebagai initialized untuk lifecycle management
-        ui_components['pretrained_initialized'] = True
-        
-        logger.info(f"✅ UI components berhasil dibuat untuk {self.module_name}")
-        return ui_components
+        try:
+            from smartcash.ui.pretrained.components.ui_components import create_pretrained_main_ui
+            
+            # Create UI components dengan immediate validation
+            ui_components = create_pretrained_main_ui(config, **kwargs)
+            
+            if not ui_components or not isinstance(ui_components, dict):
+                raise ValueError(f"❌ Gagal membuat UI components untuk {self.module_name}")
+            
+            # Validate critical components exist
+            required_components = ['ui', 'log_output', 'status_panel']
+            missing = [comp for comp in required_components if comp not in ui_components]
+            if missing:
+                raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
+            
+            # Mark sebagai initialized untuk lifecycle management
+            ui_components['pretrained_initialized'] = True
+            
+            logger.info(f"✅ UI components berhasil dibuat untuk {self.module_name}")
+            return ui_components
+            
+        except Exception as e:
+            self.logger.error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
+            raise
     
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Setup module-specific handlers dengan error handling
@@ -205,22 +220,33 @@ class PretrainedInitializer(CommonInitializer):
                 ui_components['status'].value = error_msg
 
 
-def initialize_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+def initialize_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
     """🚀 Factory function untuk inisialisasi pretrained UI
     
     Args:
         config: Konfigurasi opsional untuk inisialisasi
-        **kwargs: Parameter tambahan
+        **kwargs: Parameter tambahan yang akan diteruskan ke initializer
         
     Returns:
-        Dictionary berisi komponen UI yang sudah diinisialisasi
+        Widget UI utama yang siap ditampilkan
         
-    Raises:
-        RuntimeError: Jika inisialisasi gagal
+    Example:
+        ```python
+        ui = initialize_pretrained_ui(config=my_config)
+        display(ui)  # Langsung bisa di-display
+        ```
     """
     try:
         initializer = PretrainedInitializer()
-        return initializer.initialize(config or {}, **kwargs)
+        result = initializer.initialize(config or {}, **kwargs)
+        
+        # CommonInitializer.initialize() already returns the root UI component
+        # or an error component if something went wrong
+        return result
+        
     except Exception as e:
-        logger.error(f"❌ Gagal inisialisasi pretrained UI: {str(e)}")
-        raise RuntimeError(f"Pretrained UI initialization failed: {str(e)}") from e
+        error_msg = f"❌ Gagal menginisialisasi pretrained UI: {str(e)}"
+        error_component = create_error_component(error_msg, str(e), "Pretrained Model Error")
+        if isinstance(error_component, dict) and 'ui' in error_component:
+            return error_component['ui']
+        return error_component

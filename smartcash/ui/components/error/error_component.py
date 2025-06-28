@@ -42,20 +42,23 @@ class ErrorComponent:
         # Create main error display
         error_display = self._create_main_error_display(error_message, style, traceback is not None and show_traceback)
         
-        # Create a container with max width and center alignment
+        # Create a container with proper width constraints
         container_style = """
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            margin: 0;
-            padding: 0 16px;
-            box-sizing: border-box;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
         """
         
         content_style = """
-            max-width: 1200px;
-            width: 100%;
-            margin: 10px 0;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 auto !important;
+            padding: 0 8px !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
         """
         
         # Create traceback section if needed
@@ -82,11 +85,14 @@ class ErrorComponent:
                 layout=widgets.Layout(
                     width='100%',
                     margin='0',
-                    padding='0 16px',
+                    padding='0',
                     _css={
                         'display': 'flex',
                         'justify-content': 'center',
-                        'box-sizing': 'border-box'
+                        'box-sizing': 'border-box',
+                        'max-width': '100%',
+                        'overflow': 'hidden',
+                        'padding': '0 8px'
                     }
                 )
             )
@@ -100,8 +106,11 @@ class ErrorComponent:
                 width='100%',
                 margin='10px 0',
                 _css={
-                    'max-width': '1200px',
-                    'width': '100%'
+                    'max-width': '100%',
+                    'width': '100%',
+                    'box-sizing': 'border-box',
+                    'overflow': 'hidden',
+                    'padding': '0 8px'
                 }
             )
             
@@ -109,11 +118,14 @@ class ErrorComponent:
                 layout=widgets.Layout(
                     width='100%',
                     margin='0',
-                    padding='0 16px',
+                    padding='0',
                     _css={
                         'display': 'flex',
                         'justify-content': 'center',
-                        'box-sizing': 'border-box'
+                        'box-sizing': 'border-box',
+                        'max-width': '100%',
+                        'overflow': 'hidden',
+                        'padding': '0 8px'
                     }
                 )
             )
@@ -192,11 +204,14 @@ class ErrorComponent:
         
         html_content = f"""
         <div style="
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-            padding: 0 8px;
-            margin: 8px 0;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 0 !important;
+            margin: 8px 0 !important;
+            overflow: hidden !important;
+            word-wrap: break-word !important;
+            word-break: break-word !important;
         ">
             <div style="
                 background: {style['bg']};
@@ -207,9 +222,10 @@ class ErrorComponent:
                 padding: 16px;
                 margin: 0;
                 box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-                width: 100%;
-                max-width: 100%;
-                box-sizing: border-box;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
             ">
                 <div style="
                     display: flex; 
@@ -217,7 +233,10 @@ class ErrorComponent:
                     margin-bottom: 12px;
                     flex-wrap: wrap;
                     gap: 8px;
-                    width: 100%;
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
                 ">
                     <span style="font-size: 18px; flex-shrink: 0; margin-top: 2px;">{style['icon']}</span>
                     <h3 style="
@@ -237,11 +256,13 @@ class ErrorComponent:
                     font-size: 14px; 
                     line-height: 1.5;
                     margin-bottom: 12px;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                    width: 100%;
-                    max-width: 100%;
-                    box-sizing: border-box;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    white-space: normal !important;
                 ">{message}</div>
                 
                 <div style="
@@ -251,9 +272,13 @@ class ErrorComponent:
                     border-top: 1px solid {style['border']};
                     padding-top: 8px;
                     margin-top: 8px;
-                    word-wrap: break-word;
-                    width: 100%;
-                    box-sizing: border-box;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    white-space: normal !important;
                 ">
                     💡 Cobalah refresh cell atau periksa dependencies
                 </div>

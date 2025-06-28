@@ -49,6 +49,19 @@ class AugmentationConfigHandler(ConfigHandler):
             if not config:
                 self._log_to_ui("⚠️ Config kosong, menggunakan default", "warning")
                 return self.get_default_config()
+                
+            # Ensure required sections exist
+            if 'augmentation' not in config:
+                config['augmentation'] = {}
+                
+            # Ensure basic structure exists
+            if 'basic' not in config['augmentation']:
+                config['augmentation']['basic'] = self.get_default_config().get('basic', {})
+                
+            # Ensure advanced structure exists
+            if 'advanced' not in config['augmentation']:
+                config['augmentation']['advanced'] = self.get_default_config().get('advanced', {})
+                return self.get_default_config()
             
             # Handle inheritance dari _base_
             if '_base_' in config:

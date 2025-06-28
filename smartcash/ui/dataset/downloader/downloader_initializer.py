@@ -40,6 +40,22 @@ class DownloaderInitializer(CommonInitializer):
         try:
             from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
             
+            # Ensure we have a valid config
+            if not config:
+                config = self.config_handler.get_default_config()
+            
+            # Ensure required sections exist
+            if 'downloader' not in config:
+                config['downloader'] = {}
+                
+            # Ensure basic structure exists
+            if 'basic' not in config['downloader']:
+                config['downloader']['basic'] = self.config_handler.get_default_config().get('downloader', {}).get('basic', {})
+                
+            # Ensure advanced structure exists
+            if 'advanced' not in config['downloader']:
+                config['downloader']['advanced'] = self.config_handler.get_default_config().get('downloader', {}).get('advanced', {})
+            
             # Create UI components dengan immediate validation
             ui_components = create_downloader_main_ui(config)
             

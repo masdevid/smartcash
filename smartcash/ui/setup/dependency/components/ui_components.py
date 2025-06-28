@@ -18,6 +18,7 @@ from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.card import create_card
 from smartcash.ui.components.dialog import create_confirmation_area
+from smartcash.ui.components.action_buttons import create_action_buttons
 
 # Local components for package-specific UIs
 from smartcash.ui.setup.dependency.utils.ui_utils import create_package_checkbox

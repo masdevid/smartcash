@@ -42,6 +42,20 @@ class DownloaderConfigHandler(ConfigHandler):
                 self.config_manager.save_config(config, filename)
                 self.logger.info(f"💾 Default config tersimpan ke {filename}")
             
+            # Ensure required sections exist
+            if 'downloader' not in config:
+                config['downloader'] = {}
+                
+            # Ensure basic structure exists
+            if 'basic' not in config['downloader']:
+                default_config = self.get_default_config()
+                config['downloader']['basic'] = default_config.get('downloader', {}).get('basic', {})
+                
+            # Ensure advanced structure exists
+            if 'advanced' not in config['downloader']:
+                default_config = self.get_default_config()
+                config['downloader']['advanced'] = default_config.get('downloader', {}).get('advanced', {})
+            
             # Auto-detect dan set API key dari Colab secrets
             config = set_api_key_to_config(config, force_refresh=False)
             

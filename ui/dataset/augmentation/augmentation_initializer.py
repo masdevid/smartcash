@@ -40,6 +40,10 @@ class AugmentationInitializer(CommonInitializer):
         try:
             from smartcash.ui.dataset.augmentation.components.ui_components import create_augmentation_main_ui
             
+            # Ensure we have a valid config
+            if not config:
+                config = self.config_handler.get_default_config()
+                
             # Create UI components dengan immediate validation
             ui_components = create_augmentation_main_ui(config)
             

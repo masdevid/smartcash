@@ -1,139 +1,117 @@
+# File: smartcash/ui/pretrained/handlers/defaults.py
 """
 File: smartcash/ui/pretrained/handlers/defaults.py
-Deskripsi: Default configuration untuk pretrained module
+Deskripsi: Default configuration dan constants untuk pretrained models
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
+
+# Default configuration untuk pretrained models
+DEFAULT_CONFIG = {
+    'pretrained_models': {
+        'models_dir': '/content/models',
+        'drive_models_dir': '/data/pretrained',
+        'pretrained_type': 'yolov5s',
+        'auto_download': False,
+        'sync_drive': True
+    }
+}
+
+# Available model variants - Simplified to YOLOv5s only
+MODEL_VARIANTS = ['yolov5s']
+
+# Model descriptions - Single option
+MODEL_DESCRIPTIONS = {
+    'yolov5s': '⚖️ YOLOv5 Small - Optimal untuk currency detection'
+}
+
+# Model file sizes - Single option
+MODEL_SIZES = {
+    'yolov5s': '14.4 MB'
+}
+
+# Default directories
+DEFAULT_DIRECTORIES = {
+    'local_models': '/content/models',
+    'drive_models': '/data/pretrained',
+    'checkpoints': '/content/checkpoints',
+    'downloads': '/content/downloads'
+}
+
 
 def get_default_pretrained_config() -> Dict[str, Any]:
-    """
-    Get default configuration untuk pretrained module.
+    """🔧 Mendapatkan konfigurasi default untuk pretrained models
     
     Returns:
-        Dict berisi default pretrained configuration
+        Dictionary berisi konfigurasi default
     """
+    return DEFAULT_CONFIG.copy()
+
+
+def get_model_variants() -> List[str]:
+    """📋 Mendapatkan daftar variant model yang tersedia
+    
+    Returns:
+        List berisi nama-nama variant model
+    """
+    return MODEL_VARIANTS.copy()
+
+
+def get_model_descriptions() -> Dict[str, str]:
+    """📝 Mendapatkan deskripsi untuk setiap variant model
+    
+    Returns:
+        Dictionary berisi deskripsi model
+    """
+    return MODEL_DESCRIPTIONS.copy()
+
+
+def get_model_sizes() -> Dict[str, str]:
+    """📊 Mendapatkan ukuran file untuk setiap variant model
+    
+    Returns:
+        Dictionary berisi ukuran file model
+    """
+    return MODEL_SIZES.copy()
+
+
+def get_default_directories() -> Dict[str, str]:
+    """📁 Mendapatkan direktori default
+    
+    Returns:
+        Dictionary berisi path direktori default
+    """
+    return DEFAULT_DIRECTORIES.copy()
+
+
+def get_model_info(model_type: str) -> Dict[str, str]:
+    """ℹ️ Mendapatkan informasi lengkap untuk model tertentu
+    
+    Args:
+        model_type: Tipe model (e.g., 'yolov5s')
+        
+    Returns:
+        Dictionary berisi informasi model
+    """
+    if model_type not in MODEL_VARIANTS:
+        model_type = 'yolov5s'  # Fallback ke default
+    
     return {
-        'pretrained_models': {
-            # Direktori models (updated ke /data/pretrained)
-            'models_dir': '/data/pretrained',
-            'drive_models_dir': '/content/drive/MyDrive/SmartCash/pretrained',
-            
-            # Model configurations
-            'models': {
-                'yolov5s': {
-                    'name': 'YOLOv5s',
-                    'source': 'ultralytics',
-                    'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
-                    'filename': 'yolov5s.pt',
-                    'min_size_mb': 10,
-                    'description': 'YOLOv5s object detection backbone dari Ultralytics',
-                    'architecture': 'CSPDarknet',
-                    'input_size': [640, 640],
-                    'output_channels': [128, 256, 512]
-                },
-                'efficientnet_b4': {
-                    'name': 'EfficientNet-B4',
-                    'source': 'timm',
-                    'url': 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin',
-                    'filename': 'efficientnet_b4_timm.bin',
-                    'min_size_mb': 60,
-                    'description': 'EfficientNet-B4 feature extraction backbone dari TIMM',
-                    'architecture': 'EfficientNet',
-                    'input_size': [640, 640],
-                    'output_channels': [56, 160, 448]  # Akan di-adapt ke [128, 256, 512]
-                }
-            }
-        },
-        
-        # Progress tracking configuration
-        'progress': {
-            'steps': {
-                'init': {'value': 0, 'label': 'Inisialisasi'},
-                'check_models': {'value': 20, 'label': 'Memeriksa model tersedia'},
-                'download_start': {'value': 30, 'label': 'Memulai download'},
-                'download_progress': {'value': 50, 'label': 'Mengunduh model'},
-                'sync_start': {'value': 80, 'label': 'Memulai sinkronisasi'},
-                'sync_complete': {'value': 95, 'label': 'Sinkronisasi selesai'},
-                'complete': {'value': 100, 'label': 'Proses selesai'}
-            }
-        },
-        
-        # Cache configuration
-        'cache': {
-            'dir': '.cache/smartcash/pretrained',
-            'auto_cleanup': True,
-            'max_size_gb': 2
-        },
-        
-        # Download configuration
-        'download': {
-            'timeout': 300,  # 5 minutes
-            'chunk_size': 8192,
-            'retry_attempts': 3,
-            'verify_ssl': True
-        }
+        'type': model_type,
+        'description': MODEL_DESCRIPTIONS.get(model_type, 'Model YOLOv5'),
+        'size': MODEL_SIZES.get(model_type, 'Unknown'),
+        'category': _get_model_category(model_type)
     }
 
-def get_model_variants() -> Dict[str, Dict[str, Any]]:
-    """
-    Get available model variants untuk customization.
+
+def _get_model_category(model_type: str) -> str:
+    """🏷️ Mendapatkan kategori model berdasarkan tipe
     
-    Returns:
-        Dict berisi model variants yang bisa dipilih user
-    """
-    return {
-        'yolov5_variants': {
-            'yolov5n': {
-                'name': 'YOLOv5n (Nano)',
-                'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5n.pt',
-                'filename': 'yolov5n.pt',
-                'min_size_mb': 2,
-                'description': 'Smallest and fastest YOLOv5 model'
-            },
-            'yolov5s': {
-                'name': 'YOLOv5s (Small)',
-                'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
-                'filename': 'yolov5s.pt',
-                'min_size_mb': 10,
-                'description': 'Small model with good balance of speed and accuracy'
-            },
-            'yolov5m': {
-                'name': 'YOLOv5m (Medium)',
-                'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5m.pt',
-                'filename': 'yolov5m.pt',
-                'min_size_mb': 40,
-                'description': 'Medium model with better accuracy'
-            },
-            'yolov5l': {
-                'name': 'YOLOv5l (Large)',
-                'url': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5l.pt',
-                'filename': 'yolov5l.pt',
-                'min_size_mb': 90,
-                'description': 'Large model with high accuracy'
-            }
-        },
+    Args:
+        model_type: Tipe model
         
-        'efficientnet_variants': {
-            'efficientnet_b0': {
-                'name': 'EfficientNet-B0',
-                'url': 'https://huggingface.co/timm/efficientnet_b0.ra_in1k/resolve/main/pytorch_model.bin',
-                'filename': 'efficientnet_b0_timm.bin',
-                'min_size_mb': 20,
-                'description': 'Smallest EfficientNet model'
-            },
-            'efficientnet_b4': {
-                'name': 'EfficientNet-B4',
-                'url': 'https://huggingface.co/timm/efficientnet_b4.ra2_in1k/resolve/main/pytorch_model.bin',
-                'filename': 'efficientnet_b4_timm.bin',
-                'min_size_mb': 60,
-                'description': 'Balanced performance and accuracy'
-            },
-            'efficientnet_b7': {
-                'name': 'EfficientNet-B7',
-                'url': 'https://huggingface.co/timm/efficientnet_b7.ra2_in1k/resolve/main/pytorch_model.bin',
-                'filename': 'efficientnet_b7_timm.bin',
-                'min_size_mb': 250,
-                'description': 'Largest EfficientNet model with highest accuracy'
-            }
-        }
-    }
+    Returns:
+        String kategori model
+    """
+    # Simplified - hanya YOLOv5s yang tersedia
+    return 'currency_detection_optimized' if model_type == 'yolov5s' else 'standard'

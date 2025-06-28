@@ -1,18 +1,11 @@
 # File: smartcash/ui/pretrained/components/ui_components.py
 """
 File: smartcash/ui/pretrained/components/ui_components.py
-Deskripsi: UI components untuk pretrained models - Fixed version dengan complete implementation
+Deskripsi: UI components untuk pretrained models - Simplified dengan YOLOv5s only
 """
 
-# Standard library imports
-import sys
-import traceback
-from typing import Dict, Any, Optional, List
-
-# Third-party imports
+from typing import Dict, Any, Optional
 import ipywidgets as widgets
-
-# SmartCash imports
 from smartcash.common.logger import get_logger
 from smartcash.ui.components import (
     create_header,
@@ -24,193 +17,173 @@ from smartcash.ui.components import (
 
 logger = get_logger(__name__)
 
-def create_pretrained_ui_components(env=None, config: Optional[Dict] = None, **kwargs) -> Dict:
-    """🎯 Create pretrained UI menggunakan shared reusable components
+def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """🎯 Create main UI untuk pretrained models dengan simplified approach
     
     Args:
-        env: Environment configuration (optional)
-        config: Configuration dictionary (optional)
-        **kwargs: Additional keyword arguments
+        config: Konfigurasi untuk inisialisasi UI
+        **kwargs: Parameter tambahan
             
     Returns:
-        Dictionary berisi komponen UI atau fallback UI jika terjadi error
+        Dictionary berisi komponen UI yang dibuat
     """
-    module_name = kwargs.get('module_name', 'pretrained_ui')
-    logger = get_logger(module_name)
-    
-    # 🔧 Safe config handling
-    if config is None:
-        config = {}
-    if not isinstance(config, dict):
-        config = {}
-    
-    # Ensure pretrained_models section exists
-    if 'pretrained_models' not in config:
-        config['pretrained_models'] = {}
-    
-    pretrained_config = config.get('pretrained_models', {})
-    
-    # 📝 Create input options
-    input_options = _create_pretrained_input_options(pretrained_config)
+    try:
+        pretrained_config = config.get('pretrained_models', {})
+        
+        # Create input options
+        input_options = create_pretrained_input_options(pretrained_config)
+        
+        # Header
+        header = create_header(
+            title="🤖 Pretrained Models Configuration",
+            subtitle="Setup YOLOv5s untuk currency detection",
+            icon="🎯"
+        )
+        
+        # Status panel
+        status_panel = create_status_panel()
+        
+        # Action buttons
+        action_buttons = create_action_buttons([
+            {'name': 'download_sync', 'label': '📥 Download & Sync', 'style': 'primary'},
+            {'name': 'save', 'label': '💾 Save Config', 'style': 'success'},
+            {'name': 'reset', 'label': '🔄 Reset', 'style': 'warning'}
+        ])
+        
+        # Progress tracker
+        progress_tracker = create_dual_progress_tracker()
+        
+        # Log output
+        log_output = create_log_accordion()
+        
+        # Main UI layout
+        ui_container = widgets.VBox([
+            header,
+            input_options['ui'],
+            action_buttons['ui'],
+            status_panel['ui'],
+            progress_tracker['ui'],
+            log_output['ui']
+        ])
+        
+        # Compile all components
+        ui_components = {
+            'ui': ui_container,
+            'header': header,
+            'status_panel': status_panel,
+            'action_buttons': action_buttons,
+            'progress_tracker': progress_tracker,
+            'log_output': log_output['output'],
+            'log_accordion': log_output,
             
-    # 🎨 Create UI components
-    ui_components = {}
+            # Input components
+            **input_options,
             
-    # Header
-    ui_components['header'] = create_header(
-        title="🤖 Pretrained Models Configuration",
-        subtitle="Setup YOLOv5 dan EfficientNet-B4 untuk deteksi mata uang"
-    )
+            # Action button references
+            'download_sync_button': action_buttons['buttons']['download_sync'],
+            'save_button': action_buttons['buttons']['save'],
+            'reset_button': action_buttons['buttons']['reset'],
             
-    # Status panel
-    ui_components['status'] = create_status_panel()
+            # Status components
+            'status': status_panel['status'],
+            'confirmation_area': status_panel['confirmation_area'],
             
-    # Progress tracker
-    ui_components['progress_tracker'] = create_dual_progress_tracker(
-        primary_label="Model Download",
-        secondary_label="Drive Sync"
-    )
+            # Progress components
+            'main_progress': progress_tracker['main_progress'],
+            'sub_progress': progress_tracker['sub_progress'],
             
-    # Action buttons with new API - using secondary_buttons for additional actions
-    action_buttons = create_action_buttons(
-        primary_button={
-            "label": "📥 Download & Sync Models",
-            "style": "primary",
-            "width": "200px"
-        },
-        secondary_buttons=[
-            {
-                "label": "💾 Simpan Config",
-                "style": "success",
-                "width": "160px"
-            },
-            {
-                "label": "🔄 Reset",
-                "style": "warning",
-                "width": "120px"
-            }
-        ]
-    )
-    
-    # Get buttons from the new action buttons component
-    download_button = action_buttons.get('primary')
-    save_button = action_buttons.get('secondary_0')
-    reset_button = action_buttons.get('secondary_1')
-    button_container = action_buttons['container']
-    
-    if reset_button is None:
-        print("[WARNING] Reset button not found, creating fallback")
-        reset_button = widgets.Button(description='🔄 Reset',
-                                   button_style='warning')
-        reset_button.layout = widgets.Layout(width='120px')
-    
-    # Update UI components with buttons for backward compatibility
-    ui_components['download_sync_button'] = download_button
-    ui_components['save_button'] = save_button
-    ui_components['reset_button'] = reset_button
-    
-    # Store the container for layout
-    ui_components['action_buttons_container'] = action_components.get('container', 
-                                                                   widgets.HBox([download_button, save_button, reset_button]))
-            
-    # Log accordion
-    ui_components['log_accordion'] = create_log_accordion()
-    ui_components['log_output'] = ui_components['log_accordion']['log_output']
-            
-    # Dialog area (for confirmations)
-    ui_components['confirmation_area'] = widgets.VBox(
-        layout=widgets.Layout(display='none')
-    )
-            
-    # 📋 Create main layout
-            
-    # Input form section
-    input_form = widgets.VBox([
-        widgets.HTML("<h4>📝 Konfigurasi Model</h4>"),
-        input_options['models_dir_text'],
-        input_options['drive_models_dir_text'],
-        input_options['pretrained_type_dropdown'],
-        input_options['auto_download_checkbox'],
-        input_options['sync_drive_checkbox']
-    ])
-            
-    # Action section
-    action_section = widgets.HBox([
-        ui_components['download_sync_button'],
-        ui_components['save_button'],
-        ui_components['reset_button']
-    ])
-            
-    # Main container
-    ui_components['main_container'] = widgets.VBox([
-        ui_components['header'],
-        ui_components['status'],
-        input_form,
-        action_section,
-        ui_components['progress_tracker'],
-        ui_components['confirmation_area'],
-        ui_components['log_accordion'].get('accordion', ui_components['log_output'])
-    ])
-            
-    from smartcash.ui.utils.logging_utils import log_missing_components
-    log_missing_components(ui_components)
-    return ui_components
+            # State flags
+            'pretrained_initialized': True,
+            'ui_initialized': True
+        }
+        
+        logger.info("✅ Pretrained UI components berhasil dibuat")
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating pretrained UI: {str(e)}")
+        raise
 
-def _create_pretrained_input_options(pretrained_config: Dict[str, Any]) -> Dict[str, widgets.Widget]:
-    """Create input form widgets for pretrained models
+
+def create_pretrained_input_options(config: Dict[str, Any]) -> Dict[str, Any]:
+    """🔧 Create input options untuk pretrained configuration
     
     Args:
-        pretrained_config: Configuration dictionary for pretrained models
+        config: Konfigurasi pretrained models
         
     Returns:
-        Dictionary containing widget components
+        Dictionary berisi input components
     """
-    # Ensure config is a dictionary
-    config = pretrained_config if isinstance(pretrained_config, dict) else {}
-    
-    # Define model types
-    model_types = [
-        ('YOLOv5s (Ringan)', 'yolov5s'),
-        ('YOLOv5m (Medium)', 'yolov5m'),
-        ('YOLOv5l (Besar)', 'yolov5l'),
-        ('YOLOv5x (Extra Besar)', 'yolov5x')
-    ]
-    
-    # Get values from config with defaults
-    model_type = config.get('pretrained_type', 'yolov5s')
-    if model_type not in [t[1] for t in model_types]:
-        model_type = 'yolov5s'
-    
-    # Create widgets
-    widgets_dict = {
-        'models_dir_text': widgets.Text(
-            value=str(config.get('models_dir', '/content/models')),
+    try:
+        # Models directory input
+        models_dir_input = widgets.Text(
+            value=config.get('models_dir', '/content/models'),
             description='Models Dir:',
+            placeholder='/content/models',
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='500px')
-        ),
-        'drive_models_dir_text': widgets.Text(
-            value=str(config.get('drive_models_dir', '/content/drive/MyDrive/SmartCash/models')),
-            description='Drive Models:',
+            layout={'width': '400px'}
+        )
+        
+        # Drive models directory input - Updated path
+        drive_models_dir_input = widgets.Text(
+            value=config.get('drive_models_dir', '/data/pretrained'),
+            description='Drive Dir:',
+            placeholder='/data/pretrained',
             style={'description_width': '120px'},
-            layout=widgets.Layout(width='500px')
-        ),
-        'pretrained_type_dropdown': widgets.Dropdown(
-            options=model_types,
-            value=model_type,
+            layout={'width': '400px'}
+        )
+        
+        # Pretrained type - Simplified to YOLOv5s only
+        pretrained_type_info = widgets.HTML(
+            value="<b>🤖 Model Type:</b> YOLOv5s (Optimal untuk currency detection)"
+        )
+        
+        # Hidden dropdown for consistency (always yolov5s)
+        pretrained_type_dropdown = widgets.Dropdown(
+            options=['yolov5s'],
+            value='yolov5s',
             description='Model Type:',
-            style={'description_width': '120px'}
-        ),
-        'auto_download_checkbox': widgets.Checkbox(
-            value=bool(config.get('auto_download', False)),
+            style={'description_width': '120px'},
+            layout={'width': '300px', 'display': 'none'}  # Hidden
+        )
+        
+        # Auto download checkbox
+        auto_download_checkbox = widgets.Checkbox(
+            value=config.get('auto_download', False),
             description='Auto Download',
             style={'description_width': '120px'}
-        ),
-        'sync_drive_checkbox': widgets.Checkbox(
-            value=bool(config.get('sync_drive', True)),
-            description='Sync Drive',
+        )
+        
+        # Sync drive checkbox
+        sync_drive_checkbox = widgets.Checkbox(
+            value=config.get('sync_drive', True),
+            description='Sync to Drive',
             style={'description_width': '120px'}
         )
-    }
-    
-    return widgets_dict
+        
+        # Layout input options
+        input_ui = widgets.VBox([
+            widgets.HTML("<h4>📁 Directory Configuration</h4>"),
+            models_dir_input,
+            drive_models_dir_input,
+            widgets.HTML("<br>"),
+            pretrained_type_info,
+            widgets.HTML("<h4>⚙️ Options</h4>"),
+            widgets.HBox([auto_download_checkbox, sync_drive_checkbox])
+        ])
+        
+        return {
+            'ui': input_ui,
+            'models_dir_input': models_dir_input,
+            'drive_models_dir_input': drive_models_dir_input,
+            'pretrained_type_dropdown': pretrained_type_dropdown,
+            'auto_download_checkbox': auto_download_checkbox,
+            'sync_drive_checkbox': sync_drive_checkbox
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating input options: {str(e)}")
+        raise
+
+
+# Remove fallback UI function - errors should be handled by CommonInitializer

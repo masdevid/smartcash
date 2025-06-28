@@ -21,12 +21,39 @@ Key Features:
 - Comprehensive error handling
 """
 
+# Setup aggressive log suppression at the very top
+import sys
+import os
+import warnings
 import logging
+
+# Suppress warnings before any other imports
+warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# Setup aggressive logging suppression
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.CRITICAL)
+root_logger.handlers = []
+root_logger.addHandler(logging.NullHandler())
+
+# Suppress common loggers
+for logger_name in [''] + logging.root.manager.loggerDict.keys():
+    try:
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.CRITICAL)
+        logger.handlers = []
+        logger.propagate = False
+    except Exception:
+        pass
+
+# Now import other modules
 import contextlib
 from typing import Dict, Any, Optional, Type, Callable
 from abc import ABC, abstractmethod
 import traceback
-import sys
 import ipywidgets as widgets
 
 from smartcash.common.logger import get_logger
@@ -58,11 +85,28 @@ class CommonInitializer(ABC):
     
     @classmethod
     def _initialize_suppression(cls):
-        """Class method to initialize log suppression exactly once"""
+        """Class method to initialize additional log suppression"""
         if not cls._suppression_initialized:
-            from smartcash.ui.utils.logging_utils import setup_aggressive_log_suppression
-            setup_aggressive_log_suppression()
-            cls._suppression_initialized = True
+            try:
+                # Additional suppression for specific loggers
+                for logger_name in ['smartcash', 'urllib3', 'matplotlib', 'PIL']:
+                    try:
+                        logger = logging.getLogger(logger_name)
+                        logger.setLevel(logging.CRITICAL)
+                        logger.handlers = []
+                        logger.propagate = False
+                    except Exception:
+                        pass
+                
+                # Suppress specific warnings that might still appear
+                warnings.filterwarnings('ignore', category=RuntimeWarning)
+                warnings.filterwarnings('ignore', category=ImportWarning)
+                
+                # Mark as initialized
+                cls._suppression_initialized = True
+            except Exception:
+                # If anything fails, just continue without suppression
+                pass
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):
         """Initialize dengan complete output suppression hingga UI ready
@@ -74,16 +118,33 @@ class CommonInitializer(ABC):
         # Initialize suppression at class level
         self._initialize_suppression()
         
+        # Store basic attributes
         self.module_name = module_name
         self._ui_components = {}
         self._logger_bridge = None
         self.config_handler = config_handler_class() if config_handler_class else None
         
-        # Initialize silent logger
-        self.logger = get_logger(f"smartcash.ui.{module_name}")
-        if hasattr(self.logger, 'set_level'):
-            self.logger.set_level(logging.CRITICAL)  # Silent until UI ready
-        else:
+        # Setup logger with maximum suppression
+        try:
+            self.logger = get_logger(f"smartcash.ui.{module_name}")
+            if hasattr(self.logger, 'set_level'):
+                self.logger.set_level(logging.CRITICAL)
+            else:
+                self.logger.setLevel(logging.CRITICAL)
+            
+            # Ensure no handlers can cause output
+            if hasattr(self.logger, 'handlers'):
+                for handler in self.logger.handlers[:]:
+                    self.logger.removeHandler(handler)
+            
+            # Add null handler to prevent 'no handlers' warnings
+            if not self.logger.handlers:
+                self.logger.addHandler(logging.NullHandler())
+                
+        except Exception:
+            # If logger setup fails, create a silent logger
+            self.logger = logging.getLogger(f"smartcash.ui.{module_name}.silent")
+            self.logger.addHandler(logging.NullHandler())
             self.logger.setLevel(logging.CRITICAL)
     
     @contextlib.contextmanager

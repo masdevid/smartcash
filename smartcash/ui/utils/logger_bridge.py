@@ -392,7 +392,7 @@ class UILoggerBridge:
             if 'log_output' in self.ui_components:
                 log_output = self.ui_components['log_output']
                 if hasattr(log_output, 'append_log'):
-                    print("[DEBUG] Found log_output directly in ui_components")
+                    self.logger.debug("Found log_output directly in ui_components")
                     return log_output
             
             # 3. Try to find log_accordion and get its output
@@ -401,7 +401,7 @@ class UILoggerBridge:
                 if hasattr(log_accordion, 'children') and len(log_accordion.children) > 0:
                     log_output = log_accordion.children[0]
                     if hasattr(log_output, 'append_log'):
-                        print("[DEBUG] Found log_output in log_accordion children")
+                        self.logger.debug("Found log_output in log_accordion children")
                         return log_output
             
             # 4. Try to find any widget with 'log' in the key that has append_log method

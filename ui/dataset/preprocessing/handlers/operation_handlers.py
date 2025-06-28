@@ -56,26 +56,69 @@ class OperationHandler(BasePreprocessingHandler):
         start_operation_flow(self.ui_components, "Dataset Check")
         
         try:
+            # Extract and validate configuration
             config = self.extract_config()
             if not config:
-                raise ValueError("Konfigurasi tidak valid")
+                self.log_error("Konfigurasi tidak valid atau kosong")
+                update_status_panel_enhanced(
+                    self.ui_components, 
+                    "❌ Gagal memeriksa dataset: Konfigurasi tidak valid", 
+                    'error'
+                )
+                complete_operation_flow(
+                    self.ui_components, 
+                    "Dataset Check", 
+                    False, 
+                    "Gagal: Konfigurasi tidak valid"
+                )
+                return
             
+            # Create progress callback
             progress_callback = self.create_progress_callback()
+            if progress_callback:
+                progress_callback('overall', 0, 100, "Memeriksa dataset...")
             
-            # Suppress output selama API call
+            # Suppress output during API call
             from smartcash.ui.utils.logging_utils import suppress_all_outputs
-            suppress_all_outputs()
+            with suppress_all_outputs():
+                from smartcash.dataset.preprocessor.api import get_preprocessing_status
+                result = get_preprocessing_status(
+                    config=config,
+                    progress_callback=progress_callback
+                )
             
-            from smartcash.dataset.preprocessor.api import get_preprocessing_status
-            result = get_preprocessing_status(config=config)
+            # Check operation status using 'status' key
+            if not result.get('status'):
+                error_msg = result.get('message', 'Gagal memeriksa dataset')
+                self.log_error(error_msg)
+                complete_operation_flow(
+                    self.ui_components, 
+                    "Dataset Check", 
+                    False, 
+                    f"Gagal: {error_msg}"
+                )
+                return
             
+            # Process successful result
             self.process_operation_result(result, 'check')
-            complete_operation_flow(self.ui_components, "Dataset Check", True, "Pemeriksaan selesai")
+            complete_operation_flow(
+                self.ui_components, 
+                "Dataset Check", 
+                True, 
+                "✅ Pemeriksaan dataset selesai"
+            )
             
         except Exception as e:
-            error_msg = f"Gagal memeriksa dataset: {str(e)}"
+            error_msg = f"Terjadi kesalahan saat memeriksa dataset: {str(e)}"
             self.log_error(error_msg)
-            complete_operation_flow(self.ui_components, "Dataset Check", False, error_msg)
+            if 'progress_callback' in locals():
+                progress_callback('overall', 0, 100, f"Error: {str(e)}")
+            complete_operation_flow(
+                self.ui_components, 
+                "Dataset Check", 
+                False, 
+                f"❌ {error_msg}"
+            )
     
     def _handle_cleanup_operation(self) -> None:
         """Handle cleanup operation dengan enhanced flow"""

@@ -257,11 +257,38 @@ class BasePreprocessingHandler(ABC):
     # === UTILITY METHODS ===
     
     def extract_config(self) -> Dict[str, Any]:
-        """Extract config dengan fallback"""
-        config_handler = self.ui_components.get('config_handler')
-        if config_handler and hasattr(config_handler, 'extract_config'):
-            return config_handler.extract_config(self.ui_components)
-        return self.ui_components.get('config', {})
+        """Extract config dengan fallback dan validasi"""
+        try:
+            # Check if we have a config handler
+            config_handler = self.ui_components.get('config_handler')
+            if config_handler and hasattr(config_handler, 'extract_config'):
+                config = config_handler.extract_config(self.ui_components)
+                
+                # Validate the extracted config
+                if not isinstance(config, dict):
+                    self.log_error("Konfigurasi tidak valid: bukan dictionary")
+                    return {}
+                    
+                # Ensure required sections exist
+                required_sections = ['preprocessing', 'data', 'performance']
+                for section in required_sections:
+                    if section not in config:
+                        self.log_error(f"Konfigurasi tidak valid: bagian '{section}' tidak ditemukan")
+                        return {}
+                        
+                return config
+                
+            # Fallback to direct config from ui_components
+            config = self.ui_components.get('config', {})
+            if not isinstance(config, dict):
+                self.log_error("Konfigurasi tidak valid: config bukan dictionary")
+                return {}
+                
+            return config
+            
+        except Exception as e:
+            self.log_error(f"Error saat mengekstrak konfigurasi: {str(e)}")
+            return {}
     
     def is_confirmation_pending(self) -> bool:
         """Check pending confirmations"""

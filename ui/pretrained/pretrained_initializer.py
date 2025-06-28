@@ -131,10 +131,14 @@ class PretrainedInitializer(CommonInitializer):
         """
         try:
             # Check critical UI components
-            critical_widgets = ['download_sync_button', 'save_button', 'reset_button']
-            missing_widgets = [w for w in critical_widgets if not ui_components.get(w)]
+            critical_widgets = {
+                'download_btn': 'Download button',
+                'save_button': 'Save button',
+                'reset_button': 'Reset button'
+            }
+            missing_widgets = [name for key, name in critical_widgets.items() if not ui_components.get(key)]
             if missing_widgets:
-                raise RuntimeError(f"Widget kritis tidak ditemukan: {missing_widgets}")
+                raise RuntimeError(f"Widget kritis tidak ditemukan: {', '.join(missing_widgets)}")
             
             # Check pretrained model existence
             self._check_pretrained_model_exists(ui_components, config)

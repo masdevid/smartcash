@@ -46,19 +46,24 @@ class DependencyInitializer(CommonInitializer):
         try:
             from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
             
+            # Log start of UI component creation
+            self.logger.debug("Memulai pembuatan komponen UI")
+            
             # Create UI components dengan error handling
             ui_components = create_dependency_main_ui(config)
             
             # Validasi tipe return
             if not isinstance(ui_components, dict):
                 error_msg = f"UI components harus berupa dictionary, dapat: {type(ui_components)}"
-                self.logger.error(error_msg)
-                return self.create_error_response(error_msg)
+                self.logger.error(error_msg, exc_info=True, stack_info=True)
+                return self.create_error_response(
+                    f"{error_msg}\n\nDetail: {str(ui_components)[:500]}"
+                )
                     
             # Validasi komponen tidak kosong
             if not ui_components:
                 error_msg = "UI components tidak boleh kosong"
-                self.logger.error(error_msg)
+                self.logger.error(error_msg, exc_info=True, stack_info=True)
                 return self.create_error_response(error_msg)
             
             # Validasi komponen kritis
@@ -66,18 +71,32 @@ class DependencyInitializer(CommonInitializer):
             missing = [comp for comp in required_components if comp not in ui_components]
             if missing:
                 error_msg = f"Komponen UI kritis tidak ditemukan: {missing}"
-                self.logger.error(error_msg)
-                return self.create_error_response(error_msg)
+                self.logger.error(
+                    f"{error_msg}\nKomponen yang tersedia: {list(ui_components.keys())}",
+                    exc_info=True,
+                    stack_info=True
+                )
+                return self.create_error_response(
+                    f"{error_msg}\n\nKomponen yang tersedia: {', '.join(ui_components.keys())}"
+                )
             
             # Add config handler reference
             ui_components['config_handler'] = self.config_handler
             
+            self.logger.debug("Pembuatan komponen UI berhasil")
             return ui_components
             
         except Exception as e:
-            error_msg = f"Gagal membuat komponen UI: {str(e)}"
-            self.logger.error(f"{error_msg}\n{str(e)}")
-            return self.create_error_response(error_msg, e)
+            import traceback
+            error_trace = traceback.format_exc()
+            error_msg = f"Gagal membuat komponen UI: {str(e)}\n\nTraceback:\n{error_trace}"
+            self.logger.error(error_msg, exc_info=True, stack_info=True)
+            return self.create_error_response(
+                f"Terjadi kesalahan saat memuat antarmuka pengguna.\n\n"
+                f"Error: {str(e)}\n\n"
+                "Silakan periksa log untuk detail lebih lanjut.",
+                e
+            )
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Setup event handlers dengan proper logger bridge integration

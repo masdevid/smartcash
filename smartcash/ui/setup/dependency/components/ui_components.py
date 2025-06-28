@@ -88,7 +88,13 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         layout=widgets.Layout(width='auto', margin='0 5px')
     )
     
-    # Container for all buttons
+    # Container for all action buttons
+    action_components = {
+        'install': install_btn,
+        'check_updates': check_updates_btn,
+        'uninstall': uninstall_btn
+    }
+    
     action_buttons = widgets.HBox(
         [install_btn, check_updates_btn, uninstall_btn],
         layout=widgets.Layout(
@@ -147,17 +153,20 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
         )
     )
     
-    # Store components
+    # Store components with required keys
     ui_components.update({
-        'layout': layout,
+        'ui': layout,  # Main UI component
         'log_output': log_components.get('log_output'),
         'log_accordion': log_accordion,
         'header': header,
         'status_panel': status_panel,
         'tabs': tabs,
-        'action_buttons': action_buttons,
+        'action_buttons': action_components,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_button': save_reset_buttons['reset_button'],
         'save_reset': save_reset,
-        'log_accordion': log_accordion
+        'status': status_panel.get('status', None),
+        'confirmation_area': status_panel.get('confirmation_area', None)
     })
     
     return ui_components

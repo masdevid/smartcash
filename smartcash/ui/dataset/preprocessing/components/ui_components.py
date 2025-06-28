@@ -85,8 +85,8 @@ def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dic
     )
     
     # Confirmation area
-    confirmation_area, _ = create_confirmation_area()
-    ui_components['confirmation_area'] = confirmation_area
+    confirmation_area = create_confirmation_area(ui_components)
+    # Already stored in ui_components by create_confirmation_area
     
     # === LAYOUT SECTIONS ===
     

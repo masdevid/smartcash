@@ -51,16 +51,17 @@ class CommonInitializer(ABC):
         - Memory-efficient resource handling
         - Progress tracker integration for long-running operations
         - No premature output suppression
-    
-    Subclasses must implement the abstract methods:
-        - _create_ui_components()
-        - _get_default_config()
-    
-    Optional lifecycle hooks:
-        - _pre_initialize_checks(): Pre-initialization validation
-        - _setup_handlers(): Event handler setup
-        - _after_init_checks(): Post-initialization validation
     """
+    # Class-level flag to ensure we only set up suppression once
+    _suppression_initialized = False
+    
+    @classmethod
+    def _initialize_suppression(cls):
+        """Class method to initialize log suppression exactly once"""
+        if not cls._suppression_initialized:
+            from smartcash.ui.utils.logging_utils import setup_aggressive_log_suppression
+            setup_aggressive_log_suppression()
+            cls._suppression_initialized = True
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):
         """Initialize dengan complete output suppression hingga UI ready
@@ -69,8 +70,8 @@ class CommonInitializer(ABC):
             module_name: Nama module (used for logging)
             config_handler_class: Optional ConfigHandler class for config management
         """
-        # Immediate suppression untuk prevent early logs
-        setup_aggressive_log_suppression()
+        # Initialize suppression at class level
+        self._initialize_suppression()
         
         self.module_name = module_name
         self._ui_components = {}
@@ -83,6 +84,25 @@ class CommonInitializer(ABC):
             self.logger.set_level(logging.CRITICAL)  # Silent until UI ready
         else:
             self.logger.setLevel(logging.CRITICAL)
+    
+    @contextlib.contextmanager
+    def _suppress_outputs(self):
+        """Context manager untuk suppress semua output selama inisialisasi"""
+        from smartcash.ui.utils.logging_utils import (
+            setup_aggressive_log_suppression,
+            setup_stdout_suppression,
+            restore_stdout
+        )
+        
+        # Setup suppression
+        setup_aggressive_log_suppression()
+        setup_stdout_suppression()
+        
+        try:
+            yield
+        finally:
+            # Restore stdout when done
+            restore_stdout()
     
     def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
         """Setup logger bridge AFTER UI components created dan suppress semua stdout
@@ -138,59 +158,51 @@ class CommonInitializer(ABC):
             >>> ui = initializer.initialize()
             >>> display(ui)  # Explicitly display the UI
         """
-        
-        # Suppress ALL output until UI is completely ready
-        from smartcash.ui.utils.logging_utils import suppress_all_outputs
-        suppress_all_outputs()
-        
-        try:
-            # 1. Load config - silent
-            config = self._load_config(config)
-            
-            # 2. Create UI components - silent  
-            ui_components = self._create_ui_components(config, **kwargs) or {}
-            self._ui_components = ui_components
-            
-            # 3. Add metadata for tracking
-            ui_components.update({
-                'module_name': self.module_name,
-                'initialization_timestamp': self._get_timestamp()
-            })
-            
-            # 4. Initialize logger bridge SETELAH UI ready
-            self._initialize_logger_bridge(ui_components)
-            
-            # 4. Pre-initialization checks (optional) - silent
-            if hasattr(self, '_pre_initialize_checks'):
-                self._pre_initialize_checks(config=config, **kwargs)
-            
-            # 5. Setup handlers SETELAH logger bridge ready
-            if hasattr(self, '_setup_handlers'):
-                ui_components = self._setup_handlers(ui_components, config, **kwargs) or ui_components
-            
-            # 6. Get root UI component
-            root_ui = self._get_ui_root(ui_components)
-            if not root_ui:
-                raise ValueError("No root UI component found")
-            
-            # 7. Post-initialization checks (optional) - silent
-            if hasattr(self, '_after_init_checks'):
-                self._after_init_checks(ui_components=ui_components, config=config, **kwargs)
-            
-            # 8. SUCCESS: Log ONLY to UI setelah everything ready
-            if hasattr(self.logger, 'info'):
-                self.logger.info(f"✅ {self.module_name} siap digunakan")
-            
-            return root_ui
-            
-        except Exception as e:
-            error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
-            
-            # Pass the exception to create_error_response for better error reporting
-            return self.create_error_response(error_msg, e)
-        finally:
-            # Keep suppression active - hanya restore jika benar-benar diperlukan
-            pass
+        # Use context manager to ensure proper cleanup
+        with self._suppress_outputs():
+            try:
+                # 1. Load config - silent
+                config = self._load_config(config)
+                
+                # 2. Create UI components - silent  
+                ui_components = self._create_ui_components(config, **kwargs) or {}
+                self._ui_components = ui_components
+                
+                # 3. Add metadata for tracking
+                ui_components.update({
+                    'module_name': self.module_name,
+                    'initialization_timestamp': self._get_timestamp()
+                })
+                
+                # 4. Initialize logger bridge SETELAH UI ready
+                self._initialize_logger_bridge(ui_components)
+                
+                # 5. Pre-initialization checks (optional) - silent
+                if hasattr(self, '_pre_initialize_checks'):
+                    self._pre_initialize_checks(config=config, **kwargs)
+                
+                # 6. Setup handlers SETELAH logger bridge ready
+                if hasattr(self, '_setup_handlers'):
+                    ui_components = self._setup_handlers(ui_components, config, **kwargs) or ui_components
+                
+                # 7. Get root UI component
+                root_ui = self._get_ui_root(ui_components)
+                if not root_ui:
+                    raise ValueError("No root UI component found")
+                
+                # 8. Post-initialization checks (optional) - silent
+                if hasattr(self, '_after_init_checks'):
+                    self._after_init_checks(ui_components=ui_components, config=config, **kwargs)
+                
+                # 9. SUCCESS: Log ONLY to UI setelah everything ready
+                if hasattr(self.logger, 'info'):
+                    self.logger.info(f"✅ {self.module_name} siap digunakan")
+                
+                return root_ui
+                
+            except Exception as e:
+                error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
+                return self.create_error_response(error_msg, e)
     
     def _load_config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Load and validate the configuration for the module.
@@ -353,9 +365,14 @@ class CommonInitializer(ABC):
             except Exception:
                 tb_text = None
         
+        # Strip any leading emoji from error message
+        error_msg = str(error_message).strip()
+        if error_msg and len(error_msg) > 0 and ord(error_msg[0]) > 255:  # Check if first character is likely an emoji
+            error_msg = error_msg[1:].strip()
+            
         # Create error component
         error_component = create_error_component(
-            error_message=str(error_message),
+            error_message=error_msg,
             title=f"🚨 {self.module_name} Error",
             traceback=tb_text,
             error_type="error",

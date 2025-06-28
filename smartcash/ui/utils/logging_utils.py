@@ -16,36 +16,73 @@ LoggerType = logging.Logger
 
 
 def setup_aggressive_log_suppression() -> None:
-    """Setup aggressive log suppression untuk prevent pollution dari backend services tanpa tqdm manipulation"""
-    # Clear dan disable root logger
+    """Setup aggressive log suppression to prevent pollution from backend services"""
+    # Clear and disable root logger
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(logging.CRITICAL)
     root.propagate = False
     
-    # Suppression targets TANPA tqdm untuk avoid AttributeError
+    # Add NullHandler to prevent "No handlers could be found" warnings
+    if not root.handlers:
+        root.addHandler(logging.NullHandler())
+    
+    # Extended list of loggers to suppress
     suppression_targets = [
-        'requests', 'urllib3', 'tensorflow', 'torch', 'sklearn', 'ipywidgets',
-        'google', 'yaml', 'matplotlib', 'pandas', 'numpy', 'PIL',
-        'smartcash.dataset', 'smartcash.model', 'smartcash.training',
-        'smartcash.common', 'smartcash.ui.dataset', 'smartcash.detection',
-        'IPython', 'traitlets', 'tornado', 'seaborn', 'cv2', 'pathlib',
-        'asyncio', 'concurrent', 'multiprocessing', 'threading',
-        'h5py', 'scipy', 'plotly', 'bokeh', 'altair', 'streamlit'
+        # Core Python
+        '', 'root', '__main__',
+        
+        # Common libraries
+        'requests', 'urllib3', 'urllib', 'http', 'httpx',
+        'asyncio', 'concurrent', 'threading', 'multiprocessing',
+        'tornado', 'traitlets', 'zmq', 'jupyter', 'IPython',
+        
+        # Data science
+        'numpy', 'pandas', 'scipy', 'h5py', 'tables', 'pytables',
+        'matplotlib', 'PIL', 'Pillow', 'seaborn', 'plotly', 'bokeh',
+        'altair', 'plotnine', 'ggplot', 'sklearn', 'tensorflow',
+        'torch', 'transformers', 'datasets', 'tqdm', 'tqdm.auto',
+        
+        # Web and UI
+        'ipywidgets', 'ipykernel', 'ipython', 'jupyter_client',
+        'jupyter_core', 'notebook', 'nbformat', 'nbconvert',
+        
+        # SmartCash modules
+        'smartcash', 'smartcash.*',  # This will match all submodules
     ]
     
-    # Suppress semua targets dengan safe error handling
+    # Suppress all targets with safe error handling
     for target in suppression_targets:
         try:
             logger = logging.getLogger(target)
             logger.setLevel(logging.CRITICAL)
             logger.propagate = False
-            logger.handlers.clear()
+            logger.handlers = []
+            # Add NullHandler to prevent "No handlers could be found" warnings
+            if not logger.handlers:
+                logger.addHandler(logging.NullHandler())
         except Exception:
-            pass  # Silent fail untuk compatibility
+            pass  # Silent fail for compatibility
     
-    # Suppress warnings secara global
+    # Suppress warnings globally
     warnings.filterwarnings('ignore')
+    # Also suppress deprecation warnings
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    warnings.filterwarnings("ignore", category=UserWarning)
+    
+    # Suppress specific warnings from common libraries
+    for warning_category in [
+        'ignore:The psycopg2 wheel package will be renamed',
+        'ignore:distutils Version classes are deprecated',
+        'ignore:There is no current event loop',
+        'ignore:Jupyter is migrating its paths',
+        'ignore:Setuptools is replacing distutils',
+        'ignore:numpy.ufunc size changed',
+        'ignore:invalid value encountered',
+        'ignore:divide by zero encountered',
+    ]:
+        warnings.filterwarnings("ignore", message=warning_category)
 
 def setup_stdout_suppression() -> None:
     """Setup stdout/stderr suppression dengan anonymous class pattern"""

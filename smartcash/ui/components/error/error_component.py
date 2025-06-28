@@ -50,40 +50,47 @@ class ErrorComponent:
             padding: 0 !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
+            position: relative !important;
         """
         
         content_style = """
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 auto !important;
-            padding: 0 8px !important;
+            padding: 0 !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
+            position: relative !important;
         """
         
         # Create traceback section if needed
         if traceback and show_traceback:
             traceback_widget = self._create_traceback_section(traceback)
             
-            # Create a VBox for the error and traceback
+            # Create a VBox for the error and traceback with proper width constraints
             content = widgets.VBox(
                 [error_display, traceback_widget],
                 layout=widgets.Layout(
                     width='100%',
-                    margin='0',
+                    max_width='100%',
+                    margin='10px 0',
                     padding='0',
                     _css={
-                        'max-width': '1200px',
-                        'width': '100%',
-                        'margin': '10px 0'
+                        'max-width': '100%',
+                        'width': '100% !important',
+                        'box-sizing': 'border-box',
+                        'overflow': 'hidden',
+                        'padding': '0 8px',
+                        'position': 'relative'
                     }
                 )
             )
             
-            # Create the outer container
+            # Create the outer container with proper width constraints
             container = widgets.VBox(
                 layout=widgets.Layout(
                     width='100%',
+                    max_width='100%',
                     margin='0',
                     padding='0',
                     _css={
@@ -91,8 +98,10 @@ class ErrorComponent:
                         'justify-content': 'center',
                         'box-sizing': 'border-box',
                         'max-width': '100%',
+                        'width': '100% !important',
                         'overflow': 'hidden',
-                        'padding': '0 8px'
+                        'padding': '0',
+                        'position': 'relative'
                     }
                 )
             )
@@ -104,19 +113,22 @@ class ErrorComponent:
             # For single error display without traceback
             error_display.layout = widgets.Layout(
                 width='100%',
+                max_width='100%',
                 margin='10px 0',
                 _css={
                     'max-width': '100%',
-                    'width': '100%',
+                    'width': '100% !important',
                     'box-sizing': 'border-box',
                     'overflow': 'hidden',
-                    'padding': '0 8px'
+                    'padding': '0 8px',
+                    'position': 'relative'
                 }
             )
             
             container = widgets.VBox(
                 layout=widgets.Layout(
                     width='100%',
+                    max_width='100%',
                     margin='0',
                     padding='0',
                     _css={
@@ -124,8 +136,10 @@ class ErrorComponent:
                         'justify-content': 'center',
                         'box-sizing': 'border-box',
                         'max-width': '100%',
+                        'width': '100% !important',
                         'overflow': 'hidden',
-                        'padding': '0 8px'
+                        'padding': '0',
+                        'position': 'relative'
                     }
                 )
             )

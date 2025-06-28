@@ -68,10 +68,13 @@ class BackboneInitializer(ConfigCellInitializer):
             pass
         return None
     
-    def create_child_components(self) -> Dict[str, Any]:
+    def create_child_components(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Create child components spesifik untuk backbone configuration.
         
+        Args:
+            config: Configuration dictionary (optional, falls back to self.config)
+            
         Returns:
             Dictionary berisi form components dan sections
         """
@@ -79,8 +82,11 @@ class BackboneInitializer(ConfigCellInitializer):
             create_backbone_child_components, get_layout_sections
         )
         
+        # Use provided config or fall back to instance config
+        config = config or self.config
+        
         # Create all child components
-        child_components = create_backbone_child_components(self.config)
+        child_components = create_backbone_child_components(config)
         
         # Store layout sections for parent to use
         child_components['_layout_sections'] = get_layout_sections(child_components)

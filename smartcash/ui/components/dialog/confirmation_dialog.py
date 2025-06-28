@@ -15,12 +15,16 @@ def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
         confirmation_area = widgets.Output(
             layout=widgets.Layout(
                 width='100%',
-                min_height='0px',
-                max_height='250px',
+                min_height='50px',
+                max_height='500px',
                 margin='10px 0',
-                padding='0',
-                overflow='visible',
-                display='none'  # Initially hidden
+                padding='10px',
+                border='1px solid #e0e0e0',
+                border_radius='4px',
+                overflow_y='auto',
+                overflow_x='hidden',
+                display='none',  # Initially hidden
+                flex='1 1 auto'  # Allow expansion
             )
         )
         ui_components['confirmation_area'] = confirmation_area
@@ -83,15 +87,15 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-radius: 20px;
+            border-radius: 12px;
             border: 1px solid {card_border};
             box-shadow: 
-                0 8px 32px 0 rgba(31, 38, 135, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.4);
-            padding: 24px;
-            max-height: 200px;
+                0 4px 16px 0 rgba(31, 38, 135, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            padding: 12px 16px;
+            max-height: 160px;
             overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s ease;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -114,19 +118,21 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         
         .dialog-header-{dialog_id} {{
             color: #1a202c;
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: 600;
-            margin: 0 0 8px 0;
-            line-height: 1.4;
+            margin: 0 0 6px 0;
+            line-height: 1.3;
+            padding: 0 4px;
         }}
         
         .dialog-message-{dialog_id} {{
             color: #4a5568;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            margin: 0 0 20px 0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin: 0 0 12px 0;
+            padding: 0 2px;
             white-space: pre-line;
-            max-height: 60px;
+            max-height: 50px;
             overflow-y: auto;
         }}
         
@@ -140,13 +146,13 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         
         .glass-btn-{dialog_id} {{
             border: none;
-            border-radius: 10px;
-            padding: 10px 20px;
-            font-size: 0.9rem;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.25s ease;
-            min-width: 100px;
+            transition: all 0.15s ease;
+            min-width: 80px;
             text-align: center;
             user-select: none;
             outline: none;

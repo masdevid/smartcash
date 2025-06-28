@@ -193,16 +193,18 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Import shared action section component
     from smartcash.ui.components.action_section import create_action_section
     
-    # Prepare action_buttons in the expected format for create_action_section
-    action_buttons_for_section = {
-        'container': action_buttons.get('container'),
-        'primary': action_buttons.get('primary'),
-        'secondary': [b for b in action_buttons.get('buttons', []) if b != action_buttons.get('primary')]
-    }
+    # Pastikan container action buttons ada dan valid
+    button_container = action_buttons.get('container')
+    if button_container is None:
+        # Buat container baru jika tidak ada
+        button_container = widgets.HBox(
+            [b for b in action_buttons.get('buttons', []) if b is not None],
+            layout=widgets.Layout(justify_content='flex-end', width='100%')
+        )
     
     # Create action section using shared component
     action_section = create_action_section(
-        action_buttons=action_buttons_for_section,
+        action_buttons=button_container,  # Langsung kirim container widget-nya
         confirmation_area=confirmation_area,
         title="🚀 Operations",
         status_label="📋 Status & Konfirmasi:",

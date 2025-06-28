@@ -42,12 +42,12 @@ def create_action_section(
                 [confirmation_area],
                 layout=widgets.Layout(
                     display='flex',
-                    flex_flow='row wrap',
-                    justify_content='space-between',
-                    align_items='center',
+                    flex_flow='column nowrap',
                     width='100%',
                     margin='0',
-                    padding='0'
+                    padding='0',
+                    align_items='stretch',
+                    flex='1 1 auto'
                 )
             )
         ]
@@ -56,18 +56,27 @@ def create_action_section(
     buttons_container = action_buttons['container'] if isinstance(action_buttons, dict) else action_buttons
     
     # Create the action section
+    # Create main container with flex layout for proper expansion
     action_section = widgets.VBox(
-        [title_widget, buttons_container] + status_section,
+        [
+            title_widget, 
+            buttons_container, 
+            *status_section
+        ],
         layout=widgets.Layout(
             display='flex',
             flex_direction='column',
             width='100%',
+            height='auto',
+            min_height='100px',
             margin='10px 0',
             padding='12px',
             border='1px solid #e0e0e0',
             border_radius='8px',
             background_color='#f9f9f9',
-            overflow='hidden'
+            overflow='visible',
+            align_items='stretch',
+            flex='1 1 auto'
         )
     )
     

@@ -44,10 +44,11 @@ def create_model_form(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
         ">{}</small>
     """
     
-    # === BACKBONE SELECTION ===
+    # === PEMILIHAN BACKBONE ===
     
     backbone_dropdown = widgets.Dropdown(
         options=[
+            ('Pilih Backbone', ''),
             ('EfficientNet-B4 (Recommended)', 'efficientnet_b4'),
             ('CSPDarknet (YOLOv5 Baseline)', 'cspdarknet')
         ],
@@ -74,28 +75,29 @@ def create_model_form(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     
     layer_mode_dropdown = widgets.Dropdown(
         options=[
-            ('Single Layer (Fast)', 'single'),
-            ('Multi-layer (Accurate)', 'multilayer')
+            ('Satu Lapisan (Cepat)', 'single'),
+            ('Multi Lapisan (Akurat)', 'multilayer')
         ],
         value=model_config.get('layer_mode', 'single'),
-        description='Layer Mode:',
+        description='Mode Lapisan:',
         style=dropdown_style,
         layout=dropdown_layout
     )
     
     # === OPTIMIZATION OPTIONS ===
-    
+    # Optimasi fitur
     feature_optimization_checkbox = widgets.Checkbox(
         value=model_config.get('feature_optimization', {}).get('enabled', False),
-        description='Enable Feature Optimization',
+        description='Aktifkan Optimasi Fitur',
         indent=False,
         style={'description_width': 'auto'},
         layout=checkbox_layout
     )
     
+    # Pelatihan presisi campuran
     mixed_precision_checkbox = widgets.Checkbox(
         value=model_config.get('mixed_precision', True),
-        description='Mixed Precision Training (FP16)',
+        description='Aktifkan Pelatihan Presisi Campuran',
         indent=False,
         style={'description_width': 'auto'},
         layout=checkbox_layout
@@ -103,29 +105,29 @@ def create_model_form(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     
     # === SECTION ORGANIZATION ===
     
-    # Architecture section
+    # Bagian Arsitektur
     architecture_section = widgets.VBox([
-        widgets.HTML(section_header_style.format('🏗️ Model Architecture')),
+        widgets.HTML(section_header_style.format('🏗️ Arsitektur Model')),
         backbone_dropdown,
-        widgets.HTML(help_text_style.format('Backbone network untuk feature extraction'))
+        widgets.HTML(help_text_style.format('Jaringan backbone untuk ekstraksi fitur'))
     ], layout=widgets.Layout(margin='0 0 10px 0'))
     
-    # Detection section
+    # Bagian Deteksi
     detection_section = widgets.VBox([
-        widgets.HTML(section_header_style.format('🎯 Detection Configuration')),
+        widgets.HTML(section_header_style.format('🎯 Konfigurasi Deteksi')),
         detection_layers_select,
         widgets.HTML(help_text_style.format('Pilih layer deteksi yang dibutuhkan')),
         layer_mode_dropdown,
-        widgets.HTML(help_text_style.format('Mode operasi detection layers'))
+        widgets.HTML(help_text_style.format('Mode operasi layer deteksi'))
     ], layout=widgets.Layout(margin='0 0 10px 0'))
     
-    # Optimization section
+    # Bagian Optimasi
     optimization_section = widgets.VBox([
-        widgets.HTML(section_header_style.format('⚡ Optimization')),
+        widgets.HTML(section_header_style.format('⚡ Optimasi')),
         feature_optimization_checkbox,
-        widgets.HTML(help_text_style.format('Channel attention untuk improved accuracy')),
+        widgets.HTML(help_text_style.format('Channel attention untuk akurasi yang lebih baik')),
         mixed_precision_checkbox,
-        widgets.HTML(help_text_style.format('Faster training dengan reduced precision'))
+        widgets.HTML(help_text_style.format('Pelatihan lebih cepat dengan presisi yang lebih rendah'))
     ], layout=widgets.Layout(margin='0'))
     
     # === MAIN FORM ASSEMBLY ===

@@ -54,8 +54,14 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         progress_tracker = create_dual_progress_tracker()
         
         # Log output
-        log_components = create_log_accordion()
-        log_output = log_components['ui']
+        log_accordion = create_log_accordion()
+        log_output = log_accordion  # Langsung gunakan widget accordion
+        
+        # Create log components dictionary
+        log_components = {
+            'ui': log_output,
+            'output': log_output.children[0]  # Output widget is the first child
+        }
         
         # Create main layout
         main_ui = widgets.VBox([

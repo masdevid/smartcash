@@ -35,16 +35,28 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     config_summary = create_config_summary(config)
     child_components['config_summary'] = config_summary
     
-    # Two-column layout dengan grid flexbox
+    # Two-column layout with optimized spacing
     model_config_section = widgets.HBox([
-        model_form,
-        config_summary
+        widgets.Box(
+            [model_form],
+            layout=widgets.Layout(width='65%', padding='0 5px 0 0')
+        ),
+        widgets.Box(
+            [config_summary],
+            layout=widgets.Layout(width='35%', padding='0 0 0 5px')
+        )
     ], layout=widgets.Layout(
         display='flex',
-        gap='20px',
+        gap='10px',
         width='100%',
-        align_items='stretch'
+        align_items='flex-start',
+        margin='0',
+        padding='0'
     ))
+    
+    # Prevent duplicate display by checking parent
+    if hasattr(model_form, 'parent') and model_form.parent is not None:
+        return child_components
     
     # Store the main section without adding it to the components yet
     # to prevent duplicate display
@@ -52,10 +64,10 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     
     # === CONFIG SECTION ===
     
-    # Save/Reset buttons
+    # Tombol Simpan/Reset
     save_reset_components = create_save_reset_buttons(
-        save_label="Simpan Konfigurasi",
-        reset_label="Reset", 
+        save_label="💾 Simpan",
+        reset_label="🔄 Reset", 
         with_sync_info=True
     )
     child_components['save_reset_buttons'] = save_reset_components
@@ -73,21 +85,21 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     
     # === ACTION SECTION ===
     
-    # Action buttons
+    # Tombol Aksi
     action_components = create_action_buttons(
         primary_button={
-            "label": "🏗️ Build Model",
+            "label": "🏗️ Bangun Model",
             "style": "success",
             "width": "160px"
         },
         secondary_buttons=[
             {
-                "label": "📊 Validate Config",
+                "label": "📊 Validasi Konfigurasi",
                 "style": "info",
                 "width": "150px"
             },
             {
-                "label": "🔍 Model Info",
+                "label": "🔍 Info Model",
                 "style": "warning",
                 "width": "120px"
             }

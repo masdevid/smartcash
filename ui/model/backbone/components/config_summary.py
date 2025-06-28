@@ -31,7 +31,7 @@ def create_config_summary(config: Optional[Dict[str, Any]] = None) -> widgets.VB
             font-weight: 600;
             border-bottom: 2px solid #27ae60;
             padding-bottom: 5px;
-        ">📋 Configuration Summary</h4>
+        ">📋 Ringkasan Konfigurasi</h4>
     """)
     
     # === SUMMARY CONTAINER ===
@@ -40,12 +40,15 @@ def create_config_summary(config: Optional[Dict[str, Any]] = None) -> widgets.VB
         header_html,
         summary_html
     ], layout=widgets.Layout(
-        width='40%',  # Right column width
-        padding='20px',
-        border='1px solid #ddd',
-        border_radius='10px',
+        width='100%',  # Take full width of parent
+        padding='15px',
+        border='1px solid #e0e0e0',
+        border_radius='8px',
         background_color='#f8f9fa',
-        box_shadow='0 2px 8px rgba(0,0,0,0.08)'
+        box_shadow='0 1px 3px rgba(0,0,0,0.05)',
+        margin='0',
+        height='100%',
+        box_sizing='border-box'
     ))
     
     # Store HTML widget untuk update

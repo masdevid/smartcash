@@ -36,147 +36,125 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     Returns:
         Dictionary containing UI components and state
     """
-    config = config or {}
-    ui_components = {}
+    logger = get_logger(__name__)
     
-    # === CORE COMPONENTS ===
-    header = create_header(
-        title="Manajemen Dependensi",
-        description="Kelola dependensi Python untuk proyek SmartCash",
-        icon="📦"
-    )
-    
-    status_panel = create_status_panel(
-        message="Siap mengelola dependensi",
-        status_type="success"
-    )
-    
-    # Create main sections
-    categories = create_categories_section(config)
-    custom_packages = create_custom_packages_section()
-    
-    # Create tab layout with consistent styling
-    tabs = widgets.Tab(children=[categories, custom_packages])
-    tabs.set_title(0, "📦 Paket")
-    tabs.set_title(1, "➕ Kustom")
-    tabs.selected_index = 0
-    tabs.layout = widgets.Layout(width='100%', margin='10px 0')
-    
-    # Create action buttons with consistent styling and tooltips
-    # Primary action button
-    install_btn = widgets.Button(
-        description='Install',
-        icon='download',
-        button_style='success',
-        tooltip='Install selected packages',
-        layout=widgets.Layout(width='auto', margin='0 5px')
-    )
-    
-    # Secondary action buttons
-    check_updates_btn = widgets.Button(
-        description='Check Updates',
-        icon='sync',
-        button_style='info',
-        tooltip='Check for package updates',
-        layout=widgets.Layout(width='auto', margin='0 5px')
-    )
-    
-    uninstall_btn = widgets.Button(
-        description='Uninstall',
-        icon='trash',
-        button_style='danger',
-        tooltip='Uninstall selected packages',
-        layout=widgets.Layout(width='auto', margin='0 5px')
-    )
-    
-    # Container for all action buttons
-    action_components = {
-        'install': install_btn,
-        'check_updates': check_updates_btn,
-        'uninstall': uninstall_btn
-    }
-    
-    action_buttons = widgets.HBox(
-        [install_btn, check_updates_btn, uninstall_btn],
-        layout=widgets.Layout(
-            margin='10px 0',
-            justify_content='flex-start',
-            width='100%',
-            flex_flow='row wrap',
-            align_items='center',
-            gap='10px'
+    try:
+        config = config or {}
+        ui_components = {}
+        
+        # === CORE COMPONENTS ===
+        header = create_header(
+            title="📦 Manajemen Dependensi",
+            description="Kelola dependensi Python untuk proyek SmartCash",
+            icon="settings"
         )
-    )
-    
-    # Create save/reset buttons with consistent styling
-    save_reset_buttons = create_save_reset_buttons(
-        save_label="💾 Simpan Konfigurasi",
-        reset_label="🔄 Reset",
-        button_width='auto',
-        container_width='100%',
-        save_tooltip="Simpan konfigurasi dependensi",
-        reset_tooltip="Reset ke konfigurasi default"
-    )
-    
-    # Use the container from save_reset_buttons
-    save_reset = save_reset_buttons['container']
-    
-    # Update the container's layout
-    save_reset.layout = widgets.Layout(
-        margin='10px 0',
-        justify_content='flex-end',
-        width='100%'
-    )
-    
-    # Create log accordion and get its components
-    log_components = create_log_accordion(
-        module_name="Dependency Management",
-        height="300px"
-    )
-    log_accordion = log_components['log_accordion']
-    
-    # Main layout with consistent spacing
-    layout = widgets.VBox(
-        children=[
+        
+        # Status panel
+        status_panel = create_status_panel()
+        
+        # Create action buttons with consistent styling
+        action_buttons = create_action_buttons(
+            primary_button={"label": "⚙️ Install Dependensi", "style": "primary"},
+            secondary_buttons=[
+                {"label": "🔄 Periksa Pembaruan", "style": "info"},
+                {"label": "🗑️ Hapus Terpilih", "style": "danger"}
+            ]
+        )
+        
+        # Initialize button references with fallbacks
+        install_btn = action_buttons.get('primary')
+        check_updates_btn = action_buttons.get('secondary_0')
+        uninstall_btn = action_buttons.get('secondary_1')
+        
+        # Fallback button creation if any are missing
+        if not install_btn:
+            install_btn = widgets.Button(
+                description='⚙️ Install Dependensi',
+                button_style='primary',
+                layout=widgets.Layout(width='auto')
+            )
+        
+        # Create main content sections
+        categories = create_categories_section(config)
+        custom_packages = create_custom_packages_section()
+        
+        # Create tab layout
+        tabs = widgets.Tab(children=[categories, custom_packages])
+        tabs.set_title(0, "📦 Paket")
+        tabs.set_title(1, "➕ Kustom")
+        tabs.selected_index = 0
+        tabs.layout = widgets.Layout(width='100%', margin='10px 0')
+        
+        # Create save/reset buttons
+        save_reset_buttons = create_save_reset_buttons()
+        save_btn = save_reset_buttons.get('save_button')
+        reset_btn = save_reset_buttons.get('reset_button')
+        
+        # Create button containers
+        action_buttons_container = widgets.HBox(
+            [install_btn, check_updates_btn, uninstall_btn],
+            layout=widgets.Layout(
+                justify_content='flex-end',
+                margin='10px 0',
+                width='100%'
+            )
+        )
+        
+        save_reset_container = widgets.HBox(
+            [save_btn, reset_btn],
+            layout=widgets.Layout(
+                justify_content='flex-end',
+                margin='10px 0',
+                width='100%'
+            )
+        )
+        
+        # Create log accordion
+        log_components = create_log_accordion()
+        log_accordion = log_components.get('accordion')
+        
+        # Main content layout
+        content = widgets.VBox([
             header,
             status_panel,
-            widgets.VBox([tabs], layout=widgets.Layout(width='100%', margin='10px 0')),
-            action_buttons,
-            save_reset,
+            widgets.HTML('<hr style="margin: 10px 0; border: 0.5px solid #e0e0e0;">'),
+            tabs,
+            widgets.HTML('<hr style="margin: 15px 0; border: 0.5px solid #e0e0e0;">'),
+            action_buttons_container,
+            save_reset_container
+        ], layout=widgets.Layout(width='100%'))
+        
+        # Combine main content and logs
+        layout = widgets.VBox([
+            content,
             log_accordion
-        ],
-        layout=widgets.Layout(
-            width='100%',
-            padding='15px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            margin='10px 0'
-        )
-    )
-    
-    # Store components with required keys
-    ui_components.update({
-        'ui': layout,  # Main UI component
-        'log_output': log_components.get('log_output'),
-        'log_accordion': log_accordion,
-        'header': header,
-        'status_panel': status_panel,  # This is the main status panel widget
-        'tabs': tabs,
-        'action_buttons': action_components,
-        'save_button': save_reset_buttons['save_button'],
-        'reset_button': save_reset_buttons['reset_button'],
-        'save_reset': save_reset
-    })
-    
-    # Initialize confirmation area if needed
-    if 'confirmation_area' not in ui_components:
+        ], layout=widgets.Layout(width='100%'))
+        
+        # Store all components
+        ui_components.update({
+            'ui': layout,
+            'log_output': log_components.get('log_output'),
+            'log_accordion': log_accordion,
+            'header': header,
+            'status_panel': status_panel,
+            'tabs': tabs,
+            'install_button': install_btn,
+            'check_updates_button': check_updates_btn,
+            'uninstall_button': uninstall_btn,
+            'save_button': save_btn,
+            'reset_button': reset_btn,
+            'action_buttons_container': action_buttons_container,
+            'save_reset_container': save_reset_container
+        })
+        
+        # Initialize confirmation area
         ui_components['confirmation_area'] = create_confirmation_area(ui_components)
         
-    # Ensure status panel is properly initialized
-    from smartcash.ui.components.status_panel import update_status_panel
-    update_status_panel(status_panel, "Siap mengelola dependensi", "success")
-    
-    return ui_components
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"Error creating dependency UI: {str(e)}", exc_info=True)
+        raise
 
 # ======================== CATEGORIES ========================
 
@@ -210,14 +188,34 @@ def create_categories_section(
         if on_package_select:
             on_package_select(package_key, is_checked)
     
+    # Create category sections
     category_sections = [
         _create_category_section(cat, selected_packages, handle_package_select)
         for cat in categories
     ]
     
+    # Create a grid layout with max 3 columns
+    grid_children = []
+    row = []
+    
+    for i, section in enumerate(category_sections):
+        row.append(section)
+        if len(row) == 3 or i == len(category_sections) - 1:
+            grid_children.append(
+                widgets.HBox(
+                    row,
+                    layout=widgets.Layout(
+                        width='100%',
+                        justify_content='space-between',
+                        margin='0 0 10px 0'
+                    )
+                )
+            )
+            row = []
+    
     return widgets.VBox([
-        widgets.HTML("<h3>Kategori Paket</h3>"),
-        widgets.VBox(category_sections, layout=widgets.Layout(width='100%'))
+        widgets.HTML("<h3 style='margin: 0 0 12px 0;'>Kategori Paket</h3>"),
+        widgets.VBox(grid_children, layout=widgets.Layout(width='100%'))
     ])
 
 def _create_category_section(
@@ -251,34 +249,77 @@ def _create_category_section(
         for pkg in category.get('packages', [])
     ]
     
-    # Create a container for the category content
+    # Create a compact container for the category content
     category_content = widgets.VBox(
         package_items,
         layout=widgets.Layout(
-            padding='10px',
+            padding='4px 6px',
             width='100%',
-            margin='5px 0'
+            margin='2px 0',
+            overflow_y='auto',
+            max_height='200px',
+            min_height='40px'
         )
     )
     
-    # Create a custom card using VBox with similar styling
+    # Create a compact card with grid layout
     card = widgets.VBox(
         [
+            # Compact category header
             widgets.HTML(
-                f"<h4 style='margin: 0 0 10px 0; padding: 0;'>{category.get('icon', '')} {category.get('name', '')}</h4>"
+                f"""
+                <div style='
+                    margin: 0 0 6px 0;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                '>
+                    <span style='font-size: 1em;'>{category.get('icon', '📦')}</span>
+                    <h4 style='margin: 0; font-size: 0.95em; color: #2c3e50;'>{category.get('name', 'Kategori')}</h4>
+                </div>
+                """
             ),
+            # Package items with scrolling
             category_content,
-            widgets.HTML(f"<div style='color: #666; font-size: 0.9em; margin-top: 10px;'>{category.get('description', '')}</div>")
+            # Compact description tooltip
+            widgets.HTML(
+                f"""
+                <div style='
+                    color: #888;
+                    font-size: 0.75em;
+                    margin-top: 4px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    width: 100%;
+                ' 
+                title='{category.get('description', '')}'>
+                    {category.get('description', '')}
+                </div>
+                """
+            )
         ],
         layout=widgets.Layout(
-            margin='10px 0',
-            width='100%',
-            border='1px solid #e0e0e0',
+            margin='0 8px 8px 0',
+            width='32%',
+            min_width='250px',
+            border='1px solid #e8e8e8',
             border_radius='6px',
-            padding='15px',
-            background='#ffffff'
+            padding='10px',
+            background='#ffffff',
+            box_shadow='0 1px 3px rgba(0,0,0,0.05)',
+            _hover='box-shadow: 0 2px 5px rgba(0,0,0,0.1);',
+            transition='all 0.15s ease-in-out',
+            flex='1 1 30%',
+            max_width='32%',
+            min_height='200px',
+            height='auto',
+            overflow='hidden'
         )
     )
+    
+    card.add_class('category-card')
     
     return card
 
@@ -295,8 +336,30 @@ def _create_package_item(
         on_select: Callback function when selection changes
         
     Returns:
-        Widget containing the package item
+        Widget containing the package item with enhanced styling
     """
+    # Create a compact container for the package item
+    package_container = widgets.HBox(
+        layout=widgets.Layout(
+            width='100%',
+            padding='2px 4px',
+            margin='1px 0',
+            border_radius='3px',
+            border='1px solid transparent',
+            _hover='background-color: #f8f9fa;',
+            transition='all 0.15s ease',
+            align_items='center',
+            height='28px',
+            overflow='hidden'
+        )
+    )
+    
+    # Add custom class for styling
+    package_container.add_class('package-item')
+    if is_checked:
+        package_container.add_style('background-color: #f0f7ff; border-color: #cce5ff;')
+    
+    # Create the checkbox with better styling
     checkbox = create_package_checkbox(
         package_name=package.get('name', ''),
         version=package.get('version', ''),

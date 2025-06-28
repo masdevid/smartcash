@@ -3,6 +3,7 @@ File: smartcash/ui/components/dialog/confirmation_dialog.py
 Deskripsi: Simple HTML glass morphism dialog di dalam confirmation area (tidak trigger dialog asli Colab)
 """
 
+from turtle import width
 from typing import Dict, Any, Callable, Optional
 import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
@@ -15,6 +16,7 @@ def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
         confirmation_area = widgets.Output(
             layout=widgets.Layout(
                 width='100%',
+                max_width='100%',
                 min_height='50px',
                 max_height='500px',
                 margin='10px 0',
@@ -27,6 +29,10 @@ def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
                 flex='1 1 auto'  # Allow expansion
             )
         )
+        # Add data attribute for easier JavaScript selection
+        confirmation_area.add_class('confirmation-area')
+        confirmation_area.layout._dom_classes = confirmation_area.layout._dom_classes or []
+        confirmation_area.layout._dom_classes.append('confirmation-area')
         ui_components['confirmation_area'] = confirmation_area
     
     return ui_components['confirmation_area']
@@ -48,11 +54,11 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         # Show confirmation area with animation
         confirmation_area.layout.display = 'block'
         confirmation_area.layout.visibility = 'visible'
-        confirmation_area.layout.height = '350px'  # Slightly more than content for padding
-        confirmation_area.layout.min_height = '350px'
-        confirmation_area.layout.max_height = '350px'
-        confirmation_area.layout.padding = '20px 0'
-        confirmation_area.layout.margin = '10px 0'
+        confirmation_area.layout.height = '250px'  # Set to 250px as requested
+        confirmation_area.layout.min_height = '250px'
+        confirmation_area.layout.max_height = '250px'
+        confirmation_area.layout.padding = '10px 0'  # Reduced padding for more compact look
+        confirmation_area.layout.margin = '5px 0'  # Reduced margin
         confirmation_area.layout.overflow = 'hidden'
         
         # Generate unique IDs untuk buttons
@@ -86,6 +92,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             width: 80%;
             margin: 0 auto;
             padding: 0;
+            overflow-x: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }}
         
@@ -126,25 +133,19 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             color: #1a202c;
             font-size: 1rem;
             font-weight: 600;
-            margin: 0 0 6px 0;
             line-height: 1.3;
             padding: 0 4px;
         }}
         
         .dialog-message-{dialog_id} {{
-            color: #4a5568;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            margin: 10px 0 20px 0;
+            color: #4b5563;
+            font-size: 14px;  # Slightly smaller font
+            line-height: 1.3;  # Tighter line height
+            margin: 10px 0 15px;  # Reduced margins
             padding: 0 10px;
+            max-height: 120px;  # Limit height for scrolling
+            overflow-y: auto;  # Add scroll if content is too long
             white-space: pre-line;
-            max-height: 180px;
-            overflow-y: auto;
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
         }}
         
         .dialog-actions-{dialog_id} {{
@@ -158,7 +159,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         .glass-btn-{dialog_id} {{
             border: none;
             border-radius: 6px;
-            padding: 6px 14px;
+            padding: 8px 16px;
             font-size: 0.8rem;
             font-weight: 500;
             cursor: pointer;
@@ -236,14 +237,16 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
         
         @media (max-width: 480px) {{
             .glass-card-{dialog_id} {{
-                padding: 16px 12px;
-                max-height: 180px;
+                padding: 15px;  # Reduced padding
+                margin: 0;
             }}
             
             .dialog-actions-{dialog_id} {{
-                flex-direction: column;
-                gap: 8px;
+                flex-direction: row;  # Buttons side by side
+                justify-content: flex-end;  # Align to right
+                gap: 10px;  # Space between buttons
                 width: 100%;
+                margin-top: 10px;  # Add some space above buttons
             }}
             
             .glass-btn-{dialog_id} {{
@@ -300,16 +303,46 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
                     }}
                     
                     setTimeout(() => {{
-                        // Trigger Python callback
+                        // First, reset the confirmation area styles in the frontend
+                        const confirmationArea = document.querySelector('.confirmation-area');
+                        if (confirmationArea) {{
+                            confirmationArea.style.transition = 'all 0.3s ease';
+                            confirmationArea.style.height = '0';
+                            confirmationArea.style.minHeight = '0';
+                            confirmationArea.style.maxHeight = '0';
+                            confirmationArea.style.padding = '0';
+                            confirmationArea.style.margin = '0';
+                            confirmationArea.style.overflow = 'hidden';
+                            confirmationArea.style.border = 'none';
+                        }}
+                        
+                        // Then trigger Python callback after a short delay
                         if (window.jupyter && window.jupyter.notebook && window.jupyter.notebook.kernel) {{
                             const code = `
 try:
     callback = ui_components.get('_confirm_callback_{confirm_id}')
     if callback:
         callback()
-    ui_components.get('confirmation_area').layout.display = 'none'
+    confirmation_area = ui_components.get('confirmation_area')
+    if confirmation_area:
+        # Reset to default values
+        confirmation_area.layout.display = 'none'
+        confirmation_area.layout.visibility = 'hidden'
+        confirmation_area.layout.height = None  # Reset to auto
+        confirmation_area.layout.min_height = '50px'  # Default min height
+        confirmation_area.layout.max_height = '500px'  # Default max height
+        confirmation_area.layout.padding = '10px'  # Default padding
+        confirmation_area.layout.margin = '10px 0'  # Default margin
+        confirmation_area.layout.overflow = 'hidden'  # Keep hidden when not in use
+        confirmation_area.layout.border = '1px solid #e0e0e0'  # Default border
+        confirmation_area.layout.border_radius = '4px'  # Default border radius
     ui_components.pop('_confirm_callback_{confirm_id}', None)
     ui_components.pop('_cancel_callback_{cancel_id}', None)
+    # Clear the output after resetting styles
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        with ui_components['confirmation_area']:
+            from IPython.display import clear_output
+            clear_output(wait=True)
 except Exception as e:
     print(f"⚠️ Error in confirm callback: {{e}}")
 `;
@@ -337,7 +370,20 @@ except Exception as e:
                     }}
                     
                     setTimeout(() => {{
-                        // Trigger Python callback
+                        // First, reset the confirmation area styles in the frontend
+                        const confirmationArea = document.querySelector('.confirmation-area');
+                        if (confirmationArea) {{
+                            confirmationArea.style.transition = 'all 0.3s ease';
+                            confirmationArea.style.height = '0';
+                            confirmationArea.style.minHeight = '0';
+                            confirmationArea.style.maxHeight = '0';
+                            confirmationArea.style.padding = '0';
+                            confirmationArea.style.margin = '0';
+                            confirmationArea.style.overflow = 'hidden';
+                            confirmationArea.style.border = 'none';
+                        }}
+                        
+                        // Then trigger Python callback after a short delay
                         if (window.jupyter && window.jupyter.notebook && window.jupyter.notebook.kernel) {{
                             const code = `
 try:
@@ -346,16 +392,24 @@ try:
         callback()
     confirmation_area = ui_components.get('confirmation_area')
     if confirmation_area:
+        # Reset to default values instead of 0
         confirmation_area.layout.display = 'none'
         confirmation_area.layout.visibility = 'hidden'
-        confirmation_area.layout.height = '0'
-        confirmation_area.layout.min_height = '0'
-        confirmation_area.layout.max_height = '0'
-        confirmation_area.layout.padding = '0'
-        confirmation_area.layout.margin = '0'
-        confirmation_area.layout.overflow = 'hidden'
+        confirmation_area.layout.height = None  # Reset to auto
+        confirmation_area.layout.min_height = '50px'  # Default min height
+        confirmation_area.layout.max_height = '500px'  # Default max height
+        confirmation_area.layout.padding = '10px'  # Default padding
+        confirmation_area.layout.margin = '10px 0'  # Default margin
+        confirmation_area.layout.overflow = 'hidden'  # Keep hidden when not in use
+        confirmation_area.layout.border = '1px solid #e0e0e0'  # Default border
+        confirmation_area.layout.border_radius = '4px'  # Default border radius
     ui_components.pop('_confirm_callback_{confirm_id}', None)
     ui_components.pop('_cancel_callback_{cancel_id}', None)
+    # Clear the output after resetting styles
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        with ui_components['confirmation_area']:
+            from IPython.display import clear_output
+            clear_output(wait=True)
 except Exception as e:
     print(f"⚠️ Error in cancel callback: {{e}}")
 `;

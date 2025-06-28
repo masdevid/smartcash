@@ -93,7 +93,7 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     child_components['action_components'] = action_components
     
     # Confirmation area
-    confirmation_area, _ = create_confirmation_area()
+    confirmation_area, _ = create_confirmation_area(ui_components=child_components)
     child_components['confirmation_area'] = confirmation_area
     
     # Create action section

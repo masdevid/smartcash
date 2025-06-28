@@ -58,8 +58,8 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Initialize ui_components dictionary
     ui_components = {}
     
-    # Create confirmation area first
-    confirmation_area = create_confirmation_area(ui_components)
+    # Create confirmation area first with ui_components
+    confirmation_area = create_confirmation_area(ui_components=ui_components)
     
     # Header and status panel with consistent styling
     header = create_header(

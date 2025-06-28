@@ -87,7 +87,7 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
         main_ui = widgets.VBox([
             header,
             input_options['ui'],
-            action_buttons['container'],
+            action_buttons['container'],  # Changed from action_buttons['ui']
             status_panel,
             progress_tracker['ui'] if isinstance(progress_tracker, dict) else progress_tracker,
             log_output
@@ -98,6 +98,7 @@ def create_pretrained_main_ui(config: Dict[str, Any], **kwargs) -> Dict[str, Any
             'ui': main_ui,  # Main UI component
             'header': header,
             'status_panel': status_panel,
+            'action_buttons_container': action_buttons['container'],  # Store container reference
             'action_buttons': action_buttons,
             'progress_tracker': progress_tracker,
             'log_output': log_output,

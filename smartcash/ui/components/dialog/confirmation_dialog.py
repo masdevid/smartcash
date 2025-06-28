@@ -13,8 +13,11 @@ def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
     """Buat area konfirmasi yang simple"""
     
     if 'confirmation_area' not in ui_components or not isinstance(ui_components['confirmation_area'], widgets.Output):
-        # Create layout with proper CSS classes
-        layout = widgets.Layout(
+        # Create the output widget first
+        confirmation_area = widgets.Output()
+        
+        # Set layout with proper CSS classes
+        confirmation_area.layout = widgets.Layout(
             width='100%',
             max_width='100%',
             min_height='50px',
@@ -29,16 +32,16 @@ def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
             flex='1 1 auto'  # Allow expansion
         )
         
-        # Create the output widget
-        confirmation_area = widgets.Output(layout=layout)
-        
         # Add class using the proper method
         if hasattr(confirmation_area, 'add_class'):
             confirmation_area.add_class('confirmation-area')
         else:
             # Fallback for older ipywidgets versions
-            confirmation_area.add_class('confirmation-area')
-            
+            try:
+                confirmation_area.add_class('confirmation-area')
+            except Exception:
+                pass  # Ignore if add_class is not available
+                
         ui_components['confirmation_area'] = confirmation_area
     
     return ui_components['confirmation_area']

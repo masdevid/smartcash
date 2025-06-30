@@ -24,15 +24,47 @@ class ConfigCellHandler:
         self.listeners: List[Callable] = []
         self._setup_config_file()
     
-    def _setup_config_file(self) -> None:
-        """Setup config file path and load if exists"""
-        config_dir = os.path.join(os.getcwd(), 'config')
-        os.makedirs(config_dir, exist_ok=True)
+    def _get_configs_directory(self) -> str:
+        """Get the configuration directory path.
         
-        filename = f"{self.parent_module}_{self.module_name}.yaml" if self.parent_module else f"{self.module_name}.yaml"
-        self.file_path = os.path.join(config_dir, filename)
+        Returns:
+            str: Path to the configs directory
+        """
+        from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS
         
-        if os.path.exists(self.file_path):
+        # Find the configs directory from REQUIRED_FOLDERS
+        configs_dir = next((d for d in REQUIRED_FOLDERS if d.endswith('configs')), None)
+        if not configs_dir:
+            configs_dir = os.path.join(os.getcwd(), 'configs')
+            
+        os.makedirs(configs_dir, exist_ok=True)
+        return configs_dir
+        
+    def _get_config_filename(self) -> str:
+        """Generate the configuration filename.
+        
+        Returns:
+            str: The generated filename
+        """
+        if self.parent_module:
+            return f"{self.parent_module}_{self.module_name}.yaml"
+        return f"{self.module_name}.yaml"
+    
+    def _setup_config_file(self, filename: str = None, load_config: bool = True) -> None:
+        """Setup config file path and optionally load if exists.
+        
+        Args:
+            filename: Optional custom filename (without path). If None, uses default naming.
+            load_config: Whether to automatically load the config if file exists.
+        """
+        configs_dir = self._get_configs_directory()
+        
+        if filename is None:
+            filename = self._get_config_filename()
+            
+        self.file_path = os.path.join(configs_dir, filename)
+        
+        if load_config and os.path.exists(self.file_path):
             self.load()
     
     def load(self) -> Dict[str, Any]:

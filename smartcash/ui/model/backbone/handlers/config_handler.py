@@ -170,16 +170,9 @@ class BackboneConfigHandler(ConfigCellHandler):
     
     def _setup_config_file(self) -> None:
         """Set up the configuration file path using fixed model_config.yaml"""
-        import os
-        
-        # Use fixed filename model_config.yaml
-        config_dir = os.path.join(os.getcwd(), 'config')
-        os.makedirs(config_dir, exist_ok=True)
-        self.file_path = os.path.join(config_dir, 'model_config.yaml')
+        # Use parent's implementation with custom filename
+        super()._setup_config_file(filename='model_config.yaml')
         
         # Log the file path
-        self.logger_bridge.info(f"Using config file: {self.file_path}")
-        
-        # Load if exists
-        if os.path.exists(self.file_path):
-            self.load()
+        if hasattr(self, 'logger_bridge'):
+            self.logger_bridge.info(f"Using config file: {self.file_path}")

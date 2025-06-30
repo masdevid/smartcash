@@ -3,8 +3,14 @@ File: smartcash/ui/dataset/downloader/handlers/download_handler.py
 Deskripsi: Simplified download handler dengan shared dialog API seperti preprocessing
 """
 
-from typing import Dict, Any
-from smartcash.ui.dataset.downloader.utils.ui_utils import clear_outputs, handle_ui_error, show_ui_success, log_to_accordion
+from typing import Dict, Any, Optional
+from smartcash.ui.dataset.downloader.handlers.error_handling import (
+    with_downloader_error_handling,
+    handle_downloader_error,
+    DOWNLOAD_CONTEXT,
+    CLEANUP_CONTEXT
+)
+from smartcash.ui.dataset.downloader.utils.ui_utils import clear_outputs, log_to_accordion
 from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
 from smartcash.ui.dataset.downloader.utils.progress_utils import create_progress_callback
 from smartcash.ui.dataset.downloader.utils.backend_utils import check_existing_dataset, create_backend_downloader, get_cleanup_targets, create_backend_cleanup_service
@@ -20,6 +26,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
     
     return ui_components
 
+@with_downloader_error_handling(operation="setup_download_handler")
 def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
     """Setup download handler dengan dialog confirmation"""
     
@@ -35,7 +42,9 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
             validation = config_handler.validate_config(ui_config)
             
             if not validation['valid']:
-                handle_ui_error(ui_components, f"Config tidak valid: {', '.join(validation['errors'])}", button_manager)
+                error_msg = f"Config tidak valid: {', '.join(validation['errors'])}"
+                log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
+                button_manager.enable_buttons()
                 return
             
             # Check existing dataset
@@ -47,12 +56,19 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                 _execute_download_operation(ui_components, ui_config, button_manager)
                 
         except Exception as e:
-            handle_ui_error(ui_components, f"Error download handler: {str(e)}", button_manager)
+            handle_downloader_error(
+                e,
+                DOWNLOAD_CONTEXT,
+                logger=ui_components.get('logger_bridge'),
+                ui_components=ui_components
+            )
+            button_manager.enable_buttons()
     
     download_button = ui_components.get('download_button')
     if download_button:
         download_button.on_click(execute_download)
 
+@with_downloader_error_handling(operation="setup_check_handler")
 def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
     """Setup check handler dengan backend scanner"""
     
@@ -62,28 +78,32 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
         button_manager.disable_buttons('check_button')
         
         try:
-            _setup_progress_tracker(ui_components, "Dataset Check")
+            # Check existing dataset
+            has_existing, total_images, summary_data = check_existing_dataset(
+                ui_components.get('logger_bridge')
+            )
             
-            from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
-            scanner = create_dataset_scanner(ui_components.get('logger_bridge'))
-            scanner.set_progress_callback(ui_components['progress_callback'])
-            
-            result = scanner.scan_existing_dataset_parallel()
-            
-            if result.get('status') == 'success':
+            if has_existing and summary_data:
                 from smartcash.ui.dataset.downloader.utils.ui_utils import display_check_results
-                display_check_results(ui_components, result)
-                show_ui_success(ui_components, "Dataset check selesai", button_manager)
+                display_check_results(ui_components, summary_data)
             else:
-                handle_ui_error(ui_components, result.get('message', 'Scan failed'), button_manager)
+                log_to_accordion(ui_components, "ℹ️ Tidak ada dataset yang ditemukan", 'info')
                 
         except Exception as e:
-            handle_ui_error(ui_components, f"Error check handler: {str(e)}", button_manager)
+            handle_downloader_error(
+                e,
+                DOWNLOAD_CONTEXT._replace(operation="check_dataset"),
+                logger=ui_components.get('logger_bridge'),
+                ui_components=ui_components
+            )
+        finally:
+            button_manager.enable_buttons()
     
-    check_button = ui_components.get('check_button')
-    if check_button:
-        check_button.on_click(execute_check)
+    # Register handler
+    if 'check_button' in ui_components and ui_components['check_button']:
+        ui_components['check_button'].on_click(execute_check)
 
+@with_downloader_error_handling(operation="setup_cleanup_handler")
 def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
     """Setup cleanup handler dengan dialog confirmation"""
     
@@ -94,76 +114,91 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], config: Dict[str, Any])
         
         try:
             # Get cleanup targets
-            targets_result = get_cleanup_targets(ui_components.get('logger'))
+            targets_result = get_cleanup_targets(ui_components.get('logger_bridge'))
             
-            if targets_result.get('status') != 'success':
-                handle_ui_error(ui_components, "Gagal mendapatkan cleanup targets", button_manager)
-                return
-            
-            summary = targets_result.get('summary', {})
-            total_files = summary.get('total_files', 0)
-            
-            if total_files == 0:
-                show_ui_success(ui_components, "Tidak ada file untuk dibersihkan", button_manager)
-                return
-            
-            # Show confirmation dengan shared dialog
-            _show_cleanup_confirmation(ui_components, targets_result)
-            
+            if targets_result.get('has_targets', False):
+                _show_cleanup_confirmation(ui_components, targets_result)
+            else:
+                log_to_accordion(ui_components, "ℹ️ Tidak ada target cleanup yang ditemukan", 'info')
+                
         except Exception as e:
-            handle_ui_error(ui_components, f"Error cleanup handler: {str(e)}", button_manager)
+            handle_downloader_error(
+                e,
+                CLEANUP_CONTEXT._replace(operation="check_cleanup_targets"),
+                logger=ui_components.get('logger_bridge'),
+                ui_components=ui_components
+            )
+        finally:
+            button_manager.enable_buttons()
     
-    cleanup_button = ui_components.get('cleanup_button')
-    if cleanup_button:
-        cleanup_button.on_click(execute_cleanup)
+    # Register handler
+    if 'cleanup_button' in ui_components and ui_components['cleanup_button']:
+        ui_components['cleanup_button'].on_click(execute_cleanup)
 
+@with_downloader_error_handling(operation="setup_config_handlers")
 def setup_config_handlers(ui_components: Dict[str, Any]):
     """Setup save/reset handlers"""
     
     def save_config_handler(button=None):
+        button_manager = get_button_manager(ui_components)
+        clear_outputs(ui_components)
+        button_manager.disable_buttons('save_button')
+        
         try:
             config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "Config handler tidak tersedia")
-                return
-            
-            # Set UI components untuk logging
-            if hasattr(config_handler, 'set_ui_components'):
-                config_handler.set_ui_components(ui_components)
-            
-            success = config_handler.save_config(ui_components)
-            if success:
-                show_ui_success(ui_components, "✅ Konfigurasi berhasil disimpan")
+            if config_handler:
+                result = config_handler.save_config(ui_components)
+                if result.get('success'):
+                    log_to_accordion(ui_components, "✅ Konfigurasi berhasil disimpan", 'success')
+                else:
+                    error_msg = f"Gagal menyimpan konfigurasi: {result.get('error')}"
+                    log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
             else:
-                handle_ui_error(ui_components, "❌ Gagal menyimpan konfigurasi")
+                log_to_accordion(ui_components, "❌ Config handler tidak tersedia", 'error')
+                
         except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error saat save: {str(e)}")
+            handle_downloader_error(
+                e,
+                DOWNLOAD_CONTEXT._replace(operation="save_config"),
+                logger=ui_components.get('logger_bridge'),
+                ui_components=ui_components
+            )
+        finally:
+            button_manager.enable_buttons()
     
     def reset_config_handler(button=None):
+        button_manager = get_button_manager(ui_components)
+        clear_outputs(ui_components)
+        button_manager.disable_buttons('reset_button')
+        
         try:
             config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                handle_ui_error(ui_components, "Config handler tidak tersedia")
-                return
-            
-            # Set UI components untuk logging
-            if hasattr(config_handler, 'set_ui_components'):
-                config_handler.set_ui_components(ui_components)
-            
-            success = config_handler.reset_config(ui_components)
-            if success:
-                show_ui_success(ui_components, "🔄 Konfigurasi berhasil direset")
+            if config_handler:
+                result = config_handler.reset_config(ui_components)
+                if result.get('success'):
+                    log_to_accordion(ui_components, "✅ Konfigurasi berhasil direset ke default", 'success')
+                else:
+                    error_msg = f"Gagal mereset konfigurasi: {result.get('error')}"
+                    log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
             else:
-                handle_ui_error(ui_components, "❌ Gagal reset konfigurasi")
+                log_to_accordion(ui_components, "❌ Config handler tidak tersedia", 'error')
+                
         except Exception as e:
-            handle_ui_error(ui_components, f"❌ Error saat reset: {str(e)}")
+            handle_downloader_error(
+                e,
+                DOWNLOAD_CONTEXT._replace(operation="reset_config"),
+                logger=ui_components.get('logger_bridge'),
+                ui_components=ui_components
+            )
+        finally:
+            button_manager.enable_buttons()
     
-    save_button = ui_components.get('save_button')
-    reset_button = ui_components.get('reset_button')
-    if save_button:
-        save_button.on_click(save_config_handler)
-    if reset_button:
-        reset_button.on_click(reset_config_handler)
+    # Register handlers
+    if 'save_button' in ui_components and ui_components['save_button']:
+        ui_components['save_button'].on_click(save_config_handler)
+    
+    if 'reset_button' in ui_components and ui_components['reset_button']:
+        ui_components['reset_button'].on_click(reset_config_handler)
 
 # === CONFIRMATION HANDLERS ===
 
@@ -297,72 +332,87 @@ def _hide_confirmation_area(ui_components: Dict[str, Any]):
 
 # === EXECUTION HELPERS ===
 
+@with_downloader_error_handling(operation="execute_download_operation")
 def _execute_download_operation(ui_components: Dict[str, Any], ui_config: Dict[str, Any], button_manager):
     """Execute download operation dengan backend service"""
     try:
-        logger = ui_components.get('logger')
-        _setup_progress_tracker(ui_components, "Dataset Download")
+        # Setup progress tracker
+        _setup_progress_tracker(ui_components, "download")
         
-        # Create downloader
-        downloader = create_backend_downloader(ui_config, logger)
+        # Create downloader instance
+        downloader = create_backend_downloader(
+            ui_config,
+            ui_components.get('logger_bridge')
+        )
+        
         if not downloader:
-            handle_ui_error(ui_components, "Gagal membuat download service", button_manager)
-            return
-        
-        # Setup progress callback
-        if hasattr(downloader, 'set_progress_callback'):
-            downloader.set_progress_callback(ui_components['progress_callback'])
-        
-        # Log config
-        from smartcash.ui.dataset.downloader.utils.ui_utils import log_download_config
-        log_download_config(ui_components, ui_config)
-        
-        if logger:
-            logger.info("🚀 Memulai download dataset")
+            raise ValueError("Gagal membuat downloader instance")
         
         # Execute download
         result = downloader.download_dataset()
         
-        if result and result.get('status') == 'success':
-            from smartcash.ui.dataset.downloader.utils.ui_utils import show_download_success
-            show_download_success(ui_components, result)
-            show_ui_success(ui_components, "Download berhasil", button_manager)
+        if result.get('success'):
+            log_to_accordion(ui_components, "✅ Download selesai", 'success')
+            
+            # Tampilkan summary
+            if 'summary' in result:
+                from smartcash.ui.dataset.downloader.utils.ui_utils import display_check_results
+                display_check_results(ui_components, result['summary'])
         else:
-            error_msg = result.get('message', 'Download gagal') if result else 'No response from service'
-            handle_ui_error(ui_components, error_msg, button_manager)
+            error_msg = result.get('error', 'Gagal mendownload dataset')
+            log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
+            raise Exception(error_msg)
             
     except Exception as e:
-        handle_ui_error(ui_components, f"Error download operation: {str(e)}", button_manager)
+        handle_downloader_error(
+            e,
+            DOWNLOAD_CONTEXT._replace(operation="download_dataset"),
+            logger=ui_components.get('logger_bridge'),
+            ui_components=ui_components
+        )
+        raise
+    finally:
+        if button_manager:
+            button_manager.enable_buttons()
 
+@with_downloader_error_handling(operation="execute_cleanup_operation")
 def _execute_cleanup_operation(ui_components: Dict[str, Any], targets_result: Dict[str, Any], button_manager):
     """Execute cleanup operation dengan backend service"""
     try:
-        logger = ui_components.get('logger')
-        _setup_progress_tracker(ui_components, "Dataset Cleanup")
+        # Setup progress tracker
+        _setup_progress_tracker(ui_components, "cleanup")
         
         # Create cleanup service
-        cleanup_service = create_backend_cleanup_service(logger)
+        cleanup_service = create_backend_cleanup_service(ui_components.get('logger_bridge'))
+        
         if not cleanup_service:
-            handle_ui_error(ui_components, "Gagal membuat cleanup service", button_manager)
-            return
-        
-        # Setup progress callback
-        cleanup_service.set_progress_callback(ui_components['progress_callback'])
-        
-        if logger:
-            logger.info("🧹 Memulai cleanup dataset")
+            raise ValueError("Gagal membuat cleanup service")
         
         # Execute cleanup
-        result = cleanup_service.cleanup_dataset_files(targets_result.get('targets', {}))
+        result = cleanup_service.cleanup(targets_result.get('targets', []))
         
-        if result.get('status') == 'success':
-            cleaned_count = len(result.get('cleaned_targets', []))
-            show_ui_success(ui_components, f"Cleanup selesai: {cleaned_count} direktori dibersihkan", button_manager)
+        if result.get('success'):
+            log_to_accordion(ui_components, "✅ Cleanup selesai", 'success')
+            
+            # Tampilkan summary
+            if 'summary' in result:
+                log_to_accordion(ui_components, result['summary'], 'info')
         else:
-            handle_ui_error(ui_components, result.get('message', 'Cleanup failed'), button_manager)
+            error_msg = result.get('error', 'Gagal membersihkan dataset')
+            log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
+            raise Exception(error_msg)
             
     except Exception as e:
-        handle_ui_error(ui_components, f"Error cleanup operation: {str(e)}", button_manager)
+        handle_downloader_error(
+            e,
+            CLEANUP_CONTEXT._replace(operation="cleanup_dataset"),
+            logger=ui_components.get('logger_bridge'),
+            ui_components=ui_components
+        )
+        raise
+    finally:
+        if button_manager:
+            button_manager.enable_buttons()
 
 def _setup_progress_tracker(ui_components: Dict[str, Any], operation_name: str):
     """Setup progress tracker untuk operation"""

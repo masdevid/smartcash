@@ -7,7 +7,7 @@ Deskripsi: Konstanta untuk environment configuration
 REQUIRED_FOLDERS = [
     '/content/smartcash',
     '/content/smartcash/data',
-    '/content/smartcash/data/download',
+    '/content/smartcash/data/downloads',
     '/content/smartcash/data/backup',
     '/content/smartcash/data/train',
     '/content/smartcash/data/test',

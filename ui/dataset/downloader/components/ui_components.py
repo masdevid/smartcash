@@ -6,9 +6,8 @@ Deskripsi: Fixed UI components dengan confirmation area yang visible
 import ipywidgets as widgets
 from typing import Dict, Any
 from smartcash.ui.components import create_header
-from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.components import (
-    create_action_buttons, create_dual_progress_tracker, create_divider,
+    create_action_buttons, create_dual_progress_tracker,
     create_status_panel, create_log_accordion, create_save_reset_buttons
 )
 from smartcash.ui.components.dialog import create_confirmation_area
@@ -19,10 +18,7 @@ def create_downloader_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Create main downloader UI dengan visible confirmation area"""
     # Initialize ui_components dictionary to store all UI components
     ui_components = {}
-    
-    get_icon = lambda key, fallback="📥": ICONS.get(key, fallback) if 'ICONS' in globals() else fallback
-    get_color = lambda key, fallback="#333": COLORS.get(key, fallback) if 'COLORS' in globals() else fallback
-    
+
     # Header
     header = create_header(
         "Dataset Downloader", 

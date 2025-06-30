@@ -3,7 +3,7 @@ File: smartcash/ui/dataset/downloader/utils/ui_utils.py
 Deskripsi: Optimized UI utilities untuk download operations dengan confirmation management
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 def log_download_config(ui_components: Dict[str, Any], config: Dict[str, Any]):
     """Log download configuration dalam format yang rapi"""
@@ -119,75 +119,8 @@ def clear_outputs(ui_components: Dict[str, Any]):
         with ui_components['log_output']:
             ui_components['log_output'].clear_output(wait=True)
 
-def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, button_manager=None):
-    """Handle error dengan UI updates dan proper state reset
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        error_msg: Pesan error yang akan ditampilkan
-        button_manager: Manager untuk mengontrol state tombol (opsional)
-    """
-    from smartcash.ui.utils.fallback_utils import show_status_safe
-    
-    # Gunakan logger_bridge untuk logging
-    logger_bridge = ui_components.get('logger_bridge')
-    if logger_bridge:
-        logger_bridge.error(f"❌ {error_msg}")
-    
-    # Update progress tracker
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        if hasattr(progress_tracker, 'error'):
-            progress_tracker.error(error_msg)
-        elif hasattr(progress_tracker, 'reset'):
-            progress_tracker.reset()
-    
-    # Log to accordion
-    log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
-    
-    # Show status
-    show_status_safe(error_msg, 'error', ui_components)
-    
-    # Hide confirmation area
-    hide_confirmation_area(ui_components)
-    
-    # Enable buttons
-    if button_manager:
-        button_manager.enable_buttons()
-
-def show_ui_success(ui_components: Dict[str, Any], message: str, button_manager=None):
-    """Show success dengan UI updates
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        message: Pesan sukses yang akan ditampilkan
-        button_manager: Manager untuk mengontrol state tombol (opsional)
-    """
-    from smartcash.ui.utils.fallback_utils import show_status_safe
-    
-    # Gunakan logger_bridge untuk logging
-    logger_bridge = ui_components.get('logger_bridge')
-    if logger_bridge:
-        logger_bridge.info(f"✅ {message}")
-    
-    # Update progress tracker
-    progress_tracker = ui_components.get('progress_tracker')
-    if progress_tracker:
-        if hasattr(progress_tracker, 'complete'):
-            progress_tracker.complete(message)
-    
-    # Log to accordion
-    log_to_accordion(ui_components, f"✅ {message}", 'success')
-    
-    # Show status
-    show_status_safe(message, 'success', ui_components)
-    
-    # Hide confirmation area
-    hide_confirmation_area(ui_components)
-    
-    # Enable buttons
-    if button_manager:
-        button_manager.enable_buttons()
+# Error handling has been moved to error_handling.py
+# Please use the centralized error handling utilities from there
 
 # === CONFIRMATION AREA MANAGEMENT ===
 

@@ -17,7 +17,14 @@ class TestBackboneConfigHandler:
         temp_dir = tempfile.mkdtemp()
         original_dir = os.getcwd()
         os.chdir(temp_dir)
-        os.makedirs('config', exist_ok=True)
+        
+        # Create configs directory instead of config
+        configs_dir = os.path.join(temp_dir, 'configs')
+        os.makedirs(configs_dir, exist_ok=True)
+        
+        # Also create a model_config.yaml file for testing
+        with open(os.path.join(configs_dir, 'model_config.yaml'), 'w') as f:
+            f.write("model:\n  name: test_model\n")
         
         yield temp_dir
         

@@ -17,10 +17,13 @@ class TestBackboneInitializer:
         temp_dir = tempfile.mkdtemp()
         original_dir = os.getcwd()
         os.chdir(temp_dir)
-        os.makedirs('config', exist_ok=True)
+        
+        # Create configs directory instead of config
+        configs_dir = os.path.join(temp_dir, 'configs')
+        os.makedirs(configs_dir, exist_ok=True)
         
         # Create a minimal config file
-        with open('config/model_config.yaml', 'w') as f:
+        with open(os.path.join(configs_dir, 'model_config.yaml'), 'w') as f:
             f.write("""
             model:
               backbone: test_backbone

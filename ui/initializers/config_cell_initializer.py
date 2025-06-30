@@ -522,14 +522,18 @@ class ConfigCellInitializer(Generic[T], ABC):
                 )
                 children.append(info_container)
 
+            # Create main container with consistent styling
             main_container = widgets.VBox(
                 children=children,
                 layout=widgets.Layout(
                     width='100%',
+                    max_width='1200px',
                     padding='15px',
                     gap='10px',
-                    border='1px solid #ddd',
-                    border_radius='8px'
+                    border='1px solid #e0e0e0',
+                    border_radius='8px',
+                    margin='10px auto',
+                    box_shadow='0 1px 3px rgba(0,0,0,0.1)'
                 )
             )
             

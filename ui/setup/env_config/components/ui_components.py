@@ -126,23 +126,40 @@ def create_env_config_ui() -> Dict[str, Any]:
         progress_container = ipywidgets.VBox()
         ui_components['progress_container'] = progress_container
     
-    # Create main container
-    main_container = ipywidgets.VBox([
+    # Create main container sections
+    # Top section - Header and status
+    top_section = ipywidgets.VBox([
         header,
         status_panel,
-        setup_button_container,
-        progress_container,  # Use the validated progress container
-        log_accordion['log_accordion'],  # Use the accordion widget from the dictionary
-        create_divider(),
+        setup_button_container
+    ])
+    
+    # Middle section - Progress and logs
+    middle_section = ipywidgets.VBox([
+        progress_container,
+        log_accordion['log_accordion']
+    ])
+    
+    # Bottom section - Info and summary
+    bottom_section = ipywidgets.VBox([
         setup_summary,
         env_info_panel,
         tips_requirements
-    ], layout=ipywidgets.Layout(
-        width='100%',
-        padding='15px',
-        border='1px solid #ddd',
-        border_radius='8px'
-    ))
+    ])
+    
+    # Main container with consistent styling
+    main_container = ipywidgets.VBox(
+        [top_section, middle_section, bottom_section],
+        layout=ipywidgets.Layout(
+            width='100%',
+            max_width='1200px',
+            padding='15px',
+            border='1px solid #e0e0e0',
+            border_radius='8px',
+            margin='10px auto',
+            box_shadow='0 1px 3px rgba(0,0,0,0.1)'
+        )
+    )
     
     # Store the log components for later use
     ui_components['log_components'] = log_accordion

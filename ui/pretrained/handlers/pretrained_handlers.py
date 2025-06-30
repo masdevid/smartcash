@@ -4,16 +4,67 @@ File: smartcash/ui/pretrained/handlers/pretrained_handlers.py
 Deskripsi: Complete handlers untuk pretrained module dengan DRY patterns
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional, TYPE_CHECKING
+from pathlib import Path
+import logging
+
+# Import with type checking to avoid circular imports
+if TYPE_CHECKING:
+    from smartcash.ui.utils.logger_bridge import UILoggerBridge
+    LoggerBridge = UILoggerBridge
+else:
+    LoggerBridge = Any
+
 from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
 from smartcash.ui.pretrained.services.model_checker import PretrainedModelChecker
 from smartcash.ui.pretrained.services.model_downloader import PretrainedModelDownloader
 from smartcash.ui.pretrained.services.model_syncer import PretrainedModelSyncer
-from smartcash.common.logger import get_logger
+from smartcash.ui.utils.error_utils import with_error_handling, log_errors, create_error_context
 
-logger = get_logger(__name__)
+@with_error_handling
+@log_errors
+class PretrainedHandlers:
+    """Centralized handlers for pretrained module operations"""
+    
+    def __init__(self, ui_components: Dict[str, Any], logger_bridge: Optional[LoggerBridge] = None):
+        """Initialize pretrained handlers
+        
+        Args:
+            ui_components: Dictionary containing UI components
+            logger_bridge: Optional logger bridge instance
+        """
+        self.ui_components = ui_components
+        self.logger_bridge = logger_bridge or ui_components.get('logger_bridge')
+        self._setup_handlers()
+    
+    def _log(self, message: str, level: str = "info", **kwargs):
+        """Log message using logger_bridge if available
+        
+        Args:
+            message: Message to log
+            level: Log level ('debug', 'info', 'warning', 'error')
+            **kwargs: Additional logging arguments
+        """
+        if not self.logger_bridge:
+            return
+            
+        log_method = getattr(self.logger_bridge, level.lower(), None)
+        if log_method and callable(log_method):
+            log_method(message, **kwargs)
+    
+    def _create_error_context(self, **kwargs) -> Dict[str, Any]:
+        """Create consistent error context
+        
+        Returns:
+            Dictionary containing error context
+        """
+        return create_error_context(
+            module="pretrained_handlers",
+            **kwargs
+        )
 
-def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env: str = None, **kwargs) -> Dict[str, Any]:
+def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], 
+                           env: str = None, **kwargs) -> Dict[str, Any]:
     """🔧 Setup handlers dengan complete workflow patterns
     
     Args:
@@ -26,7 +77,10 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
         Dictionary UI components yang sudah di-update dengan handlers
     """
     try:
-        # Initialize handlers dan services
+        # Initialize handlers
+        handlers = PretrainedHandlers(ui_components)
+        
+        # Initialize services with logger bridge
         config_handler = PretrainedConfigHandler()
         model_checker = PretrainedModelChecker()
         model_downloader = PretrainedModelDownloader()
@@ -45,67 +99,29 @@ def setup_pretrained_handlers(ui_components: Dict[str, Any], config: Dict[str, A
             'model_downloader': model_downloader,
             'model_syncer': model_syncer,
             'handlers': {
-                'download_sync': _handle_download_sync
-            }
+                'download_sync': _handle_download_sync,
+                'pretrained_handlers': handlers
+            },
+            'logger_bridge': handlers.logger_bridge
         })
         
+        handlers._log("✅ Pretrained handlers initialized successfully", "info")
         return ui_components
         
     except Exception as e:
-        logger.error("Error setting up pretrained handlers", exc_info=True)
-        return ui_components
+        error_ctx = create_error_context(
+            module="pretrained_handlers",
+            function="setup_pretrained_handlers",
+            error=str(e)
+        )
+        if 'logger_bridge' in ui_components:
+            ui_components['logger_bridge'].error(
+                f"❌ Failed to setup pretrained handlers: {str(e)}",
+                exc_info=True,
+                extra=error_ctx
+            )
+        raise
 
-def _setup_config_handlers(ui_components: Dict[str, Any]):
-    """Setup save/reset handlers dengan UI logging"""
-    
-    def save_config(button=None):
-        _clear_outputs(ui_components)
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                _log_to_ui(ui_components, "❌ Config handler tidak tersedia", "error")
-                return
-            
-            if hasattr(config_handler, 'set_ui_components'):
-                config_handler.set_ui_components(ui_components)
-            
-            config_handler.save_config(ui_components)
-        except Exception as e:
-            _log_to_ui(ui_components, f"❌ Error save: {str(e)}", "error")
-    
-    def reset_config(button=None):
-        _clear_outputs(ui_components)
-        try:
-            config_handler = ui_components.get('config_handler')
-            if not config_handler:
-                _log_to_ui(ui_components, "❌ Config handler tidak tersedia", "error")
-                return
-            
-            if hasattr(config_handler, 'set_ui_components'):
-                config_handler.set_ui_components(ui_components)
-            
-            config_handler.reset_config(ui_components)
-        except Exception as e:
-            _log_to_ui(ui_components, f"❌ Error reset: {str(e)}", "error")
-    
-    # Bind handlers
-    if save_button := ui_components.get('save_button'):
-        save_button.on_click(save_config)
-    if reset_button := ui_components.get('reset_button'):
-        reset_button.on_click(reset_config)
-
-def _setup_operation_handlers(ui_components: Dict[str, Any]):
-    """Setup operation handlers dengan confirmation workflow"""
-    
-    def download_sync_handler(button=None):
-        return _handle_download_sync_with_confirmation(ui_components)
-    
-    if download_sync_button := ui_components.get('download_sync_button'):
-        download_sync_button.on_click(download_sync_handler)
-
-def _handle_download_sync_with_confirmation(ui_components: Dict[str, Any]) -> bool:
-    """Handle download/sync dengan confirmation pattern"""
-    try:
         _clear_outputs(ui_components)
         
         if _should_execute_download_sync(ui_components):

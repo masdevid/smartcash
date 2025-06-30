@@ -34,7 +34,7 @@ class BasePreprocessingHandler(ABC):
     # === ERROR HANDLING ===
     
     def _handle_error(self, error: Exception, context: str = "Operation failed") -> None:
-        """Handle and propagate errors to CommonInitializer
+        """Handle and propagate errors using CommonInitializer's error handling
         
         Args:
             error: The exception that was raised
@@ -42,17 +42,29 @@ class BasePreprocessingHandler(ABC):
         """
         error_msg = f"{context}: {str(error)}"
         
-        # Log the error with traceback
-        self.logger.error(error_msg, exc_info=True)
-        
-        # Update UI status
-        update_status_panel_enhanced(self.ui_components, f"❌ {context}", 'error')
-        
-        # If we have access to the initializer, let it handle the error
+        # Try to use CommonInitializer's error handling if available
         if hasattr(self, 'initializer') and self.initializer:
-            self.initializer.handle_error(error, context=context)
-        else:
-            # Otherwise, re-raise to propagate up
+            if hasattr(self.initializer, '_handle_error'):
+                self.initializer._handle_error(error_msg, exc_info=True, context=context)
+                return
+            elif hasattr(self.initializer, 'handle_error'):
+                self.initializer.handle_error(error, context=context)
+                return
+        
+        # Fallback to basic error handling
+        try:
+            # Log the error with traceback
+            self.logger.error(error_msg, exc_info=True)
+            
+            # Update UI status
+            update_status_panel_enhanced(self.ui_components, f"❌ {context}", 'error')
+            
+            # Re-raise to propagate up
+            raise error
+            
+        except Exception as e:
+            # Last resort: log and re-raise
+            self.logger.exception("Error in _handle_error fallback")
             raise error
     
     def setup_with_initializer(self, initializer):

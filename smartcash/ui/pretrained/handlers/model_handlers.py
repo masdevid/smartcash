@@ -4,21 +4,34 @@ Deskripsi: Handlers untuk operasi terkait model pretrained
 """
 
 import logging
-from typing import Dict, Any, Optional, Callable, TYPE_CHECKING
+from typing import Dict, Any, Optional, Callable, TYPE_CHECKING, List, Union
 from pathlib import Path
 import shutil
 
 if TYPE_CHECKING:
-    from smartcash.common.logger import LoggerBridge
+    from smartcash.ui.utils.logger_bridge import UILoggerBridge as LoggerBridge
 else:
     LoggerBridge = Any  # For runtime type hints
 
 from smartcash.ui.pretrained.services.model_checker import check_model_exists
 from smartcash.ui.pretrained.services.model_downloader import PretrainedModelDownloader
+from smartcash.ui.utils.error_utils import with_error_handling, log_errors, create_error_context
 
 class ModelOperationError(Exception):
     """Custom exception untuk operasi model"""
-    pass
+    
+    def __init__(self, message: str, error_code: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+        """Initialize ModelOperationError
+        
+        Args:
+            message: Pesan error yang deskriptif
+            error_code: Kode error opsional untuk penanganan spesifik
+            details: Detail tambahan tentang error
+        """
+        self.message = message
+        self.error_code = error_code
+        self.details = details or {}
+        super().__init__(self.message)
 
 class ModelOperationHandler:
     """Handler untuk operasi-operasi terkait model"""
@@ -43,26 +56,56 @@ class ModelOperationHandler:
         # Log initialization
         self._log_debug("ModelOperationHandler initialized")
     
+    def _log(self, message: str, level: str = "info", **kwargs) -> None:
+        """Log message using logger_bridge if available
+        
+        Args:
+            message: Pesan yang akan dicatat
+            level: Tingkat log ('debug', 'info', 'warning', 'error')
+            **kwargs: Argumen tambahan untuk logging
+        """
+        if not self.logger_bridge:
+            return
+            
+        log_func = getattr(self.logger_bridge, level.lower(), None)
+        if callable(log_func):
+            log_func(message, **kwargs)
+    
     def _log_debug(self, message: str, **kwargs) -> None:
         """Log debug message using logger_bridge if available"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'debug'):
-            self.logger_bridge.debug(message, **kwargs)
+        self._log(message, "debug", **kwargs)
             
     def _log_info(self, message: str, **kwargs) -> None:
         """Log info message using logger_bridge if available"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'info'):
-            self.logger_bridge.info(message, **kwargs)
+        self._log(message, "info", **kwargs)
             
     def _log_warning(self, message: str, **kwargs) -> None:
         """Log warning message using logger_bridge if available"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'warning'):
-            self.logger_bridge.warning(message, **kwargs)
+        self._log(message, "warning", **kwargs)
             
     def _log_error(self, message: str, exc_info: bool = False, **kwargs) -> None:
         """Log error message using logger_bridge if available"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'error'):
-            self.logger_bridge.error(message, exc_info=exc_info, **kwargs)
+        self._log(message, "error", exc_info=exc_info, **kwargs)
+        
+    def _create_error_context(self, **kwargs) -> Dict[str, Any]:
+        """Buat konteks error yang konsisten
+        
+        Returns:
+            Dict berisi konteks error yang relevan
+        """
+        return create_error_context(
+            component="pretrained",
+            handler="ModelOperationHandler",
+            **kwargs
+        )
     
+    @with_error_handling(
+        component="pretrained",
+        operation="set_ui_operation_state",
+        error_message="Gagal mengubah state UI",
+        raise_exception=ModelOperationError
+    )
+    @log_errors(level="error")
     def set_ui_operation_state(self, in_progress: bool) -> None:
         """Set UI state selama operasi berlangsung
         
@@ -72,6 +115,11 @@ class ModelOperationHandler:
         Raises:
             ModelOperationError: Jika gagal mengubah state UI
         """
+        error_context = self._create_error_context(
+            operation="set_ui_operation_state",
+            in_progress=in_progress
+        )
+        self._log_debug(f"Mengubah state UI operation: in_progress={in_progress}", extra=error_context)
         try:
             self._log_debug(f"Setting UI operation state: in_progress={in_progress}")
             # Clear logs jika memulai operasi baru
@@ -100,6 +148,13 @@ class ModelOperationHandler:
                 self.logger_bridge.error(error_msg, exc_info=True)
             raise ModelOperationError(error_msg) from e
     
+    @with_error_handling(
+        component="pretrained",
+        operation="update_download_progress",
+        error_message="Gagal mengupdate progress download",
+        raise_exception=ModelOperationError
+    )
+    @log_errors(level="error")
     def update_download_progress(self, progress: int, message: str = "") -> None:
         """Update progress download di UI
         
@@ -110,37 +165,42 @@ class ModelOperationHandler:
         Raises:
             ModelOperationError: Jika gagal mengupdate progress
         """
-        try:
-            # Update progress tracker jika tersedia
-            if 'progress_tracker' in self.ui_components:
-                if hasattr(self.ui_components['progress_tracker'], 'update_progress'):
-                    self.ui_components['progress_tracker'].update_progress(progress, message)
+        error_context = self._create_error_context(
+            operation="update_download_progress",
+            progress=progress
+        )
+        
+        # Update progress tracker jika tersedia
+        if 'progress_tracker' in self.ui_components:
+            if hasattr(self.ui_components['progress_tracker'], 'update_progress'):
+                self.ui_components['progress_tracker'].update_progress(progress, message)
+        
+        # Update status panel jika tersedia
+        status_panel = self.ui_components.get('status_panel')
+        if status_panel is not None:
+            if message:
+                status_panel.value = f"⏳ {message} ({progress}%)"
+            else:
+                status_panel.value = f"⏳ Mengunduh... ({progress}%)"
             
-            # Update status panel jika tersedia
-            status_panel = self.ui_components.get('status_panel')
-            if status_panel is not None:
-                if message:
-                    status_panel.value = f"⏳ {message} ({progress}%)"
-                else:
-                    status_panel.value = f"⏳ Mengunduh... ({progress}%)"
-                
-                # Tampilkan pesan selesai
-                if progress >= 100:
-                    status_panel.value = "✅ Download selesai!"
-            
-            # Log progress jika logger tersedia
-            if self.logger_bridge and progress % 10 == 0:  # Log setiap 10%
-                self.logger_bridge.debug("Download progress updated", {
-                    "progress": progress,
-                    "message": message
-                })
-                
-        except Exception as e:
-            error_msg = f"Gagal mengupdate progress: {str(e)}"
-            if self.logger_bridge:
-                self.logger_bridge.error(error_msg, exc_info=True)
-            raise ModelOperationError(error_msg) from e
+            # Tampilkan pesan selesai
+            if progress >= 100:
+                status_panel.value = "✅ Download selesai!"
+        
+        # Log progress setiap 10%
+        if progress % 10 == 0:
+            self._log_debug(
+                f"Progress update: {progress}% - {message}",
+                extra={"progress": progress, "message": message, **error_context}
+            )
     
+    @with_error_handling(
+        component="pretrained",
+        operation="cleanup_old_models_dir",
+        error_message="Gagal membersihkan direktori model lama",
+        raise_exception=ModelOperationError
+    )
+    @log_errors(level="warning")
     def cleanup_old_models_dir(self, old_dir: str, new_dir: str) -> None:
         """Bersihkan direktori model lama jika berbeda dengan yang baru
         
@@ -154,28 +214,32 @@ class ModelOperationHandler:
         if not old_dir or old_dir == new_dir:
             return
             
-        try:
-            old_path = Path(old_dir)
-            if old_path.exists() and old_path.is_dir():
-                if self.logger_bridge:
-                    self.logger_bridge.info(f"Membersihkan direktori model lama: {old_dir}")
-                
-                shutil.rmtree(old_dir, ignore_errors=True)
-                
-                if self.logger_bridge:
-                    self.logger_bridge.info("Direktori model lama berhasil dibersihkan")
-                    
-        except Exception as e:
-            error_msg = f"Gagal membersihkan direktori model lama: {str(e)}"
-            if self.logger_bridge:
-                self.logger_bridge.warning(error_msg, exc_info=True)
-            raise ModelOperationError(error_msg) from e
+        error_context = self._create_error_context(
+            operation="cleanup_old_models_dir",
+            old_dir=old_dir,
+            new_dir=new_dir
+        )
+        
+        old_path = Path(old_dir)
+        if old_path.exists() and old_path.is_dir():
+            self._log_info(f"Membersihkan direktori model lama: {old_dir}", extra=error_context)
+            
+            shutil.rmtree(old_dir, ignore_errors=True)
+            
+            self._log_info("Direktori model lama berhasil dibersihkan", extra=error_context)
     
+    @with_error_handling(
+        component="pretrained",
+        operation="check_and_download_model",
+        error_message="Gagal dalam proses check dan download model",
+        raise_exception=ModelOperationError
+    )
+    @log_errors(level="error")
     def check_and_download_model(self, config: Dict[str, Any]) -> bool:
         """Cek dan download model jika diperlukan
         
         Args:
-            config: Konfigurasi sistem
+            config: Konfigurasi sistem yang berisi pengaturan model
             
         Returns:
             bool: True jika model tersedia atau berhasil didownload
@@ -183,6 +247,12 @@ class ModelOperationHandler:
         Raises:
             ModelOperationError: Jika terjadi error saat proses
         """
+        # Setup error context
+        error_context = self._create_error_context(
+            operation="check_and_download_model",
+            config_keys=list(config.keys()) if config else []
+        )
+        
         try:
             self.set_ui_operation_state(True)
             
@@ -190,11 +260,10 @@ class ModelOperationHandler:
             models_dir = pretrained_config.get('models_dir', '/data/pretrained')
             model_type = 'yolov5s'  # Hardcoded sesuai permintaan
             
-            if self.logger_bridge:
-                self.logger_bridge.info("Memeriksa ketersediaan model", {
-                    "model_type": model_type,
-                    "models_dir": models_dir
-                })
+            self._log_info(
+                f"Memeriksa ketersediaan model - Tipe: {model_type}, Direktori: {models_dir}",
+                extra=error_context
+            )
             
             # Bersihkan direktori lama jika berbeda
             if self.last_models_dir and self.last_models_dir != models_dir:
@@ -203,8 +272,10 @@ class ModelOperationHandler:
             
             # Cek ketersediaan model
             if check_model_exists(models_dir, model_type):
-                if self.logger_bridge:
-                    self.logger_bridge.info("Model sudah tersedia", {"model_type": model_type})
+                self._log_info(
+                    f"Model {model_type} sudah tersedia di {models_dir}",
+                    extra={"model_type": model_type, **error_context}
+                )
                 self.update_download_progress(100, "Model sudah tersedia")
                 return True
                 
@@ -212,11 +283,12 @@ class ModelOperationHandler:
             model_url = None
             if 'model_urls' in pretrained_config and pretrained_config['model_urls']:
                 model_url = pretrained_config['model_urls'].get('yolov5s')
-                if self.logger_bridge:
-                    self.logger_bridge.info("Menggunakan URL kustom untuk download", {"url": model_url})
+                self._log_info(
+                    f"Menggunakan URL kustom untuk download: {model_url}",
+                    extra={"model_url": model_url, **error_context}
+                )
             
-            if self.logger_bridge:
-                self.logger_bridge.info("Memulai proses download model")
+            self._log_info("Memulai proses download model", extra=error_context)
                 
             success = self.downloader.download_yolov5s(
                 models_dir=models_dir,
@@ -225,24 +297,28 @@ class ModelOperationHandler:
                 model_url=model_url
             )
             
-            if success and self.logger_bridge:
-                self.logger_bridge.info("Model berhasil didownload", {"model_type": model_type})
+            if success:
+                self._log_info(
+                    f"Model {model_type} berhasil didownload ke {models_dir}",
+                    extra={"model_type": model_type, **error_context}
+                )
+            else:
+                self._log_warning(
+                    f"Gagal mendownload model {model_type}",
+                    extra={"model_type": model_type, **error_context}
+                )
             
             return success
-            
-        except Exception as e:
-            error_msg = f"Gagal memeriksa/mendownload model: {str(e)}"
-            if self.logger_bridge:
-                self.logger_bridge.error(error_msg, exc_info=True)
-            raise ModelOperationError(error_msg) from e
             
         finally:
             try:
                 self.set_ui_operation_state(False)
             except Exception as e:
-                error_msg = f"Gagal mengembalikan state UI: {str(e)}"
-                if self.logger_bridge:
-                    self.logger_bridge.error(error_msg, exc_info=True)
+                self._log_error(
+                    "Gagal mengembalikan state UI setelah operasi model",
+                    exc_info=True,
+                    extra=error_context
+                )
                 # Tetap lanjutkan walaupun gagal mengembalikan state UI
     
     def _update_status(self, message: str) -> None:

@@ -231,6 +231,9 @@ class CommonInitializer(ABC):
                 
             except Exception as e:
                 error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
+                # Log the error first
+                self._handle_error(error_msg, exc_info=True)
+                # Then create and return the error response
                 return self.create_error_response(error_msg, e)
     
     def _load_config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -365,25 +368,45 @@ class CommonInitializer(ABC):
         """
         from datetime import datetime
         return datetime.now().isoformat()
+    
+    def _handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
+        """Centralized error handling for all initializers.
         
+        Args:
+            error_msg: The error message to log
+            exc_info: Whether to include exception info
+            **kwargs: Additional arguments for logging
+        """
+        if hasattr(self, '_logger_bridge'):
+            self._logger_bridge.error(error_msg, exc_info=exc_info, **kwargs)
+        elif hasattr(self, '_logger'):
+            self._logger.error(error_msg, exc_info=exc_info, **kwargs)
+        else:
+            print(f"[ERROR] {error_msg}", flush=True)
+            if exc_info and 'exc_info' in kwargs:
+                import traceback
+                traceback.print_exc()
+
     def create_error_response(self, error_message: str, error: Optional[Exception] = None) -> Dict[str, Any]:
         """Create a fallback UI component to display error messages.
         
         This method creates a consistent error UI that can be used across all initializers.
         It returns a dictionary with the error component and placeholders for other UI elements.
         
+        Note: This method only creates the error response UI and does not log the error.
+        Call _handle_error() separately if you need to log the error.
+        
         Args:
             error_message: The error message to display
             error: Optional exception for traceback
             
         Returns:
-            Dictionary containing:
+            Dict containing:
             - 'ui': The main error widget
-            - 'log_output': None (placeholder for log output)
-            - 'status_panel': None (placeholder for status panel)
+            - 'log_output': Empty output widget
+            - 'status_panel': Empty widget
             - 'error': Boolean flag indicating this is an error state
         """
-        import traceback
         from smartcash.ui.components.error.error_component import create_error_component
         
         # Get traceback if error is provided
@@ -392,7 +415,7 @@ class CommonInitializer(ABC):
             try:
                 tb_text = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
             except Exception:
-                tb_text = None
+                tb_text = str(error)
         
         # Strip any leading emoji from error message
         error_msg = str(error_message).strip()
@@ -402,16 +425,14 @@ class CommonInitializer(ABC):
         # Create error component
         error_component = create_error_component(
             error_message=error_msg,
-            title=f"🚨 {self.module_name} Error",
             traceback=tb_text,
             error_type="error",
-            show_traceback=bool(tb_text)
+            module_name=getattr(self, 'module_name', 'unknown')
         )
         
-        # Return in the expected format
         return {
             'ui': error_component.get('container', error_component),
-            'log_output': None,
-            'status_panel': None,
+            'log_output': widgets.Output(),
+            'status_panel': widgets.Output(),
             'error': True
         }

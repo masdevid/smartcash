@@ -230,6 +230,7 @@ class PretrainedInitializer(CommonInitializer):
         except Exception as e:
             logger.warning(f"⚠️ Gagal membersihkan direktori model lama: {str(e)}")
     
+
     def _check_pretrained_model_exists(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
         """🔍 Check dan download otomatis pretrained model jika tidak ditemukan
         

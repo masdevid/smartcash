@@ -8,12 +8,7 @@ Deskripsi: Handlers package initialization dengan simplified structure
 from .config_handler import PretrainedConfigHandler
 from .config_extractor import extract_pretrained_config, validate_pretrained_config
 from .config_updater import update_pretrained_ui, reset_pretrained_ui
-from .defaults import (
-    get_default_pretrained_config, 
-    get_model_variants,
-    get_model_descriptions,
-    get_model_info
-)
+from .defaults import get_model_info
 
 # Event handlers - Optional import
 try:
@@ -36,9 +31,6 @@ __all__ = [
     'validate_pretrained_config',
     'update_pretrained_ui',
     'reset_pretrained_ui',
-    'get_default_pretrained_config',
-    'get_model_variants',
-    'get_model_descriptions',
     'get_model_info',
     
     # Event handlers

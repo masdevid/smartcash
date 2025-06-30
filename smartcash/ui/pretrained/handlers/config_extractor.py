@@ -25,41 +25,41 @@ def extract_pretrained_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("❌ UI components tidak valid untuk ekstraksi config")
     
     try:
+        from smartcash.ui.pretrained.handlers.defaults import DEFAULT_MODEL_URLS
+        
         config = {'pretrained_models': {}}
         pretrained_config = config['pretrained_models']
         
         # Extract models directory
         if 'models_dir_input' in ui_components:
             models_dir = ui_components['models_dir_input'].value.strip()
-            pretrained_config['models_dir'] = models_dir if models_dir else '/content/models'
+            pretrained_config['models_dir'] = models_dir if models_dir else '/data/pretrained'
         else:
-            pretrained_config['models_dir'] = '/content/models'
+            pretrained_config['models_dir'] = '/data/pretrained'
         
-        # Extract drive models directory
-        if 'drive_models_dir_input' in ui_components:
-            drive_dir = ui_components['drive_models_dir_input'].value.strip()
-            pretrained_config['drive_models_dir'] = drive_dir if drive_dir else '/data/pretrained'
-        else:
-            pretrained_config['drive_models_dir'] = '/data/pretrained'
+        # Hardcode model type to yolov5s
+        pretrained_config['pretrained_type'] = 'yolov5s'
         
-        # Extract pretrained type
-        if 'pretrained_type_dropdown' in ui_components:
-            pretrained_type = ui_components['pretrained_type_dropdown'].value
-            pretrained_config['pretrained_type'] = pretrained_type if pretrained_type else 'yolov5s'
-        else:
-            pretrained_config['pretrained_type'] = 'yolov5s'
+        # Extract model download URLs
+        model_urls = {}
         
-        # Extract auto download setting
-        if 'auto_download_checkbox' in ui_components:
-            pretrained_config['auto_download'] = ui_components['auto_download_checkbox'].value
-        else:
-            pretrained_config['auto_download'] = False
+        # YOLOv5 URL
+        if 'yolo_url_input' in ui_components:
+            yolo_url = ui_components['yolo_url_input'].value.strip()
+            if yolo_url and yolo_url != DEFAULT_MODEL_URLS['yolov5s']:
+                model_urls['yolov5s'] = yolo_url
         
-        # Extract sync drive setting
-        if 'sync_drive_checkbox' in ui_components:
-            pretrained_config['sync_drive'] = ui_components['sync_drive_checkbox'].value
-        else:
-            pretrained_config['sync_drive'] = True
+        # EfficientNet URL
+        if 'efficientnet_url_input' in ui_components:
+            effnet_url = ui_components['efficientnet_url_input'].value.strip()
+            if effnet_url and effnet_url != DEFAULT_MODEL_URLS['efficientnet']:
+                model_urls['efficientnet'] = effnet_url
+        
+        if model_urls:
+            pretrained_config['model_urls'] = model_urls
+        
+        # Disable sync drive by default
+        pretrained_config['sync_drive'] = False
         
         logger.info("✅ Config berhasil diekstrak dari UI components")
         return config

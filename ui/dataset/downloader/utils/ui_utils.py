@@ -89,17 +89,23 @@ def show_download_success(ui_components: Dict[str, Any], result: Dict[str, Any])
     show_ui_success(ui_components, success_message)
 
 def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Log message menggunakan ui_logger yang sudah ada"""
-    logger = ui_components.get('logger')
-    if logger:
-        # Map level ke ui_logger method
+    """Log message menggunakan logger_bridge yang sudah ada
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        message: Pesan yang akan di-log
+        level: Level log (info, success, warning, error)
+    """
+    logger_bridge = ui_components.get('logger_bridge')
+    if logger_bridge:
+        # Map level ke logger_bridge method
         log_methods = {
-            'info': logger.info,
-            'success': logger.success,
-            'warning': logger.warning,
-            'error': logger.error
+            'info': logger_bridge.info,
+            'success': logger_bridge.info,  # Fallback to info if success not available
+            'warning': logger_bridge.warning,
+            'error': logger_bridge.error
         }
-        log_method = log_methods.get(level, logger.info)
+        log_method = log_methods.get(level, logger_bridge.info)
         log_method(message)
     
     # Auto-expand untuk errors/warnings
@@ -114,12 +120,19 @@ def clear_outputs(ui_components: Dict[str, Any]):
             ui_components['log_output'].clear_output(wait=True)
 
 def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, button_manager=None):
-    """Handle error dengan UI updates dan proper state reset"""
+    """Handle error dengan UI updates dan proper state reset
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        error_msg: Pesan error yang akan ditampilkan
+        button_manager: Manager untuk mengontrol state tombol (opsional)
+    """
     from smartcash.ui.utils.fallback_utils import show_status_safe
     
-    logger = ui_components.get('logger')
-    if logger:
-        logger.error(f"❌ {error_msg}")
+    # Gunakan logger_bridge untuk logging
+    logger_bridge = ui_components.get('logger_bridge')
+    if logger_bridge:
+        logger_bridge.error(f"❌ {error_msg}")
     
     # Update progress tracker
     progress_tracker = ui_components.get('progress_tracker')
@@ -143,12 +156,19 @@ def handle_ui_error(ui_components: Dict[str, Any], error_msg: str, button_manage
         button_manager.enable_buttons()
 
 def show_ui_success(ui_components: Dict[str, Any], message: str, button_manager=None):
-    """Show success dengan UI updates"""
+    """Show success dengan UI updates
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        message: Pesan sukses yang akan ditampilkan
+        button_manager: Manager untuk mengontrol state tombol (opsional)
+    """
     from smartcash.ui.utils.fallback_utils import show_status_safe
     
-    logger = ui_components.get('logger')
-    if logger:
-        logger.success(f"✅ {message}")
+    # Gunakan logger_bridge untuk logging
+    logger_bridge = ui_components.get('logger_bridge')
+    if logger_bridge:
+        logger_bridge.info(f"✅ {message}")
     
     # Update progress tracker
     progress_tracker = ui_components.get('progress_tracker')

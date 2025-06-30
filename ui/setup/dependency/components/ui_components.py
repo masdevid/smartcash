@@ -110,7 +110,7 @@ def create_dependency_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[s
     
     # Create log accordion
     log_components = create_log_accordion()
-    log_accordion = log_components.get('accordion')
+    log_accordion = log_components.get('log_output')  # Use 'log_output' key instead of 'accordion'
     
     # Main content layout
     content = widgets.VBox([

@@ -43,11 +43,6 @@ def update_pretrained_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) 
             ui_components['pretrained_type_dropdown'].value = pretrained_config['pretrained_type']
             logger.debug(f"🔧 Updated pretrained_type: {pretrained_config['pretrained_type']}")
         
-        # Update auto download checkbox
-        if 'auto_download_checkbox' in ui_components and 'auto_download' in pretrained_config:
-            ui_components['auto_download_checkbox'].value = pretrained_config['auto_download']
-            logger.debug(f"🔧 Updated auto_download: {pretrained_config['auto_download']}")
-        
         # Update sync drive checkbox
         if 'sync_drive_checkbox' in ui_components and 'sync_drive' in pretrained_config:
             ui_components['sync_drive_checkbox'].value = pretrained_config['sync_drive']
@@ -103,17 +98,31 @@ def apply_config_to_ui(ui_components: Dict[str, Any], config_key: str, config_va
     """
     try:
         # Mapping config key ke UI component
-        key_mapping = {
+        config_mapping = {
             'models_dir': 'models_dir_input',
-            'drive_models_dir': 'drive_models_dir_input',
-            'pretrained_type': 'pretrained_type_dropdown',
-            'auto_download': 'auto_download_checkbox',
-            'sync_drive': 'sync_drive_checkbox'
+            'sync_drive': 'sync_drive_checkbox',
+            'model_urls': {
+                'yolov5s': 'yolo_url_input',
+                'efficientnet': 'efficientnet_url_input'
+            }
         }
         
-        ui_key = key_mapping.get(config_key)
+        # Handle model URLs specially
+        if config_key == 'model_urls' and isinstance(config_value, dict):
+            url_mapping = config_mapping.get('model_urls', {})
+            updated = False
+            for model_name, url in config_value.items():
+                ui_key = url_mapping.get(model_name)
+                if ui_key and ui_key in ui_components:
+                    ui_components[ui_key].value = url
+                    logger.debug(f"🔧 Applied {model_name} URL: {url}")
+                    updated = True
+            return updated
+            
+        # Handle regular config values
+        ui_key = config_mapping.get(config_key)
         if not ui_key or ui_key not in ui_components:
-            logger.warning(f"⚠️ UI component tidak ditemukan untuk key: {config_key}")
+            logger.warning(f" UI component tidak ditemukan untuk key: {config_key}")
             return False
         
         # Apply value ke UI component

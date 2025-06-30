@@ -4,14 +4,16 @@ File: smartcash/ui/pretrained/handlers/config_handler.py
 Deskripsi: Config handler untuk pretrained models dengan konsistensi pattern dan DRY utilities
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.ui.pretrained.handlers.config_extractor import extract_pretrained_config
 from smartcash.ui.pretrained.handlers.config_updater import update_pretrained_ui
 from smartcash.common.config.manager import get_config_manager
-from smartcash.common.logger import get_logger
 
-logger = get_logger(__name__)
+if TYPE_CHECKING:
+    from smartcash.common.logger import LoggerBridge
+else:
+    LoggerBridge = Any  # For runtime type hints
 
 class PretrainedConfigHandler(ConfigHandler):
     """Pretrained config handler dengan consistent pattern dan error handling"""
@@ -21,13 +23,51 @@ class PretrainedConfigHandler(ConfigHandler):
         self.config_manager = get_config_manager()
         self.config_filename = 'pretrained_config.yaml'
         self._ui_components: Optional[Dict[str, Any]] = None
+        self._logger_bridge: Optional[LoggerBridge] = None
     
     @property
-    def logger_bridge(self):
+    def logger_bridge(self) -> Optional[LoggerBridge]:
         """Get logger bridge dari UI components atau fallback ke parent logger"""
+        if self._logger_bridge:
+            return self._logger_bridge
         if self._ui_components and 'logger_bridge' in self._ui_components:
-            return self._ui_components['logger_bridge']
-        return self.logger
+            self._logger_bridge = self._ui_components['logger_bridge']
+            return self._logger_bridge
+        return None
+        
+    def set_ui_components(self, ui_components: Dict[str, Any]) -> None:
+        """Set UI components and update logger bridge reference"""
+        self._ui_components = ui_components
+        if 'logger_bridge' in ui_components:
+            self._logger_bridge = ui_components['logger_bridge']
+    
+    def _log_debug(self, message: str, **kwargs) -> None:
+        """Log debug message using logger_bridge if available"""
+        if self.logger_bridge and hasattr(self.logger_bridge, 'debug'):
+            self.logger_bridge.debug(message, **kwargs)
+            
+    def _log_info(self, message: str, **kwargs) -> None:
+        """Log info message using logger_bridge if available"""
+        if self.logger_bridge and hasattr(self.logger_bridge, 'info'):
+            self.logger_bridge.info(message, **kwargs)
+            
+    def _log_warning(self, message: str, **kwargs) -> None:
+        """Log warning message using logger_bridge if available"""
+        if self.logger_bridge and hasattr(self.logger_bridge, 'warning'):
+            self.logger_bridge.warning(message, **kwargs)
+            
+    def _log_error(self, message: str, exc_info: bool = False, **kwargs) -> None:
+        """Log error message using logger_bridge if available"""
+        if self.logger_bridge and hasattr(self.logger_bridge, 'error'):
+            self.logger_bridge.error(message, exc_info=exc_info, **kwargs)
+            
+    def _log_operation_success(self, message: str) -> None:
+        """Log successful operation with consistent formatting"""
+        self._log_info(message)
+        
+    def _log_operation_error(self, message: str) -> None:
+        """Log operation error with consistent formatting"""
+        self._log_error(message, exc_info=True)
     
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract config dari UI dengan enhanced error handling"""

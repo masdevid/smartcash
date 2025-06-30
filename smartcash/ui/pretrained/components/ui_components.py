@@ -42,11 +42,16 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None, **kwargs)
         primary_button={
             "label": "📥 Download Model",
             "style": "success",
-            "width": "180px"
+            "width": "180px",
+            "key": "download_button"
         },
         secondary_buttons=[
-            {"label": "🔄 Sync Model", "style": "info", "width": "150px"},
-            {"label": "🧹 Cleanup", "style": "warning", "width": "120px"}
+            {
+                "label": "🔄 Sync Model", 
+                "style": "info", 
+                "width": "150px",
+                "key": "sync_button"
+            }
         ]
     )
     
@@ -93,12 +98,15 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None, **kwargs)
         box_shadow='0 2px 4px rgba(0,0,0,0.05)'
     ))
     
-    # Update UI components
+    # Update UI components with references to all interactive elements
     ui_components.update({
         'ui': main_ui,
         'header': header,
         'status_panel': status_panel,
+        'progress_tracker': progress_tracker,
         'log_output': log_components.get('log_output'),
+        'download_button': action_components.get('primary_button'),
+        'sync_button': action_components.get('secondary_buttons', [{}])[0].get('button') if action_components.get('secondary_buttons') else None,
         'progress_tracker': progress_tracker,
         'confirmation_area': confirmation_area,
         'input_options': input_components,
@@ -117,50 +125,66 @@ def create_pretrained_input_options(config: Dict[str, Any]) -> Dict[str, Any]:
     """Create input options untuk konfigurasi pretrained models"""
     # Default values
     default_values = {
-        'model_dir': '/content/models',
-        'model_type': 'yolov5s',
-        'auto_download': True
+        'model_dir': '/data/pretrained',
+        'model_type': 'yolov5s'  # Hardcoded to yolov5s
     }
     
     # Apply config values
     config = {**default_values, **config}
     
+    from smartcash.ui.pretrained.handlers.defaults import DEFAULT_MODEL_URLS
+    
     # Create input components
     model_dir_input = widgets.Text(
-        value=config['model_dir'],
+        value=config.get('models_dir', '/data/pretrained'),
         description='Model Directory:',
-        placeholder='/content/models',
+        placeholder='/data/pretrained',
         style={'description_width': '120px'},
-        layout={'width': '400px'}
+        layout={'width': '100%'}
     )
     
-    model_type_dropdown = widgets.Dropdown(
-        options=['yolov5s', 'yolov5m', 'yolov5l'],
-        value=config['model_type'],
-        description='Model Type:',
+    # URL Inputs
+    yolo_url_input = widgets.Text(
+        value=config.get('model_urls', {}).get('yolov5s', DEFAULT_MODEL_URLS['yolov5s']),
+        description='YOLOv5 URL:',
+        placeholder='https://...',
         style={'description_width': '120px'},
-        layout={'width': '300px'}
+        layout={'width': '100%'}
     )
     
-    auto_download_checkbox = widgets.Checkbox(
-        value=config['auto_download'],
-        description='Auto Download',
-        style={'description_width': '120px'}
+    efficientnet_url_input = widgets.Text(
+        value=config.get('model_urls', {}).get('efficientnet', DEFAULT_MODEL_URLS['efficientnet']),
+        description='EfficientNet URL:',
+        placeholder='https://...',
+        style={'description_width': '120px'},
+        layout={'width': '100%'}
     )
     
     # Create layout
     input_ui = widgets.VBox([
         widgets.HTML("<h4>📁 Model Configuration</h4>"),
         model_dir_input,
-        model_type_dropdown,
-        widgets.HTML("<h4>⚙️ Options</h4>"),
-        auto_download_checkbox
+        widgets.HTML(
+            "<div style='margin: 10px 0 5px 8px; color: #666;'>"
+            "Model Type: <b>yolov5s</b></div>"
+        ),
+        widgets.HTML(
+            "<div style='margin: 15px 0 5px 0; font-weight: bold;'>"
+            "Custom Download URLs:</div>"
+        ),
+        yolo_url_input,
+        efficientnet_url_input,
+        widgets.HTML(
+            "<div style='margin-top: 5px; font-size: 0.9em; color: #666;'>"
+            "Biarkan kosong untuk menggunakan URL default"
+            "</div>"
+        )
     ])
     
     return {
         'ui': input_ui,
         'model_dir_input': model_dir_input,
-        'model_type_dropdown': model_type_dropdown,
-        'auto_download_checkbox': auto_download_checkbox
+        'yolo_url_input': yolo_url_input,
+        'efficientnet_url_input': efficientnet_url_input
     }
 

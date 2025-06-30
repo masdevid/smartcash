@@ -17,8 +17,15 @@ from smartcash.common.environment import get_environment_manager
 class DownloadService(BaseDownloaderComponent):
     """Fixed download service dengan proper imports dan enhanced directory management"""
     
-    def __init__(self, config: Dict[str, Any], logger=None):
-        super().__init__(logger)
+    def __init__(self, config: Dict[str, Any], logger=None, logger_bridge=None):
+        """Initialize download service with centralized logging
+        
+        Args:
+            config: Configuration dictionary
+            logger: Optional logger instance (legacy support)
+            logger_bridge: LoggerBridge instance for centralized logging
+        """
+        super().__init__(logger=logger, logger_bridge=logger_bridge)
         self.config = config
         self.env_manager = get_environment_manager()
         self.progress_tracker = None
@@ -31,7 +38,7 @@ class DownloadService(BaseDownloaderComponent):
         self.chunk_size = config.get('chunk_size', 8192*4)
         self.parallel_downloads = config.get('parallel_downloads', True)
         
-        self.logger.info(f"🔧 DownloadService initialized with {self.max_workers} workers")
+        self._log_info(f"🔧 DownloadService initialized with {self.max_workers} workers")
         
         # Lazy initialization
         self._roboflow_client = None

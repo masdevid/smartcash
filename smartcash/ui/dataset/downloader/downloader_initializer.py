@@ -8,7 +8,6 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.ui.components.error.error_component import create_error_component
-from smartcash.common.logger import get_logger
 
 class DownloaderInitializer(CommonInitializer):
     """Downloader initializer dengan pattern terbaru dari CommonInitializer"""
@@ -20,6 +19,7 @@ class DownloaderInitializer(CommonInitializer):
             config_handler_class: Optional ConfigHandler class (defaults to DownloaderConfigHandler)
         """
         super().__init__(module_name='downloader', config_handler_class=config_handler_class)
+        self._logger_bridge = None  # Will be set by parent class
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation
@@ -37,44 +37,63 @@ class DownloaderInitializer(CommonInitializer):
         Raises:
             ValueError: Jika UI components tidak valid atau komponen penting tidak ada
         """
+        self._log_debug("Memulai inisialisasi komponen UI")
+        
         try:
             from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
             
             # Ensure we have a valid config
             if not config:
                 config = self.config_handler.get_default_config()
+                self._log_debug("Menggunakan konfigurasi default")
             
             # Ensure required sections exist
             if 'downloader' not in config:
                 config['downloader'] = {}
+                self._log_debug("Menambahkan section 'downloader' ke konfigurasi")
                 
             # Ensure basic structure exists
             if 'basic' not in config['downloader']:
-                config['downloader']['basic'] = self.config_handler.get_default_config().get('downloader', {}).get('basic', {})
+                default_basic = self.config_handler.get_default_config().get('downloader', {}).get('basic', {})
+                config['downloader']['basic'] = default_basic
+                self._log_debug("Menggunakan konfigurasi basic default")
                 
             # Ensure advanced structure exists
             if 'advanced' not in config['downloader']:
-                config['downloader']['advanced'] = self.config_handler.get_default_config().get('downloader', {}).get('advanced', {})
+                default_advanced = self.config_handler.get_default_config().get('downloader', {}).get('advanced', {})
+                config['downloader']['advanced'] = default_advanced
+                self._log_debug("Menggunakan konfigurasi advanced default")
             
             # Create UI components dengan immediate validation
+            self._log_info("Membuat komponen UI utama")
             ui_components = create_downloader_main_ui(config)
             
             if not isinstance(ui_components, dict):
-                raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
+                error_msg = f"UI components harus berupa dictionary, dapat: {type(ui_components)}"
+                self._log_error(error_msg)
+                raise ValueError(error_msg)
                     
             if not ui_components:
-                raise ValueError("UI components tidak boleh kosong")
+                error_msg = "UI components tidak boleh kosong"
+                self._log_error(error_msg)
+                raise ValueError(error_msg)
             
             # Validate critical components exist
             required_components = ['ui', 'log_output', 'status_panel']
             missing = [comp for comp in required_components if comp not in ui_components]
             if missing:
-                raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
+                error_msg = f"Komponen UI kritis tidak ditemukan: {missing}"
+                self._log_error(error_msg)
+                raise ValueError(error_msg)
                 
+            # Add logger_bridge to ui_components for child components
+            ui_components['logger_bridge'] = self.logger_bridge
+            self._log_info("Komponen UI berhasil diinisialisasi")
+            
             return ui_components
             
         except Exception as e:
-            self.logger.error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
+            self._log_error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
             raise
         
         # Add module-specific metadata
@@ -101,23 +120,33 @@ class DownloaderInitializer(CommonInitializer):
         Raises:
             ValueError: Jika handler setup gagal
         """
+        self._log_debug("Memulai setup handlers")
+        
         # Ensure logger bridge is available before setting up handlers
-        if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
-            raise ValueError("Logger bridge belum diinisialisasi sebelum setup handlers")
-                
-        # Add logger bridge to ui_components untuk akses handlers
-        ui_components['logger_bridge'] = self._logger_bridge
+        if not hasattr(self, 'logger_bridge') or not self.logger_bridge:
+            error_msg = "Logger bridge belum diinisialisasi sebelum setup handlers"
+            self._log_error(error_msg)
+            raise ValueError(error_msg)
         
-        from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
-        
-        # Setup handlers dengan error handling
-        handlers = setup_download_handlers(ui_components, config, kwargs.get('env'))
-        
-        if not handlers:
-            raise ValueError("Gagal menginisialisasi download handlers")
+        try:
+            from smartcash.ui.dataset.downloader.handlers.download_handler import setup_download_handlers
             
-        ui_components['handlers'] = handlers
-        return ui_components
+            # Setup handlers dengan error handling
+            self._log_info("Menginisialisasi download handlers")
+            handlers = setup_download_handlers(ui_components, config, kwargs.get('env'))
+            
+            if not handlers:
+                error_msg = "Gagal menginisialisasi download handlers"
+                self._log_error(error_msg)
+                raise ValueError(error_msg)
+                
+            ui_components['handlers'] = handlers
+            self._log_info("Handlers berhasil diinisialisasi")
+            return ui_components
+            
+        except Exception as e:
+            self._log_error(f"Gagal setup handlers: {str(e)}", exc_info=True)
+            raise
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default config dengan fallback handling
@@ -128,11 +157,17 @@ class DownloaderInitializer(CommonInitializer):
         Raises:
             ImportError: Jika modul default config tidak ditemukan
         """
+        self._log_debug("Mengambil konfigurasi default")
+        
         try:
             from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
-            return get_default_downloader_config()
+            config = get_default_downloader_config()
+            self._log_debug("Konfigurasi default berhasil dimuat")
+            return config
+            
         except ImportError as e:
-            self.logger.error(f"❌ Gagal import default config: {str(e)}")
+            error_msg = f"Gagal import default config: {str(e)}"
+            self._log_error(error_msg)
             raise ImportError(f"Default downloader config tidak ditemukan: {str(e)}") from e
     
     def _pre_initialize_checks(self, **kwargs) -> None:
@@ -144,10 +179,13 @@ class DownloaderInitializer(CommonInitializer):
         Raises:
             RuntimeError: Jika dependencies tidak memenuhi syarat atau konfigurasi tidak valid
         """
+        self._log_debug("Memulai pre-initialization checks")
+        
         # Check critical imports
         try:
             import ipywidgets
             import requests
+            self._log_debug("Dependencies terpenuhi: ipywidgets, requests")
             # Downloader doesn't have an api module like preprocessing
             # Only check for required packages
         except ImportError as e:

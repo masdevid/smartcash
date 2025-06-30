@@ -383,7 +383,7 @@ try:
         with ui_components['confirmation_area']:
             clear_output(wait=True)
 except Exception as e:
-    print(f"⚠️ Error in ` + callbackType + ` callback: {e}")
+    print(f"⚠️ Error in ${callbackType} callback: {str(e) if 'e' in locals() else 'Unknown error'}")
 `;
                         window.jupyter.notebook.kernel.execute(code);
                     }}

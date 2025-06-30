@@ -3,10 +3,19 @@ File: smartcash/ui/dataset/downloader/utils/progress_utils.py
 Deskripsi: Progress callback utilities untuk download operations
 """
 
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, Optional
+from smartcash.ui.utils.logger_bridge import UILoggerBridge
 from .ui_utils import is_milestone_step, map_step_to_current_progress
 
 def create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[str, int, int, str], None]:
+    """Create a progress callback function for download operations.
+    
+    Args:
+        ui_components: Dictionary containing UI components including logger_bridge
+        
+    Returns:
+        A callback function that can be used to report progress
+    """
     """Create minimal progress callback untuk download operations"""
     def progress_callback(step: str, current: int, total: int, message: str):
         try:
@@ -22,9 +31,9 @@ def create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[str, in
             
             # Only log important milestones, not every progress update
             if is_milestone_step(step, current):
-                logger = ui_components.get('logger')
-                if logger:
-                    logger.info(message)
+                logger_bridge = ui_components.get('logger_bridge')
+                if logger_bridge:
+                    logger_bridge.info(message)
         except Exception:
             pass  # Silent fail to prevent blocking
     

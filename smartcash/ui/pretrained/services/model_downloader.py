@@ -7,41 +7,114 @@ Deskripsi: Complete service untuk downloading pretrained models dengan progress 
 import os
 import requests
 import hashlib
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, TYPE_CHECKING
 from concurrent.futures import ThreadPoolExecutor
-from smartcash.common.logger import get_logger
 
-logger = get_logger(__name__)
+if TYPE_CHECKING:
+    from smartcash.common.logger import LoggerBridge
+else:
+    LoggerBridge = Any  # For runtime type hints
 
 class PretrainedModelDownloader:
     """🚀 Service untuk downloading pretrained models dengan progress tracking"""
     
-    def __init__(self):
-        self.logger = logger
+    def __init__(self, logger_bridge: Optional[LoggerBridge] = None):
+        """Initialize downloader with optional logger bridge
+        
+        Args:
+            logger_bridge: LoggerBridge instance for centralized logging
+        """
+        self._logger_bridge = logger_bridge
         self._download_urls = {
             'yolov5s': 'https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5s.pt'
         }
         self._expected_sizes = {
             'yolov5s': 14_400_000  # ~14.4MB
         }
+        self._last_downloaded_files = {}  # Track last downloaded files by model type
+        
+    def set_logger_bridge(self, logger_bridge: LoggerBridge) -> None:
+        """Set the logger bridge for this downloader
+        
+        Args:
+            logger_bridge: LoggerBridge instance for centralized logging
+        """
+        self._logger_bridge = logger_bridge
+        
+    def _log_debug(self, message: str, **kwargs) -> None:
+        """Log debug message using logger_bridge if available"""
+        if self._logger_bridge and hasattr(self._logger_bridge, 'debug'):
+            self._logger_bridge.debug(message, **kwargs)
+            
+    def _log_info(self, message: str, **kwargs) -> None:
+        """Log info message using logger_bridge if available"""
+        if self._logger_bridge and hasattr(self._logger_bridge, 'info'):
+            self._logger_bridge.info(message, **kwargs)
+            
+    def _log_warning(self, message: str, **kwargs) -> None:
+        """Log warning message using logger_bridge if available"""
+        if self._logger_bridge and hasattr(self._logger_bridge, 'warning'):
+            self._logger_bridge.warning(message, **kwargs)
+            
+    def _log_error(self, message: str, exc_info: bool = False, **kwargs) -> None:
+        """Log error message using logger_bridge if available"""
+        if self._logger_bridge and hasattr(self._logger_bridge, 'error'):
+            self._logger_bridge.error(message, exc_info=exc_info, **kwargs)
+    
+    def _cleanup_old_file(self, file_path: str, status_callback: Optional[Callable[[str], None]] = None) -> None:
+        """🧹 Hapus file lama jika berbeda dengan yang baru
+        
+        Args:
+            file_path: Path ke file yang akan dihapus
+            status_callback: Callback untuk update status
+        """
+        if not file_path or not os.path.exists(file_path):
+            return
+            
+        try:
+            filename = os.path.basename(file_path)
+            status_msg = f"🧹 Membersihkan file lama: {filename}"
+            if status_callback:
+                status_callback(status_msg)
+                
+            os.remove(file_path)
+            success_msg = f"✅ Berhasil menghapus file lama: {file_path}"
+            self._log_info(success_msg)
+            
+        except Exception as e:
+            error_msg = f"⚠️ Gagal menghapus file lama {file_path}: {str(e)}"
+            self._log_error(error_msg, exc_info=True)
+            if status_callback:
+                status_callback(error_msg)
     
     def download_yolov5s(self, models_dir: str, 
                         progress_callback: Optional[Callable[[int, str], None]] = None,
-                        status_callback: Optional[Callable[[str], None]] = None) -> bool:
-        """📥 Download YOLOv5s model dengan progress tracking
+                        status_callback: Optional[Callable[[str], None]] = None,
+                        model_url: Optional[str] = None) -> bool:
+        """📥 Download YOLOv5s model dengan progress tracking dan auto-cleanup
         
         Args:
             models_dir: Directory untuk menyimpan model
             progress_callback: Callback untuk update progress (progress_pct, message)
             status_callback: Callback untuk update status message
+            model_url: URL kustom untuk download model (opsional)
             
         Returns:
             True jika download berhasil, False jika gagal
         """
         try:
             model_type = 'yolov5s'
-            url = self._download_urls[model_type]
+            url = model_url or self._download_urls[model_type]
             output_path = os.path.join(models_dir, f'{model_type}.pt')
+            
+            # Check if we have a previous download with different URL
+            if model_type in self._last_downloaded_files:
+                last_url, last_path = self._last_downloaded_files[model_type]
+                if last_url != url and os.path.exists(last_path) and os.path.exists(output_path):
+                    self._cleanup_old_file(last_path, status_callback)
+            
+            # Update last downloaded file info
+            self._last_downloaded_files[model_type] = (url, output_path)
             
             # Update status
             if status_callback:

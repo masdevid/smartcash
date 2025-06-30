@@ -1,78 +1,58 @@
-# File: smartcash/ui/pretrained/handlers/defaults.py
 """
 File: smartcash/ui/pretrained/handlers/defaults.py
 Deskripsi: Default configuration dan constants untuk pretrained models
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 # Default configuration untuk pretrained models
 DEFAULT_CONFIG = {
     'pretrained_models': {
-        'models_dir': '/content/models',
-        'drive_models_dir': '/data/pretrained',
-        'pretrained_type': 'yolov5s',
-        'auto_download': False,
-        'sync_drive': True
+        'models_dir': '/data/pretrained',
+        'pretrained_type': 'yolov5s',  # Hardcoded to yolov5s
+        'sync_drive': False  # Disabled by default
     }
 }
 
-# Available model variants - Simplified to YOLOv5s only
-MODEL_VARIANTS = ['yolov5s']
-
-# Model descriptions - Single option
-MODEL_DESCRIPTIONS = {
-    'yolov5s': '⚖️ YOLOv5 Small - Optimal untuk currency detection'
+# Default model download URLs
+DEFAULT_MODEL_URLS = {
+    'yolov5s': 'https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5s.pt',
+    'efficientnet': 'https://github.com/lukemelas/EfficientNet-PyTorch/releases/download/1.0/adv-efficientnet-b-0-b64d5ed6.pth'
 }
 
-# Model file sizes - Single option
-MODEL_SIZES = {
-    'yolov5s': '14.4 MB'
+# Hardcoded model info
+MODEL_INFO = {
+    'yolov5s': {
+        'description': '⚖️ YOLOv5 Small - Optimal untuk currency detection',
+        'size': '14.4 MB',
+        'category': 'detection',
+        'filename': 'yolov5s.pt',
+        'url_key': 'yolov5s'
+    },
+    'efficientnet': {
+        'description': '🎯 EfficientNet - Lightweight model untuk klasifikasi',
+        'size': '31 MB',
+        'category': 'classification',
+        'filename': 'efficientnet-b0.pth',
+        'url_key': 'efficientnet'
+    }
 }
 
 # Default directories
 DEFAULT_DIRECTORIES = {
-    'local_models': '/content/models',
-    'drive_models': '/data/pretrained',
-    'checkpoints': '/content/checkpoints',
-    'downloads': '/content/downloads'
+    'models': '/data/pretrained',
+    'checkpoints': '/checkpoints',
+    'downloads': '/downloads'
 }
 
 
-def get_default_pretrained_config() -> Dict[str, Any]:
-    """🔧 Mendapatkan konfigurasi default untuk pretrained models
+def get_default_config() -> Dict[str, Any]:
+    """⚙️ Mendapatkan konfigurasi default
     
     Returns:
         Dictionary berisi konfigurasi default
     """
     return DEFAULT_CONFIG.copy()
-
-
-def get_model_variants() -> List[str]:
-    """📋 Mendapatkan daftar variant model yang tersedia
-    
-    Returns:
-        List berisi nama-nama variant model
-    """
-    return MODEL_VARIANTS.copy()
-
-
-def get_model_descriptions() -> Dict[str, str]:
-    """📝 Mendapatkan deskripsi untuk setiap variant model
-    
-    Returns:
-        Dictionary berisi deskripsi model
-    """
-    return MODEL_DESCRIPTIONS.copy()
-
-
-def get_model_sizes() -> Dict[str, str]:
-    """📊 Mendapatkan ukuran file untuk setiap variant model
-    
-    Returns:
-        Dictionary berisi ukuran file model
-    """
-    return MODEL_SIZES.copy()
 
 
 def get_default_directories() -> Dict[str, str]:
@@ -84,34 +64,25 @@ def get_default_directories() -> Dict[str, str]:
     return DEFAULT_DIRECTORIES.copy()
 
 
-def get_model_info(model_type: str) -> Dict[str, str]:
-    """ℹ️ Mendapatkan informasi lengkap untuk model tertentu
+def get_model_info() -> Dict[str, Any]:
+    """ℹ️ Mendapatkan informasi model YOLOv5s
     
-    Args:
-        model_type: Tipe model (e.g., 'yolov5s')
-        
     Returns:
         Dictionary berisi informasi model
     """
-    if model_type not in MODEL_VARIANTS:
-        model_type = 'yolov5s'  # Fallback ke default
-    
     return {
-        'type': model_type,
-        'description': MODEL_DESCRIPTIONS.get(model_type, 'Model YOLOv5'),
-        'size': MODEL_SIZES.get(model_type, 'Unknown'),
-        'category': _get_model_category(model_type)
+        'type': 'yolov5s',
+        'description': MODEL_INFO['yolov5s']['description'],
+        'size': MODEL_INFO['yolov5s']['size'],
+        'category': MODEL_INFO['yolov5s']['category'],
+        'filename': MODEL_INFO['yolov5s']['filename']
     }
 
 
-def _get_model_category(model_type: str) -> str:
-    """🏷️ Mendapatkan kategori model berdasarkan tipe
+def _get_model_category() -> str:
+    """🏷️ Mendapatkan kategori model
     
-    Args:
-        model_type: Tipe model
-        
     Returns:
-        String kategori model
+        String kategori model (always 'detection' for YOLOv5s)
     """
-    # Simplified - hanya YOLOv5s yang tersedia
-    return 'currency_detection_optimized' if model_type == 'yolov5s' else 'standard'
+    return 'detection'

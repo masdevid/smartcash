@@ -39,7 +39,7 @@ def setup_download_handler(ui_components: Dict[str, Any], config: Dict[str, Any]
                 return
             
             # Check existing dataset
-            has_existing, total_images, summary_data = check_existing_dataset(ui_components.get('logger'))
+            has_existing, total_images, summary_data = check_existing_dataset(ui_components.get('logger_bridge'))
             
             if has_existing:
                 _show_download_confirmation(ui_components, ui_config, total_images)
@@ -65,7 +65,7 @@ def setup_check_handler(ui_components: Dict[str, Any], config: Dict[str, Any]):
             _setup_progress_tracker(ui_components, "Dataset Check")
             
             from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
-            scanner = create_dataset_scanner(ui_components.get('logger'))
+            scanner = create_dataset_scanner(ui_components.get('logger_bridge'))
             scanner.set_progress_callback(ui_components['progress_callback'])
             
             result = scanner.scan_existing_dataset_parallel()

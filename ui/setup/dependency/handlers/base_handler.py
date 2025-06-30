@@ -5,16 +5,24 @@
 # =============================================================================
 
 from typing import Dict, Any
-from smartcash.ui.utils.error_handler import ErrorHandler
-from smartcash.ui.utils.error_utils import safe_ui_operation
+from smartcash.ui.pretrained.utils import (
+    with_error_handling,
+    log_errors,
+    get_logger,
+    safe_ui_operation
+)
+
+# Initialize logger
+logger = get_logger()
 
 class BaseDependencyHandler:
     """Base handler dengan centralized error handling dan logger_bridge"""
     
+    @with_error_handling(component="dependency", operation="BaseDependencyHandler")
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
         self.logger_bridge = ui_components.get('logger_bridge')
-        self.error_handler = ErrorHandler(self.logger_bridge, "dependency")
+        logger.info("Initialized BaseDependencyHandler")
     
     def log_info(self, message: str) -> None:
         """Log info message"""

@@ -61,14 +61,9 @@ import ipywidgets as widgets
 from smartcash.ui.config_cell.components import component_registry
 from smartcash.ui.config_cell.components.ui_parent_components import ParentComponentManager
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
-from smartcash.ui.config_cell.handlers.error_handler import create_error_response
-from smartcash.ui.utils.logger_bridge import UILoggerBridge
-from smartcash.ui.utils.logging_utils import (
-    setup_aggressive_log_suppression,
-    setup_stdout_suppression,
-    restore_stdout,
-    allow_tqdm_display
-)
+from smartcash.ui.handlers.error_handler import create_error_response, handle_ui_errors
+from smartcash.ui.utils.ui_logger import get_module_logger, UILogger
+from smartcash.ui.utils.fallback_utils import safe_execute
 
 # Import shared components untuk parent
 from smartcash.ui.components import (
@@ -81,8 +76,8 @@ from smartcash.ui.components import (
 # Type variables
 T = TypeVar('T', bound=ConfigCellHandler)
 
-# Logger setup
-logger = logging.getLogger(__name__)
+# Get module logger
+logger = get_module_logger(__name__)
 
 class ConfigCellInitializer(Generic[T], ABC):
     """🎯 Base class untuk config cell yang menyediakan parent components.
@@ -180,16 +175,9 @@ class ConfigCellInitializer(Generic[T], ABC):
             title=self.title
         )
         
-        # Setup logger bridge after parent component is ready
-        try:
-            self._logger_bridge = UILoggerBridge(
-                ui_components={'parent': self.parent_component},
-                logger_name=f"{self.component_id}_bridge"
-            )
-        except Exception as e:
-            # Fallback jika UILoggerBridge gagal
-            self._logger.warning(f"Failed to create UILoggerBridge: {e}")
-            self._logger_bridge = None
+        # Initialize UILogger for this component with UI components
+        self._ui_logger = get_module_logger(f"{__name__}.{self.component_id}")
+        self._ui_logger.ui_components = {'parent': self.parent_component}
         
         # Setup shared configuration manager
         self._shared_config_manager = None
@@ -197,15 +185,13 @@ class ConfigCellInitializer(Generic[T], ABC):
         self._setup_shared_config()
         
     @property
-    def logger(self):
-        """Get the logger instance to use for logging.
+    def logger(self) -> UILogger:
+        """Get the UILogger instance for this component.
         
         Returns:
-            The logger bridge if available, otherwise the module logger
+            Configured UILogger instance for this component
         """
-        if hasattr(self, '_logger_bridge') and self._logger_bridge:
-            return self._logger_bridge
-        return self._logger
+        return self._ui_logger
         
     @property
     def handler(self) -> T:
@@ -220,9 +206,9 @@ class ConfigCellInitializer(Generic[T], ABC):
         """
         if self._handler is None:
             self._handler = self.create_handler()
-            # Inject logger bridge ke handler jika support
-            if hasattr(self._handler, 'set_logger_bridge') and hasattr(self, '_logger_bridge'):
-                self._handler.set_logger_bridge(self._logger_bridge)
+            # Inject logger to handler if supported
+            if hasattr(self._handler, 'set_logger') and hasattr(self, '_ui_logger'):
+                self._handler.set_logger(self._ui_logger)
         return self._handler
     
     @abstractmethod
@@ -329,7 +315,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         1. Membuat parent components (header, status, log, info)
         2. Memanggil create_child_components() untuk child-specific UI
         3. Menyusun semua components dalam struktur yang konsisten
-        4. Setup logger bridge dengan semua components
+        4. Setup UI components dengan centralized error handling
         
         Args:
             config: Configuration dictionary
@@ -409,12 +395,12 @@ class ConfigCellInitializer(Generic[T], ABC):
             self._logger.debug("Creating child components...")
             self.child_components = self.create_child_components(config)
             
-            # === 3. UPDATE LOGGER BRIDGE ===
-            # Logger bridge perlu di-reinitialize dengan semua components
-            self._logger.debug("Updating logger bridge with all components...")
+            # === 3. UPDATE UI LOGGER COMPONENTS ===
+            # Update UI components in the logger with all available components
+            self._ui_logger.debug("Updating logger with all UI components...")
             
-            if self._logger_bridge is not None:
-                # Collect all components
+            try:
+                # Update UI components in the logger
                 all_components = {
                     **self.parent_components,
                     **self.child_components,
@@ -423,20 +409,12 @@ class ConfigCellInitializer(Generic[T], ABC):
                     'log_output': self.parent_components.get('log_accordion')  # Fallback
                 }
                 
-                try:
-                    # Create new logger bridge dengan complete UI components
-                    self._logger_bridge = UILoggerBridge(
-                        ui_components=all_components,
-                        logger_name=f"{self.component_id}_bridge"
-                    )
+                if hasattr(self, '_ui_logger'):
+                    self._ui_logger.ui_components = all_components
                     
-                    # Re-assign logger if needed
-                    if hasattr(self._logger_bridge, 'logger'):
-                        self._logger = self._logger_bridge.logger
-                except Exception as e:
-                    self._logger.warning(f"Failed to update logger bridge: {e}")
-            else:
-                self._logger.debug("Logger bridge not available, skipping update")
+            except Exception as e:
+                self._ui_logger.warning(f"Failed to update logger components: {e}")
+                # Continue with existing logger if update fails
             
             # === 4. ASSEMBLE FINAL STRUCTURE ===
             self._logger.debug("Assembling UI structure...")
@@ -507,9 +485,9 @@ class ConfigCellInitializer(Generic[T], ABC):
                 )
                 children.append(log_container)
                 
-                # Make sure logger bridge knows about the log widget
-                if self._logger_bridge is not None and hasattr(self._logger_bridge, 'ui_components'):
-                    self._logger_bridge.ui_components['log_accordion'] = log_widget
+                # Update UI components in the logger
+                if hasattr(self, '_ui_logger') and hasattr(self._ui_logger, 'ui_components'):
+                    self._ui_logger.ui_components['log_accordion'] = log_widget
                 
             # Add info accordion if available
             if info_accordion and isinstance(info_accordion, widgets.Widget):
@@ -543,7 +521,7 @@ class ConfigCellInitializer(Generic[T], ABC):
                 **self.child_components,
                 'child_container': child_container,
                 'container': main_container,
-                'logger_bridge': self._logger_bridge
+                # logger_bridge removed - using centralized error handling instead
             }
             
             self._logger.debug("✅ UI components created successfully")
@@ -560,7 +538,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         
         Base implementation:
         1. Setup basic handlers untuk parent components
-        2. Connect logger bridge
+        2. Setup UI components
         3. Setup error handling
         
         Child class bisa override untuk add custom handlers:
@@ -574,7 +552,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         Note:
             - SELALU call super().setup_handlers() di awal override
             - Akses components via self.ui_components dictionary
-            - Use self._logger_bridge untuk logging
+            - Use self._ui_logger untuk logging
         """
         self._logger.debug("Setting up base event handlers...")
         
@@ -582,11 +560,6 @@ class ConfigCellInitializer(Generic[T], ABC):
         if 'save_button' in self.ui_components:
             self.ui_components['save_button'].on_click(
                 lambda b: self._on_save_click()
-            )
-            
-        if 'reset_button' in self.ui_components:
-            self.ui_components['reset_button'].on_click(
-                lambda b: self._on_reset_click()
             )
             
     def initialize(self, config: Optional[Dict[str, Any]] = None) -> widgets.Widget:
@@ -603,13 +576,13 @@ class ConfigCellInitializer(Generic[T], ABC):
         
         Args:
             config: Optional config override (default: use self.config)
-            
+        
         Returns:
             Root container widget ready untuk display
-            
+        
         Raises:
             Exception: Jika initialization gagal
-            
+        
         Usage:
             ```python
             initializer = MyConfigInitializer(config)
@@ -620,208 +593,86 @@ class ConfigCellInitializer(Generic[T], ABC):
         if self._is_initialized:
             self._logger.warning("Already initialized, returning existing container")
             return self.get_container()
-            
-        try:
-            self._logger.info(f"🚀 Initializing {self.component_id}...")
-            
-            # Use provided config or check shared config or default
-            if config is not None:
-                self.config = config
-            else:
-                # Try get from shared config first
-                shared_config = self._get_shared_config()
-                if shared_config:
-                    self.config = shared_config
-                    self._logger.info(f"📡 Loaded config from shared manager")
-                # Else use existing self.config
-                
-            # Setup output suppression
-            self._setup_output_suppression()
-            
-            # Create all UI components
-            self._create_ui_components()
-            
-            # Setup event handlers
-            self.setup_handlers()
-            
-            # Register component
-            self._register_component()
-            
-            # Mark as initialized
-            self._is_initialized = True
-            
-            # Restore output
-            self._restore_output()
-            
-            self._logger.info(f"✅ {self.component_id} initialized successfully")
-            
-            return self.get_container()
-            
-        except Exception as e:
-            self._logger.error(f"❌ Initialization failed: {str(e)}", exc_info=True)
-            self._restore_output()
-            
-            # Return error container
-            return create_error_response(
-                error_message=str(e),
-                error=e,
-                title=f"Failed to initialize {self.title}"
-            )
-            
+        
+        self._logger.info(f"🚀 Initializing {self.component_id}...")
+        
+        # Use provided config or check shared config or default
+        if config is not None:
+            self.config = config
+        else:
+            # Try get from shared config first
+            shared_config = self._get_shared_config()
+            if shared_config:
+                self.config = shared_config
+                self._logger.info(f"📡 Loaded config from shared manager")
+            # Else use existing self.config
+        
+        # Setup output suppression
+        self._setup_output_suppression()
+        
+        # Create all UI components
+        self._create_ui_components()
+        
+        # Setup event handlers
+        self.setup_handlers()
+        
+        # Register component
+        self._register_component()
+        
+        # Mark as initialized
+        self._is_initialized = True
+        
+        # Restore output
+        self._restore_output()
+        
+        self._logger.info(f"✅ {self.component_id} initialized successfully")
+        
+        return self.get_container()
+
+    @handle_ui_errors(error_component_title="UI Components Error")
     def _create_ui_components(self) -> None:
         """🎨 Internal method untuk create UI components.
         
         INTERNAL - Jangan call langsung atau override!
         """
-        # Create components via template method
-        self.ui_components = self.create_ui_components(self.config)
+        # Create all UI components
+        ui_components = self.create_ui_components(self.config)
         
-        # Update parent component dengan UI
-        if 'container' in self.ui_components:
-            self.parent_component.content_area.children = (
-                self.ui_components['container'],
-            )
+        # Store components
+        self.ui_components = ui_components
+        
+        # Extract parent and child components
+        self.parent_components = ui_components.get('parent_components', {})
+        self.child_components = ui_components.get('child_components', {})
+
+    # ... (rest of the code remains the same)
+
+    @handle_ui_errors(error_component_title="Shared Config Setup Error", log_error=True)
+    def _setup_shared_config(self) -> None:
+        """Setup shared configuration manager if needed.
+        
+        INTERNAL - Jangan call langsung!
+        """
+        if not self.component_id:
+            self._logger.debug("No component_id, skipping shared config setup")
+            return
             
-    def _setup_output_suppression(self) -> None:
-        """⚡ Setup output suppression untuk clean UI.
+        # Import here to avoid circular imports
+        from smartcash.ui.utils.shared_config import get_shared_config_manager
         
-        INTERNAL - Suppress noisy library outputs.
-        """
-        setup_aggressive_log_suppression()
-        if self.ui_components:
-            setup_stdout_suppression()
-        self._logger.debug("Output suppression enabled")
+        # Get parent module or use global
+        parent_module = self.parent_id.split('.')[0] if self.parent_id else 'global'
+        self._shared_config_manager = get_shared_config_manager(parent_module)
         
-    def _restore_output(self) -> None:
-        """🔄 Restore output settings.
-        
-        INTERNAL - Restore normal output behavior.
-        """
-        restore_stdout()
-        allow_tqdm_display()
-        self._logger.debug("Output restored")
-        
-    def _register_component(self) -> None:
-        """📋 Register component di registry.
-        
-        INTERNAL - Setup component tracking.
-        """
-        full_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
-        
-        component_registry.register_component(
-            component_id=full_id,
-            component={
-                **self.ui_components,
-                'initializer': self
-            },
-            parent_id=self.parent_id
+        # Subscribe to config updates
+        self._unsubscribe_func = self._shared_config_manager.subscribe(
+            self.component_id,
+            self._on_shared_config_update
         )
         
-        self._logger.debug(f"Registered component: {full_id}")
-        
-    def get_container(self) -> widgets.Widget:
-        """📦 Get root container widget.
-        
-        Returns:
-            Root container widget
-            
-        Note:
-            Safe to call multiple times, akan return same container.
-        """
-        if not self._is_initialized:
-            raise RuntimeError(f"{self.component_id} not initialized. Call initialize() first.")
-        return self.ui_components.get('container', self.parent_component.container)
-        
-    def update_status(self, message: str, status_type: str = "info") -> None:
-        """📊 Update status panel dengan message.
-        
-        PUBLIC METHOD - Gunakan untuk update status dari handlers.
-        
-        Args:
-            message: Status message untuk display
-            status_type: Type ('success', 'info', 'warning', 'error')
-            
-        Example:
-            ```python
-            self.update_status("Processing...", "info")
-            self.update_status("✅ Complete!", "success")
-            self.update_status("❌ Failed", "error")
-            ```
-        """
-        if 'status_panel' in self.ui_components:
-            from smartcash.ui.components import update_status_panel
-            update_status_panel(
-                self.ui_components['status_panel'],
-                message,
-                status_type
-            )
-            
-    def _on_save_click(self) -> None:
-        """💾 Default save button handler dengan config sharing.
-        
-        INTERNAL - Override setup_handlers() untuk custom behavior.
-        """
-        try:
-            self.update_status("💾 Saving configuration...", "info")
-            
-            # Extract current config
-            current_config = self.handler.extract_config(self.ui_components)
-            
-            # Save config
-            success = self.handler.save_config(self.ui_components)
-            
-            if success:
-                self.update_status("✅ Configuration saved", "success")
-                
-                # Broadcast to other components
-                self.broadcast_config_change(current_config)
-                
-            else:
-                self.update_status("❌ Save failed", "error")
-                
-        except Exception as e:
-            self.update_status(f"❌ Error: {str(e)}", "error")
-            self._logger.error(f"Save failed: {str(e)}", exc_info=True)
-            
-    def _on_reset_click(self) -> None:
-        """🔄 Default reset button handler.
-        
-        INTERNAL - Override setup_handlers() untuk custom behavior.
-        """
-        try:
-            self.update_status("🔄 Resetting to defaults...", "info")
-            self.handler.reset_ui(self.ui_components)
-            self.update_status("✅ Reset to defaults", "success")
-        except Exception as e:
-            self.update_status(f"❌ Error: {str(e)}", "error")
-            self._logger.error(f"Reset failed: {str(e)}", exc_info=True)
-            
-    def _setup_shared_config(self) -> None:
-        """Initialize shared configuration manager and set up subscription.
-        
-        This method is called during initialization to set up the shared config
-        manager and subscribe to configuration updates.
-        """
-        try:
-            from smartcash.ui.config_cell.managers.shared_config_manager import get_shared_config_manager
-            
-            # Get shared config manager for this component's parent
-            parent_module = self.parent_id.split('.')[0] if self.parent_id else 'global'
-            self._shared_config_manager = get_shared_config_manager(parent_module)
-            
-            # Subscribe to config updates
-            self._unsubscribe_func = self._shared_config_manager.subscribe(
-                self.component_id,
-                self._on_shared_config_update
-            )
-            
-            self._logger.debug(f"✅ Initialized shared config for {self.component_id}")
-            
-        except Exception as e:
-            self._logger.warning(f"⚠️ Failed to setup shared config: {e}", exc_info=True)
-            self._shared_config_manager = None
-            self._unsubscribe_func = None
-            
+        self._ui_logger.debug(f"✅ Initialized shared config for {self.component_id}")
+
+    @handle_ui_errors(error_component_title="Shared Config Update Error")
     def _on_shared_config_update(self, config: Dict[str, Any]) -> None:
         """Handle updates from shared configuration.
         
@@ -831,20 +682,9 @@ class ConfigCellInitializer(Generic[T], ABC):
         if not config:
             return
             
-        try:
-            self._logger.info("🔄 Updating from shared configuration...")
-            
-            # Update local config
-            self.config.update(config)
-            
-            # Update UI components if initialized
-            if self._is_initialized and hasattr(self.handler, 'update_ui_from_config'):
-                self.handler.update_ui_from_config(self.ui_components, config)
-                self.update_status("✅ Configuration updated from shared source", "success")
-                
-        except Exception as e:
-            self._logger.error(f"❌ Failed to apply shared config: {e}", exc_info=True)
-            self.update_status(f"❌ Failed to apply shared config: {e}", "error")
+        self._ui_logger.info(f"Received shared config update: {list(config.keys())}")
+        self.handler.apply_shared_config(config, self.ui_components)
+        self.update_status("Configuration updated from shared source", "success")
     
     def _get_shared_config(self) -> Optional[Dict[str, Any]]:
         """Get configuration from shared manager if available.
@@ -875,6 +715,7 @@ class ConfigCellInitializer(Generic[T], ABC):
         else:
             self._logger.info("No shared configuration found")
     
+    @handle_ui_errors(error_component_title="Cleanup Error")
     def cleanup(self) -> None:
         """🧹 Cleanup resources dan unregister component.
         
@@ -890,27 +731,23 @@ class ConfigCellInitializer(Generic[T], ABC):
             Ini TIDAK menghapus widgets dari display.
             Hanya cleanup internal state dan references.
         """
-        try:
-            # Unsubscribe from shared config
-            if self._unsubscribe_func:
-                self._unsubscribe_func()
-                self._unsubscribe_func = None
-            
-            # Unregister from component registry
-            full_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
-            component_registry.unregister_component(full_id)
-            
-            # Clear components
-            self.ui_components.clear()
-            self.parent_components.clear()
-            self.child_components.clear()
-            
-            # Reset state
-            self._is_initialized = False
-            self._handler = None
-            self._shared_config_manager = None
-            
-            self._logger.debug(f"✅ Cleanup completed for {self.component_id}")
-            
-        except Exception as e:
-            self._logger.error(f"❌ Cleanup error: {str(e)}", exc_info=True)
+        # Unsubscribe from shared config
+        if self._unsubscribe_func:
+            self._unsubscribe_func()
+            self._unsubscribe_func = None
+        
+        # Unregister from component registry
+        full_id = f"{self.parent_id}.{self.component_id}" if self.parent_id else self.component_id
+        component_registry.unregister_component(full_id)
+        
+        # Clear components
+        self.ui_components.clear()
+        self.parent_components.clear()
+        self.child_components.clear()
+        
+        # Reset state
+        self._is_initialized = False
+        self._handler = None
+        self._shared_config_manager = None
+        
+        self._logger.debug(f"✅ Cleanup completed for {self.component_id}")

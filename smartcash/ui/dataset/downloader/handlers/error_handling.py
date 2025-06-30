@@ -7,12 +7,13 @@ from typing import Any, Dict, Optional, Callable, TypeVar, Type
 from functools import wraps
 
 from smartcash.common.exceptions import SmartCashError
-from smartcash.ui.utils.error_utils import (
-    create_error_context,
+from smartcash.ui.pretrained.utils import (
     with_error_handling,
-    safe_ui_operation,
     log_errors,
-    ErrorContext
+    get_logger,
+    create_error_context,
+    ErrorContext,
+    safe_ui_operation
 )
 
 # Type variable for generic function return type

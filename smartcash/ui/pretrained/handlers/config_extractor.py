@@ -4,16 +4,66 @@ File: smartcash/ui/pretrained/handlers/config_extractor.py
 Deskripsi: Config extractor untuk pretrained models dengan fail-fast approach
 """
 
-from typing import Dict, Any
-from smartcash.common.logger import get_logger
+from typing import Dict, Any, Optional, TypeVar, Callable
+from functools import wraps
 
-logger = get_logger(__name__)
+# Type variables for generic function typing
+T = TypeVar('T')
 
-def extract_pretrained_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+# Type alias for logger bridge to support different logger implementations
+LoggerBridge = Any
+
+def with_error_handling(logger_bridge: Optional[LoggerBridge] = None):
+    """Decorator untuk menangani error dan logging secara konsisten"""
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> T:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                error_msg = f"❌ Error in {func.__name__}: {str(e)}"
+                if logger_bridge and hasattr(logger_bridge, 'error'):
+                    logger_bridge.error(error_msg, exc_info=True)
+                else:
+                    print(f"[ERROR] {error_msg}")
+                raise  # Re-raise to allow caller to handle
+        return wrapper
+    return decorator
+
+
+def _log_debug(logger_bridge: Optional[LoggerBridge], message: str) -> None:
+    """Log debug message using logger_bridge if available"""
+    if logger_bridge and hasattr(logger_bridge, 'debug'):
+        logger_bridge.debug(f"🔧 {message}")
+
+
+def _log_info(logger_bridge: Optional[LoggerBridge], message: str) -> None:
+    """Log info message using logger_bridge if available"""
+    if logger_bridge and hasattr(logger_bridge, 'info'):
+        logger_bridge.info(f"ℹ️ {message}")
+
+
+def _log_warning(logger_bridge: Optional[LoggerBridge], message: str) -> None:
+    """Log warning message using logger_bridge if available"""
+    if logger_bridge and hasattr(logger_bridge, 'warning'):
+        logger_bridge.warning(f"⚠️ {message}")
+
+
+def _log_error(logger_bridge: Optional[LoggerBridge], message: str, exc_info: bool = False) -> None:
+    """Log error message using logger_bridge if available"""
+    if logger_bridge and hasattr(logger_bridge, 'error'):
+        logger_bridge.error(f"❌ {message}", exc_info=exc_info)
+
+
+def extract_pretrained_config(
+    ui_components: Dict[str, Any],
+    logger_bridge: Optional[LoggerBridge] = None
+) -> Dict[str, Any]:
     """🔧 Extract konfigurasi dari UI components pretrained models
     
     Args:
         ui_components: Dictionary berisi komponen UI
+        logger_bridge: Logger bridge instance untuk logging (opsional)
         
     Returns:
         Dictionary berisi ekstraksi konfigurasi pretrained models
@@ -22,7 +72,9 @@ def extract_pretrained_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         ValueError: Jika ekstraksi config gagal atau data tidak valid
     """
     if not ui_components or not isinstance(ui_components, dict):
-        raise ValueError("❌ UI components tidak valid untuk ekstraksi config")
+        error_msg = "UI components tidak valid untuk ekstraksi config"
+        _log_error(logger_bridge, error_msg)
+        raise ValueError(error_msg)
     
     try:
         from smartcash.ui.pretrained.handlers.defaults import DEFAULT_MODEL_URLS
@@ -34,11 +86,14 @@ def extract_pretrained_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         if 'models_dir_input' in ui_components:
             models_dir = ui_components['models_dir_input'].value.strip()
             pretrained_config['models_dir'] = models_dir if models_dir else '/data/pretrained'
+            _log_debug(logger_bridge, f"Extracted models_dir: {pretrained_config['models_dir']}")
         else:
             pretrained_config['models_dir'] = '/data/pretrained'
+            _log_debug(logger_bridge, f"Using default models_dir: {pretrained_config['models_dir']}")
         
         # Hardcode model type to yolov5s
         pretrained_config['pretrained_type'] = 'yolov5s'
+        _log_debug(logger_bridge, f"Set pretrained_type to: {pretrained_config['pretrained_type']}")
         
         # Extract model download URLs
         model_urls = {}
@@ -48,61 +103,79 @@ def extract_pretrained_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             yolo_url = ui_components['yolo_url_input'].value.strip()
             if yolo_url and yolo_url != DEFAULT_MODEL_URLS['yolov5s']:
                 model_urls['yolov5s'] = yolo_url
+                _log_debug(logger_bridge, f"Using custom YOLOv5 URL: {yolo_url}")
         
         # EfficientNet URL
         if 'efficientnet_url_input' in ui_components:
             effnet_url = ui_components['efficientnet_url_input'].value.strip()
             if effnet_url and effnet_url != DEFAULT_MODEL_URLS['efficientnet']:
                 model_urls['efficientnet'] = effnet_url
+                _log_debug(logger_bridge, f"Using custom EfficientNet URL: {effnet_url}")
         
         if model_urls:
             pretrained_config['model_urls'] = model_urls
+            _log_debug(logger_bridge, f"Using custom model URLs: {model_urls}")
         
         # Disable sync drive by default
         pretrained_config['sync_drive'] = False
+        _log_debug(logger_bridge, "Sync drive disabled by default")
         
-        logger.info("✅ Config berhasil diekstrak dari UI components")
+        _log_info(logger_bridge, "Config berhasil diekstrak dari UI components")
         return config
         
+    except ImportError as e:
+        error_msg = f"Gagal mengimpor modul defaults: {str(e)}"
+        _log_error(logger_bridge, error_msg, exc_info=True)
+        raise ImportError(error_msg) from e
     except Exception as e:
-        error_msg = f"❌ Gagal mengekstrak config dari UI: {str(e)}"
-        logger.error(error_msg)
+        error_msg = f"Gagal mengekstrak config dari UI: {str(e)}"
+        _log_error(logger_bridge, error_msg, exc_info=True)
         raise ValueError(error_msg) from e
 
 
-def validate_pretrained_config(config: Dict[str, Any]) -> bool:
+def validate_pretrained_config(
+    config: Dict[str, Any],
+    logger_bridge: Optional[LoggerBridge] = None
+) -> bool:
     """🔍 Validasi konfigurasi pretrained models
     
     Args:
         config: Dictionary konfigurasi untuk divalidasi
+        logger_bridge: Logger bridge instance untuk logging (opsional)
         
     Returns:
         True jika valid, False jika tidak
     """
     try:
         if not isinstance(config, dict):
+            _log_warning(logger_bridge, "Config bukan dictionary")
             return False
         
         pretrained_models = config.get('pretrained_models', {})
         if not isinstance(pretrained_models, dict):
+            _log_warning(logger_bridge, "pretrained_models bukan dictionary")
             return False
         
         # Validasi required fields
         required_fields = ['models_dir', 'pretrained_type']
         for field in required_fields:
             if field not in pretrained_models or not pretrained_models[field]:
-                logger.warning(f"⚠️ Required field missing: {field}")
+                _log_warning(logger_bridge, f"Required field missing: {field}")
                 return False
         
         # Validasi pretrained_type values - Simplified to YOLOv5s only
         valid_types = ['yolov5s']
         if pretrained_models['pretrained_type'] not in valid_types:
-            logger.warning(f"⚠️ Invalid pretrained_type: {pretrained_models['pretrained_type']}, using yolov5s")
+            _log_warning(
+                logger_bridge, 
+                f"Invalid pretrained_type: {pretrained_models['pretrained_type']}, using yolov5s"
+            )
             return False
         
-        logger.info("✅ Config validation passed")
+        _log_info(logger_bridge, "Config validation passed")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Error validating config: {str(e)}")
+        error_msg = f"Error validating config: {str(e)}"
+        _log_error(logger_bridge, error_msg, exc_info=True)
         return False

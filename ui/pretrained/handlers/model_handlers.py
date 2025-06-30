@@ -15,8 +15,14 @@ else:
 
 from smartcash.ui.pretrained.services.model_checker import check_model_exists
 from smartcash.ui.pretrained.services.model_downloader import PretrainedModelDownloader
-from smartcash.ui.utils.error_utils import with_error_handling, log_errors, create_error_context
+from smartcash.ui.pretrained.utils import (
+    with_error_handling,
+    log_errors,
+    get_logger,
+    create_error_context
+)
 
+@with_error_handling(component="model_handlers", operation="ModelOperationError")
 class ModelOperationError(Exception):
     """Custom exception untuk operasi model"""
     
@@ -33,6 +39,7 @@ class ModelOperationError(Exception):
         self.details = details or {}
         super().__init__(self.message)
 
+@with_error_handling(component="model_handlers", operation="ModelOperationHandler")
 class ModelOperationHandler:
     """Handler untuk operasi-operasi terkait model"""
     

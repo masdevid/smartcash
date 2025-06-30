@@ -3,11 +3,11 @@ File: smartcash/ui/setup/dependency/dependency_initializer.py
 Deskripsi: Initializer untuk dependency management module dengan pattern terbaru
 """
 
-from typing import Dict, Any, Type, Optional
+from typing import Dict, Any, Type, Optional, Union
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.setup.dependency.handlers.config_handler import DependencyConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.logger_bridge import UILoggerBridge, create_ui_logger_bridge
+from smartcash.ui.utils.ui_logger import UILogger, get_logger
 
 class DependencyInitializer(CommonInitializer):
     """Initializer untuk dependency management dengan pattern terbaru"""
@@ -27,7 +27,7 @@ class DependencyInitializer(CommonInitializer):
             config_handler_class=config_handler_class,
             **kwargs
         )
-        self._logger_bridge = None
+        self._logger = None
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation
@@ -46,6 +46,10 @@ class DependencyInitializer(CommonInitializer):
         try:
             from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
             
+            # Initialize logger if not already done
+            if not hasattr(self, 'logger') or self.logger is None:
+                self.logger = get_logger(self.__class__.__module__)
+                
             # Log start of UI component creation
             self.logger.debug("Memulai pembuatan komponen UI")
             

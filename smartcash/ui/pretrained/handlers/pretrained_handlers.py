@@ -19,10 +19,13 @@ from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHand
 from smartcash.ui.pretrained.services.model_checker import PretrainedModelChecker
 from smartcash.ui.pretrained.services.model_downloader import PretrainedModelDownloader
 from smartcash.ui.pretrained.services.model_syncer import PretrainedModelSyncer
-from smartcash.ui.utils.error_utils import with_error_handling, log_errors, create_error_context
+from smartcash.ui.pretrained.utils import (
+    with_error_handling,
+    log_errors,
+    get_logger
+)
 
-@with_error_handling
-@log_errors
+@with_error_handling(component="pretrained_handlers", operation="PretrainedHandlers")
 class PretrainedHandlers:
     """Centralized handlers for pretrained module operations"""
     

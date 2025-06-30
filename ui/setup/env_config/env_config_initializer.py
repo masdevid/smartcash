@@ -1,38 +1,44 @@
 # File: smartcash/ui/setup/env_config/env_config_initializer.py 
 # Deskripsi: Initialize environment configuration UI with minimal dependencies
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Union
 import ipywidgets as widgets
-# Import logger utilities
-from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
-from smartcash.ui.utils.simple_logger import create_simple_logger
-from smartcash.ui.utils.logging_utils import suppress_all_outputs, restore_stdout
+import logging
+
+# Import consolidated logger
+from smartcash.ui.utils.ui_logger import (
+    UILogger,
+    get_logger,
+    setup_global_logging,
+    LogSuppressor
+)
 
 # Type aliases
-LoggerType = Callable[[str], None]
+LoggerType = Union[UILogger, logging.Logger]
 
 def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """Initialize environment configuration UI dengan setup sederhana"""
-    # Suppress all outputs during initialization
-    suppress_all_outputs()
+    # Initialize UI components
+    ui_components = {}
+    
     try:
-        # 1. Create UI components first (without logging)
-        ui_components = _create_ui_components()
+        # 1. Set up global logging first
+        setup_global_logging(ui_components=ui_components, log_level=logging.INFO)
+        logger = get_logger(__name__)
         
-        # 2. Setup logger bridge first (before any logging)
-        logger_bridge = _initialize_logger_bridge(ui_components)
-        ui_components['_logger_bridge'] = logger_bridge
+        # 2. Create UI components
+        ui_components.update(_create_ui_components())
         
-        # 3. Initialize status checker if not present
+        # 3. Initialize logger in UI components
+        ui_components['logger'] = logger
+        
+        # 4. Initialize status checker if not present
         if '_status_checker' not in ui_components:
             from smartcash.ui.setup.env_config.handlers.status_checker import StatusChecker
-            ui_components['_status_checker'] = StatusChecker(logger=logger_bridge)
+            ui_components['_status_checker'] = StatusChecker(logger=logger)
         
-        # 4. Now setup handlers (this will do the initial status update)
+        # 5. Now setup handlers (this will do the initial status update)
         _setup_handlers(ui_components, config or {})
-        
-        # 5. Restore output after UI is ready
-        restore_stdout()
         
         # Return the container widget which holds the UI
         if 'container' in ui_components:
@@ -43,7 +49,7 @@ def initialize_env_config_ui(config: Optional[Dict[str, Any]] = None) -> widgets
             raise ValueError("No valid UI container found in components")
             
     except Exception as e:
-        restore_stdout()  # Ensure output is restored even on error
+        logger.error(f"Failed to initialize environment config UI: {e}", exc_info=True)
         error_fallback = _create_error_fallback(str(e))
         if 'container' in error_fallback:
             return error_fallback['container']
@@ -167,53 +173,42 @@ def _setup_event_handlers(ui_components: Dict[str, Any], config: Dict[str, Any])
 
 def _create_fallback_logger(message: str = None, error: Exception = None) -> Any:
     """Create and configure a fallback logger with optional message and error handling."""
-    from smartcash.ui.utils.simple_logger import create_simple_logger
+    from smartcash.ui.utils.ui_logger import UILogger
     
-    logger = create_simple_logger('EnvConfigLogger')
+    logger = UILogger(ui_components={}, name='EnvConfigLogger')
     if message:
         if error:
-            logger.error(f"❌ {message}: {str(error)}", exc_info=True)
+            logger.error(f"{message}: {str(error)}", exc_info=True)
         else:
-            logger.warning(f"⚠️ {message}")
+            logger.warning(message)
     return logger
 
 def _initialize_logger_bridge(ui_components: Dict[str, Any]) -> Any:
     """Initialize and configure the logger bridge with duplicate prevention."""
     try:
-        # First, ensure we have the log output widget
-        if 'log_accordion' in ui_components and 'log_output' not in ui_components:
-            # If we have the accordion but not the output, extract it
-            log_accordion = ui_components['log_accordion']
-            if hasattr(log_accordion, 'log_output'):
-                ui_components['log_output'] = log_accordion.log_output
-                
-        # Initialize standard logger bridge
-        logger_bridge = create_ui_logger_bridge(ui_components)
-        ui_components['_logger_bridge'] = logger_bridge
+        # Check if logger already exists
+        if 'logger' in ui_components and ui_components['logger'] is not None:
+            return ui_components['logger']
+            
+        # Create a new logger
+        logger = get_logger(__name__)
         
-        # Disable console logging in the logger bridge to prevent duplicates
-        if hasattr(logger_bridge, 'set_console_logging'):
-            logger_bridge.set_console_logging(False)
+        # Store logger in components
+        ui_components['logger'] = logger
         
-        # Setup log output widget if it exists
+        # Configure log output widget if available
         _setup_log_output_widget(ui_components)
         
-        # Mark UI as ready to receive logs
-        if hasattr(logger_bridge, 'set_ui_ready'):
-            logger_bridge.set_ui_ready(True)
+        # Log initialization
+        logger.debug("Logger initialized")
         
-        # Log initialization with a unique marker
-        logger_bridge.info("🔌 Logger bridge initialized - Ready to receive logs")
-        
-        # Clear any buffered logs to prevent duplicates
-        if hasattr(logger_bridge, '_flush_log_buffer'):
-            logger_bridge._flush_log_buffer()
-            
-        return logger_bridge
+        return logger
         
     except Exception as e:
-        # Fallback to simple logger if initialization fails
-        error_msg = f"Failed to initialize logger bridge: {str(e)}"
+        # Fallback to basic logger if initialization fails
+        print(f"Warning: Failed to initialize logger: {e}")
+        logging.basicConfig(level=logging.INFO)
+        return logging.getLogger(__name__)
         print(f"[ERROR] {error_msg}")
         
         # Try to create a fallback logger
@@ -244,7 +239,7 @@ def _perform_initial_status_check(ui_components: Dict[str, Any]) -> None:
     """Check environment status and update UI components."""
     if not isinstance(ui_components, dict):
         raise ValueError("ui_components must be a dictionary")
-    logger = ui_components.get('_logger_bridge', create_simple_logger('EnvConfigLogger'))
+    logger = ui_components.get('_logger_bridge', UILogger(ui_components={}, name='EnvConfigLogger'))
     
     try:
         logger.info("🔍 Starting initial environment status check...")

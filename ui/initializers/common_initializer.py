@@ -21,28 +21,24 @@ Key Features:
 - Comprehensive error handling
 """
 
-# Import logging utilities first
-from smartcash.ui.utils.logging_utils import (
-    setup_aggressive_log_suppression,
-    setup_stdout_suppression,
-    suppress_ml_logs,
-    suppress_viz_logs,
-    suppress_data_logs
-)
-
-
-
-# Import other modules
-import contextlib
+# Import logging utilities
 import logging
 from typing import Dict, Any, Optional, Type, Callable
 from abc import ABC, abstractmethod
 import traceback
 import ipywidgets as widgets
+import contextlib
 
-from smartcash.common.logger import get_logger
+# Import new consolidated logger and error handler
+from smartcash.common.logger import get_logger as get_common_logger
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.logger_bridge import create_ui_logger_bridge
+from smartcash.ui.utils.ui_logger import (
+    UILogger,
+    setup_global_logging,
+    get_module_logger,
+    LogSuppressor
+)
+from smartcash.ui.handlers.error_handler import create_error_response
 
 class CommonInitializer(ABC):
     """Enhanced base class for initializing UI modules with comprehensive lifecycle management.
@@ -63,17 +59,21 @@ class CommonInitializer(ABC):
     # Class-level flag to ensure we only set up suppression once
     _suppression_initialized = False
     
-    @classmethod
-    def _initialize_suppression(cls):
-        """Class method to ensure suppression is initialized"""
-        if not cls._suppression_initialized:
-            # Setup aggressive suppression at module level
-            setup_aggressive_log_suppression()
-            setup_stdout_suppression()
-            suppress_ml_logs()
-            suppress_viz_logs()
-            suppress_data_logs()
-            cls._suppression_initialized = True
+    def _initialize_suppression(self):
+        """Initialize log and output suppression."""
+        try:
+            # Set up global logging with suppression
+            setup_global_logging(
+                ui_components=self.ui_components,
+                log_level=logging.INFO,
+                log_to_file=False
+            )
+            # Apply additional suppression for backend libraries
+            LogSuppressor.setup_aggressive_log_suppression()
+            return True
+        except Exception as e:
+            print(f"Warning: Failed to initialize suppression: {e}")
+            return False
     
     def __init__(self, module_name: str, config_handler_class: Type[ConfigHandler] = None):
         """Initialize dengan complete output suppression hingga UI ready
@@ -91,23 +91,13 @@ class CommonInitializer(ABC):
         self._logger_bridge = None
         self.config_handler = config_handler_class() if config_handler_class else None
         
-        # Setup logger with maximum suppression
+        # Setup logger with module-level logging
         try:
-            self.logger = get_logger(f"smartcash.ui.{module_name}")
-            if hasattr(self.logger, 'set_level'):
-                self.logger.set_level(logging.CRITICAL)
-            else:
-                self.logger.setLevel(logging.CRITICAL)
+            self.logger = get_module_logger(
+                name=self.__class__.__module__
+            )
+            self.ui_components['logger'] = self.logger
             
-            # Ensure no handlers can cause output
-            if hasattr(self.logger, 'handlers'):
-                for handler in self.logger.handlers[:]:
-                    self.logger.removeHandler(handler)
-            
-            # Add null handler to prevent 'no handlers' warnings
-            if not self.logger.handlers:
-                self.logger.addHandler(logging.NullHandler())
-                
         except Exception:
             # If logger setup fails, create a silent logger
             self.logger = logging.getLogger(f"smartcash.ui.{module_name}.silent")
@@ -116,50 +106,39 @@ class CommonInitializer(ABC):
     
     @contextlib.contextmanager
     def _suppress_outputs(self):
-        """Context manager untuk suppress semua output selama inisialisasi"""
-        from smartcash.ui.utils.logging_utils import (
-            setup_aggressive_log_suppression,
-            setup_stdout_suppression,
-            restore_stdout
+        """Context manager for suppressing outputs during initialization."""
+        # Set up global logging with suppression
+        setup_global_logging(
+            ui_components=self.ui_components,
+            log_level=logging.INFO,
+            log_to_file=False
         )
-        
-        # Setup suppression
-        setup_aggressive_log_suppression()
-        setup_stdout_suppression()
         
         try:
             yield
         finally:
-            # Restore stdout when done
-            restore_stdout()
+            # Cleanup is handled by the UILogger's cleanup on exit
+            pass
     
-    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
-        """Setup logger bridge AFTER UI components created dan suppress semua stdout
-        
-        Args:
-            ui_components: Dictionary of UI components that may be needed for logging
-        """
+    def _initialize_logger_bridge(self) -> None:
+        """Initialize the logger for UI logging integration."""
         try:
-            # Additional stdout suppression untuk ensure tidak ada log yang leak
-            from smartcash.ui.utils.logging_utils import setup_stdout_suppression
-            setup_stdout_suppression()
-            
-            # Initialize logger bridge with UI components using factory function
-            self._logger_bridge = create_ui_logger_bridge(
-                ui_components=ui_components,
-                logger_name=f"smartcash.ui.{self.module_name}"
+            # Create a module-level logger with UI integration
+            self._logger_bridge = get_module_logger(
+                name=f"smartcash.ui.{self.module_name}"
             )
-            self.logger = self._logger_bridge
             
-            # Store logger bridge in ui_components for handlers to use
-            ui_components['logger_bridge'] = self._logger_bridge
+            # Store in UI components
+            self.ui_components['logger'] = self._logger_bridge
             
-            if hasattr(self._logger_bridge, 'set_ui_ready'):
-                self._logger_bridge.set_ui_ready(True)
+            # Set UI components for the logger
+            if hasattr(self._logger_bridge, 'set_ui_components'):
+                self._logger_bridge.set_ui_components(self.ui_components)
             
-            # ONLY log to UI, tidak ke stdout
-            # self.logger.debug(f"Logger bridge initialized for {self.module_name}")
         except Exception as e:
+            # If logger bridge setup fails, use the default logger
+            print(f"Warning: Failed to initialize logger bridge: {e}")
+            self._logger_bridge = self.logger
             # Fallback silent logger - NO stdout output
             self.logger = get_logger(f"smartcash.ui.{self.module_name}")
             if hasattr(self.logger, 'set_level'):
@@ -204,7 +183,7 @@ class CommonInitializer(ABC):
                 })
                 
                 # 4. Initialize logger bridge SETELAH UI ready
-                self._initialize_logger_bridge(ui_components)
+                self._initialize_logger_bridge()
                 
                 # 5. Pre-initialization checks (optional) - silent
                 if hasattr(self, '_pre_initialize_checks'):
@@ -339,26 +318,18 @@ class CommonInitializer(ABC):
             ui_components: Dictionary of UI components
         """
         try:
-            def log_to_ui(message: str, level: str = 'info') -> None:
-                """Log message to UI output if available.
-                
-                Args:
-                    message: Message to log
-                    level: Log level (info, success, warning, error)
-                """
-                try:
-                    if 'log_output' in ui_components and ui_components['log_output']:
-                        with ui_components['log_output']:
-                            icons = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌'}
-                            print(f"{icons.get(level, 'ℹ️')} {message}")
-                except Exception:
-                    pass  # Silent fail for logger bridge
+            # Use the UILogger's built-in UI integration
+            if hasattr(self, 'logger') and hasattr(self.logger, 'set_ui_components'):
+                self.logger.set_ui_components(ui_components)
             
-            ui_components['logger_bridge'] = log_to_ui
+            # Store namespace for component identification
             ui_components['logger_namespace'] = f"smartcash.ui.{self.module_name}"
             
         except Exception as e:
-            self.logger.warning(f"⚠️ Failed to setup logger bridge: {str(e)}")
+            if hasattr(self, 'logger'):
+                self.logger.warning(f"Failed to setup logger bridge: {str(e)}")
+            else:
+                print(f"[WARNING] Failed to setup logger bridge: {str(e)}")
             
     def _get_timestamp(self) -> str:
         """Get current timestamp for tracking purposes.
@@ -377,11 +348,11 @@ class CommonInitializer(ABC):
             exc_info: Whether to include exception info
             **kwargs: Additional arguments for logging
         """
-        if hasattr(self, '_logger_bridge'):
-            self._logger_bridge.error(error_msg, exc_info=exc_info, **kwargs)
-        elif hasattr(self, '_logger'):
-            self._logger.error(error_msg, exc_info=exc_info, **kwargs)
+        # Use the logger directly for consistent error handling
+        if hasattr(self, 'logger') and self.logger:
+            self.logger.error(error_msg, exc_info=exc_info, **kwargs)
         else:
+            # Fallback to print if logger is not available
             print(f"[ERROR] {error_msg}", flush=True)
             if exc_info and 'exc_info' in kwargs:
                 import traceback
@@ -407,31 +378,17 @@ class CommonInitializer(ABC):
             - 'status_panel': Empty widget
             - 'error': Boolean flag indicating this is an error state
         """
-        from smartcash.ui.components.error.error_component import create_error_component
-        
-        # Get traceback if error is provided
-        tb_text = None
-        if error is not None:
-            try:
-                tb_text = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
-            except Exception:
-                tb_text = str(error)
-        
-        # Strip any leading emoji from error message
-        error_msg = str(error_message).strip()
-        if error_msg and len(error_msg) > 0 and ord(error_msg[0]) > 255:  # Check if first character is likely an emoji
-            error_msg = error_msg[1:].strip()
-            
-        # Create error component
-        error_component = create_error_component(
-            error_message=error_msg,
-            traceback=tb_text,
-            error_type="error",
-            module_name=getattr(self, 'module_name', 'unknown')
+        # Use the centralized error response creator
+        error_response = create_error_response(
+            error_message=error_message,
+            error=error,
+            title=f"{self.module_name} Error",
+            include_traceback=True
         )
         
+        # Add additional components needed for initializers
         return {
-            'ui': error_component.get('container', error_component),
+            'ui': error_response.get('container', error_response),
             'log_output': widgets.Output(),
             'status_panel': widgets.Output(),
             'error': True

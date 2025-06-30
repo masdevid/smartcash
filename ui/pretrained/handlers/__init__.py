@@ -1,11 +1,20 @@
 # File: smartcash/ui/pretrained/handlers/__init__.py
 """
 File: smartcash/ui/pretrained/handlers/__init__.py
-Deskripsi: Handlers package initialization dengan simplified structure
+Deskripsi: Module untuk menangani event handlers di pretrained module
 """
 
-# Config management
-from .config_handler import PretrainedConfigHandler
+from .event_handlers import (
+    setup_all_handlers,
+    setup_config_handlers,
+    setup_operation_handlers
+)
+
+from .progress_handlers import (
+    ProgressHandlers,
+    setup_progress_handlers
+)
+
 from .config_extractor import extract_pretrained_config, validate_pretrained_config
 from .config_updater import update_pretrained_ui, reset_pretrained_ui
 from .defaults import get_model_info

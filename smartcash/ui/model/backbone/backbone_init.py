@@ -125,7 +125,7 @@ class BackboneInitializer(ConfigCellInitializer):
         """
         return widgets.Layout(
             width='100%',
-            max_width='1200px',
+            max_width='1280px',
             margin='0 auto',
             padding='15px',
             border='1px solid #e0e0e0',

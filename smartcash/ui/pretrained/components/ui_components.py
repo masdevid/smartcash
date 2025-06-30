@@ -90,7 +90,7 @@ def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None, **kwargs)
         log_components.get('log_accordion', widgets.VBox([]))
     ], layout=widgets.Layout(
         width='100%',
-        max_width='1200px',
+        max_width='1280px',
         margin='0 auto',
         padding='15px',
         border='1px solid #e0e0e0',

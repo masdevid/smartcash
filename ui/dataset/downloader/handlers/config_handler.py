@@ -65,8 +65,12 @@ class DownloaderConfigHandler(ConfigHandler):
             self.logger.error(f"❌ Error loading config: {str(e)}")
             return self.get_default_config()
     
-    def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Save config dengan merge strategy untuk dataset_config.yaml"""
+    def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> Dict[str, Any]:
+        """Save config dengan merge strategy untuk dataset_config.yaml
+        
+        Returns:
+            Dict[str, Any]: Dictionary dengan format {'status': bool, 'error': Optional[str]}
+        """
         try:
             filename = config_filename or self.config_filename
             
@@ -76,8 +80,9 @@ class DownloaderConfigHandler(ConfigHandler):
             # Validate sebelum save
             validation = self.validate_config(current_config)
             if not validation['valid']:
-                self.logger.error(f"❌ Config tidak valid: {'; '.join(validation['errors'])}")
-                return False
+                error_msg = f"Config tidak valid: {'; '.join(validation['errors'])}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'status': False, 'error': error_msg}
             
             # Load existing config untuk merge
             existing_config = self.config_manager.load_config(filename) or {}
@@ -90,17 +95,23 @@ class DownloaderConfigHandler(ConfigHandler):
             
             if success:
                 self.logger.success(f"✅ Config tersimpan ke {filename}")
-                return True
+                return {'status': True}
             else:
-                self.logger.error(f"❌ Gagal menyimpan config ke {filename}")
-                return False
+                error_msg = f"Gagal menyimpan config ke {filename}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'status': False, 'error': error_msg}
                 
         except Exception as e:
-            self.logger.error(f"❌ Error saving config: {str(e)}")
-            return False
+            error_msg = f"Error saving config: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            return {'status': False, 'error': error_msg}
     
-    def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
-        """Enhanced reset config dengan proper UI update dan error handling"""
+    def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> Dict[str, Any]:
+        """Enhanced reset config dengan proper UI update dan error handling
+        
+        Returns:
+            Dict[str, Any]: Dictionary dengan format {'status': bool, 'error': Optional[str]}
+        """
         try:
             self.logger.info("🔄 Starting config reset...")
             
@@ -123,8 +134,9 @@ class DownloaderConfigHandler(ConfigHandler):
                 default_config = self.get_default_config()
                 self.logger.info("✅ Default config loaded")
             except Exception as e:
-                self.logger.error(f"❌ Error getting default config: {str(e)}")
-                return False
+                error_msg = f"Error getting default config: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'status': False, 'error': error_msg}
             
             # Preserve API key di config
             if current_api_key:
@@ -140,7 +152,8 @@ class DownloaderConfigHandler(ConfigHandler):
                     default_config = set_api_key_to_config(default_config, force_refresh=False)
                     self.logger.info("🔍 Attempted auto-detection from Colab secrets")
                 except Exception as e:
-                    self.logger.warning(f"⚠️ Auto-detection failed: {str(e)}")
+                    warning_msg = f"Auto-detection failed: {str(e)}"
+                    self.logger.warning(f"⚠️ {warning_msg}")
             
             # Update UI dengan default config yang sudah dimodifikasi
             try:
@@ -148,28 +161,33 @@ class DownloaderConfigHandler(ConfigHandler):
                 self.update_ui(ui_components, default_config)
                 self.logger.success("✅ UI components updated successfully")
             except Exception as e:
-                self.logger.error(f"❌ Error updating UI: {str(e)}")
-                return False
-            
-            # Save default ke file
+                error_msg = f"Error updating UI: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                # Tetap lanjutkan karena UI mungkin masih bisa direset
+                # Cuma log errornya aja
+
+            # Coba save ke file
             try:
-                filename = config_filename or self.config_filename
-                success = self.config_manager.save_config(default_config, filename)
+                if config_filename is None:
+                    config_filename = self.config_filename
                 
+                success = self.save_config(ui_components, config_filename)
                 if success:
-                    api_status = "dengan API key" if current_api_key else "tanpa API key"
-                    self.logger.success(f"🔄 Config berhasil direset ke default {api_status}")
-                    return True
+                    self.logger.info("✅ Config direset dan disimpan ke file")
+                    return {'status': True}
                 else:
-                    self.logger.warning("⚠️ Config direset di UI tapi gagal tersimpan ke file")
-                    return True  # UI sudah direset, anggap berhasil
+                    warning_msg = "Config direset di UI tapi gagal tersimpan ke file"
+                    self.logger.warning(f"⚠️ {warning_msg}")
+                    return {'status': True, 'error': warning_msg}
             except Exception as e:
-                self.logger.error(f"❌ Error saving config: {str(e)}")
-                return True  # UI sudah direset, anggap berhasil
+                error_msg = f"Error saving config: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'status': True, 'error': error_msg}
                 
         except Exception as e:
-            self.logger.error(f"❌ Error reset config: {str(e)}")
-            return False
+            error_msg = f"Error reset config: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            return {'status': False, 'error': error_msg}
     
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Enhanced validation dengan comprehensive checks untuk downloader"""

@@ -280,7 +280,7 @@ def _create_responsive_layout(layout_style: str, responsive_breakpoint: str,
     breakpoint_configs = {
         'small': {'max_width': '600px'},
         'medium': {'max_width': '900px'},
-        'large': {'max_width': '1200px'}
+        'large': {'max_width': '1280px'}
     }
     
     if responsive_breakpoint in breakpoint_configs:

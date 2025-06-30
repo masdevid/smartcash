@@ -152,7 +152,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         [top_section, middle_section, bottom_section],
         layout=ipywidgets.Layout(
             width='100%',
-            max_width='1200px',
+            max_width='1280px',
             padding='15px',
             border='1px solid #e0e0e0',
             border_radius='8px',

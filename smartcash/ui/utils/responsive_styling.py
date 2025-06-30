@@ -10,7 +10,7 @@ def get_responsive_css() -> str:
     <style>
     .hyperparams-container {
         width: 100%;
-        max-width: 1200px;
+        max-width: 1280px;
         margin: 0 auto;
         padding: 10px;
     }

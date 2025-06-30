@@ -72,12 +72,16 @@ class ConfigOperation:
 
     def _handle_config_error(self, error: Exception, operation: str) -> None:
         """Handle configuration-related errors."""
-        from .error_handling import handle_downloader_error, create_downloader_error_context
+        from smartcash.ui.dataset.downloader.handlers.error_handling import (
+            handle_downloader_error, 
+            create_error_context
+        )
         
         handle_downloader_error(
             error,
-            create_downloader_error_context(
+            create_error_context(
                 operation=operation,
+                component="downloader",
                 ui_components=self.ui_components
             ),
             logger=self.ui_components.get('logger_bridge'),

@@ -527,7 +527,7 @@ class ConfigCellInitializer(Generic[T], ABC):
                 children=children,
                 layout=widgets.Layout(
                     width='100%',
-                    max_width='1200px',
+                    max_width='1280px',
                     padding='15px',
                     gap='10px',
                     border='1px solid #e0e0e0',

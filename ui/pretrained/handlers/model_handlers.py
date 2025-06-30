@@ -92,7 +92,7 @@ class ModelOperationHandler:
                     self.ui_components[key].disabled = in_progress
             
             if self.logger_bridge and in_progress:
-                self.logger_bridge.debug("UI operation state updated", {"in_progress": in_progress})
+                self.logger_bridge.debug(f"UI operation state updated - in_progress: {in_progress}")
                 
         except Exception as e:
             error_msg = f"Gagal mengubah state UI: {str(e)}"

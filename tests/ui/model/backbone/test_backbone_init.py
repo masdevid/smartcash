@@ -244,7 +244,7 @@ def test_get_container_layout():
     # Verify the layout properties
     assert isinstance(layout, widgets.Layout)
     assert layout.width == '100%'
-    assert layout.max_width == '1200px'
+    assert layout.max_width == '1280px'
 
 @patch('os.path.exists')
 @patch('builtins.open', new_callable=mock_open, read_data='model:\n  backbone: test_backbone')

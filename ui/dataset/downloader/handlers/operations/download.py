@@ -4,6 +4,7 @@ Download operation handler for dataset downloader.
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 from smartcash.ui.dataset.downloader.handlers.confirmation import confirmation_handler
+from smartcash.ui.dataset.downloader.handlers.error_handling import handle_downloader_error, ErrorContext
 from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion, clear_outputs
 from smartcash.ui.dataset.downloader.utils.backend_utils import create_backend_downloader
 from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
@@ -25,24 +26,37 @@ class DownloadOperation:
 
     def _on_download_clicked(self, config: Dict[str, Any]) -> None:
         """Handle download button click."""
+        print("\n=== _on_download_clicked: Starting download process")
         button_manager = get_button_manager(self.ui_components)
         clear_outputs(self.ui_components)
         button_manager.disable_buttons('download_button')
         
         try:
-            # Extract and validate config
+            print("=== _on_download_clicked: Getting config handler")
             config_handler = self.ui_components.get('config_handler')
+            print(f"=== _on_download_clicked: Config handler: {config_handler is not None}")
+            
+            print("=== _on_download_clicked: Extracting config")
             ui_config = config_handler.extract_config(self.ui_components)
+            print(f"=== _on_download_clicked: Extracted config: {bool(ui_config)}")
+            
+            print("=== _on_download_clicked: Validating config")
             validation = config_handler.validate_config(ui_config)
+            print(f"=== _on_download_clicked: Config valid: {validation['valid']}")
             
             if not validation['valid']:
                 error_msg = f"Config tidak valid: {', '.join(validation['errors'])}"
                 log_to_accordion(self.ui_components, f"❌ {error_msg}", 'error')
+                print(f"=== _on_download_clicked: Config validation failed: {error_msg}")
                 return
                 
             # Check for existing files if needed
+            print("=== _on_download_clicked: Checking for existing files")
             existing_count = self._check_existing_files(ui_config)
+            print(f"=== _on_download_clicked: Existing files count: {existing_count}")
+            
             if existing_count is not None:
+                print("=== _on_download_clicked: Showing download confirmation")
                 self._show_download_confirmation(ui_config, existing_count)
             
         except Exception as e:
@@ -57,6 +71,7 @@ class DownloadOperation:
 
     def _show_download_confirmation(self, ui_config: Dict[str, Any], existing_count: int) -> None:
         """Show download confirmation dialog."""
+        print("\n=== _show_download_confirmation: Starting")
         roboflow = ui_config.get('data', {}).get('roboflow', {})
         download = ui_config.get('download', {})
         
@@ -64,34 +79,36 @@ class DownloadOperation:
         <div style='font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;'>
             <h3 style='margin-top: 0; color: #2c3e50;'>Download Dataset</h3>
             <div style='background: #f8f9fa; padding: 12px; border-radius: 6px; margin: 12px 0; font-size: 14px;'>
-                <div style='margin-bottom: 8px;'><b>Dataset:</b> {workspace}/{project} (v{version})</div>
-                <div style='display: flex; gap: 16px; margin-bottom: 8px;'>
-                    <span><b>Format:</b> {output_format}</span>
-                    <span><b>Validasi:</b> {validation_status}</span>
-                    <span><b>Backup:</b> {backup_status}</span>
-                </div>
-                {existing_warning}
+                <div style='margin-bottom: 8px;'><strong>Dataset:</strong> {dataset_name} v{version}</div>
+                <div style='margin-bottom: 8px;'><strong>Format:</strong> {format} ({split_type} split)</div>
+                <div><strong>Lokasi:</strong> {download_dir}</div>
             </div>
-            <p style='margin: 12px 0 0;'>Lanjutkan download?</p>
+            {existing_warning}
+            <p style='margin: 12px 0 0; color: #6c757d;'>Apakah Anda yakin ingin melanjutkan download?</p>
         </div>
         """.format(
-            workspace=roboflow.get('workspace', 'N/A'),
-            project=roboflow.get('project', 'N/A'),
-            version=roboflow.get('version', 'N/A'),
-            output_format=roboflow.get('output_format', 'yolov5pytorch'),
-            validation_status='<span style="color: #28a745;">✓</span>' if download.get('validate_download', True) else '<span style="color: #6c757d;">✗</span>',
-            backup_status='<span style="color: #28a745;">✓</span>' if download.get('backup_existing', False) else '<span style="color: #6c757d;">✗</span>',
+            dataset_name=roboflow.get('dataset_name', 'Tidak Diketahui'),
+            version=roboflow.get('version', '1'),
+            format=download.get('format', 'yolov8'),
+            split_type=download.get('split_type', 'train'),
+            download_dir=download.get('download_dir', 'tidak diketahui'),
             existing_warning=f"<div style='background: #fff3cd; color: #856404; padding: 8px; border-radius: 4px; margin: 8px 0 0; font-size: 13px;'>⚠️ {existing_count} file sudah ada</div>" if existing_count > 0 else ""
         )
         
-        confirmation_handler.show_confirmation_dialog(
-            ui_components=self.ui_components,
-            title="Konfirmasi Download",
-            message=message,
-            confirm_callback=self._execute_download,
-            confirm_args=(ui_config,),
-            danger_mode=False
-        )
+        print("=== _show_download_confirmation: Calling confirmation_handler.show_confirmation_dialog")
+        try:
+            confirmation_handler.show_confirmation_dialog(
+                ui_components=self.ui_components,
+                title="Konfirmasi Download",
+                message=message,
+                confirm_callback=self._execute_download,
+                confirm_args=(ui_config,),
+                danger_mode=False
+            )
+            print("=== _show_download_confirmation: confirmation_dialog called successfully")
+        except Exception as e:
+            print(f"=== _show_download_confirmation: Error showing confirmation dialog: {str(e)}")
+            raise
 
     def _execute_download(self, ui_config: Dict[str, Any]) -> None:
         """Execute the download operation."""
@@ -169,12 +186,16 @@ class DownloadOperation:
 
     def _handle_download_error(self, error: Exception, operation: str) -> None:
         """Handle download-related errors."""
-        from .error_handling import handle_downloader_error, create_downloader_error_context
+        from smartcash.ui.dataset.downloader.handlers.error_handling import (
+            handle_downloader_error, 
+            create_error_context
+        )
         
         handle_downloader_error(
             error,
-            create_downloader_error_context(
+            create_error_context(
                 operation=operation,
+                component="downloader",
                 ui_components=self.ui_components
             ),
             logger=self.ui_components.get('logger_bridge'),

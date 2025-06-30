@@ -194,7 +194,7 @@ def create_evaluation_layout(form_components: Dict[str, Any], config: Dict[str, 
     ], layout=widgets.Layout(
         padding='15px',
         width='100%',
-        max_width='1200px',  # Mencegah terlalu lebar pada layar besar
+        max_width='1280px',  # Mencegah terlalu lebar pada layar besar
         margin='0 auto',     # Auto margin untuk centering
         overflow_x='hidden'  # Mencegah horizontal scrollbar
     ))

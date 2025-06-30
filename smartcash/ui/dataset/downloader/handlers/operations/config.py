@@ -2,7 +2,8 @@
 Configuration operation handler for dataset downloader.
 """
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion
+from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion, clear_outputs
+from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
 
 
 class ConfigOperation:

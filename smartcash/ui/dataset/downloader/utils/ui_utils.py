@@ -2,7 +2,29 @@
 File: smartcash/ui/dataset/downloader/utils/ui_utils.py
 Deskripsi: Optimized UI utilities for download operations
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+def clear_outputs(ui_components: Dict[str, Any], *output_keys: str) -> None:
+    """Clear specified output components or all outputs if no keys provided.
+    
+    Args:
+        ui_components: Dictionary containing UI components
+        *output_keys: Optional keys of output components to clear. If not provided,
+                    clears all outputs with 'output' or 'log' in their keys.
+    """
+    if not ui_components:
+        return
+        
+    if output_keys:
+        # Clear only specified outputs
+        for key in output_keys:
+            if key in ui_components and hasattr(ui_components[key], 'clear_output'):
+                ui_components[key].clear_output()
+    else:
+        # Clear all outputs if no specific keys provided
+        for key, component in ui_components.items():
+            if any(k in key.lower() for k in ('output', 'log')) and hasattr(component, 'clear_output'):
+                component.clear_output()
 
 def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info') -> None:
     """Log message using the logger_bridge if available.

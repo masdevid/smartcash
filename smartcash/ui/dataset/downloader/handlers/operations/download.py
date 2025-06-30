@@ -4,8 +4,9 @@ Download operation handler for dataset downloader.
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 from smartcash.ui.dataset.downloader.handlers.confirmation import confirmation_handler
-from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion
+from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion, clear_outputs
 from smartcash.ui.dataset.downloader.utils.backend_utils import create_backend_downloader
+from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
 
 
 class DownloadOperation:

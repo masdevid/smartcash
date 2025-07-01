@@ -43,42 +43,23 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'):
     except Exception:
         pass
 
+# DEPRECATED: log_to_accordion has been removed as UILogger already handles log redirection to accordion
+# Use UILogger directly for all logging needs:
+# logger = ui_components.get('logger')
+# if logger:
+#     logger.info/error/warning/success(message)
+#
+# This function is kept as a stub for backward compatibility but will be removed in future versions
 def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info'):
-    """Log ke accordion output dengan styling"""
-    try:
-        accordion = ui_components.get('log_accordion')
-        log_output = ui_components.get('log_output')
+    """DEPRECATED: Use UILogger directly instead"""
+    # Get logger from ui_components
+    logger = ui_components.get('logger')
+    if logger and hasattr(logger, level):
+        # Use UILogger directly
+        getattr(logger, level)(message)
+        return True
         
-        if accordion and log_output and hasattr(log_output, 'clear_output'):
-            # Expand accordion jika error atau warning
-            if level in ['error', 'warning']:
-                if hasattr(accordion, 'selected_index'):
-                    accordion.selected_index = 0
-            
-            # Log ke output widget
-            color_map = {
-                'info': '#007bff', 'success': '#28a745', 'warning': '#ffc107', 
-                'error': '#dc3545', 'debug': '#6c757d'
-            }
-            color = color_map.get(level, '#007bff')
-            emoji_map = {'info': 'ℹ️', 'success': '✅', 'warning': '⚠️', 'error': '❌', 'debug': '🔍'}
-            emoji = emoji_map.get(level, 'ℹ️')
-            
-            html = f"""
-            <div style="color: {color}; margin: 2px 0; padding: 4px; 
-                        font-family: monospace; font-size: 13px;
-                        border-left: 3px solid {color}; padding-left: 8px;">
-                {emoji} {message}
-            </div>
-            """
-            
-            with log_output:
-                display(HTML(html))
-            return True
-    except Exception:
-        pass
-        
-    # Fallback ke log_to_ui
+    # Fallback to log_to_ui if logger not available
     log_to_ui(ui_components, message, level)
     return False
 

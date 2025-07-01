@@ -6,14 +6,14 @@ import os
 from typing import Dict, Any, Tuple, Optional, Callable, List
 from functools import wraps
 
+from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
+
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
-    log_errors,
-    get_logger
+    log_errors
 )
 
 # Type aliases
-LoggerBridge = Callable[[str, str], None]
 ModelInfo = Dict[str, Any]
 
 # Constants
@@ -57,7 +57,7 @@ def _create_model_info(
 def check_model_exists(
     models_dir: str, 
     model_type: str = DEFAULT_MODEL_TYPE,
-    logger_bridge: Optional[LoggerBridge] = None,
+    logger: Optional[UILogger] = None,
     **kwargs
 ) -> bool:
     """🔍 Check apakah model pretrained ada di direktori
@@ -65,13 +65,13 @@ def check_model_exists(
     Args:
         models_dir: Path direktori model
         model_type: Tipe model (default: yolov5s)
-        logger_bridge: Logger bridge untuk logging ke UI
+        logger: UILogger instance untuk logging ke UI
         **kwargs: Additional arguments for error context
         
     Returns:
         bool: True jika model ada, False jika tidak
     """
-    logger = get_logger(logger_bridge)
+    logger = logger or get_module_logger('smartcash.ui.pretrained.services.model_checker')
     
     if not models_dir or not os.path.exists(models_dir):
         logger.debug(f"Directory tidak ditemukan: {models_dir}")
@@ -87,9 +87,9 @@ def check_model_exists(
     return False
 
 
-def _process_model_file(model_path: str, pattern: str, logger_bridge: Optional[LoggerBridge] = None) -> Optional[Dict]:
+def _process_model_file(model_path: str, pattern: str, logger: Optional[UILogger] = None) -> Optional[Dict]:
     """Process a single model file and return its info"""
-    logger = get_logger(logger_bridge)
+    logger = logger or get_module_logger('smartcash.ui.pretrained.services.model_checker')
     try:
         file_size = os.path.getsize(model_path)
         if file_size < MIN_MODEL_SIZE:
@@ -106,18 +106,18 @@ def _process_model_file(model_path: str, pattern: str, logger_bridge: Optional[L
         logger.error(f"Error processing {pattern}: {str(e)}", exc_info=True)
         return None
 
-def _log_message(message: str, logger_bridge: Optional[LoggerBridge] = None, level: str = "info") -> None:
-    """Log a message using the logger bridge if available"""
-    if logger_bridge:
-        logger_bridge(message, level)
-    elif level == "error":
-        print(f"[ERROR] {message}")
-    elif level == "warning":
-        print(f"[WARN] {message}")
-    elif level == "debug":
-        print(f"[DEBUG] {message}")
+def _log_message(message: str, logger: Optional[UILogger] = None, level: str = "info") -> None:
+    """Log a message using the UILogger if available"""
+    logger = logger or get_module_logger('smartcash.ui.pretrained.services.model_checker')
+    
+    if hasattr(logger, level):
+        getattr(logger, level)(message)
     else:
-        print(f"[INFO] {message}")
+        # Fallback to standard logging levels
+        if level == "success":
+            logger.info(f"✅ {message}")
+        else:
+            logger.info(message)
 
 @with_error_handling(
     component="model_checker",
@@ -130,7 +130,7 @@ def _log_message(message: str, logger_bridge: Optional[LoggerBridge] = None, lev
 def get_model_info(
     models_dir: str, 
     model_type: str = DEFAULT_MODEL_TYPE,
-    logger_bridge: Optional[LoggerBridge] = None,
+    logger: Optional[UILogger] = None,
     **kwargs
 ) -> ModelInfo:
     """📊 Get detailed information tentang model di direktori
@@ -138,13 +138,13 @@ def get_model_info(
     Args:
         models_dir: Path direktori model
         model_type: Tipe model (default: yolov5s)
-        logger_bridge: Logger bridge untuk logging ke UI
+        logger: UILogger instance untuk logging ke UI
         **kwargs: Additional arguments for error context
         
     Returns:
         Dictionary berisi informasi model
     """
-    logger = get_logger(logger_bridge)
+    logger = logger or get_module_logger('smartcash.ui.pretrained.services.model_checker')
     
     info = _create_model_info(models_dir, model_type)
     
@@ -156,7 +156,7 @@ def get_model_info(
     for pattern in _get_model_patterns(model_type):
         model_path = os.path.join(models_dir, pattern)
         if os.path.isfile(model_path):
-            if file_info := _process_model_file(model_path, pattern, logger_bridge):
+            if file_info := _process_model_file(model_path, pattern, logger):
                 info['files'].append(file_info)
                 info['total_size'] += file_info['size']
     
@@ -184,7 +184,7 @@ def check_both_locations(
     local_dir: str, 
     drive_dir: str, 
     model_type: str = 'yolov5s',
-    logger_bridge: Optional[LoggerBridge] = None,
+    logger: Optional[UILogger] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """🔍 Check model existence di kedua lokasi (local dan drive)
@@ -193,17 +193,17 @@ def check_both_locations(
         local_dir: Path direktori local
         drive_dir: Path direktori drive
         model_type: Tipe model (default: yolov5s)
-        logger_bridge: Logger bridge untuk logging ke UI
+        logger: UILogger instance untuk logging ke UI
         **kwargs: Additional arguments for error context
         
     Returns:
         Dictionary berisi status kedua lokasi
     """
-    logger = get_logger(logger_bridge)
+    logger = logger or get_module_logger('smartcash.ui.pretrained.services.model_checker')
     logger.info(f"🔍 Checking model in both locations: local={local_dir}, drive={drive_dir}")
     
-    local_info = get_model_info(local_dir, model_type, logger_bridge=logger_bridge)
-    drive_info = get_model_info(drive_dir, model_type, logger_bridge=logger_bridge)
+    local_info = get_model_info(local_dir, model_type, logger=logger)
+    drive_info = get_model_info(drive_dir, model_type, logger=logger)
     
     recommendation = _get_recommendation(local_info, drive_info)
     
@@ -280,20 +280,20 @@ def validate_model_file(model_path: str) -> Tuple[bool, Optional[str]]:
 @log_errors(level="error")
 def create_models_directory(
     models_dir: str,
-    logger_bridge: Optional[LoggerBridge] = None,
+    logger: Optional[UILogger] = None,
     **kwargs
 ) -> bool:
     """📁 Create direktori models jika belum ada
     
     Args:
         models_dir: Path direktori yang akan dibuat
-        logger_bridge: Logger bridge untuk logging ke UI
+        logger: Logger untuk logging ke UI
         **kwargs: Additional arguments for error context
         
     Returns:
         True jika berhasil dibuat atau sudah ada, False jika gagal
     """
-    logger = get_logger(logger_bridge)
+    logger = logger or get_module_logger('smartcash.ui.pretrained.services.model_checker')
     
     if os.path.exists(models_dir):
         logger.debug(f"📁 Directory sudah ada: {models_dir}")

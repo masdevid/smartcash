@@ -149,7 +149,7 @@ class DependencyInitializer(CommonInitializer):
         except Exception as e:
             raise RuntimeError(f"Gagal memuat konfigurasi default: {str(e)}") from e
     
-    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> UILoggerBridge:
+    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> UILogger:
         """Initialize logger bridge untuk dependency module
         
         Args:

@@ -17,8 +17,14 @@ from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
 class SimpleConfigManager:
     """Config manager dengan sync functionality"""
     
-    def __init__(self, base_dir: Optional[str] = None, config_file: Optional[str] = None):
-        """Inisialisasi config manager"""
+    def __init__(self, base_dir: Optional[str] = None, config_file: Optional[str] = None, auto_sync: bool = False):
+        """Initialize config manager
+        
+        Args:
+            base_dir: Base directory for configs (defaults to appropriate location based on environment)
+            config_file: Name of the main config file (default: base_config.yaml)
+            auto_sync: Whether to automatically sync configs on initialization (default: False)
+        """
         # Setup minimal logging
         self._logger = logging.getLogger(__name__)
         if not self._logger.handlers:
@@ -35,6 +41,7 @@ class SimpleConfigManager:
             
         self.config_file = config_file or "base_config.yaml"
         self.config_cache = {}
+        self.auto_sync = auto_sync
         
         # Config directories
         self.config_dir = self.base_dir / DEFAULT_CONFIG_DIR
@@ -43,6 +50,10 @@ class SimpleConfigManager:
         
         # Setup structure
         self._ensure_config_directory()
+        
+        # Only auto-sync if explicitly enabled
+        if self.auto_sync:
+            self.sync_configs_to_drive(force_overwrite=False)
     
     def _get_default_base_dir(self) -> Path:
         """Get default base directory"""
@@ -53,11 +64,15 @@ class SimpleConfigManager:
             return Path(os.getcwd())
     
     def _ensure_config_directory(self):
-        """Ensure config directory exists"""
+        """Ensure config directory exists
+        
+        Note: This no longer performs any auto-syncing of templates
+        """
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             self._logger.warning(f"Could not create config directory: {str(e)}")
+            raise
     
     def discover_repo_configs(self) -> List[str]:
         """🔍 Discover semua config files di repo"""
@@ -105,15 +120,22 @@ class SimpleConfigManager:
     
     def sync_configs_to_drive(self, force_overwrite: bool = False, 
                             target_configs: Optional[List[str]] = None) -> Dict[str, Any]:
-        """🚀 Sync configs dari repo ke Drive dengan auto-discovery"""
+        """🚀 Sync configs from repo to Drive with auto-discovery
         
-        # Discover configs yang tersedia
+        Args:
+            force_overwrite: Whether to overwrite existing files (default: False)
+            target_configs: List of specific config files to sync (default: None = sync all)
+            
+        Returns:
+            Dictionary containing sync results
+        """
+        # Discover available configs
         available_configs = self.discover_repo_configs()
         
         if not available_configs:
             return {
                 'success': False,
-                'message': 'Tidak ada config ditemukan di repo',
+                'message': 'No configs found in repository',
                 'synced_count': 0,
                 'error_count': 1
             }
@@ -227,13 +249,19 @@ class SimpleConfigManager:
 # Singleton instance
 _INSTANCE = None
 
-def get_config_manager(base_dir=None, config_file=None):
-    """Get singleton config manager"""
+def get_config_manager(base_dir=None, config_file=None, auto_sync=False):
+    """Get singleton config manager
+    
+    Args:
+        base_dir: Base directory for configs
+        config_file: Name of the main config file
+        auto_sync: Whether to automatically sync configs on initialization (default: False)
+    """
     global _INSTANCE
     
     if _INSTANCE is None:
         try:
-            _INSTANCE = SimpleConfigManager(base_dir, config_file)
+            _INSTANCE = SimpleConfigManager(base_dir, config_file, auto_sync=auto_sync)
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Error creating config manager: {str(e)}")

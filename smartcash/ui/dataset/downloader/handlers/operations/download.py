@@ -3,9 +3,11 @@ Download operation handler for dataset downloader.
 """
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
+from smartcash.common.worker_utils import get_optimal_worker_count
+from smartcash.ui.utils.ui_logger import UILogger
 from smartcash.ui.dataset.downloader.handlers.confirmation import confirmation_handler
 from smartcash.ui.dataset.downloader.handlers.error_handling import handle_downloader_error, ErrorContext
-from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion, clear_outputs
+from smartcash.ui.dataset.downloader.utils.ui_utils import clear_outputs
 from smartcash.ui.dataset.downloader.utils.backend_utils import create_backend_downloader
 from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
 
@@ -46,7 +48,9 @@ class DownloadOperation:
             
             if not validation['valid']:
                 error_msg = f"Config tidak valid: {', '.join(validation['errors'])}"
-                log_to_accordion(self.ui_components, f"❌ {error_msg}", 'error')
+                logger = self.ui_components.get('logger')
+                if logger:
+                    logger.error(f"❌ {error_msg}")
                 print(f"=== _on_download_clicked: Config validation failed: {error_msg}")
                 return
                 
@@ -115,10 +119,12 @@ class DownloadOperation:
         try:
             # Setup operation environment
             self._setup_operation("download")
-            log_to_accordion(self.ui_components, "✅ Download dikonfirmasi, memulai...", "success")
+            logger = self.ui_components.get('logger')
+            if logger:
+                logger.success("✅ Download dikonfirmasi, memulai...")
             
             # Start operation in background thread
-            with ThreadPoolExecutor() as executor:
+            with ThreadPoolExecutor(max_workers=get_optimal_worker_count('io')) as executor:
                 executor.submit(self._perform_download, ui_config)
                 
         except Exception as e:
@@ -134,7 +140,7 @@ class DownloadOperation:
             # Create downloader instance
             downloader = create_backend_downloader(
                 ui_config,
-                self.ui_components.get('logger_bridge')
+                self.ui_components.get('logger')
             )
             
             if not downloader:
@@ -143,11 +149,14 @@ class DownloadOperation:
             # Execute download
             result = downloader.download()
             
+            logger = self.ui_components.get('logger')
             if result.get('status') is True:
-                log_to_accordion(self.ui_components, "✅ Download berhasil diselesaikan", 'success')
+                if logger:
+                    logger.success("✅ Download berhasil diselesaikan")
             else:
                 error_msg = result.get('error', 'Gagal mendownload dataset')
-                log_to_accordion(self.ui_components, f"❌ {error_msg}", 'error')
+                if logger:
+                    logger.error(f"❌ {error_msg}")
                 
         except Exception as e:
             self._handle_download_error(e, "perform_download")
@@ -165,7 +174,9 @@ class DownloadOperation:
         self._setup_progress_tracker(operation_name)
         
         # Log operation start
-        log_to_accordion(self.ui_components, f"🚀 Memulai {operation_name.lower()}...", 'info')
+        logger = self.ui_components.get('logger')
+        if logger:
+            logger.info(f"🚀 Memulai {operation_name.lower()}...")
 
     def _setup_progress_tracker(self, operation_name: str) -> None:
         """Setup and initialize progress tracker."""
@@ -190,6 +201,8 @@ class DownloadOperation:
             handle_downloader_error, 
             create_error_context
         )
+        # Get logger from ui_components
+        logger = self.ui_components.get('logger')
         
         handle_downloader_error(
             error,
@@ -198,7 +211,7 @@ class DownloadOperation:
                 component="downloader",
                 ui_components=self.ui_components
             ),
-            logger=self.ui_components.get('logger_bridge'),
+            logger=logger,
             ui_components=self.ui_components
         )
 

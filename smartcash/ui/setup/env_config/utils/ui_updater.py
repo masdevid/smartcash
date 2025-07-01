@@ -6,11 +6,6 @@ Deskripsi: Utilities untuk update UI components
 import ipywidgets as widgets
 from typing import Dict, Any
 
-def update_progress_bar(progress_widget: widgets.FloatProgress, value: float, description: str = "") -> None:
-    """📊 Update progress bar"""
-    progress_widget.value = value
-    if description:
-        progress_widget.description = description
 
 def update_status_panel(status_widget: widgets.HTML, message: str, status_type: str = "info") -> None:
     """📋 Update status panel dengan styling"""

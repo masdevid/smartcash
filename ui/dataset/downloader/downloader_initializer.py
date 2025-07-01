@@ -7,7 +7,8 @@ from typing import Dict, Any, Optional, Type
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.components.error.error_component import create_error_component
+from smartcash.ui.utils.ui_logger import get_module_logger
+from smartcash.ui.handlers.error_handler import create_error_response
 
 class DownloaderInitializer(CommonInitializer):
     """Downloader initializer dengan pattern terbaru dari CommonInitializer"""
@@ -19,7 +20,7 @@ class DownloaderInitializer(CommonInitializer):
             config_handler_class: Optional ConfigHandler class (defaults to DownloaderConfigHandler)
         """
         super().__init__(module_name='downloader', config_handler_class=config_handler_class)
-        self._logger_bridge = None  # Will be set by parent class
+        # Parent class handles logger initialization through get_module_logger
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Create UI components dengan proper error handling dan validation
@@ -78,8 +79,8 @@ class DownloaderInitializer(CommonInitializer):
             if missing:
                 raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
                 
-            # Add logger_bridge to ui_components for child components
-            ui_components['logger_bridge'] = self._logger_bridge
+            # Add logger to ui_components for child components
+            # Logger is already added by CommonInitializer
             
             # Add module-specific metadata
             ui_components.update({
@@ -113,7 +114,7 @@ class DownloaderInitializer(CommonInitializer):
         self.logger.debug("Memulai setup handlers")
         
         # Ensure logger bridge is available before setting up handlers
-        if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
+        if not hasattr(self, '_logger') or not self._logger:
             raise ValueError("Logger bridge belum diinisialisasi sebelum setup handlers")
         
         try:
@@ -252,11 +253,14 @@ class DownloaderInitializer(CommonInitializer):
         if 'handlers' not in ui_components:
             raise RuntimeError("Event handlers tidak terpasang dengan benar")
         
+        # Logger is already added by parent class via _add_logger_bridge method
+        # No need for backward compatibility with logger_bridge
+        
         # Test logger bridge functionality
         try:
-            self.logger.info("🧪 Testing logger bridge connectivity...")
+            ui_components['logger'].info("🧪 Testing logger bridge connectivity...")
         except Exception as e:
-            self.logger.warning(f"⚠️ Logger bridge test warning: {str(e)}")
+            ui_components['logger'].warning(f"⚠️ Logger bridge test warning: {str(e)}")
     
 
 
@@ -277,6 +281,9 @@ def initialize_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) 
         ```
     """
     try:
+        # Get module logger for initialization errors
+        logger = get_module_logger('smartcash.ui.dataset.downloader')
+        
         initializer = DownloaderInitializer()
         result = initializer.initialize(config=config, **kwargs)
         
@@ -286,4 +293,8 @@ def initialize_downloader_ui(config: Optional[Dict[str, Any]] = None, **kwargs) 
         return result
     except Exception as e:
         error_msg = f"❌ Gagal menginisialisasi downloader UI: {str(e)}"
-        return {'ui': create_error_component(error_msg, str(e), "Downloader Error"), 'error': True}
+        logger = get_module_logger('smartcash.ui.dataset.downloader')
+        logger.error(error_msg, exc_info=True)
+        # Use error_response from error_handler
+        error_response = create_error_response(error_msg, e, "Downloader Error")
+        return {'ui': error_response['container'], 'error': True}

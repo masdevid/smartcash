@@ -3,6 +3,7 @@ File: smartcash/ui/dataset/downloader/utils/ui_utils.py
 Deskripsi: Optimized UI utilities for download operations
 """
 from typing import Dict, Any, Optional
+from smartcash.ui.utils.ui_logger import UILogger
 
 def clear_outputs(ui_components: Dict[str, Any], *output_keys: str) -> None:
     """Clear specified output components or all outputs if no keys provided.
@@ -26,30 +27,8 @@ def clear_outputs(ui_components: Dict[str, Any], *output_keys: str) -> None:
             if any(k in key.lower() for k in ('output', 'log')) and hasattr(component, 'clear_output'):
                 component.clear_output()
 
-def log_to_accordion(ui_components: Dict[str, Any], message: str, level: str = 'info') -> None:
-    """Log message using the logger_bridge if available.
-    
-    Args:
-        ui_components: Dictionary containing UI components
-        message: The message to log
-        level: Log level (info, warning, error)
-    """
-    logger_bridge = ui_components.get('logger_bridge')
-    if logger_bridge:
-        # Map level to logger_bridge method
-        log_methods = {
-            'info': logger_bridge.info,
-            'success': logger_bridge.info,  # Fallback to info if success not available
-            'warning': logger_bridge.warning,
-            'error': logger_bridge.error
-        }
-        log_method = log_methods.get(level, logger_bridge.info)
-        log_method(message)
-    
-    # Auto-expand for errors/warnings
-    if level in ['error', 'warning'] and 'log_accordion' in ui_components:
-        if hasattr(ui_components['log_accordion'], 'selected_index'):
-            ui_components['log_accordion'].selected_index = 0
+# NOTE: log_to_accordion function has been removed as UILogger already handles log redirection to accordion
+# Use UILogger directly for all logging needs
 
 def map_step_to_current_progress(step: str, overall_progress: int) -> int:
     """Map step progress to current operation progress bar.

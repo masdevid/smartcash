@@ -8,14 +8,21 @@ import traceback
 from typing import Dict, Any
 
 def detect_environment_info() -> Dict[str, Any]:
-    """🔍 Deteksi informasi environment lengkap"""
-    # Initialize result with basic info that's unlikely to fail
-    result = {
-        'python_version': _get_python_version(),
-        'platform': _get_platform_info(),
-        'status': 'success'
-    }
+    """Detect and return comprehensive environment information.
     
+    Returns:
+        Dictionary containing detailed environment information including:
+        - python_version: Current Python version
+        - os: Operating system information
+        - gpu: GPU information if available
+        - storage_info: Disk storage information
+        - runtime: Runtime information (type, GPU availability)
+        - is_colab: Boolean indicating if running in Google Colab
+        - cpu_cores: Number of CPU cores
+        - total_ram: Total RAM in bytes
+        - drive_mounted: Boolean indicating if drive is mounted
+        - drive_mount_path: Path where drive is mounted
+    """
     # Helper function to safely get values
     def safe_get(func, default=None, *args, **kwargs):
         try:
@@ -24,11 +31,27 @@ def detect_environment_info() -> Dict[str, Any]:
             print(f"Warning: Error in {func.__name__}: {str(e)}")
             return default
     
+    # Initialize result with basic info
+    result = {
+        'python_version': safe_get(_get_python_version, 'Unknown'),
+        'os': safe_get(_get_os_info, 'Unknown'),
+        'status': 'success'
+    }
+    
+    # Get runtime information
+    runtime_info = safe_get(get_runtime_type, {})
+    if runtime_info:
+        result['runtime'] = runtime_info
+        result['runtime_display'] = runtime_info.get('display', 'Unknown')
+    
     # Get additional info with error handling
     try:
+        # Get GPU info
+        gpu_info = safe_get(_get_gpu_info, 'Unknown')
         result.update({
+            'gpu': gpu_info,
+            'gpu_available': 'No CUDA available' not in str(gpu_info),
             'is_colab': safe_get(_is_google_colab, False),
-            'gpu_info': safe_get(_get_gpu_info, 'Unknown'),
             'cpu_cores': safe_get(_get_cpu_cores, 0),
             'total_ram': safe_get(_get_total_ram, 0),
             'storage_info': safe_get(_get_storage_info, {})
@@ -36,7 +59,7 @@ def detect_environment_info() -> Dict[str, Any]:
         
         # Get drive mount status with detailed error handling
         try:
-            drive_mounted, mount_path = _is_drive_mounted()
+            drive_mounted, mount_path = safe_get(_is_drive_mounted, (False, ''))
             result.update({
                 'drive_mounted': drive_mounted,
                 'drive_mount_path': mount_path or ''
@@ -149,9 +172,25 @@ def _get_storage_info() -> str:
     except:
         return "N/A"
 
-def _get_runtime_type() -> str:
-    """⚡ Get runtime type information"""
+def get_runtime_type() -> Dict[str, str]:
+    """Get detailed runtime type information.
+    
+    Returns:
+        Dictionary containing:
+        - type: Runtime type (e.g., 'colab', 'local')
+        - gpu: GPU availability ('available' or 'not available')
+        - display: Formatted display string
+    """
+    runtime_info = {
+        'type': 'local',
+        'gpu': 'not available',
+        'display': 'Local Environment'
+    }
+    
     if _is_google_colab():
-        gpu_available = "GPU" if "CUDA" in _get_gpu_info() else "CPU"
-        return f"Colab {gpu_available}"
-    return "Local"
+        runtime_info['type'] = 'colab'
+        gpu_available = "CUDA" in _get_gpu_info()
+        runtime_info['gpu'] = 'available' if gpu_available else 'not available'
+        runtime_info['display'] = f"Google Colab ({'GPU' if gpu_available else 'CPU'})"
+    
+    return runtime_info

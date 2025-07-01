@@ -13,7 +13,7 @@ import time
 
 from smartcash.common.logger import get_logger
 from smartcash.common.utils.file_naming_manager import FileNamingManager
-from smartcash.common.threadpools import get_optimal_thread_count
+from smartcash.common.worker_utils import get_optimal_worker_count
 
 class DatasetFileRenamer:
     """Service untuk batch rename dataset ke UUID consistency format"""
@@ -244,7 +244,7 @@ class DatasetFileRenamer:
             return {'success_count': 0, 'error_count': 0, 'errors': []}
         
         results = {'success_count': 0, 'error_count': 0, 'errors': []}
-        max_workers = min(get_optimal_thread_count(), 8)
+        max_workers = min(get_optimal_worker_count('io'), 8)
         
         def rename_single_file(old_new_pair: Tuple[str, str]) -> Dict[str, Any]:
             old_path, new_path = old_new_pair

@@ -2,7 +2,8 @@
 Configuration operation handler for dataset downloader.
 """
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion, clear_outputs
+from smartcash.ui.utils.ui_logger import UILogger
+from smartcash.ui.dataset.downloader.utils.ui_utils import clear_outputs
 from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
 
 
@@ -34,13 +35,18 @@ class ConfigOperation:
             config_handler = self.ui_components.get('config_handler')
             if config_handler:
                 result = config_handler.save_config(self.ui_components)
+                logger = self.ui_components.get('logger')
                 if result.get('status') is True:
-                    log_to_accordion(self.ui_components, "✅ Konfigurasi berhasil disimpan", 'success')
+                    if logger:
+                        logger.success("✅ Konfigurasi berhasil disimpan")
                 else:
                     error_msg = result.get('error', 'Terjadi kesalahan saat menyimpan konfigurasi')
-                    log_to_accordion(self.ui_components, f"❌ {error_msg}", 'error')
+                    if logger:
+                        logger.error(f"❌ {error_msg}")
             else:
-                log_to_accordion(self.ui_components, "❌ Config handler tidak tersedia", 'error')
+                logger = self.ui_components.get('logger')
+                if logger:
+                    logger.error("❌ Config handler tidak tersedia")
                 
         except Exception as e:
             self._handle_config_error(e, "save_config")
@@ -57,13 +63,18 @@ class ConfigOperation:
             config_handler = self.ui_components.get('config_handler')
             if config_handler:
                 result = config_handler.reset_config(self.ui_components)
+                logger = self.ui_components.get('logger')
                 if result.get('status') is True:
-                    log_to_accordion(self.ui_components, "✅ Konfigurasi berhasil direset ke default", 'success')
+                    if logger:
+                        logger.success("✅ Konfigurasi berhasil direset ke default")
                 else:
                     error_msg = result.get('error', 'Terjadi kesalahan saat mereset konfigurasi')
-                    log_to_accordion(self.ui_components, f"❌ {error_msg}", 'error')
+                    if logger:
+                        logger.error(f"❌ {error_msg}")
             else:
-                log_to_accordion(self.ui_components, "❌ Config handler tidak tersedia", 'error')
+                logger = self.ui_components.get('logger')
+                if logger:
+                    logger.error("❌ Config handler tidak tersedia")
                 
         except Exception as e:
             self._handle_config_error(e, "reset_config")
@@ -77,6 +88,9 @@ class ConfigOperation:
             create_error_context
         )
         
+        # Get logger from ui_components
+        logger = self.ui_components.get('logger')
+        
         handle_downloader_error(
             error,
             create_error_context(
@@ -84,7 +98,7 @@ class ConfigOperation:
                 component="downloader",
                 ui_components=self.ui_components
             ),
-            logger=self.ui_components.get('logger_bridge'),
+            logger=logger,
             ui_components=self.ui_components
         )
 

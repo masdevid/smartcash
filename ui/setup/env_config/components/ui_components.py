@@ -7,7 +7,7 @@ import ipywidgets
 from typing import Dict, Any
 from smartcash.ui.components import (
     create_header, create_status_panel,
-    create_log_accordion, create_divider
+    create_log_accordion
 )
 from smartcash.ui.setup.env_config.utils.dual_progress_tracker import track_setup_progress
 from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary

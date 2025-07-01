@@ -17,8 +17,8 @@ class FileProcessor(BaseDownloaderComponent):
         super().__init__(logger)
         # Use provided max_workers or get optimal count
         if max_workers is None:
-            from smartcash.common.threadpools import get_optimal_thread_count
-            max_workers = get_optimal_thread_count('io')
+            from smartcash.common.worker_utils import get_optimal_worker_count
+            max_workers = get_optimal_worker_count('io')
         
         self.max_workers = max_workers
         self._setup_naming_manager()

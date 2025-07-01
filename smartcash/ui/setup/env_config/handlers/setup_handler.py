@@ -1,601 +1,779 @@
 """
-File: smartcash/ui/setup/env_config/handlers/setup_handler.py
-Deskripsi: Setup handler untuk environment configuration dengan proper workflow
+Setup Workflow Handler for Environment Configuration.
+
+This module provides the SetupHandler class which orchestrates the environment
+setup workflow, including drive mounting, folder creation, and configuration syncing.
+It works in conjunction with EnvConfigHandler which manages the configuration state.
 """
 
-import os
-import time
-import traceback
+import asyncio
 from enum import Enum
-from typing import Dict, Any
-from smartcash.ui.setup.env_config.utils.dual_progress_tracker import SetupStage
-from smartcash.ui.setup.env_config.handlers.drive_handler import DriveHandler
-from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler
-from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.setup.env_config.utils.ui_updater import update_status_panel
-from smartcash.ui.setup.env_config.utils.dual_progress_tracker import track_setup_progress
-from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple, TypedDict, cast
 
-class SetupHandler:
-    """🚀 Handler untuk mengelola setup environment workflow"""
+from smartcash.common.environment import get_environment_manager
+from smartcash.ui.handlers.base_handler import BaseHandler
+from smartcash.ui.setup.env_config.handlers.base_config_mixin import BaseConfigMixin
+from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
+from smartcash.ui.setup.env_config.constants import SetupStage
+
+class SetupPhase(str, Enum):
+    """Phases of the setup workflow."""
+    INIT = "initializing"
+    DRIVE = "drive_setup"
+    FOLDERS = "folder_setup"
+    CONFIG = "config_sync"
+    VERIFY = "verification"
+    COMPLETE = "complete"
+    ERROR = "error"
+
+class SetupSummary(TypedDict, total=False):
+    """Type definition for setup summary data."""
+    status: str
+    message: str
+    phase: SetupPhase
+    progress: float
+    current_stage: str
+    drive_mounted: bool
+    mount_path: str
+    folders_created: int
+    symlinks_created: int
+    configs_synced: int
+    verified_folders: List[str]
+    missing_folders: List[str]
+    verified_symlinks: List[Tuple[str, str]]
+    missing_symlinks: List[Tuple[str, str]]
+    config_check: Dict[str, Any]
+
+class SetupHandler(BaseHandler, BaseConfigMixin):
+    """Orchestrates the environment setup workflow.
     
-    def __init__(self, logger=None):
-        self.logger = logger or self._create_dummy_logger()
-        self.drive_handler = DriveHandler(logger)
-        self.folder_handler = FolderHandler(logger)
-        self.config_handler = ConfigHandler()
-        self._last_summary_data = None  # Store the last summary data
+    This handler manages the complete setup workflow while delegating
+    configuration management to EnvConfigHandler.
     
-    def run_full_setup(self, ui_components: Dict[str, Any], clear_logs: bool = True) -> Dict[str, Any]:
-        """🔄 Run full setup workflow with progress tracking
+    Key Responsibilities:
+    - Manages setup workflow and state
+    - Handles progress tracking
+    - Manages error recovery
+    - Coordinates between setup steps
+    - Provides status updates
+    
+    Note: Configuration state is managed by EnvConfigHandler.
+    """
+    
+    # Default configuration for the handler
+    DEFAULT_CONFIG = {
+        'auto_start': False,        # Start setup automatically
+        'stop_on_error': True,      # Stop on first error
+        'verify_setup': True,       # Verify setup after completion
+        'enable_logging': True,     # Enable detailed logging
+        'max_retries': 3,           # Max retries for failed operations
+        'retry_delay': 5,           # Delay between retries in seconds
+        'stages': [                 # Ordered list of setup stages
+            'drive',
+            'folder',
+            'config',
+            'verify'
+        ]
+    }
+    
+    def __init__(self, config_handler=None, env_config_handler: Optional[EnvConfigHandler] = None, **kwargs):
+        """Initialize the SetupHandler with configuration.
         
         Args:
-            ui_components: Dictionary containing UI components
-            clear_logs: Whether to clear logs before starting (default: True)
+            config_handler: Instance of ConfigHandler for configuration
+            env_config_handler: Instance of EnvConfigHandler for configuration state
+            **kwargs: Additional keyword arguments for BaseHandler
+                - logger: Custom logger instance (optional)
+                - parent: Parent widget (optional)
+                
+        Raises:
+            ValueError: If required dependencies are not provided
+        """
+        # Initialize base classes
+        super().__init__(
+            module_name='setup',
+            parent_module='env_config',
+            **kwargs
+        )
+        
+        # Initialize BaseConfigMixin with the provided config handler
+        BaseConfigMixin.__init__(self, config_handler=config_handler, **kwargs)
+        
+        # Validate and store EnvConfigHandler reference
+        if env_config_handler is None:
+            self.logger.warning("No EnvConfigHandler provided, creating a new instance")
+            env_config_handler = EnvConfigHandler(config_handler=config_handler, **kwargs)
+            
+        self.env_config = env_config_handler
+        
+        # Initialize environment manager
+        self.env_manager = get_environment_manager(logger=self.logger)
+        
+        # Initialize workflow state
+        self._current_phase = SetupPhase.INIT
+        self._setup_in_progress = False
+        self._setup_progress = 0.0
+        self._last_error = None
+        self._retry_count = 0
+        self._current_stage = "Not started"
+        
+        # Load and validate configuration
+        self.auto_start = self.get_config_value('auto_start', False)
+        self.stop_on_error = self.get_config_value('stop_on_error', True)
+        self.verify_setup = self.get_config_value('verify_setup', True)
+        self.max_retries = max(0, int(self.get_config_value('max_retries', 3)))
+        self.retry_delay = max(0, float(self.get_config_value('retry_delay', 5)))
+        self.stages = self.get_config_value('stages', [])
+        
+        # Validate required stages
+        if not self.stages:
+            self.logger.warning("No setup stages configured, using default stages")
+            self.stages = ['drive', 'folder', 'config', 'verify']
+        
+        # Initialize last summary
+        self._last_summary = self._create_initial_summary()
+        
+        # Log successful initialization
+        self.logger.info(
+            f"Initialized SetupHandler with {len(self.stages)} stages: {', '.join(self.steps)}"
+        )
+    
+    def _update_summary(self, **updates) -> None:
+        """Update the setup summary with the provided values.
+        
+        Args:
+            **updates: Key-value pairs to update in the summary
+            
+        Raises:
+            ValueError: If any of the update keys are not valid summary fields
+        """
+        if self._last_summary is None:
+            self._last_summary = self._create_initial_summary()
+            
+        # Validate update keys against the summary structure
+        valid_keys = set(self._last_summary.keys())
+        invalid_keys = set(updates.keys()) - valid_keys
+        
+        if invalid_keys:
+            self.logger.warning(f"Ignoring invalid summary fields: {', '.join(invalid_keys)}")
+            
+        # Apply valid updates
+        valid_updates = {k: v for k, v in updates.items() if k in valid_keys}
+        self._last_summary.update(valid_updates)
+        
+        # Update the current phase if it was provided
+        if 'phase' in valid_updates:
+            self._current_phase = valid_updates['phase']
+            
+        # Log significant state changes
+        if 'status' in valid_updates:
+            self.logger.info(f"Setup status updated to: {valid_updates['status']}")
+    
+    async def start_setup(self, auto_start: bool = None) -> None:
+        """Start the environment setup process.
+        
+        This method initiates the setup workflow, which includes:
+        1. Drive mounting
+        2. Folder creation
+        3. Configuration syncing
+        4. Status verification
+        
+        Args:
+            auto_start: Whether to start the setup automatically. If None, uses the instance's auto_start setting.
+            
+        Raises:
+            RuntimeError: If setup is already in progress
+        """
+        auto_start = auto_start if auto_start is not None else self.auto_start
+        
+        if self._setup_in_progress:
+            error_msg = "Setup is already in progress"
+            self.logger.warning(error_msg)
+            raise RuntimeError(error_msg)
+            
+        try:
+            self._setup_in_progress = True
+            self._setup_progress = 0.0
+            self._last_error = None
+            self._retry_count = 0
+            
+            self.logger.info("Initializing environment setup")
+            
+            # Update status through the status panel
+            self._update_status("Initializing environment setup...")
+            
+            # Ensure handlers are initialized
+            if not hasattr(self, 'handlers'):
+                self.initialize_handlers()
+            
+            # Validate configuration before starting
+            if not self._validate_config():
+                error_msg = "Configuration validation failed"
+                self.logger.error(error_msg)
+                self._handle_setup_error(error_msg)
+                return
+                
+            # Start the setup process
+            if auto_start:
+                self.logger.info("Starting setup workflow")
+                asyncio.create_task(self._run_setup_workflow())
+                
+        except Exception as e:
+            self.logger.error(f"Failed to start setup: {str(e)}")
+            self._handle_setup_error(f"Failed to start setup: {str(e)}")
+            raise
+    
+    async def _run_stage(self, stage: str) -> bool:
+        """Execute a single setup stage with retry logic and proper error handling.
+        
+        Args:
+            stage: The name of the stage to run (must be a key in self.handlers)
             
         Returns:
-            Dict containing setup results and status
+            bool: True if the stage completed successfully, False otherwise
+            
+        Raises:
+            ValueError: If the stage name is invalid
+            RuntimeError: If the stage handler is not properly initialized
         """
-        self.logger.info("🚀 Starting full setup workflow...")
-        summary_data = {'status': 'pending', 'message': 'Setup started', 'phase': 'initialization'}
+        # Validate stage name
+        if stage not in self.handlers:
+            error_msg = f"Unknown setup stage: {stage}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+            
+        handler = self.handlers[stage]
+        if not hasattr(handler, 'run') or not callable(handler.run):
+            error_msg = f"Handler for stage '{stage}' is missing required 'run' method"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+            
+        attempt = 0
+        max_attempts = 1 + self.max_retries  # Initial attempt + retries
         
-        try:
-            # Validate UI components
-            if not ui_components or not isinstance(ui_components, dict):
-                raise ValueError("Invalid UI components provided")
-                
-            # Initialize progress tracker if not already done
-            if 'progress_tracker' not in ui_components:
-                self.logger.info("🔧 Initializing progress tracker...")
-                from smartcash.ui.setup.env_config.utils.dual_progress_tracker import DualProgressTracker
-                progress_tracker = DualProgressTracker(ui_components=ui_components, logger=self.logger)
-                ui_components['progress_tracker'] = progress_tracker
-                self.logger.info("✅ Progress tracker initialized")
-            else:
-                progress_tracker = ui_components['progress_tracker']
-                self.logger.info("ℹ️ Using existing progress tracker")
+        while attempt < max_attempts:
+            attempt += 1
+            self._current_stage = stage
             
-            # Make sure progress container is visible
-            if hasattr(progress_tracker, 'show'):
-                progress_tracker.show()
-                
-            # Set initial stage
-            progress_tracker.update_stage(SetupStage.INIT, "Starting setup process...")
+            # Update status for this attempt
+            if attempt > 1:
+                retry_msg = f" (Attempt {attempt}/{max_attempts})"
+                self.logger.warning(f"Retrying {stage} stage{retry_msg}")
+                await asyncio.sleep(self.retry_delay * (attempt - 1))  # Exponential backoff
             
-            # Execute the setup workflow
-            summary_data = self._execute_setup_workflow(ui_components, progress_tracker)
+            self._update_status(f"Starting {stage.replace('_', ' ')} stage...")
+            self.logger.info(f"Executing setup stage: {stage}")
             
-            # Update the UI based on the result
-            self._update_ui_after_setup(ui_components, summary_data)
-            
-            return summary_data
-            
-        except Exception as e:
-            error_msg = f"❌ Setup failed: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            
-            # Update UI with error state
-            if 'progress_tracker' in locals() and hasattr(progress_tracker, 'error'):
-                progress_tracker.error(error_msg)
-                
-            self._set_error_state(ui_components, error_msg)
-            
-            return {
-                'status': 'error',
-                'message': error_msg,
-                'error': str(e),
-                'phase': summary_data.get('phase', 'unknown')
-            }
-            
-        finally:
-            # Ensure progress tracker is properly cleaned up
-            if 'progress_tracker' in locals() and progress_tracker is not None:
-                try:
-                    # Only complete if not already in error state
-                    error_occurred = 'error' in locals() and isinstance(error, Exception)
-                    if not error_occurred or not hasattr(error, 'handled'):
-                        progress_tracker.complete("Setup completed" if not error_occurred else "Setup failed")
-                except Exception as cleanup_error:
-                    self.logger.error(f"Error during progress tracker cleanup: {str(cleanup_error)}", exc_info=True)
-                
-    def _update_ui_after_setup(self, ui_components: Dict[str, Any], summary_data: Dict[str, Any]) -> None:
-        """Update UI components after setup completes"""
-        if not isinstance(summary_data, dict):
-            summary_data = {'status': 'unknown', 'message': 'No summary data available'}
-            
-        # Store the summary data for future reference
-        self._last_summary_data = summary_data
-        
-        # Update setup summary if available
-        if 'setup_summary' in ui_components:
             try:
-                from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
+                # Execute the stage handler
+                result = await handler.run()
                 
-                status = summary_data.get('status', 'unknown')
-                
-                if status in ['success', True]:
-                    status_msg = "✅ Environment setup completed successfully!"
-                    status_type = 'success'
-                elif status == 'warning':
-                    status_msg = "⚠️ Setup completed with some issues"
-                    status_type = 'warning'
-                else:
-                    status_msg = summary_data.get('message', '❌ Setup failed')
-                    status_type = 'error'
-                
-                update_setup_summary(
-                    ui_components['setup_summary'],
-                    status_message=status_msg,
-                    status_type=status_type,
-                    details=summary_data
+                # If we get here, the stage completed without exceptions
+                self.logger.info(f"Successfully completed setup stage: {stage}")
+                self._update_summary(
+                    status='completed',
+                    phase=stage,
+                    message=f"{stage.replace('_', ' ').title()} completed successfully"
                 )
+                return True
+                
+            except asyncio.CancelledError:
+                self.logger.warning(f"Stage '{stage}' was cancelled")
+                self._update_status(f"{stage.replace('_', ' ')} cancelled", is_error=True)
+                return False
+                
             except Exception as e:
-                error_msg = f"Error updating setup summary: {str(e)}"
-                self.logger.error(error_msg, exc_info=True)
-                if 'progress_tracker' in ui_components:
-                    ui_components['progress_tracker'].logger.error(error_msg)
-        
-        # Set completion state if we have a successful or warning status
-        if summary_data.get('status') in ['success', 'warning', True]:
-            self._set_completion_state(ui_components, summary_data)
-    
-    def _execute_setup_workflow(self, ui_components: Dict[str, Any], progress_tracker) -> Dict[str, Any]:
-        """🔧 Execute setup steps dengan progress tracking"""
-        from smartcash.ui.setup.env_config.constants import REQUIRED_FOLDERS, SYMLINK_MAP
-        
-        # Initialize summary data
-        summary_data = {}
-        self.logger.info("🔍 Starting setup workflow execution...")
-        
-        # Load existing summary data if available to maintain state
-        summary_data = getattr(self, '_last_summary_data', None)
-        
-        # Initialize with default values if summary_data is None or not a dictionary
-        if not isinstance(summary_data, dict):
-            summary_data = {
-                'drive_mounted': False,
-                'mount_path': 'N/A',
-                'configs_synced': 0,
-                'symlinks_created': 0,
-                'folders_created': 0,
-                'required_folders': len(REQUIRED_FOLDERS),
-                'required_symlinks': len(SYMLINK_MAP),
-                'status': 'pending',  # Use 'status' instead of 'success' for consistency
-                'verified_folders': [],
-                'missing_folders': [],
-                'verified_symlinks': [],
-                'missing_symlinks': []
-            }
-        
-        # Ensure all required keys exist in the dictionary
-        for key in ['drive_mounted', 'mount_path', 'configs_synced', 'symlinks_created', 
-                   'folders_created', 'status', 'verified_folders', 'missing_folders',
-                   'verified_symlinks', 'missing_symlinks']:
-            if key not in summary_data:
-                summary_data[key] = None if key == 'mount_path' else 0 if 'count' in key or 'created' in key else False
-        
-        # Store the initialized summary data
-        self._last_summary_data = summary_data
-        
-        try:
-            # Step 1: Mount Drive (if not already mounted)
-            if not summary_data.get('drive_mounted', False):
-                self.logger.info("🔧 Step 1: Mounting Google Drive...")
-                progress_tracker.update_stage(SetupStage.DRIVE_MOUNT)
-                progress_tracker.update_within_stage(0, "Starting drive mount...")
-                
-                drive_result = self.drive_handler.mount_drive()
-                
-                # Check if user cancelled the drive mount
-                if drive_result.get('cancelled', False):
-                    self.logger.info("ℹ️ Drive mount was cancelled by user")
-                    summary_data['status'] = False
-                    summary_data['status_message'] = "Drive mount was cancelled"
-                    summary_data['cancelled'] = True
-                    return summary_data
-                    
-                summary_data['drive_mounted'] = drive_result.get('success', False)
-                summary_data['mount_path'] = drive_result.get('mount_path', 'N/A')
-                
-                if summary_data['drive_mounted']:
-                    progress_tracker.update_within_stage(100, "Drive mounted successfully")
-                    progress_tracker.complete_stage("Drive mounted successfully")
-            else:
-                self.logger.info("✅ Google Drive already mounted")
-                progress_tracker.update_stage(SetupStage.DRIVE_MOUNT)
-                progress_tracker.update_within_stage(100, "Drive already mounted")
-            
-            # Step 2: Create Folders (if not already created)
-            try:
-                progress_tracker.update_stage(SetupStage.FOLDER_SETUP)
-                
-                if summary_data.get('folders_created', 0) < len(REQUIRED_FOLDERS):
-                    self.logger.info("📁 Step 2: Creating directories...")
-                    progress_tracker.update_within_stage(0, "Starting folder creation...")
-                    
-                    # Execute folder creation
-                    folder_result = self.folder_handler.create_required_folders()
-                    created_count = folder_result.get('created_count', 0)
-                    symlinks_count = folder_result.get('symlinks_count', 0)
-                    
-                    # Update summary data
-                    summary_data['folders_created'] = created_count
-                    summary_data['symlinks_created'] = symlinks_count
-                    summary_data['backups_created'] = folder_result.get('backups_created', [])
-                    summary_data['backups_count'] = folder_result.get('backups_count', 0)
-                    
-                    # Update progress based on results
-                    backups_count = folder_result.get('backups_count', 0)
-                    status_parts = []
-                    
-                    if created_count > 0:
-                        status_parts.append(f"{created_count} folders")
-                    if symlinks_count > 0:
-                        status_parts.append(f"{symlinks_count} symlinks")
-                    if backups_count > 0:
-                        status_parts.append(f"{backups_count} backups")
-                    
-                    if status_parts:
-                        status_msg = f"Created {', '.join(status_parts)}"
-                        if backups_count > 0:
-                            status_msg += " (backups in ~/data/backup)"
-                        self.logger.info(status_msg)
-                        progress_tracker.update_within_stage(100, status_msg)
-                    else:
-                        status_msg = "No new folders, symlinks, or backups needed"
-                        self.logger.info(status_msg)
-                        progress_tracker.update_within_stage(100, status_msg)
-                    
-                    # Complete the stage with the final status
-                    progress_tracker.complete_stage("Folder setup completed")
-                else:
-                    self.logger.info("✅ Directories already created")
-                    progress_tracker.update_within_stage(100, "All folders already exist")
-                    progress_tracker.complete_stage("All folders already exist")
-                    
-            except Exception as e:
-                error_msg = f"Error during folder creation: {str(e)}"
-                self.logger.error(error_msg)
-                progress_tracker.error(error_msg)
-                summary_data['status'] = 'error'
-                summary_data['message'] = error_msg
-                return summary_data
-            
-            # Step 3: Sync Configurations
-            progress_tracker.update_stage(SetupStage.CONFIG_SYNC)
-            progress_tracker.update_within_stage(0, "Starting config sync...")
-            
-            config_result = self.config_handler.sync_configurations()
-            synced_count = config_result.get('synced_count', 0)
-            summary_data['configs_synced'] = synced_count
-            
-            if synced_count > 0:
-                progress_tracker.update_within_stage(100, f"Synced {synced_count} configurations")
-                progress_tracker.complete_stage("Configuration sync completed")
-            else:
-                progress_tracker.update_within_stage(100, "No configurations needed syncing")
-            
-            # Step 4: Create missing symlinks
-            progress_tracker.update_stage(SetupStage.FOLDER_SETUP, "Verifying symlinks...")
-            
-            if 'missing_symlinks' in summary_data and summary_data['missing_symlinks']:
-                self.logger.info("🔗 Step 4: Creating missing symlinks...")
-                progress_tracker.update_within_stage(0, f"Creating {len(summary_data['missing_symlinks'])} symlinks...")
-                
-                # Create missing symlinks
-                created_symlinks = []
-                total_symlinks = len(summary_data['missing_symlinks'])
-                
-                for i, (source, target) in enumerate(list(summary_data['missing_symlinks'])):
-                    try:
-                        # Update progress
-                        progress = int((i / total_symlinks) * 100)
-                        progress_tracker.update_within_stage(
-                            progress, 
-                            f"Creating symlink {i+1}/{total_symlinks}: {os.path.basename(target)}"
-                        )
-                        
-                        # Ensure parent directory exists
-                        os.makedirs(os.path.dirname(target), exist_ok=True)
-                        # Create symlink
-                        os.symlink(source, target, target_is_directory=True)
-                        created_symlinks.append((source, target))
-                        self.logger.success(f"Created symlink: {target} -> {source}")
-                    except Exception as e:
-                        self.logger.warning(f"Failed to create symlink {target} -> {source}: {str(e)}")
-                
-                # Update verified/missing symlinks
-                for symlink in created_symlinks:
-                    if symlink in summary_data['missing_symlinks']:
-                        summary_data['missing_symlinks'].remove(symlink)
-                        summary_data['verified_symlinks'].append(symlink)
-                
-                if created_symlinks:
-                    progress_tracker.update_within_stage(100, f"Created {len(created_symlinks)} symlinks")
-                    progress_tracker.complete_stage("Symlink creation completed")
-                else:
-                    progress_tracker.update_within_stage(100, "No symlinks needed to be created")
-            else:
-                progress_tracker.update_within_stage(100, "No missing symlinks found")
-            
-            # Step 5: Verify Setup
-            self.logger.info("✅ Step 5: Verifying setup...")
-            progress_tracker.update_stage(SetupStage.ENV_SETUP)
-            progress_tracker.update_within_stage(0, "Verifying environment setup...")
-            
-            # Verify all required folders exist
-            verified_folders = []
-            missing_folders = []
-            total_folders = len(REQUIRED_FOLDERS)
-            
-            for i, folder in enumerate(REQUIRED_FOLDERS):
-                progress = int((i / total_folders) * 100)
-                progress_tracker.update_within_stage(progress, f"Verifying {os.path.basename(folder)}...")
-                
-                if os.path.exists(folder) and os.path.isdir(folder):
-                    verified_folders.append(folder)
-                else:
-                    missing_folders.append(folder)
-            
-            # Verify all required symlinks exist
-            verified_symlinks = []
-            missing_symlinks = []
-            total_symlinks = len(SYMLINK_MAP)
-            
-            for i, (source, target) in enumerate(SYMLINK_MAP.items()):
-                progress = int((i / total_symlinks) * 100)
-                progress_tracker.update_within_stage(
-                    50 + (progress // 2),  # First half for folders, second half for symlinks
-                    f"Verifying symlink {i+1}/{total_symlinks}: {os.path.basename(target)}"
+                self._last_error = str(e)
+                self.logger.error(
+                    f"Error in setup stage '{stage}' (attempt {attempt}/{max_attempts}): {str(e)}",
+                    exc_info=True
                 )
                 
-                if os.path.lexists(target) and os.path.islink(target):
-                    verified_symlinks.append((source, target))
-                else:
-                    missing_symlinks.append((source, target))
-            
-            # Update summary data
-            summary_data['verified_folders'] = verified_folders
-            summary_data['missing_folders'] = missing_folders
-            summary_data['verified_symlinks'] = verified_symlinks
-            summary_data['missing_symlinks'] = missing_symlinks
-            
-            # Determine overall status
-            has_errors = (
-                len(missing_folders) > 0 or 
-                len(missing_symlinks) > 0 or 
-                not summary_data.get('drive_mounted', False)
-            )
-            
-            if has_errors:
-                summary_data['status'] = 'warning'  # Changed from False to 'warning'
-                summary_data['status_message'] = "Setup completed with some issues"
-                progress_tracker.update_within_stage(100, "Verification completed with issues")
-                progress_tracker.warning("⚠️ Setup completed with some issues")
+                # If this was the last attempt, handle the error
+                if attempt >= max_attempts:
+                    error_msg = f"Failed to complete {stage} after {max_attempts} attempts"
+                    self._handle_setup_error(error_msg)
+                    self._update_status(error_msg, is_error=True)
+                    return False
                 
-                # Log missing items
-                if missing_folders:
-                    self.logger.warning(f"Missing folders: {', '.join(os.path.basename(f) for f in missing_folders)}")
-                if missing_symlinks:
-                    self.logger.warning(f"Missing symlinks: {', '.join(t for _, t in missing_symlinks)}")
-                if not summary_data.get('drive_mounted', False):
-                    self.logger.warning("Google Drive is not mounted")
-            else:
-                summary_data['status'] = 'success'  # Changed from True to 'success'
-                summary_data['status_message'] = "Setup completed successfully"
-                progress_tracker.update_within_stage(100, "Verification completed successfully")
-                progress_tracker.complete("✅ Setup completed successfully")
-            
-            # Mark all stages as complete if successful or has warnings
-            if summary_data.get('status') in ['success', 'warning']:
-                # Explicitly complete each stage
-                for stage in [
-                    SetupStage.INIT,
-                    SetupStage.DRIVE_MOUNT,
-                    SetupStage.CONFIG_SYNC,
-                    SetupStage.FOLDER_SETUP,
-                    SetupStage.ENV_SETUP
-                ]:
-                    progress_tracker.update_stage(stage)
-                    progress_tracker.complete_stage(f"Completed {stage.name.replace('_', ' ').title()}")
-                
-                # Finally, set to complete stage
-                progress_tracker.update_stage(SetupStage.COMPLETE)
-                progress_tracker.complete("✅ All setup steps completed successfully")
-            
-            # Log final summary
-            self.logger.info("\n📋 Setup Summary:" + "\n" + "="*50)
-            self.logger.info(f"Drive Mounted: {'✅' if summary_data.get('drive_mounted', False) else '❌'}")
-            self.logger.info(f"Folders Created: {len(verified_folders)}/{len(REQUIRED_FOLDERS)}")
-            self.logger.info(f"Symlinks Created: {len(verified_symlinks)}/{len(SYMLINK_MAP)}")
-            self.logger.info(f"Configs Synced: {summary_data.get('configs_synced', 0)}")
-            
-            if missing_folders:
-                self.logger.warning(f"Missing Folders: {', '.join(os.path.basename(f) for f in missing_folders)}")
-            if missing_symlinks:
-                self.logger.warning(f"Missing Symlinks: {', '.join(f'-> {t}' for _, t in missing_symlinks)}")
-            
-            self.logger.info(f"Final Status: {summary_data.get('status', 'unknown')}")
-            self.logger.info("="*50)
-            
-            # Debug: Log the exact status value and type
-            self.logger.debug(f"Status type: {type(summary_data.get('status'))}, value: {summary_data.get('status')}")
-            self.logger.debug(f"Summary data keys: {list(summary_data.keys())}")
-            
-            return summary_data
-            
-        except Exception as e:
-            error_msg = f"❌ Setup workflow failed: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)  # Include traceback in logs
-            self.logger.error(f"Error type: {type(e).__name__}")
-            self.logger.error(f"Error args: {e.args}")
-            self.logger.error(f"Current summary_data: {summary_data}")
-            
-            # Log the full traceback to a file for debugging
-            import traceback
-            self.logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            
-            # Ensure summary_data has the correct structure
-            if not isinstance(summary_data, dict):
-                summary_data = {}
-                
-            summary_data.update({
-                'status': 'error',
-                'status_message': error_msg,
-                'error': str(e),
-                'success': False
-            })
-            
-            # Update setup summary if UI components are available
-            try:
-                if 'setup_summary' in ui_components:
-                    update_setup_summary(
-                        ui_components['setup_summary'],
-                        status_message=error_msg,
-                        status_type='error',
-                        details=summary_data
-                    )
-                
-                # Update progress tracker with error if available
-                if 'progress_tracker' in ui_components and hasattr(ui_components['progress_tracker'], 'error'):
-                    ui_components['progress_tracker'].error(error_msg)
-                    
-            except Exception as ui_error:
-                self.logger.error(f"Failed to update UI with error: {str(ui_error)}", exc_info=True)
-            
-        return summary_data
-    
-    def _set_running_state(self, ui_components: Dict[str, Any]) -> None:
-        """🔄 Set UI ke running state"""
-        try:
-            # Disable setup button
-            ui_components['setup_button'].disabled = True
-            ui_components['setup_button'].description = "⏳ Running Setup..."
-            
-            # Show progress container if it exists
-            if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-                ui_components['progress_container'].layout.visibility = 'visible'
-                ui_components['progress_container'].layout.display = 'flex'
-            
-            # Show progress bar if it exists in the progress tracker
-            progress_tracker = ui_components.get('progress_tracker')
-            if progress_tracker and hasattr(progress_tracker, 'show'):
-                progress_tracker.show()
-            
-            # Update status panel
-            update_status_panel(ui_components['status_panel'], "Setup sedang berjalan...", "warning")
-            
-            # Force UI update
-            if hasattr(ui_components.get('progress_bar', None), 'value'):
-                ui_components['progress_bar'].value = 0
-                
-        except Exception as e:
-            if self.logger:
-                self.logger.error(f"Error in _set_running_state: {str(e)}", exc_info=True)
-    
-    def _set_completion_state(self, ui_components: Dict[str, Any], summary_data: Dict[str, Any]) -> None:
-        """✅ Set UI ke completion state"""
-        if 'setup_button' not in ui_components:
-            return
-            
-        if summary_data.get('cancelled', False):
-            # Handle cancellation case
-            ui_components['setup_button'].disabled = False
-            ui_components['setup_button'].button_style = ''
-            ui_components['setup_button'].description = "▶️ Setup Environment"
-            
-            if 'status_panel' in ui_components:
-                update_status_panel(ui_components['status_panel'],
-                                 "ℹ️ Setup was cancelled", "info")
-        elif summary_data.get('status') == 'success':
-            # Handle successful completion
-            ui_components['setup_button'].disabled = False
-            ui_components['setup_button'].button_style = 'success'
-            ui_components['setup_button'].description = "✅ Setup Complete"
-            
-            if 'status_panel' in ui_components:
-                update_status_panel(ui_components['status_panel'],
-                                 "✅ Environment setup completed successfully!", "success")
-        else:
-            # Handle failure case
-            ui_components['setup_button'].disabled = False
-            ui_components['setup_button'].description = "🔄 Retry Setup"
-            ui_components['setup_button'].button_style = 'warning'  # Changed from 'danger' to 'warning'
-            
-            # Get error message from summary_data if available
-            error_msg = summary_data.get('message', 'Setup failed, please try again')
-            update_status_panel(ui_components['status_panel'], error_msg, "warning")
-    
-    def _set_error_state(self, ui_components: Dict[str, Any], error_msg: str) -> None:
-        """Set error state in UI components"""
-        if 'setup_button' in ui_components:
-            ui_components['setup_button'].disabled = False
-            ui_components['setup_button'].description = "❌ Retry Setup"
-            ui_components['setup_button'].button_style = 'danger'
-        update_status_panel(ui_components.get('status_panel'), error_msg, "danger")
+                # Otherwise, log the error and let the loop retry
+                self.logger.warning(f"Will retry {stage} stage after error: {str(e)}")
         
-    def setup_button_handler(self, button, ui_components: Dict[str, Any], clear_logs: bool = True) -> None:
-        """Handle setup button click events
+        # This line should never be reached due to the loop logic above
+        return False
+    
+    def initialize_handlers(self, **handler_kwargs) -> None:
+        """Initialize all required workflow handlers.
+        
+        This method initializes the various handlers needed for the setup workflow,
+        using the EnvConfigHandler for configuration management.
         
         Args:
-            button: The button widget that was clicked
-            ui_components: Dictionary containing UI components
-            clear_logs: Whether to clear the log accordion before starting
+            **handler_kwargs: Additional keyword arguments to pass to handlers
+        """
+        self.logger.info("Initializing setup workflow handlers")
+        
+        try:
+            # Common kwargs for all handlers
+            common_kwargs = {
+                'config_handler': self.config_handler,
+                'logger': self.logger,
+                **handler_kwargs
+            }
+            
+            # Initialize drive handler
+            from .drive_handler import DriveHandler
+            self.drive_handler = DriveHandler(**{
+                **common_kwargs,
+                'on_drive_mounted': self._on_drive_mounted,
+                'on_drive_mount_failed': self._on_drive_mount_failed
+            })
+            
+            # Initialize folder handler
+            from .folder_handler import FolderHandler
+            self.folder_handler = FolderHandler(**{
+                **common_kwargs,
+                'on_folders_created': self._on_folders_created,
+                'on_folder_creation_failed': self._on_folder_creation_failed
+            })
+            
+            # Initialize config handler - use the one from env_config
+            # This ensures we're using the same config handler instance
+            self.config_handler = self.env_config.get_config_handler()
+            
+            # Initialize status checker
+            from .status_checker import StatusChecker
+            self.status_checker = StatusChecker(**{
+                **common_kwargs,
+                'on_status_checked': self._on_status_checked,
+                'on_status_check_failed': self._on_status_check_failed
+            })
+            
+            # Store all handlers for easy access
+            self.handlers = {
+                'drive': self.drive_handler,
+                'folder': self.folder_handler,
+                'config': self.config_handler,
+                'status': self.status_checker
+            }
+            
+            self.logger.info("Setup workflow handlers initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize setup handlers: {str(e)}")
+            raise
+    
+    async def _run_setup_workflow(self) -> None:
+        """Execute the setup workflow with progress tracking and error handling.
+        
+        This method runs each stage of the setup process in sequence:
+        1. Drive setup
+        2. Folder creation
+        3. Configuration sync
+        4. Verification
+        
+        The method handles progress updates, error recovery, and retries as configured.
         """
         try:
-            # Only clear logs if explicitly requested (not on retry)
-            if clear_logs and 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'children'):
-                log_output = ui_components['log_accordion'].children[0]
-                if hasattr(log_output, 'clear_output'):
-                    log_output.clear_output()
+            stages = self.get_config_value('stages', [])
+            total_stages = len(stages)
             
-            # Disable button during setup
-            button.disabled = True
-            button.description = "🔄 Setting up..."
-            button.button_style = 'info'
-            
-            # Run the setup process with clear_logs parameter
-            setup_result = self.run_full_setup(ui_components, clear_logs=clear_logs)
-            
-            # Update button state based on result
-            if setup_result is True or (hasattr(setup_result, 'get') and setup_result.get('status') == 'success'):
-                button.description = "✅ Setup Complete"
-                button.button_style = 'success'
-            elif hasattr(setup_result, 'get') and setup_result.get('cancelled', False):
-                # Handle cancellation case
-                button.description = "▶️ Setup Environment"  # Reset to initial state
-                button.button_style = ''  # Reset style
-                button.disabled = False  # Re-enable the button
-                return  # Exit early for cancellation
-            else:
-                button.description = "🔄 Retry Setup"  # Changed from "Setup Failed" to "Retry Setup"
-                button.button_style = 'warning'  # Changed from 'danger' to 'warning' for retry
-                button.disabled = False  # Allow retry on failure
+            if total_stages == 0:
+                self.logger.warning("No setup stages configured")
+                return
                 
-                # Update summary with error details if available
-                if hasattr(setup_result, 'get') and 'message' in setup_result:
-                    if 'setup_summary' in ui_components:
-                        from smartcash.ui.setup.env_config.components.setup_summary import update_setup_summary
-                        update_setup_summary(
-                            ui_components['setup_summary'],
-                            status_message=setup_result['message'],
-                            status_type='error',
-                            details=self._last_summary_data or {}
-                        )
+            self.logger.info(f"Starting setup workflow with {total_stages} stages")
+            
+            for i, stage in enumerate(stages, 1):
+                if not self._setup_in_progress and self.stop_on_error:
+                    self.logger.warning(f"Stopping setup workflow after stage '{stage}' due to error")
+                    break
+                    
+                # Calculate progress based on completed stages
+                stage_progress = (i - 1) / total_stages
+                self._setup_progress = stage_progress
+                self._update_status(f"Starting {stage.replace('_', ' ')} stage...")
+                
+                # Execute the current stage
+                await self._run_stage(stage)
+                
+                # Update progress
+                self._setup_progress = i / total_stages
+                self._update_progress(self._setup_progress * 100)
+            
+            # Final status update
+            if self._setup_in_progress:
+                self._setup_progress = 1.0
+                self.logger.info("Setup workflow completed successfully")
+                self._update_status("Setup completed successfully")
+                self._on_setup_completed(True)
+            else:
+                error_msg = "Setup workflow failed"
+                if self._last_error:
+                    error_msg += f": {self._last_error}"
+                self.logger.error(error_msg)
+                self._update_status(error_msg, is_error=True)
+                self._on_setup_completed(False, error=self._last_error)
+                
         except Exception as e:
-            error_msg = f"Setup error: {str(e)}"
-            self.logger.error(error_msg)
-            if 'status_panel' in ui_components:
-                update_status_panel(ui_components['status_panel'], error_msg, "error")
-            button.description = "❌ Error - Click to Retry"
-            button.button_style = 'danger'
-            button.disabled = False  # Allow retry on error
+            error_msg = f"Setup workflow failed: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self._handle_setup_error(error_msg)
+            self._on_setup_completed(False, error=error_msg)
     
-    def _create_dummy_logger(self):
-        """📝 Create dummy logger fallback"""
-        class DummyLogger:
-            def info(self, msg): print(f"ℹ️ {msg}")
-            def warning(self, msg): print(f"⚠️ {msg}")
-            def error(self, msg): print(f"❌ {msg}")
-            def success(self, msg): print(f"✅ {msg}")
-        return DummyLogger()
+    def _update_progress(self, progress: float, stage: str = None) -> None:
+        """Update the setup progress and optionally the current stage.
+        
+        Args:
+            progress: The progress value between 0.0 and 1.0
+            stage: Optional description of the current stage
+            
+        Note:
+            Progress is automatically clamped between 0.0 and 1.0.
+            Emits the 'progress_updated' signal if available.
+        """
+        # Validate and clamp progress value
+        progress = max(0.0, min(1.0, float(progress)))
+        
+        # Update internal state
+        self._setup_progress = progress
+        
+        # Update summary with progress and optional stage
+        updates = {'progress': progress}
+        if stage is not None:
+            updates['current_stage'] = str(stage)[:100]  # Truncate long stage names
+            
+        self._update_summary(**updates)
+        
+        # Log progress update
+        self.logger.debug(f"Progress updated: {progress:.1%} - {stage or 'No stage info'}")
+        
+        # Emit progress update signal if available
+        if hasattr(self, 'progress_updated'):
+            try:
+                self.progress_updated.emit(progress, stage or "")
+            except Exception as e:
+                self.logger.error(f"Failed to emit progress update: {str(e)}")
+    
+    async def run_setup(self, ui_components: Optional[Dict[str, Any]] = None) -> SetupSummary:
+        """Run the complete setup workflow.
+        
+        The setup process follows this order:
+        1. Mount Google Drive (if needed)
+        2. Setup symlinks (before folder creation)
+        3. Create required folders
+        4. Sync configurations
+        5. Verify setup
+        
+        Args:
+            ui_components: Dictionary of UI components for progress updates
+            
+        Returns:
+            SetupSummary with the results of the setup process
+        """
+        self.set_stage(SetupStage.INIT, "Starting setup process")
+        
+        # Initialize summary
+        summary: SetupSummary = {
+            'status': 'pending',
+            'message': 'Setup started',
+            'phase': 'initialization',
+            'drive_mounted': False,
+            'mount_path': '',
+            'symlinks_created': 0,
+            'folders_created': 0,
+            'configs_synced': 0,
+            'errors': []
+        }
+        
+        try:
+            # Step 1: Mount Drive
+            summary = await self._mount_drive_step(summary, ui_components)
+            
+            # Step 2: Setup Symlinks (must be before folder creation)
+            if summary.get('status') == 'success':
+                summary = await self._setup_symlinks_step(summary, ui_components)
+            
+            # Step 3: Create Folders
+            if summary.get('status') == 'success':
+                summary = await self._create_folders_step(summary, ui_components)
+            
+            # Step 4: Sync Configs
+            if summary.get('status') == 'success':
+                summary = await self._sync_configs_step(summary, ui_components)
+            
+            # Step 5: Verify Setup
+            if summary.get('status') == 'success':
+                summary = await self._verify_setup_step(summary, ui_components)
+            
+            # Update final status
+            summary.update({
+                'status': 'success' if summary.get('status') != 'error' else 'error',
+                'phase': 'complete'
+            })
+            
+            self.set_stage(SetupStage.COMPLETE, summary['message'])
+            
+        except Exception as e:
+            error_msg = f"Setup failed: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            summary.update({
+                'status': 'error',
+                'message': error_msg,
+                'phase': summary.get('phase', 'unknown')
+            })
+            
+            if ui_components:
+                self._update_ui_status(ui_components, f"Error: {error_msg}", 'error')
+        
+        self._last_summary = summary
+        return summary
+    
+    async def _mount_drive_step(self, summary: SetupSummary, ui_components: Optional[Dict[str, Any]]) -> SetupSummary:
+        """Handle the drive mounting step."""
+        self.set_stage(SetupStage.DRIVE_MOUNT, "Mounting Google Drive")
+        
+        try:
+            # Mount the drive
+            drive_handler = self.get_handler('drive')
+            result = await drive_handler.mount_drive()
+            
+            if result.get('success', False):
+                summary.update({
+                    'status': 'success',
+                    'message': 'Google Drive mounted successfully',
+                    'drive_mounted': True,
+                    'mount_path': result.get('mount_path', '')
+                })
+                self.logger.info(f"Google Drive mounted at: {summary['mount_path']}")
+            else:
+                error_msg = result.get('message', 'Failed to mount Google Drive')
+                summary.update({
+                    'status': 'error',
+                    'message': error_msg,
+                    'errors': [error_msg]
+                })
+                self.logger.error(f"Failed to mount Google Drive: {error_msg}")
+            
+            return summary
+            
+        except Exception as e:
+            error_msg = f"Error mounting Google Drive: {str(e)}"
+            summary.update({
+                'status': 'error',
+                'message': error_msg,
+                'errors': [error_msg]
+            })
+            self.logger.error(error_msg, exc_info=True)
+            if ui_components:
+                self._update_ui_status(ui_components, f"Error mounting drive: {str(e)}", 'error')
+            
+            return summary
+    
+    async def _setup_symlinks_step(self, summary: SetupSummary, ui_components: Optional[Dict[str, Any]]) -> SetupSummary:
+        """Handle the symlink setup step.
+        
+        This must run before folder creation to ensure symlinks are in place.
+        """
+        self.set_stage(SetupStage.SYMLINK_SETUP, "Setting up symlinks")
+        
+        if ui_components:
+            self._update_ui_status(ui_components, "Setting up symlinks...", 'info')
+        
+        try:
+            # Get the folder handler
+            folder_handler = self.get_handler('folder')
+            
+            # Setup symlinks
+            result = await folder_handler.setup_symlinks()
+            
+            if result.get('success', False):
+                symlinks_created = result.get('symlinks_created', 0)
+                summary.update({
+                    'status': 'success',
+                    'message': f'Created {symlinks_created} symlinks',
+                    'symlinks_created': symlinks_created
+                })
+                self.logger.info(f"Created {symlinks_created} symlinks")
+            else:
+                error_msg = result.get('message', 'Failed to setup symlinks')
+                summary.update({
+                    'status': 'error',
+                    'message': error_msg,
+                    'errors': summary.get('errors', []) + [error_msg]
+                })
+                self.logger.error(f"Failed to setup symlinks: {error_msg}")
+            
+            return summary
+            
+        except Exception as e:
+            error_msg = f"Error setting up symlinks: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            if ui_components:
+                self._update_ui_status(ui_components, error_msg, 'error')
+            
+            summary.update({
+                'status': 'error',
+                'message': error_msg,
+                'errors': summary.get('errors', []) + [error_msg]
+            })
+            
+            return summary
+    
+    async def _create_folders_step(self, summary: SetupSummary, ui_components: Optional[Dict[str, Any]]) -> SetupSummary:
+        """Handle the folder creation step."""
+        self.set_stage(SetupStage.FOLDER_SETUP, "Creating required folders")
+        
+        if ui_components:
+            self._update_ui_status(ui_components, "Creating folders...", 'info')
+        
+        try:
+            # Get the folder handler
+            folder_handler = self.get_handler('folder')
+            
+            # Create folders
+            result = await folder_handler.create_required_folders()
+            
+            if result.get('success', False):
+                folders_created = result.get('folders_created', 0)
+                summary.update({
+                    'status': 'success',
+                    'message': f'Created {folders_created} folders',
+                    'folders_created': folders_created
+                })
+                self.logger.info(f"Created {folders_created} folders")
+            else:
+                error_msg = result.get('message', 'Failed to create folders')
+                summary.update({
+                    'status': 'error',
+                    'message': error_msg,
+                    'errors': summary.get('errors', []) + [error_msg]
+                })
+                self.logger.error(f"Failed to create folders: {error_msg}")
+            
+            return summary
+            
+        except Exception as e:
+            error_msg = f"Error creating folders: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            if ui_components:
+                self._update_ui_status(ui_components, error_msg, 'error')
+            
+            summary.update({
+                'status': 'error',
+                'message': error_msg,
+                'errors': summary.get('errors', []) + [error_msg]
+            })
+            
+            return summary
+    
+    async def _sync_configs_step(self, summary: SetupSummary, ui_components: Optional[Dict[str, Any]] = None) -> SetupSummary:
+        """Handle the configuration syncing step."""
+        self.set_stage(SetupStage.CONFIG_SYNC, "Synchronizing configurations")
+        
+        if ui_components:
+            self._update_ui_status(ui_components, "Synchronizing configurations...", 'info')
+        
+        try:
+            # Sync configs
+            sync_result = await self.config_handler.sync_configurations()
+            
+            summary.update({
+                'configs_synced': sync_result.get('synced_count', 0),
+                'phase': 'config_sync',
+                'message': 'Configuration sync completed',
+                'config_check': sync_result
+            })
+            
+            return summary
+            
+        except Exception as e:
+            error_msg = f"Error syncing configurations: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            summary.update({
+                'phase': 'config_sync',
+                'message': error_msg
+            })
+            
+            if ui_components:
+                self._update_ui_status(ui_components, f"Error syncing configurations: {str(e)}", 'error')
+            
+            return summary
+    
+    async def _verify_setup_step(self, summary: SetupSummary, ui_components: Optional[Dict[str, Any]] = None) -> SetupSummary:
+        """Execute the setup verification step."""
+        self.set_stage(SetupStage.VERIFICATION, "Verifying setup")
+        
+        if ui_components:
+            self._update_ui_status(ui_components, "Verifying setup...", 'info')
+        
+        try:
+            # Verify folder structure
+            folder_check = self.folder_handler.verify_folder_structure()
+            
+            summary.update({
+                'verified_folders': folder_check.get('valid_folders', []),
+                'missing_folders': folder_check.get('missing_folders', []),
+                'verified_symlinks': folder_check.get('valid_symlinks', []),
+                'missing_symlinks': [
+                    (s['source'], s['target']) 
+                    for s in folder_check.get('invalid_symlinks', [])
+                ],
+                'phase': 'verification',
+                'message': 'Verification completed'
+            })
+            
+            return summary
+            
+        except Exception as e:
+            error_msg = f"Error verifying setup: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            summary.update({
+                'phase': 'verification',
+                'message': error_msg
+            })
+            
+            if ui_components:
+                self._update_ui_status(ui_components, f"Error verifying setup: {str(e)}", 'error')
+            
+            return summary
+    
+    def _update_ui_status(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
+        """Update the UI status display.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            message: Status message to display
+            status_type: Type of status ('info', 'success', 'warning', 'error')
+        """
+        if 'status_panel' in ui_components:
+            try:
+                status_panel = ui_components['status_panel']
+                
+                # Map status types to CSS classes
+                status_classes = {
+                    'info': 'info',
+                    'success': 'success',
+                    'warning': 'warning',
+                    'error': 'danger'
+                }
+                
+                css_class = status_classes.get(status_type, 'info')
+                status_panel.value = f"<div class='alert alert-{css_class}'>{message}</div>"
+                
+            except Exception as e:
+                self.logger.error(f"Error updating status panel: {str(e)}", exc_info=True)
+    
+    def get_last_summary(self) -> Optional[SetupSummary]:
+        """Get the summary of the last setup run.
+        
+        Returns:
+            SetupSummary of the last run, or None if no run has been performed
+        """
+        return self._last_summary

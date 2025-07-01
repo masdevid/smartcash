@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Import after setting up logging
 from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer
-from smartcash.ui.config_cell.handlers.error_handler import create_error_response
+from smartcash.ui.handlers.error_handler import create_error_response
 import ipywidgets as widgets
 
 class TestHandler:

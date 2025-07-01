@@ -6,13 +6,13 @@ Deskripsi: Centralized error handling for the downloader module
 from typing import Any, Dict, Optional, Callable, TypeVar, Type
 from functools import wraps
 
-from smartcash.common.exceptions import SmartCashError
+from smartcash.common.exceptions import SmartCashError, ErrorContext
+from smartcash.ui.handlers.error_handler import create_error_response
+from smartcash.ui.utils.ui_logger import get_module_logger
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
     log_errors,
-    get_logger,
     create_error_context,
-    ErrorContext,
     safe_ui_operation
 )
 
@@ -83,15 +83,32 @@ def handle_downloader_error(
             ui_components=ui_components
         )
     
+    # Get logger if not provided
+    if not logger and ui_components and 'logger' in ui_components:
+        logger = ui_components.get('logger')
+    elif not logger:
+        logger = get_module_logger('smartcash.ui.dataset.downloader')
+    
     # Log the error
     error_msg = f"Downloader error in {context.operation}: {str(error)}"
-    if logger:
-        logger.error(error_msg, exc_info=True)
+    logger.error(error_msg, exc_info=True)
+    
+    # Create error response using centralized error handler
+    error_response = create_error_response(
+        error_message=error_msg,
+        error=error,
+        title="Downloader Error",
+        include_traceback=True
+    )
     
     # Update UI if components are available
-    if ui_components and 'error_output' in ui_components:
-        from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion
-        log_to_accordion(ui_components, f"❌ {error_msg}", 'error')
+    if ui_components:
+        # Log error directly using UILogger
+        if logger:
+            logger.error(f"❌ {error_msg}")
+        
+        # Store error response in ui_components for potential display
+        ui_components['last_error'] = error_response
     
     # Re-raise as SmartCashError if it isn't already
     if not isinstance(error, SmartCashError):

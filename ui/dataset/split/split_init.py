@@ -156,7 +156,7 @@ class SplitConfigInitializer(ConfigCellInitializer):
             form_components = create_split_form(config)
             
             # Add logger bridge reference untuk use di event handlers
-            form_components['logger_bridge'] = self._logger_bridge
+            form_components['logger'] = self.logger
             
             # Create layout yang organize form components
             layout_components = create_split_layout(form_components)
@@ -317,7 +317,7 @@ def create_split_config_cell(config: Optional[Dict[str, Any]] = None, **kwargs) 
         logger.error(error_msg, exc_info=True)
         
         # Display error menggunakan parent's error handler
-        from smartcash.ui.config_cell.handlers.error_handler import create_error_response
+        from smartcash.ui.handlers.error_handler import create_error_response
         error_widget = create_error_response(
             error_message=error_msg,
             error=e,
@@ -345,7 +345,7 @@ def get_split_config_components(config: Optional[Dict[str, Any]] = None, **kwarg
             # References
             'initializer': SplitConfigInitializer instance,
             'handler': SplitConfigHandler instance,
-            'logger_bridge': UILoggerBridge instance,
+            'logger': UILogger instance,
             
             # Containers
             'container': Root container widget,
@@ -391,7 +391,7 @@ def get_split_config_components(config: Optional[Dict[str, Any]] = None, **kwarg
             # Core references
             'initializer': initializer,
             'handler': initializer.handler,
-            'logger_bridge': initializer._logger_bridge,
+            'logger': initializer.logger,
             
             # Main container
             'container': initializer.get_container(),

@@ -29,7 +29,8 @@ class ErrorHandler:
         self, 
         logger: Optional[UILogger] = None, 
         default_component: str = "ui",
-        ui_components: Optional[Dict[str, Any]] = None
+        ui_components: Optional[Dict[str, Any]] = None,
+        **kwargs
     ):
         """Initialize the error handler.
         
@@ -37,7 +38,14 @@ class ErrorHandler:
             logger: UILogger instance for error logging
             default_component: Default component name for error context
             ui_components: Dictionary of UI components for error display
+            **kwargs: Additional keyword arguments (for compatibility)
         """
+        # Handle context parameter if passed (for backward compatibility)
+        if 'context' in kwargs:
+            context = kwargs.pop('context')
+            if not default_component and hasattr(context, 'component'):
+                default_component = context.component
+        
         self.logger = logger or get_module_logger(__name__)
         self.default_component = default_component
         self.ui_components = ui_components or {}

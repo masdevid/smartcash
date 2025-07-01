@@ -1,13 +1,12 @@
 
 # =============================================================================
-# File: smartcash/ui/setup/dependency/handlers/base_handler.py - FIXED
-# Deskripsi: Base handler dengan logger_bridge dan error_handler integration
+# File: smartcash/ui/setup/dependency/handlers/base_handler.py
+# Description: Base handler with error handling and logging
 # =============================================================================
 
 from typing import Dict, Any
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
-    log_errors,
     get_logger,
     safe_ui_operation
 )
@@ -16,33 +15,29 @@ from smartcash.ui.pretrained.utils import (
 logger = get_logger()
 
 class BaseDependencyHandler:
-    """Base handler dengan centralized error handling dan logger_bridge"""
+    """Base handler with centralized error handling and logging"""
     
     @with_error_handling(component="dependency", operation="BaseDependencyHandler")
     def __init__(self, ui_components: Dict[str, Any]):
         self.ui_components = ui_components
-        self.logger_bridge = ui_components.get('logger_bridge')
+        self.logger = logger
         logger.info("Initialized BaseDependencyHandler")
     
     def log_info(self, message: str) -> None:
         """Log info message"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'info'):
-            self.logger_bridge.info(message)
+        self.logger.info(message)
     
     def log_success(self, message: str) -> None:
         """Log success message"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'success'):
-            self.logger_bridge.success(message)
+        self.logger.info(f"SUCCESS: {message}")
     
     def log_warning(self, message: str) -> None:
         """Log warning message"""  
-        if self.logger_bridge and hasattr(self.logger_bridge, 'warning'):
-            self.logger_bridge.warning(message)
+        self.logger.warning(message)
     
     def log_error(self, message: str) -> None:
         """Log error message"""
-        if self.logger_bridge and hasattr(self.logger_bridge, 'error'):
-            self.logger_bridge.error(message)
+        self.logger.error(message)
     
     @safe_ui_operation
     def disable_ui_during_operation(self) -> None:

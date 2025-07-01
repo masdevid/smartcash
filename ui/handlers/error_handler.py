@@ -44,7 +44,7 @@ def handle_ui_errors(
         def wrapper(*args, **kwargs) -> T:
             # Create error context with function name
             ctx = ErrorContext(
-                component_name=func.__name__,
+                component=func.__name__,
                 operation="execution",
                 **error_handler_kwargs
             )
@@ -57,17 +57,24 @@ def handle_ui_errors(
             )
             
             # Execute with error handling
-            result = handler.handle_errors(
-                func,
-                *args,
-                **kwargs,
-                on_error=lambda e: create_error_response(
+            try:
+                result = func(*args, **kwargs)
+                return result
+            except Exception as e:
+                handler.handle_error(
+                    error=e,
+                    context=ErrorContext(
+                        component=func.__name__,
+                        operation="execution"
+                    )
+                )
+                # Call the error handler's callback if provided
+                return create_error_response(
                     error_message=str(e),
                     error=e,
                     title=error_component_title,
                     return_type=return_type
                 )
-            )
             
             return result
                 

@@ -20,8 +20,8 @@ class DatasetScanner(BaseDownloaderComponent):
         self.directory_manager = DirectoryManager()
         
         if max_workers is None:
-            from smartcash.common.threadpools import get_optimal_thread_count
-            max_workers = get_optimal_thread_count('io')
+            from smartcash.common.worker_utils import get_optimal_worker_count
+            max_workers = get_optimal_worker_count('io')
         
         self.max_workers = max_workers
         self.logger.info(f"🔍 DatasetScanner initialized with {self.max_workers} workers")

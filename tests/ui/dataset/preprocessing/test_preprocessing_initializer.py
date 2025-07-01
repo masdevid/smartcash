@@ -9,14 +9,31 @@ import logging
 
 from smartcash.ui.dataset.preprocessing.preprocessing_initializer import PreprocessingInitializer
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import PreprocessingConfigHandler
-from smartcash.ui.utils.logger_bridge import UILoggerBridge, create_ui_logger_bridge
+from smartcash.ui.utils.ui_logger import UILogger
 
-# Mock the create_ui_logger_bridge function to return a mock logger bridge
-def mock_create_ui_logger_bridge(ui_components, logger_name):
-    mock_bridge = MagicMock(spec=UILoggerBridge)
-    mock_bridge.logger = logging.getLogger(logger_name)
-    mock_bridge.logger.setLevel(logging.INFO)
-    return mock_bridge
+# Mock the UILogger
+class MockUILogger:
+    def __init__(self, name):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+    
+    def debug(self, msg, *args, **kwargs):
+        self.logger.debug(msg, *args, **kwargs)
+    
+    def info(self, msg, *args, **kwargs):
+        self.logger.info(msg, *args, **kwargs)
+    
+    def warning(self, msg, *args, **kwargs):
+        self.logger.warning(msg, *args, **kwargs)
+    
+    def error(self, msg, *args, **kwargs):
+        self.logger.error(msg, *args, **kwargs)
+    
+    def critical(self, msg, *args, **kwargs):
+        self.logger.critical(msg, *args, **kwargs)
+
+def mock_get_module_logger(logger_name):
+    return MockUILogger(logger_name)
 
 class TestPreprocessingInitializerLogging:
     """Test logging behavior of PreprocessingInitializer."""
@@ -91,14 +108,10 @@ class TestPreprocessingInitializerLogging:
     
     @pytest.fixture
     def mock_logger_bridge(self):
-        """Mock the UILoggerBridge to test log redirection."""
-        with patch('smartcash.ui.utils.logger_bridge.UILoggerBridge') as mock_ui_bridge_class, \
-             patch('smartcash.ui.utils.logger_bridge.create_ui_logger_bridge', new=mock_create_ui_logger_bridge):
-            # Create a mock instance with a real logger
-            mock_instance = MagicMock(spec=UILoggerBridge)
-            mock_instance.logger = logging.getLogger('test_ui_logger')
-            mock_instance.logger.setLevel(logging.INFO)
-            mock_ui_bridge_class.return_value = mock_instance
+        """Mock the UILogger to test log redirection."""
+        with patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.get_module_logger') as mock_logger:
+            mock_logger.return_value = MockUILogger('test_logger')
+            yield mock_logger
             
             yield mock_instance
 

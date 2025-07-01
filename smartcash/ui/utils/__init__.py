@@ -4,12 +4,13 @@ Deskripsi: Package untuk UI utilities
 """
 
 from .widget_utils import display_widget, safe_display
-from .error_handler import ErrorHandler
+# Import ErrorHandler from the correct location in handlers package
 from .error_utils import (
     create_error_context,
     error_handler_scope,
     with_error_handling,
-    log_errors
+    log_errors,
+    ErrorHandler
 )
 from .ui_logger import (
     UILogger,

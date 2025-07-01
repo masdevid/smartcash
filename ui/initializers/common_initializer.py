@@ -1,22 +1,19 @@
 """
 File: smartcash/ui/initializers/common_initializer.py
-Deskripsi: Enhanced CommonInitializer dengan proper logging sequence dan progress tracker integration
+Deskripsi: Enhanced CommonInitializer with proper logging sequence
 
 Initialization Flow:
 1. Load and validate configuration without suppression
-2. Create UI components (including progress tracker)
-3. Initialize logger bridge for UI logging integration
-4. Run pre-initialization checks (if _pre_initialize_checks exists)
-5. Set up event handlers (if _setup_handlers exists)
-6. Get and validate root UI component
-7. Run post-initialization checks (if _after_init_checks exists)
-8. Log successful initialization
-9. Return UI components with proper cleanup
+2. Create UI components
+3. Run pre-initialization checks (if _pre_initialize_checks exists)
+4. Set up event handlers (if _setup_handlers exists)
+5. Get and validate root UI component
+6. Run post-initialization checks (if _after_init_checks exists)
+7. Log successful initialization
+8. Return UI components with proper cleanup
 
 Key Features:
 - No premature output suppression
-- Progress tracker integration
-- UI logger bridge for real-time logging
 - Extensible lifecycle hooks
 - Comprehensive error handling
 """
@@ -30,7 +27,6 @@ import ipywidgets as widgets
 import contextlib
 
 # Import new consolidated logger and error handler
-from smartcash.common.logger import get_logger as get_common_logger
 from smartcash.ui.handlers.config_handlers import ConfigHandler
 from smartcash.ui.utils.ui_logger import (
     UILogger,
@@ -88,6 +84,8 @@ class CommonInitializer(ABC):
         # Store basic attributes
         self.module_name = module_name
         self._ui_components = {}
+        # Add ui_components as property for backward compatibility
+        self.ui_components = self._ui_components
         self._logger_bridge = None
         self.config_handler = config_handler_class() if config_handler_class else None
         
@@ -120,31 +118,7 @@ class CommonInitializer(ABC):
             # Cleanup is handled by the UILogger's cleanup on exit
             pass
     
-    def _initialize_logger_bridge(self) -> None:
-        """Initialize the logger for UI logging integration."""
-        try:
-            # Create a module-level logger with UI integration
-            self._logger_bridge = get_module_logger(
-                name=f"smartcash.ui.{self.module_name}"
-            )
-            
-            # Store in UI components
-            self.ui_components['logger'] = self._logger_bridge
-            
-            # Set UI components for the logger
-            if hasattr(self._logger_bridge, 'set_ui_components'):
-                self._logger_bridge.set_ui_components(self.ui_components)
-            
-        except Exception as e:
-            # If logger bridge setup fails, use the default logger
-            print(f"Warning: Failed to initialize logger bridge: {e}")
-            self._logger_bridge = self.logger
-            # Fallback silent logger - NO stdout output
-            self.logger = get_logger(f"smartcash.ui.{self.module_name}")
-            if hasattr(self.logger, 'set_level'):
-                self.logger.set_level(logging.CRITICAL)
-            else:
-                self.logger.setLevel(logging.CRITICAL)
+    # _initialize_logger_bridge method removed - functionality now handled by BaseHandler
     
     def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Any:
         """Initialize dan return UI module dengan complete output suppression
@@ -182,10 +156,7 @@ class CommonInitializer(ABC):
                     'initialization_timestamp': self._get_timestamp()
                 })
                 
-                # 4. Initialize logger bridge SETELAH UI ready
-                self._initialize_logger_bridge()
-                
-                # 5. Pre-initialization checks (optional) - silent
+                # 4. Pre-initialization checks (optional) - silent
                 if hasattr(self, '_pre_initialize_checks'):
                     self._pre_initialize_checks(config=config, **kwargs)
                 
@@ -212,8 +183,39 @@ class CommonInitializer(ABC):
                 error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
                 # Log the error first
                 self._handle_error(error_msg, exc_info=True)
-                # Then create and return the error response
-                return self.create_error_response(error_msg, e)
+                # Then create and return the error response using imported function
+                try:
+                    # Create error response with return_type=dict to ensure we get a dictionary
+                    error_response = create_error_response(
+                        error_message=error_msg,
+                        error=e,
+                        title=f"{self.module_name} Error",
+                        include_traceback=True,
+                        return_type=dict
+                    )
+                    
+                    # Get the container widget from the error response
+                    error_widget = error_response.get('container')
+                    
+                    # If no container is returned, create a basic error widget
+                    if error_widget is None:
+                        error_widget = widgets.HTML(f"<div style='color:red'>{error_msg}</div>")
+                    
+                    # Store additional components in UI components for reference
+                    self._ui_components.update({
+                        'ui': error_widget,
+                        'log_output': widgets.Output(),
+                        'status_panel': widgets.Output(),
+                        'error': True
+                    })
+                    
+                    # Return the widget directly for display
+                    return error_widget
+                    
+                except Exception as inner_e:
+                    # Last resort fallback if error handling itself fails
+                    print(f"Error creating error response: {inner_e}")
+                    return widgets.HTML(f"<div style='color:red'>Error: Failed to initialize {self.module_name}: {str(e)}</div>")
     
     def _load_config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """Load and validate the configuration for the module.
@@ -311,25 +313,7 @@ class CommonInitializer(ABC):
         """
         pass
         
-    def _add_logger_bridge(self, ui_components: Dict[str, Any]) -> None:
-        """Add logger bridge to UI components for logging to UI output.
-        
-        Args:
-            ui_components: Dictionary of UI components
-        """
-        try:
-            # Use the UILogger's built-in UI integration
-            if hasattr(self, 'logger') and hasattr(self.logger, 'set_ui_components'):
-                self.logger.set_ui_components(ui_components)
-            
-            # Store namespace for component identification
-            ui_components['logger_namespace'] = f"smartcash.ui.{self.module_name}"
-            
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Failed to setup logger bridge: {str(e)}")
-            else:
-                print(f"[WARNING] Failed to setup logger bridge: {str(e)}")
+    # _add_logger_bridge method removed - functionality now handled by BaseHandler
             
     def _get_timestamp(self) -> str:
         """Get current timestamp for tracking purposes.
@@ -358,38 +342,4 @@ class CommonInitializer(ABC):
                 import traceback
                 traceback.print_exc()
 
-    def create_error_response(self, error_message: str, error: Optional[Exception] = None) -> Dict[str, Any]:
-        """Create a fallback UI component to display error messages.
-        
-        This method creates a consistent error UI that can be used across all initializers.
-        It returns a dictionary with the error component and placeholders for other UI elements.
-        
-        Note: This method only creates the error response UI and does not log the error.
-        Call _handle_error() separately if you need to log the error.
-        
-        Args:
-            error_message: The error message to display
-            error: Optional exception for traceback
-            
-        Returns:
-            Dict containing:
-            - 'ui': The main error widget
-            - 'log_output': Empty output widget
-            - 'status_panel': Empty widget
-            - 'error': Boolean flag indicating this is an error state
-        """
-        # Use the centralized error response creator
-        error_response = create_error_response(
-            error_message=error_message,
-            error=error,
-            title=f"{self.module_name} Error",
-            include_traceback=True
-        )
-        
-        # Add additional components needed for initializers
-        return {
-            'ui': error_response.get('container', error_response),
-            'log_output': widgets.Output(),
-            'status_panel': widgets.Output(),
-            'error': True
-        }
+    # create_error_response method removed - now using imported create_error_response directly

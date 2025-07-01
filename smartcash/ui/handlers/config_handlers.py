@@ -1,17 +1,17 @@
 """
 File: smartcash/ui/handlers/config_handlers.py
-Deskripsi: ConfigHandler with integrated UILogger and error handling
+Description: ConfigHandler with shared configuration management, BaseHandler integration,
+and support for both persistent and non-persistent configuration handling.
 """
 
 from typing import Dict, Any, Optional, Callable, TypeVar, List
-from abc import ABC, abstractmethod
-from functools import partial
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from smartcash.common.config.manager import get_config_manager
-from smartcash.ui.utils.ui_logger import get_module_logger
-from smartcash.ui.handlers.error_handler import handle_ui_errors, create_error_response, ErrorContext
+from smartcash.ui.handlers.base_handler import BaseHandler
+from smartcash.ui.handlers.error_handler import handle_ui_errors
 from smartcash.ui.config_cell.managers.shared_config_manager import (
     get_shared_config_manager,
     subscribe_to_config,
@@ -35,32 +35,59 @@ class ConfigState:
         return self.config.copy()
 
 
-class ConfigHandler(ABC):
+class ConfigHandler(BaseHandler):
     """ConfigHandler with shared configuration management and proper lifecycle handling.
     
     Features:
     - Shared configuration across components using SharedConfigManager
-    - Thread-safe operations
+    - Thread-safe operations with proper lifecycle hooks
     - Automatic config change notifications
     - Fallback to local config when shared config is not available
+    - Support for non-persistent configuration (in-memory only)
+    - Inherits from BaseHandler for centralized functionality:
+      - Consistent logging and log redirection to UI
+      - Standardized error handling with UI feedback
+      - Confirmation dialog utilities
+      - Button state management (enable/disable)
+      - Status panel updates
+      - Progress tracker integration
+      - UI component clearing and reset
+    
+    This handler standardizes API response success checking using the 'status' key
+    for consistency across the application.
+    
+    For handlers that don't require persistence (where load/save operations are irrelevant),
+    set persistence_enabled=False when initializing the handler. This will make the handler
+    operate in memory-only mode without attempting to load from or save to disk.
+    
+    When persistence_enabled=False:
+    - extract_config and update_ui methods become optional
+    - If extract_config is not implemented, in-memory state is used
+    - If update_ui is not implemented, UI updates are skipped
+    - No file operations are performed
+    - Shared config operations are skipped
+    
+    This allows for simpler handlers that only need to maintain state in memory
+    without the overhead of implementing UI extraction/update methods when they
+    aren't needed.
     """
     
     @handle_ui_errors(error_component_title="Config Error", log_error=True)
-    def __init__(self, module_name: str, parent_module: str = None, use_shared_config: bool = True):
-        self.module_name = module_name
-        self.parent_module = parent_module
-        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
-        self.use_shared_config = use_shared_config
+    def __init__(self, module_name: str, parent_module: str = None, use_shared_config: bool = True,
+                 persistence_enabled: bool = True):
+        # Initialize BaseHandler first
+        super().__init__(module_name, parent_module)
         
-        # Initialize logger with module-level logging
-        self.logger = get_module_logger(f"smartcash.ui.{self.full_module_name}.config")
-        self.config_manager = get_config_manager()
+        # Config-specific attributes
+        self.use_shared_config = use_shared_config
+        self.persistence_enabled = persistence_enabled
+        self.config_manager = get_config_manager() if persistence_enabled else None
         self.callbacks: List[Callable[[Dict[str, Any]], None]] = []
         
-        # Initialize shared config manager if enabled
+        # Initialize shared config manager if enabled and persistence is enabled
         self.shared_manager = None
         self._unsubscribe = None
-        if self.use_shared_config and self.parent_module:
+        if self.persistence_enabled and self.use_shared_config and self.parent_module:
             try:
                 self.shared_manager = get_shared_config_manager(self.parent_module)
                 self._unsubscribe = subscribe_to_config(
@@ -75,10 +102,13 @@ class ConfigHandler(ABC):
                     exc_info=True
                 )
         
-        # Local config state
+        # Local config state (always available even for non-persistent config)
         self._config_state = ConfigState()
         
-        self.logger.debug(f"Initialized ConfigHandler for {self.full_module_name}")
+        self.logger.debug(
+            f"Initialized ConfigHandler for {self.full_module_name} " +
+            f"(persistence {'enabled' if self.persistence_enabled else 'disabled'})"
+        )
     
     def __del__(self):
         """Clean up resources."""
@@ -96,16 +126,28 @@ class ConfigHandler(ABC):
         
     @abstractmethod
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Ekstrak konfigurasi dari komponen UI"""
+        """Ekstrak konfigurasi dari komponen UI
+        
+        Note: Please create a dedicated Single Responsibility Principle (SRP) file for this method,
+        e.g. `config_extractor.py` to avoid cluttering this file with unrelated code.
+        """
         pass
         
     @abstractmethod
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari konfigurasi yang dimuat"""
+        """Update UI dari konfigurasi yang dimuat
+        
+        Note: Please create a dedicated Single Responsibility Principle (SRP) file for this method,
+        e.g. `config_updater.py` to avoid cluttering this file with unrelated code.
+        """
         pass
         
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default config dari defaults.py untuk reset scenarios"""
+        """Get default config dari defaults.py untuk reset scenarios
+        
+        Note: Please create a dedicated file `defaults.py` for this hardcoded configuration
+        without cluttering with unrelated functions.
+        """
         try:
             module_path = (f"smartcash.ui.{self.parent_module}.{self.module_name}.handlers.defaults" 
                           if hasattr(self, 'parent_module') and self.parent_module 
@@ -134,11 +176,25 @@ class ConfigHandler(ABC):
         """Load config with fallback to shared config and base_config.yaml.
         
         Priority order:
-        1. Specific config from file
-        2. Shared config (if enabled)
-        3. Base config from file
+        1. Specific config from file (if persistence enabled)
+        2. Shared config (if enabled and persistence enabled)
+        3. Base config from file (if persistence enabled)
         4. Default config
+        
+        For non-persistent handlers, this will always return the default config or
+        the current in-memory config state.
         """
+        # If persistence is disabled, just return current state or default config
+        if not self.persistence_enabled:
+            if self._config_state.config:
+                self.logger.debug(f"Using in-memory config for {self.module_name} (persistence disabled)")
+                return self._config_state.config
+            else:
+                default_config = self.get_default_config()
+                self.logger.debug(f"Using default config for {self.module_name} (persistence disabled)")
+                self._config_state.update(default_config)
+                return default_config
+        
         config_name = config_name or f"{self.module_name}_config"
         
         # Try to load from shared config first if enabled
@@ -158,29 +214,66 @@ class ConfigHandler(ABC):
         try:
             # Try to load specific config
             if specific_config := self.config_manager.get_config(config_name):
-                self.logger.info(f"Loaded config: {config_name}")
-                resolved = self._resolve_config_inheritance(specific_config, config_name)
-                self._config_state.update(resolved)
-                return resolved
-            
-            # Fallback to base config if enabled
-            if use_base_config and (base_config := self.config_manager.get_config('base_config')):
-                self.logger.info(f"Using base_config.yaml for {config_name}")
-                resolved = self._resolve_config_inheritance(base_config, 'base_config')
-                self._config_state.update(resolved)
-                return resolved
+                if use_base_config:
+                    specific_config = self._resolve_config_inheritance(specific_config, config_name)
+                self.logger.info(f"Loaded specific config: {config_name}")
+                self._config_state.update(specific_config)
+                return specific_config
                 
+            # Try to load base config
+            if use_base_config:
+                if base_config := self.config_manager.get_config('base_config'):
+                    self.logger.info("Loaded base config")
+                    self._config_state.update(base_config)
+                    return base_config
         except Exception as e:
-            self.logger.error(
-                f"Error loading config: {e}",
+            self.logger.warning(
+                f"Failed to load file-based config: {e}",
                 exc_info=True
             )
-        
-        # Final fallback to defaults
-        self.logger.warning(f"Using defaults for {config_name}")
+            
+        # Use default config as last resort
         default_config = self.get_default_config()
+        self.logger.info("Using default config")
         self._config_state.update(default_config)
         return default_config
+    
+    def _try_extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Try to extract config from UI components, respecting persistence setting.
+        
+        For persistent handlers, extract_config is required.
+        For non-persistent handlers, extract_config is optional.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            
+        Returns:
+            Dict[str, Any]: Extracted or current config
+            
+        Raises:
+            ValueError: If extraction fails for persistent handlers
+        """
+        if not self.persistence_enabled:
+            # For non-persistent handlers, extract_config is optional
+            extract_method = getattr(self, 'extract_config', None)
+            if callable(extract_method):
+                try:
+                    config = extract_method(ui_components)
+                    if config:
+                        return config
+                except NotImplementedError:
+                    self.logger.debug(f"Using current config for {self.module_name} (extract_config not implemented)")
+            else:
+                self.logger.debug(f"Using current config for {self.module_name} (extract_config not implemented)")
+            
+            # Use current config if extract_config is not implemented or fails
+            return self._config_state.get() or {}
+        else:
+            # For persistent handlers, extract_config is required
+            config = self.extract_config(ui_components)
+            if not config:
+                raise ValueError("Failed to extract configuration from UI components")
+            return config
     
     @handle_ui_errors(
         error_component_title="Config Save Error",
@@ -198,16 +291,25 @@ class ConfigHandler(ABC):
             
         Returns:
             bool: True if save was successful
+            
+        For non-persistent handlers, this will only update the in-memory state
+        and will not attempt to save to disk or shared config.
+        
+        For non-persistent handlers, extract_config is optional. If not implemented,
+        the current in-memory config will be used.
         """
         self.before_save(ui_components)
         
-        # Extract and validate config
-        config = self.extract_config(ui_components)
-        if not config:
-            raise ValueError("Failed to extract configuration from UI components")
+        # Try to extract config based on persistence setting
+        config = self._try_extract_config(ui_components)
         
-        # Update local state
+        # Always update local state
         self._config_state.update(config)
+        
+        # For non-persistent handlers, just update in-memory state and return
+        if not self.persistence_enabled:
+            self.logger.debug(f"Updated in-memory config for {self.module_name} (persistence disabled)")
+            return self._handle_save_success(ui_components, config)
         
         # Update shared config if enabled
         if self.use_shared_config and update_shared and self.parent_module:
@@ -227,45 +329,90 @@ class ConfigHandler(ABC):
                 )
                 # Fall through to file-based save
         
-        # Fallback to file-based save
+        # Save to file
         config_name = config_name or f"{self.module_name}_config"
         try:
-            success = self.config_manager.save_config(config, config_name)
-            if success:
-                return self._handle_save_success(ui_components, config)
-            
-            self._handle_save_failure(ui_components, "Failed to save configuration to file")
-            return False
-            
+            self.config_manager.save_config(config_name, config)
+            self.logger.info(f"Saved config to {config_name}.yaml")
+            return self._handle_save_success(ui_components, config)
         except Exception as e:
-            self._handle_save_failure(ui_components, f"Error saving config: {str(e)}")
-            return False
+            error_msg = f"Failed to save config: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return self._handle_save_failure(ui_components, error_msg)
     
     @handle_ui_errors(
         error_component_title="Config Reset Error",
         log_error=True,
         return_type=bool
     )
-    def reset_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None) -> bool:
-        """Reset config to defaults with proper error handling."""
+    def reset_config(self, ui_components: Dict[str, Any], config_name: Optional[str] = None, 
+                    update_shared: bool = True) -> bool:
+        """Reset config to defaults with lifecycle hooks.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            config_name: Optional custom config name
+            update_shared: Whether to update shared config if enabled
+            
+        Returns:
+            bool: True if reset was successful
+            
+        For non-persistent handlers, this will only reset the in-memory state
+        and will not attempt to save to disk or shared config.
+        
+        For non-persistent handlers, update_ui is optional. If implemented, it will
+        be called to update the UI with the default configuration.
+        """
         self.before_reset(ui_components)
         
-        # Get and validate default config
+        # Get default config
         default_config = self.get_default_config()
         if not default_config:
-            raise ValueError("Failed to get default configuration")
+            error_msg = "Failed to get default configuration"
+            self.logger.error(error_msg)
+            self._handle_reset_failure(ui_components, error_msg)
+            return False
+            
+        # Always update local state
+        self._config_state.update(default_config)
         
-        # Update UI and save
-        self.update_ui(ui_components, default_config)
+        # For non-persistent handlers, just update in-memory state and return
+        if not self.persistence_enabled:
+            self.logger.debug(f"Reset in-memory config for {self.module_name} (persistence disabled)")
+            self._handle_reset_success(ui_components, default_config)
+            return True
+        
+        # Update shared config if enabled
+        if self.use_shared_config and update_shared and self.parent_module:
+            try:
+                broadcast_config_update(
+                    parent_module=self.parent_module,
+                    module_name=self.module_name,
+                    config=default_config,
+                    persist=True
+                )
+                self.logger.info(f"Reset shared config for {self.module_name}")
+                self._handle_reset_success(ui_components, default_config)
+                return True
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to reset shared config: {e}",
+                    exc_info=True
+                )
+                # Fall through to file-based save
+        
+        # Save default config to file
         config_name = config_name or f"{self.module_name}_config"
-        success = self.config_manager.save_config(default_config, config_name)
-        
-        # Handle success/failure
-        if success:
-            return self._handle_reset_success(ui_components, default_config)
-        
-        self._handle_reset_failure(ui_components, "Failed to reset configuration")
-        return False
+        try:
+            self.config_manager.save_config(config_name, default_config)
+            self.logger.info(f"Reset config saved to {config_name}.yaml")
+            self._handle_reset_success(ui_components, default_config)
+            return True
+        except Exception as e:
+            error_msg = f"Failed to reset config: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self._handle_reset_failure(ui_components, error_msg)
+            return False
     
     def _execute_callbacks(self, config: Dict[str, Any], operation: str) -> None:
         """Safely execute callbacks with error handling.
@@ -304,10 +451,40 @@ class ConfigHandler(ABC):
             ui_components: Dictionary of UI components
             config: Configuration data
             callback_type: Either 'save' or 'reset'
+            
+        For non-persistent handlers, update_ui is optional. If implemented, it will
+        be called to update the UI with the configuration.
         """
         ui_components['config'] = config
+        
+        # Try to update UI based on persistence setting
+        self._try_update_ui(ui_components, config)
+        
+        # Call lifecycle hook and execute callbacks
         getattr(self, f'after_{callback_type}_success')(ui_components, config)
         self._execute_callbacks(config, callback_type)
+    
+    def _try_update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """Try to update UI components with config data, respecting persistence setting.
+        
+        For persistent handlers, update_ui is required.
+        For non-persistent handlers, update_ui is optional.
+        
+        Args:
+            ui_components: Dictionary of UI components
+            config: Configuration data to apply to UI
+        """
+        if self.persistence_enabled or not hasattr(self, 'persistence_enabled'):
+            # For persistent handlers, update_ui is required
+            self.update_ui(ui_components, config)
+        else:
+            # For non-persistent handlers, update_ui is optional
+            update_method = getattr(self, 'update_ui', None)
+            if callable(update_method):
+                try:
+                    update_method(ui_components, config)
+                except NotImplementedError:
+                    self.logger.debug(f"UI not updated for {self.module_name} (update_ui not implemented)")
     
     def _handle_failure(self, ui_components: Dict[str, Any], error: str, 
                        callback_type: str) -> None:
@@ -367,98 +544,41 @@ class ConfigHandler(ABC):
     # Lifecycle hooks
     def before_save(self, ui_components: Dict[str, Any]) -> None:
         """Hook called before saving configuration."""
-        self._clear_ui_outputs(ui_components)
-        self._update_status_panel(ui_components, "Saving configuration...", "info")
+        self.clear_ui_outputs(ui_components)
+        self.update_status_panel(ui_components, "Saving configuration...", "info")
+    
+    def before_reset(self, ui_components: Dict[str, Any]) -> None:
+        """Hook called before resetting configuration."""
+        self.clear_ui_outputs(ui_components)
+        self.update_status_panel(ui_components, "Resetting configuration...", "info")
     
     def after_save_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Hook called after successful save."""
-        self._update_status_panel(ui_components, "Configuration saved successfully", "success")
+        self.update_status_panel(ui_components, "Configuration saved successfully", "success")
         self.logger.info(f"Configuration {self.module_name} saved successfully")
     
     def after_save_failure(self, ui_components: Dict[str, Any], error: str) -> None:
         """Hook called when save fails."""
-        self._update_status_panel(ui_components, f"Failed to save: {error}", "error")
+        self.update_status_panel(ui_components, f"Failed to save: {error}", "error")
         self.logger.error(f"Error saving configuration: {error}", exc_info=True)
     
     def before_reset(self, ui_components: Dict[str, Any]) -> None:
         """Hook called before resetting configuration."""
-        self._clear_ui_outputs(ui_components)
-        self._reset_progress_bars(ui_components)
-        self._update_status_panel(ui_components, "Resetting configuration...", "info")
+        self.clear_ui_outputs(ui_components)
+        self.reset_progress_bars(ui_components)
+        self.update_status_panel(ui_components, "Resetting configuration...", "info")
     
     def after_reset_success(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Hook called after successful reset."""
-        self._update_status_panel(ui_components, "Configuration reset successfully", "success")
+        self.update_status_panel(ui_components, "Configuration reset successfully", "success")
         self.logger.info(f"Configuration {self.module_name} reset successfully")
     
     def after_reset_failure(self, ui_components: Dict[str, Any], error: str) -> None:
         """Hook called when reset fails."""
-        self._update_status_panel(ui_components, f"Failed to reset: {error}", "error")
+        self.update_status_panel(ui_components, f"Failed to reset: {error}", "error")
         self.logger.error(f"Error resetting configuration: {error}", exc_info=True)
     
-    # Helper methods with proper error handling
-    def _clear_ui_outputs(self, ui_components: Dict[str, Any]) -> None:
-        """Clear UI outputs with safe widget access."""
-        output_keys = ['log_output', 'status', 'confirmation_area']
-        
-        for key in output_keys:
-            widget = ui_components.get(key)
-            if widget and hasattr(widget, 'clear_output'):
-                try:
-                    widget.clear_output(wait=True)
-                except Exception as e:
-                    self.logger.debug(f"Error clearing {key}: {str(e)}", exc_info=True)
-    
-    def _reset_progress_bars(self, ui_components: Dict[str, Any]) -> None:
-        """Reset progress bars with safe widget access."""
-        progress_keys = ['progress_bar', 'progress_container', 'current_progress', 'progress_tracker']
-        
-        for key in progress_keys:
-            widget = ui_components.get(key)
-            if widget:
-                try:
-                    # Try to hide widget
-                    if hasattr(widget, 'layout'):
-                        widget.layout.visibility = 'hidden'
-                        widget.layout.display = 'none'
-                    
-                    # Try to reset value
-                    if hasattr(widget, 'value'):
-                        widget.value = 0
-                    
-                    # Try to reset progress tracker
-                    if hasattr(widget, 'reset'):
-                        widget.reset()
-                        
-                except Exception as e:
-                    self.logger.debug(f"Error resetting {key}: {str(e)}", exc_info=True)
-    
-    def _update_status_panel(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
-        """Update status panel with safe fallback"""
-        try:
-            if 'status_panel' in ui_components and hasattr(ui_components['status_panel'], 'update'):
-                ui_components['status_panel'].update(
-                    create_error_response(
-                        error_message=message,
-                        title="Status Update",
-                        error_type=status_type,
-                        include_traceback=False
-                    )
-                )
-            elif 'logger' in ui_components:
-                log_method = getattr(ui_components['logger'], status_type, ui_components['logger'].info)
-                log_method(f"Status: {message}")
-            else:
-                print(f"[{status_type.upper()}] {message}")
-        except Exception as e:
-            self.logger.error(
-                f"Failed to update status panel: {str(e)}",
-                exc_info=True,
-                extra={
-                    'component': self.__class__.__name__,
-                    'operation': 'update_status_panel'
-                }
-            )
+    # Use BaseHandler's UI output clearing and progress bar reset methods instead of custom implementation
     
     # Callback management dengan one-liner checks
     def add_callback(self, cb: Callable) -> None:

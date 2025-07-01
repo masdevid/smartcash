@@ -8,19 +8,16 @@ from typing import Dict, Any, Optional, Callable, TYPE_CHECKING, List, Union
 from pathlib import Path
 import shutil
 
-if TYPE_CHECKING:
-    from smartcash.ui.utils.logger_bridge import UILoggerBridge as LoggerBridge
-else:
-    LoggerBridge = Any  # For runtime type hints
+from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
 
 from smartcash.ui.pretrained.services.model_checker import check_model_exists
 from smartcash.ui.pretrained.services.model_downloader import PretrainedModelDownloader
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
     log_errors,
-    get_logger,
-    create_error_context
+    get_logger
 )
+from smartcash.ui.utils.error_utils import create_error_context
 
 @with_error_handling(component="model_handlers", operation="ModelOperationError")
 class ModelOperationError(Exception):
@@ -43,55 +40,57 @@ class ModelOperationError(Exception):
 class ModelOperationHandler:
     """Handler untuk operasi-operasi terkait model"""
     
-    def __init__(self, ui_components: Dict[str, Any], logger_bridge: Optional[LoggerBridge] = None):
+    def __init__(self, ui_components: Dict[str, Any], logger: Optional[UILogger] = None):
         """Initialize model operation handler
         
         Args:
             ui_components: Dictionary berisi komponen UI
-            logger_bridge: LoggerBridge instance untuk logging terpusat. 
-                         Jika tidak disediakan, akan mencoba mengambil dari ui_components.
+            logger: UILogger instance untuk logging terpusat. 
+                   Jika tidak disediakan, akan mencoba mengambil dari ui_components.
         """
         self.ui_components = ui_components
-        self.logger_bridge = logger_bridge or ui_components.get('logger_bridge')
+        self.logger = logger or ui_components.get('logger')
+        if not self.logger:
+            self.logger = get_module_logger('smartcash.ui.pretrained.handlers.model_handlers')
         self.last_models_dir = None
         
-        # Initialize downloader with logger bridge
+        # Initialize downloader with logger
         self.downloader = PretrainedModelDownloader()
-        if hasattr(self.downloader, 'set_logger_bridge') and self.logger_bridge:
-            self.downloader.set_logger_bridge(self.logger_bridge)
+        if hasattr(self.downloader, 'set_logger'):
+            self.downloader.set_logger(self.logger)
             
         # Log initialization
         self._log_debug("ModelOperationHandler initialized")
     
     def _log(self, message: str, level: str = "info", **kwargs) -> None:
-        """Log message using logger_bridge if available
+        """Log message using UILogger
         
         Args:
             message: Pesan yang akan dicatat
             level: Tingkat log ('debug', 'info', 'warning', 'error')
             **kwargs: Argumen tambahan untuk logging
         """
-        if not self.logger_bridge:
-            return
+        if not self.logger:
+            self.logger = get_module_logger('smartcash.ui.pretrained.handlers.model_handlers')
             
-        log_func = getattr(self.logger_bridge, level.lower(), None)
+        log_func = getattr(self.logger, level.lower(), None)
         if callable(log_func):
             log_func(message, **kwargs)
     
     def _log_debug(self, message: str, **kwargs) -> None:
-        """Log debug message using logger_bridge if available"""
+        """Log debug message using UILogger"""
         self._log(message, "debug", **kwargs)
             
     def _log_info(self, message: str, **kwargs) -> None:
-        """Log info message using logger_bridge if available"""
+        """Log info message using UILogger"""
         self._log(message, "info", **kwargs)
             
     def _log_warning(self, message: str, **kwargs) -> None:
-        """Log warning message using logger_bridge if available"""
+        """Log warning message using UILogger"""
         self._log(message, "warning", **kwargs)
             
     def _log_error(self, message: str, exc_info: bool = False, **kwargs) -> None:
-        """Log error message using logger_bridge if available"""
+        """Log error message using UILogger"""
         self._log(message, "error", exc_info=exc_info, **kwargs)
         
     def _create_error_context(self, **kwargs) -> Dict[str, Any]:
@@ -108,9 +107,7 @@ class ModelOperationHandler:
     
     @with_error_handling(
         component="pretrained",
-        operation="set_ui_operation_state",
-        error_message="Gagal mengubah state UI",
-        raise_exception=ModelOperationError
+        operation="set_ui_operation_state"
     )
     @log_errors(level="error")
     def set_ui_operation_state(self, in_progress: bool) -> None:
@@ -157,9 +154,7 @@ class ModelOperationHandler:
     
     @with_error_handling(
         component="pretrained",
-        operation="update_download_progress",
-        error_message="Gagal mengupdate progress download",
-        raise_exception=ModelOperationError
+        operation="update_download_progress"
     )
     @log_errors(level="error")
     def update_download_progress(self, progress: int, message: str = "") -> None:
@@ -203,9 +198,7 @@ class ModelOperationHandler:
     
     @with_error_handling(
         component="pretrained",
-        operation="cleanup_old_models_dir",
-        error_message="Gagal membersihkan direktori model lama",
-        raise_exception=ModelOperationError
+        operation="cleanup_old_models_dir"
     )
     @log_errors(level="warning")
     def cleanup_old_models_dir(self, old_dir: str, new_dir: str) -> None:
@@ -237,9 +230,7 @@ class ModelOperationHandler:
     
     @with_error_handling(
         component="pretrained",
-        operation="check_and_download_model",
-        error_message="Gagal dalam proses check dan download model",
-        raise_exception=ModelOperationError
+        operation="check_and_download_model"
     )
     @log_errors(level="error")
     def check_and_download_model(self, config: Dict[str, Any]) -> bool:

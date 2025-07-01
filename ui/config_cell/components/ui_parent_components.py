@@ -12,7 +12,7 @@ from IPython.display import display
 from smartcash.common.logger import get_logger
 from smartcash.ui.config_cell.components.component_registry import component_registry
 from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
-from smartcash.ui.config_cell.handlers.error_handler import handle_ui_errors
+from smartcash.ui.handlers.error_handler import handle_ui_errors
 
 # Import shared components
 from smartcash.ui.components import (

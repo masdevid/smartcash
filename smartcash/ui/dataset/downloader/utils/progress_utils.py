@@ -4,7 +4,7 @@ Deskripsi: Progress callback utilities untuk download operations
 """
 
 from typing import Dict, Any, Callable, Optional
-from smartcash.ui.utils.logger_bridge import UILoggerBridge
+from smartcash.ui.utils.ui_logger import UILogger
 from .ui_utils import is_milestone_step, map_step_to_current_progress
 
 def create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[str, int, int, str], None]:

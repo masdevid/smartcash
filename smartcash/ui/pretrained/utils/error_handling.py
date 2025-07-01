@@ -5,18 +5,26 @@ This module provides consistent error handling patterns for the pretrained servi
 module, ensuring all errors are properly logged and handled according to the project's
 standards.
 """
-from typing import Any, Callable, Dict, Optional, TypeVar, Type, Union, cast
 from functools import wraps
+from typing import Any, Callable, Dict, Optional, TypeVar, Union
 import logging
 import traceback
 
+from functools import wraps
+import logging
+from typing import Any, Callable, Dict, Optional, TypeVar, Type, Union
 from smartcash.ui.utils.error_utils import (
     with_error_handling as base_with_error_handling,
     log_errors as base_log_errors,
     create_error_context,
-    ErrorHandler
+    ErrorHandler,
+    safe_ui_operation as base_safe_ui_operation
 )
-from smartcash.common.exceptions import SmartCashError, UIError
+from smartcash.common.exceptions import (
+    SmartCashError, 
+    UIError, 
+    ErrorContext
+)
 
 # Type variables for generic function typing
 T = TypeVar('T')
@@ -177,8 +185,27 @@ def log_errors(
     return decorator
 
 # Export public API
+def safe_ui_operation(component: str = "pretrained", operation: str = "unknown"):
+    """
+    Decorator untuk menjalankan operasi UI dengan error handling yang aman
+    
+    Args:
+        component: Nama komponen yang menggunakan decorator
+        operation: Nama operasi yang di-wrap
+        
+    Returns:
+        Decorated function with error handling
+    """
+    return base_safe_ui_operation(component=component, operation=operation)
+
 __all__ = [
     'with_error_handling',
     'log_errors',
     'get_logger',
+    'create_error_context',
+    'ErrorContext',
+    'ErrorHandler',
+    'SmartCashError',
+    'UIError',
+    'safe_ui_operation'
 ]

@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
-from smartcash.common.threadpools import get_optimal_thread_count
+from smartcash.common.worker_utils import get_optimal_worker_count
 from smartcash.common.utils.file_naming_manager import create_file_naming_manager, is_research_format
 
 class FileProcessor:
@@ -24,7 +24,7 @@ class FileProcessor:
         
         # File handling settings
         self.supported_image_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
-        self.max_workers = self.config.get('max_workers', get_optimal_thread_count('io'))
+        self.max_workers = self.config.get('max_workers', get_optimal_worker_count('io'))
         self.use_threading = self.config.get('use_threading', True)
     
     def read_image(self, image_path: Union[str, Path]) -> Optional[np.ndarray]:

@@ -6,9 +6,9 @@ This module provides the PretrainedModelSyncer class for syncing model files wit
 tracking and error handling. Supports one-way and bi-directional sync operations.
 
 Example:
-    from smartcash.ui.utils.logger_bridge import LoggerBridge
+    from smartcash.ui.utils.ui_logger import get_module_logger
     
-    syncer = PretrainedModelSyncer(logger_bridge=LoggerBridge())
+    syncer = PretrainedModelSyncer()
     
     # One-way sync
     syncer.sync_to_drive(
@@ -36,22 +36,18 @@ from typing import Dict, List, Optional, Any, Tuple, Callable, TypeVar, Union
 from pathlib import Path
 from functools import wraps
 
-from smartcash.ui.utils.logger_bridge import LoggerBridge
+from smartcash.ui.utils.ui_logger import get_module_logger, UILogger
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
-    log_errors,
-    get_logger
+    log_errors
 )
 from smartcash.ui.pretrained.utils.progress_adapter import PretrainedProgressAdapter
 
 # Type aliases
-LoggerBridge = Callable[[str, str], None]
+LoggerType = UILogger
 ProgressCallback = Callable[[int, str], None]  # (progress_pct: int, message: str) -> None
 StatusCallback = Callable[[str], None]  # (message: str) -> None
 ProgressTrackerType = Union[PretrainedProgressAdapter, ProgressCallback]
-
-# Set up logger
-logger = get_logger()
 
 # Type variable for class methods
 T = TypeVar('T', bound='PretrainedModelSyncer')
@@ -74,13 +70,13 @@ class SyncResult:
     """Result of a synchronization operation.
     
     Attributes:
-        success: True if operation completed successfully
+        status: True if operation completed successfully
         files_processed: Number of files processed
         files_skipped: Number of files skipped (already in sync)
         error: Error message if operation failed
         details: Additional operation details
     """
-    success: bool = False
+    status: bool = False
     files_processed: int = 0
     files_skipped: int = 0
     error: Optional[str] = None
@@ -93,7 +89,7 @@ class PretrainedModelSyncer:
     Supports one-way and bi-directional sync operations.
     
     Example:
-        syncer = PretrainedModelSyncer(logger_bridge=LoggerBridge())
+        syncer = PretrainedModelSyncer(logger=get_module_logger('smartcash.ui.pretrained.services'))
         success = syncer.sync_to_drive(
             source_dir="/path/to/local",
             drive_dir="/path/to/drive",
@@ -103,17 +99,17 @@ class PretrainedModelSyncer:
     """
     
     def __init__(self, 
-                 logger_bridge: Optional[LoggerBridge] = None,
+                 logger: Optional[LoggerType] = None,
                  progress_tracker: Optional[PretrainedProgressAdapter] = None):
-        """Initialize the model syncer with an optional logger bridge and progress tracker.
+        """Initialize the model syncer with an optional logger and progress tracker.
         
         Args:
-            logger_bridge: Optional logger bridge for UI logging. If not provided,
-                         logging will be done to console only.
+            logger: Optional logger for UI logging. If not provided,
+                   the default ui_logger will be used.
             progress_tracker: Optional progress tracker instance. If not provided,
                            a new one will be created when needed.
         """
-        self._logger_bridge = logger_bridge
+        self._logger = logger or get_module_logger(__name__)
         self._progress_tracker = progress_tracker
         self._model_extensions = ['.pt', '.bin', '.pth', '.ckpt']
     
@@ -125,8 +121,8 @@ class PretrainedModelSyncer:
             level: Log level (debug, info, warning, error, critical)
             **kwargs: Additional logging parameters
         """
-        log_func = getattr(logger, level.lower(), logger.info)
-        log_func(message, **kwargs)
+        log_method = getattr(self._logger, level, self._logger.info)
+        log_method(message, **kwargs)
     
     def _update_progress(self, 
                         current: int, 
@@ -365,7 +361,7 @@ class PretrainedModelSyncer:
                 status_msg = "No model files found in source directory"
                 self._update_status(status_msg, status_callback)
                 self._log(status_msg, "warning")
-                result.success = True
+                result.status = True
                 return result
                 
             self._update_status(
@@ -433,7 +429,7 @@ class PretrainedModelSyncer:
             result.error = error_msg
         
         # Determine overall success
-        result.success = result.files_processed > 0 or result.files_skipped == total_files
+        result.status = result.files_processed > 0 or result.files_skipped == total_files
         
         # Update result details
         result.details.update({
@@ -455,7 +451,7 @@ class PretrainedModelSyncer:
                 f"Processed: {result.files_processed}, "
                 f"Skipped: {result.files_skipped}"
             )
-            if not result.success:
+            if not result.status:
                 completion_msg = f"⚠️ {completion_msg} (with errors)"
         
         self._update_status(completion_msg, status_callback)
@@ -463,7 +459,7 @@ class PretrainedModelSyncer:
             total_files, 
             total_files, 
             progress_callback, 
-            "Sync completed" + (" with errors" if not result.success else "")
+            "Sync completed" + (" with errors" if not result.status else "")
         )
         
         return result
@@ -657,7 +653,7 @@ class PretrainedModelSyncer:
         )
         
         # Log detailed file differences if debug level is enabled
-        if self._logger_bridge and hasattr(self._logger_bridge, 'debug'):
+        if hasattr(self._logger, 'debug'):
             if only_in_local:
                 self._log("Files only in local: " + ", ".join(only_in_local[:5] + 
                         (['...'] if len(only_in_local) > 5 else [])) + 

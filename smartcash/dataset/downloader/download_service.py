@@ -13,6 +13,7 @@ from smartcash.dataset.downloader.file_processor import create_file_processor
 from smartcash.dataset.downloader.validators import create_dataset_validator
 from smartcash.dataset.downloader.progress_tracker import DownloadProgressTracker, DownloadStage
 from smartcash.common.environment import get_environment_manager
+from smartcash.common.worker_utils import get_download_workers    
 
 class DownloadService(BaseDownloaderComponent):
     """Fixed download service dengan proper imports dan enhanced directory management"""
@@ -32,7 +33,7 @@ class DownloadService(BaseDownloaderComponent):
         self.directory_manager = DirectoryManager()
         
         # Extract config dengan optimal workers
-        self.max_workers = config.get('max_workers', self._get_default_workers())
+        self.max_workers = config.get('max_workers', get_download_workers())
         self.timeout = config.get('timeout', 30)
         self.retry_count = config.get('retry_count', 3)
         self.chunk_size = config.get('chunk_size', 8192*4)
@@ -45,13 +46,6 @@ class DownloadService(BaseDownloaderComponent):
         self._file_processor = None
         self._validator = None
     
-    def _get_default_workers(self) -> int:
-        """Get default optimal workers untuk download"""
-        try:
-            from smartcash.common.threadpools import get_download_workers
-            return get_download_workers()
-        except ImportError:
-            return 4  # Safe fallback
     
     def set_progress_callback(self, callback) -> None:
         """Set progress callback dan create tracker"""
@@ -443,7 +437,7 @@ def create_download_service(config: Dict[str, Any], logger=None) -> Optional[Dow
             return None
         
         # Apply defaults dengan optimal workers
-        from smartcash.common.threadpools import get_download_workers, get_optimal_thread_count
+        from smartcash.common.worker_utils import get_download_workers, get_optimal_worker_count
         
         defaults = {
             'workspace': 'smartcash-wo2us',

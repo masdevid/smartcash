@@ -3,8 +3,10 @@ Cleanup operation handler for dataset downloader.
 """
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
+from smartcash.common.worker_utils import get_optimal_worker_count
+from smartcash.ui.utils.ui_logger import UILogger
 from smartcash.ui.dataset.downloader.handlers.confirmation import confirmation_handler
-from smartcash.ui.dataset.downloader.utils.ui_utils import log_to_accordion, clear_outputs
+from smartcash.ui.dataset.downloader.utils.ui_utils import clear_outputs
 from smartcash.ui.dataset.downloader.utils.backend_utils import get_cleanup_targets, create_backend_cleanup_service
 from smartcash.ui.dataset.downloader.utils.button_manager import get_button_manager
 
@@ -31,12 +33,14 @@ class CleanupOperation:
         
         try:
             # Get cleanup targets
-            targets_result = get_cleanup_targets(self.ui_components.get('logger_bridge'))
+            targets_result = get_cleanup_targets(self.ui_components.get('logger'))
             
             if targets_result.get('has_targets', False):
                 self._show_cleanup_confirmation(targets_result)
             else:
-                log_to_accordion(self.ui_components, "ℹ️ Tidak ada target cleanup yang ditemukan", 'info')
+                logger = self.ui_components.get('logger')
+                if logger:
+                    logger.info("ℹ️ Tidak ada target cleanup yang ditemukan")
                 
         except Exception as e:
             self._handle_cleanup_error(e, "check_cleanup_targets")
@@ -87,10 +91,12 @@ class CleanupOperation:
         try:
             # Setup operation environment
             self._setup_operation("cleanup")
-            log_to_accordion(self.ui_components, "✅ Cleanup dikonfirmasi, memulai...", "success")
+            logger = self.ui_components.get('logger')
+            if logger:
+                logger.success("✅ Cleanup dikonfirmasi, memulai...")
             
             # Start operation in background thread
-            with ThreadPoolExecutor() as executor:
+            with ThreadPoolExecutor(max_workers=get_optimal_worker_count('io')) as executor:
                 executor.submit(self._perform_cleanup, targets_result)
                 
         except Exception as e:
@@ -105,7 +111,7 @@ class CleanupOperation:
         try:
             # Create cleanup service
             cleanup_service = create_backend_cleanup_service(
-                self.ui_components.get('logger_bridge')
+                self.ui_components.get('logger')
             )
             
             if not cleanup_service:
@@ -115,10 +121,14 @@ class CleanupOperation:
             result = cleanup_service.cleanup(targets_result.get('files', []))
             
             if result.get('status') is True:
-                log_to_accordion(self.ui_components, "✅ Pembersihan berhasil diselesaikan", 'success')
+                logger = self.ui_components.get('logger')
+                if logger:
+                    logger.success("✅ Pembersihan berhasil diselesaikan")
             else:
                 error_msg = result.get('error', 'Gagal membersihkan file')
-                log_to_accordion(self.ui_components, f"❌ {error_msg}", 'error')
+                logger = self.ui_components.get('logger')
+                if logger:
+                    logger.error(f"❌ {error_msg}")
                 
         except Exception as e:
             self._handle_cleanup_error(e, "perform_cleanup")
@@ -136,7 +146,9 @@ class CleanupOperation:
         self._setup_progress_tracker(operation_name)
         
         # Log operation start
-        log_to_accordion(self.ui_components, f"🚀 Memulai {operation_name.lower()}...", 'info')
+        logger = self.ui_components.get('logger')
+        if logger:
+            logger.info(f"🚀 Memulai {operation_name.lower()}...")
 
     def _setup_progress_tracker(self, operation_name: str) -> None:
         """Setup and initialize progress tracker."""
@@ -161,6 +173,8 @@ class CleanupOperation:
             handle_downloader_error, 
             create_error_context
         )
+        # Get logger from ui_components
+        logger = self.ui_components.get('logger')
         
         handle_downloader_error(
             error,
@@ -169,7 +183,7 @@ class CleanupOperation:
                 component="downloader",
                 ui_components=self.ui_components
             ),
-            logger=self.ui_components.get('logger_bridge'),
+            logger=logger,
             ui_components=self.ui_components
         )
 

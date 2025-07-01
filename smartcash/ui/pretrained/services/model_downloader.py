@@ -12,6 +12,7 @@ import time
 from typing import Callable, Optional, Dict, Any, TYPE_CHECKING, Union
 from concurrent.futures import ThreadPoolExecutor
 
+from smartcash.ui.types import ProgressTrackerType, StatusCallback
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
     log_errors,
@@ -23,7 +24,7 @@ from smartcash.ui.pretrained.utils.progress_adapter import PretrainedProgressAda
 logger = get_logger()
 
 if TYPE_CHECKING:
-    from smartcash.ui.utils.logger_bridge import UILoggerBridge as LoggerBridge
+    from smartcash.ui.utils.ui_logger import UILogger as LoggerBridge
 else:
     LoggerBridge = Any  # For runtime type hints
 

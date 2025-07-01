@@ -10,10 +10,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, TypedDict
 
 from smartcash.common.environment import get_environment_manager
-from smartcash.common.constants.paths import get_paths_for_environment
-from smartcash.ui.handlers.base_handler import BaseHandler
 from smartcash.ui.handlers.error_handler import handle_ui_errors
-from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHandler, ConfigState
+from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHandler
+from smartcash.ui.setup.env_config.handlers.base_config_mixin import BaseConfigMixin
 
 class SyncResult(TypedDict, total=False):
     """Type definition for configuration sync results.
@@ -31,71 +30,6 @@ class SyncResult(TypedDict, total=False):
     errors: List[str]
     details: Dict[str, Any]
 
-
-class EnvConfigHandler(BaseConfigHandler):
-    """Environment-specific config handler that doesn't persist to disk.
-    
-    This handler uses the non-persistent configuration feature of BaseConfigHandler
-    to maintain configuration in memory only without reading/writing to disk.
-    """
-    
-    def __init__(self, module_name: str, parent_module: str = None, **kwargs):
-        # Initialize with persistence disabled and shared config disabled
-        super().__init__(
-            module_name=module_name, 
-            parent_module=parent_module, 
-            use_shared_config=False,
-            persistence_enabled=False
-        )
-        
-    def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract configuration from UI components.
-        
-        Args:
-            ui_components: Dictionary of UI components
-            
-        Returns:
-            Dictionary containing the extracted configuration
-        """
-        try:
-            config = {}
-            
-            # Extract configuration from UI components if needed
-            # Example:
-            # if 'some_widget' in ui_components:
-            #     config['some_setting'] = ui_components['some_widget'].value
-                
-            self._logger.debug("Extracted config from UI components")
-            return config
-            
-        except Exception as e:
-            self._logger.error(f"Failed to extract config: {str(e)}", exc_info=True)
-            return {}
-    
-    def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI components from configuration.
-        
-        Args:
-            ui_components: Dictionary of UI components to update
-            config: Configuration dictionary to apply
-        """
-        try:
-            if not ui_components or not config:
-                self._logger.debug("No UI components or config provided for update")
-                return
-                
-            # Update UI components from config
-            # Example:
-            # if 'some_setting' in config and 'some_widget' in ui_components:
-            #     ui_components['some_widget'].value = config['some_setting']
-                
-            self._logger.debug("Updated UI components from config")
-            
-        except Exception as e:
-            self._logger.error(f"Failed to update UI: {str(e)}", exc_info=True)
-
-
-from smartcash.ui.setup.env_config.handlers.base_config_mixin import BaseConfigMixin
 
 class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
     """Handler for configuration synchronization in the environment setup.

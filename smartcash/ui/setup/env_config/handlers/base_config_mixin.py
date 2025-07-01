@@ -40,6 +40,20 @@ class BaseConfigMixin:
             The current configuration dictionary
         """
         return self._config
+        
+    @config.setter
+    def config(self, value: Dict[str, Any]) -> None:
+        """Set the configuration.
+        
+        Args:
+            value: The new configuration dictionary
+        """
+        self._config = value.copy() if value is not None else {}
+        
+        # If we have a config handler, update its config as well
+        if hasattr(self, '_config_handler') and self._config_handler is not None:
+            handler_name = getattr(self, 'module_name', self.__class__.__name__.lower())
+            self._config_handler.update_handler_config(handler_name, self._config)
     
     @property
     def config_handler(self):

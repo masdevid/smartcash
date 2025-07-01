@@ -58,6 +58,9 @@ class EnvConfigInitializer(CommonInitializer):
         Args:
             config_handler_class: Optional ConfigHandler class (defaults to ConfigHandler)
         """
+        # Initialize ui_components before calling parent's __init__
+        self._ui_components = {}
+        self.ui_components = self._ui_components
         super().__init__(module_name='env_config', config_handler_class=config_handler_class)
         self._env_config_handler = None
         self._setup_handler = None

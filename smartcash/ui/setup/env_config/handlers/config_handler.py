@@ -180,10 +180,16 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         
         # Set default paths based on environment
         if config_dir is None:
-            config_dir = env_manager.config_dir
+            # Use base_dir/configs as the default config directory
+            config_dir = env_manager.base_dir / 'configs'
             
         if repo_config_dir is None:
-            repo_config_dir = env_manager.repo_config_dir
+            # Default to /smartcash/configs in the repository
+            repo_config_dir = Path('/smartcash/configs')
+            
+        # Ensure paths are Path objects
+        config_dir = Path(config_dir) if not isinstance(config_dir, Path) else config_dir
+        repo_config_dir = Path(repo_config_dir) if not isinstance(repo_config_dir, Path) else repo_config_dir
             
         # Store paths in config
         config = {

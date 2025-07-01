@@ -1,6 +1,14 @@
 """
 File: smartcash/ui/setup/env_config/__init__.py
-Deskripsi: Entry point untuk environment configuration module SmartCash
+
+Environment Configuration Module.
+
+This module provides the main interface for initializing and managing
+the environment configuration UI components in SmartCash.
+
+Exports:
+    - EnvConfigInitializer: Main class for environment configuration initialization
+    - initialize_env_config_ui: Convenience function for quick UI initialization
 """
 
 # Import main exports for clean API

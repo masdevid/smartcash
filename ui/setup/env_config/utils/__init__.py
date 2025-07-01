@@ -1,26 +1,22 @@
 """
 File: smartcash/ui/setup/env_config/utils/__init__.py
-Deskripsi: Utility untuk environment configuration
-"""
 
-from .dual_progress_tracker import (
-    SetupStage,
-    DualProgressTracker,
-    track_setup_progress
-)
+Utility Functions and Classes for Environment Configuration.
+
+This package provides utility modules that support the environment configuration
+functionality, including progress tracking and UI state management.
+
+Key Utilities:
+    - dual_progress_tracker: Manages multi-stage progress tracking
+    - ui_state: Handles UI state management and button states
+"""
 
 from .ui_state import (
     BUTTON_STATES,
-    update_button_state,
 )
 
 __all__ = [
-    # Progress tracking
-    'SetupStage',
-    'DualProgressTracker',
-    'track_setup_progress',
     
     # UI State utilities
-    'BUTTON_STATES',
-    'update_button_state'
+    'BUTTON_STATES',  
 ]

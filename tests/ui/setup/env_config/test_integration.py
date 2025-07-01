@@ -3,12 +3,13 @@ Integration tests for the environment configuration module.
 
 These tests verify the end-to-end functionality of the environment configuration system.
 """
+import os
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 from pathlib import Path
 
 # Import the initializer we'll be testing
-from smartcash.ui.setup.env_config import EnvConfigInitializer
+from smartcash.ui.setup.env_config.env_config_initializer import EnvConfigInitializer
 
 class TestEnvConfigIntegration:
     """Integration tests for the environment configuration system."""
@@ -35,19 +36,37 @@ class TestEnvConfigIntegration:
             'handlers': {}
         }
 
-    def test_initialization(self, mock_handlers, mock_ui_components):
+    @pytest.fixture
+    def mock_env_manager(self):
+        """Create a mock environment manager with required attributes and methods."""
+        manager = MagicMock()
+        # Set up the mock to use the correct properties and methods
+        manager.base_dir = Path("/tmp")
+        manager._data_path = Path("/tmp/data")  # Private attribute used by get_dataset_path
+        manager.get_dataset_path.return_value = Path("/tmp/data")
+        manager._in_colab = False  # Private attribute used by is_colab property
+        
+        # Add is_colab property
+        type(manager).is_colab = property(lambda self: self._in_colab)
+        
+        return manager
+
+    def test_initialization(self, mock_handlers, mock_ui_components, mock_env_manager):
         """Test that the initializer can be created and initialized."""
-        # Create the initializer
-        initializer = EnvConfigInitializer()
-        
-        # Set up the initializer with mocks
-        initializer._ui_components = mock_ui_components
-        
-        # Mock the _setup_handlers method
-        initializer._setup_handlers = MagicMock(return_value=mock_ui_components)
-        
-        # Mock the _create_ui_components method
-        initializer._create_ui_components = MagicMock(return_value=mock_ui_components)
+        # Patch the EnvironmentManager to return our mock
+        with patch('smartcash.ui.setup.env_config.env_config_initializer.EnvironmentManager', 
+                  return_value=mock_env_manager):
+            # Create the initializer
+            initializer = EnvConfigInitializer()
+            
+            # Set up the initializer with mocks
+            initializer._ui_components = mock_ui_components
+            
+            # Mock the _setup_handlers method
+            initializer._setup_handlers = MagicMock(return_value=mock_ui_components)
+            
+            # Mock the _create_ui_components method
+            initializer._create_ui_components = MagicMock(return_value=mock_ui_components)
         
         # Initialize with a test config
         config = {

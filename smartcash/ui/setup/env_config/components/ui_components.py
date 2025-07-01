@@ -9,7 +9,8 @@ from smartcash.ui.components import (
     create_header, create_status_panel,
     create_log_accordion
 )
-from smartcash.ui.setup.env_config.utils.dual_progress_tracker import track_setup_progress
+from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
+from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary
 from smartcash.ui.setup.env_config.components.env_info_panel import create_env_info_panel
 from smartcash.ui.setup.env_config.components.tips_panel import create_tips_requirements
@@ -72,12 +73,16 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Store the container in ui_components first
     ui_components['progress_container'] = progress_container
     
-    # Create progress tracker - it will register itself in the components
-    progress_tracker = track_setup_progress(ui_components=ui_components)
+    # Create progress tracker with dual-level progress
+    progress_tracker = ProgressTracker()
+    progress_tracker.show(level=ProgressLevel.DUAL)
     
-    # Ensure the progress bar is visible by default
-    if hasattr(progress_tracker, 'show'):
-        progress_tracker.show()
+    # Add the progress tracker to the container
+    if hasattr(progress_tracker, 'container'):
+        progress_container.children = (progress_tracker.container,)
+    
+    # Store the progress tracker in ui_components
+    ui_components['progress_tracker'] = progress_tracker
     
     # Make sure the progress container is visible
     progress_container.layout.visibility = 'visible'
@@ -165,6 +170,11 @@ def create_env_config_ui() -> Dict[str, Any]:
     ui_components['log_components'] = log_accordion
     ui_components['ui'] = main_container
     # Log any missing critical components
-    from smartcash.ui.utils.logging_utils import log_missing_components
-    log_missing_components(ui_components)
+    from smartcash.ui.utils.ui_logger import UILogger
+    logger = UILogger(ui_components, name=__name__)
+    missing = [k for k in ['log_accordion', 'log_output'] if k not in ui_components]
+    if missing:
+        logger.warning(f"Missing critical UI components: {', '.join(missing)}")
+    else:
+        logger.debug("All critical UI components present")
     return ui_components

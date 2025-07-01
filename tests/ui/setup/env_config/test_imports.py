@@ -16,32 +16,29 @@ def test_import_handlers():
         DriveHandler,
         FolderHandler,
         StatusChecker,
-        SetupHandler,
-        BaseEnvHandler,
-        EnvConfigErrorHandler
+        SetupHandler
     )
     assert all((
         ConfigHandler,
         DriveHandler,
         FolderHandler,
         StatusChecker,
-        SetupHandler,
-        BaseEnvHandler,
-        EnvConfigErrorHandler
+        SetupHandler
     ))
 
 def test_import_utils():
     """Test that utility modules can be imported."""
     from smartcash.ui.setup.env_config.utils import (
-        ui_state,
-        dual_progress_tracker,
         env_detector,
-        handler_utils,
-        ui_updater
+        handler_utils
     )
-    assert all([ui_state, dual_progress_tracker, env_detector, handler_utils, ui_updater])
+    assert all([env_detector, handler_utils])
 
 def test_import_components():
     """Test that UI components can be imported."""
-    from smartcash.ui.setup.env_config.components import ui_components
-    assert ui_components is not None
+    from smartcash.ui.setup.env_config.components import (
+        env_info_panel,
+        setup_summary,
+        tips_panel
+    )
+    assert all([env_info_panel, setup_summary, tips_panel])

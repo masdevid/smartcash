@@ -9,7 +9,7 @@ from enum import Enum, auto
 from typing import Dict, Any, Optional, TypeVar, Tuple
 
 from smartcash.ui.handlers.base_handler import BaseHandler
-from smartcash.ui.setup.env_config.constants import SetupStage
+from smartcash.ui.setup.env_config.constants import SetupStage, STAGE_WEIGHTS
 
 T = TypeVar('T')
 
@@ -27,15 +27,8 @@ class BaseEnvHandler(BaseHandler):
     """
     
     # Stage weights for progress calculation (must sum to 100)
-    STAGE_WEIGHTS = {
-        SetupStage.INIT: 0,
-        SetupStage.DRIVE_MOUNT: 20,
-        SetupStage.FOLDER_SETUP: 20,
-        SetupStage.SYMLINK_SETUP: 20,
-        SetupStage.CONFIG_SYNC: 20,
-        SetupStage.ENV_SETUP: 10,
-        SetupStage.COMPLETE: 10
-    }
+    # These weights are imported from constants.py
+    STAGE_WEIGHTS = STAGE_WEIGHTS
     
     # Default configuration for the handler
     DEFAULT_CONFIG: Dict[str, Any] = {

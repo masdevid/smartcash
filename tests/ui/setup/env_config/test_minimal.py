@@ -5,6 +5,7 @@ Deskripsi: Tests for env_config_initializer.py
 import os
 import sys
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock, ANY
 
 # Add the project root to the Python path
@@ -25,12 +26,23 @@ TEST_CONFIG = {
 # Mock the required modules
 @pytest.fixture(autouse=True)
 def mock_imports():
+    # Create a mock EnvironmentManager with required attributes and methods
+    mock_env_manager = MagicMock()
+    mock_env_manager.base_dir = Path("/tmp")
+    mock_env_manager._data_path = Path("/tmp/data")  # Private attribute used by get_dataset_path
+    mock_env_manager._in_colab = False  # Private attribute used by is_colab property
+    mock_env_manager.get_dataset_path.return_value = Path("/tmp/data")  # Method that returns data path
+    
+    # Add is_colab property
+    type(mock_env_manager).is_colab = property(lambda self: self._in_colab)
+    
     with patch('smartcash.ui.setup.env_config.components.ui_components.create_env_config_ui') as mock_create_ui, \
          patch('smartcash.ui.utils.ui_logger.UILogger') as mock_ui_logger, \
          patch('smartcash.ui.utils.ui_logger.get_logger') as mock_get_logger, \
          patch('smartcash.ui.utils.ui_logger.get_module_logger') as mock_get_module_logger, \
          patch('smartcash.ui.handlers.error_handler.create_error_response') as mock_error_response, \
-         patch('smartcash.ui.setup.env_config.handlers.setup_handler.SetupHandler') as mock_setup_handler_cls:
+         patch('smartcash.ui.setup.env_config.handlers.setup_handler.SetupHandler') as mock_setup_handler_cls, \
+         patch('smartcash.common.environment.EnvironmentManager', return_value=mock_env_manager) as mock_env_manager_cls:
         
         # Configure the mocks
         mock_logger = MagicMock()
@@ -51,7 +63,8 @@ def mock_imports():
             'status_bar': MagicMock(),
             'config_form': MagicMock(),
             'action_buttons': MagicMock(),
-            'setup_button': MagicMock()
+            'progress_bar': MagicMock(),
+            'handlers': {}
         }
         mock_create_ui.return_value = mock_ui
         
@@ -295,13 +308,9 @@ def test_legacy_initialize_env_config_ui(mock_imports, monkeypatch):
     mock_log_output = MagicMock()
     mock_status_panel = MagicMock()
     
-    # Create a mock for the initialize method
-    mock_initialize = MagicMock(return_value={
-        'ui': mock_ui,
-        'log_output': mock_log_output,
-        'status_panel': mock_status_panel,
-        'root': mock_ui  # Add root for backward compatibility
-    })
+    # Create a mock for the initialize method that returns a widget directly
+    mock_ui_widget = MagicMock()
+    mock_initialize = MagicMock(return_value=mock_ui_widget)
     
     # Patch the EnvConfigInitializer class
     with patch('smartcash.ui.setup.env_config.env_config_initializer.EnvConfigInitializer') as mock_initializer_cls:
@@ -314,16 +323,14 @@ def test_legacy_initialize_env_config_ui(mock_imports, monkeypatch):
         test_config = {}
         result = initialize_env_config_ui(test_config)
         
-        # Verify the result has the expected structure
+        # Verify the result is the UI widget returned by initialize()
         assert result is not None
-        assert isinstance(result, dict)
-        assert 'ui' in result
-        assert 'log_output' in result
-        assert 'status_panel' in result
+        assert result == mock_ui_widget
         
         # Verify the initializer was called with the correct config
         mock_initializer_cls.assert_called_once()
-        mock_initialize.assert_called_once_with(test_config)
+        # The initialize method is called with config as a keyword argument
+        mock_initialize.assert_called_once_with(config=test_config)
         
         # Reset mocks for next test
         mock_initializer_cls.reset_mock()
@@ -351,7 +358,8 @@ def test_legacy_initialize_env_config_ui(mock_imports, monkeypatch):
         
         # Verify the initializer was called with the custom config
         mock_initializer_cls.assert_called_once()
-        mock_initialize.assert_called_once_with(custom_config)
+        # The initialize method now expects a config parameter
+        mock_initialize.assert_called_once_with(config=custom_config)
         
         # Reset mocks for error test
         mock_initializer_cls.reset_mock()

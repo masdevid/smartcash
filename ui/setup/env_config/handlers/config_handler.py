@@ -173,38 +173,49 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             repo_config_dir: Directory for repository configuration files (str or Path).
                            Defaults to '/smartcash/configs'.
             **kwargs: Additional keyword arguments including:
-                - config: Dictionary of configuration overrides
-                - config_handler: Parent config handler (not used here as this is the root handler)
+                - config: Optional configuration dictionary to use instead of loading from file
         """
-        # Initialize with default config first
-        config = kwargs.pop('config', {})
-        if not isinstance(config, dict):
-            config = {}
-        
-        # Ensure handlers config exists in provided config
-        if 'handlers' not in config:
-            config['handlers'] = self.DEFAULT_CONFIG['handlers'].copy()
-        
-        # Merge with defaults, preserving nested handler configs
-        merged_config = {**self.DEFAULT_CONFIG, **config}
-        
-        # Get environment-specific paths
+        # Initialize environment manager
         env_manager = get_environment_manager()
-        env_paths = get_paths_for_environment(
-            is_colab=env_manager.is_colab,
-            is_drive_mounted=env_manager.is_drive_mounted
+        
+        # Set default paths based on environment
+        if config_dir is None:
+            config_dir = env_manager.config_dir
+            
+        if repo_config_dir is None:
+            repo_config_dir = env_manager.repo_config_dir
+            
+        # Store paths in config
+        config = {
+            'config_dir': str(config_dir),
+            'repo_config_dir': str(repo_config_dir),
+            'auto_sync': True,
+            'max_retries': 3,
+            'retry_delay': 2.0
+        }
+        
+        # Update with any provided config values
+        if 'config' in kwargs:
+            config.update(kwargs.pop('config'))
+            
+        # Store config for later use
+        self.config = config
+            
+        # Initialize logger
+        self.logger = get_logger('ConfigHandler')
+        
+        # Initialize progress tracker
+        self.progress_tracker = DualProgressTracker(
+            total_stages=len(SetupStage),
+            stage_descriptions={
+                SetupStage.INIT: 'Initializing configuration',
+                SetupStage.VALIDATE: 'Validating configuration',
+                SetupStage.SYNC: 'Synchronizing configuration',
+                SetupStage.VERIFY: 'Verifying configuration',
+                SetupStage.COMPLETE: 'Configuration complete'
+            },
+            logger=self.logger
         )
-        
-        # Set config_dir based on environment
-        if config_dir is not None:
-            merged_config['config_dir'] = str(Path(config_dir).resolve())
-        else:
-            # Use environment-specific config path if available, otherwise default
-            merged_config['config_dir'] = env_paths.get('config', merged_config['config_dir'])
-        
-        # Set repo_config_dir (can be overridden)
-        if repo_config_dir is not None:
-            merged_config['repo_config_dir'] = str(Path(repo_config_dir).resolve())
         
         # Call parent constructor with persistence disabled
         super().__init__(
@@ -212,7 +223,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             parent_module='env_config',
             use_shared_config=False,
             persistence_enabled=False,
-            config=merged_config,
             **kwargs
         )
         

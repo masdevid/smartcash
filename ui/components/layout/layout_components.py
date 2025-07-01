@@ -25,7 +25,7 @@ LAYOUTS = {
     'hbox': widgets.Layout(display='flex', flex_flow='row wrap', align_items='center', width='100%'),
     'vbox': widgets.Layout(display='flex', flex_flow='column', align_items='stretch', width='100%'),
     'divider': widgets.Layout(height='1px', border='0', border_top='1px solid #eee', margin='15px 0'),
-    'card': widgets.Layout(border='1px solid #ddd', border_radius='4px', padding='15px', margin='10px 0', width='100%'),
+    'card': widgets.Layout(border='1px solid #ddd', padding='15px', margin='10px 0', width='100%'),
     'tabs': widgets.Layout(width='100%', margin='10px 0'),
     'accordion': widgets.Layout(width='100%', margin='10px 0'),
     

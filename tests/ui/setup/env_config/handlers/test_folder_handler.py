@@ -19,7 +19,7 @@ if project_root not in sys.path:
 # Import the module directly without mocking first
 try:
     from smartcash.ui.setup.env_config.handlers.folder_handler import FolderHandler, FolderOperationResult
-    from smartcash.ui.setup.env_config.handlers.base_handler import BaseEnvHandler
+    from smartcash.ui.setup.env_config.handlers.base_env_handler import BaseEnvHandler
 except ImportError as e:
     print(f"Error importing modules: {e}")
     raise
@@ -115,8 +115,6 @@ class TestFolderHandler:
 
     def test_initialization(self, folder_handler, mock_base_handler, mock_error_handler):
         """Test that FolderHandler initializes correctly."""
-        from smartcash.ui.setup.env_config.handlers.error_handler import EnvConfigErrorHandler
-        
         # Verify the handler was created
         assert folder_handler is not None
         
@@ -128,6 +126,9 @@ class TestFolderHandler:
         
         # Verify config was set correctly
         assert folder_handler._config == TEST_CONFIG
+        
+        # Verify error handler was set correctly
+        assert folder_handler._error_handler == mock_error_handler
         
         # Verify error handler was set
         assert folder_handler._error_handler == mock_error_handler

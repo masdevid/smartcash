@@ -29,8 +29,8 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.utils.ui_logger import get_module_logger
 
 # Import handlers
+from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHandler
 
 # Type aliases
@@ -61,7 +61,6 @@ class EnvConfigInitializer(CommonInitializer):
         self.ui_components = self._ui_components
         super().__init__(module_name='env_config', config_handler_class=config_handler_class)
         self._env_config_handler = None
-        self._setup_handler = None
     
     def _init_handlers(self, config: Dict[str, Any]) -> None:
         """Initialize the environment configuration and setup handlers.
@@ -71,23 +70,16 @@ class EnvConfigInitializer(CommonInitializer):
         """
         self.logger.info("Initializing environment configuration handlers")
         
-        # Initialize ConfigHandler (configuration management)
-        self._config_handler = ConfigHandler(
-            module_name='env_config',
-            parent_module='setup',
-            logger=self.logger
-        )
-        
-        # Initialize SetupHandler with reference to ConfigHandler
-        self._setup_handler = SetupHandler(
-            config_handler=self._config_handler,
+        # Initialize the main EnvConfigHandler which will manage other handlers
+        self._env_config_handler = EnvConfigHandler(
             logger=self.logger
         )
         
         # Store references in the handlers dictionary
         self._handlers = {
             'env_config': self._env_config_handler,
-            'setup': self._setup_handler
+            'setup': self._env_config_handler.setup_handler,
+            'config': self._env_config_handler.config_handler
         }
         
         self.logger.info("Environment configuration handlers initialized")
@@ -144,41 +136,17 @@ class EnvConfigInitializer(CommonInitializer):
         try:
             self.logger.debug("Setting up event handlers")
             
-            # Initialize the ConfigHandler first
-            config_handler = ConfigHandler(
-                module_name='env_config',
-                parent_module='setup',
-                persistence_enabled=True
-            )
+            # Store the main handler in ui_components
+            ui_components['env_config_handler'] = self._env_config_handler
+            ui_components['config_handler'] = self._env_config_handler.config_handler
+            ui_components['setup_handler'] = self._env_config_handler.setup_handler
             
-            # Initialize the ConfigHandler with the config handler
-            handler = ConfigHandler(
-                module_name='env_config',
-                parent_module='setup',
-                logger=self.logger
-            )
-            
-            if not handler:
-                raise ValueError("Failed to initialize environment config handler")
-                
-            ui_components['env_config_handler'] = handler
-            ui_components['config_handler'] = config_handler  # Store for later use
             self.logger.info("Environment config handler initialized successfully")
             
             # Set up event handlers
             if 'setup_button' in ui_components and hasattr(ui_components['setup_button'], 'on_click'):
-                # Wrap the click handler to update status after sync
-                async def wrapped_click(button):
-                    try:
-                        await handler.handle_setup_button_click(button)
-                        # Update status panel after sync
-                        if 'status_panel' in ui_components:
-                            summary = handler.get_summary()
-                            ui_components['status_panel'].value = self._format_summary(summary)
-                    except Exception as e:
-                        self.logger.error(f"Error in setup button click: {str(e)}", exc_info=True)
-                
-                ui_components['setup_button'].on_click(wrapped_click)
+                # Directly use the handler's method for button clicks
+                ui_components['setup_button'].on_click(self._env_config_handler.handle_setup_button_click)
                 self.logger.debug("Setup button click handler attached")
             
             return ui_components

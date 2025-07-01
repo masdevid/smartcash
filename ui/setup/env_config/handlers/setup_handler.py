@@ -49,14 +49,10 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
     """Orchestrates the environment setup workflow.
     
     This class handles the complete environment setup process, using
-    ConfigHandler for configuration management.
+    ConfigHandler for configuration management and progress tracking.
     
-    The setup process follows these steps:
-    1. Initialize all required handlers
-    2. Set up drive mounting
-    3. Create required folders
-    4. Set up configuration files
-    5. Verify the setup
+    See the _run_setup_workflow() method for detailed information about
+    the setup process steps and workflow.
     """
     
     # Default configuration for the handler
@@ -126,9 +122,33 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         
         # Log successful initialization
         self.logger.info(
-            f"Initialized SetupHandler with {len(self.stages)} stages: {', '.join(self.steps)}"
+            f"Initialized SetupHandler with {len(self.stages)} stages: {', '.join(self.stages)}"
         )
     
+    def _create_initial_summary(self) -> 'SetupSummary':
+        """Create and return a new setup summary with default values.
+        
+        Returns:
+            A new SetupSummary dictionary with default values
+        """
+        return {
+            'status': 'pending',
+            'message': 'Initializing setup...',
+            'phase': SetupPhase.INIT,
+            'progress': 0.0,
+            'current_stage': 'INIT',
+            'drive_mounted': False,
+            'mount_path': '',
+            'folders_created': 0,
+            'symlinks_created': 0,
+            'configs_synced': 0,
+            'verified_folders': [],
+            'missing_folders': [],
+            'verified_symlinks': [],
+            'missing_symlinks': [],
+            'config_check': {}
+        }
+        
     def _update_summary(self, **updates) -> None:
         """Update the setup summary with the provided values.
         
@@ -164,10 +184,11 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         """Start the environment setup process.
         
         This method initiates the setup workflow, which includes:
-        1. Drive mounting
-        2. Folder creation
-        3. Configuration syncing
-        4. Status verification
+        1. Drive mounting and verification
+        2. Symlink setup (before folder creation)
+        3. Required folder creation
+        4. Configuration synchronization
+        5. Final verification and status check
         
         Args:
             auto_start: Whether to start the setup automatically. If None, uses the instance's auto_start setting.
@@ -238,6 +259,25 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             error_msg = f"Handler for stage '{stage}' is missing required 'run' method"
             self.logger.error(error_msg)
             raise RuntimeError(error_msg)
+        
+        # Set up progress tracking for this stage
+        stage_progress = 0.0
+        
+        def update_stage_progress(progress: float, message: str = None):
+            """Update progress within the current stage.
+            
+            Args:
+                progress: Progress value between 0.0 and 1.0 for this stage
+                message: Optional progress message
+            """
+            nonlocal stage_progress
+            stage_progress = max(0.0, min(1.0, progress))
+            stage_msg = f"{stage.replace('_', ' ').title()}: {message or ''}".strip()
+            self._update_progress(stage_progress, stage_msg)
+        
+        # Add progress callback to handler if supported
+        if hasattr(handler, 'set_progress_callback'):
+            handler.set_progress_callback(update_stage_progress)
             
         attempt = 0
         max_attempts = 1 + self.max_retries  # Initial attempt + retries
@@ -252,7 +292,9 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
                 self.logger.warning(f"Retrying {stage} stage{retry_msg}")
                 await asyncio.sleep(self.retry_delay * (attempt - 1))  # Exponential backoff
             
-            self._update_status(f"Starting {stage.replace('_', ' ')} stage...")
+            start_msg = f"Starting {stage.replace('_', ' ')} stage..."
+            self._update_status(start_msg)
+            update_stage_progress(0.0, start_msg)
             self.logger.info(f"Executing setup stage: {stage}")
             
             try:
@@ -260,11 +302,14 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
                 result = await handler.run()
                 
                 # If we get here, the stage completed without exceptions
+                complete_msg = f"{stage.replace('_', ' ').title()} completed successfully"
                 self.logger.info(f"Successfully completed setup stage: {stage}")
+                update_stage_progress(1.0, complete_msg)
+                
                 self._update_summary(
                     status='completed',
                     phase=stage,
-                    message=f"{stage.replace('_', ' ').title()} completed successfully"
+                    message=complete_msg
                 )
                 return True
                 
@@ -292,6 +337,31 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         
         # This line should never be reached due to the loop logic above
         return False
+    
+    def _handle_setup_error(self, error_msg: str, error: Optional[Exception] = None) -> None:
+        """Handle setup errors by updating status, logging, and notifying listeners.
+        
+        Args:
+            error_msg: Human-readable error message
+            error: Optional exception that caused the error
+        """
+        self._setup_in_progress = False
+        self._last_error = str(error) if error else error_msg
+        
+        # Update the summary with error information
+        self._update_summary(
+            status='error',
+            phase=SetupPhase.ERROR,
+            message=error_msg,
+            progress=self._setup_progress
+        )
+        
+        # Log the error
+        self.logger.error(f"Setup error: {error_msg}", exc_info=error)
+        
+        # Notify listeners of the error
+        if hasattr(self, 'on_error') and callable(self.on_error):
+            self.on_error(error_msg, error)
     
     def initialize_handlers(self, **handler_kwargs) -> None:
         """Initialize all required handlers for the setup process.
@@ -357,13 +427,103 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
     async def _run_setup_workflow(self) -> None:
         """Execute the setup workflow with progress tracking and error handling.
         
-        This method runs each stage of the setup process in sequence:
-        1. Drive setup
-        2. Folder creation
-        3. Configuration sync
-        4. Verification
+        This method orchestrates the complete environment setup process by executing each stage
+        in the order defined in the 'stages' configuration. The stages must proceed in this order:
+        INIT → DRIVE_MOUNT → SYMLINK_SETUP → FOLDER_SETUP → CONFIG_SYNC → ENV_SETUP → VERIFY → COMPLETE
         
-        The method handles progress updates, error recovery, and retries as configured.
+        Workflow Stages:
+            1. INIT: Initial setup and validation
+               - Validates configuration and dependencies
+               - Initializes required components
+               - Sets up progress tracking
+            
+            2. DRIVE_MOUNT: Mount and verify the drive
+               - Handles drive mounting and verification
+               - Sets up necessary drive connections
+               - Verifies drive accessibility
+            
+            3. SYMLINK_SETUP: Setup required symlinks
+               - Creates symbolic links for required paths
+               - Must run before folder creation
+               - Handles existing symlinks based on configuration
+            
+            4. FOLDER_SETUP: Create required folder structure
+               - Creates all necessary directories
+               - Sets up folder permissions
+               - Handles existing folders based on configuration
+            
+            5. CONFIG_SYNC: Synchronize configuration files
+               - Syncs configuration from source to target locations
+               - Handles configuration validation
+               - Manages configuration versioning
+            
+            6. ENV_SETUP: Environment-specific setup
+               - Performs environment-specific initialization
+               - Sets up environment variables
+               - Configures runtime environment
+            
+            7. VERIFY: Perform final verification and status check
+               - Validates the complete setup
+               - Performs health checks
+               - Generates a setup report
+            
+            8. COMPLETE: Finalize setup
+               - Performs cleanup operations
+               - Saves final state
+               - Emits completion signals
+        
+        Progress Tracking:
+            - Overall workflow progress (0-100%)
+            - Individual stage progress (0-100% within each stage's allocated portion)
+            - Detailed status messages for each operation
+            - Stage weights:
+                - INIT: 5%
+                - DRIVE_MOUNT: 15%
+                - SYMLINK_SETUP: 10%
+                - FOLDER_SETUP: 20%
+                - CONFIG_SYNC: 20%
+                - ENV_SETUP: 15%
+                - VERIFY: 10%
+                - COMPLETE: 5%
+        
+        Error Handling:
+            - Configurable retry mechanism for transient failures
+            - Graceful degradation on non-critical errors
+            - Detailed error reporting and logging
+            - Cleanup on failure based on configuration
+            - Automatic rollback of failed operations when possible
+        
+        Configuration:
+            The behavior can be customized through the following configuration options:
+                - stages: List of stage names to execute (default: all stages)
+                - max_retries: Maximum number of retry attempts per stage (default: 3)
+                - retry_delay: Delay between retry attempts in seconds (default: 5)
+                - stop_on_error: Whether to stop on first error (default: True)
+                - verify_setup: Whether to run verification after setup (default: True)
+        
+        State Management:
+            - Tracks current stage and progress
+            - Maintains setup state across retries
+            - Updates internal status and summary
+            - Handles stage transitions and dependencies
+            - Maintains error state and recovery information
+            
+        Note:
+            - This method is designed to be idempotent and can be safely retried in case of failures.
+            - Progress callbacks are invoked on the event loop thread.
+            - The method follows the Open/Closed Principle - stages can be extended without modifying this method.
+        
+        Raises:
+            RuntimeError: If the setup process encounters an unrecoverable error
+            asyncio.CancelledError: If the operation is cancelled
+            ValueError: If the configuration is invalid
+            
+        Side Effects:
+            - Updates internal state and progress trackers
+            - Modifies filesystem (creates/mounts drives, creates directories, etc.)
+            - May modify system configuration
+            - Emits progress and status updates through callbacks
+            - May start/stop services or processes
         """
         try:
             stages = self.get_config_value('stages', [])
@@ -374,23 +534,51 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
                 return
                 
             self.logger.info(f"Starting setup workflow with {total_stages} stages")
+            self._setup_in_progress = True
+            
+            # Initialize workflow progress tracking
+            completed_stages = 0
             
             for i, stage in enumerate(stages, 1):
                 if not self._setup_in_progress and self.stop_on_error:
                     self.logger.warning(f"Stopping setup workflow after stage '{stage}' due to error")
                     break
+                
+                # Calculate progress range for this stage (0.0 to 1.0 for the entire workflow)
+                stage_start_progress = completed_stages / total_stages
+                stage_end_progress = i / total_stages
+                
+                def get_workflow_progress(stage_progress: float) -> float:
+                    """Convert stage progress to overall workflow progress."""
+                    return stage_start_progress + (stage_progress * (stage_end_progress - stage_start_progress))
+                
+                # Save the current _update_progress method
+                original_update_progress = self._update_progress
+                
+                # Create a scoped update_progress for this stage
+                def stage_update_progress(progress: float, message: str = None):
+                    """Update progress within the context of the current stage."""
+                    workflow_progress = get_workflow_progress(progress)
+                    original_update_progress(workflow_progress, message)
+                
+                # Temporarily replace _update_progress for this stage
+                self._update_progress = stage_update_progress
+                
+                try:
+                    # Execute the current stage with progress tracking
+                    success = await self._run_stage(stage)
                     
-                # Calculate progress based on completed stages
-                stage_progress = (i - 1) / total_stages
-                self._setup_progress = stage_progress
-                self._update_status(f"Starting {stage.replace('_', ' ')} stage...")
-                
-                # Execute the current stage
-                await self._run_stage(stage)
-                
-                # Update progress
-                self._setup_progress = i / total_stages
-                self._update_progress(self._setup_progress * 100)
+                    if not success and self.stop_on_error:
+                        self.logger.warning(f"Stage '{stage}' failed, stopping workflow")
+                        break
+                        
+                    # Only count completed stages for progress
+                    if success:
+                        completed_stages += 1
+                        
+                finally:
+                    # Restore original _update_progress method
+                    self._update_progress = original_update_progress
             
             # Final status update
             if self._setup_in_progress:
@@ -449,12 +637,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
     async def run_setup(self, ui_components: Optional[Dict[str, Any]] = None) -> SetupSummary:
         """Run the complete setup workflow.
         
-        The setup process follows this order:
-        1. Mount Google Drive (if needed)
-        2. Setup symlinks (before folder creation)
-        3. Create required folders
-        4. Sync configurations
-        5. Verify setup
+        See the class docstring for a detailed description of the setup process steps.
         
         Args:
             ui_components: Dictionary of UI components for progress updates

@@ -142,22 +142,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         # Store config for later use
         self.config = config
             
-        # Initialize logger
-        self.logger = get_logger('ConfigHandler')
-        
-        # Initialize progress tracker
-        self.progress_tracker = DualProgressTracker(
-            total_stages=len(SetupStage),
-            stage_descriptions={
-                SetupStage.INIT: 'Initializing configuration',
-                SetupStage.VALIDATE: 'Validating configuration',
-                SetupStage.SYNC: 'Synchronizing configuration',
-                SetupStage.VERIFY: 'Verifying configuration',
-                SetupStage.COMPLETE: 'Configuration complete'
-            },
-            logger=self.logger
-        )
-        
         # Call parent constructor with persistence disabled
         super().__init__(
             module_name='config',  # Explicit module name for consistency
@@ -228,8 +212,7 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         """
         try:
             # Update progress if tracker is available
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(10, "Starting configuration sync...")
+            # Progress tracking removed - handled by workflow manager
             
             result = await self.sync_configs_from_repo()
             
@@ -255,8 +238,7 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         except Exception as e:
             error_msg = f"Error in sync_configurations: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_error(error_msg)
+            # Progress tracking removed - handled by workflow manager
             return {
                 'status': False,
                 'message': error_msg,
@@ -283,8 +265,7 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         
         try:
             # Update progress
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(20, "Scanning repository for configurations...")
+            # Progress tracking removed - handled by workflow manager
             
             # Get available configs from repository
             repo_configs = await self.get_available_configs()
@@ -292,16 +273,7 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
                 error_msg = "No configurations found in repository"
                 self.logger.error(error_msg)
                 result['errors'].append(error_msg)
-                if hasattr(self, 'progress_tracker'):
-                    self.progress_tracker.set_error(error_msg)
                 return result
-            
-            # Update progress
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(
-                    30, 
-                    f"Found {len(repo_configs)} configurations in repository"
-                )
             
             # Process each config file
             total_files = len(repo_configs)
@@ -309,14 +281,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             
             for idx, config_file in enumerate(repo_configs, 1):
                 try:
-                    # Update progress for each file
-                    progress = 30 + int(60 * (idx / total_files))
-                    if hasattr(self, 'progress_tracker'):
-                        self.progress_tracker.set_progress(
-                            progress,
-                            f"Processing {config_file} ({idx}/{total_files})"
-                        )
-                    
                     # Skip if config file exists and we're not forcing
                     if not force and os.path.exists(os.path.join(self.config['config_dir'], config_file)):
                         self.logger.debug(f"Skipping existing config: {config_file}")
@@ -347,25 +311,11 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             result['total_files'] = total_files
             result['status'] = len(result['errors']) == 0
             
-            # Update progress
-            if hasattr(self, 'progress_tracker'):
-                if result['status']:
-                    self.progress_tracker.set_progress(
-                        100, 
-                        f"Successfully synced {synced_count} of {total_files} configurations"
-                    )
-                else:
-                    self.progress_tracker.set_error(
-                        f"Completed with {len(result['errors'])} errors"
-                    )
-            
             return result
             
         except Exception as e:
             error_msg = f"Error in sync_configs_from_repo: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_error(error_msg)
             result['errors'].append(error_msg)
             return result
     
@@ -379,10 +329,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             RuntimeError: If there's an error discovering repository configs
         """
         try:
-            # Update progress if tracker is available
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(10, "Discovering available configurations...")
-            
             # Get repository configs
             self.logger.debug(f"Discovering configs in: {self.config['repo_config_dir']}")
             repo_configs = []
@@ -391,8 +337,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             if not os.path.exists(self.config['repo_config_dir']):
                 error_msg = f"Repository config directory not found: {self.config['repo_config_dir']}"
                 self.logger.error(error_msg)
-                if hasattr(self, 'progress_tracker'):
-                    self.progress_tracker.set_error(error_msg)
                 return []
                 
             # Use config manager to discover configs if available
@@ -408,20 +352,11 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             
             self.logger.info(f"Found {len(repo_configs)} config files in repository")
             
-            # Update progress
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(
-                    20, 
-                    f"Found {len(repo_configs)} configuration files"
-                )
-            
             return repo_configs
             
         except Exception as e:
             error_msg = f"Error discovering repository configurations: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_error("Failed to discover configurations")
             return []
     
     async def _to_async(self, func):
@@ -455,10 +390,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         }
         
         try:
-            # Update progress
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(10, "Checking for missing configurations...")
-            
             # Get repository configs
             repo_configs = await self.get_available_configs()
             result['total_repo'] = len(repo_configs)
@@ -492,8 +423,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             if not missing_configs:
                 msg = "All configurations are up to date"
                 self.logger.info(msg)
-                if hasattr(self, 'progress_tracker'):
-                    self.progress_tracker.set_progress(100, msg)
                 
                 result.update({
                     'status': True,
@@ -503,13 +432,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
                 })
                 return result
             
-            # Update progress
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_progress(
-                    30, 
-                    f"Found {len(missing_configs)} missing configurations to copy"
-                )
-            
             # Copy missing configs
             copied = []
             failed = []
@@ -517,14 +439,6 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             
             for idx, config in enumerate(missing_configs, 1):
                 try:
-                    # Update progress for each file
-                    progress = 30 + int(60 * (idx / total_files))
-                    if hasattr(self, 'progress_tracker'):
-                        self.progress_tracker.set_progress(
-                            progress,
-                            f"Copying {os.path.basename(config)} ({idx}/{total_files})"
-                        )
-                    
                     src_path = os.path.join(self.config['repo_config_dir'], config)
                     dest_path = os.path.join(self.config['config_dir'], config)
                     
@@ -560,21 +474,18 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
             elif copied and failed:
                 msg = f"Copied {len(copied)} configurations, failed to copy {len(failed)}"
                 result['message'] = msg
-                if hasattr(self, 'progress_tracker'):
-                    self.progress_tracker.set_warning(msg)
+                # Progress tracking removed - handled by workflow manager
             else:
                 msg = "Failed to copy any configurations"
                 result['message'] = msg
-                if hasattr(self, 'progress_tracker'):
-                    self.progress_tracker.set_error(msg)
+                # Progress tracking removed - handled by workflow manager
             
             return result
             
         except Exception as e:
             error_msg = f"Error in check_and_copy_missing_configs: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            if hasattr(self, 'progress_tracker'):
-                self.progress_tracker.set_error("Failed to check and copy configurations")
+            # Progress tracking removed - handled by workflow manager
             
             # Update result with error
             result.update({

@@ -8,7 +8,7 @@ CommonInitializer pattern used throughout the application for consistency.
 Key Features:
 - Implements the CommonInitializer interface for consistent initialization
 - Manages the lifecycle of environment configuration UI components
-- Coordinates between EnvConfigHandler (configuration) and SetupHandler (workflow)
+- Coordinates configuration and workflow using ConfigHandler and SetupHandler
 - Handles error states and provides user feedback
 - Supports both programmatic and interactive usage patterns
 
@@ -30,7 +30,6 @@ from smartcash.ui.utils.ui_logger import get_module_logger
 
 # Import handlers
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
 from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHandler
 
@@ -46,10 +45,9 @@ class EnvConfigInitializer(CommonInitializer):
     
     The initialization process follows these steps:
     1. Initialize configuration handler
-    2. Initialize EnvConfigHandler (configuration management)
-    3. Initialize SetupHandler (workflow management)
-    4. Set up UI components and event handlers
-    5. Perform any post-initialization setup
+    2. Initialize SetupHandler with ConfigHandler
+    3. Set up UI components and event handlers
+    4. Perform any post-initialization setup
     """
     
     def __init__(self, config_handler_class: Type[BaseConfigHandler] = ConfigHandler):
@@ -73,16 +71,16 @@ class EnvConfigInitializer(CommonInitializer):
         """
         self.logger.info("Initializing environment configuration handlers")
         
-        # Initialize EnvConfigHandler first (configuration management)
-        self._env_config_handler = EnvConfigHandler(
-            config_handler=self.config_handler,
+        # Initialize ConfigHandler (configuration management)
+        self._config_handler = ConfigHandler(
+            module_name='env_config',
+            parent_module='setup',
             logger=self.logger
         )
         
-        # Initialize SetupHandler with reference to EnvConfigHandler
+        # Initialize SetupHandler with reference to ConfigHandler
         self._setup_handler = SetupHandler(
-            config_handler=self.config_handler,
-            env_config_handler=self._env_config_handler,
+            config_handler=self._config_handler,
             logger=self.logger
         )
         
@@ -128,7 +126,7 @@ class EnvConfigInitializer(CommonInitializer):
                 'settings': {}
             }
     
-    # Override _setup_handlers to use EnvConfigHandler orchestrator
+    # Override _setup_handlers to use ConfigHandler
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Setup event handlers with proper error handling
         
@@ -153,11 +151,11 @@ class EnvConfigInitializer(CommonInitializer):
                 persistence_enabled=True
             )
             
-            # Initialize the EnvConfigHandler orchestrator with the config handler
-            handler = EnvConfigHandler(
-                config_handler=config_handler,
-                ui_components=ui_components,
-                config=config
+            # Initialize the ConfigHandler with the config handler
+            handler = ConfigHandler(
+                module_name='env_config',
+                parent_module='setup',
+                logger=self.logger
             )
             
             if not handler:

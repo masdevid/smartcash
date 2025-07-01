@@ -3,7 +3,7 @@ Setup Workflow Handler for Environment Configuration.
 
 This module provides the SetupHandler class which orchestrates the environment
 setup workflow, including drive mounting, folder creation, and configuration syncing.
-It works in conjunction with EnvConfigHandler which manages the configuration state.
+It uses ConfigHandler for configuration management.
 """
 
 import asyncio
@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Optional, Tuple, TypedDict, cast
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.handlers.base_handler import BaseHandler
 from smartcash.ui.setup.env_config.handlers.base_config_mixin import BaseConfigMixin
-from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
+
 from smartcash.ui.setup.env_config.constants import SetupStage
 
 class SetupPhase(str, Enum):
@@ -48,17 +48,15 @@ class SetupSummary(TypedDict, total=False):
 class SetupHandler(BaseHandler, BaseConfigMixin):
     """Orchestrates the environment setup workflow.
     
-    This handler manages the complete setup workflow while delegating
-    configuration management to EnvConfigHandler.
+    This class handles the complete environment setup process, using
+    ConfigHandler for configuration management.
     
-    Key Responsibilities:
-    - Manages setup workflow and state
-    - Handles progress tracking
-    - Manages error recovery
-    - Coordinates between setup steps
-    - Provides status updates
-    
-    Note: Configuration state is managed by EnvConfigHandler.
+    The setup process follows these steps:
+    1. Initialize all required handlers
+    2. Set up drive mounting
+    3. Create required folders
+    4. Set up configuration files
+    5. Verify the setup
     """
     
     # Default configuration for the handler
@@ -77,12 +75,11 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         ]
     }
     
-    def __init__(self, config_handler=None, env_config_handler: Optional[EnvConfigHandler] = None, **kwargs):
+    def __init__(self, config_handler=None, **kwargs):
         """Initialize the SetupHandler with configuration.
         
         Args:
-            config_handler: Instance of ConfigHandler for configuration
-            env_config_handler: Instance of EnvConfigHandler for configuration state
+            config_handler: Configuration handler instance
             **kwargs: Additional keyword arguments for BaseHandler
                 - logger: Custom logger instance (optional)
                 - parent: Parent widget (optional)
@@ -90,22 +87,15 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         Raises:
             ValueError: If required dependencies are not provided
         """
-        # Initialize base classes
+        # Initialize BaseHandler first
         super().__init__(
             module_name='setup',
             parent_module='env_config',
             **kwargs
         )
         
-        # Initialize BaseConfigMixin with the provided config handler
+        # Initialize BaseConfigMixin with the config handler
         BaseConfigMixin.__init__(self, config_handler=config_handler, **kwargs)
-        
-        # Validate and store EnvConfigHandler reference
-        if env_config_handler is None:
-            self.logger.warning("No EnvConfigHandler provided, creating a new instance")
-            env_config_handler = EnvConfigHandler(config_handler=config_handler, **kwargs)
-            
-        self.env_config = env_config_handler
         
         # Initialize environment manager
         self.env_manager = get_environment_manager(logger=self.logger)
@@ -304,13 +294,13 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         return False
     
     def initialize_handlers(self, **handler_kwargs) -> None:
-        """Initialize all required workflow handlers.
+        """Initialize all required handlers for the setup process.
         
-        This method initializes the various handlers needed for the setup workflow,
-        using the EnvConfigHandler for configuration management.
+        This method initializes all the handlers needed for the setup process,
+        using ConfigHandler for configuration management.
         
-        Args:
-            **handler_kwargs: Additional keyword arguments to pass to handlers
+        Returns:
+            Dict[str, Any]: Dictionary of initialized handlers
         """
         self.logger.info("Initializing setup workflow handlers")
         

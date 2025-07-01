@@ -31,6 +31,7 @@ class SyncResult(TypedDict, total=False):
     details: Dict[str, Any]
 
 
+
 class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
     """Handler for configuration synchronization in the environment setup.
     
@@ -187,11 +188,11 @@ class ConfigHandler(BaseConfigHandler, BaseConfigMixin):
         """
         return self._last_sync_result
         
-    def get_config_handler(self) -> EnvConfigHandler:
-        """Get the underlying EnvConfigHandler instance.
+    def get_config_handler(self) -> 'ConfigHandler':
+        """Get the underlying ConfigHandler instance.
         
         Returns:
-            The EnvConfigHandler instance used by this handler
+            The ConfigHandler instance used by this handler
         """
         return self._config_handler
         

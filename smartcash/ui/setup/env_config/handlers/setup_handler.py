@@ -699,7 +699,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             })
             
             if ui_components:
-                self._update_ui_status(ui_components, f"Error: {error_msg}", 'error')
+                self._update_status_panel(ui_components, f"Error: {error_msg}", 'error')
         
         self._last_summary = summary
         return summary
@@ -741,7 +741,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             })
             self.logger.error(error_msg, exc_info=True)
             if ui_components:
-                self._update_ui_status(ui_components, f"Error mounting drive: {str(e)}", 'error')
+                self._update_status_panel(ui_components, f"Error mounting drive: {str(e)}", 'error')
             
             return summary
     
@@ -753,7 +753,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         self.set_stage(SetupStage.SYMLINK_SETUP, "Setting up symlinks")
         
         if ui_components:
-            self._update_ui_status(ui_components, "Setting up symlinks...", 'info')
+            self._update_status_panel(ui_components, "Setting up symlinks...", 'info')
         
         try:
             # Get the folder handler
@@ -786,7 +786,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             self.logger.error(error_msg, exc_info=True)
             
             if ui_components:
-                self._update_ui_status(ui_components, error_msg, 'error')
+                self._update_status_panel(ui_components, error_msg, 'error')
             
             summary.update({
                 'status': 'error',
@@ -801,7 +801,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         self.set_stage(SetupStage.FOLDER_SETUP, "Creating required folders")
         
         if ui_components:
-            self._update_ui_status(ui_components, "Creating folders...", 'info')
+            self._update_status_panel(ui_components, "Creating folders...", 'info')
         
         try:
             # Get the folder handler
@@ -834,7 +834,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             self.logger.error(error_msg, exc_info=True)
             
             if ui_components:
-                self._update_ui_status(ui_components, error_msg, 'error')
+                self._update_status_panel(ui_components, error_msg, 'error')
             
             summary.update({
                 'status': 'error',
@@ -844,37 +844,205 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             
             return summary
     
+    def _perform_initial_status_check(self, ui_components: Dict[str, Any]) -> None:
+        """Perform initial status check on the environment using the status_checker.
+        
+        This method performs a comprehensive check of the environment status using the
+        status_checker handler and updates the UI components accordingly. It's called 
+        during the initialization process and after setup completion.
+        
+        Args:
+            ui_components: Dictionary containing UI components to update
+        """
+        try:
+            self.logger.debug("Performing comprehensive status check...")
+            
+            # Store UI components for later use
+            self.ui_components = ui_components
+            
+            # Initialize status checker if not already done
+            if not hasattr(self, 'status_checker'):
+                self.status_checker = StatusChecker(
+                    config_handler=self.config_handler,
+                    logger=self.logger
+                )
+            
+            # Perform environment check
+            check_result = self.status_checker.check_environment()
+            
+            # Update UI based on check result
+            if check_result.get('status'):
+                status_msg = check_result.get('status_message', 'Environment is ready')
+                self._update_status_panel(ui_components, status_msg, 'success')
+            else:
+                status_msg = check_result.get('status_message', 'Environment check completed with warnings')
+                self._update_status_panel(ui_components, status_msg, 'warning')
+            
+            # Store the check result for reference
+            self.last_status_check = check_result
+            
+            self.logger.debug("Status check completed")
+            
+        except Exception as e:
+            error_msg = f"Error performing status check: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self._update_status_panel(ui_components, error_msg, "error")
+    
+    def _is_setup_complete(self) -> bool:
+        """Check if the environment setup is complete.
+        
+        This checks for the existence of a marker file or configuration
+        that indicates the initial setup has been completed.
+        
+        Returns:
+            bool: True if setup is complete, False otherwise
+        """
+        try:
+            # Check for a marker file in the config directory
+            if not hasattr(self, 'config_handler') or not hasattr(self.config_handler, 'config_dir'):
+                self.logger.warning("Config handler not properly initialized, cannot check setup completion")
+                return False
+                
+            marker_file = Path(self.config_handler.config_dir) / '.setup_complete'
+            return marker_file.exists()
+            
+        except Exception as e:
+            self.logger.warning(f"Error checking setup completion: {str(e)}")
+            return False
+            
+    def _should_sync_config_templates(self) -> bool:
+        """Determine if config templates should be synced.
+        
+        Returns:
+            bool: True if config templates should be synced, False otherwise
+            
+        Raises:
+            RuntimeError: If there's an error checking sync status
+        """
+        try:
+            # Get drive handler to check mount status
+            drive_handler = self.get_handler('drive')
+            if not drive_handler or not drive_handler._is_drive_mounted():
+                self.logger.debug("Skipping config template sync: Drive not mounted")
+                return False
+            
+            # Check if setup is complete by looking for a marker file or config
+            if not self._is_setup_complete():
+                self.logger.debug("Skipping config template sync: Setup not complete")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            error_msg = f"Error checking if should sync config templates: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
+            
+    def sync_config_templates(self, force_overwrite: bool = False, update_ui: bool = False, 
+                            ui_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Synchronize configuration templates with the config directory.
+        
+        This method can be used both as part of the setup workflow and independently.
+        
+        Args:
+            force_overwrite: Whether to overwrite existing config files
+            update_ui: Whether to update the UI with progress
+            ui_components: UI components to update if update_ui is True
+            
+        Returns:
+            Dict containing sync results including:
+            - success: bool indicating if sync was successful
+            - synced_count: number of files synced
+            - skipped_count: number of files skipped
+            - message: status message
+        """
+        if update_ui and not ui_components:
+            self.logger.warning("update_ui is True but no ui_components provided")
+            
+        try:
+            if update_ui and ui_components:
+                self._update_status_panel(ui_components, "Synchronizing configurations...", 'info')
+                
+            self.logger.info("Starting configuration template synchronization...")
+            
+            # Get the config manager instance with auto_sync enabled
+            from smartcash.common.config import get_config_manager
+            config_manager = get_config_manager(auto_sync=True)
+            
+            # Sync configs using the config manager
+            result = config_manager.sync_configs_to_drive(force_overwrite=force_overwrite)
+            
+            # Log the result
+            if result.get('success', False):
+                self.logger.info(
+                    f"Successfully synced {result.get('synced_count', 0)} config templates. "
+                    f"Skipped {result.get('skipped_count', 0)} up-to-date files."
+                )
+            else:
+                self.logger.warning(
+                    f"Config template sync completed with issues: {result.get('message', 'Unknown error')}"
+                )
+                
+            # Update UI if requested
+            if update_ui and ui_components:
+                status_type = 'success' if result.get('success', False) else 'warning'
+                message = result.get('message', 'Configuration sync completed')
+                self._update_status_panel(ui_components, message, status_type)
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error syncing configuration templates: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            
+            if update_ui and ui_components:
+                self._update_status_panel(ui_components, error_msg, 'error')
+                
+            return {
+                'success': False,
+                'message': error_msg,
+                'error': str(e)
+            }
+    
     async def _sync_configs_step(self, summary: SetupSummary, ui_components: Optional[Dict[str, Any]] = None) -> SetupSummary:
-        """Handle the configuration syncing step."""
+        """Handle the configuration syncing step in the setup workflow.
+        
+        This is a wrapper around sync_config_templates that updates the setup summary.
+        """
         self.set_stage(SetupStage.CONFIG_SYNC, "Synchronizing configurations")
         
-        if ui_components:
-            self._update_ui_status(ui_components, "Synchronizing configurations...", 'info')
-        
         try:
-            # Sync configs
-            sync_result = await self.config_handler.sync_configurations()
+            # Use the reusable sync method
+            sync_result = await self.sync_config_templates(
+                force_overwrite=False,
+                update_ui=bool(ui_components),
+                ui_components=ui_components
+            )
             
+            # Update summary with the sync result
             summary.update({
                 'configs_synced': sync_result.get('synced_count', 0),
+                'skipped_configs': sync_result.get('skipped_count', 0),
                 'phase': 'config_sync',
-                'message': 'Configuration sync completed',
-                'config_check': sync_result
+                'message': sync_result.get('message', 'Configuration sync completed'),
+                'config_check': sync_result,
+                'success': sync_result.get('success', False)
             })
             
             return summary
             
         except Exception as e:
-            error_msg = f"Error syncing configurations: {str(e)}"
+            error_msg = f"Error in configuration sync step: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             
             summary.update({
                 'phase': 'config_sync',
-                'message': error_msg
+                'message': error_msg,
+                'success': False
             })
             
             if ui_components:
-                self._update_ui_status(ui_components, f"Error syncing configurations: {str(e)}", 'error')
+                self._update_status_panel(ui_components, error_msg, 'error')
             
             return summary
     
@@ -883,7 +1051,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         self.set_stage(SetupStage.VERIFICATION, "Verifying setup")
         
         if ui_components:
-            self._update_ui_status(ui_components, "Verifying setup...", 'info')
+            self._update_status_panel(ui_components, "Verifying setup...", 'info')
         
         try:
             # Verify folder structure
@@ -913,35 +1081,11 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             })
             
             if ui_components:
-                self._update_ui_status(ui_components, f"Error verifying setup: {str(e)}", 'error')
+                self._update_status_panel(ui_components, f"Error verifying setup: {str(e)}", 'error')
             
             return summary
     
-    def _update_ui_status(self, ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
-        """Update the UI status display.
-        
-        Args:
-            ui_components: Dictionary of UI components
-            message: Status message to display
-            status_type: Type of status ('info', 'success', 'warning', 'error')
-        """
-        if 'status_panel' in ui_components:
-            try:
-                status_panel = ui_components['status_panel']
-                
-                # Map status types to CSS classes
-                status_classes = {
-                    'info': 'info',
-                    'success': 'success',
-                    'warning': 'warning',
-                    'error': 'danger'
-                }
-                
-                css_class = status_classes.get(status_type, 'info')
-                status_panel.value = f"<div class='alert alert-{css_class}'>{message}</div>"
-                
-            except Exception as e:
-                self.logger.error(f"Error updating status panel: {str(e)}", exc_info=True)
+    # Status updates are now handled by the parent class's _update_status_panel method
     
     def get_last_summary(self) -> Optional[SetupSummary]:
         """Get the summary of the last setup run.
@@ -949,4 +1093,62 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         Returns:
             SetupSummary of the last run, or None if no run has been performed
         """
+        return self._last_summary
+        
+    def _on_setup_completed(self, success: bool, error: Optional[str] = None) -> None:
+        """Handle setup completion by creating the setup complete marker file if successful.
+        
+        This method is called when the setup workflow completes, either successfully or with an error.
+        If successful, it creates a marker file to indicate that setup has been completed.
+        
+        Args:
+            success: Whether the setup completed successfully
+            error: Optional error message if the setup failed
+            
+        Note:
+            The marker file is created in the config directory with the name '.setup_complete'.
+            This file is checked by EnvConfigInitializer._is_setup_complete() to determine
+            if the setup has been completed.
+        """
+        try:
+            if success:
+                # Only create the marker file if setup was successful
+                if hasattr(self, 'config_handler') and hasattr(self.config_handler, 'config_dir'):
+                    marker_file = Path(self.config_handler.config_dir) / '.setup_complete'
+                    try:
+                        # Create parent directories if they don't exist
+                        marker_file.parent.mkdir(parents=True, exist_ok=True)
+                        # Create the marker file
+                        marker_file.touch()
+                        self.logger.info(f"Created setup completion marker file at: {marker_file}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to create setup completion marker file: {str(e)}", exc_info=True)
+            
+            # Update the setup state
+            self._setup_in_progress = False
+            self._current_phase = SetupPhase.COMPLETE if success else SetupPhase.ERROR
+            
+            # Update the last summary
+            self._update_summary(
+                status='completed' if success else 'failed',
+                phase=self._current_phase,
+                message='Setup completed successfully' if success else f'Setup failed: {error}'
+            )
+            
+            # Log the completion
+            if success:
+                self.logger.info("Setup completed successfully")
+            else:
+                self.logger.error(f"Setup failed: {error}")
+                
+        except Exception as e:
+            self.logger.error(f"Error in _on_setup_completed: {str(e)}", exc_info=True)
+            # Still update the state even if we couldn't create the marker file
+            self._setup_in_progress = False
+            self._current_phase = SetupPhase.ERROR
+            self._update_summary(
+                status='error',
+                phase=SetupPhase.ERROR,
+                message=f'Error in setup completion: {str(e)}'
+            )
         return self._last_summary

@@ -1,4 +1,6 @@
 """
+File: smartcash/ui/setup/env_config/env_config_initializer.py
+
 Environment Configuration Initializer Module.
 
 This module provides the EnvConfigInitializer class which is responsible for
@@ -18,8 +20,10 @@ Example:
     >>> display(ui)
 """
 
+import logging
 import os
 import sys
+from pathlib import Path
 from typing import Dict, Any, Optional, Type, TypeVar, cast
 
 # Import CommonInitializer base class
@@ -55,12 +59,26 @@ class EnvConfigInitializer(CommonInitializer):
         
         Args:
             config_handler_class: Optional ConfigHandler class (defaults to ConfigHandler)
+            
+        Raises:
+            RuntimeError: If environment manager initialization fails
         """
-        # Initialize ui_components before calling parent's __init__
-        self._ui_components = {}
-        self.ui_components = self._ui_components
-        super().__init__(module_name='env_config', config_handler_class=config_handler_class)
-        self._env_config_handler = None
+        try:
+            # Initialize ui_components before calling parent's __init__
+            self._ui_components = {}
+            self.ui_components = self._ui_components
+            
+            # Initialize environment manager
+            from smartcash.common.environment import get_environment_manager
+            self._env_manager = get_environment_manager()
+            
+            # Call parent initializer
+            super().__init__(module_name='env_config', config_handler_class=config_handler_class)
+            self._env_config_handler = None
+            
+        except Exception as e:
+            error_msg = f"Failed to initialize environment manager: {str(e)}"
+            raise RuntimeError(error_msg) from e
     
     def _init_handlers(self, config: Dict[str, Any]) -> None:
         """Initialize the environment configuration and setup handlers.
@@ -171,22 +189,21 @@ class EnvConfigInitializer(CommonInitializer):
         self.logger.debug("Checking drive connectivity before initialization")
         
         try:
-            from smartcash.common.environment import get_environment_manager
-            
-            # Get environment manager instance
-            env_manager = get_environment_manager()
+            # Use the instance's environment manager
+            if not hasattr(self, '_env_manager') or self._env_manager is None:
+                raise RuntimeError("Environment manager not initialized")
             
             # Check if we're in Colab
-            if not env_manager._in_colab:
+            if not self._env_manager._in_colab:
                 self.logger.warning("Not a Colab environment, skipping drive check")
                 return
                 
             # Refresh drive status
-            drive_mounted = env_manager.refresh_drive_status()
+            drive_mounted = self._env_manager.refresh_drive_status()
             
             # Log drive path if mounted
-            if drive_mounted and env_manager.drive_path:
-                self.logger.info(f"Google Drive connected at: {env_manager.drive_path}")
+            if drive_mounted and self._env_manager.drive_path:
+                self.logger.info(f"Google Drive connected at: {self._env_manager.drive_path}")
             else:
                 self.logger.warning("Google Drive not detected")
                 
@@ -283,22 +300,29 @@ class EnvConfigInitializer(CommonInitializer):
             
         Note:
             This method is called by the parent class's initialize() method
-            after all other initialization is complete.
         """
         try:
             self.logger.info("Performing post-initialization checks...")
-            
-            # Perform initial status check
-            self._perform_initial_status_check(ui_components)
-            
-            # Check if we should sync config templates
-            if self._should_sync_config_templates():
-                self.logger.info("Drive is mounted and setup is complete, syncing config templates...")
-                self._update_status(ui_components, "Syncing config templates...", "info")
-                self._sync_config_templates()
-            
-            # Update status to show initialization is complete
-            self._update_status(ui_components, "Environment configuration UI ready", "success")
+            # Delegate status check to setup handler if available
+            if hasattr(self, '_env_config_handler') and hasattr(self._env_config_handler, 'setup_handler'):
+                setup_handler = self._env_config_handler.setup_handler
+                
+                # Perform initial status check using setup handler
+                setup_handler._perform_initial_status_check(ui_components)
+                
+                # Check if we should sync config templates
+                if setup_handler._should_sync_config_templates():
+                    self.logger.info("Drive is mounted and setup is complete, syncing config templates...")
+                    # Use the new sync method with UI updates enabled for the initializer
+                    setup_handler.sync_config_templates(
+                        force_overwrite=False,
+                        update_ui=True,
+                        ui_components=ui_components
+                    )
+                
+                
+            else:
+                self.logger.warning("Setup handler not available for post-initialization checks")
             
             self.logger.info("Post-initialization checks completed successfully")
             return ui_components
@@ -306,78 +330,8 @@ class EnvConfigInitializer(CommonInitializer):
         except Exception as e:
             error_msg = f"Error during post-initialization checks: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            self._update_status(ui_components, f"Error: {str(e)}", "error")
             return ui_components
-    
-    def _should_sync_config_templates(self) -> bool:
-        """Determine if config templates should be synced.
-        
-        Returns:
-            bool: True if config templates should be synced, False otherwise
-        """
-        try:
-            # Check if drive is mounted
-            if not hasattr(self, '_env_manager') or not self._env_manager.drive_mounted:
-                self.logger.debug("Skipping config template sync: Drive not mounted")
-                return False
-            
-            # Check if setup is complete by looking for a marker file or config
-            if not self._is_setup_complete():
-                self.logger.debug("Skipping config template sync: Setup not complete")
-                return False
-                
-            return True
-            
-        except Exception as e:
-            self.logger.warning(f"Error checking if should sync config templates: {str(e)}")
-            return False
-    
-    def _is_setup_complete(self) -> bool:
-        """Check if the environment setup is complete.
-        
-        This checks for the existence of a marker file or configuration
-        that indicates the initial setup has been completed.
-        
-        Returns:
-            bool: True if setup is complete, False otherwise
-        """
-        try:
-            # Check for a marker file in the config directory
-            marker_file = Path(self.config_handler.config_dir) / '.setup_complete'
-            return marker_file.exists()
-            
-        except Exception as e:
-            self.logger.warning(f"Error checking setup completion: {str(e)}")
-            return False
-    
-    def _sync_config_templates(self) -> None:
-        """Sync configuration templates from repository to config directory.
-        
-        This method is called after initialization when the drive is mounted
-        and setup is complete to ensure all required config templates are available.
-        """
-        try:
-            self.logger.info("Starting config template synchronization...")
-            
-            # Get the config manager instance with auto_sync enabled
-            from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager(auto_sync=True)
-            
-            # Sync all configs
-            result = config_manager.sync_configs_to_drive(force_overwrite=False)
-            
-            if result.get('success', False):
-                self.logger.info(
-                    f"Successfully synced {result.get('synced_count', 0)} config templates. "
-                    f"Skipped {result.get('skipped_count', 0)} up-to-date files."
-                )
-            else:
-                self.logger.warning(
-                    f"Config template sync completed with issues: {result.get('message', 'Unknown error')}"
-                )
-                
-        except Exception as e:
-            self.logger.error(f"Error during config template sync: {str(e)}", exc_info=True)
+
 
 def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
     """Initialize and return the environment configuration UI.

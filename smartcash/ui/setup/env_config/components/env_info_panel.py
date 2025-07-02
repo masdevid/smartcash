@@ -119,27 +119,41 @@ def _format_gpu_info(env_info: Dict[str, Any]) -> str:
     
     return f'✅ {gpu_name} {gpu_memory}'.strip()
 
-def _format_storage_info(storage_info: Dict[str, Any]) -> str:
+def _format_storage_info(storage_info: Any) -> str:
     """Format storage information for display.
     
     Args:
-        storage_info: Dictionary containing storage information
+        storage_info: Dictionary containing storage information or error message string
         
     Returns:
         Formatted storage information string
     """
-    if not storage_info:
-        return 'N/A'
+    try:
+        # Handle case where storage_info is a string (error message)
+        if isinstance(storage_info, str):
+            return f"Error: {storage_info}"
+            
+        # Handle case where storage_info is None or empty
+        if not storage_info:
+            return 'N/A'
+            
+        # Ensure we have numeric values
+        total = float(storage_info.get('total', 0)) if storage_info.get('total') is not None else 0
+        used = float(storage_info.get('used', 0)) if storage_info.get('used') is not None else 0
         
-    total = storage_info.get('total', 0)
-    free = storage_info.get('free', 0)
-    used = storage_info.get('used', 0)
-    
-    if total > 0:
-        used_percent = (used / total) * 100
-        return f"{_format_bytes(used)} / {_format_bytes(total)} ({used_percent:.1f}% used)"
-    
-    return f"{_format_bytes(used)} used"
+        # Calculate percentage if we have valid total
+        if total > 0:
+            used_percent = (used / total) * 100
+            return f"{_format_bytes(used)} / {_format_bytes(total)} ({used_percent:.1f}% used)"
+        
+        # Fallback to just showing used space if total is 0 or not available
+        return f"{_format_bytes(used)} used"
+        
+    except Exception as e:
+        # Log the error and return a user-friendly message
+        import logging
+        logging.error(f"Error formatting storage info: {e}")
+        return "Storage info unavailable"
 
 def _get_drive_status(env_info: Dict[str, Any]) -> str:
     """Get formatted drive status.

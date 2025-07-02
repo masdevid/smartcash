@@ -90,6 +90,25 @@ def _get_platform_info() -> str:
     """🖥️ Get platform information"""
     return f"{platform.system()} {platform.release()}"
 
+def _get_os_info() -> Dict[str, Any]:
+    """Get detailed OS information.
+    
+    Returns:
+        Dictionary containing OS information including:
+        - system: OS name (e.g., 'Linux', 'Windows', 'Darwin')
+        - release: OS release version
+        - version: OS version
+        - machine: Machine type (e.g., 'x86_64')
+        - processor: Processor information
+    """
+    return {
+        'system': platform.system(),
+        'release': platform.release(),
+        'version': platform.version(),
+        'machine': platform.machine(),
+        'processor': platform.processor() or 'Unknown'
+    }
+
 def _is_google_colab() -> bool:
     """🔍 Check if running in Google Colab"""
     try:

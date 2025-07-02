@@ -81,6 +81,14 @@ class TestSetupHandler(unittest.IsolatedAsyncioTestCase):
         self.progress_updates = []
         self.handler._update_progress = self._mock_update_progress
         
+        # Mock the status panel update method
+        self.handler._update_status_panel = MagicMock()
+        
+        # Mock the _update_status method to use _update_status_panel
+        self.handler._update_status = MagicMock()
+        self.handler._update_status.side_effect = lambda msg, is_error=False: \
+            self.handler._update_status_panel({}, msg, 'error' if is_error else 'info')
+        
         # Mock the stage handlers
         self.handler._handlers = {
             'drive': self._create_mock_handler('drive'),

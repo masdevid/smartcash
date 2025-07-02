@@ -102,6 +102,14 @@ def create_error_response(
     Returns:
         Either a dictionary with error info or a widget, based on return_type
     """
+    # Ensure error_message is always a string
+    if not isinstance(error_message, str):
+        error_message = str(error_message) if error_message is not None else "An unknown error occurred"
+    
+    # If error is provided but error_message is generic, use error's string representation
+    if error is not None and error_message == "An unknown error occurred":
+        error_message = str(error)
+    
     # Create fallback UI using the centralized utility
     error_ui = safe_execute(
         create_fallback_ui,

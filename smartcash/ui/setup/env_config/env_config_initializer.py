@@ -20,7 +20,7 @@ Contoh:
     >>> display(ui)
 """
 
-from smartcash.ui.core.shared.logger import get_enhanced_logger
+import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
 
@@ -31,11 +31,11 @@ from smartcash.ui.core.shared.logger import get_module_logger
 
 # Import handlers yang sudah direfactor
 from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
-from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
+from smartcash.ui.setup.env_config.configs.config_handler import ConfigHandler
 from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
 
 # Import UI components
-from smartcash.ui.setup.env_config.components.env_config_ui import EnvConfigUI
+from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui
 
 # Import configs
 from smartcash.ui.setup.env_config.configs.defaults import DEFAULT_CONFIG
@@ -118,9 +118,8 @@ class EnvConfigInitializer(ModuleInitializer):
         self.logger.info("🎨 Membuat UI components...")
         
         try:
-            # Create main UI component
-            env_config_ui = EnvConfigUI()
-            ui_components = env_config_ui.create_ui()
+            # Create UI components using existing function
+            ui_components = create_env_config_ui()
             
             self.logger.info("✅ UI components berhasil dibuat")
             return ui_components
@@ -244,7 +243,7 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         Initialized UI widget dari EnvConfigInitializer
     """
     # Get module logger
-    logger = get_enhanced_logger('smartcash.ui.setup.env_config')
+    logger = get_module_logger('smartcash.ui.setup.env_config')
     logger.debug("🚀 Initializing environment configuration UI")
     
     try:
@@ -253,7 +252,20 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         return initializer.initialize(config=config, **kwargs)
         
     except Exception as e:
-        logger.error(f"❌ Gagal initialize env config UI: {str(e)}", exc_info=True)
-        # Return error UI component
-        from smartcash.ui.components.error_display import create_error_display
-        return create_error_display(f"Gagal initialize environment configuration: {str(e)}")
+        # Use the centralized error handler
+        from smartcash.ui.core.shared.error_handler import CoreErrorHandler
+        error_handler = CoreErrorHandler('env_config_initializer')
+        
+        # Format error message
+        error_msg = f"Gagal initialize environment configuration: {str(e)}"
+        
+        # Log and handle the error
+        error_handler.handle_error(
+            error_msg=error_msg,
+            level='error',
+            exc_info=True,
+            create_ui_error=True
+        )
+        
+        # Return the UI error component
+        return error_handler.get_ui_error()

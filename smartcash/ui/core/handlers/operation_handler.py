@@ -13,7 +13,15 @@ import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, Future
 
-from smartcash.ui.core.handlers.base_handler import BaseHandler, ProgressLevel
+from smartcash.ui.core.handlers.base_handler import BaseHandler
+
+class ProgressLevel(Enum):
+    """Level untuk progress tracking."""
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 T = TypeVar('T')
 

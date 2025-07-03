@@ -9,7 +9,7 @@ Handler untuk mengatur workflow setup environment dengan stage-based operations.
 import asyncio
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, TypedDict, Union
+from typing import Callable, Dict, Any, List, Optional, Tuple, TypedDict, Union
 from datetime import datetime
 
 # Import core handlers

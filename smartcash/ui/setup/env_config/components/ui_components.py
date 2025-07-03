@@ -168,6 +168,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     main_container.container.children = all_components
     
     # Store the main UI container
-    ui_components['ui'] = main_ui
+    ui_components['ui'] = main_container.container
+    ui_components['main_container'] = main_container
     
     return ui_components

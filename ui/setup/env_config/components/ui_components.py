@@ -92,16 +92,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     progress_tracker.show(level=ProgressLevel.DUAL)
     ui_components['progress_tracker'] = progress_tracker
     
-    # 5. Create Log Accordion with default parameters
-    log_accordion = create_log_accordion()
-    # Expand the accordion by default
-    if 'log_accordion' in log_accordion and hasattr(log_accordion['log_accordion'], 'selected_index'):
-        log_accordion['log_accordion'].selected_index = 0  # Expand first accordion item
-    
-    # Store log components
-    ui_components['log_accordion'] = log_accordion
-    ui_components['log_output'] = log_accordion  # Alias for compatibility
-    ui_components['log_components'] = log_accordion
+    # 5. (removed) Stand-alone LogAccordion – we now rely on the footer container to provide it
     
     # 6. Create environment-specific components
     env_info_panel = create_env_info_panel()
@@ -110,9 +101,21 @@ def create_env_config_ui() -> Dict[str, Any]:
     tips_requirements = create_tips_requirements()
     ui_components['tips_requirements'] = tips_requirements
     
-    # 7. Create footer container with default parameters
-    footer_container = create_footer_container()
+    # 7. Create footer container – use it as the single source for logs
+    footer_container = create_footer_container(
+        show_progress=False,  # progress tracker already created above
+        show_logs=True,
+        show_info=False,
+        show_tips=False,
+        log_module_name="Environment"
+    )
     ui_components['footer_container'] = footer_container
+
+    # Expose log components via footer container to maintain previous API keys
+    if footer_container.log_accordion:
+        ui_components['log_accordion'] = footer_container.log_accordion
+        ui_components['log_output'] = footer_container.log_accordion
+        ui_components['log_components'] = footer_container.log_accordion
     
     # 8. Assemble Main Container with all sections using default parameters
     main_container = create_main_container(

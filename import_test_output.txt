@@ -474,8 +474,8 @@ VBox(children=(HTML(value='<div style="background:#f8f9fa;padding:15px;border-ra
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='300px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('PROCESS LOGS',))
 <IPython.core.display.HTML object>
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='250px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('PROCESS LOGS',))
-2025-07-04 05:11:11,810 - LOGGER.20 - INFO - 📋 Config updated: 6 items
-2025-07-04 05:11:11,810 - LOGGER.20 - ERROR - ❌ Gagal setup handlers: Can't instantiate abstract class FolderOperation without an implementation for abstract methods 'get_operations', 'initialize'
+2025-07-04 05:16:25,471 - LOGGER.20 - INFO - 📋 Config updated: 6 items
+2025-07-04 05:16:25,471 - LOGGER.20 - ERROR - ❌ Gagal setup handlers: Can't instantiate abstract class FolderOperation without an implementation for abstract methods 'get_operations', 'initialize'
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 107, in setup_handlers
     setup_handler = SetupHandler()
@@ -484,7 +484,7 @@ Traceback (most recent call last):
     self._folder_operation = FolderOperation()
                              ^^^^^^^^^^^^^^^^^
 TypeError: Can't instantiate abstract class FolderOperation without an implementation for abstract methods 'get_operations', 'initialize'
-2025-07-04 05:11:11,812 - LOGGER.20 - ERROR - Failed to initialize environment configuration UI: ❌ Gagal setup handlers: Can't instantiate abstract class FolderOperation without an implementation for abstract methods 'get_operations', 'initialize'
+2025-07-04 05:16:25,473 - LOGGER.20 - ERROR - Failed to initialize environment configuration UI: ❌ Gagal setup handlers: Can't instantiate abstract class FolderOperation without an implementation for abstract methods 'get_operations', 'initialize'
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 107, in setup_handlers
     setup_handler = SetupHandler()
@@ -828,15 +828,15 @@ ImportError: cannot import name 'create_error_ui' from 'smartcash.ui.utils.fallb
 ✅ Ditemukan: /Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_5_dataset_visualization.py
 --------------------------------------------------------------------------------
 Warning: Failed to initialize suppression: 'PretrainedInitializer' object has no attribute 'ui_components'
-2025-07-04 05:11:11,861 - UI_LOGGER.smartcash.ui.ui.pretrained - ERROR - ❌ Modul defaults tidak ditemukan: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
+2025-07-04 05:16:25,520 - UI_LOGGER.smartcash.ui.ui.pretrained - ERROR - ❌ Modul defaults tidak ditemukan: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/config_handler.py", line 217, in get_default_config
     from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
 ImportError: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
-2025-07-04 05:11:11,862 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - WARNING - Failed to load config: "Attempt to overwrite 'message' in LogRecord"
+2025-07-04 05:16:25,521 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - WARNING - Failed to load config: "Attempt to overwrite 'message' in LogRecord"
 <IPython.core.display.HTML object>
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='300px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('200PX LOGS',))
-2025-07-04 05:11:11,872 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - ERROR - ❌ Gagal inisialisasi pretrained: 'log_output'
+2025-07-04 05:16:25,531 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - ERROR - ❌ Gagal inisialisasi pretrained: 'log_output'
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/initializers/common_initializer.py", line 150, in initialize
     ui_components = self._create_ui_components(config, **kwargs) or {}
@@ -3429,7 +3429,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
 --------------------------------------------------------------------------------
 
 ================================================================================
-🏁 Selesai dalam 8.72 detik
+🏁 Selesai dalam 8.42 detik
 📊 Total modul diuji: 463
 ✅ Berhasil: 420
 ❌ Gagal: 43
@@ -3794,11 +3794,11 @@ ANALYSIS OF FAILED IMPORTS:
 1. Periksa apakah semua dependensi sudah terinstall
 2. Pastikan path modul sudah benar
 3. Periksa error di file log untuk detail lebih lanjut
-   Path log: /Users/masdevid/Projects/smartcash/logs/import_test_20250704_051103.log
+   Path log: /Users/masdevid/Projects/smartcash/logs/import_test_20250704_051617.log
 
 📝 Daftar modul yang gagal disimpan di: /Users/masdevid/Projects/smartcash/logs/failed_imports.txt
 
-❌ Error tidak terduga: 43 != 0 : 43 dari 463 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_051103.log untuk detail lengkap.
+❌ Error tidak terduga: 43 != 0 : 43 dari 463 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_051617.log untuk detail lengkap.
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/tests/unit/test_imports.py", line 526, in test_module_imports
     self.assertEqual(
@@ -3806,4 +3806,4 @@ Traceback (most recent call last):
     assertion_func(first, second, msg=msg)
   File "/opt/anaconda3/lib/python3.12/unittest/case.py", line 878, in _baseAssertEqual
     raise self.failureException(msg)
-AssertionError: 43 != 0 : 43 dari 463 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_051103.log untuk detail lengkap.
+AssertionError: 43 != 0 : 43 dari 463 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_051617.log untuk detail lengkap.

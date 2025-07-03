@@ -32,7 +32,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Initialize components dictionary
     ui_components = {}
     
-    # 1. Create Header Container with default parameters
+    # 1. Create Header Container
     header_container = create_header_container(
         title="🔧 Environment Setup",
         subtitle="Konfigurasi lingkungan untuk SmartCash YOLOv5-EfficientNet"
@@ -56,9 +56,9 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Get setup button from action container
     setup_button = action_container['buttons']['setup']
     
-    # Create form container without save/reset buttons - CUSTOM COMPONENT
+    # Create form container without save/reset buttons
     form_components = create_form_container(
-        show_buttons=False,  # No save/reset buttons
+        show_buttons=False,
         container_margin="15px 0",
         container_padding="10px"
     )
@@ -76,14 +76,14 @@ def create_env_config_ui() -> Dict[str, Any]:
     ui_components['clear_dialog'] = action_container['clear_dialog']
     ui_components['is_dialog_visible'] = action_container['is_dialog_visible']
     
-    # 3. Create Summary Container for setup summary - CUSTOM COMPONENT
+    # 3. Create Summary Container for setup summary
     setup_summary = create_setup_summary()
     summary_container = create_summary_container(
         theme="info",
         title="Setup Summary",
         icon="📋"
     )
-    summary_container.set_content(setup_summary.value)  # Inject setup summary into summary container
+    summary_container.set_content(setup_summary.value)
     ui_components['setup_summary'] = setup_summary
     ui_components['summary_container'] = summary_container
     
@@ -92,18 +92,17 @@ def create_env_config_ui() -> Dict[str, Any]:
     progress_tracker.show(level=ProgressLevel.DUAL)
     ui_components['progress_tracker'] = progress_tracker
     
-    # 5. (removed) Stand-alone LogAccordion – we now rely on the footer container to provide it
-    
-    # 6. Create environment-specific components
+    # 5. Environment Info Panel
     env_info_panel = create_env_info_panel()
     ui_components['env_info_panel'] = env_info_panel
     
+    # 6. Tips & Requirements
     tips_requirements = create_tips_requirements()
     ui_components['tips_requirements'] = tips_requirements
     
-    # 7. Create footer container – use it as the single source for logs
+    # 7. Create footer container with logs
     footer_container = create_footer_container(
-        show_progress=False,  # progress tracker already created above
+        show_progress=False,
         show_logs=True,
         show_info=False,
         show_tips=False,
@@ -111,10 +110,9 @@ def create_env_config_ui() -> Dict[str, Any]:
     )
     ui_components['footer_container'] = footer_container
 
-    # Expose log components via footer container to maintain previous API keys
+    # Expose log components via footer container
     if footer_container.log_accordion:
         ui_components['log_accordion'] = footer_container.log_accordion
-        # Output widget inside accordion
         if getattr(footer_container, 'log_output', None):
             ui_components['log_output'] = footer_container.log_output
             ui_components['log_components'] = footer_container.log_output
@@ -122,36 +120,32 @@ def create_env_config_ui() -> Dict[str, Any]:
             ui_components['log_output'] = footer_container.log_accordion
             ui_components['log_components'] = footer_container.log_accordion
     
-    # 8. Assemble Main Container with all sections using default parameters
-    # Create a proper layout with all components in the right order
+    # 8. Create the final UI layout using direct widget assembly
+    # This gives us more control than using the container classes
     all_components = [
-        header_container.container,         # Header at the top
-        form_components['container'],       # Form section
-        summary_container.container,        # Summary section
-        action_container['container'],      # Action buttons
-        footer_container.container          # Footer at the bottom
+        header_container.container,
+        form_components['container'],
+        summary_container.container,
+        env_info_panel,
+        tips_requirements,
+        footer_container.container
     ]
     
     # Filter out any None components
     all_components = [c for c in all_components if c is not None]
     
-    # Create a custom VBox container with all components in the right order
-    import ipywidgets as widgets
-    custom_container = widgets.VBox(all_components)
-    
-    # Create the main container with proper layout
-    main_container = create_main_container(
-        header_container=header_container.container,
-        form_container=form_components['container'],
-        action_container=action_container['container'],
-        footer_container=footer_container.container
+    # Create the main container directly with ipywidgets
+    main_ui = ipywidgets.VBox(
+        all_components,
+        layout=ipywidgets.Layout(
+            width='100%',
+            padding='15px',
+            border='1px solid #ddd',
+            border_radius='8px'
+        )
     )
     
-    # Replace the main container's children with our custom ordered components
-    main_container.container.children = all_components
-    
     # Store the main UI container
-    ui_components['ui'] = main_container.container
-    ui_components['main_container'] = main_container
+    ui_components['ui'] = main_ui
     
     return ui_components

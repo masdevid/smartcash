@@ -164,18 +164,10 @@ def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  #
     initializer = EnvConfigInitializer()
     result = initializer.initialize(config=config, **kwargs)
 
-    from smartcash.ui.utils.widget_utils import safe_display
-
     # Check if initialization was successful (using 'status' key for API consistency)
     if not result.get('status', False):
         # If there was an error, display the error UI
-        return safe_display(result.get('ui', {}))
+        return result.get('ui', {}).get('ui', {})
     
-    # Get the UI components and return the main widget
-    ui_components = result.get('ui', {})
-    if isinstance(ui_components, dict) and 'main_container' in ui_components:
-        # Return the main container widget directly
-        return ui_components['main_container'].container
-    
-    # Fallback to returning the UI components dictionary
-    return safe_display(ui_components)
+    # Return the main UI widget directly
+    return result.get('ui', {}).get('ui', {})

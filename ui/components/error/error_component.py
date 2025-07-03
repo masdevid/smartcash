@@ -135,7 +135,7 @@ class ErrorComponent:
             'traceback_widget': getattr(self, '_traceback_widget', None)
         }
         
-        return self._components
+        return self._components['widget']
     
     def _get_styles(self) -> Dict[str, Dict[str, str]]:
         """Glassmorphism color schemes"""

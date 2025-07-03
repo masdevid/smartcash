@@ -108,7 +108,54 @@ class SetupHandler(OperationHandler, ConfigurableHandler):
         # UI components akan di-set dari luar
         self._ui_components = {}
         
+        # Initialize operations
+        self._operations = {
+            'start_setup': self._run_setup_workflow,
+            'cancel_setup': self.cancel_operation,
+            'verify_environment': self.verify_environment,
+            'reset_environment': self.reset_environment,
+            'sync_templates': self.sync_config_templates
+        }
+        
         self.logger.info("🔧 Setup handler initialized")
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations.
+        
+        Returns:
+            Dictionary mapping operation names to their handler methods
+        """
+        return self._operations
+    
+    def initialize(self) -> Dict[str, Any]:
+        """Initialize the handler.
+        
+        Returns:
+            Dictionary containing initialization status
+        """
+        try:
+            # Initialize operation handlers
+            self._drive_operation.initialize()
+            self._folder_operation.initialize()
+            self._config_operation.initialize()
+            
+            # Mark as initialized
+            self._is_initialized = True
+            
+            return {
+                'status': True,
+                'message': 'Setup handler initialized successfully',
+                'operations': list(self._operations.keys())
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to initialize SetupHandler: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return {
+                'status': False,
+                'error': error_msg,
+                'message': 'Failed to initialize setup handler'
+            }
     
     def set_ui_components(self, ui_components: Dict[str, Any]):
         """Set UI components untuk updates.

@@ -334,9 +334,12 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         exc_type, exc_value, exc_tb = sys.exc_info()
         tb_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
         
+        # Create error message without logging
+        error_msg = str(e)
+        
         # Create error component with traceback
         error_component = create_error_component(
-            error_message=str(e),
+            error_message=error_msg,
             traceback=tb_str,
             title="❌ Environment Configuration Error",
             error_type="error",

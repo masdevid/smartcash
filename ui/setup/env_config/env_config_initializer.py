@@ -1,355 +1,259 @@
 """
 File: smartcash/ui/setup/env_config/env_config_initializer.py
 
-Environment Configuration Initializer Module.
+Environment Configuration Initializer Module - Refactored dengan arsitektur baru.
 
-This module provides the EnvConfigInitializer class which is responsible for
-initializing and managing the environment configuration UI. It follows the
-CommonInitializer pattern used throughout the application for consistency.
+Modul ini menyediakan class EnvConfigInitializer yang bertanggung jawab untuk
+inisialisasi dan manajemen environment configuration UI. Menggunakan arsitektur
+baru dari smartcash/ui/core untuk konsistensi dan maintainability.
 
-Key Features:
-- Implements the CommonInitializer interface for consistent initialization
-- Manages the lifecycle of environment configuration UI components
-- Coordinates configuration and workflow using ConfigHandler and SetupHandler
-- Handles error states and provides user feedback
-- Supports both programmatic and interactive usage patterns
+Fitur Utama:
+- Implementasi ModuleInitializer untuk consistent initialization
+- Manajemen lifecycle environment configuration UI components
+- Koordinasi konfigurasi dan workflow menggunakan handlers terbaru
+- Error handling dan user feedback yang lebih baik
+- Support untuk programmatic dan interactive usage patterns
 
-Example:
+Contoh:
     >>> initializer = EnvConfigInitializer()
     >>> ui = initializer.initialize()
     >>> display(ui)
 """
 
-import logging
-import os
-import sys
+from smartcash.ui.core.shared.logger import get_enhanced_logger
+from typing import Dict, Any, Optional
 from pathlib import Path
-from typing import Dict, Any, Optional, Type, TypeVar, cast
 
-# Import CommonInitializer base class
-from smartcash.ui.initializers.common_initializer import CommonInitializer
+# Import base classes dari arsitektur baru
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from smartcash.ui.core.handlers.ui_handler import UIHandler
+from smartcash.ui.core.shared.logger import get_module_logger
 
-# Import consolidated logger
-from smartcash.ui.utils.ui_logger import get_module_logger
-
-# Import handlers
+# Import handlers yang sudah direfactor
 from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
-from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHandler
+from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
 
-# Type aliases
-T = TypeVar('T')
+# Import UI components
+from smartcash.ui.setup.env_config.components.env_config_ui import EnvConfigUI
 
-class EnvConfigInitializer(CommonInitializer):
-    """Environment configuration UI initializer using CommonInitializer pattern.
+# Import configs
+from smartcash.ui.setup.env_config.configs.defaults import DEFAULT_CONFIG
+
+
+class EnvConfigInitializer(ModuleInitializer):
+    """Environment configuration UI initializer menggunakan arsitektur baru.
     
-    This class is responsible for initializing and managing the environment
-    configuration UI. It follows the CommonInitializer pattern for consistency
-    with other UI initializers in the application.
+    Class ini bertanggung jawab untuk inisialisasi dan manajemen environment
+    configuration UI. Mengikuti ModuleInitializer pattern untuk konsistensi
+    dengan UI initializers lainnya dalam aplikasi.
     
-    The initialization process follows these steps:
-    1. Initialize configuration handler
-    2. Initialize SetupHandler with ConfigHandler
-    3. Set up UI components and event handlers
-    4. Perform any post-initialization setup
+    Proses inisialisasi mengikuti tahapan berikut:
+    1. Pre-initialization checks
+    2. Create UI components
+    3. Setup handlers dengan dependency injection
+    4. Post-initialization checks dan syncing
     """
     
-    def __init__(self, config_handler_class: Type[BaseConfigHandler] = ConfigHandler):
-        """Initialize the environment configuration initializer.
+    def __init__(self):
+        """Initialize environment configuration initializer.
         
-        Args:
-            config_handler_class: Optional ConfigHandler class (defaults to ConfigHandler)
-            
         Raises:
-            RuntimeError: If environment manager initialization fails
+            RuntimeError: Jika environment manager initialization gagal
         """
         try:
-            # Initialize ui_components before calling parent's __init__
-            self._ui_components = {}
-            self.ui_components = self._ui_components
+            # Initialize dengan module info
+            super().__init__(
+                module_name='env_config',
+                parent_module='setup'
+            )
             
             # Initialize environment manager
             from smartcash.common.environment import get_environment_manager
             self._env_manager = get_environment_manager()
             
-            # Call parent initializer
-            super().__init__(module_name='env_config', config_handler_class=config_handler_class)
-            self._env_config_handler = None
+            # Initialize handlers storage
+            self._handlers = {}
+            
+            self.logger.info("🔧 Environment configuration initializer siap")
             
         except Exception as e:
-            error_msg = f"Failed to initialize environment manager: {str(e)}"
+            error_msg = f"❌ Gagal initialize environment manager: {str(e)}"
             raise RuntimeError(error_msg) from e
-    
-    def _init_handlers(self, config: Dict[str, Any]) -> None:
-        """Initialize the environment configuration and setup handlers.
-        
-        Args:
-            config: Configuration dictionary
-        """
-        self.logger.info("Initializing environment configuration handlers")
-        
-        # Initialize the main EnvConfigHandler which will manage other handlers
-        self._env_config_handler = EnvConfigHandler(
-            logger=self.logger
-        )
-        
-        # Store references in the handlers dictionary
-        self._handlers = {
-            'env_config': self._env_config_handler,
-            'setup': self._env_config_handler.setup_handler,
-            'config': self._env_config_handler.config_handler
-        }
-        
-        self.logger.info("Environment configuration handlers initialized")
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration for environment setup.
+        """Get default configuration untuk environment setup.
         
         Returns:
-            Dictionary containing default configuration
-            
-        Raises:
-            ImportError: If default config module is not found
+            Default configuration dictionary
         """
-        self.logger.debug("Loading default configuration")
-        
-        try:
-            # Default configuration for environment setup
-            return {
-                'version': '1.0.0',  # Add version for compatibility with tests
-                'env_config': {
-                    'env_name': 'smartcash_env',
-                    'env_path': os.path.join(os.path.expanduser('~'), 'smartcash_envs'),
-                    'python_version': f"{sys.version_info.major}.{sys.version_info.minor}"
-                },
-                'ui': {'theme': 'dark', 'log_level': 'INFO'},
-                'settings': {}  # Add empty settings for compatibility with tests
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Gagal mendapatkan konfigurasi default: {str(e)}", exc_info=True)
-            # Fallback to minimal config
-            return {
-                'version': '1.0.0',
-                'env_config': {},
-                'ui': {'theme': 'light', 'log_level': 'INFO'},
-                'settings': {}
-            }
+        return DEFAULT_CONFIG.copy()
     
-    # Override _setup_handlers to use ConfigHandler
-    def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Setup event handlers with proper error handling
+    def pre_initialize_checks(self):
+        """Perform pre-initialization checks."""
+        self.logger.info("🔍 Melakukan pre-initialization checks...")
         
-        Args:
-            ui_components: Dictionary containing UI components
-            config: Configuration to use
-            **kwargs: Additional arguments
+        # Check environment manager
+        if not self._env_manager:
+            raise RuntimeError("Environment manager tidak tersedia")
             
+        # Check paths
+        required_paths = [
+            Path.home(),
+            Path.cwd()
+        ]
+        
+        for path in required_paths:
+            if not path.exists():
+                self.logger.warning(f"⚠️ Path tidak ditemukan: {path}")
+        
+        self.logger.info("✅ Pre-initialization checks selesai")
+    
+    def create_ui_components(self) -> Dict[str, Any]:
+        """Create UI components untuk environment configuration.
+        
         Returns:
-            Dictionary of UI components updated with handlers
-            
-        Raises:
-            ValueError: If handler setup fails
+            Dictionary berisi UI components
         """
+        self.logger.info("🎨 Membuat UI components...")
+        
         try:
-            self.logger.debug("Setting up event handlers")
+            # Create main UI component
+            env_config_ui = EnvConfigUI()
+            ui_components = env_config_ui.create_ui()
             
-            # Store the main handler in ui_components
-            ui_components['env_config_handler'] = self._env_config_handler
-            ui_components['config_handler'] = self._env_config_handler.config_handler
-            ui_components['setup_handler'] = self._env_config_handler.setup_handler
-            
-            self.logger.info("Environment config handler initialized successfully")
-            
-            # Set up event handlers
-            if 'setup_button' in ui_components and hasattr(ui_components['setup_button'], 'on_click'):
-                # Directly use the handler's method for button clicks
-                ui_components['setup_button'].on_click(self._env_config_handler.handle_setup_button_click)
-                self.logger.debug("Setup button click handler attached")
-            
+            self.logger.info("✅ UI components berhasil dibuat")
             return ui_components
             
         except Exception as e:
-            self.logger.error(f"Failed to setup handlers: {str(e)}", exc_info=True)
-            raise
-            
-    def pre_initialize_checks(self, config: Dict[str, Any], **kwargs) -> None:
-        """Perform pre-initialization checks for environment configuration.
-        
-        This method checks drive connectivity using EnvironmentManager before proceeding
-        with the initialization process.
-        
-        Args:
-            config: Configuration dictionary
-            **kwargs: Additional keyword arguments
-            
-        Raises:
-            RuntimeError: If drive connectivity check fails
-        """
-        self.logger.debug("Checking drive connectivity before initialization")
-        
-        try:
-            # Use the instance's environment manager
-            if not hasattr(self, '_env_manager') or self._env_manager is None:
-                raise RuntimeError("Environment manager not initialized")
-            
-            # Check if we're in Colab
-            if not self._env_manager._in_colab:
-                self.logger.warning("Not a Colab environment, skipping drive check")
-                return
-                
-            # Refresh drive status
-            drive_mounted = self._env_manager.refresh_drive_status()
-            
-            # Log drive path if mounted
-            if drive_mounted and self._env_manager.drive_path:
-                self.logger.info(f"Google Drive connected at: {self._env_manager.drive_path}")
-            else:
-                self.logger.warning("Google Drive not detected")
-                
-        except Exception as e:
-            error_msg = f"Failed to check drive connectivity: {str(e)}"
+            error_msg = f"❌ Gagal create UI components: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
-            
-    # Using CommonInitializer's _create_ui_components implementation
-        
-    def get_default_config(self) -> Dict[str, Any]:
-        """Public method to get the default configuration."""
-        return self._get_default_config()
-        
-    def get_ui_root(self) -> Any:
-        """Get the root UI component.
-        
-        Returns:
-            The root widget of the UI or None if not initialized
-        """
-        return self._ui_components.get('root') if hasattr(self, '_ui_components') else None
     
-    # Removed _register_handlers() - handler registration is now handled in _setup_handlers()
-            
-    def _create_ui_components(self, config: Dict[str, Any] = None, **kwargs) -> Dict[str, Any]:
-        """Create and return UI components as a dictionary.
+    def setup_handlers(self):
+        """Setup handlers dengan dependency injection pattern.
         
-        Args:
-            config: Loaded configuration
-            **kwargs: Additional arguments
-            
-        Returns:
-            Dictionary of UI components with required keys:
-            - 'ui': Main UI component
-            - 'log_output': Log output widget
-            - 'status_panel': Status panel widget
+        Menggunakan config sebagai class property sesuai arsitektur baru.
         """
+        self.logger.info("🔧 Setup handlers...")
+        
         try:
-            from smartcash.ui.setup.env_config.components.ui_components import create_env_config_ui
+            # Initialize config handler dulu
+            config_handler = ConfigHandler()
+            config_handler.config = self.config
             
-            # Ensure we have a valid config
-            if not config:
-                config = self.config_handler.get_default_config()
-                self.logger.debug("Using default configuration")
+            # Initialize setup handler dengan config handler
+            setup_handler = SetupHandler()
+            setup_handler.config = self.config
             
-            # Ensure required sections exist
-            if 'env_config' not in config:
-                config['env_config'] = {}
-                self.logger.debug("Added 'env_config' section to configuration")
+            # Initialize main env config handler
+            env_config_handler = EnvConfigHandler(
+                ui_components=self.ui_components
+            )
+            env_config_handler.config = self.config
             
-            # Create UI components with immediate validation
-            self.logger.info("Creating main UI components")
-            ui_components = create_env_config_ui()
+            # Setup dependency injection
+            env_config_handler.setup_dependencies(
+                config_handler=config_handler,
+                setup_handler=setup_handler
+            )
             
-            if not isinstance(ui_components, dict):
-                raise ValueError(f"UI components must be a dictionary, got: {type(ui_components)}")
+            # Store handlers
+            self._handlers = {
+                'env_config': env_config_handler,
+                'config': config_handler,
+                'setup': setup_handler
+            }
             
-            if not ui_components:
-                raise ValueError("UI components cannot be empty")
-            
-            # Validate critical components exist
-            required_components = ['ui', 'log_output', 'status_panel']
-            missing = [comp for comp in required_components if comp not in ui_components]
-            if missing:
-                raise ValueError(f"Missing required UI components: {missing}")
-            
-            # Add module-specific metadata
-            ui_components['config_handler'] = self.config_handler
-            if 'env' in kwargs:
-                ui_components['env'] = kwargs['env']
-            
-            self.logger.info("UI components initialized successfully")
-            return ui_components
+            self.logger.info("✅ Handlers berhasil di-setup")
             
         except Exception as e:
-            error_msg = f"Failed to create UI components: {str(e)}"
+            error_msg = f"❌ Gagal setup handlers: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            raise
+            raise RuntimeError(error_msg) from e
     
-    def post_initialization_checks(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Perform post-initialization checks and updates.
+    def post_initialization_checks(self):
+        """Perform post-initialization checks dan syncing.
         
-        This method is called after all initialization is complete to perform
-        any final checks or updates to the UI state, including syncing config
-        templates if the drive is mounted and setup is complete.
-        
-        Args:
-            ui_components: Dictionary of UI components
-            config: Configuration dictionary
-            **kwargs: Additional keyword arguments
-            
-        Returns:
-            The updated ui_components dictionary
-            
-        Note:
-            This method is called by the parent class's initialize() method
+        Method ini dipanggil setelah semua inisialisasi selesai untuk melakukan
+        final checks atau updates ke UI state, termasuk syncing config
+        templates jika drive mounted dan setup complete.
         """
         try:
-            self.logger.info("Performing post-initialization checks...")
-            # Delegate status check to setup handler if available
-            if hasattr(self, '_env_config_handler') and hasattr(self._env_config_handler, 'setup_handler'):
-                setup_handler = self._env_config_handler.setup_handler
-                
-                # Perform initial status check using setup handler
-                setup_handler._perform_initial_status_check(ui_components)
-                
-                # Check if we should sync config templates
-                if setup_handler._should_sync_config_templates():
-                    self.logger.info("Drive is mounted and setup is complete, syncing config templates...")
-                    # Use the new sync method with UI updates enabled for the initializer
-                    setup_handler.sync_config_templates(
-                        force_overwrite=False,
-                        update_ui=True,
-                        ui_components=ui_components
-                    )
-                
-                
-            else:
-                self.logger.warning("Setup handler not available for post-initialization checks")
+            self.logger.info("🔍 Melakukan post-initialization checks...")
             
-            self.logger.info("Post-initialization checks completed successfully")
-            return ui_components
+            # Get setup handler
+            setup_handler = self._handlers.get('setup')
+            if not setup_handler:
+                self.logger.warning("⚠️ Setup handler tidak tersedia")
+                return
+            
+            # Perform initial status check
+            setup_handler.perform_initial_status_check(self.ui_components)
+            
+            # Check if we should sync config templates
+            if setup_handler.should_sync_config_templates():
+                self.logger.info("📋 Drive mounted dan setup complete, syncing config templates...")
+                
+                # Sync dengan UI updates enabled
+                setup_handler.sync_config_templates(
+                    force_overwrite=False,
+                    update_ui=True,
+                    ui_components=self.ui_components
+                )
+            
+            self.logger.info("✅ Post-initialization checks selesai")
             
         except Exception as e:
-            error_msg = f"Error during post-initialization checks: {str(e)}"
+            error_msg = f"❌ Error during post-initialization checks: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            return ui_components
+            # Don't raise, just log error
+    
+    @property
+    def handlers(self) -> Dict[str, Any]:
+        """Get handlers dictionary.
+        
+        Returns:
+            Dictionary berisi handlers
+        """
+        return self._handlers
+    
+    def get_handler(self, handler_name: str) -> Optional[Any]:
+        """Get specific handler by name.
+        
+        Args:
+            handler_name: Nama handler yang diinginkan
+            
+        Returns:
+            Handler instance atau None jika tidak ditemukan
+        """
+        return self._handlers.get(handler_name)
 
 
 def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
-    """Initialize and return the environment configuration UI.
+    """Initialize dan return environment configuration UI.
     
-    This is the main entry point for the environment configuration UI.
-    It creates an instance of EnvConfigInitializer and initializes it with the provided config.
+    Ini adalah main entry point untuk environment configuration UI.
+    Membuat instance EnvConfigInitializer dan initialize dengan config yang diberikan.
     
     Args:
         config: Optional configuration dictionary
-        **kwargs: Additional keyword arguments to pass to the initializer
+        **kwargs: Additional keyword arguments untuk initializer
         
     Returns:
-        The initialized UI widget (success or error) from EnvConfigInitializer
+        Initialized UI widget dari EnvConfigInitializer
     """
-    # Get module logger for initialization
-    logger = get_module_logger('smartcash.ui.setup.env_config')
-    logger.debug("Initializing environment configuration UI")
+    # Get module logger
+    logger = get_enhanced_logger('smartcash.ui.setup.env_config')
+    logger.debug("🚀 Initializing environment configuration UI")
     
-    # Create and initialize the initializer
-    initializer = EnvConfigInitializer()
-    return initializer.initialize(config=config, **kwargs)
+    try:
+        # Create dan initialize initializer
+        initializer = EnvConfigInitializer()
+        return initializer.initialize(config=config, **kwargs)
+        
+    except Exception as e:
+        logger.error(f"❌ Gagal initialize env config UI: {str(e)}", exc_info=True)
+        # Return error UI component
+        from smartcash.ui.components.error_display import create_error_display
+        return create_error_display(f"Gagal initialize environment configuration: {str(e)}")

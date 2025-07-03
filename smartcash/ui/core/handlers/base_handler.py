@@ -1,83 +1,112 @@
-# smartcash/ui/core/handlers/base_handler.py
 """
-Base handler class for all UI handlers in SmartCash.
-Provides common functionality and interface for all handlers.
+File: smartcash/ui/core/handlers/base_handler.py
+Deskripsi: Base handler dengan fail-fast principle dan centralized error handling
 """
-from typing import Dict, Any, Optional, Callable
+
 import logging
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, Callable, Union, List
+from smartcash.ui.utils.ui_logger import get_module_logger
+from smartcash.ui.core.shared.ui_component_manager import UIComponentManager
 
-from smartcash.ui.core.shared.logger import get_ui_logger
-from smartcash.ui.core.shared.error_handler import get_ui_error_handler
-from smartcash.ui.core.shared.ui_component_manager import get_ui_component_manager
-
-
-class BaseHandler:
-    """
-    Base handler class for all UI handlers.
+class BaseHandler(ABC):
+    """Base handler dengan fail-fast principle dan centralized error handling."""
     
-    This class provides common functionality and interface for all handlers
-    in the SmartCash UI system. It handles basic initialization, logging,
-    and error handling.
-    """
-    
-    def __init__(
-        self,
-        ui_components: Dict[str, Any],
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the base handler.
+    def __init__(self, module_name: str, parent_module: str = None):
+        """Initialize base handler.
         
         Args:
-            ui_components: Dictionary containing UI components
-            logger: Optional logger instance, will create one if not provided
+            module_name: Nama module (e.g., 'downloader')
+            parent_module: Parent module (e.g., 'dataset')
         """
-        self.ui_components = ui_components
+        self.module_name = module_name
+        self.parent_module = parent_module
+        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
-        # Set up centralized logger and error handler
-        self.logger = logger or get_ui_logger(
-            ui_components=ui_components,
-            # Auto-determine suppression based on log_output readiness
-            suppress_logs=None
-        )
-        self.error_handler = get_ui_error_handler(self.logger)
+        # Setup logger
+        from smartcash.ui.core.shared.logger import get_enhanced_logger
+        self.logger = get_enhanced_logger(f"smartcash.ui.{self.full_module_name}")
         
-        # Initialize UI component manager
-        self.ui_component_manager = get_ui_component_manager(ui_components, self.logger)
+        # Component manager
+        self._component_manager = UIComponentManager(self.full_module_name)
         
-        self.setup()
+        # Internal state
+        self._is_initialized = False
+        self._error_count = 0
+        self._last_error = None
         
-    def setup(self) -> None:
+        self.logger.debug(f"🚀 Initialized {self.__class__.__name__} for {self.full_module_name}")
+    
+    @property
+    def is_initialized(self) -> bool:
+        return self._is_initialized
+    
+    @property
+    def error_count(self) -> int:
+        return self._error_count
+    
+    @property
+    def last_error(self) -> Optional[str]:
+        return self._last_error
+    
+    def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
+        """Centralized error handling dengan fail-fast principle.
+        
+        Args:
+            error_msg: Error message
+            exc_info: Include exception info
+            **kwargs: Additional context
+            
+        Raises:
+            RuntimeError: Always raises untuk fail-fast behavior
         """
-        Set up the handler after initialization.
+        self._error_count += 1
+        self._last_error = error_msg
         
-        This method is called during initialization and can be overridden
-        by subclasses to perform additional setup tasks.
-        """
+        # Log error dengan context
+        context = f" | Context: {kwargs}" if kwargs else ""
+        self.logger.error(f"❌ {error_msg}{context}", exc_info=exc_info)
+        
+        # Fail-fast: raise exception
+        raise RuntimeError(f"Handler Error [{self.full_module_name}]: {error_msg}")
+    
+    def reset_error_state(self) -> None:
+        """Reset error state."""
+        self._error_count = 0
+        self._last_error = None
+        self.logger.debug(f"🔄 Reset error state for {self.full_module_name}")
+    
+    def get_component(self, name: str, default: Any = None) -> Any:
+        """Get component from manager."""
+        return self._component_manager.get_component(name, default)
+    
+    def add_component(self, name: str, component: Any, shared: bool = False) -> None:
+        """Add component to manager."""
+        if not self._component_manager.add_component(name, component, shared):
+            self.handle_error(f"Failed to add component '{name}'")
+    
+    def remove_component(self, name: str) -> bool:
+        """Remove component from manager."""
+        return self._component_manager.remove_component(name)
+    
+    def get_component_stats(self) -> Dict[str, Any]:
+        """Get component statistics."""
+        return self._component_manager.get_stats()
+    
+    @abstractmethod
+    def initialize(self) -> Dict[str, Any]:
+        """Initialize handler (to be implemented by subclasses)."""
         pass
     
-    def handle_error(self, error: Exception, context: str = "", show_traceback: bool = True, create_fallback_ui: bool = True) -> Dict[str, Any]:
-        """
-        Handle errors that occur during handler operations.
-        
-        Args:
-            error: The exception that was raised
-            context: Additional context about where the error occurred
-            show_traceback: Whether to show the traceback in the logs
-            create_fallback_ui: Whether to create fallback UI components
-            
-        Returns:
-            Dict with error information
-        """
-        # Use centralized error handler
-        result = self.error_handler.handle_error(
-            error=error,
-            context=context,
-            show_traceback=show_traceback,
-            create_fallback_ui=create_fallback_ui
-        )
-        
-        # Add handler information
-        result["handler"] = self.__class__.__name__
-        
-        return result
+    def cleanup(self) -> None:
+        """Cleanup handler resources."""
+        self._component_manager.cleanup()
+        self.logger.debug(f"🧹 Cleaned up {self.__class__.__name__}")
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup()
+        if exc_type is not None:
+            self.handle_error(f"Exception in context: {exc_val}", exc_info=True)

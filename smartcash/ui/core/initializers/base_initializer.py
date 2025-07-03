@@ -1,199 +1,114 @@
-# smartcash/ui/core/initializers/base_initializer.py
 """
-Base initializer class for all UI initializers in SmartCash.
-Provides common functionality and lifecycle hooks for UI initialization.
+File: smartcash/ui/core/initializers/base_initializer.py
+Deskripsi: Base initializer dengan fail-fast principle
 """
-from typing import Dict, Any, Optional
-import logging
+
 from abc import ABC, abstractmethod
-
-from smartcash.ui.core.shared.logger import get_ui_logger
-from smartcash.ui.core.shared.error_handler import get_ui_error_handler
-from smartcash.ui.core.shared.ui_component_manager import get_ui_component_manager
-from smartcash.ui.decorators import safe_ui_operation
-
+from typing import Dict, Any, Optional
+from smartcash.ui.utils.ui_logger import get_module_logger
 
 class BaseInitializer(ABC):
-    """
-    Base initializer class for all UI initializers.
+    """Base initializer dengan fail-fast principle."""
     
-    This class provides common functionality and lifecycle hooks for UI initialization
-    in the SmartCash UI system. It handles basic initialization, logging,
-    error handling, and defines the initialization lifecycle.
-    """
-    
-    def __init__(
-        self,
-        module_name: str,
-        parent_module: Optional[str] = None,
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the base initializer.
-        
-        Args:
-            module_name: Name of the module being initialized
-            parent_module: Optional parent module name
-            logger: Optional logger instance, will create one if not provided
-        """
+    def __init__(self, module_name: str, parent_module: str = None):
         self.module_name = module_name
         self.parent_module = parent_module
+        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
-        # UI components dictionary
-        self.ui_components = {}
+        from smartcash.ui.core.shared.logger import get_enhanced_logger
+        self.logger = get_enhanced_logger(f"smartcash.ui.{self.full_module_name}")
         
-        # Initialize UI component manager
-        self.ui_component_manager = get_ui_component_manager(self.ui_components, self.logger)
+        self._is_initialized = False
+        self._initialization_result = None
+        self._error_count = 0
+        self._last_error = None
         
-        # Set up centralized logger and error handler
-        log_path = f"{parent_module}.{module_name}" if parent_module else module_name
-        self.logger = get_ui_logger(
-            module_name=module_name,
-            parent_module=f"ui.{parent_module}" if parent_module else "ui",
-            ui_components=self.ui_components,
-            # Auto-determine suppression based on log_output readiness
-            suppress_logs=None
-        )
-        
-        self.error_handler = get_ui_error_handler(
-            module_name=module_name,
-            parent_module=f"ui.{parent_module}" if parent_module else "ui",
-            ui_components=self.ui_components,
-            logger=self.logger
-        )
-        
-        # Initialization state
-        self.is_initialized = False
-        self.has_error = False
-        self.error_info = None
+        self.logger.debug(f"🚀 Initialized {self.__class__.__name__} for {self.full_module_name}")
     
-    def initialize(self) -> Dict[str, Any]:
-        """
-        Initialize the UI components.
-        
-        This method orchestrates the initialization lifecycle:
-        1. Pre-initialization checks
-        2. Create UI components
-        3. Set up handlers
-        4. Post-initialization checks
-        
-        Returns:
-            Dictionary containing UI components or error information
-        """
-        try:
-            self.logger.info(f"Initializing {self.module_name} module...")
-            
-            # Reset state
-            self.is_initialized = False
-            self.has_error = False
-            self.error_info = None
-            
-            # 1. Pre-initialization checks
-            if not self.pre_initialization_checks():
-                self.logger.error(f"Pre-initialization checks failed for {self.module_name}")
-                return self.ui_components
-            
-            # 2. Create UI components
-            self.ui_components = self.create_ui_components()
-            if not self.ui_components:
-                self.logger.error(f"Failed to create UI components for {self.module_name}")
-                return self.ui_components
-            
-            # 3. Set up handlers
-            setup_result = self.setup_handlers()
-            if not setup_result.get("status", False):
-                self.logger.error(f"Failed to set up handlers for {self.module_name}")
-                return self.ui_components
-            
-            # 4. Post-initialization checks
-            if not self.post_initialization_checks():
-                self.logger.error(f"Post-initialization checks failed for {self.module_name}")
-                return self.ui_components
-            
-            # Mark as initialized
-            self.is_initialized = True
-            self.logger.info(f"{self.module_name} module initialized successfully")
-            
-            return self.ui_components
-        except Exception as e:
-            return self.handle_error(e, f"Error initializing {self.module_name} module")
+    @property
+    def is_initialized(self) -> bool:
+        return self._is_initialized
     
-    @safe_ui_operation(operation_name="pre_initialization_checks", log_level="error", fallback_return=False)
-    def pre_initialization_checks(self) -> bool:
-        """
-        Perform checks before initialization.
-        
-        Returns:
-            True if checks pass, False otherwise
-        """
-        # This method can be overridden by subclasses
-        return True
+    @property
+    def initialization_result(self) -> Optional[Dict[str, Any]]:
+        return self._initialization_result
     
-    @abstractmethod
-    def create_ui_components(self) -> Dict[str, Any]:
-        """
-        Create UI components.
+    @property
+    def error_count(self) -> int:
+        return self._error_count
+    
+    @property
+    def last_error(self) -> Optional[str]:
+        return self._last_error
+    
+    def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
+        """Handle initialization errors dengan fail-fast principle."""
+        self._error_count += 1
+        self._last_error = error_msg
         
-        This method must be implemented by subclasses.
+        # Log error dengan context
+        context = f" | Context: {kwargs}" if kwargs else ""
+        self.logger.error(f"❌ {error_msg}{context}", exc_info=exc_info)
         
-        Returns:
-            Dictionary containing UI components
-        """
+        # Fail-fast: raise exception
+        raise RuntimeError(f"Initialization Error [{self.full_module_name}]: {error_msg}")
+    
+    def pre_initialize_checks(self) -> None:
+        """Perform pre-initialization checks dengan fail-fast."""
+        # Default implementation - can be overridden
+        # Subclasses should raise exceptions if checks fail
         pass
     
-    @abstractmethod
-    def setup_handlers(self) -> Dict[str, Any]:
-        """
-        Set up handlers for UI components.
-        
-        This method must be implemented by subclasses.
-        
-        Returns:
-            Dict with setup status and any error information
-        """
+    def post_initialize_cleanup(self) -> None:
+        """Perform post-initialization cleanup."""
+        # Default implementation - can be overridden
         pass
     
-    @safe_ui_operation(operation_name="post_initialization_checks", log_level="error", fallback_return=False)
-    def post_initialization_checks(self) -> bool:
-        """
-        Perform checks after initialization.
+    def run_initialization(self) -> Dict[str, Any]:
+        """Run full initialization process dengan fail-fast."""
+        # Pre-checks
+        self.pre_initialize_checks()
         
-        Returns:
-            True if checks pass, False otherwise
-        """
-        # This method can be overridden by subclasses
-        return True
-    
-    def handle_error(self, error: Exception, context: str = "", show_traceback: bool = True, create_fallback_ui: bool = True) -> Dict[str, Any]:
-        """
-        Handle errors that occur during initialization.
+        # Main initialization
+        result = self.initialize()
         
-        Args:
-            error: The exception that was raised
-            context: Additional context about where the error occurred
-            show_traceback: Whether to show the traceback in the logs
-            create_fallback_ui: Whether to create fallback UI components
-            
-        Returns:
-            Dict with error information
-        """
-        # Use centralized error handler
-        result = self.error_handler.handle_error(
-            error=error,
-            context=context,
-            show_traceback=show_traceback,
-            create_fallback_ui=create_fallback_ui
-        )
+        # Validate result
+        if not isinstance(result, dict):
+            self.handle_error("Initialize method must return a dictionary")
         
-        # Update state
-        self.has_error = True
-        self.error_info = {
-            "error": str(error),
-            "error_type": type(error).__name__,
-            "context": context
-        }
+        if not result.get('success', False):
+            error_msg = result.get('error', 'Unknown initialization error')
+            self.handle_error(f"Initialization failed: {error_msg}")
         
-        # Add initializer information
-        result["initializer"] = self.__class__.__name__
+        # Mark as initialized
+        self._is_initialized = True
+        self._initialization_result = result
         
+        # Post-cleanup
+        self.post_initialize_cleanup()
+        
+        self.logger.info(f"✅ Successfully initialized {self.full_module_name}")
         return result
+    
+    def reset_state(self) -> None:
+        """Reset initializer state."""
+        self._is_initialized = False
+        self._initialization_result = None
+        self._error_count = 0
+        self._last_error = None
+        self.logger.debug(f"🔄 Reset state for {self.full_module_name}")
+    
+    @abstractmethod
+    def initialize(self) -> Dict[str, Any]:
+        """Initialize the module (to be implemented by subclasses)."""
+        pass
+    
+    def get_initialization_stats(self) -> Dict[str, Any]:
+        """Get initialization statistics."""
+        return {
+            'module': self.full_module_name,
+            'is_initialized': self._is_initialized,
+            'error_count': self._error_count,
+            'last_error': self._last_error,
+            'has_result': self._initialization_result is not None
+        }

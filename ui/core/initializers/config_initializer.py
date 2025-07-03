@@ -1,239 +1,228 @@
-# smartcash/ui/core/initializers/config_initializer.py
 """
-Config initializer class for initializing configuration-specific UI components.
-Extends BaseInitializer with configuration-specific capabilities.
+File: smartcash/ui/core/initializers/config_initializer.py
+Deskripsi: Initializer dengan configuration management terintegrasi.
+Extends BaseInitializer dengan config loading dan validation.
 """
-from typing import Dict, Any, Optional, Callable, List, Union, Type
-import logging
-import importlib
-import copy
 
-from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
-from smartcash.ui.core.shared.logger import get_ui_logger
-from smartcash.ui.decorators import safe_ui_operation
+from typing import Dict, Any, Optional, Type
+from pathlib import Path
+
+from smartcash.ui.core.initializers.base_initializer import BaseInitializer
+from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
+from smartcash.ui.handlers.config_handlers import ConfigHandler as LegacyConfigHandler
 
 
-class ConfigInitializer(ModuleInitializer):
-    """
-    Initializer for configuration-specific UI components.
+class ConfigurableInitializer(BaseInitializer):
+    """Initializer dengan configuration management.
     
-    This class extends ModuleInitializer with configuration-specific capabilities,
-    including config loading, saving, and validation.
+    Features:
+    - 📋 Auto config loading saat init
+    - ✅ Config validation
+    - 🔄 Config-UI synchronization
+    - 💾 Config persistence support
     """
     
-    def __init__(
-        self,
-        module_name: str,
-        parent_module: str,
-        default_config: Optional[Dict[str, Any]] = None,
-        persistence_enabled: bool = True,
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the config initializer.
+    def __init__(self, 
+                 module_name: str, 
+                 parent_module: Optional[str] = None,
+                 config_handler_class: Optional[Type] = None,
+                 enable_shared_config: bool = True):
+        """Initialize dengan config support.
         
         Args:
-            module_name: Name of the module being initialized
-            parent_module: Parent module name (e.g., 'dataset', 'setup')
-            default_config: Optional default configuration dictionary
-            persistence_enabled: Whether to enable configuration persistence
-            logger: Optional logger instance
+            module_name: Nama module
+            parent_module: Parent module untuk shared config
+            config_handler_class: Custom config handler class
+            enable_shared_config: Enable shared config antar modules
         """
-        super().__init__(module_name, parent_module, logger)
+        super().__init__(module_name, parent_module)
         
-        # Configuration state
-        self._default_config = copy.deepcopy(default_config) if default_config else {}
-        self._config = copy.deepcopy(self._default_config)
-        self.persistence_enabled = persistence_enabled
+        # Setup config handler
+        if config_handler_class:
+            # Use custom handler (untuk backward compatibility)
+            self.config_handler = config_handler_class(module_name)
+        else:
+            # Use new SharedConfigHandler
+            self.config_handler = SharedConfigHandler(
+                module_name, 
+                parent_module,
+                enable_sharing=enable_shared_config
+            )
         
-        # Config manager
-        self.config_manager = None
-        
-        # Ensure UI components include log output/accordion if not already present
-        if 'log_output' not in self.ui_components:
-            self.ui_components['log_output'] = None
-        if 'log_accordion' not in self.ui_components:
-            self.ui_components['log_accordion'] = None
+        self.logger.debug(f"📋 ConfigurableInitializer setup with {type(self.config_handler).__name__}")
     
-    def setup_handlers(self) -> Dict[str, Any]:
-        """
-        Set up handlers for UI components.
-        
-        Returns:
-            Dict with setup status and any error information
-        """
-        # First set up the UI handler from the parent class
-        result = super().setup_handlers()
-        if not result.get("success", False):
-            return result
-        
-        try:
-            # Set up config manager if persistence is enabled
-            if self.persistence_enabled:
-                self._setup_config_manager()
-            
-            # Load initial config
-            self._load_initial_config()
-            
-            return {
-                "status": True,  # Using 'status' instead of 'success' for consistency
-                "initializer": self.__class__.__name__
-            }
-        except Exception as e:
-            return {
-                "status": False,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "initializer": self.__class__.__name__
-            }
-    
-    def _setup_config_manager(self) -> None:
-        """
-        Set up the configuration manager.
-        
-        This method can be overridden by subclasses to set up
-        a custom configuration manager.
-        """
-        # Try to dynamically load the shared config manager
-        try:
-            manager_path = "smartcash.ui.core.shared.shared_config_manager"
-            manager_module = importlib.import_module(manager_path)
-            
-            if hasattr(manager_module, "SharedConfigManager"):
-                manager_class = getattr(manager_module, "SharedConfigManager")
-                self.config_manager = manager_class(
-                    module_name=self.module_name,
-                    parent_module=self.parent_module,
-                    logger=self.logger
-                )
-        except (ImportError, AttributeError) as e:
-            self.logger.debug(f"Could not load shared config manager: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Error setting up config manager: {str(e)}")
-    
-    def _load_initial_config(self) -> None:
-        """Load the initial configuration."""
-        if self.persistence_enabled and self.config_manager:
-            # Try to load config from persistent storage
-            try:
-                loaded_config = self.config_manager.load_config()
-                if loaded_config:
-                    self._config = loaded_config
-                    self.update_ui_from_config(self._config)
-                    return
-            except Exception as e:
-                self.logger.warning(f"Failed to load config from persistent storage: {str(e)}")
-        
-        # Fall back to default config
-        self._config = copy.deepcopy(self._default_config)
-        self.update_ui_from_config(self._config)
-    
-    @safe_ui_operation(operation_name="load_config", log_level="error")
-    def load_config(self) -> Dict[str, Any]:
-        """
-        Load configuration from persistent storage.
-        
-        Returns:
-            Loaded configuration dictionary
-        """
-        if not self.persistence_enabled:
-            return copy.deepcopy(self._config)
-        
-        if not self.config_manager:
-            self.logger.warning("Config manager not initialized, returning in-memory config")
-            return copy.deepcopy(self._config)
-        
-        try:
-            loaded_config = self.config_manager.load_config()
-            if loaded_config:
-                self._config = loaded_config
-                self.update_ui_from_config(self._config)
-            return copy.deepcopy(self._config)
-        except Exception as e:
-            self.logger.error(f"Failed to load config: {str(e)}")
-            return copy.deepcopy(self._config)
-    
-    @safe_ui_operation(operation_name="save_config", log_level="error")
-    def save_config(self) -> Dict[str, Any]:
-        """
-        Save configuration to persistent storage.
-        
-        Returns:
-            Dict with save status and any error information
-        """
-        # Extract current config from UI
-        current_config = self.extract_config_from_ui()
-        
-        # Validate config
-        if not self.validate_config(current_config):
-            return {
-                "status": False,
-                "error": "Invalid configuration",
-                "initializer": self.__class__.__name__
-            }
-        
-        # Update in-memory config
-        self._config = current_config
-        
-        # Save to persistent storage if enabled
-        if self.persistence_enabled and self.config_manager:
-            try:
-                self.config_manager.save_config(self._config)
-                return {
-                    "status": True,
-                    "initializer": self.__class__.__name__
-                }
-            except Exception as e:
-                return {
-                    "status": False,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "initializer": self.__class__.__name__
-                }
-        
-        # If persistence is disabled, just return success
-        return {
-            "status": True,
-            "initializer": self.__class__.__name__
-        }
-    
-    @safe_ui_operation(operation_name="reset_config", log_level="error")
-    def reset_config(self) -> Dict[str, Any]:
-        """
-        Reset configuration to defaults.
-        
-        Returns:
-            Dict with operation status
-        """
-        # Reset in-memory config
-        self._config = copy.deepcopy(self._default_config)
-        
-        # Update UI
-        self.update_ui_from_config(self._config)
-        
-        # Save to persistent storage if enabled
-        if self.persistence_enabled and self.config_manager:
-            try:
-                self.config_manager.save_config(self._config)
-            except Exception as e:
-                return {
-                    "status": False,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "initializer": self.__class__.__name__
-                }
-        
-        return {
-            "status": True,
-            "initializer": self.__class__.__name__
-        }
+    # === Config Properties ===
     
     @property
     def config(self) -> Dict[str, Any]:
-        """Get the current configuration."""
-        return copy.deepcopy(self._config)
+        """Get current configuration."""
+        return self.config_handler.config
     
-    @property
-    def default_config(self) -> Dict[str, Any]:
-        """Get the default configuration."""
-        return copy.deepcopy(self._default_config)
+    @config.setter
+    def config(self, new_config: Dict[str, Any]) -> None:
+        """Set configuration."""
+        self.config_handler.config = new_config
+    
+    # === Extended Initialization ===
+    
+    def pre_initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> None:
+        """Load configuration before initialization."""
+        super().pre_initialize(config, **kwargs)
+        
+        # Load config
+        if config:
+            # Use provided config
+            self.logger.info(f"📋 Using provided config: {len(config)} items")
+            self.config = config
+        else:
+            # Load from file
+            self.logger.info("📋 Loading configuration from file...")
+            self.load_config()
+    
+    def post_initialize(self, **kwargs) -> None:
+        """Sync UI dengan config after initialization."""
+        super().post_initialize(**kwargs)
+        
+        # Sync UI jika handler support
+        if hasattr(self.config_handler, 'update_ui_from_config'):
+            try:
+                self.config_handler.set_ui_components(self._ui_components)
+                self.config_handler.update_ui_from_config(self.config)
+                self.logger.info("🔄 UI synced with configuration")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Failed to sync UI with config: {e}")
+    
+    # === Config Operations ===
+    
+    def load_config(self, name: Optional[str] = None) -> bool:
+        """Load configuration dari file.
+        
+        Args:
+            name: Optional config name
+            
+        Returns:
+            True jika berhasil load
+        """
+        try:
+            # Check jika handler support load
+            if hasattr(self.config_handler, 'load_config'):
+                return self.config_handler.load_config(name)
+            else:
+                self.logger.warning("⚠️ Config handler doesn't support loading")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load config: {e}")
+            return False
+    
+    def save_config(self, name: Optional[str] = None) -> bool:
+        """Save configuration ke file.
+        
+        Args:
+            name: Optional config name
+            
+        Returns:
+            True jika berhasil save
+        """
+        try:
+            # Extract dari UI dulu jika ada
+            if hasattr(self.config_handler, 'extract_config_from_ui'):
+                self.config_handler.sync_config_with_ui()
+            
+            # Save
+            if hasattr(self.config_handler, 'save_config'):
+                return self.config_handler.save_config(name)
+            else:
+                self.logger.warning("⚠️ Config handler doesn't support saving")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save config: {e}")
+            return False
+    
+    def reset_config(self) -> None:
+        """Reset configuration ke defaults."""
+        try:
+            self.config_handler.reset_config()
+            
+            # Update UI jika ada
+            if hasattr(self.config_handler, 'update_ui_from_config'):
+                self.config_handler.update_ui_from_config(self.config)
+                
+            self.logger.info("🔄 Configuration reset to defaults")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to reset config: {e}")
+    
+    # === Config Validation ===
+    
+    def validate_config(self, config: Optional[Dict[str, Any]] = None) -> bool:
+        """Validate configuration.
+        
+        Args:
+            config: Config untuk validate (default: current config)
+            
+        Returns:
+            True jika valid
+        """
+        config = config or self.config
+        
+        try:
+            return self.config_handler.validate_config(config)
+        except Exception as e:
+            self.logger.error(f"❌ Config validation error: {e}")
+            return False
+    
+    def get_config_errors(self, config: Optional[Dict[str, Any]] = None) -> List[str]:
+        """Get list of config validation errors.
+        
+        Override di subclass untuk custom validation.
+        """
+        return []
+    
+    # === Utility Methods ===
+    
+    def get_config_value(self, key: str, default: Any = None) -> Any:
+        """Get config value dengan dot notation."""
+        return self.config_handler.get_config_value(key, default)
+    
+    def set_config_value(self, key: str, value: Any) -> None:
+        """Set config value dengan dot notation."""
+        self.config_handler.set_config_value(key, value)
+    
+    def export_config(self) -> Dict[str, Any]:
+        """Export current configuration untuk sharing."""
+        return {
+            'module': self.full_module_name,
+            'version': getattr(self.config_handler, 'CONFIG_VERSION', '1.0.0'),
+            'config': self.config,
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def import_config(self, config_data: Dict[str, Any]) -> bool:
+        """Import configuration dari export."""
+        try:
+            if 'config' not in config_data:
+                raise ValueError("Invalid config data: missing 'config' key")
+            
+            # Validate version jika ada
+            if 'version' in config_data:
+                current_version = getattr(self.config_handler, 'CONFIG_VERSION', '1.0.0')
+                if config_data['version'] != current_version:
+                    self.logger.warning(
+                        f"⚠️ Version mismatch: {config_data['version']} != {current_version}"
+                    )
+            
+            # Import config
+            self.config = config_data['config']
+            
+            # Update UI
+            if hasattr(self.config_handler, 'update_ui_from_config'):
+                self.config_handler.update_ui_from_config(self.config)
+            
+            self.logger.info("📥 Configuration imported successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to import config: {e}")
+            return False

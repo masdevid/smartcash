@@ -1,218 +1,376 @@
-# smartcash/ui/core/handlers/ui_handler.py
 """
-Module UI handler class for managing module-specific UI components and operations.
-Extends BaseHandler with UI-specific capabilities.
+File: smartcash/ui/core/handlers/ui_handler.py
+
+UI Handler - Container-Aware Updates untuk layout berbasis container.
 """
-from typing import Dict, Any, Optional, Callable, Union, Type
+
+from typing import Dict, Any, Optional, List, Callable
 import logging
-import importlib
-import traceback
+from abc import ABC
 
 from smartcash.ui.core.handlers.base_handler import BaseHandler
-from smartcash.ui.core.shared.logger import get_ui_logger
-from smartcash.ui.utils.fallback_utils import create_fallback_ui, FallbackConfig
-from smartcash.ui.decorators import safe_ui_operation
-from smartcash.ui.components.error.error_component import create_error_component
 
 
 class UIHandler(BaseHandler):
-    """
-    Handler for managing module-specific UI components and operations.
+    """Handler dengan UI-specific utilities yang container-aware."""
     
-    This class extends BaseHandler with UI-specific capabilities, including
-    dynamic loading of module-specific config components, UI updates, and
-    error handling with proper UI feedback.
-    """
-    
-    def __init__(
-        self,
-        ui_components: Dict[str, Any],
-        parent_module: str,
-        module_name: str,
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the module UI handler.
+    def __init__(self, module_name: str, parent_module: str = None):
+        super().__init__(module_name, parent_module)
+        self.ui_components = {}
+        
+    def _find_component(self, component_type: str, attribute_name: str = None) -> Optional[Any]:
+        """Find component dalam container hierarchy.
         
         Args:
-            ui_components: Dictionary containing UI components
-            parent_module: Parent module name (e.g., 'dataset', 'setup')
-            module_name: Module name (e.g., 'downloader', 'env_config')
-            logger: Optional logger instance
+            component_type: Type/name component yang dicari
+            attribute_name: Attribute name jika berbeda dari component_type
+            
+        Returns:
+            Component instance atau None
         """
-        self.parent_module = parent_module
-        self.module_name = module_name
-        self.logger = logger or get_ui_logger(
-            module_name=module_name,
-            parent_module=f"ui.{parent_module}"
-        )
+        attr_name = attribute_name or component_type
         
-        # Initialize config components
-        self._config_handler = None
-        self._config_extractor = None
-        self._config_updater = None
-        self._config_validator = None
-        self._config_defaults = None
+        # Direct access
+        if component_type in self.ui_components:
+            return self.ui_components[component_type]
         
-        super().__init__(ui_components, self.logger)
+        # Container-based search
+        container_keys = ['main_container', 'summary_container', 'action_container', 'form_container', 'footer_container']
+        
+        for container_key in container_keys:
+            if container_key in self.ui_components:
+                container = self.ui_components[container_key]
+                
+                # Check container attributes
+                if hasattr(container, attr_name):
+                    return getattr(container, attr_name)
+                
+                # Check container content
+                if hasattr(container, 'content') and hasattr(container.content, attr_name):
+                    return getattr(container.content, attr_name)
+                
+                # Check container children
+                if hasattr(container, 'children'):
+                    for child in container.children:
+                        if hasattr(child, attr_name):
+                            return getattr(child, attr_name)
+                        # Check by class name
+                        if getattr(child, '__class__', None).__name__ == component_type:
+                            return child
+        
+        return None
     
-    def setup(self) -> None:
-        """Set up the handler after initialization."""
+    def update_status(self, message: str, status_type: str = 'info'):
+        """Update status panel dengan container-aware access."""
         try:
-            self._load_config_components()
+            status_panel = self._find_component('status_panel', 'status_panel')
+            if status_panel and hasattr(status_panel, 'update'):
+                status_panel.update(message, status_type)
+                return
+            
+            # Fallback: log status
+            self.logger.info(f"📢 Status: {message} ({status_type})")
+            
         except Exception as e:
-            self.logger.error(f"Failed to load config components: {str(e)}")
+            self.logger.error(f"❌ Failed to update status: {str(e)}")
     
-    @safe_ui_operation(operation_name="load_config_components", log_level="error")
-    def _load_config_components(self) -> None:
-        """
-        Dynamically load module-specific config components.
-        
-        This method attempts to load the following components:
-        - Config handler
-        - Config extractor
-        - Config updater
-        - Config validator
-        - Config defaults
-        """
-        if not self.parent_module or not self.module_name:
-            self.logger.warning("Parent module or module name not provided, skipping config component loading")
-            return
-        
+    def update_progress(self, value: float, message: str = None):
+        """Update progress tracker dengan container-aware access."""
         try:
-            # Try to load config handler
-            handler_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.configs.handler"
-            handler_module = importlib.import_module(handler_path)
-            if hasattr(handler_module, "get_config_handler"):
-                self._config_handler = handler_module.get_config_handler(self.ui_components)
+            progress_tracker = self._find_component('ProgressTracker', 'progress_tracker')
+            if progress_tracker and hasattr(progress_tracker, 'update'):
+                progress_tracker.update(value, message)
+                return
             
-            # Try to load config extractor
-            extractor_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.configs.extractor"
-            extractor_module = importlib.import_module(extractor_path)
-            if hasattr(extractor_module, "extract_config"):
-                self._config_extractor = extractor_module.extract_config
+            # Fallback: log progress
+            self.logger.info(f"📊 Progress: {value*100:.1f}% - {message or 'Processing...'}")
             
-            # Try to load config updater
-            updater_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.configs.updater"
-            updater_module = importlib.import_module(updater_path)
-            if hasattr(updater_module, "update_ui"):
-                self._config_updater = updater_module.update_ui
-            
-            # Try to load config validator
-            validator_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.configs.validator"
-            validator_module = importlib.import_module(validator_path)
-            if hasattr(validator_module, "validate_config"):
-                self._config_validator = validator_module.validate_config
-            
-            # Try to load config defaults
-            defaults_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.configs.defaults"
-            defaults_module = importlib.import_module(defaults_path)
-            if hasattr(defaults_module, "DEFAULT_CONFIG"):
-                self._config_defaults = defaults_module.DEFAULT_CONFIG
-        
-        except ImportError as e:
-            self.logger.debug(f"Could not import config component: {str(e)}")
         except Exception as e:
-            self.logger.error(f"Error loading config components: {str(e)}")
+            self.logger.error(f"❌ Failed to update progress: {str(e)}")
     
-    @safe_ui_operation(operation_name="extract_config", log_level="error")
-    def extract_config(self) -> Dict[str, Any]:
-        """
-        Extract configuration from UI components.
-        
-        Returns:
-            Configuration dictionary extracted from UI
-        """
-        if self._config_handler and hasattr(self._config_handler, "extract_config_from_ui"):
-            return self._config_handler.extract_config_from_ui()
-        
-        if self._config_extractor:
-            return self._config_extractor(self.ui_components)
-        
-        self.logger.warning("No config extractor available")
-        return {}
-    
-    @safe_ui_operation(operation_name="update_ui", log_level="error")
-    def update_ui(self, config: Dict[str, Any]) -> None:
-        """
-        Update UI components from configuration.
-        
-        Args:
-            config: Configuration dictionary
-        """
-        if self._config_handler and hasattr(self._config_handler, "update_ui_from_config"):
-            self._config_handler.set_config(config, validate=False)
-            return
-        
-        if self._config_updater:
-            self._config_updater(self.ui_components, config)
-            return
-        
-        self.logger.warning("No config updater available")
-    
-    @safe_ui_operation(operation_name="validate_config", log_level="error", fallback_return=False)
-    def validate_config(self, config: Dict[str, Any]) -> bool:
-        """
-        Validate configuration.
-        
-        Args:
-            config: Configuration to validate
+    def log_message(self, message: str, level: str = 'info'):
+        """Log message dengan container-aware access."""
+        try:
+            log_component = self._find_component('log_accordion', 'log_output')
+            if log_component:
+                self._log_to_component(log_component, message, level)
+                return
             
-        Returns:
-            True if configuration is valid, False otherwise
-        """
-        if self._config_handler and hasattr(self._config_handler, "validate_config"):
-            return self._config_handler.validate_config(config)
-        
-        if self._config_validator:
-            return self._config_validator(config)
-        
-        self.logger.warning("No config validator available")
-        return True
-    
-    @safe_ui_operation(operation_name="reset_config", log_level="error")
-    def reset_config(self) -> Dict[str, Any]:
-        """
-        Reset configuration to defaults.
-        
-        Returns:
-            Dict with operation status
-        """
-        if self._config_handler and hasattr(self._config_handler, "reset_to_defaults"):
-            return self._config_handler.reset_to_defaults()
-        
-        if self._config_defaults and self._config_updater:
-            self._config_updater(self.ui_components, self._config_defaults)
-            return {"success": True, "handler": self.__class__.__name__}
-        
-        self.logger.warning("No config defaults or updater available")
-        return {"success": False, "error": "No config defaults or updater available"}
-    
-    def handle_error(self, error: Exception, context: str = "") -> Dict[str, Any]:
-        """
-        Handle errors with proper UI feedback.
-        
-        Args:
-            error: The exception that was raised
-            context: Additional context about where the error occurred
+            # Fallback: standard logging
+            getattr(self.logger, level.lower(), self.logger.info)(message)
             
-        Returns:
-            Dict containing error information and UI components
-        """
-        error_message = f"{context}: {str(error)}" if context else str(error)
-        self.logger.error(f"Error in {self.__class__.__name__}: {error_message}")
-        
-        # Create error UI component
-        error_ui = create_error_component(
-            error_message=error_message,
-            traceback=traceback.format_exc(),
-            module_name=f"{self.parent_module}.{self.module_name}"
-        )
-        
+        except Exception as e:
+            self.logger.error(f"❌ Failed to log message: {str(e)}")
+    
+    def _log_to_component(self, log_component: Any, message: str, level: str):
+        """Log message ke component."""
+        if hasattr(log_component, 'log') and callable(log_component.log):
+            log_component.log(message, level)
+        elif hasattr(log_component, 'append_stdout') and callable(log_component.append_stdout):
+            log_component.append_stdout(f"[{level.upper()}] {message}\n")
+        elif hasattr(log_component, 'value'):
+            log_component.value += f"<div>[{level.upper()}] {message}</div>"
+        else:
+            self.logger.warning(f"Log component has no supported method")
+    
+    def show_dialog(self, title: str, message: str, dialog_type: str = 'info'):
+        """Show dialog dengan container-aware access."""
+        try:
+            dialog_area = self._find_component('confirmation_area', 'dialog_area')
+            if dialog_area:
+                self._show_dialog(dialog_area, title, message, dialog_type)
+                return
+            
+            # Fallback: log dialog
+            self.logger.info(f"💬 Dialog: {title} - {message}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to show dialog: {str(e)}")
+    
+    def _show_dialog(self, dialog_component: Any, title: str, message: str, dialog_type: str):
+        """Show dialog pada component."""
+        if hasattr(dialog_component, 'show_dialog') and callable(dialog_component.show_dialog):
+            dialog_component.show_dialog(title, message, dialog_type)
+        elif hasattr(dialog_component, 'value'):
+            dialog_component.value = f"<div><h4>{title}</h4><p>{message}</p></div>"
+        else:
+            self.logger.warning(f"Dialog component has no supported method")
+    
+    def update_summary(self, content: str):
+        """Update summary dengan container-aware access."""
+        try:
+            summary_widget = self._find_component('setup_summary', 'summary_container')
+            if summary_widget:
+                self._set_summary_content(summary_widget, content)
+                return
+            
+            # Fallback: log summary
+            self.logger.info(f"📋 Summary: {content}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to update summary: {str(e)}")
+    
+    def _set_summary_content(self, summary_widget: Any, content: str):
+        """Set content pada summary widget."""
+        if hasattr(summary_widget, 'value'):
+            summary_widget.value = content
+        elif hasattr(summary_widget, 'set_content'):
+            summary_widget.set_content(content)
+        else:
+            self.logger.warning(f"Summary widget has no supported method")
+    
+    def enable_button(self, button_name: str, enabled: bool = True):
+        """Enable/disable button dengan container-aware access."""
+        try:
+            button = self._find_component(button_name)
+            if button and hasattr(button, 'disabled'):
+                button.disabled = not enabled
+                return
+            
+            # Fallback: log button state
+            self.logger.info(f"🔘 Button {button_name}: {'enabled' if enabled else 'disabled'}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to update button: {str(e)}")
+    
+    def reset_component(self, component_type: str):
+        """Reset component dengan container-aware access."""
+        try:
+            component = self._find_component(component_type)
+            if component:
+                # Try different reset methods
+                if hasattr(component, 'reset'):
+                    component.reset()
+                elif hasattr(component, 'clear'):
+                    component.clear()
+                elif hasattr(component, 'clear_output'):
+                    component.clear_output(wait=True)
+                elif hasattr(component, 'value'):
+                    component.value = ""
+                return
+            
+            self.logger.warning(f"Component {component_type} not found for reset")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to reset component: {str(e)}")
+    
+    def clear_all_components(self):
+        """Clear all UI components safely."""
+        try:
+            components_to_clear = ['progress_tracker', 'status_panel', 'log_accordion', 'confirmation_area']
+            
+            for component_type in components_to_clear:
+                self.reset_component(component_type)
+                
+            self.logger.info("🧹 All UI components cleared")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to clear all components: {str(e)}")
+    
+    def update_component_safely(self, component_type: str, update_func: Callable):
+        """Update component dengan safe execution."""
+        try:
+            component = self._find_component(component_type)
+            if component:
+                update_func(component)
+            else:
+                self.logger.warning(f"Component {component_type} not found")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to update component {component_type}: {str(e)}")
+    
+    def get_component_status(self, component_type: str) -> Dict[str, Any]:
+        """Get status component dengan container-aware access."""
+        try:
+            component = self._find_component(component_type)
+            if component:
+                return {
+                    'exists': True,
+                    'type': type(component).__name__,
+                    'has_value': hasattr(component, 'value'),
+                    'has_update': hasattr(component, 'update'),
+                    'has_reset': hasattr(component, 'reset')
+                }
+            else:
+                return {
+                    'exists': False,
+                    'type': None
+                }
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to get component status: {str(e)}")
+            return {
+                'exists': False,
+                'error': str(e)
+            }
+    
+    def show_confirmation(self, title: str, message: str, on_confirm: Callable, on_cancel: Callable = None):
+        """Show confirmation dialog dengan container-aware access."""
+        try:
+            # Try to use dialog component
+            dialog_area = self._find_component('confirmation_area', 'dialog_area')
+            if dialog_area and hasattr(dialog_area, 'show_confirmation'):
+                dialog_area.show_confirmation(title, message, on_confirm, on_cancel)
+                return
+            
+            # Fallback: direct confirmation
+            self.logger.info(f"💬 Confirmation: {title} - {message}")
+            if on_confirm:
+                on_confirm()
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to show confirmation: {str(e)}")
+    
+    def update_widget_value(self, widget_name: str, value: Any):
+        """Update widget value dengan container-aware access."""
+        try:
+            widget = self._find_component(widget_name)
+            if widget and hasattr(widget, 'value'):
+                widget.value = value
+                return
+            
+            self.logger.warning(f"Widget {widget_name} not found or has no value attribute")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to update widget value: {str(e)}")
+    
+    def get_widget_value(self, widget_name: str) -> Any:
+        """Get widget value dengan container-aware access."""
+        try:
+            widget = self._find_component(widget_name)
+            if widget and hasattr(widget, 'value'):
+                return widget.value
+            
+            self.logger.warning(f"Widget {widget_name} not found or has no value attribute")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to get widget value: {str(e)}")
+            return None
+    
+    def cleanup(self):
+        """Cleanup UI handler."""
+        try:
+            self.clear_all_components()
+            self.ui_components.clear()
+            super().cleanup()
+            self.logger.debug(f"🧹 Cleaned up UIHandler for {self.full_module_name}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to cleanup UIHandler: {str(e)}")
+
+
+class ModuleUIHandler(UIHandler):
+    """Module-specific UI handler dengan config integration."""
+    
+    def __init__(self, module_name: str, parent_module: str = None):
+        super().__init__(module_name, parent_module)
+        self._status_history = []
+        self._progress_history = []
+    
+    def track_status(self, message: str, status_type: str = 'info'):
+        """Track dan update status dengan history."""
+        self._status_history.append({
+            'message': message,
+            'type': status_type,
+            'timestamp': self._get_timestamp()
+        })
+        self.update_status(message, status_type)
+    
+    def track_progress(self, value: float, message: str = None):
+        """Track dan update progress dengan history."""
+        self._progress_history.append({
+            'value': value,
+            'message': message,
+            'timestamp': self._get_timestamp()
+        })
+        self.update_progress(value, message)
+    
+    def _get_timestamp(self) -> str:
+        """Get current timestamp."""
+        from datetime import datetime
+        return datetime.now().strftime("%H:%M:%S")
+    
+    def get_status_history(self) -> List[Dict[str, Any]]:
+        """Get status history."""
+        return self._status_history.copy()
+    
+    def get_progress_history(self) -> List[Dict[str, Any]]:
+        """Get progress history."""
+        return self._progress_history.copy()
+    
+    def clear_history(self):
+        """Clear status dan progress history."""
+        self._status_history.clear()
+        self._progress_history.clear()
+    
+    def get_ui_state(self) -> Dict[str, Any]:
+        """Get comprehensive UI state."""
         return {
-            "success": False,
-            "error": error_message,
-            "error_type": type(error).__name__,
-            "handler": self.__class__.__name__,
-            "ui": error_ui
+            'status_history': self.get_status_history(),
+            'progress_history': self.get_progress_history(),
+            'components_status': {
+                component_type: self.get_component_status(component_type)
+                for component_type in ['progress_tracker', 'status_panel', 'log_accordion', 'confirmation_area']
+            }
         }
+    
+    def restore_ui_state(self, state: Dict[str, Any]):
+        """Restore UI state dari saved state."""
+        try:
+            if 'status_history' in state:
+                self._status_history = state['status_history']
+            if 'progress_history' in state:
+                self._progress_history = state['progress_history']
+                
+            # Restore latest status dan progress
+            if self._status_history:
+                latest_status = self._status_history[-1]
+                self.update_status(latest_status['message'], latest_status['type'])
+                
+            if self._progress_history:
+                latest_progress = self._progress_history[-1]
+                self.update_progress(latest_progress['value'], latest_progress['message'])
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to restore UI state: {str(e)}")

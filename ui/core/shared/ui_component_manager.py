@@ -1,262 +1,335 @@
-# smartcash/ui/core/shared/ui_component_manager.py
 """
-UI Component Manager for managing shared UI components across modules.
-Provides centralized management of status panel, summary container, and other shared components.
+File: smartcash/ui/core/shared/ui_component_manager.py
+Deskripsi: UI component manager dengan fail-fast principle dan silent fail untuk reset
 """
-from typing import Dict, Any, Optional, List
-import logging
-import ipywidgets as widgets
 
-from smartcash.ui.core.shared.logger import get_ui_logger
-from smartcash.ui.components.status_panel import create_status_panel, update_status_panel
-from smartcash.ui.components.summary_container import create_summary_container, SummaryContainer
-from smartcash.ui.decorators import safe_ui_operation
+import weakref
+from typing import Dict, Any, Optional, List, Type, Union, Callable
+from threading import Lock
+from dataclasses import dataclass
+from smartcash.ui.utils.ui_logger import get_module_logger
 
+@dataclass
+class ComponentInfo:
+    """Component registration info."""
+    name: str
+    instance: Any
+    component_type: Type
+    module: str
+    references: int = 0
+    metadata: Dict[str, Any] = None
+
+class ComponentRegistry:
+    """Global registry untuk shared components dengan fail-fast operations."""
+    
+    _instance = None
+    _lock = Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            self._components: Dict[str, ComponentInfo] = {}
+            self._type_index: Dict[Type, set] = {}
+            self._weak_refs: Dict[str, weakref.ref] = {}
+            self._lock = Lock()
+            self._initialized = True
+    
+    def register(self, name: str, component: Any, component_type: Type = None,
+                module: str = None, metadata: Dict[str, Any] = None) -> None:
+        """Register component dengan fail-fast validation."""
+        if not name:
+            raise ValueError("Component name cannot be empty")
+        
+        if component is None:
+            raise ValueError(f"Component '{name}' cannot be None")
+        
+        with self._lock:
+            if component_type is None:
+                component_type = type(component)
+            
+            info = ComponentInfo(
+                name=name,
+                instance=component,
+                component_type=component_type,
+                module=module or "unknown",
+                metadata=metadata or {}
+            )
+            
+            # Update existing or create new
+            if name in self._components:
+                self._components[name].references += 1
+            else:
+                self._components[name] = info
+                
+                # Update type index
+                if component_type not in self._type_index:
+                    self._type_index[component_type] = set()
+                self._type_index[component_type].add(name)
+                
+                # Create weak reference
+                self._weak_refs[name] = weakref.ref(
+                    component, lambda ref: self._on_component_deleted(name)
+                )
+    
+    def get(self, name: str) -> Optional[Any]:
+        """Get component dengan reference counting."""
+        with self._lock:
+            if info := self._components.get(name):
+                info.references += 1
+                return info.instance
+            return None
+    
+    def get_by_type(self, component_type: Type) -> List[Any]:
+        """Get all components of specific type."""
+        with self._lock:
+            components = []
+            if names := self._type_index.get(component_type):
+                for name in names:
+                    if comp := self.get(name):
+                        components.append(comp)
+            return components
+    
+    def unregister(self, name: str) -> bool:
+        """Unregister component."""
+        with self._lock:
+            if info := self._components.get(name):
+                # Remove from type index
+                if info.component_type in self._type_index:
+                    self._type_index[info.component_type].discard(name)
+                    if not self._type_index[info.component_type]:
+                        del self._type_index[info.component_type]
+                
+                # Remove component
+                del self._components[name]
+                
+                # Remove weak ref
+                if name in self._weak_refs:
+                    del self._weak_refs[name]
+                
+                return True
+            return False
+    
+    def _on_component_deleted(self, name: str) -> None:
+        """Callback when component is garbage collected."""
+        self.unregister(name)
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get registry statistics."""
+        with self._lock:
+            return {
+                'total_components': len(self._components),
+                'total_references': sum(info.references for info in self._components.values()),
+                'weak_refs': len(self._weak_refs)
+            }
 
 class UIComponentManager:
-    """
-    Manager for shared UI components across modules.
+    """Manager untuk UI component lifecycle dengan fail-fast operations."""
     
-    This class provides centralized management of status panel, summary container,
-    and other shared UI components that are used across multiple modules.
-    """
-    
-    def __init__(
-        self,
-        ui_components: Dict[str, Any],
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the UI component manager.
+    def __init__(self, module_name: str):
+        if not module_name:
+            raise ValueError("Module name cannot be empty")
         
-        Args:
-            ui_components: Dictionary of UI components
-            logger: Optional logger instance
-        """
-        self.ui_components = ui_components
-        self.logger = logger or get_ui_logger(__name__)
-    
-    @safe_ui_operation(operation_name="update_status_panel", log_level="error")
-    def update_status_panel(self, message: str, status_type: str = "info") -> Dict[str, Any]:
-        """
-        Update the status panel with the given message and status type.
+        self.module_name = module_name
+        from smartcash.ui.core.shared.logger import get_enhanced_logger
+        self.logger = get_enhanced_logger(f"smartcash.ui.{module_name}")
         
-        Args:
-            message: Message to display in the status panel
-            status_type: Type of status (info, success, warning, error)
-            
-        Returns:
-            Dict with update status
-        """
+        self._components: Dict[str, Any] = {}
+        self._component_validators: Dict[str, Callable] = {}
+        self._registry = ComponentRegistry()
+        
+        self.logger.debug(f"🎯 Initialized UIComponentManager for {module_name}")
+    
+    def add_component(self, name: str, component: Any, shared: bool = False,
+                     validator: Optional[Callable[[Any], bool]] = None) -> None:
+        """Add component dengan fail-fast validation."""
+        if not name:
+            raise ValueError("Component name cannot be empty")
+        
+        if component is None:
+            raise ValueError(f"Component '{name}' cannot be None")
+        
+        # Validate if validator provided
+        if validator:
+            if not validator(component):
+                raise ValueError(f"Component '{name}' failed validation")
+            self._component_validators[name] = validator
+        
+        # Store component
+        self._components[name] = component
+        
+        # Register if shared
+        if shared:
+            self._registry.register(
+                f"{self.module_name}.{name}",
+                component,
+                module=self.module_name
+            )
+        
+        self.logger.debug(f"✅ Added component '{name}' (shared: {shared})")
+    
+    def get_component(self, name: str, default: Any = None) -> Any:
+        """Get component dengan fallback ke registry."""
+        # Check local first
+        if name in self._components:
+            return self._components[name]
+        
+        # Check registry dengan module prefix
+        full_name = f"{self.module_name}.{name}"
+        if comp := self._registry.get(full_name):
+            return comp
+        
+        # Check registry tanpa prefix
+        if comp := self._registry.get(name):
+            return comp
+        
+        return default
+    
+    def remove_component(self, name: str) -> bool:
+        """Remove component dari local dan registry."""
+        removed = False
+        
+        # Remove local
+        if name in self._components:
+            del self._components[name]
+            removed = True
+        
+        # Remove dari registry
+        full_name = f"{self.module_name}.{name}"
+        if self._registry.unregister(full_name):
+            removed = True
+        
+        # Remove validator
+        if name in self._component_validators:
+            del self._component_validators[name]
+        
+        if removed:
+            self.logger.debug(f"🗑️ Removed component '{name}'")
+        
+        return removed
+    
+    def has_component(self, name: str) -> bool:
+        """Check if component exists."""
+        return self.get_component(name) is not None
+    
+    def list_components(self) -> List[str]:
+        """List all component names."""
+        return list(self._components.keys())
+    
+    def add_components(self, components: Dict[str, Any], shared: bool = False) -> None:
+        """Add multiple components dengan fail-fast validation."""
+        if not components:
+            raise ValueError("Components dictionary cannot be empty")
+        
+        for name, component in components.items():
+            self.add_component(name, component, shared)
+        
+        self.logger.info(f"📦 Added {len(components)} components")
+    
+    def update_component_safely(self, name: str, update_func: Callable[[Any], None]) -> None:
+        """Update component dengan fail-fast validation."""
+        component = self.get_component(name)
+        if component is None:
+            raise RuntimeError(f"Component '{name}' not found for update")
+        
         try:
-            if 'status_panel' not in self.ui_components:
-                # Create a new status panel if it doesn't exist
-                self.ui_components['status_panel'] = create_status_panel(
-                    message=message,
-                    status_type=status_type
-                )
-            else:
-                # Update existing status panel
-                update_status_panel(
-                    panel=self.ui_components['status_panel'],
-                    message=message,
-                    status_type=status_type
-                )
-            
-            return {
-                "status": True,
-                "message": "Status panel updated",
-                "component": "status_panel"
-            }
+            update_func(component)
         except Exception as e:
-            self.logger.error(f"Error updating status panel: {str(e)}")
-            return {
-                "status": False,
-                "message": f"Error updating status panel: {str(e)}",
-                "error": str(e),
-                "component": "status_panel"
-            }
+            raise RuntimeError(f"Failed to update component '{name}': {str(e)}")
     
-    @safe_ui_operation(operation_name="clear_status_panel", log_level="error")
-    def clear_status_panel(self) -> Dict[str, Any]:
-        """
-        Clear the status panel.
-        
-        Returns:
-            Dict with clear status
-        """
-        try:
-            if 'status_panel' in self.ui_components:
-                update_status_panel(
-                    panel=self.ui_components['status_panel'],
-                    message="",
-                    status_type="info"
-                )
-            else:
-                self.ui_components['status_panel'] = create_status_panel(
-                    message="",
-                    status_type="info"
-                )
-            
-            return {
-                "status": True,
-                "message": "Status panel cleared",
-                "component": "status_panel"
-            }
-        except Exception as e:
-            self.logger.error(f"Error clearing status panel: {str(e)}")
-            return {
-                "status": False,
-                "message": f"Error clearing status panel: {str(e)}",
-                "error": str(e),
-                "component": "status_panel"
-            }
-    
-    @safe_ui_operation(operation_name="update_summary_container", log_level="error")
-    def update_summary_container(self, content: Any, title: str = "", message_type: str = "info", icon: str = "") -> Dict[str, Any]:
-        """
-        Update the summary container with the given content.
-        
-        Args:
-            content: Content to display in the summary container (can be HTML string or dict for status items)
-            title: Optional title for the summary container
-            message_type: Type of message (info, success, warning, danger, primary)
-            icon: Optional icon to display
-            
-        Returns:
-            Dict with update status
-        """
-        try:
-            # Create summary container if it doesn't exist
-            if 'summary_container' not in self.ui_components or not isinstance(self.ui_components['summary_container'], SummaryContainer):
-                self.ui_components['summary_container'] = create_summary_container(theme=message_type, title=title, icon=icon)
-            
-            summary_container = self.ui_components['summary_container']
-            
-            # Update content based on type
-            if isinstance(content, dict):
-                summary_container.show_status(content, title=title, icon=icon)
-            elif isinstance(content, str):
-                if title:
-                    summary_container.show_message(title=title, message=content, message_type=message_type, icon=icon)
-                else:
-                    summary_container.set_html(content, theme=message_type)
-            else:
-                summary_container.set_content(str(content))
-            
-            return {
-                "status": True,
-                "message": "Summary container updated",
-                "component": "summary_container"
-            }
-        except Exception as e:
-            self.logger.error(f"Error updating summary container: {str(e)}")
-            return {
-                "status": False,
-                "message": f"Error updating summary container: {str(e)}",
-                "error": str(e),
-                "component": "summary_container"
-            }
-    
-    @safe_ui_operation(operation_name="clear_summary_container", log_level="error")
-    def clear_summary_container(self) -> Dict[str, Any]:
-        """
-        Clear the summary container.
-        
-        Returns:
-            Dict with clear status
-        """
-        try:
-            if 'summary_container' not in self.ui_components:
-                # Create an empty summary container if it doesn't exist
-                self.ui_components['summary_container'] = create_summary_container()
-                return {
-                    "status": True,
-                    "message": "Empty summary container created",
-                    "component": "summary_container"
-                }
-            
-            # Use the clear method if it's a SummaryContainer
-            if isinstance(self.ui_components['summary_container'], SummaryContainer):
-                self.ui_components['summary_container'].clear()
-            # Fallback for other widget types
-            elif hasattr(self.ui_components['summary_container'], 'clear_output'):
-                self.ui_components['summary_container'].clear_output()
-            elif hasattr(self.ui_components['summary_container'], 'value'):
-                self.ui_components['summary_container'].value = ""
-            else:
-                self.logger.warning("Summary container does not have clear method or compatible attributes")
-                return {
-                    "status": False,
-                    "message": "Summary container does not have clear method or compatible attributes",
-                    "component": "summary_container"
-                }
-            
-            return {
-                "status": True,
-                "message": "Summary container cleared",
-                "component": "summary_container"
-            }
-        except Exception as e:
-            self.logger.error(f"Error clearing summary container: {str(e)}")
-            return {
-                "status": False,
-                "message": f"Error clearing summary container: {str(e)}",
-                "error": str(e),
-                "component": "summary_container"
-            }
-    
-    def reset_components(self, components: List[str] = None) -> Dict[str, Any]:
-        """
-        Reset specified UI components.
-        
-        Args:
-            components: List of component names to reset. If None, reset all managed components.
-                Valid values: 'status_panel', 'summary_container'
-                
-        Returns:
-            Dict with reset status for each component
-        """
-        all_components = ['status_panel', 'summary_container']
-        to_reset = components if components is not None else all_components
-        
+    def reset_components_silently(self, component_names: Optional[List[str]] = None) -> Dict[str, bool]:
+        """Reset components dengan silent fail untuk missing components."""
         results = {}
         
-        if 'status_panel' in to_reset:
-            results['status_panel'] = self.clear_status_panel()
+        # Determine target components
+        if component_names is None:
+            target_components = list(self._components.keys())
+        else:
+            target_components = component_names
         
-        if 'summary_container' in to_reset:
-            results['summary_container'] = self.clear_summary_container()
+        for component_name in target_components:
+            try:
+                # Silent fail: skip if component doesn't exist
+                if component_name not in self._components:
+                    self.logger.debug(f"🔇 Component '{component_name}' not found, skipping")
+                    results[component_name] = False
+                    continue
+                
+                component = self._components[component_name]
+                
+                # Silent fail: skip if component is None
+                if component is None:
+                    self.logger.debug(f"🔇 Component '{component_name}' is None, skipping")
+                    results[component_name] = False
+                    continue
+                
+                # Reset component
+                success = self._reset_component(component)
+                results[component_name] = success
+                
+                if success:
+                    self.logger.debug(f"✅ Reset component '{component_name}'")
+                else:
+                    self.logger.debug(f"🔇 No reset method for '{component_name}'")
+                    
+            except Exception as e:
+                # Log error but continue with other components
+                self.logger.error(f"❌ Error resetting '{component_name}': {e}")
+                results[component_name] = False
         
+        return results
+    
+    def _reset_component(self, component: Any) -> bool:
+        """Reset component dengan available methods."""
+        # Try common reset methods
+        if hasattr(component, 'reset') and callable(component.reset):
+            component.reset()
+            return True
+        elif hasattr(component, 'clear') and callable(component.clear):
+            component.clear()
+            return True
+        elif hasattr(component, 'clear_output') and callable(component.clear_output):
+            component.clear_output(wait=True)
+            return True
+        elif hasattr(component, 'clear_logs') and callable(component.clear_logs):
+            component.clear_logs()
+            return True
+        elif hasattr(component, 'value'):
+            if isinstance(component.value, str):
+                component.value = ""
+                return True
+            elif isinstance(component.value, (int, float)):
+                component.value = 0
+                return True
+            elif isinstance(component.value, bool):
+                component.value = False
+                return True
+            elif isinstance(component.value, list):
+                component.value = []
+                return True
+            elif isinstance(component.value, dict):
+                component.value = {}
+                return True
+        
+        return False
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get manager statistics."""
         return {
-            "status": all(result.get("status", False) for result in results.values()),
-            "message": "Components reset",
-            "components": results
+            'module': self.module_name,
+            'local_components': len(self._components),
+            'validators': len(self._component_validators),
+            'registry_stats': self._registry.get_stats()
         }
-
-
-# Create a singleton instance for global access
-_ui_component_manager = None
-
-
-def get_ui_component_manager(ui_components: Dict[str, Any] = None, 
-                           logger: Optional[logging.Logger] = None) -> UIComponentManager:
-    """
-    Get or create the UI component manager singleton.
     
-    Args:
-        ui_components: Dictionary of UI components
-        logger: Optional logger instance
-        
-    Returns:
-        UIComponentManager instance
-    """
-    global _ui_component_manager
-    
-    if _ui_component_manager is None and ui_components is not None:
-        _ui_component_manager = UIComponentManager(ui_components, logger)
-    
-    if _ui_component_manager is None:
-        raise ValueError("UI component manager not initialized. Please provide ui_components.")
-    
-    return _ui_component_manager
+    def cleanup(self) -> None:
+        """Cleanup manager resources."""
+        count = len(self._components)
+        self._components.clear()
+        self._component_validators.clear()
+        self.logger.info(f"🧹 Cleaned up UIComponentManager: {count} components removed")

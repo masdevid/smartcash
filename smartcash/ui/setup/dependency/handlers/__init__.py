@@ -7,10 +7,10 @@
 from .event_handlers import setup_all_handlers
 
 # Base class
-from .base_handler import BaseDependencyHandler
+from .base_dependency_handler import BaseDependencyHandler
 
 # SRP handlers dengan base class pattern
-from .config_event_handlers import setup_config_handlers, ConfigEventHandler
+from .event_handlers import setup_config_handlers, setup_event_handlers, setup_all_handlers
 from .operation_handlers import setup_operation_handlers, OperationHandler
 from .selection_handlers import setup_selection_handlers, SelectionHandler
 
@@ -28,7 +28,7 @@ __all__ = [
     'BaseDependencyHandler',
     
     # SRP handlers dengan base class
-    'setup_config_handlers', 'ConfigEventHandler',
+    'setup_config_handlers', 'setup_event_handlers', 'setup_all_handlers',
     'setup_operation_handlers', 'OperationHandler',
     'setup_selection_handlers', 'SelectionHandler',
     

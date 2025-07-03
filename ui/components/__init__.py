@@ -47,7 +47,12 @@ def __getattr__(name):
         return create_slider
     raise AttributeError(f"module 'smartcash.ui.components' has no attribute '{name}'")
     
-from smartcash.ui.components.log_accordion import create_log_accordion, update_log
+# Import log_accordion components from the new module structure
+from smartcash.ui.components.log_accordion.legacy import (
+    create_log_accordion, 
+    update_log,
+    log as log_message
+)
 from smartcash.ui.components.tabs import create_tab_widget, create_tabs
 from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
 from smartcash.ui.components.error import ErrorComponent, create_error_component

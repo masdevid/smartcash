@@ -1,193 +1,268 @@
-# smartcash/ui/core/shared/logger.py
 """
-Centralized logger for SmartCash UI components with suppression support.
-Extends the existing UILogger with additional features for core components.
+File: smartcash/ui/core/shared/logger.py
+Deskripsi: Enhanced UILogger dengan suppression support untuk prevent logs
+sebelum log_output ready. Centralized logging dengan contextual emojis.
 """
-from typing import Dict, Any, Optional, Union
+
 import logging
-import sys
-from IPython.display import display
+from typing import Optional, List, Dict, Any, Callable
+from datetime import datetime
+from contextlib import contextmanager
+import threading
+from collections import deque
 
-from smartcash.ui.utils.ui_logger import get_module_logger, UILogger as BaseUILogger
+from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
 
 
-class UILogger(BaseUILogger):
+class EnhancedUILogger(UILogger):
+    """Enhanced logger dengan auto-suppression dan buffering.
+    
+    Features:
+    - 🔇 Auto-suppress logs sampai UI ready
+    - 📦 Buffer logs saat suppressed
+    - 🎯 Contextual emoji support
+    - 🔄 Thread-safe operations
+    - 📊 Log statistics tracking
     """
-    Enhanced UILogger for core components with suppression support.
     
-    This class extends the base UILogger from smartcash.ui.utils.ui_logger with
-    additional features for log suppression and context management.
+    # Emoji mappings untuk context
+    CONTEXT_EMOJIS = {
+        'init': '🚀',
+        'setup': '🔧',
+        'config': '📋',
+        'save': '💾',
+        'load': '📂',
+        'reset': '🔄',
+        'error': '❌',
+        'warning': '⚠️',
+        'success': '✅',
+        'info': 'ℹ️',
+        'debug': '🔍',
+        'progress': '📊',
+        'complete': '🎉',
+        'cancel': '⏹️',
+        'sync': '🔄',
+        'network': '🌐',
+        'file': '📄',
+        'folder': '📁',
+        'ui': '🎨',
+        'handler': '🎯',
+        'operation': '⚡',
+    }
     
-    Key features:
-    - Automatically suppresses logs until log_output is ready
-    - Ensures all logs are directed to log_output only
-    - Provides methods for temporary log suppression
-    """
-    
-    def __init__(
-        self,
-        module_name: str,
-        parent_module: str = "ui",
-        ui_components: Optional[Dict[str, Any]] = None,
-        log_level: str = "info",
-        suppress_logs: bool = None
-    ):
-        """
-        Initialize the enhanced UI logger.
+    def __init__(self, name: str, level: int = logging.INFO):
+        """Initialize enhanced logger."""
+        super().__init__(name, level)
         
-        Args:
-            module_name: Name of the module
-            parent_module: Parent module name
-            ui_components: Dictionary containing UI components
-            log_level: Logging level (debug, info, warning, error, critical)
-            suppress_logs: If True, logs will be suppressed; if None, auto-determine based on log_output readiness
-        """
-        # Convert string log level to int for base class
-        level_map = {
-            "debug": logging.DEBUG,
-            "info": logging.INFO,
-            "warning": logging.WARNING,
-            "error": logging.ERROR,
-            "critical": logging.CRITICAL
+        # Suppression state
+        self._suppressed = True  # Default suppressed until UI ready
+        self._buffer = deque(maxlen=1000)  # Buffer untuk suppressed logs
+        self._lock = threading.Lock()
+        
+        # Stats tracking
+        self._stats = {
+            'total': 0,
+            'suppressed': 0,
+            'buffered': 0,
+            'by_level': {}
         }
-        int_log_level = level_map.get(log_level.lower(), logging.INFO)
         
-        # Initialize the base UILogger
-        super().__init__(ui_components, name=f"smartcash.{parent_module}.{module_name}", log_level=int_log_level)
-        
-        # Store additional properties
-        self.module_name = module_name
-        self.parent_module = parent_module
-        
-        # Auto-determine suppression if not explicitly set
-        if suppress_logs is None:
-            # Suppress logs if log_output is not ready
-            self.suppress_logs = not self._is_log_output_ready()
-        else:
-            self.suppress_logs = suppress_logs
+        # Callbacks
+        self._on_unsuppress_callbacks: List[Callable] = []
     
-    def _is_log_output_ready(self) -> bool:
-        """
-        Check if log_output is ready to receive logs.
-        
-        Returns:
-            True if log_output is ready, False otherwise
-        """
-        if not self.ui_components:
-            return False
-            
-        log_output = self.ui_components.get('log_output')
-        if log_output is None:
-            return False
-            
-        # Check if log_output has append_text method
-        return hasattr(log_output, 'append_text')
+    # === Suppression Control ===
     
-    def _log_to_ui(self, level: str, message: str) -> None:
-        """
-        Override base _log_to_ui to add suppression support.
-        
-        Args:
-            level: Log level
-            message: Log message
-        """
-        # Skip UI logging if logs are suppressed or log_output is not ready
-        if self.suppress_logs or not self._is_log_output_ready():
-            return
-            
-        # Call the parent method to handle the actual logging
-        super()._log_to_ui(level, message)
-        
-    def set_suppression(self, suppress: bool) -> None:
-        """
-        Enable or disable log suppression.
-        
-        Args:
-            suppress: True to suppress logs, False to enable them
-        """
-        self.suppress_logs = suppress
-        
-    def update_ui_components(self, ui_components: Dict[str, Any]) -> None:
-        """
-        Update UI components and check if log_output is ready.
-        
-        Args:
-            ui_components: Dictionary containing UI components
-        """
-        super().update_ui_components(ui_components)
-        
-        # Auto-unsuppress if log_output is now ready
-        if self.suppress_logs and self._is_log_output_ready():
-            self.suppress_logs = False
-        
     def suppress(self) -> None:
         """Enable log suppression."""
-        self.suppress_logs = True
-        
-    def unsuppress(self) -> None:
-        """Disable log suppression."""
-        self.suppress_logs = False
-        
+        with self._lock:
+            self._suppressed = True
+            self.debug("🔇 Logging suppressed")
+    
+    def unsuppress(self, flush_buffer: bool = True) -> None:
+        """Disable log suppression dan optionally flush buffer."""
+        with self._lock:
+            self._suppressed = False
+            
+            if flush_buffer and self._buffer:
+                # Flush buffered logs
+                buffer_copy = list(self._buffer)
+                self._buffer.clear()
+                
+                for record in buffer_copy:
+                    super().handle(record)
+                
+                self._stats['buffered'] = 0
+            
+            # Run callbacks
+            for callback in self._on_unsuppress_callbacks:
+                try:
+                    callback()
+                except Exception as e:
+                    super().error(f"Callback error: {e}")
+            
+            self.debug(f"🔊 Logging enabled (flushed {len(buffer_copy) if flush_buffer else 0} logs)")
+    
+    @contextmanager
     def with_suppression(self, suppress: bool = True):
-        """
-        Context manager for temporary log suppression.
+        """Context manager untuk temporary suppression."""
+        original_state = self._suppressed
         
-        Usage:
-            with logger.with_suppression():
-                # Logs are suppressed in this block
-            # Logs are restored to previous state outside the block
+        if suppress:
+            self.suppress()
+        else:
+            self.unsuppress(flush_buffer=False)
+        
+        try:
+            yield
+        finally:
+            if original_state:
+                self.suppress()
+            else:
+                self.unsuppress(flush_buffer=False)
+    
+    def on_unsuppress(self, callback: Callable) -> None:
+        """Register callback untuk saat unsuppress."""
+        self._on_unsuppress_callbacks.append(callback)
+    
+    # === Enhanced Logging Methods ===
+    
+    def handle(self, record: logging.LogRecord) -> None:
+        """Handle log record dengan suppression check."""
+        with self._lock:
+            # Update stats
+            self._stats['total'] += 1
+            level_name = record.levelname
+            self._stats['by_level'][level_name] = self._stats['by_level'].get(level_name, 0) + 1
             
-        Args:
-            suppress: True to suppress logs, False to enable them
-            
-        Returns:
-            Context manager for log suppression
-        """
-        class LogSuppressionContext:
-            def __init__(self, logger, suppress):
-                self.logger = logger
-                self.suppress = suppress
-                self.previous_state = None
-                
-            def __enter__(self):
-                self.previous_state = self.logger.suppress_logs
-                self.logger.suppress_logs = self.suppress
-                return self.logger
-                
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                self.logger.suppress_logs = self.previous_state
-                
-        return LogSuppressionContext(self, suppress)
+            if self._suppressed:
+                # Buffer the log
+                self._buffer.append(record)
+                self._stats['suppressed'] += 1
+                self._stats['buffered'] = len(self._buffer)
+            else:
+                # Process normally
+                super().handle(record)
+    
+    def log_with_context(self, 
+                        level: int,
+                        message: str,
+                        context: Optional[str] = None,
+                        **kwargs) -> None:
+        """Log dengan contextual emoji."""
+        # Get emoji untuk context
+        emoji = ''
+        if context:
+            emoji = self.CONTEXT_EMOJIS.get(context.lower(), '')
+        elif level == logging.ERROR:
+            emoji = self.CONTEXT_EMOJIS['error']
+        elif level == logging.WARNING:
+            emoji = self.CONTEXT_EMOJIS['warning']
+        elif level == logging.INFO:
+            emoji = self.CONTEXT_EMOJIS['info']
+        elif level == logging.DEBUG:
+            emoji = self.CONTEXT_EMOJIS['debug']
+        
+        # Format message dengan emoji
+        formatted_msg = f"{emoji} {message}" if emoji else message
+        
+        # Log it
+        self.log(level, formatted_msg, **kwargs)
+    
+    # === Convenience Methods ===
+    
+    def info_context(self, message: str, context: str, **kwargs) -> None:
+        """Info log dengan context."""
+        self.log_with_context(logging.INFO, message, context, **kwargs)
+    
+    def error_context(self, message: str, context: str, **kwargs) -> None:
+        """Error log dengan context."""
+        self.log_with_context(logging.ERROR, message, context, **kwargs)
+    
+    def debug_context(self, message: str, context: str, **kwargs) -> None:
+        """Debug log dengan context."""
+        self.log_with_context(logging.DEBUG, message, context, **kwargs)
+    
+    def success(self, message: str, **kwargs) -> None:
+        """Log success message."""
+        self.log_with_context(logging.INFO, message, 'success', **kwargs)
+    
+    def progress(self, message: str, percentage: Optional[float] = None, **kwargs) -> None:
+        """Log progress message."""
+        if percentage is not None:
+            message = f"{message} ({percentage:.1f}%)"
+        self.log_with_context(logging.INFO, message, 'progress', **kwargs)
+    
+    # === Stats Methods ===
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get logging statistics."""
+        with self._lock:
+            return self._stats.copy()
+    
+    def reset_stats(self) -> None:
+        """Reset logging statistics."""
+        with self._lock:
+            self._stats = {
+                'total': 0,
+                'suppressed': 0,
+                'buffered': 0,
+                'by_level': {}
+            }
+    
+    @property
+    def is_suppressed(self) -> bool:
+        """Check if currently suppressed."""
+        return self._suppressed
+    
+    @property
+    def buffer_size(self) -> int:
+        """Get current buffer size."""
+        return len(self._buffer)
+    
+    def clear_buffer(self) -> None:
+        """Clear log buffer without flushing."""
+        with self._lock:
+            self._buffer.clear()
+            self._stats['buffered'] = 0
 
 
-def get_ui_logger(
-    module_name: str = None,
-    parent_module: str = "ui",
-    ui_components: Optional[Dict[str, Any]] = None,
-    log_level: str = "info",
-    suppress_logs: bool = None
-) -> UILogger:
-    """
-    Get an enhanced UI logger instance with suppression support.
+# === Global Logger Registry ===
+
+_enhanced_loggers: Dict[str, EnhancedUILogger] = {}
+_loggers_lock = threading.Lock()
+
+def get_enhanced_logger(name: str, level: int = logging.INFO) -> EnhancedUILogger:
+    """Get atau create enhanced logger instance.
     
     Args:
-        module_name: Name of the module (defaults to caller's module name if None)
-        parent_module: Parent module name
-        ui_components: Dictionary containing UI components
-        log_level: Logging level (debug, info, warning, error, critical)
-        suppress_logs: If True, logs will be suppressed; if None, auto-determine based on log_output readiness
+        name: Logger name (biasanya module path)
+        level: Log level
         
     Returns:
-        Enhanced UILogger instance
+        Enhanced logger instance
     """
-    # Use caller's module name if not provided
-    if module_name is None:
-        import inspect
-        frame = inspect.currentframe().f_back
-        module = inspect.getmodule(frame)
-        if module:
-            module_name = module.__name__.split('.')[-1]
-        else:
-            module_name = "unknown"
-            
-    return UILogger(module_name, parent_module, ui_components, log_level, suppress_logs)
+    with _loggers_lock:
+        if name not in _enhanced_loggers:
+            _enhanced_loggers[name] = EnhancedUILogger(name, level)
+        
+        return _enhanced_loggers[name]
+
+def suppress_all_loggers() -> None:
+    """Suppress semua enhanced loggers."""
+    with _loggers_lock:
+        for logger in _enhanced_loggers.values():
+            logger.suppress()
+
+def unsuppress_all_loggers(flush_buffer: bool = True) -> None:
+    """Unsuppress semua enhanced loggers."""
+    with _loggers_lock:
+        for logger in _enhanced_loggers.values():
+            logger.unsuppress(flush_buffer)
+
+def get_all_logger_stats() -> Dict[str, Dict[str, Any]]:
+    """Get statistics dari semua loggers."""
+    with _loggers_lock:
+        return {
+            name: logger.get_stats() 
+            for name, logger in _enhanced_loggers.items()
+        }

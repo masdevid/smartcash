@@ -14,8 +14,9 @@ from IPython.display import HTML
 # Import shared components
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.components.progress_tracker.progress_config import ProgressConfig
-from smartcash.ui.components.log_accordion import create_log_accordion, LogLevel
-from smartcash.ui.components.info.info_components import create_info_accordion
+from smartcash.ui.components.log_accordion import create_log_accordion
+from smartcash.ui.components.log_accordion import LogLevel
+from smartcash.ui.components.info_accordion import create_info_accordion
 from smartcash.ui.components.closeable_tips_panel import create_closeable_tips_panel
 
 class FooterContainer:
@@ -68,6 +69,9 @@ class FooterContainer:
         self.tips_title = tips_title
         self.tips_content = tips_content
         
+        # Track progress state internally
+        self._progress = 0.0
+        
         # Default style options
         self.style = {
             'width': '100%',
@@ -117,8 +121,28 @@ class FooterContainer:
                 auto_scroll=True,
                 enable_deduplication=True
             )
-            self.log_accordion = log_components['log_accordion']
-            self.log_output = log_components['log_output']
+            # The legacy create_log_accordion returns 'accordion' as the key instead of 'log_accordion'
+            self.log_accordion = log_components['accordion']
+            # Try to get the output widget from the accordion's children
+            if hasattr(self.log_accordion, 'children') and len(self.log_accordion.children) > 0:
+                box = self.log_accordion.children[0]
+                if hasattr(box, 'children') and len(box.children) > 0:
+                    vbox = box.children[0]
+                    if hasattr(vbox, 'children') and len(vbox.children) > 0:
+                        # The output widget is typically the last child
+                        self.log_output = vbox.children[-1]
+                        return
+            
+            # Fallback to using the accordion itself if we can't find the output widget
+            self.log_output = widgets.Output()
+            
+            # Add the output widget to the accordion if it's not already there
+            if hasattr(self.log_accordion, 'children') and len(self.log_accordion.children) > 0:
+                box = self.log_accordion.children[0]
+                if hasattr(box, 'children') and len(box.children) > 0:
+                    vbox = box.children[0]
+                    if hasattr(vbox, 'children') and len(vbox.children) > 0:
+                        vbox.children = list(vbox.children[:-1]) + [self.log_output]
         else:
             self.log_accordion = None
             self.log_output = None
@@ -138,6 +162,19 @@ class FooterContainer:
         
         # Create info panel if enabled
         if self.show_info:
+            # Map info_style to an appropriate icon
+            style_to_icon = {
+                'info': 'info',
+                'success': 'check_circle',
+                'warning': 'warning',
+                'error': 'error'
+            }
+            icon = style_to_icon.get(info_style, 'info')
+            
+            # Convert string content to HTML widget if needed
+            if isinstance(info_content, str):
+                info_content = widgets.HTML(value=info_content)
+            
             # Load info content from info_boxes if path is provided
             if self.info_box_path:
                 try:
@@ -148,38 +185,40 @@ class FooterContainer:
                     # Get the info box function (convention: get_*_info)
                     function_name = f'get_{self.info_box_path}'
                     if not hasattr(module, function_name):
-                        # Try without the 'get_' prefix
-                        function_name = self.info_box_path
+                        function_name = 'get_info'
                     
-                    if hasattr(module, function_name):
-                        # Call the function to get the info accordion
-                        self.info_panel = getattr(module, function_name)(open_by_default=False)
-                    else:
-                        # Fallback to creating a basic info panel with error message
-                        error_content = f"<p>Error: Could not find info box function in {module_path}</p>"
-                        self.info_panel = create_info_accordion(
-                            title=info_title,
-                            content=error_content,
-                            style='warning',
-                            open_by_default=False
-                        )
-                except ImportError:
-                    # Fallback to creating a basic info panel with error message
-                    error_content = f"<p>Error: Could not load info box from {self.info_box_path}</p>"
-                    self.info_panel = create_info_accordion(
+                    # Call the function to get the content
+                    info_content = getattr(module, function_name)()
+                    
+                    # Convert string content to HTML widget if needed
+                    if isinstance(info_content, str):
+                        info_content = widgets.HTML(value=info_content)
+                    
+                    # Create the info panel with the loaded content and extract the container widget
+                    info_accordion = create_info_accordion(
                         title=info_title,
-                        content=error_content,
-                        style='warning',
-                        open_by_default=False
+                        content=info_content,
+                        icon=icon
                     )
+                    self.info_panel = info_accordion['container']
+                except (ImportError, AttributeError) as e:
+                    print(f"Warning: Could not load info box '{self.info_box_path}': {e}")
+                    # Create error accordion with the error message
+                    error_message = widgets.HTML(f"<p>Could not load info box: {e}</p>")
+                    error_accordion = create_info_accordion(
+                        title=f"{info_title} (Error)",
+                        content=error_message,
+                        icon='warning'
+                    )
+                    self.info_panel = error_accordion['container']
             else:
-                # Use provided content
-                self.info_panel = create_info_accordion(
+                # Use provided content and extract the container widget
+                info_accordion = create_info_accordion(
                     title=info_title,
                     content=info_content,
-                    style=info_style,
-                    open_by_default=False
+                    icon=icon
                 )
+                self.info_panel = info_accordion['container']
         else:
             self.info_panel = None
     
@@ -251,8 +290,54 @@ class FooterContainer:
             total: Total progress value
             level: Progress level to update ('main', 'step', etc.)
         """
+        # Update internal progress state (as a percentage 0-100)
+        if total > 0:
+            self._progress = (value / total) * 100.0
+        else:
+            self._progress = 0.0
+            
         if self.progress_tracker:
-            self.progress_tracker.update(value, total, level)
+            # Check if the progress tracker has a set_progress method (newer version)
+            if hasattr(self.progress_tracker, 'set_progress'):
+                self.progress_tracker.set_progress(value, total, level)
+            # Fallback to update method (older version)
+            elif hasattr(self.progress_tracker, 'update'):
+                self.progress_tracker.update(level, value, message=f"{value/total*100:.1f}%" if total > 0 else "0%")
+    
+    def get_progress(self) -> float:
+        """Get the current progress value.
+        
+        Returns:
+            float: Current progress value (0-100)
+        """
+        # Return the internal progress state
+        return self._progress
+    
+    def complete(self) -> None:
+        """Mark the current progress as complete (100%).
+        
+        This is a convenience method for test compatibility.
+        """
+        self._progress = 100.0  # Explicitly set internal state
+        if self.progress_tracker:
+            # Try different methods to update progress
+            if hasattr(self.progress_tracker, 'set_progress'):
+                self.progress_tracker.set_progress(100, 100, 'main')
+            elif hasattr(self.progress_tracker, 'update'):
+                self.progress_tracker.update('main', 100, message="100%")
+            
+    def reset(self) -> None:
+        """Reset the progress to 0%.
+        
+        This is a convenience method for test compatibility.
+        """
+        self._progress = 0.0  # Explicitly set internal state
+        if self.progress_tracker:
+            # Try different methods to update progress
+            if hasattr(self.progress_tracker, 'set_progress'):
+                self.progress_tracker.set_progress(0, 100, 'main')
+            elif hasattr(self.progress_tracker, 'update'):
+                self.progress_tracker.update('main', 0, message="0%")
     
     def log(self, message: str, level: str = 'info') -> None:
         """Add a log message to the log accordion.
@@ -262,8 +347,29 @@ class FooterContainer:
             level: Log level ('debug', 'info', 'success', 'warning', 'error', 'critical')
         """
         if self.log_output:
-            log_level = LogLevel[level.upper()] if hasattr(LogLevel, level.upper()) else LogLevel.INFO
-            self.log_output.append_log(message, log_level)
+            # For legacy log accordion, we need to find the output widget inside the Accordion
+            if hasattr(self.log_output, 'children') and len(self.log_output.children) > 0:
+                # Get the first child which should be the Box containing the output
+                box = self.log_output.children[0]
+                if hasattr(box, 'children') and len(box.children) > 0:
+                    # Get the VBox inside the Box
+                    vbox = box.children[0]
+                    if hasattr(vbox, 'children') and len(vbox.children) > 0:
+                        # Find the output widget (should be the last child)
+                        output_widget = vbox.children[-1]
+                        if hasattr(output_widget, 'append_stdout'):
+                            output_widget.append_stdout(f"[{level.upper()}] {message}\n")
+                            return
+            
+            # For newer log accordion with LogLevel
+            if hasattr(LogLevel, level.upper()):
+                log_level = LogLevel[level.upper()]
+                if hasattr(self.log_output, 'append_log'):
+                    self.log_output.append_log(message, log_level)
+                    return
+            
+            # Fallback to simple logging
+            print(f"[{level.upper()}] {message}")
     
     def update_info(self, title: str, content: Union[str, widgets.Widget], style: str = 'info', info_box_path: Optional[str] = None) -> None:
         """Update the info panel content.
@@ -294,21 +400,19 @@ class FooterContainer:
                         new_info_panel = getattr(module, function_name)(open_by_default=self.info_panel.selected_index == 0)
                     else:
                         # Fallback to creating a basic info panel with error message
-                        error_content = f"<p>Error: Could not find info box function in {module_path}</p>"
+                        error_content = widgets.HTML(value=f"<p>Error: Could not find info box function in {module_path}</p>")
                         new_info_panel = create_info_accordion(
                             title=title,
                             content=error_content,
-                            style='warning',
-                            open_by_default=self.info_panel.selected_index == 0
+                            icon='warning'
                         )
-                except ImportError:
+                except ImportError as e:
                     # Fallback to creating a basic info panel with error message
-                    error_content = f"<p>Error: Could not load info box from {info_box_path}</p>"
+                    error_content = widgets.HTML(value=f"<p>Error: Could not load info box from {info_box_path}: {str(e)}</p>")
                     new_info_panel = create_info_accordion(
                         title=title,
                         content=error_content,
-                        style='warning',
-                        open_by_default=self.info_panel.selected_index == 0
+                        icon='warning'
                     )
             else:
                 # Use provided content

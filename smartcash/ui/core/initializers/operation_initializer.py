@@ -1,234 +1,258 @@
-# smartcash/ui/core/initializers/operation_initializer.py
 """
-Operation initializer class for initializing operation-specific UI components.
-Extends BaseInitializer with operation-specific capabilities.
+File: smartcash/ui/core/initializers/operation_initializer.py
+Deskripsi: Operation initializer dengan fail-fast principle
 """
-from typing import Dict, Any, Optional, Callable, List, Union, Type
-import logging
-import importlib
 
+from typing import Dict, Any, Optional, Callable
 from smartcash.ui.core.initializers.base_initializer import BaseInitializer
-from smartcash.ui.core.shared.logger import get_ui_logger
-from smartcash.ui.decorators import safe_ui_operation
-
 
 class OperationInitializer(BaseInitializer):
-    """
-    Initializer for operation-specific UI components.
+    """Initializer untuk operation dengan fail-fast principle."""
     
-    This class extends BaseInitializer with operation-specific capabilities,
-    including progress tracking, dialog management, and summary generation.
-    """
+    def __init__(self, 
+                 module_name: str, 
+                 parent_module: str = None,
+                 enable_progress: bool = True,
+                 enable_summary: bool = True,
+                 enable_dialogs: bool = True):
+        super().__init__(module_name, parent_module)
+        self._enable_progress = enable_progress
+        self._enable_summary = enable_summary
+        self._enable_dialogs = enable_dialogs
+        self._progress_tracker = None
+        
+        self.logger.debug(f"🔧 Initialized OperationInitializer for {self.full_module_name}")
     
-    def __init__(
-        self,
-        module_name: str,
-        parent_module: str,
-        operation_name: str,
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the operation initializer.
+    def create_operation_ui(self, title: str, description: str, 
+                           custom_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Create operation UI dengan fail-fast validation."""
+        ui_components = {}
         
-        Args:
-            module_name: Name of the module being initialized
-            parent_module: Parent module name (e.g., 'dataset', 'setup')
-            operation_name: Name of the operation
-            logger: Optional logger instance
-        """
-        super().__init__(module_name, parent_module, logger)
-        self.operation_name = operation_name
+        # Create components - fail-fast if any critical component fails
+        ui_components.update(self._create_header_components(title, description))
+        ui_components.update(self._create_action_components())
         
-        # Operation components
-        self.progress_tracker = None
-        self.dialog = None
-        self.summary_generator = None
-        self.operation_handler = None
+        if self._enable_progress:
+            ui_components.update(self._create_progress_components())
         
-        # Ensure UI components include log output/accordion if not already present
-        if 'log_output' not in self.ui_components:
-            self.ui_components['log_output'] = None
-        if 'log_accordion' not in self.ui_components:
-            self.ui_components['log_accordion'] = None
+        ui_components.update(self._create_log_components())
+        
+        if self._enable_summary:
+            ui_components.update(self._create_summary_components())
+        
+        if self._enable_dialogs:
+            ui_components.update(self._create_dialog_components())
+        
+        if custom_components:
+            ui_components.update(custom_components)
+        
+        ui_components.update(self._create_main_container(ui_components))
+        
+        self.logger.info(f"✅ Created operation UI with {len(ui_components)} components")
+        return ui_components
     
-    @safe_ui_operation(operation_name="setup_handlers", log_level="error")
-    def setup_handlers(self) -> Dict[str, Any]:
-        """
-        Set up handlers for UI components.
-        
-        Returns:
-            Dict with setup status and any error information
-        """
+    def _create_header_components(self, title: str, description: str) -> Dict[str, Any]:
+        """Create header components."""
         try:
-            # Set up progress tracker
-            self._setup_progress_tracker()
+            from smartcash.ui.components.header import create_header
             
-            # Set up dialog
-            self._setup_dialog()
+            header = create_header(title=title, subtitle=description, show_divider=True)
+            if header is None:
+                raise RuntimeError("create_header returned None")
             
-            # Set up summary generator
-            self._setup_summary_generator()
-            
-            # Set up operation handler
-            self.operation_handler = self._create_operation_handler()
-            
-            # Set up additional handlers
-            self._setup_additional_handlers()
-            
-            return {
-                "status": True,  # Using 'status' instead of 'success' for consistency
-                "initializer": self.__class__.__name__
-            }
+            return {'header': header, 'header_container': header}
+        except ImportError:
+            raise ImportError("Header components module not available")
         except Exception as e:
-            return {
-                "status": False,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "initializer": self.__class__.__name__
-            }
+            raise RuntimeError(f"Failed to create header components: {str(e)}")
     
-    def _setup_progress_tracker(self) -> None:
-        """
-        Set up the progress tracker for this operation.
-        
-        This method can be overridden by subclasses to set up
-        a custom progress tracker.
-        """
-        # Default implementation - can be overridden by subclasses
-        pass
-    
-    def _setup_dialog(self) -> None:
-        """
-        Set up the dialog for this operation.
-        
-        This method can be overridden by subclasses to set up
-        a custom dialog.
-        """
-        # Default implementation - can be overridden by subclasses
-        pass
-    
-    def _setup_summary_generator(self) -> None:
-        """
-        Set up the summary generator for this operation.
-        
-        This method can be overridden by subclasses to set up
-        a custom summary generator.
-        """
-        # Default implementation - can be overridden by subclasses
-        pass
-    
-    def _create_operation_handler(self) -> Any:
-        """
-        Create the operation handler for this operation.
-        
-        Returns:
-            Operation handler instance
-        """
-        # Try to dynamically load the operation-specific handler class
+    def _create_action_components(self) -> Dict[str, Any]:
+        """Create action components."""
         try:
-            handler_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.operations.{self.operation_name}_handler"
-            handler_module = importlib.import_module(handler_path)
+            from smartcash.ui.components.action_container import create_action_container
             
-            # Look for a class named [OperationName]Handler (e.g., BatchDownloadHandler)
-            handler_class_name = f"{self.operation_name.capitalize()}Handler"
-            if hasattr(handler_module, handler_class_name):
-                handler_class = getattr(handler_module, handler_class_name)
-                return handler_class(
-                    self.ui_components,
-                    self.operation_name,
-                    self.parent_module,
-                    self.module_name,
-                    self.logger
-                )
-        except (ImportError, AttributeError) as e:
-            self.logger.debug(f"Could not load operation-specific handler: {str(e)}")
+            action_buttons = [
+                {"button_id": "start", "text": "▶️ Start", "style": "primary", "order": 1},
+                {"button_id": "cancel", "text": "⏹️ Cancel", "style": "danger", "order": 2}
+            ]
+            
+            action_container = create_action_container(
+                buttons=action_buttons, title="Actions", alignment="center"
+            )
+            if action_container is None:
+                raise RuntimeError("create_action_container returned None")
+            
+            return {
+                'action_container': action_container,
+                'start_button': action_container.get('buttons', {}).get('start'),
+                'cancel_button': action_container.get('buttons', {}).get('cancel')
+            }
+        except ImportError:
+            raise ImportError("Action container module not available")
         except Exception as e:
-            self.logger.error(f"Error creating operation handler: {str(e)}")
-        
-        # Return None if no handler could be created
-        return None
+            raise RuntimeError(f"Failed to create action components: {str(e)}")
     
-    def _setup_additional_handlers(self) -> None:
-        """
-        Set up additional handlers for this operation.
-        
-        This method can be overridden by subclasses to set up
-        any additional handlers needed for the operation.
-        """
-        # Default implementation - can be overridden by subclasses
-        pass
-    
-    @safe_ui_operation(operation_name="run_operation", log_level="error")
-    def run_operation(self, **kwargs) -> Dict[str, Any]:
-        """
-        Run the operation.
-        
-        Args:
-            **kwargs: Additional arguments for the operation
+    def _create_progress_components(self) -> Dict[str, Any]:
+        """Create progress components."""
+        try:
+            from smartcash.ui.components.progress_tracker import ProgressTracker
             
-        Returns:
-            Dict with operation status and results
-        """
-        if not self.operation_handler:
+            self._progress_tracker = ProgressTracker()
+            if self._progress_tracker is None:
+                raise RuntimeError("ProgressTracker creation returned None")
+            
             return {
-                "status": False,
-                "error": f"Operation handler for '{self.operation_name}' not initialized",
-                "initializer": self.__class__.__name__
+                'progress_tracker': self._progress_tracker,
+                'progress_bar': self._progress_tracker
             }
-        
-        return self.operation_handler.run(**kwargs)
+        except ImportError:
+            raise ImportError("Progress tracker module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create progress components: {str(e)}")
     
-    @safe_ui_operation(operation_name="cancel_operation", log_level="error")
-    def cancel_operation(self) -> Dict[str, Any]:
-        """
-        Cancel the operation.
-        
-        Returns:
-            Dict with operation status
-        """
-        if not self.operation_handler:
+    def _create_log_components(self) -> Dict[str, Any]:
+        """Create log components."""
+        try:
+            from smartcash.ui.components.log_accordion import create_log_accordion
+            
+            log_accordion = create_log_accordion()
+            if log_accordion is None:
+                raise RuntimeError("create_log_accordion returned None")
+            
+            # Expand accordion by default
+            if isinstance(log_accordion, dict) and 'log_accordion' in log_accordion:
+                accordion_widget = log_accordion['log_accordion']
+                if hasattr(accordion_widget, 'selected_index'):
+                    accordion_widget.selected_index = 0
+            
             return {
-                "status": False,
-                "error": f"Operation handler for '{self.operation_name}' not initialized",
-                "initializer": self.__class__.__name__
+                'log_accordion': log_accordion,
+                'log_output': log_accordion,
+                'log_components': log_accordion
             }
-        
-        return self.operation_handler.cancel()
+        except ImportError:
+            raise ImportError("Log accordion module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create log components: {str(e)}")
     
-    @safe_ui_operation(operation_name="get_operation_status", log_level="debug")
-    def get_operation_status(self) -> Dict[str, Any]:
-        """
-        Get the current status of the operation.
-        
-        Returns:
-            Dict with operation status
-        """
-        if not self.operation_handler:
+    def _create_summary_components(self) -> Dict[str, Any]:
+        """Create summary components."""
+        try:
+            from smartcash.ui.components.summary_container import create_summary_container
+            
+            summary_container = create_summary_container(
+                title="Operation Summary", theme="info", icon="📋"
+            )
+            if summary_container is None:
+                raise RuntimeError("create_summary_container returned None")
+            
             return {
-                "is_running": False,
-                "is_completed": False,
-                "is_cancelled": False,
-                "has_error": True,
-                "error": f"Operation handler for '{self.operation_name}' not initialized",
-                "operation_name": self.operation_name,
-                "initializer": self.__class__.__name__
+                'summary_container': summary_container,
+                'summary_output': summary_container
             }
-        
-        return self.operation_handler.get_status()
+        except ImportError:
+            raise ImportError("Summary container module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create summary components: {str(e)}")
     
-    @safe_ui_operation(operation_name="get_operation_summary", log_level="debug")
-    def get_operation_summary(self) -> Dict[str, Any]:
-        """
-        Get the summary of the operation.
-        
-        Returns:
-            Dict with operation summary
-        """
-        if not self.operation_handler:
+    def _create_dialog_components(self) -> Dict[str, Any]:
+        """Create dialog components."""
+        try:
+            from smartcash.ui.components.dialog import create_confirmation_area
+            
+            confirmation_area = create_confirmation_area()
+            if confirmation_area is None:
+                raise RuntimeError("create_confirmation_area returned None")
+            
             return {
-                "status": False,
-                "error": f"Operation handler for '{self.operation_name}' not initialized",
-                "initializer": self.__class__.__name__
+                'confirmation_area': confirmation_area,
+                'dialog_area': confirmation_area,
+                'error_area': confirmation_area
             }
+        except ImportError:
+            raise ImportError("Dialog components module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create dialog components: {str(e)}")
+    
+    def _create_main_container(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
+        """Create main container."""
+        try:
+            from smartcash.ui.components.main_container import create_main_container
+            
+            container_components = {}
+            
+            if 'header' in ui_components:
+                container_components['header_container'] = ui_components['header']
+            if 'action_container' in ui_components:
+                container_components['form_container'] = ui_components['action_container']
+            if 'summary_container' in ui_components:
+                container_components['summary_container'] = ui_components['summary_container']
+            
+            main_container = create_main_container(**container_components)
+            if main_container is None:
+                raise RuntimeError("create_main_container returned None")
+            
+            return {'main_container': main_container, 'ui': main_container}
+        except ImportError:
+            raise ImportError("Main container module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create main container: {str(e)}")
+    
+    def update_progress(self, value: float, message: Optional[str] = None) -> None:
+        """Update progress tracker dengan fail-fast."""
+        if self._progress_tracker is None:
+            raise RuntimeError("Progress tracker not initialized")
         
-        return self.operation_handler.get_summary()
+        if not hasattr(self._progress_tracker, 'update'):
+            raise RuntimeError("Progress tracker has no update method")
+        
+        try:
+            self._progress_tracker.update(value, message)
+        except Exception as e:
+            raise RuntimeError(f"Failed to update progress: {str(e)}")
+    
+    def reset_progress(self) -> None:
+        """Reset progress tracker dengan fail-fast."""
+        if self._progress_tracker is None:
+            raise RuntimeError("Progress tracker not initialized")
+        
+        if not hasattr(self._progress_tracker, 'reset'):
+            raise RuntimeError("Progress tracker has no reset method")
+        
+        try:
+            self._progress_tracker.reset()
+        except Exception as e:
+            raise RuntimeError(f"Failed to reset progress: {str(e)}")
+    
+    def show_confirmation(self, message: str, on_confirm: Callable, 
+                         on_cancel: Optional[Callable] = None, title: str = "Konfirmasi") -> None:
+        """Show confirmation dialog dengan fail-fast."""
+        try:
+            from smartcash.ui.components.dialog import show_confirmation_dialog
+            
+            show_confirmation_dialog(
+                title=title, message=message, on_confirm=on_confirm, on_cancel=on_cancel
+            )
+        except ImportError:
+            raise ImportError("Dialog module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to show confirmation dialog: {str(e)}")
+    
+    def show_info_dialog(self, title: str, message: str) -> None:
+        """Show info dialog dengan fail-fast."""
+        try:
+            from smartcash.ui.components.dialog import show_info_dialog
+            
+            show_info_dialog(title, message)
+        except ImportError:
+            raise ImportError("Dialog module not available")
+        except Exception as e:
+            raise RuntimeError(f"Failed to show info dialog: {str(e)}")
+    
+    def initialize(self) -> Dict[str, Any]:
+        """Initialize operation."""
+        return {
+            'success': True,
+            'message': f"Operation initializer ready for {self.full_module_name}",
+            'module': self.full_module_name
+        }

@@ -1,87 +1,89 @@
 """
-File: smartcash/ui/components/dialog/confirmation_dialog.py
-Deskripsi: Simple HTML glass morphism dialog di dalam confirmation area (tidak trigger dialog asli Colab)
+Confirmation dialog component for displaying modal dialogs with confirmation actions.
 """
 
-from turtle import width
+import uuid
 from typing import Dict, Any, Callable, Optional
 import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
-import uuid
 
-def create_confirmation_area(ui_components: Dict[str, Any]) -> widgets.Output:
-    """Buat area konfirmasi yang simple"""
+from smartcash.ui.components.base_component import BaseUIComponent
+
+
+class ConfirmationDialog(BaseUIComponent):
+    """A confirmation dialog component with glass morphism styling."""
     
-    if 'confirmation_area' not in ui_components or not isinstance(ui_components['confirmation_area'], widgets.Output):
-        # Create the output widget first
-        confirmation_area = widgets.Output()
+    def __init__(self, 
+                 component_name: str = "confirmation_dialog",
+                 **kwargs):
+        """Initialize the confirmation dialog.
         
-        # Set layout with proper CSS classes
-        confirmation_area.layout = widgets.Layout(
-            width='100%',
-            max_width='100%',
-            min_height='50px',
-            max_height='500px',
-            margin='10px 0',
-            padding='10px',
-            border='1px solid #e0e0e0',
-            border_radius='4px',
-            overflow_y='auto',
-            overflow_x='hidden',
-            display='none',  # Initially hidden
-            flex='1 1 auto'  # Allow expansion
+        Args:
+            component_name: Unique name for this component
+            **kwargs: Additional arguments to pass to BaseUIComponent
+        """
+        self._callbacks: Dict[str, Callable] = {}
+        self._is_visible = False
+        
+        # Initialize base class
+        super().__init__(component_name, **kwargs)
+    
+    def _create_ui_components(self) -> None:
+        """Create and initialize UI components."""
+        # Create main container
+        self._ui_components['container'] = widgets.Output(
+            layout=widgets.Layout(
+                width='100%',
+                max_width='100%',
+                min_height='50px',
+                max_height='500px',
+                margin='10px 0',
+                padding='10px',
+                border='1px solid #e0e0e0',
+                border_radius='4px',
+                overflow_y='auto',
+                overflow_x='hidden',
+                display='none',  # Initially hidden
+                flex='1 1 auto'  # Allow expansion
+            )
         )
         
-        # Add class using the proper method
-        if hasattr(confirmation_area, 'add_class'):
-            confirmation_area.add_class('confirmation-area')
-        else:
-            # Fallback for older ipywidgets versions
-            try:
-                confirmation_area.add_class('confirmation-area')
-            except Exception:
-                pass  # Ignore if add_class is not available
-                
-        ui_components['confirmation_area'] = confirmation_area
+        # Add class for styling
+        if hasattr(self._ui_components['container'], 'add_class'):
+            self._ui_components['container'].add_class('confirmation-area')
     
-    return ui_components['confirmation_area']
-
-def show_confirmation_dialog(ui_components: Dict[str, Any],
-                           title: str,
-                           message: str,
-                           on_confirm: Optional[Callable] = None,
-                           on_cancel: Optional[Callable] = None,
-                           confirm_text: str = "Konfirmasi",
-                           cancel_text: str = "Batal",
-                           danger_mode: bool = False) -> None:
-    """Show simple HTML glass morphism dialog dalam confirmation area"""
-    
-    try:
-        # Ensure confirmation area exists
-        confirmation_area = create_confirmation_area(ui_components)
+    def show(self, 
+             title: str,
+             message: str,
+             on_confirm: Optional[Callable] = None,
+             on_cancel: Optional[Callable] = None,
+             confirm_text: str = "Konfirmasi",
+             cancel_text: str = "Batal",
+             danger_mode: bool = False) -> None:
+        """Show the confirmation dialog.
         
-        # Show confirmation area with animation
-        confirmation_area.layout.display = 'flex'
-        confirmation_area.layout.visibility = 'visible'
-        confirmation_area.layout.height = 'auto'  # Allow height to adjust to content
-        confirmation_area.layout.min_height = '200px'  # Minimum height
-        confirmation_area.layout.max_height = '300px'  # Maximum height before scrolling
-        confirmation_area.layout.padding = '10px 15px'  # Add horizontal padding
-        confirmation_area.layout.margin = '5px 0'  # Reduced margin
-        confirmation_area.layout.overflow = 'hidden'
-        confirmation_area.layout.flex = '0 0 auto'  # Don't grow or shrink
+        Args:
+            title: Dialog title
+            message: Dialog message
+            on_confirm: Callback for confirm action
+            on_cancel: Callback for cancel action
+            confirm_text: Text for confirm button
+            cancel_text: Text for cancel button
+            danger_mode: Whether to use danger styling
+        """
+        if not self._initialized:
+            self.initialize()
         
-        # Generate unique IDs untuk buttons
+        # Store callbacks
+        self._callbacks['confirm'] = on_confirm
+        self._callbacks['cancel'] = on_cancel
+        
+        # Generate unique IDs
         dialog_id = f"dialog_{uuid.uuid4().hex[:8]}"
         confirm_id = f"confirm_{uuid.uuid4().hex[:8]}"
         cancel_id = f"cancel_{uuid.uuid4().hex[:8]}"
         
-        # Store callbacks in ui_components untuk JavaScript access
-        ui_components[f'_confirm_callback_{confirm_id}'] = on_confirm
-        ui_components[f'_cancel_callback_{cancel_id}'] = on_cancel
-        ui_components[f'_dialog_id'] = dialog_id
-        
-        # Define colors berdasarkan mode
+        # Define colors based on mode
         if danger_mode:
             confirm_bg = "#ef4444"
             confirm_hover = "#dc2626"
@@ -93,7 +95,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             card_accent = "rgba(79, 70, 229, 0.05)"
             card_border = "rgba(79, 70, 229, 0.15)"
         
-        # Build HTML dengan inline styles complete
+        # Build HTML with inline styles
         dialog_html = f"""
         <style>
         .smartcash-dialog-{dialog_id} {{
@@ -323,9 +325,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
                     <button id="{confirm_id}" class="glass-btn-{dialog_id} confirm-btn-{dialog_id}">
                         {confirm_text}
                     </button>
-                    <button id="{cancel_id}" class="glass-btn-{dialog_id} cancel-btn-{dialog_id}">
-                        {cancel_text}
-                    </button>
+                    {f'<button id="{cancel_id}" class="glass-btn-{dialog_id} cancel-btn-{dialog_id}">{cancel_text}</button>' if cancel_text else ''}
                 </div>
             </div>
         </div>
@@ -335,7 +335,7 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
             const confirmBtn = document.getElementById('{confirm_id}');
             const cancelBtn = document.getElementById('{cancel_id}');
             
-            function resetDialogState(callbackType) {{
+            function handleAction(actionType) {{
                 // Add fade out animation
                 const card = document.querySelector('.glass-card-{dialog_id}');
                 if (card) {{
@@ -346,148 +346,239 @@ def show_confirmation_dialog(ui_components: Dict[str, Any],
                 }}
                 
                 setTimeout(() => {{
-                    // First, reset the confirmation area styles in the frontend
-                    const confirmationArea = document.querySelector('.confirmation-area');
-                    if (confirmationArea) {{
-                        confirmationArea.style.transition = 'all 0.3s ease';
-                        confirmationArea.style.height = '0';
-                        confirmationArea.style.minHeight = '0';
-                        confirmationArea.style.maxHeight = '0';
-                        confirmationArea.style.padding = '0';
-                        confirmationArea.style.margin = '0';
-                        confirmationArea.style.overflow = 'hidden';
-                        confirmationArea.style.border = 'none';
+                    // Hide the dialog
+                    const container = document.querySelector('.confirmation-area');
+                    if (container) {{
+                        container.style.transition = 'all 0.3s ease';
+                        container.style.height = '0';
+                        container.style.minHeight = '0';
+                        container.style.maxHeight = '0';
+                        container.style.padding = '0';
+                        container.style.margin = '0';
+                        container.style.overflow = 'hidden';
+                        container.style.border = 'none';
                     }}
                     
-                    // Then trigger Python callback after a short delay
+                    // Execute the appropriate callback
                     if (window.jupyter && window.jupyter.notebook && window.jupyter.notebook.kernel) {{
-                        // Use string concatenation instead of template literals for the Python code
                         const code = `
-try:
-    # Execute the appropriate callback
-    callback = ui_components.get('_` + callbackType + `_callback_` + (callbackType === 'confirm' ? '${confirm_id}' : '${cancel_id}') + `')
-    if callback:
-        callback()
-        
-    # Reset the dialog state
-    from IPython.display import clear_output
-    from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area
-    clear_dialog_area(ui_components)
-    
-    # Clean up callbacks
-    ui_components.pop('_confirm_callback_${confirm_id}', None)
-    ui_components.pop('_cancel_callback_${cancel_id}', None)
-    
-    # Clear the output
-    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-        with ui_components['confirmation_area']:
-            clear_output(wait=True)
-except Exception as e:
-    print(f"⚠️ Error in ${callbackType} callback: {str(e) if 'e' in locals() else 'Unknown error'}")
+from IPython.display import clear_output
+from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area
+
+# Clear the output
+if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+    with ui_components['confirmation_area']:
+        clear_output(wait=True)
+
+# Execute the callback
+if '${action_type}' in ui_components._callbacks and ui_components._callbacks['${action_type}']:
+    try:
+        ui_components._callbacks['${action_type}']()
+    except Exception as e:
+        print(f"⚠️ Error in ${action_type} callback: {str(e) if 'e' in locals() else 'Unknown error'}")
+
+# Clear callbacks
+ui_components._callbacks = {{}}
 `;
                         window.jupyter.notebook.kernel.execute(code);
                     }}
                 }}, 200);
             }}
             
-            function handleConfirm() {{
-                try {{
-                    resetDialogState('confirm');
-                }} catch (e) {{
-                    console.error('Error in confirm handler:', e);
-                }}
-            }}
-            
-            function handleCancel() {{
-                try {{
-                    resetDialogState('cancel');
-                }} catch (e) {{
-                    console.error('Error in cancel handler:', e);
-                }}
-            }}
-            
             if (confirmBtn) {{
-                confirmBtn.onclick = handleConfirm;
+                confirmBtn.onclick = () => handleAction('confirm');
             }}
             
             if (cancelBtn) {{
-                cancelBtn.onclick = handleCancel;
+                cancelBtn.onclick = () => handleAction('cancel');
             }}
         }})();
         </script>
+        """.format(
+            dialog_id=dialog_id,
+            confirm_id=confirm_id,
+            cancel_id=cancel_id,
+            title=title,
+            message=message,
+            confirm_text=confirm_text,
+            cancel_text=cancel_text,
+            card_border=card_border,
+            card_accent=card_accent,
+            confirm_bg=confirm_bg,
+            confirm_hover=confirm_hover
+        )
+        
+        # Show the dialog
+        self._show_dialog(dialog_html)
+    
+    def show_info(self,
+                 title: str,
+                 message: str,
+                 on_ok: Optional[Callable] = None,
+                 ok_text: str = "OK") -> None:
+        """Show an info dialog with a single OK button.
+        
+        Args:
+            title: Dialog title
+            message: Dialog message
+            on_ok: Callback for OK button
+            ok_text: Text for OK button
         """
+        self.show(
+            title=title,
+            message=message,
+            on_confirm=on_ok,
+            on_cancel=None,
+            confirm_text=ok_text,
+            cancel_text="",
+            danger_mode=False
+        )
+    
+    def _show_dialog(self, html_content: str) -> None:
+        """Display the dialog with the given HTML content."""
+        if not self._initialized:
+            self.initialize()
         
-        # Display HTML di confirmation area
-        with confirmation_area:
+        container = self._ui_components['container']
+        
+        # Update container styles
+        container.layout.display = 'flex'
+        container.layout.visibility = 'visible'
+        container.layout.height = 'auto'
+        container.layout.min_height = '200px'
+        container.layout.max_height = '300px'
+        container.layout.padding = '10px 15px'
+        container.layout.margin = '5px 0'
+        container.layout.overflow = 'hidden'
+        container.layout.flex = '0 0 auto'
+        
+        # Display the dialog
+        with container:
             clear_output(wait=True)
-            display(HTML(dialog_html))
+            display(HTML(html_content))
         
-    except Exception as e:
-        print(f"⚠️ Error showing dialog: {str(e)}")
-        # Simple fallback
-        response = input(f"{title}: {message} (y/N): ").lower().strip()
-        if response in ['y', 'yes', 'ya'] and on_confirm:
-            on_confirm()
-        elif on_cancel:
-            on_cancel()
+        self._is_visible = True
+    
+    def hide(self) -> None:
+        """Hide the dialog."""
+        if not self._initialized:
+            return
+        
+        container = self._ui_components.get('container')
+        if container:
+            # Clear the output
+            with container:
+                clear_output(wait=True)
+            
+            # Reset container styles
+            container.layout.display = 'none'
+            container.layout.visibility = 'hidden'
+            container.layout.height = None
+            container.layout.min_height = '50px'
+            container.layout.max_height = '500px'
+            container.layout.padding = '10px'
+            container.layout.margin = '10px 0'
+            container.layout.overflow = 'auto'
+            container.layout.border = '1px solid #e0e0e0'
+            container.layout.border_radius = '4px'
+        
+        self._is_visible = False
+        self._callbacks = {}
+    
+    def is_visible(self) -> bool:
+        """Check if the dialog is currently visible."""
+        if not self._initialized:
+            return False
+        
+        container = self._ui_components.get('container')
+        if container and hasattr(container, 'layout'):
+            return container.layout.display != 'none'
+        
+        return self._is_visible
 
-def show_info_dialog(ui_components: Dict[str, Any],
-                    title: str,
-                    message: str,
-                    on_ok: Optional[Callable] = None,
-                    ok_text: str = "OK") -> None:
-    """Show simple info dialog"""
-    show_confirmation_dialog(
-        ui_components=ui_components,
+
+# Backward compatibility functions
+def create_confirmation_area(ui_components: Dict[str, Any]) -> Any:
+    """Legacy function to create a confirmation area."""
+    if 'confirmation_dialog' not in ui_components:
+        ui_components['confirmation_dialog'] = ConfirmationDialog("legacy_dialog")
+    
+    if 'confirmation_area' not in ui_components:
+        dialog = ui_components['confirmation_dialog']
+        dialog.initialize()
+        ui_components['confirmation_area'] = dialog._ui_components['container']
+    
+    return ui_components['confirmation_area']
+
+def show_confirmation_dialog(ui_components: Dict[str, Any],
+                           title: str,
+                           message: str,
+                           on_confirm: Optional[Callable] = None,
+                           on_cancel: Optional[Callable] = None,
+                           confirm_text: str = "Konfirmasi",
+                           cancel_text: str = "Batal",
+                           danger_mode: bool = False) -> None:
+    """Legacy function to show a confirmation dialog."""
+    # Ensure the dialog exists in ui_components
+    if 'confirmation_dialog' not in ui_components:
+        ui_components['confirmation_dialog'] = ConfirmationDialog("legacy_dialog")
+    
+    # Get the dialog instance
+    dialog = ui_components['confirmation_dialog']
+    
+    # Show the dialog
+    dialog.show(
         title=title,
         message=message,
-        on_confirm=on_ok,
-        on_cancel=None,
-        confirm_text=ok_text,
-        cancel_text="",
-        danger_mode=False
+        on_confirm=on_confirm,
+        on_cancel=on_cancel,
+        confirm_text=confirm_text,
+        cancel_text=cancel_text,
+        danger_mode=danger_mode
+    )
+
+def show_info_dialog(ui_components: Dict[str, Any],
+                   title: str,
+                   message: str,
+                   on_ok: Optional[Callable] = None,
+                   ok_text: str = "OK") -> None:
+    """Legacy function to show an info dialog."""
+    # Ensure the dialog exists in ui_components
+    if 'confirmation_dialog' not in ui_components:
+        ui_components['confirmation_dialog'] = ConfirmationDialog("legacy_dialog")
+    
+    # Get the dialog instance and show info
+    dialog = ui_components['confirmation_dialog']
+    dialog.show_info(
+        title=title,
+        message=message,
+        on_ok=on_ok,
+        ok_text=ok_text
     )
 
 def clear_dialog_area(ui_components: Dict[str, Any]) -> None:
-    """Clear dialog area and reset its state"""
-    if 'confirmation_area' not in ui_components:
-        return
+    """Legacy function to clear the dialog area."""
+    if 'confirmation_dialog' in ui_components:
+        dialog = ui_components['confirmation_dialog']
+        dialog.hide()
+    elif 'confirmation_area' in ui_components:
+        # Fallback for old-style usage
+        confirmation_area = ui_components['confirmation_area']
+        if hasattr(confirmation_area, 'clear_output'):
+            with confirmation_area:
+                clear_output(wait=True)
         
-    confirmation_area = ui_components['confirmation_area']
-    
-    try:
-        # Clear any existing output
-        with confirmation_area:
-            clear_output(wait=True)
-        
-        # Reset layout properties to default values
+        # Reset styles if possible
         if hasattr(confirmation_area, 'layout'):
-            confirmation_area.layout.display = 'flex'  # Use flex for better centering
-            confirmation_area.layout.visibility = 'visible'
-            confirmation_area.layout.height = None  # Auto height
-            confirmation_area.layout.min_height = '50px'
-            confirmation_area.layout.max_height = '90vh'  # Max 90% of viewport height
-            confirmation_area.layout.padding = '20px'
-            confirmation_area.layout.margin = '10px 0'
-            confirmation_area.layout.overflow = 'hidden'
-            confirmation_area.layout.border = '1px solid #e0e0e0'
-            confirmation_area.layout.border_radius = '8px'
-            confirmation_area.layout.justify_content = 'center'
-            confirmation_area.layout.align_items = 'center'
-    except Exception as e:
-        print(f"Error resetting dialog area: {e}")
-    
-    # Clean up callbacks to prevent memory leaks
-    keys_to_remove = [
-        k for k in ui_components.keys()
-        if k.startswith(('_confirm_callback_', '_cancel_callback_'))
-    ]
-    for key in keys_to_remove:
-        ui_components.pop(key, None)
+            confirmation_area.layout.display = 'none'
+            confirmation_area.layout.visibility = 'hidden'
 
 def is_dialog_visible(ui_components: Dict[str, Any]) -> bool:
-    """Check apakah dialog sedang visible"""
-    confirmation_area = ui_components.get('confirmation_area')
-    if confirmation_area and hasattr(confirmation_area, 'layout'):
-        return confirmation_area.layout.display != 'none'
+    """Legacy function to check if dialog is visible."""
+    if 'confirmation_dialog' in ui_components:
+        return ui_components['confirmation_dialog'].is_visible()
+    elif 'confirmation_area' in ui_components:
+        confirmation_area = ui_components['confirmation_area']
+        return (hasattr(confirmation_area, 'layout') and 
+                confirmation_area.layout.display != 'none')
     return False

@@ -1,190 +1,293 @@
-# smartcash/ui/core/initializers/module_initializer.py
 """
-Module initializer class for initializing module-specific UI components.
-Extends BaseInitializer with module-specific capabilities.
+File: smartcash/ui/core/initializers/module_initializer.py
+Deskripsi: Module-specific initializer dengan UI handler integration dan full lifecycle support.
+Kombinasi ConfigurableInitializer + ModuleUIHandler untuk complete module initialization.
 """
-from typing import Dict, Any, Optional, Type
-import logging
-import importlib
 
-from smartcash.ui.core.initializers.base_initializer import BaseInitializer
+from typing import Dict, Any, Optional, Type, List, Callable
+from pathlib import Path
+
+from smartcash.ui.core.initializers.config_initializer import ConfigurableInitializer
 from smartcash.ui.core.handlers.ui_handler import ModuleUIHandler
-from smartcash.ui.decorators import safe_ui_operation
+from smartcash.ui.handlers.config_handlers import ConfigHandler as LegacyConfigHandler
 
 
-class ModuleInitializer(BaseInitializer):
-    """
-    Initializer for module-specific UI components.
+class ModuleInitializer(ConfigurableInitializer):
+    """Module-specific initializer dengan complete UI dan config management.
     
-    This class extends BaseInitializer with module-specific capabilities,
-    including handler setup and UI component management.
+    Features:
+    - 🎯 Complete module initialization
+    - 🔧 Auto handler setup
+    - 📊 UI-Config synchronization
+    - 🔄 Lifecycle management
+    - 💾 Persistence support
     """
     
-    def __init__(
-        self,
-        module_name: str,
-        parent_module: str,
-        logger: Optional[logging.Logger] = None
-    ):
-        """
-        Initialize the module initializer.
+    def __init__(self, 
+                 module_name: str, 
+                 parent_module: Optional[str] = None,
+                 handler_class: Optional[Type] = None,
+                 config_handler_class: Optional[Type] = None,
+                 enable_shared_config: bool = True,
+                 auto_setup_handlers: bool = True):
+        """Initialize module initializer.
         
         Args:
-            module_name: Name of the module being initialized
-            parent_module: Parent module name (e.g., 'dataset', 'setup')
-            logger: Optional logger instance
+            module_name: Nama module
+            parent_module: Parent module untuk organization
+            handler_class: Custom UI handler class (default: ModuleUIHandler)
+            config_handler_class: Custom config handler untuk backward compat
+            enable_shared_config: Enable config sharing
+            auto_setup_handlers: Auto setup UI event handlers
         """
-        super().__init__(module_name, parent_module, logger)
+        # Initialize parent
+        super().__init__(module_name, parent_module, config_handler_class, enable_shared_config)
         
-        # Module-specific handlers
-        self.ui_handler = None
+        # Handler setup
+        self._handler_class = handler_class or ModuleUIHandler
+        self._auto_setup_handlers = auto_setup_handlers
+        self._module_handler: Optional[ModuleUIHandler] = None
         
-        # Ensure UI components include log output/accordion if not already present
-        if 'log_output' not in self.ui_components:
-            self.ui_components['log_output'] = None
-        if 'log_accordion' not in self.ui_components:
-            self.ui_components['log_accordion'] = None
+        # Additional handlers registry
+        self._operation_handlers: Dict[str, Any] = {}
+        self._service_handlers: Dict[str, Any] = {}
+        
+        self.logger.debug(f"🎯 ModuleInitializer created with handler: {self._handler_class.__name__}")
     
-    @safe_ui_operation(operation_name="setup_handlers", log_level="error")
-    def setup_handlers(self) -> Dict[str, Any]:
-        """
-        Set up handlers for UI components.
-        
-        Returns:
-            Dict with setup status and any error information
-        """
-        try:
-            # Set up UI handler
-            self.ui_handler = self._create_ui_handler()
-            
-            # Set up module-specific handlers
-            self._setup_module_handlers()
-            
-            return {
-                "status": True,
-                "initializer": self.__class__.__name__
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "initializer": self.__class__.__name__
-            }
+    # === Handler Creation ===
     
-    def _create_ui_handler(self) -> ModuleUIHandler:
-        """
-        Create the UI handler for this module.
-        
-        Returns:
-            ModuleUIHandler instance
-        """
-        # Try to dynamically load the module-specific handler class
-        try:
-            handler_path = f"smartcash.ui.{self.parent_module}.{self.module_name}.handlers.{self.module_name}_handler"
-            handler_module = importlib.import_module(handler_path)
-            
-            # Look for a class named [ModuleName]Handler (e.g., DownloaderHandler)
-            handler_class_name = f"{self.module_name.capitalize()}Handler"
-            if hasattr(handler_module, handler_class_name):
-                handler_class = getattr(handler_module, handler_class_name)
-                return handler_class(self.ui_components, self.parent_module, self.module_name, self.logger)
-        except (ImportError, AttributeError) as e:
-            self.logger.debug(f"Could not load module-specific handler: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Error creating UI handler: {str(e)}")
-        
-        # Fall back to generic ModuleUIHandler
-        return ModuleUIHandler(self.ui_components, self.parent_module, self.module_name, self.logger)
+    def create_module_handler(self) -> ModuleUIHandler:
+        """Create module handler instance. Override untuk custom handler."""
+        return self._handler_class(
+            module_name=self.module_name,
+            parent_module=self.parent_module,
+            default_config=self.get_default_config(),
+            auto_setup_handlers=self._auto_setup_handlers,
+            enable_sharing=True
+        )
     
-    def _setup_module_handlers(self) -> None:
-        """
-        Set up module-specific handlers.
-        
-        This method should be implemented by subclasses to set up
-        any additional handlers needed for the module.
-        """
-        pass
-    
-    @safe_ui_operation(operation_name="update_ui_from_config", log_level="error")
-    def update_ui_from_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Update UI components from configuration.
-        
-        Args:
-            config: Configuration dictionary
-            
-        Returns:
-            Dict with update status and any error information
-        """
-        try:
-            if self.ui_handler:
-                self.ui_handler.update_ui(config)
-                return {
-                    "status": True,
-                    "message": "UI updated successfully",
-                    "initializer": self.__class__.__name__
-                }
-            
-            return {
-                "status": False,
-                "message": "UI handler not initialized",
-                "error": "UI handler not initialized",
-                "initializer": self.__class__.__name__
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "initializer": self.__class__.__name__
-            }
-    
-    @safe_ui_operation(operation_name="extract_config_from_ui", log_level="error")
-    def extract_config_from_ui(self) -> Dict[str, Any]:
-        """
-        Extract configuration from UI components.
-        
-        Returns:
-            Configuration dictionary extracted from UI
-        """
-        if self.ui_handler:
-            return self.ui_handler.extract_config()
-        
-        self.logger.warning("UI handler not initialized, cannot extract config")
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration. Override di subclass."""
         return {}
     
-    @safe_ui_operation(operation_name="validate_config", log_level="error", fallback_return=False)
-    def validate_config(self, config: Dict[str, Any]) -> bool:
-        """
-        Validate configuration.
+    # === Extended Setup ===
+    
+    def setup_handlers(self, **kwargs) -> None:
+        """Setup module handler dan additional handlers."""
+        self.logger.info("🔧 Setting up module handlers...")
         
-        Args:
-            config: Configuration to validate
+        try:
+            # 1. Create main module handler
+            self._module_handler = self.create_module_handler()
             
-        Returns:
-            True if configuration is valid, False otherwise
-        """
-        if self.ui_handler:
-            return self.ui_handler.validate_config(config)
+            # 2. Setup dengan UI components
+            self._module_handler.setup(self._ui_components)
+            
+            # 3. Register di handlers dict
+            self._handlers['module'] = self._module_handler
+            self._handlers['config'] = self._module_handler  # Alias untuk backward compat
+            
+            # 4. Setup operation handlers
+            self.setup_operation_handlers()
+            
+            # 5. Setup service handlers  
+            self.setup_service_handlers()
+            
+            # 6. Custom handler setup
+            self.setup_custom_handlers()
+            
+            self.logger.info(f"✅ Handlers setup complete: {len(self._handlers)} handlers")
+            
+        except Exception as e:
+            raise RuntimeError(f"Handler setup failed: {str(e)}") from e
+    
+    def setup_operation_handlers(self) -> None:
+        """Setup operation-specific handlers. Override di subclass."""
+        pass
+    
+    def setup_service_handlers(self) -> None:
+        """Setup service/business logic handlers. Override di subclass."""
+        pass
+    
+    def setup_custom_handlers(self) -> None:
+        """Setup additional custom handlers. Override di subclass."""
+        pass
+    
+    # === UI Component Creation Helper ===
+    
+    def create_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+        """Default implementation yang bisa di-override.
         
-        self.logger.warning("UI handler not initialized, cannot validate config")
+        Subclass harus override ini atau implement create_module_ui_components.
+        """
+        # Try module-specific method first
+        if hasattr(self, 'create_module_ui_components'):
+            return self.create_module_ui_components(config, **kwargs)
+        
+        # Fallback: error jika tidak di-implement
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement create_ui_components() "
+            "or create_module_ui_components()"
+        )
+    
+    # === Operation Handler Management ===
+    
+    def register_operation_handler(self, name: str, handler: Any) -> None:
+        """Register operation handler."""
+        self._operation_handlers[name] = handler
+        self._handlers[f'op_{name}'] = handler
+        self.logger.debug(f"📌 Registered operation handler: {name}")
+    
+    def get_operation_handler(self, name: str) -> Optional[Any]:
+        """Get operation handler by name."""
+        return self._operation_handlers.get(name)
+    
+    def execute_operation(self, name: str, *args, **kwargs) -> Any:
+        """Execute operation by name."""
+        handler = self.get_operation_handler(name)
+        if not handler:
+            raise ValueError(f"Operation handler not found: {name}")
+        
+        # Check for execute method
+        if hasattr(handler, 'execute'):
+            return handler.execute(*args, **kwargs)
+        elif hasattr(handler, 'execute_operation'):
+            return handler.execute_operation(*args, **kwargs)
+        else:
+            raise AttributeError(f"Operation handler {name} has no execute method")
+    
+    # === Service Handler Management ===
+    
+    def register_service_handler(self, name: str, handler: Any) -> None:
+        """Register service handler."""
+        self._service_handlers[name] = handler
+        self._handlers[f'svc_{name}'] = handler
+        self.logger.debug(f"📌 Registered service handler: {name}")
+    
+    def get_service_handler(self, name: str) -> Optional[Any]:
+        """Get service handler by name."""
+        return self._service_handlers.get(name)
+    
+    # === Module Handler Delegation ===
+    
+    @property
+    def module_handler(self) -> Optional[ModuleUIHandler]:
+        """Get module handler."""
+        return self._module_handler
+    
+    def update_ui_from_config(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Update UI dari config via handler."""
+        if self._module_handler:
+            self._module_handler.update_ui_from_config(config or self.config)
+    
+    def extract_config_from_ui(self) -> Dict[str, Any]:
+        """Extract config dari UI via handler."""
+        if self._module_handler:
+            return self._module_handler.extract_config_from_ui()
+        return {}
+    
+    def sync_config_with_ui(self) -> None:
+        """Sync config dengan UI."""
+        if self._module_handler:
+            self._module_handler.sync_config_with_ui()
+    
+    def sync_ui_with_config(self) -> None:
+        """Sync UI dengan config."""
+        if self._module_handler:
+            self._module_handler.sync_ui_with_config()
+    
+    # === Event Handler Registration ===
+    
+    def register_ui_event(self, 
+                         component_name: str, 
+                         event_name: str, 
+                         handler: Callable) -> bool:
+        """Register UI event handler."""
+        if self._module_handler:
+            return self._module_handler.register_event_handler(
+                component_name, event_name, handler
+            )
         return False
     
-    @safe_ui_operation(operation_name="reset_config", log_level="error")
-    def reset_config(self) -> Dict[str, Any]:
-        """
-        Reset configuration to defaults.
+    def register_ui_events(self, 
+                          events: Dict[str, List[Tuple[str, Callable]]]) -> Dict[str, bool]:
+        """Batch register UI events.
         
+        Args:
+            events: Dict mapping component_name ke list of (event_name, handler) tuples
+            
         Returns:
-            Dict with operation status
+            Dict mapping component_name ke success status
         """
-        if self.ui_handler:
-            return self.ui_handler.reset_config()
+        results = {}
         
-        return {
-            "status": False,
-            "message": "UI handler not initialized",
-            "error": "UI handler not initialized",
-            "initializer": self.__class__.__name__
+        for comp_name, comp_events in events.items():
+            comp_results = []
+            for event_name, handler in comp_events:
+                success = self.register_ui_event(comp_name, event_name, handler)
+                comp_results.append(success)
+            
+            results[comp_name] = all(comp_results)
+        
+        return results
+    
+    # === Lifecycle Methods ===
+    
+    def cleanup(self) -> None:
+        """Cleanup resources."""
+        # Cleanup operation handlers
+        for handler in self._operation_handlers.values():
+            if hasattr(handler, 'cleanup'):
+                try:
+                    handler.cleanup()
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Failed to cleanup handler: {e}")
+        
+        # Cleanup service handlers
+        for handler in self._service_handlers.values():
+            if hasattr(handler, 'cleanup'):
+                try:
+                    handler.cleanup()
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Failed to cleanup handler: {e}")
+        
+        # Cleanup module handler
+        if self._module_handler and hasattr(self._module_handler, 'cleanup'):
+            try:
+                self._module_handler.cleanup()
+            except Exception as e:
+                self.logger.warning(f"⚠️ Failed to cleanup module handler: {e}")
+        
+        self.logger.info("🧹 Module cleanup complete")
+    
+    def get_module_info(self) -> Dict[str, Any]:
+        """Get module information summary."""
+        info = {
+            'module': self.full_module_name,
+            'initialized': self.is_initialized,
+            'init_duration': self.init_duration,
+            'components': len(self._ui_components),
+            'handlers': {
+                'total': len(self._handlers),
+                'operations': len(self._operation_handlers),
+                'services': len(self._service_handlers)
+            },
+            'config': {
+                'items': len(self.config),
+                'shared': hasattr(self.config_handler, '_shared_manager') and 
+                         self.config_handler._shared_manager is not None
+            }
         }
+        
+        # Add handler info jika ada
+        if self._module_handler:
+            info['handler_info'] = self._module_handler.get_module_info()
+        
+        return info
+    
+    def __repr__(self) -> str:
+        """String representation."""
+        return (f"{self.__class__.__name__}("
+                f"module='{self.full_module_name}', "
+                f"initialized={self._initialized}, "
+                f"handlers={len(self._handlers)})")

@@ -1,12 +1,22 @@
 """
 File: smartcash/ui/setup/env_config/utils/__init__.py
 
-Utility Functions and Classes for Environment Configuration.
+Utils Module - DEPRECATED
 
-This package provides utility modules that support the environment configuration
-functionality, including progress tracking and UI state management.
+Utils functionality telah diintegrasikan dalam arsitektur baru:
+- env_detector.py -> EnvironmentStatusChecker (services/status_checker.py)
+- Other utils -> Base handlers dan operation handlers
 
-Key Utilities:
-    - dual_progress_tracker: Manages multi-stage progress tracking
-    - ui_state: Handles UI state management and button states
+Untuk compatibility, import dari services/status_checker.py
 """
+
+# Deprecated imports untuk backward compatibility
+from smartcash.ui.setup.env_config.services.status_checker import EnvironmentStatusChecker
+
+# Deprecated alias
+detect_environment_info = lambda: EnvironmentStatusChecker().get_overall_status()
+
+__all__ = [
+    'EnvironmentStatusChecker',
+    'detect_environment_info'  # Deprecated - use EnvironmentStatusChecker instead
+]

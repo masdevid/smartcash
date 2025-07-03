@@ -1,19 +1,17 @@
 """
-File: smartcash/ui/components/summary_container.py
-Description: Reusable summary container component with dynamic styling.
-
-This module provides a blank, reusable summary container component with
-dynamic background and border styles featuring a modern gradient look.
-It can be used for displaying various types of content with consistent
-styling across the application.
+Summary container component with dynamic theming and content display.
 """
 
-from typing import Dict, Any, List, Optional, Union, Tuple
+from typing import Dict, Any, Optional, Union, List
 import ipywidgets as widgets
+from IPython.display import display, HTML
+import re
+
+from smartcash.ui.components.base_component import BaseUIComponent
 
 
-class SummaryContainer:
-    """A blank, reusable container with dynamic styling and modern gradient look."""
+class SummaryContainer(BaseUIComponent):
+    """A reusable container with dynamic theming and content display."""
     
     # Predefined style themes with gradient backgrounds
     THEMES = {
@@ -49,52 +47,64 @@ class SummaryContainer:
         }
     }
     
-    def __init__(self, theme: str = "default", title: str = "", icon: str = ""):
+    def __init__(self, 
+                 component_name: str = "summary_container",
+                 theme: str = "default",
+                 title: str = "",
+                 icon: str = "",
+                 **kwargs):
         """Initialize the summary container.
         
         Args:
-            theme: Theme name from predefined themes (default, primary, success, warning, danger, info)
-            title: Optional title for the summary container
+            component_name: Unique name for this component
+            theme: Theme name from predefined themes
+            title: Optional title for the container
             icon: Optional icon to display next to the title
+            **kwargs: Additional arguments to pass to BaseUIComponent
         """
-        # Apply theme styling
-        theme_style = self.THEMES.get(theme, self.THEMES["default"])
+        self._theme = theme
+        self._title = title
+        self._icon = icon
+        self._theme_style = self.THEMES.get(theme, self.THEMES["default"])
         
+        # Initialize base class
+        super().__init__(component_name, **kwargs)
+    
+    def _create_ui_components(self) -> None:
+        """Create and initialize UI components."""
         # Create content widgets
         widgets_list = []
         
         # Add title if provided
-        if title:
-            self.title = widgets.HTML(
-                f"<h4 style='margin: 0 0 10px 0; font-size: 1.1rem; color: {theme_style['text_color']}'>" 
-                f"{icon + ' ' if icon else ''}{title}</h4>"
+        if self._title:
+            self._ui_components['title'] = widgets.HTML(
+                f"<h4 style='margin: 0 0 10px 0; font-size: 1.1rem; color: {self._theme_style['text_color']}'>"
+                f"{self._icon + ' ' if self._icon else ''}{self._title}</h4>"
             )
-            widgets_list.append(self.title)
+            widgets_list.append(self._ui_components['title'])
         
         # Create content area
-        self.content = widgets.HTML(value="")
-        widgets_list.append(self.content)
+        self._ui_components['content'] = widgets.HTML(value="")
+        widgets_list.append(self._ui_components['content'])
         
         # Create the container with dynamic styling
-        self.container = widgets.Box(
+        self._ui_components['container'] = widgets.Box(
             widgets_list,
             layout=widgets.Layout(
                 width="100%",
                 padding="15px",
                 margin="0 0 15px 0",
-                border=theme_style["border"],
+                border=self._theme_style["border"],
                 border_radius="8px",
-                background=theme_style["gradient"],
-                box_shadow="0 2px 5px rgba(0,0,0,0.05)"
+                background=self._theme_style["gradient"],
+                box_shadow="0 2px 5px rgba(0,0,0,0.05)",
+                flex_grow="1"
             )
         )
         
-        # Store theme for later use
-        self.theme = theme
-        self.theme_style = theme_style
-        
         # Add CSS class for styling
-        self.container.add_class("summary-container")
+        if hasattr(self._ui_components['container'], 'add_class'):
+            self._ui_components['container'].add_class("summary-container")
     
     def set_content(self, content: str) -> None:
         """Set the HTML content of the container.
@@ -102,31 +112,36 @@ class SummaryContainer:
         Args:
             content: HTML content to display in the container
         """
-        self.content.value = content
+        if not self._initialized:
+            self.initialize()
+        self._ui_components['content'].value = content
     
     def set_theme(self, theme: str) -> None:
         """Change the container theme.
         
         Args:
-            theme: Theme name from predefined themes (default, primary, success, warning, danger, info)
+            theme: Theme name from predefined themes
         """
+        if not self._initialized:
+            self.initialize()
+            
         if theme not in self.THEMES:
             theme = "default"
             
-        theme_style = self.THEMES[theme]
-        self.theme = theme
-        self.theme_style = theme_style
+        self._theme = theme
+        self._theme_style = self.THEMES[theme]
         
         # Update container styling
-        self.container.layout.border = theme_style["border"]
-        self.container.layout.background = theme_style["gradient"]
+        container = self._ui_components['container']
+        container.layout.border = self._theme_style["border"]
+        container.layout.background = self._theme_style["gradient"]
         
         # Update title if it exists
-        if hasattr(self, 'title'):
-            title_text = self.title.value
+        if 'title' in self._ui_components:
+            title_widget = self._ui_components['title']
+            title_text = title_widget.value
             if title_text:
                 # Extract the title text from HTML
-                import re
                 title_match = re.search(r'>([^<]+)</h4>', title_text)
                 if title_match:
                     title_content = title_match.group(1)
@@ -136,8 +151,8 @@ class SummaryContainer:
                     title_text = title_content[len(icon):] if icon else title_content
                     
                     # Update title with new styling
-                    self.title.value = (
-                        f"<h4 style='margin: 0 0 10px 0; font-size: 1.1rem; color: {theme_style['text_color']}'>" 
+                    title_widget.value = (
+                        f"<h4 style='margin: 0 0 10px 0; font-size: 1.1rem; color: {self._theme_style['text_color']}'>"
                         f"{icon}{title_text}</h4>"
                     )
     
@@ -148,6 +163,9 @@ class SummaryContainer:
             html: HTML content to display
             theme: Optional theme to apply
         """
+        if not self._initialized:
+            self.initialize()
+            
         if theme:
             self.set_theme(theme)
         self.set_content(html)
@@ -161,6 +179,9 @@ class SummaryContainer:
             message_type: Message type (info, success, warning, danger)
             icon: Optional icon to display
         """
+        if not self._initialized:
+            self.initialize()
+            
         # Set theme based on message type
         self.set_theme(message_type)
         
@@ -178,8 +199,8 @@ class SummaryContainer:
         # Create HTML content
         html_content = (
             f"<div style='padding: 10px;'>"
-            f"<h5 style='margin: 0; color: {self.theme_style['text_color']};'>{icon} {title}</h5>"
-            f"<div style='margin-top: 8px; color: {self.theme_style['text_color']};'>{message}</div>"
+            f"<h5 style='margin: 0; color: {self._theme_style['text_color']};'>{icon} {title}</h5>"
+            f"<div style='margin-top: 8px; color: {self._theme_style['text_color']};'>{message}</div>"
             f"</div>"
         )
         
@@ -193,11 +214,17 @@ class SummaryContainer:
             title: Optional title for the status
             icon: Optional icon for the title
         """
+        if not self._initialized:
+            self.initialize()
+            
         html_parts = []
         
         # Add title if provided
         if title:
-            html_parts.append(f"<h5 style='margin: 0 0 10px 0; color: {self.theme_style['text_color']};'>{icon} {title}</h5>")
+            html_parts.append(
+                f"<h5 style='margin: 0 0 10px 0; color: {self._theme_style['text_color']};'>"
+                f"{icon} {title}</h5>"
+            )
         
         # Add status items
         html_parts.append("<div style='display: flex; flex-direction: column; gap: 5px;'>")
@@ -205,8 +232,8 @@ class SummaryContainer:
         for label, value in items.items():
             html_parts.append(
                 f"<div style='display: flex; justify-content: space-between;'>"
-                f"<span style='color: {self.theme_style['text_color']};'>{label}</span>"
-                f"<span style='font-weight: bold; color: {self.theme_style['text_color']};'>{value}</span>"
+                f"<span style='color: {self._theme_style['text_color']};'>{label}</span>"
+                f"<span style='font-weight: bold; color: {self._theme_style['text_color']};'>{value}</span>"
                 f"</div>"
             )
         
@@ -216,11 +243,22 @@ class SummaryContainer:
     
     def clear(self) -> None:
         """Clear the container content."""
-        self.content.value = ""
+        if not self._initialized:
+            self.initialize()
+        self._ui_components['content'].value = ""
+    
+    @property
+    def container(self):
+        """Get the container widget."""
+        if not self._initialized:
+            self.initialize()
+        return self._ui_components['container']
 
 
 def create_summary_container(theme: str = "default", title: str = "", icon: str = "") -> SummaryContainer:
     """Create a summary container with dynamic styling and modern gradient look.
+    
+    This is a legacy function for backward compatibility.
     
     Args:
         theme: Theme name from predefined themes (default, primary, success, warning, danger, info)
@@ -230,4 +268,9 @@ def create_summary_container(theme: str = "default", title: str = "", icon: str 
     Returns:
         SummaryContainer instance
     """
-    return SummaryContainer(theme=theme, title=title, icon=icon)
+    return SummaryContainer(
+        component_name=f"summary_container_{uuid.uuid4().hex[:8]}",
+        theme=theme,
+        title=title,
+        icon=icon
+    )

@@ -287,19 +287,11 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         
         # Format error message
         error_msg = f"Gagal initialize environment configuration: {str(e)}"
-        
-        # Log and handle the error
-        error_handler.handle_error(
+        result = error_handler.handle_error(
             error_msg=error_msg,
             level='error',
             exc_info=True,
             create_ui_error=True
-        )
-        result = create_error_component(
-            error_message=error_msg,
-            title="❌ Environment Configuration Error",
-            error_type="error",
-            show_traceback=True
         )
         # Return a user-friendly error component
         from smartcash.ui.utils.widget_utils import safe_display

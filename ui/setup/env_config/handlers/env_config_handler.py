@@ -33,6 +33,22 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
     configuration system.
     """
     
+    # ------------------------------------------------------------------
+    # BaseHandler abstract method implementation
+    # ------------------------------------------------------------------
+    def initialize(self) -> Dict[str, Any]:
+        """Concrete initializer to satisfy :class:`BaseHandler`.
+
+        This handler is primarily driven externally (UI components call
+        `setup_dependencies` etc.), so there is no heavy lifting here.
+        We simply mark the handler as initialized and return a status
+        dictionary that can be used by callers to verify success.
+        """
+        if not self._is_initialized:
+            self._is_initialized = True
+            self.logger.debug("✅ EnvConfigHandler marked as initialized")
+        return {"status": True, "message": "EnvConfigHandler initialized"}
+
     def __init__(
         self,
         ui_components: Dict[str, Any],

@@ -11,6 +11,8 @@ from abc import ABC
 from smartcash.ui.core.handlers.base_handler import BaseHandler
 
 
+from IPython.display import display
+
 class UIHandler(BaseHandler):
     """Handler dengan UI-specific utilities yang container-aware."""
     
@@ -288,6 +290,28 @@ class UIHandler(BaseHandler):
             self.logger.error(f"❌ Failed to get widget value: {str(e)}")
             return None
     
+    def show_error_ui(self, error_result: Dict[str, Any]):
+        """Display error UI and hide standard components.
+
+        Args:
+            error_result: Dict returned from operations that includes
+                ``error`` bool and optionally ``container`` widget.
+        """
+        try:
+            if not (error_result and error_result.get('error')):
+                return
+            # Hide normal components
+            self.clear_all_components()
+            container = error_result.get('container')
+            if container is None:
+                # Build a simple ErrorComponent
+                from smartcash.ui.components.error.error_component import create_error_component
+                container = create_error_component(error_message=error_result.get('message', 'Unknown error'))['container']
+            display(container)
+        except Exception as e:
+            # Fall back to logging if even error UI fails
+            self.logger.error(f"❌ Failed to display error UI: {e}")
+
     def cleanup(self):
         """Cleanup UI handler."""
         try:

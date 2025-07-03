@@ -49,6 +49,9 @@ smartcash/ui/core/
     │   └── operation_initializer.py
     └── shared/
         ├── __init__.py       # Export only public shared utilities
+        ├── logger.py         # Enhanced UILogger with suppression support
+        ├── error_handler.py  # Centralized error handling
+        ├── ui_component_manager.py # UI component management
         └── shared_config_manager.py
 ```
 
@@ -1098,6 +1101,49 @@ class DownloaderInitializer(ModuleInitializer):
 5. **Simplified API**: Consistent interface across all modules
 6. **Testability**: Easier to mock and test individual components
 
+## Key Implementation Notes
+
+### API Response Consistency
+
+All handler and initializer methods that return status information now use the key `"status"` instead of `"success"` for consistency with the engine API. This ensures that all components check for the same key when evaluating operation results.
+
+```python
+# Before
+return {
+    "success": True,
+    "message": "Operation completed successfully"
+}
+
+# After
+return {
+    "status": True,  # Consistent with engine API
+    "message": "Operation completed successfully"
+}
+```
+
+### Enhanced Logging with Suppression
+
+The enhanced UILogger provides several ways to control log suppression:
+
+1. **Auto-suppression**: Logs are automatically suppressed until log_output is ready
+2. **Direct control**: `logger.suppress()` and `logger.unsuppress()` methods
+3. **Context manager**: `with logger.with_suppression(): ...` for temporary suppression
+
+This ensures no logs appear before log_output is ready and all logs are directed to log_output only.
+
+### Optional UI Extraction and Update Methods
+
+The config handling has been made more flexible by making extract_config and update_ui methods truly optional for non-persistent handlers:
+
+1. Checking if the methods exist before calling them
+2. Gracefully handling NotImplementedError if they're called but not implemented
+3. Using in-memory state when extract_config is not available
+4. Skipping UI updates when update_ui is not available
+
+This allows for simpler handlers that only need to maintain state in memory without implementing UI extraction/update methods.
+
 ## Conclusion
 
 This refactoring proposal provides a clear path to a more maintainable, debuggable, and consistent architecture for SmartCash handlers and initializers. By moving from config passing through method arguments to class properties and establishing a clean inheritance hierarchy, we can significantly improve the developer experience and code quality.
+
+The implementation of enhanced logging with suppression ensures a clean user experience with no logs appearing before log_output is ready, and the consistent use of the "status" key in API responses ensures compatibility with the engine API.

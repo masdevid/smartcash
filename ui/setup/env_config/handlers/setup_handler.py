@@ -713,7 +713,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             drive_handler = self.get_handler('drive')
             result = await drive_handler.mount_drive()
             
-            if result.get('success', False):
+            if result.get('status', False):
                 summary.update({
                     'status': 'success',
                     'message': 'Google Drive mounted successfully',
@@ -762,7 +762,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             # Setup symlinks
             result = await folder_handler.setup_symlinks()
             
-            if result.get('success', False):
+            if result.get('status', False):
                 symlinks_created = result.get('symlinks_created', 0)
                 summary.update({
                     'status': 'success',
@@ -810,7 +810,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             # Create folders
             result = await folder_handler.create_required_folders()
             
-            if result.get('success', False):
+            if result.get('status', False):
                 folders_created = result.get('folders_created', 0)
                 summary.update({
                     'status': 'success',
@@ -973,7 +973,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             result = config_manager.sync_configs_to_drive(force_overwrite=force_overwrite)
             
             # Log the result
-            if result.get('success', False):
+            if result.get('status', False):
                 self.logger.info(
                     f"Successfully synced {result.get('synced_count', 0)} config templates. "
                     f"Skipped {result.get('skipped_count', 0)} up-to-date files."
@@ -985,7 +985,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
                 
             # Update UI if requested
             if update_ui and ui_components:
-                status_type = 'success' if result.get('success', False) else 'warning'
+                status_type = 'success' if result.get('status', False) else 'warning'
                 message = result.get('message', 'Configuration sync completed')
                 self._update_status_panel(ui_components, message, status_type)
                 
@@ -999,7 +999,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
                 self._update_status_panel(ui_components, error_msg, 'error')
                 
             return {
-                'success': False,
+                'status': False,
                 'message': error_msg,
                 'error': str(e)
             }
@@ -1026,7 +1026,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
                 'phase': 'config_sync',
                 'message': sync_result.get('message', 'Configuration sync completed'),
                 'config_check': sync_result,
-                'success': sync_result.get('success', False)
+                'status': sync_result.get('status', False)
             })
             
             return summary
@@ -1038,7 +1038,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             summary.update({
                 'phase': 'config_sync',
                 'message': error_msg,
-                'success': False
+                'status': False
             })
             
             if ui_components:
@@ -1095,7 +1095,7 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
         """
         return self._last_summary
         
-    def _on_setup_completed(self, success: bool, error: Optional[str] = None) -> None:
+    def _on_setup_completed(self, status: bool, error: Optional[str] = None) -> None:
         """Handle setup completion by creating the setup complete marker file if successful.
         
         This method is called when the setup workflow completes, either successfully or with an error.
@@ -1126,13 +1126,13 @@ class SetupHandler(BaseHandler, BaseConfigMixin):
             
             # Update the setup state
             self._setup_in_progress = False
-            self._current_phase = SetupPhase.COMPLETE if success else SetupPhase.ERROR
+            self._current_phase = SetupPhase.COMPLETE if status else SetupPhase.ERROR
             
             # Update the last summary
             self._update_summary(
-                status='completed' if success else 'failed',
+                status='completed' if status else 'failed',
                 phase=self._current_phase,
-                message='Setup completed successfully' if success else f'Setup failed: {error}'
+                message='Setup completed successfully' if status else f'Setup failed: {error}'
             )
             
             # Log the completion

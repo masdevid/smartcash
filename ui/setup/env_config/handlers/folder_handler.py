@@ -101,7 +101,7 @@ class FolderHandler(BaseHandler, BaseConfigMixin):
         self.set_stage(SetupStage.SYMLINK_SETUP, "Setting up symlinks")
         
         result = {
-            'success': False,
+            'status': False,
             'symlinks_created': [],
             'errors': [],
             'message': 'Symlink setup started'
@@ -109,7 +109,7 @@ class FolderHandler(BaseHandler, BaseConfigMixin):
         
         if not self.required_symlinks:
             result.update({
-                'success': True,
+                'status': True,
                 'message': 'No symlinks to create',
                 'symlinks_created': []
             })
@@ -154,7 +154,7 @@ class FolderHandler(BaseHandler, BaseConfigMixin):
                 self.logger.info(f"Created symlink: {target_path} -> {source_path}")
             
             result.update({
-                'success': True,
+                'status': True,
                 'symlinks_created': symlinks_created,
                 'message': f'Successfully created {len(symlinks_created)} symlinks'
             })
@@ -163,7 +163,7 @@ class FolderHandler(BaseHandler, BaseConfigMixin):
             error_msg = f"Error setting up symlinks: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             result.update({
-                'success': False,
+                'status': False,
                 'message': error_msg,
                 'errors': [error_msg]
             })
@@ -214,7 +214,7 @@ class FolderHandler(BaseHandler, BaseConfigMixin):
                 result['status'] = 'warning'
                 result['message'] = f"Completed with {len(result['errors'])} errors"
             else:
-                result['status'] = 'success'
+                result['status'] = 'completed'
                 result['message'] = 'All folders and symlinks created successfully'
             
             self.logger.info(result['message'])

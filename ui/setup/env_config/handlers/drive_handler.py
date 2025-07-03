@@ -16,7 +16,7 @@ from smartcash.ui.setup.env_config.constants import SetupStage
 
 class MountResult(TypedDict, total=False):
     """Type definition for drive mount operation results."""
-    success: bool
+    status: bool  # True for success, False for failure
     mount_path: str
     already_mounted: bool
     cancelled: bool
@@ -95,7 +95,7 @@ class DriveHandler(BaseHandler, BaseConfigMixin):
         if not force_remount and self.env_manager.is_drive_mounted:
             self.logger.info("Google Drive is already mounted")
             self._last_mount_result = {
-                'success': True,
+                'status': True,
                 'mount_path': str(self.env_manager.drive_path),
                 'already_mounted': True,
                 'cancelled': False,
@@ -106,14 +106,14 @@ class DriveHandler(BaseHandler, BaseConfigMixin):
         
         try:
             # Use environment manager to mount drive
-            success, message = self.env_manager.mount_drive()
+            status_result, message = self.env_manager.mount_drive()
             
             # Update mount path from environment manager
             self.mount_path = str(self.env_manager.drive_path) if self.env_manager.drive_path else self.mount_path
             
-            if success:
+            if status_result:
                 self._last_mount_result = {
-                    'success': True,
+                    'status': True,
                     'mount_path': self.mount_path,
                     'already_mounted': False,
                     'cancelled': False,
@@ -123,7 +123,7 @@ class DriveHandler(BaseHandler, BaseConfigMixin):
                 self.logger.info("Google Drive mounted successfully")
             else:
                 self._last_mount_result = {
-                    'success': False,
+                    'status': False,
                     'mount_path': self.mount_path,
                     'already_mounted': False,
                     'cancelled': False,
@@ -137,7 +137,7 @@ class DriveHandler(BaseHandler, BaseConfigMixin):
             error_msg = f"Failed to mount Google Drive: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self._last_mount_result = {
-                'success': False,
+                'status': False,
                 'mount_path': self.mount_path,
                 'already_mounted': False,
                 'cancelled': False,

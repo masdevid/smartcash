@@ -6,17 +6,22 @@ for environment configuration, coordinating between different handlers and manag
 the overall environment setup process.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable
+import logging
 from pathlib import Path
 
-from smartcash.ui.handlers.base_handler import BaseHandler
-from smartcash.ui.setup.env_config.handlers.base_env_handler import BaseEnvHandler
+# Import core handlers
+from smartcash.ui.core.handlers.base_handler import BaseHandler
+from smartcash.ui.core.handlers.ui_handler import UIHandler
+from smartcash.ui.core.handlers.config_handler import ConfigHandler as CoreConfigHandler
+
+# Import module-specific handlers
 from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler, SetupSummary
 from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
 from smartcash.ui.setup.env_config.constants import SetupStage
 
 
-class EnvConfigHandler(BaseEnvHandler):
+class EnvConfigHandler(UIHandler):
     """Main orchestrator for environment configuration.
     
     This handler coordinates between different environment configuration components:
@@ -28,36 +33,72 @@ class EnvConfigHandler(BaseEnvHandler):
     configuration system.
     """
     
-    def __init__(self, config_handler: Optional[ConfigHandler] = None, **kwargs):
+    def __init__(
+        self,
+        ui_components: Dict[str, Any],
+        parent_module: str = 'setup',
+        module_name: str = 'env_config',
+        logger: Optional[logging.Logger] = None
+    ):
         """Initialize the environment configuration handler.
         
         Args:
-            config_handler: Optional ConfigHandler instance. If not provided, a new one will be created.
-            **kwargs: Additional keyword arguments for BaseEnvHandler
+            ui_components: Dictionary containing UI components
+            parent_module: Parent module name (default: 'setup')
+            module_name: Module name (default: 'env_config')
+            logger: Optional logger instance
         """
+        # Initialize the base handler
         super().__init__(
-            module_name='env_config',
-            parent_module='setup',
-            **kwargs
+            ui_components=ui_components,
+            logger=logger
         )
         
-        # Initialize core handlers
-        self._config_handler = config_handler or ConfigHandler(
-            module_name='env_config',
-            parent_module='setup',
-            logger=self.logger
-        )
+        # Store module information
+        self.module_name = module_name
+        self.parent_module = parent_module
         
-        self._setup_handler = SetupHandler(
-            config_handler=self._config_handler,
-            logger=self.logger
-        )
-        
+        # Initialize state
         self._current_stage = SetupStage.INIT
         self._status = 'idle'
         self._progress = 0.0
         
         self.logger.info("Environment configuration handler initialized")
+    
+    def setup(self) -> None:
+        """Set up the handler after initialization.
+        
+        This method initializes the config handler and setup handler.
+        """
+        # Initialize config handler if not already provided
+        self._config_handler = self.ui_components.get('config_handler')
+        if not self._config_handler:
+            self._config_handler = ConfigHandler(
+                ui_components=self.ui_components,
+                logger=self.logger
+            )
+            self.ui_components['config_handler'] = self._config_handler
+        
+        # Initialize setup handler
+        self._setup_handler = SetupHandler(
+            ui_components=self.ui_components,
+            config_handler=self._config_handler,
+            logger=self.logger
+        )
+        self.ui_components['setup_handler'] = self._setup_handler
+        
+        # Set up event handlers for UI components
+        self._setup_event_handlers()
+        
+        self.logger.debug("EnvConfigHandler setup completed")
+    
+    def _setup_event_handlers(self) -> None:
+        """Set up event handlers for UI components."""
+        # Set up setup button click handler
+        if 'setup_button' in self.ui_components:
+            setup_button = self.ui_components['setup_button']
+            if hasattr(setup_button, 'on_click'):
+                setup_button.on_click(self.handle_setup_button_click)
     
     @property
     def config_handler(self) -> ConfigHandler:
@@ -81,22 +122,29 @@ class EnvConfigHandler(BaseEnvHandler):
         try:
             self._status = 'initializing'
             self._progress = 0.0
+            self.update_status("Initializing environment...", "info")
             
             # Initialize configuration
-            if config:
-                self._config_handler.update_config(config)
+            if config and hasattr(self._config_handler, 'set_config'):
+                self._config_handler.set_config(config)
             
             # Start the setup process
-            success = await self._setup_handler.start_setup()
+            status_result = await self._setup_handler.start_setup()
+        
+            self._status = 'ready' if status_result else 'error'
+            self._progress = 100.0 if status_result else 0.0
             
-            self._status = 'ready' if success else 'error'
-            self._progress = 100.0 if success else 0.0
-            
-            return success
+            message = "Environment initialized successfully" if status_result else "Failed to initialize environment"
+            status_type = "success" if status_result else "error"
+            self.update_status(message, status_type)
+        
+            return status_result
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize environment: {str(e)}", exc_info=True)
+            error_msg = f"Failed to initialize environment: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
             self._status = 'error'
+            self.update_status(error_msg, "error")
             return False
     
     def get_status(self) -> Dict[str, Any]:
@@ -105,7 +153,7 @@ class EnvConfigHandler(BaseEnvHandler):
         Returns:
             Dict containing status information
         """
-        setup_summary = self._setup_handler.get_summary()
+        setup_summary = self._setup_handler.get_summary() if hasattr(self._setup_handler, 'get_summary') else None
         
         return {
             'status': self._status,
@@ -114,7 +162,7 @@ class EnvConfigHandler(BaseEnvHandler):
             'setup': dict(setup_summary) if setup_summary else {}
         }
     
-    async def handle_setup_button_click(self, button) -> None:
+    def handle_setup_button_click(self, button) -> None:
         """Handle setup button click event.
         
         Args:
@@ -122,10 +170,14 @@ class EnvConfigHandler(BaseEnvHandler):
         """
         try:
             if self._status == 'ready':
-                await self.initialize_environment()
+                import asyncio
+                asyncio.create_task(self.initialize_environment())
             else:
                 self.logger.warning("Environment initialization already in progress")
+                self.update_status("Environment initialization already in progress", "warning")
                 
         except Exception as e:
-            self.logger.error(f"Error handling setup button click: {str(e)}", exc_info=True)
+            error_msg = f"Error handling setup button click: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
             self._status = 'error'
+            self.update_status(error_msg, "error")

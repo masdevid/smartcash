@@ -20,13 +20,13 @@ class SyncResult(TypedDict, total=False):
     Attributes:
         synced_count: Number of configs successfully synced
         configs_synced: List of config names that were synced
-        success: Overall success status
+        status: Overall operation status (True for success, False for failure)
         errors: List of error messages if any
         details: Additional operation details
     """
     synced_count: int
     configs_synced: List[str]
-    success: bool
+    status: bool
     errors: List[str]
     details: Dict[str, Any]
 

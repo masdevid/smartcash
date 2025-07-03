@@ -308,3 +308,18 @@ class ConfigOperation(OperationHandler):
                 'error': str(e),
                 'configs_created': 0
             }
+
+    # === OperationHandler abstract method implementations ===
+    def initialize(self) -> Dict[str, Any]:
+        """Concrete initialize implementation."""
+        # Basic init could be verifying configs
+        return self.verify_configs()
+
+    def get_operations(self) -> Dict[str, Any]:
+        """Return mapping of operation names to callables."""
+        return {
+            'sync_configs': self.sync_configs,
+            'sync_templates': self.sync_templates,
+            'verify_configs': self.verify_configs,
+            'create_default_configs': self.create_default_configs
+        }

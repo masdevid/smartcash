@@ -85,9 +85,13 @@ class EnvConfigInitializer(ModuleInitializer):
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
             
-    def initialize(self) -> Dict[str, Any]:
+    def initialize(self, config: Dict[str, Any] = None, **kwargs) -> Dict[str, Any]:
         """Initialize the environment configuration UI.
         
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional keyword arguments
+            
         Returns:
             Dict containing initialization status and UI components:
                 - success: Boolean indicating if initialization was successful
@@ -95,6 +99,12 @@ class EnvConfigInitializer(ModuleInitializer):
                 - error: Error message if initialization failed
         """
         try:
+            # Store config if provided
+            if config is not None:
+                self._config = {**self._get_default_config(), **config}
+            else:
+                self._config = self._get_default_config()
+                
             # Run pre-initialization checks
             self.pre_initialize_checks()
             

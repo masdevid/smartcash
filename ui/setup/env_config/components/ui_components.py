@@ -126,20 +126,13 @@ def create_env_config_ui() -> Dict[str, Any]:
     main_container = create_main_container(
         header_container=header_container.container,
         form_container=form_components['container'],
-        summary_container=summary_container.container
+        summary_container=summary_container.container,
+        action_container=action_container['container'],
+        footer_container=footer_container.container
     )
     
     # Store the main UI container
     ui_components['ui'] = main_container.container
     ui_components['main_container'] = main_container
     
-    # Log any missing critical components
-    from smartcash.ui.utils.ui_logger import UILogger
-    logger = UILogger(ui_components, name=__name__)
-    missing = [k for k in ['log_accordion', 'log_output'] if k not in ui_components]
-    if missing:
-        logger.warning(f"Missing critical UI components: {', '.join(missing)}")
-    else:
-        logger.debug("All critical UI components present")
-        
     return ui_components

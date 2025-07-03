@@ -13,7 +13,6 @@ from smartcash.ui.components.form_container import create_form_container
 from smartcash.ui.components.summary_container import create_summary_container
 from smartcash.ui.components.footer_container import create_footer_container
 from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components import create_log_accordion
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 
@@ -53,8 +52,19 @@ def create_env_config_ui() -> Dict[str, Any]:
         alignment="center"
     )
     
-    # Get setup button from action container
+    # Get setup button from action container and connect it to handlers
     setup_button = action_container['buttons']['setup']
+    
+    # Store the button for later handler connection
+    ui_components['setup_button'] = setup_button
+    
+    # Create a placeholder for the setup handler function
+    def placeholder_setup_handler(btn):
+        # This will be replaced by the actual handler in env_config_handler.py
+        pass
+    
+    # Attach the placeholder handler - will be replaced by the real handler during initialization
+    setup_button.on_click(placeholder_setup_handler)
     
     # Create form container without save/reset buttons
     form_components = create_form_container(
@@ -124,17 +134,34 @@ def create_env_config_ui() -> Dict[str, Any]:
     
     # Fix status panel width to prevent horizontal scrollbar
     if hasattr(header_container, 'status_panel') and header_container.status_panel is not None:
+        # Fix the status panel HTML element directly
+        if hasattr(header_container.status_panel, 'children') and len(header_container.status_panel.children) > 0:
+            status_html = header_container.status_panel.children[0]
+            status_html.layout.width = '100%'
+            status_html.layout.max_width = '100%'
+            status_html.layout.overflow_x = 'hidden'
+        
+        # Also fix the container
         header_container.status_panel.layout.width = '100%'
         header_container.status_panel.layout.max_width = '100%'
+        header_container.status_panel.layout.overflow_x = 'hidden'
     
-    # Fix summary container title duplication - remove the title from the component
-    # if it already has a title in the container
+    # Fix summary container title duplication and vertical layout
     if hasattr(setup_summary, 'title_widget') and hasattr(setup_summary, 'value'):
         # Create a new widget without the title
         setup_content = setup_summary.value
         summary_container.set_content(setup_content)
     
-    # Make sure log accordion is inside the footer container
+    # Ensure summary container has vertical layout
+    if hasattr(summary_container, 'container'):
+        summary_container.container.layout.flex_flow = 'column'
+        summary_container.container.layout.align_items = 'stretch'
+        if hasattr(summary_container.container, 'children'):
+            for child in summary_container.container.children:
+                if hasattr(child, 'layout'):
+                    child.layout.width = '100%'
+    
+    # Make sure log accordion is inside the footer container and remove duplicates
     if 'log_accordion' in ui_components and ui_components['log_accordion'] is not None:
         # Check if it's already in the footer container
         if footer_container.container.children and ui_components['log_accordion'] not in footer_container.container.children:
@@ -142,6 +169,14 @@ def create_env_config_ui() -> Dict[str, Any]:
             footer_children = list(footer_container.container.children)
             footer_children.append(ui_components['log_accordion'])
             footer_container.container.children = tuple(footer_children)
+        
+        # Remove any duplicate log accordions from ui_components to prevent rendering outside container
+        # We'll keep only the reference to the one in the footer container
+        ui_components['log_accordion'] = footer_container.log_accordion
+        
+        # Make sure the log accordion is visible
+        if hasattr(footer_container.log_accordion, 'selected_index'):
+            footer_container.log_accordion.selected_index = 0  # Expand first accordion item
     
     # Create the main container with proper layout
     main_container = create_main_container(

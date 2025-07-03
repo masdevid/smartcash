@@ -120,8 +120,38 @@ def create_env_config_ui() -> Dict[str, Any]:
             ui_components['log_output'] = footer_container.log_accordion
             ui_components['log_components'] = footer_container.log_accordion
     
-    # 8. Create the final UI layout using direct widget assembly
-    # This gives us more control than using the container classes
+    # 8. Create the final UI layout using main_container
+    
+    # Fix status panel width to prevent horizontal scrollbar
+    if hasattr(header_container, 'status_panel') and header_container.status_panel is not None:
+        header_container.status_panel.layout.width = '100%'
+        header_container.status_panel.layout.max_width = '100%'
+    
+    # Fix summary container title duplication - remove the title from the component
+    # if it already has a title in the container
+    if hasattr(setup_summary, 'title_widget') and hasattr(setup_summary, 'value'):
+        # Create a new widget without the title
+        setup_content = setup_summary.value
+        summary_container.set_content(setup_content)
+    
+    # Make sure log accordion is inside the footer container
+    if 'log_accordion' in ui_components and ui_components['log_accordion'] is not None:
+        # Check if it's already in the footer container
+        if footer_container.container.children and ui_components['log_accordion'] not in footer_container.container.children:
+            # Add it to the footer if needed
+            footer_children = list(footer_container.container.children)
+            footer_children.append(ui_components['log_accordion'])
+            footer_container.container.children = tuple(footer_children)
+    
+    # Create the main container with proper layout
+    main_container = create_main_container(
+        header_container=header_container.container,
+        form_container=form_components['container'],
+        action_container=action_container['container'],
+        footer_container=footer_container.container
+    )
+    
+    # Create a list of components that should be in the main container
     all_components = [
         header_container.container,
         form_components['container'],
@@ -134,16 +164,8 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Filter out any None components
     all_components = [c for c in all_components if c is not None]
     
-    # Create the main container directly with ipywidgets
-    main_ui = ipywidgets.VBox(
-        all_components,
-        layout=ipywidgets.Layout(
-            width='100%',
-            padding='15px',
-            border='1px solid #ddd',
-            border_radius='8px'
-        )
-    )
+    # Replace the main container's children with our custom ordered components
+    main_container.container.children = all_components
     
     # Store the main UI container
     ui_components['ui'] = main_ui

@@ -7,6 +7,7 @@ Handler utama untuk environment configuration yang mengkoordinasikan
 berbagai handlers dan mengelola proses setup environment secara keseluruhan.
 """
 
+import logging
 from typing import Dict, Any, Optional, List, Callable
 from smartcash.ui.core.shared.logger import get_enhanced_logger
 from pathlib import Path

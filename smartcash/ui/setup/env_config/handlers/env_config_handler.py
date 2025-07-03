@@ -7,9 +7,8 @@ Handler utama untuk environment configuration yang mengkoordinasikan
 berbagai handlers dan mengelola proses setup environment secara keseluruhan.
 """
 
-import logging
 from typing import Dict, Any, Optional, List, Callable
-from smartcash.ui.core.shared.logger import get_enhanced_logger
+from smartcash.ui.core.shared.logger import get_enhanced_logger, UILogger
 from pathlib import Path
 
 # Import core handlers dari arsitektur baru
@@ -37,7 +36,7 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
     def __init__(
         self,
         ui_components: Dict[str, Any],
-        logger: Optional[logging.Logger] = None
+        logger: Optional[UILogger] = None
     ):
         """Initialize environment configuration handler.
         

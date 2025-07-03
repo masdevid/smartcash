@@ -333,12 +333,17 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
             
             # Delegate ke setup handler
             result = self.setup_handler.validate_environment()
+            # Show error UI if any
+            self.show_error_ui(result)
             
             if result.get('status', False):
                 self.update_status("✅ Environment validation passed", 'success')
             else:
                 self.update_status("❌ Environment validation failed", 'error')
             
+            # suppress raw dict when error already displayed
+            if result.get('error'):
+                return None
             return result
             
         except Exception as e:

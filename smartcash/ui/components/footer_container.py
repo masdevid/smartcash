@@ -123,6 +123,8 @@ class FooterContainer:
             )
             # The legacy create_log_accordion returns 'accordion' as the key instead of 'log_accordion'
             self.log_accordion = log_components['accordion']
+            # Save the append_log callable for easy logging
+            self._append_log = log_components.get('append_log')
             # Try to get the output widget from the accordion's children
             if hasattr(self.log_accordion, 'children') and len(self.log_accordion.children) > 0:
                 box = self.log_accordion.children[0]
@@ -146,6 +148,7 @@ class FooterContainer:
         else:
             self.log_accordion = None
             self.log_output = None
+            self._append_log = None
             
         # Create closeable tips panel if enabled
         if self.show_tips:
@@ -346,6 +349,12 @@ class FooterContainer:
             message: Log message
             level: Log level ('debug', 'info', 'success', 'warning', 'error', 'critical')
         """
+        # Prefer using the underlying LogAccordion's append_log callable when available
+        if getattr(self, "_append_log", None):
+            log_level = LogLevel[level.upper()] if hasattr(LogLevel, level.upper()) else LogLevel.INFO
+            self._append_log(message, log_level)
+            return
+
         if self.log_output:
             # For legacy log accordion, we need to find the output widget inside the Accordion
             if hasattr(self.log_output, 'children') and len(self.log_output.children) > 0:
@@ -362,6 +371,7 @@ class FooterContainer:
                             return
             
             # For newer log accordion with LogLevel
+            # For newer log accordion instances
             if hasattr(LogLevel, level.upper()):
                 log_level = LogLevel[level.upper()]
                 if hasattr(self.log_output, 'append_log'):

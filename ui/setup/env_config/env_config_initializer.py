@@ -282,7 +282,7 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         
     except Exception as e:
         # Use the centralized error handler
-        from smartcash.ui.core.shared.error_handler import CoreErrorHandler
+        from smartcash.ui.core.shared.error_handler import CoreErrorHandler, create_error_component
         error_handler = CoreErrorHandler('env_config_initializer')
         
         # Format error message
@@ -296,18 +296,10 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
             create_ui_error=True
         )
         
-        # Return a simple error message
-        from IPython.display import display, HTML
-        return HTML(f"""
-            <div style="
-                padding: 1rem;
-                color: #721c24;
-                background-color: #f8d7da;
-                border: 1px solid #f5c6cb;
-                border-radius: 0.25rem;
-                margin: 1rem 0;
-            ">
-                <h4>❌ Error Initializing Environment Configuration</h4>
-                <p>{error_msg}</p>
-            </div>
-        """)
+        # Return a user-friendly error component
+        return create_error_component(
+            error_message=error_msg,
+            title="❌ Environment Configuration Error",
+            error_type="error",
+            show_traceback=True
+        )

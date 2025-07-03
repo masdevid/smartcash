@@ -398,6 +398,41 @@ class SharedConfigHandler(PersistentConfigHandler):
             return list(self._shared_manager.get_all_configs().keys())
         return []
     
+    def initialize(self, **kwargs) -> Dict[str, Any]:
+        """Initialize the shared config handler.
+        
+        Args:
+            **kwargs: Additional initialization parameters
+            
+        Returns:
+            Dictionary containing initialization result with 'status' key
+        """
+        try:
+            # If sharing is enabled and not already set up, set it up
+            if self._enable_sharing and self.parent_module and not self._shared_manager:
+                self._setup_shared_config()
+                
+                # If we have a shared manager, load the initial config
+                if self._shared_manager:
+                    if shared_config := self._shared_manager.get_config(self.module_name):
+                        self._config.update(shared_config)
+                        self.logger.info(f"🔗 Loaded shared config: {len(shared_config)} items")
+            
+            return {
+                'status': True,
+                'initialized': True,
+                'sharing_enabled': self._enable_sharing and bool(self._shared_manager),
+                'message': 'Shared config handler initialized successfully'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize shared config handler: {e}", exc_info=True)
+            return {
+                'status': False,
+                'error': str(e),
+                'message': f'Failed to initialize shared config: {e}'
+            }
+    
     def __del__(self):
         """Cleanup shared config subscription."""
         if self._unsubscribe_fn:

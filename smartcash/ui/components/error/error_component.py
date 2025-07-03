@@ -10,7 +10,7 @@ from IPython.display import display, HTML
 class ErrorComponent:
     """🚨 Clean error component dengan reliable traceback toggle"""
     
-    def __init__(self, title: str = "🚨 Error", width: str = '80%'):
+    def __init__(self, title: str = "🚨 Error", width: str = '100%'):
         self.title = title
         self.width = width
         self._components = {}
@@ -50,8 +50,8 @@ class ErrorComponent:
             content = widgets.VBox(
                 [error_display, traceback_widget],
                 layout=widgets.Layout(
-                    width='80%',
-                    max_width='80%',
+                    width='100%',
+                    max_width='100%',
                     margin='10px 0',
                     padding='0',
                     _css={
@@ -68,18 +68,18 @@ class ErrorComponent:
             # Create the outer container with proper width constraints
             container = widgets.VBox(
                 layout=widgets.Layout(
-                    width='80%',
-                    max_width='80%',
+                    width='100%',
+                    max_width='100%',
                     margin='0',
                     padding='0',
                     _css={
                         'display': 'flex',
                         'justify-content': 'center',
                         'box-sizing': 'border-box',
-                        'max-width': '80% !important',
-                        'width': '80% !important',
+                        'max-width': '100% !important',
+                        'width': '100% !important',
                         'overflow': 'hidden',
-                        'padding': '10px',
+                        'padding': '0',
                         'position': 'relative'
                     }
                 )
@@ -91,12 +91,12 @@ class ErrorComponent:
         else:
             # For single error display without traceback
             error_display.layout = widgets.Layout(
-                width='80%',
-                max_width='80%',
+                width='100%',
+                max_width='100%',
                 margin='10px 0',
                 _css={
-                    'max-width': '80%',
-                    'width': '80% !important',
+                    'max-width': '100%',
+                    'width': '100% !important',
                     'box-sizing': 'border-box',
                     'overflow': 'hidden',
                     'padding': '0 8px',
@@ -106,16 +106,16 @@ class ErrorComponent:
             
             container = widgets.VBox(
                 layout=widgets.Layout(
-                    width='80%',
-                    max_width='80%',
+                    width='100%',
+                    max_width='100%',
                     margin='0',
                     padding='0',
                     _css={
                         'display': 'flex',
                         'justify-content': 'center',
                         'box-sizing': 'border-box',
-                        'max-width': '80%',
-                        'width': '80% !important',
+                        'max-width': '100%',
+                        'width': '100% !important',
                         'overflow': 'hidden',
                         'padding': '0',
                         'position': 'relative'
@@ -141,25 +141,25 @@ class ErrorComponent:
         """Glassmorphism color schemes"""
         return {
             "error": {
-                "bg": "linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, rgba(244, 67, 54, 0.05) 80%)",
+                "bg": "linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, rgba(244, 67, 54, 0.05) 100%)",
                 "border": "rgba(244, 67, 54, 0.3)",
                 "color": "#d32f2f",
                 "icon": "🚨"
             },
             "warning": {
-                "bg": "linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 80%)",
+                "bg": "linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%)",
                 "border": "rgba(255, 193, 7, 0.3)",
                 "color": "#ff8f00",
                 "icon": "⚠️"
             },
             "info": {
-                "bg": "linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 80%)",
+                "bg": "linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%)",
                 "border": "rgba(33, 150, 243, 0.3)",
                 "color": "#1565c0",
                 "icon": "ℹ️"
             },
             "success": {
-                "bg": "linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(76, 175, 80, 0.05) 80%)",
+                "bg": "linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(76, 175, 80, 0.05) 100%)",
                 "border": "rgba(76, 175, 80, 0.3)",
                 "color": "#2e7d32",
                 "icon": "✅"
@@ -197,8 +197,8 @@ class ErrorComponent:
         
         html_content = f"""
         <div style="
-            width: 80% !important;
-            max-width: 80% !important;
+            width: 100% !important;
+            max-width: 100% !important;
             box-sizing: border-box !important;
             padding: 0 !important;
             margin: 8px 0 !important;
@@ -215,8 +215,8 @@ class ErrorComponent:
                 padding: 16px;
                 margin: 0;
                 box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-                width: 80% !important;
-                max-width: 80% !important;
+                width: 100% !important;
+                max-width: 100% !important;
                 box-sizing: border-box !important;
                 overflow: hidden !important;
             ">
@@ -226,8 +226,8 @@ class ErrorComponent:
                     margin-bottom: 12px;
                     flex-wrap: wrap;
                     gap: 8px;
-                    width: 80% !important;
-                    max-width: 80% !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
                     box-sizing: border-box !important;
                     overflow: hidden !important;
                 ">
@@ -251,8 +251,8 @@ class ErrorComponent:
                     margin-bottom: 12px;
                     word-wrap: break-word !important;
                     overflow-wrap: break-word !important;
-                    width: 80% !important;
-                    max-width: 80% !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
                     box-sizing: border-box !important;
                     overflow: hidden !important;
                     white-space: normal !important;
@@ -267,8 +267,8 @@ class ErrorComponent:
                     margin-top: 8px;
                     word-wrap: break-word !important;
                     overflow-wrap: break-word !important;
-                    width: 80% !important;
-                    max-width: 80% !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
                     box-sizing: border-box !important;
                     overflow: hidden !important;
                     white-space: normal !important;
@@ -282,7 +282,7 @@ class ErrorComponent:
         return widgets.HTML(
             value=html_content,
             layout=widgets.Layout(
-                width='80%',
+                width='100%',
                 overflow='hidden'
             )
         )
@@ -293,10 +293,10 @@ class ErrorComponent:
         
         traceback_widget = widgets.HTML(
             value=f"""
-            <div style="width: 80%; max-width: 80%; box-sizing: border-box; padding: 0 8px;">
+            <div style="width: 100%; max-width: 100%; box-sizing: border-box; padding: 0 8px;">
                 <div id="traceback-{error_id}" style="
                     display: none;
-                    background: linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(248, 249, 250, 0.8) 80%);
+                    background: linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(248, 249, 250, 0.8) 100%);
                     backdrop-filter: blur(10px);
                     -webkit-backdrop-filter: blur(10px);
                     border: 1px solid rgba(0, 0, 0, 0.1);
@@ -304,8 +304,8 @@ class ErrorComponent:
                     margin: 4px 0 16px 0;
                     overflow: hidden;
                     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-                    width: 80%;
-                    max-width: 80%;
+                    width: 100%;
+                    max-width: 100%;
                     box-sizing: border-box;
                 ">
                     <div style="
@@ -332,14 +332,14 @@ class ErrorComponent:
                         max-height: 300px;
                         overflow-y: auto;
                         box-sizing: border-box;
-                        width: 80%;
-                        max-width: 80%;
+                        width: 100%;
+                        max-width: 100%;
                     ">{traceback}</pre>
                 </div>
             </div>
             """,
             layout=widgets.Layout(
-                width='80%',
+                width='100%',
                 overflow='hidden'
             )
         )
@@ -353,7 +353,7 @@ def create_error_component(
     title: str = "🚨 Error",
     error_type: str = "error",
     show_traceback: bool = True,
-    width: str = '80%',
+    width: str = '100%',
     **kwargs
 ) -> Dict[str, Any]:
     """

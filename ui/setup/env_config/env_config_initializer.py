@@ -328,6 +328,8 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
     except Exception as e:
         # Use the centralized error handler
         from smartcash.ui.core.shared.error_handler import create_error_component
+        from IPython.display import display
+        
         # Get full traceback
         import sys, traceback
         exc_type, exc_value, exc_tb = sys.exc_info()
@@ -335,6 +337,7 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         
         # Format error message
         error_msg = f"{str(e)}"
+        
         # Create error component with traceback
         error_component = create_error_component(
             error_message=error_msg,
@@ -343,5 +346,10 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
             error_type="error",
             show_traceback=True
         )
-        # from smartcash.ui.utils.widget_utils import safe_display
+        
+        # Display the error component
+        if hasattr(error_component, 'show'):
+            return error_component.show()
+        elif hasattr(error_component, 'widget'):
+            return error_component['widget']
         return error_component

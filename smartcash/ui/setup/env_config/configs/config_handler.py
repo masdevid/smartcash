@@ -37,11 +37,45 @@ class ConfigHandler(ConfigurableHandler):
             parent_module='setup'
         )
         
-        # Load default config
+        # Initialize with default config
         self.config = DEFAULT_CONFIG.copy()
         
         self.logger = get_enhanced_logger(__name__)
         self.logger.info("🔧 Environment config handler initialized")
+    
+    def initialize(self) -> Dict[str, Any]:
+        """Initialize the configuration handler.
+        
+        Returns:
+            Dictionary containing initialization status and any relevant data
+        """
+        try:
+            # Mark as initialized
+            self._is_initialized = True
+            
+            # Load any existing configuration
+            if hasattr(self, 'load_config'):
+                loaded = self.load_config()
+                if loaded:
+                    self.logger.info("✅ Successfully loaded existing configuration")
+                else:
+                    self.logger.info("ℹ️ No existing configuration found, using defaults")
+            
+            return {
+                'status': True,
+                'initialized': True,
+                'config': self.config,
+                'message': 'Configuration handler initialized successfully'
+            }
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to initialize config handler: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return {
+                'status': False,
+                'error': error_msg,
+                'message': 'Failed to initialize configuration handler'
+            }
     
     def validate_config(self, config: Optional[Dict[str, Any]] = None) -> bool:
         """Validate configuration.

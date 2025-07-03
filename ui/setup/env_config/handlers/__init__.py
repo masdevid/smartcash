@@ -21,16 +21,12 @@ from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHan
 
 # Import local handlers
 from ..configs.config_handler import ConfigHandler
-from .drive_handler import DriveHandler
-from .folder_handler import FolderHandler
+from .env_config_handler import EnvConfigHandler
 from .setup_handler import SetupHandler
-from .status_checker import StatusChecker
 
 __all__ = [
     # Environment configuration handlers
     'ConfigHandler',
-    'DriveHandler',
-    'FolderHandler',
+    'EnvConfigHandler',
     'SetupHandler',
-    'StatusChecker',
 ]

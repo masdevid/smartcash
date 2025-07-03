@@ -166,4 +166,6 @@ def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  #
 
     from smartcash.ui.utils.widget_utils import safe_display
 
-    return safe_display(result)
+    # Extract UI components from the result dictionary
+    ui_components = result.get('ui', {})
+    return safe_display(ui_components)

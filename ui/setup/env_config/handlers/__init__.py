@@ -20,7 +20,7 @@ from smartcash.ui.handlers.base_handler import BaseHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler as BaseConfigHandler
 
 # Import local handlers
-from .config_handler import ConfigHandler
+from ..configs.config_handler import ConfigHandler
 from .drive_handler import DriveHandler
 from .folder_handler import FolderHandler
 from .setup_handler import SetupHandler

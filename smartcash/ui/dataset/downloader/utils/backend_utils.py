@@ -3,114 +3,77 @@ File: smartcash/ui/dataset/downloader/utils/backend_utils.py
 Deskripsi: Backend integration utilities dengan proper scanner usage
 """
 
-from typing import Dict, Any, Tuple, Optional
-from smartcash.ui.utils.ui_logger import UILogger
-from smartcash.ui.handlers.error_handler import create_error_response
-from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
-from smartcash.dataset.downloader.download_service import create_download_service
-from smartcash.dataset.downloader.cleanup_service import create_cleanup_service
+from typing import Dict, Any, Tuple
 
-def check_existing_dataset(logger: Optional[UILogger] = None) -> Tuple[bool, int, Dict[str, Any]]:
+def check_existing_dataset(logger=None) -> Tuple[bool, int, Dict[str, Any]]:
     """
     Check existing dataset menggunakan backend scanner.
     
     Args:
-        logger: UILogger instance untuk logging terpusat
+        logger: Logger instance
         
     Returns:
         Tuple[bool, int, Dict]: (has_content, total_images, summary_data)
     """
     try:
-        if logger:
-            logger.debug("Memeriksa dataset yang sudah ada...")
-            
+        from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
+        
         scanner = create_dataset_scanner(logger)
         
-        # Use quick check untuk determine if content exists
-        has_content = scanner.quick_check_existing()
-        
-        if not has_content:
-            if logger:
-                logger.debug("Tidak ada dataset yang ditemukan")
+        # Quick check untuk determine if content exists
+        if not scanner.quick_check_existing():
             return False, 0, {}
         
-        if logger:
-            logger.info("Dataset ditemukan, memindai detail...")
-            
         # Get detailed summary jika ada content
         result = scanner.scan_existing_dataset_parallel()
         
-        if result.get('status') is True or result.get('status') == 'success':
+        if result.get('status') == 'success':
             summary = result.get('summary', {})
             splits = result.get('splits', {})
-            total_images = summary.get('total_images', 0)
             
-            if logger:
-                logger.info(f"Ditemukan {total_images} gambar dalam dataset")
+            # Extract split breakdown dengan one-liner
+            split_breakdown = {name: data.get('images', 0) 
+                              for name, data in splits.items() 
+                              if data.get('status') == 'success'}
             
-            # Extract split breakdown
-            split_breakdown = {}
-            for split_name, split_data in splits.items():
-                if split_data.get('status') is True or split_data.get('status') == 'success':
-                    split_breakdown[split_name] = split_data.get('images', 0)
-            
-            return True, total_images, {
+            return True, summary.get('total_images', 0), {
                 'summary': summary,
                 'splits': split_breakdown,
                 'downloads': result.get('downloads', {}),
                 'scan_result': result
             }
         
-        if logger:
-            logger.warning("Pemindaian dataset gagal atau tidak lengkap")
-        return False, 0, {}
-            
+        return True, 0, {}
+        
     except Exception as e:
-        error_msg = f"Gagal memeriksa dataset yang ada: {str(e)}"
         if logger:
-            logger.error(error_msg, exc_info=True)
-        error_response = create_error_response(error_msg, e, "Dataset Check Error")
-        return False, 0, {
-            'status': False,
-            'message': error_msg,
-            'error_details': error_response.get('error_details', {})
-        }
+            logger.warning(f"⚠️ Error checking existing dataset: {str(e)}")
+        return False, 0, {}
 
-def get_cleanup_targets(logger: Optional[UILogger] = None) -> Dict[str, Any]:
+def get_cleanup_targets(logger=None) -> Dict[str, Any]:
     """
     Get cleanup targets menggunakan backend scanner.
     
     Args:
-        logger: UILogger instance untuk logging terpusat
+        logger: Logger instance
         
     Returns:
         Dictionary dengan cleanup targets atau error info
     """
     try:
-        if logger:
-            logger.debug("Mendapatkan daftar target cleanup...")
-            
+        from smartcash.dataset.downloader.dataset_scanner import create_dataset_scanner
+        
         scanner = create_dataset_scanner(logger)
-        result = scanner.get_cleanup_targets()
-        
-        if logger and (result.get('status') is True or result.get('status') == 'success'):
-            logger.info("Berhasil mendapatkan daftar target cleanup")
-        elif logger:
-            logger.warning(f"Gagal mendapatkan daftar target cleanup: {result.get('message', 'Unknown error')}")
-        
-        return result
+        return scanner.get_cleanup_targets()
         
     except Exception as e:
-        error_msg = f"Gagal mendapatkan cleanup targets: {str(e)}"
         if logger:
-            logger.error(error_msg, exc_info=True)
-        error_response = create_error_response(error_msg, e, "Cleanup Error")
+            logger.error(f"❌ Error getting cleanup targets: {str(e)}")
         return {
-            'status': False,
-            'message': error_msg,
+            'status': 'error',
+            'message': f'Error getting cleanup targets: {str(e)}',
             'targets': {},
-            'summary': {'total_files': 0, 'total_size': 0},
-            'error_details': error_response.get('error_details', {})
+            'summary': {'total_files': 0, 'total_size': 0}
         }
 
 def validate_backend_service_config(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -121,138 +84,68 @@ def validate_backend_service_config(config: Dict[str, Any]) -> Dict[str, Any]:
         config: Service configuration
         
     Returns:
-        Validation result with 'status' key for consistent API response
+        Validation result
     """
     try:
-        # Validate required fields
-        required_fields = {
-            'data.roboflow.workspace': 'Workspace',
-            'data.roboflow.project': 'Project',
-            'data.roboflow.version': 'Version',
-            'data.roboflow.api_key': 'API Key',
-        }
+        from smartcash.dataset.downloader import validate_config_quick
         
-        missing = []
-        for path, label in required_fields.items():
-            parts = path.split('.')
-            value = config
-            for part in parts:
-                value = value.get(part, {})
-                if not value and not isinstance(value, (int, float, bool)):
-                    missing.append(label)
-                    break
-        
-        if missing:
-            return {
-                'status': False, 
-                'message': f"Missing required fields: {', '.join(missing)}"
-            }
+        if validate_config_quick(config):
+            return {'valid': True, 'message': 'Config valid untuk backend service'}
         else:
-            return {'status': True, 'message': 'Config valid untuk backend service'}
+            return {'valid': False, 'message': 'Config tidak valid untuk backend service'}
             
     except Exception as e:
-        error_msg = f'Error validating config: {str(e)}'
-        error_response = create_error_response(error_msg, e, "Config Validation Error")
-        return {
-            'status': False, 
-            'message': error_msg,
-            'error_details': error_response.get('error_details', {})
-        }
+        return {'valid': False, 'message': f'Error validating config: {str(e)}'}
 
-def create_backend_downloader(ui_config: Dict[str, Any], logger: Optional[UILogger] = None) -> Dict[str, Any]:
+def create_backend_downloader(ui_config: Dict[str, Any], logger=None):
     """
     Create downloader instance dari UI config.
     
     Args:
         ui_config: UI configuration
-        logger: UILogger instance untuk logging terpusat
+        logger: Logger instance
         
     Returns:
-        Dictionary with 'status' key and 'downloader' instance if successful
+        Downloader instance atau None
     """
     try:
-        if logger:
-            logger.debug("Membuat instance downloader...")
+        from smartcash.dataset.downloader import get_downloader_instance, create_ui_compatible_config
         
-        # Extract config
-        roboflow = ui_config.get('data', {}).get('roboflow', {})
-        download = ui_config.get('download', {})
+        # Convert UI config ke backend format dan enhance dengan optimal settings
+        service_config = create_ui_compatible_config(ui_config)
+        download_config = ui_config.get('download', {})
         
-        # Validate required fields
-        required = ['workspace', 'project', 'version', 'api_key']
-        missing = [field for field in required if not roboflow.get(field)]
-        if missing:
-            error_msg = f"Field yang diperlukan tidak lengkap: {', '.join(missing)}"
-            if logger:
-                logger.error(error_msg)
-            return {
-                'status': False,
-                'message': error_msg,
-                'downloader': None
-            }
-            
-        if logger:
-            logger.info("Menginisialisasi DownloadService...")
-            
-        downloader = create_download_service(
-            workspace=roboflow['workspace'],
-            project=roboflow['project'],
-            version=roboflow['version'],
-            api_key=roboflow['api_key'],
-            output_format=roboflow.get('output_format', 'yolov5pytorch'),
-            rename_files=download.get('rename_files', True),
-            validate_download=download.get('validate_download', True),
-            backup_existing=download.get('backup_existing', False),
-            logger=logger  # Pass the logger directly
-        )
+        # Update dengan performance settings dari download_config
+        service_config.update({
+            'max_workers': download_config.get('max_workers', 4),
+            'parallel_downloads': download_config.get('parallel_downloads', True),
+            'chunk_size': download_config.get('chunk_size', 8192),
+            'timeout': download_config.get('timeout', 30),
+            'retry_count': download_config.get('retry_count', 3)
+        })
         
-        return {
-            'status': True,
-            'message': 'Downloader created successfully',
-            'downloader': downloader
-        }
+        return get_downloader_instance(service_config, logger)
         
     except Exception as e:
-        error_msg = f"Gagal membuat downloader: {str(e)}"
         if logger:
-            logger.error(error_msg, exc_info=True)
-        error_response = create_error_response(error_msg, e, "Downloader Creation Error")
-        return {
-            'status': False,
-            'message': error_msg,
-            'downloader': None,
-            'error_details': error_response.get('error_details', {})
-        }
+            logger.error(f"❌ Error creating backend downloader: {str(e)}")
+        return None
 
-def create_backend_cleanup_service(logger: Optional[UILogger] = None) -> Dict[str, Any]:
+def create_backend_cleanup_service(logger=None):
     """
     Create cleanup service instance.
     
     Args:
-        logger: UILogger instance untuk logging terpusat
+        logger: Logger instance
         
     Returns:
-        Dictionary with 'status' key and 'service' instance if successful
+        Cleanup service instance atau None
     """
     try:
-        if logger:
-            logger.debug("Membuat instance cleanup service...")
-        service = create_cleanup_service(logger)  # Pass the logger directly
-        
-        return {
-            'status': True,
-            'message': 'Cleanup service created successfully',
-            'service': service
-        }
+        from smartcash.dataset.downloader.cleanup_service import create_cleanup_service
+        return create_cleanup_service(logger)
         
     except Exception as e:
-        error_msg = f"Gagal membuat cleanup service: {str(e)}"
         if logger:
-            logger.error(error_msg, exc_info=True)
-        error_response = create_error_response(error_msg, e, "Cleanup Service Creation Error")
-        return {
-            'status': False,
-            'message': error_msg,
-            'service': None,
-            'error_details': error_response.get('error_details', {})
-        }
+            logger.error(f"❌ Error creating cleanup service: {str(e)}")
+        return None

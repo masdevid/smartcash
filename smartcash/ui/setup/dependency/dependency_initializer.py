@@ -1,36 +1,38 @@
 """
 File: smartcash/ui/setup/dependency/dependency_initializer.py
-Deskripsi: Initializer untuk dependency management module dengan pattern terbaru
+Deskripsi: Initializer untuk dependency management module dengan centralized error handling
 """
 
 from typing import Dict, Any, Type, Optional, Union
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.setup.dependency.handlers.config_handler import DependencyConfigHandler
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.ui_logger import UILogger, get_logger
+from smartcash.ui.handlers.error_handler import create_error_response
 
 class DependencyInitializer(CommonInitializer):
-    """Initializer untuk dependency management dengan pattern terbaru"""
+    """Initializer untuk dependency management dengan centralized error handling"""
     
     def __init__(self, module_name: str = 'dependency', 
                  config_handler_class: Type[ConfigHandler] = DependencyConfigHandler,
                  **kwargs):
-        """Initialize dependency initializer dengan fail-fast validation
+        """Initialize dependency initializer dengan centralized error handling
         
         Args:
             module_name: Nama modul (default: 'dependency')
             config_handler_class: Kelas handler konfigurasi
             **kwargs: Argumen tambahan untuk parent class
         """
-        super().__init__(
-            module_name=module_name,
-            config_handler_class=config_handler_class,
-            **kwargs
-        )
-        self._logger = None
+        try:
+            super().__init__(
+                module_name=module_name,
+                config_handler_class=config_handler_class,
+                **kwargs
+            )
+        except Exception as e:
+            self._handle_error(f"Failed to initialize dependency initializer: {str(e)}", exc_info=True)
     
     def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan proper error handling dan validation
+        """Create UI components dengan centralized error handling dan validation
         
         Args:
             config: Konfigurasi untuk inisialisasi UI
@@ -46,10 +48,6 @@ class DependencyInitializer(CommonInitializer):
         try:
             from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
             
-            # Initialize logger if not already done
-            if not hasattr(self, 'logger') or self.logger is None:
-                self.logger = get_logger(self.__class__.__module__)
-                
             # Log start of UI component creation
             self.logger.debug("Memulai pembuatan komponen UI")
             
@@ -59,28 +57,27 @@ class DependencyInitializer(CommonInitializer):
             # Validasi tipe return
             if not isinstance(ui_components, dict):
                 error_msg = f"UI components harus berupa dictionary, dapat: {type(ui_components)}"
-                self.logger.error(error_msg, exc_info=True, stack_info=True)
-                return self.create_error_response(
+                self._handle_error(error_msg, exc_info=True)
+                return create_error_response(
                     f"{error_msg}\n\nDetail: {str(ui_components)[:500]}"
                 )
                     
             # Validasi komponen tidak kosong
             if not ui_components:
                 error_msg = "UI components tidak boleh kosong"
-                self.logger.error(error_msg, exc_info=True, stack_info=True)
-                return self.create_error_response(error_msg)
+                self._handle_error(error_msg, exc_info=True)
+                return create_error_response(error_msg)
             
-            # Validasi komponen kritis
-            required_components = ['ui', 'log_output', 'status_panel']
+            # Validasi komponen kritis untuk container-based UI
+            required_components = ['container', 'main_container', 'header_container', 'form_container', 'action_container']
             missing = [comp for comp in required_components if comp not in ui_components]
             if missing:
                 error_msg = f"Komponen UI kritis tidak ditemukan: {missing}"
-                self.logger.error(
+                self._handle_error(
                     f"{error_msg}\nKomponen yang tersedia: {list(ui_components.keys())}",
-                    exc_info=True,
-                    stack_info=True
+                    exc_info=True
                 )
-                return self.create_error_response(
+                return create_error_response(
                     f"{error_msg}\n\nKomponen yang tersedia: {', '.join(ui_components.keys())}"
                 )
             
@@ -91,19 +88,12 @@ class DependencyInitializer(CommonInitializer):
             return ui_components
             
         except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            error_msg = f"Gagal membuat komponen UI: {str(e)}\n\nTraceback:\n{error_trace}"
-            self.logger.error(error_msg, exc_info=True, stack_info=True)
-            return self.create_error_response(
-                f"Terjadi kesalahan saat memuat antarmuka pengguna.\n\n"
-                f"Error: {str(e)}\n\n"
-                "Silakan periksa log untuk detail lebih lanjut.",
-                e
-            )
+            error_msg = f"Gagal membuat komponen UI: {str(e)}"
+            self._handle_error(error_msg, exc_info=True)
+            return create_error_response(error_msg)
     
     def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Setup event handlers dengan proper logger bridge integration
+        """Setup event handlers dengan centralized error handling
         
         Args:
             ui_components: Dictionary berisi komponen UI
@@ -116,26 +106,28 @@ class DependencyInitializer(CommonInitializer):
         Raises:
             ValueError: Jika handler setup gagal
         """
-        # Ensure logger bridge is available before setting up handlers
-        if not hasattr(self, '_logger_bridge') or not self._logger_bridge:
-            raise ValueError("Logger bridge belum diinisialisasi sebelum setup handlers")
-                
-        # Add logger bridge to ui_components untuk akses handlers
-        ui_components['logger_bridge'] = self._logger_bridge
-        
-        from smartcash.ui.setup.dependency.handlers.event_handlers import setup_all_handlers
-        
-        # Setup handlers dengan error handling
-        handlers = setup_all_handlers(ui_components, config, self.config_handler)
-        
-        if not handlers:
-            raise ValueError("Gagal menginisialisasi dependency handlers")
+        try:
+            from smartcash.ui.setup.dependency.handlers.event_handlers import setup_all_handlers
             
-        ui_components['handlers'] = handlers
-        return ui_components
+            # Setup handlers dengan centralized error handling
+            handlers = setup_all_handlers(
+                ui_components=ui_components,
+                config=config,
+                config_handler=self.config_handler
+            )
+            
+            # Update UI components dengan handlers
+            ui_components.update(handlers)
+            
+            return ui_components
+            
+        except Exception as e:
+            error_msg = f"Gagal setup handlers: {str(e)}"
+            self._handle_error(error_msg, exc_info=True)
+            raise ValueError(error_msg) from e
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """Return default dependency configuration
+        """Return default dependency configuration with centralized error handling
         
         Returns:
             Dictionary berisi konfigurasi default
@@ -147,40 +139,14 @@ class DependencyInitializer(CommonInitializer):
             from smartcash.ui.setup.dependency.handlers.defaults import get_default_dependency_config
             return get_default_dependency_config()
         except Exception as e:
-            raise RuntimeError(f"Gagal memuat konfigurasi default: {str(e)}") from e
+            error_msg = f"Gagal memuat konfigurasi default: {str(e)}"
+            self._handle_error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
-    def _initialize_logger_bridge(self, ui_components: Dict[str, Any]) -> UILogger:
-        """Initialize logger bridge untuk dependency module
-        
-        Args:
-            ui_components: Dictionary berisi komponen UI
-            
-        Returns:
-            Instance UILoggerBridge yang telah diinisialisasi
-            
-        Raises:
-            ValueError: Jika komponen UI yang diperlukan tidak ditemukan
-        """
-        required_components = ['log_output', 'status_panel']
-        missing = [comp for comp in required_components if comp not in ui_components]
-        if missing:
-            raise ValueError(f"Komponen UI yang diperlukan untuk logger bridge tidak ditemukan: {missing}")
-        
-        try:
-            # Gunakan factory function untuk membuat logger bridge
-            self._logger_bridge = create_ui_logger_bridge(
-                ui_components={
-                    'log_output': ui_components.get('log_output'),
-                    'status_panel': ui_components.get('status_panel')
-                },
-                logger_name=f"{self.module_name}.ui"
-            )
-            return self._logger_bridge
-        except Exception as e:
-            raise RuntimeError(f"Gagal menginisialisasi logger bridge: {str(e)}") from e
+    # _initialize_logger_bridge method removed - using centralized error handling instead
     
     def initialize_ui(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
-        """Initialize the dependency management UI dengan error handling yang komprehensif
+        """Initialize the dependency management UI dengan centralized error handling
         
         Args:
             config: Konfigurasi opsional untuk inisialisasi
@@ -200,22 +166,18 @@ class DependencyInitializer(CommonInitializer):
             # Buat komponen UI
             ui_components = self._create_ui_components(config, **kwargs)
             
-            # Inisialisasi logger bridge
-            self._initialize_logger_bridge(ui_components)
-            
             # Setup event handlers
             ui_components = self._setup_handlers(ui_components, config, **kwargs)
             
             # Log sukses
-            self._logger_bridge.info("✅ Dependency management UI berhasil diinisialisasi")
+            self.logger.info("✅ Dependency management UI berhasil diinisialisasi")
             
             # Return the root UI component
             return self._get_ui_root(ui_components)
             
         except Exception as e:
             error_msg = f"❌ Gagal menginisialisasi dependency UI: {str(e)}"
-            if hasattr(self, '_logger_bridge') and self._logger_bridge:
-                self._logger_bridge.error(f"{error_msg}\n{str(e)}")
+            self._handle_error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
 
 

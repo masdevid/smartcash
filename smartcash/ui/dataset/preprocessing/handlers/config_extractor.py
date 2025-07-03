@@ -1,17 +1,86 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_extractor.py
-Deskripsi: Config extractor dengan API compatibility dan essential features only
+Deskripsi: Config extractor dengan API compatibility dan centralized error handling
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from pathlib import Path
+from smartcash.ui.handlers.error_handler import handle_ui_errors
 
+@handle_ui_errors(error_component_title="Config Extraction Error", log_error=True)
 def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract config yang compatible dengan preprocessing API"""
+    """Extract config yang compatible dengan preprocessing API.
+    
+    Args:
+        ui_components: Dictionary containing UI components
+        
+    Returns:
+        Extracted configuration dictionary
+    """
     from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
     
     # Base dari defaults (DRY approach)
     config = get_default_preprocessing_config()
     
+    # Extract form values
+    form_values = _extract_form_values(ui_components)
+    
+    # Update config dengan form values
+    config['preprocessing'].update({
+        'target_splits': form_values['target_splits'],
+        'normalization': {
+            'enabled': form_values['normalization_method'] != 'none',
+            'method': form_values['normalization_method'] if form_values['normalization_method'] != 'none' else 'minmax',
+            'target_size': [form_values['width'], form_values['height']],
+            'preserve_aspect_ratio': form_values['preserve_aspect'],
+            'normalize_pixel_values': True,
+            'pixel_range': [0, 1]
+        },
+        'validation': {
+            'enabled': form_values['validation_enabled'],
+            'move_invalid': form_values['move_invalid'],
+            'invalid_dir': form_values['invalid_dir'],
+            'check_image_quality': True,
+            'check_labels': True,
+            'check_coordinates': True
+        },
+        'cleanup': {
+            'target': form_values['cleanup_target'],
+            'backup_enabled': form_values['backup_enabled'],
+            'patterns': {
+                'preprocessed': ['pre_*.npy'],
+                'samples': ['sample_*.jpg']
+            }
+        }
+    })
+    
+    config['performance'].update({
+        'batch_size': form_values['batch_size'],
+        'use_gpu': True,
+        'max_memory_usage_gb': 4.0
+    })
+    
+    # Setup paths menggunakan environment manager
+    config['data'] = _setup_environment_paths(form_values['target_splits'])
+    
+    # API compatibility requirements
+    config['file_naming'] = {
+        'raw_pattern': 'rp_{nominal}_{uuid}_{sequence}',
+        'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}_{sequence}_{variance}',
+        'preserve_uuid': True
+    }
+    
+    return config
+
+def _extract_form_values(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract form values dari UI components.
+    
+    Args:
+        ui_components: Dictionary containing UI components
+        
+    Returns:
+        Dictionary of extracted form values
+    """
     # Helper untuk safe value extraction
     get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
     
@@ -42,55 +111,30 @@ def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any
     # Extract performance
     batch_size = max(1, min(get_value('batch_size_input', 32), 128))
     
-    # Update config dengan form values
-    config['preprocessing'].update({
+    return {
+        'width': width,
+        'height': height,
         'target_splits': target_splits,
-        'normalization': {
-            'enabled': normalization_method != 'none',
-            'method': normalization_method if normalization_method != 'none' else 'minmax',
-            'target_size': [width, height],
-            'preserve_aspect_ratio': preserve_aspect,
-            'normalize_pixel_values': True,
-            'pixel_range': [0, 1]
-        },
-        'validation': {
-            'enabled': validation_enabled,
-            'move_invalid': move_invalid,
-            'invalid_dir': invalid_dir,
-            'check_image_quality': True,
-            'check_labels': True,
-            'check_coordinates': True
-        },
-        'cleanup': {
-            'target': cleanup_target,
-            'backup_enabled': backup_enabled,
-            'patterns': {
-                'preprocessed': ['pre_*.npy'],
-                'samples': ['sample_*.jpg']
-            }
-        }
-    })
-    
-    config['performance'].update({
-        'batch_size': batch_size,
-        'use_gpu': True,
-        'max_memory_usage_gb': 4.0
-    })
-    
-    # Setup paths menggunakan environment manager
-    config['data'] = _setup_environment_paths(target_splits)
-    
-    # API compatibility requirements
-    config['file_naming'] = {
-        'raw_pattern': 'rp_{nominal}_{uuid}_{sequence}',
-        'preprocessed_pattern': 'pre_rp_{nominal}_{uuid}_{sequence}_{variance}',
-        'preserve_uuid': True
+        'normalization_method': normalization_method,
+        'preserve_aspect': preserve_aspect,
+        'validation_enabled': validation_enabled,
+        'move_invalid': move_invalid,
+        'invalid_dir': invalid_dir,
+        'cleanup_target': cleanup_target,
+        'backup_enabled': backup_enabled,
+        'batch_size': batch_size
     }
-    
-    return config
 
+@handle_ui_errors(error_component_title="Environment Setup Error", log_error=True)
 def _setup_environment_paths(target_splits: List[str]) -> Dict[str, Any]:
-    """Setup paths menggunakan environment manager"""
+    """Setup paths menggunakan environment manager.
+    
+    Args:
+        target_splits: List of target splits
+        
+    Returns:
+        Dictionary of path configurations
+    """
     try:
         from smartcash.common.environment import get_environment_manager
         
@@ -105,13 +149,7 @@ def _setup_environment_paths(target_splits: List[str]) -> Dict[str, Any]:
         }
         
         # Auto-create directories
-        from pathlib import Path
-        for split in target_splits:
-            for subdir in ['images', 'labels']:
-                Path(f"{base_dir}/{split}/{subdir}").mkdir(parents=True, exist_ok=True)
-                Path(f"{base_dir}/preprocessed/{split}/{subdir}").mkdir(parents=True, exist_ok=True)
-        
-        Path(f"{base_dir}/invalid").mkdir(parents=True, exist_ok=True)
+        _create_dataset_directories(base_dir, target_splits)
         
         return data_config
         
@@ -124,3 +162,17 @@ def _setup_environment_paths(target_splits: List[str]) -> Dict[str, Any]:
             'preprocessed_dir': f"{base_dir}/preprocessed", 
             'invalid_dir': f"{base_dir}/invalid"
         }
+
+def _create_dataset_directories(base_dir: str, target_splits: List[str]) -> None:
+    """Create dataset directories.
+    
+    Args:
+        base_dir: Base directory path
+        target_splits: List of target splits
+    """
+    for split in target_splits:
+        for subdir in ['images', 'labels']:
+            Path(f"{base_dir}/{split}/{subdir}").mkdir(parents=True, exist_ok=True)
+            Path(f"{base_dir}/preprocessed/{split}/{subdir}").mkdir(parents=True, exist_ok=True)
+    
+    Path(f"{base_dir}/invalid").mkdir(parents=True, exist_ok=True)

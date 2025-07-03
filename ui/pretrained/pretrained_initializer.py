@@ -149,7 +149,7 @@ class PretrainedInitializer(CommonInitializer):
                     try:
                         model_handler.check_and_download_model(config.get('pretrained_models', {}))
                     except Exception as e:
-                        self._handle_error(f"Gagal memproses download: {str(e)}", exc_info=True)
+                        self.handle_error(f"Gagal memproses download: {str(e)}", exc_info=True)
                         self._update_status(ui_components, f"❌ Gagal memproses download", 'error')
                 
                 ui_components['download_button'].on_click(on_download_clicked)
@@ -160,7 +160,7 @@ class PretrainedInitializer(CommonInitializer):
                     try:
                         model_handler.check_and_download_model(config.get('pretrained_models', {}))
                     except Exception as e:
-                        self._handle_error(f"Gagal melakukan sinkronisasi: {str(e)}", exc_info=True)
+                        self.handle_error(f"Gagal melakukan sinkronisasi: {str(e)}", exc_info=True)
                         self._update_status(ui_components, f"❌ Gagal melakukan sinkronisasi", 'error')
                 
                 ui_components['sync_button'].on_click(on_sync_clicked)
@@ -169,10 +169,10 @@ class PretrainedInitializer(CommonInitializer):
             return ui_components
             
         except Exception as e:
-            self._handle_error(f"Gagal setup module handlers: {str(e)}", exc_info=True)
+            self.handle_error(f"Gagal setup module handlers: {str(e)}", exc_info=True)
             return ui_components
     
-    def _after_init_checks(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> None:
+    def post_initialization_checks(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> None:
         """Post-initialization checks untuk validasi model pretrained
         
         Args:
@@ -258,7 +258,7 @@ class PretrainedInitializer(CommonInitializer):
             
         except Exception as e:
             error_msg = f"Gagal memeriksa model: {str(e)}"
-            self._handle_error(error_msg, exc_info=True)
+            self.handle_error(error_msg, exc_info=True)
             self._update_status(ui_components, f"❌ {error_msg}", 'error')
             return False
 

@@ -1,32 +1,77 @@
 """
 File: smartcash/ui/dataset/split/handlers/config_extractor.py
-Deskripsi: Ekstraksi config dari UI components - refactored dengan one-liner approach
+Deskripsi: Ekstraksi config dari UI components dengan centralized error handling
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
+import logging
+from datetime import datetime
+
+# Import error handling
+from smartcash.ui.handlers.error_handler import handle_ui_errors
+
+# Import validation utilities
 from smartcash.ui.dataset.split.handlers.defaults import normalize_split_ratios, validate_split_ratios
 
+# Logger
+logger = logging.getLogger(__name__)
 
+
+@handle_ui_errors(log_error=True)
 def extract_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract config dari UI components dengan one-liner extraction sesuai struktur dataset_config.yaml"""
-    # One-liner value extraction dengan fallback
-    get_value = lambda key, default: getattr(ui_components.get(key, type('', (), {'value': default})()), 'value', default)
+    """Extract config dari UI components dengan centralized error handling
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        
+    Returns:
+        Dictionary konfigurasi split dataset
+    """
+    logger.debug("Mengekstrak konfigurasi split dari UI components")
+    
+    # Extract values dengan error handling
+    config = _extract_config_values(ui_components)
+    
+    # Validate config
+    is_valid, message = validate_extracted_values(config)
+    if not is_valid:
+        logger.warning(f"Konfigurasi tidak valid: {message}")
+    else:
+        logger.debug("Konfigurasi berhasil diekstrak dan valid")
+    
+    return config
+
+
+@handle_ui_errors(log_error=True)
+def _extract_config_values(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract values dari UI components dengan centralized error handling
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        
+    Returns:
+        Dictionary konfigurasi split dataset
+    """
+    # Helper function untuk ekstraksi nilai dengan fallback
+    def get_value(key, default):
+        component = ui_components.get(key)
+        if component is None:
+            return default
+        return getattr(component, 'value', default)
     
     # Extract ratio values
-    train_ratio, valid_ratio, test_ratio = (
-        get_value('train_slider', 0.7),
-        get_value('valid_slider', 0.15), 
-        get_value('test_slider', 0.15)
-    )
+    train_ratio, valid_ratio, test_ratio = extract_ratios(ui_components)
     
-    # Validate dan normalize ratio dengan one-liner
-    train_ratio, valid_ratio, test_ratio = normalize_split_ratios(train_ratio, valid_ratio, test_ratio) if not validate_split_ratios(train_ratio, valid_ratio, test_ratio)[0] else (train_ratio, valid_ratio, test_ratio)
+    # Validate dan normalize ratio
+    valid, message = validate_split_ratios(train_ratio, valid_ratio, test_ratio)
+    if not valid:
+        logger.warning(f"Split ratio tidak valid: {message}, melakukan normalisasi")
+        train_ratio, valid_ratio, test_ratio = normalize_split_ratios(train_ratio, valid_ratio, test_ratio)
     
     # Metadata untuk config yang diperbarui
-    from datetime import datetime
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # One-liner config construction sesuai dengan dataset_config.yaml yang diperbarui
+    # Construct config sesuai dengan dataset_config.yaml
     return {
         # Inherit dari base_config.yaml
         '_base_': 'base_config.yaml',
@@ -97,6 +142,51 @@ def extract_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# One-liner extraction utilities
-extract_ratios = lambda ui_components: tuple(getattr(ui_components.get(f'{t}_slider', type('', (), {'value': d})()), 'value', d) for t, d in [('train', 0.7), ('valid', 0.15), ('test', 0.15)])
-validate_extracted_values = lambda config: validate_split_ratios(*config['data']['split_ratios'].values()) if 'data' in config and 'split_ratios' in config['data'] else (False, "Invalid config structure")
+@handle_ui_errors(log_error=True)
+def extract_ratios(ui_components: Dict[str, Any]) -> Tuple[float, float, float]:
+    """Extract split ratios dari UI components
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        
+    Returns:
+        Tuple berisi (train_ratio, valid_ratio, test_ratio)
+    """
+    defaults = {'train': 0.7, 'valid': 0.15, 'test': 0.15}
+    result = []
+    
+    for name, default in defaults.items():
+        slider = ui_components.get(f'{name}_slider')
+        if slider is None:
+            logger.warning(f"{name}_slider tidak ditemukan, menggunakan nilai default {default}")
+            result.append(default)
+        else:
+            result.append(getattr(slider, 'value', default))
+    
+    return tuple(result)
+
+
+@handle_ui_errors(log_error=True)
+def validate_extracted_values(config: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validate extracted config values
+    
+    Args:
+        config: Dictionary konfigurasi split dataset
+        
+    Returns:
+        Tuple berisi (is_valid, message)
+    """
+    # Check config structure
+    if 'data' not in config:
+        return False, "Struktur config tidak valid: 'data' tidak ditemukan"
+    
+    if 'split_ratios' not in config['data']:
+        return False, "Struktur config tidak valid: 'split_ratios' tidak ditemukan"
+    
+    # Get split ratios
+    ratios = config['data']['split_ratios']
+    if not all(k in ratios for k in ['train', 'valid', 'test']):
+        return False, "Split ratios tidak lengkap"
+    
+    # Validate ratios
+    return validate_split_ratios(ratios['train'], ratios['valid'], ratios['test'])

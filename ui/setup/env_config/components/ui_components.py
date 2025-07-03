@@ -5,12 +5,19 @@ Deskripsi: Komponen UI untuk environment configuration dengan layout lengkap
 
 import ipywidgets
 from typing import Dict, Any
-from smartcash.ui.components import (
-    create_header, create_status_panel,
-    create_log_accordion
-)
+
+# Import standard container components
+from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container
+from smartcash.ui.components.summary_container import create_summary_container
+from smartcash.ui.components.footer_container import create_footer_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components import create_log_accordion
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
+
+# Import env_config specific components
 from smartcash.ui.setup.env_config.components.setup_summary import create_setup_summary
 from smartcash.ui.setup.env_config.components.env_info_panel import create_env_info_panel
 from smartcash.ui.setup.env_config.components.tips_panel import create_tips_requirements
@@ -22,153 +29,102 @@ def create_env_config_ui() -> Dict[str, Any]:
     Returns:
         Dictionary berisi semua komponen UI
     """
-    # 1. Header
-    header = create_header(
-        "🔧 Environment Setup",
-        "Konfigurasi lingkungan untuk SmartCash YOLOv5-EfficientNet",
-        "🚀"
-    )
-    
-    # 2. Setup Button (Centered)
-    setup_button = ipywidgets.Button(
-        description="▶️ Setup Environment",
-        button_style='primary',
-        layout=ipywidgets.Layout(
-            width='200px',
-            height='45px',
-            margin='15px 0',
-            border_radius='4px'
-        )
-    )
-    
-    setup_button_container = ipywidgets.HBox(
-        [setup_button],
-        layout=ipywidgets.Layout(
-            justify_content='center',
-            align_items='center',
-            width='100%'
-        )
-    )
-    
-    # 3. Status Panel
-    status_panel = create_status_panel("Siap untuk setup environment", "info")
-    
-    # 4. Progress Tracker - Initialize with proper container and styling
+    # Initialize components dictionary
     ui_components = {}
     
-    # Create a container for the progress bar with proper styling
-    progress_container = ipywidgets.VBox(
-        layout=ipywidgets.Layout(
-            width='100%',
-            margin='10px 0',
-            padding='10px',
-            border='1px solid #e0e0e0',
-            border_radius='5px',
-            display='flex',
-            flex_flow='column',
-            align_items='stretch'
-        )
+    # 1. Create Header Container with default parameters
+    header_container = create_header_container(
+        title="🔧 Environment Setup",
+        subtitle="Konfigurasi lingkungan untuk SmartCash YOLOv5-EfficientNet"
+    )
+    ui_components['header_container'] = header_container
+    
+    # 2. Create Action Container with setup button
+    action_container = create_action_container(
+        buttons=[
+            {
+                "button_id": "setup",
+                "text": "▶️ Setup Environment",
+                "style": "primary",
+                "order": 1
+            }
+        ],
+        title="🔧 Environment Setup Actions",
+        alignment="center"
     )
     
-    # Store the container in ui_components first
-    ui_components['progress_container'] = progress_container
+    # Get setup button from action container
+    setup_button = action_container['buttons']['setup']
     
-    # Create progress tracker with dual-level progress
+    # Create form container without save/reset buttons - CUSTOM COMPONENT
+    form_components = create_form_container(
+        show_buttons=False,  # No save/reset buttons
+        container_margin="15px 0",
+        container_padding="10px"
+    )
+    
+    # Add the action container to the form container
+    form_components['form_container'].children = (action_container['container'],)
+    
+    # Store components in ui_components
+    ui_components['form_container'] = form_components['container']
+    ui_components['action_container'] = action_container
+    ui_components['setup_button'] = setup_button
+    ui_components['confirmation_area'] = action_container['dialog_area']
+    ui_components['show_dialog'] = action_container['show_dialog']
+    ui_components['show_info'] = action_container['show_info']
+    ui_components['clear_dialog'] = action_container['clear_dialog']
+    ui_components['is_dialog_visible'] = action_container['is_dialog_visible']
+    
+    # 3. Create Summary Container for setup summary - CUSTOM COMPONENT
+    setup_summary = create_setup_summary()
+    summary_container = create_summary_container(
+        theme="info",
+        title="Setup Summary",
+        icon="📋"
+    )
+    summary_container.set_content(setup_summary.value)  # Inject setup summary into summary container
+    ui_components['setup_summary'] = setup_summary
+    ui_components['summary_container'] = summary_container
+    
+    # 4. Create Progress Tracker
     progress_tracker = ProgressTracker()
     progress_tracker.show(level=ProgressLevel.DUAL)
-    
-    # Add the progress tracker to the container
-    if hasattr(progress_tracker, 'container'):
-        progress_container.children = (progress_tracker.container,)
-    
-    # Store the progress tracker in ui_components
     ui_components['progress_tracker'] = progress_tracker
     
-    # Make sure the progress container is visible
-    progress_container.layout.visibility = 'visible'
-    progress_container.layout.display = 'flex'
-    
-    # 5. Log Accordion
-    log_accordion = create_log_accordion(
-        module_name="Setup Environment",
-        height="150px",
-        width="100%",
-        max_logs=1000,
-        show_timestamps=True,
-        show_level_icons=True,
-        auto_scroll=True
-    )
+    # 5. Create Log Accordion with default parameters
+    log_accordion = create_log_accordion()
     # Expand the accordion by default
     if 'log_accordion' in log_accordion and hasattr(log_accordion['log_accordion'], 'selected_index'):
         log_accordion['log_accordion'].selected_index = 0  # Expand first accordion item
     
-    # 6. Setup Summary
-    setup_summary = create_setup_summary()
+    # Store log components
+    ui_components['log_accordion'] = log_accordion
+    ui_components['log_output'] = log_accordion  # Alias for compatibility
+    ui_components['log_components'] = log_accordion
     
-    # 6. Environment & Colab Info Panel
+    # 6. Create environment-specific components
     env_info_panel = create_env_info_panel()
+    ui_components['env_info_panel'] = env_info_panel
     
-    # 7. Tips & Requirements (2 kolom)
     tips_requirements = create_tips_requirements()
+    ui_components['tips_requirements'] = tips_requirements
     
-    # Assemble main UI
-    ui_components = {
-        'header': header,
-        'setup_button': setup_button,
-        'setup_button_container': setup_button_container,
-        'status_panel': status_panel,
-        'progress_tracker': progress_tracker,
-        'log_accordion': log_accordion,
-        'log_output': log_accordion,  # Alias untuk kompatibilitas
-        'setup_summary': setup_summary,
-        'env_info_panel': env_info_panel,
-        'tips_requirements': tips_requirements
-    }
+    # 7. Create footer container with default parameters
+    footer_container = create_footer_container()
+    ui_components['footer_container'] = footer_container
     
-    # Ensure progress container exists and is valid
-    progress_container = ui_components.get('progress_container')
-    if not isinstance(progress_container, ipywidgets.VBox):
-        progress_container = ipywidgets.VBox()
-        ui_components['progress_container'] = progress_container
-    
-    # Create main container sections
-    # Top section - Header and status
-    top_section = ipywidgets.VBox([
-        header,
-        status_panel,
-        setup_button_container
-    ])
-    
-    # Middle section - Progress and logs
-    middle_section = ipywidgets.VBox([
-        progress_container,
-        log_accordion['log_accordion']
-    ])
-    
-    # Bottom section - Info and summary
-    bottom_section = ipywidgets.VBox([
-        setup_summary,
-        env_info_panel,
-        tips_requirements
-    ])
-    
-    # Main container with consistent styling
-    main_container = ipywidgets.VBox(
-        [top_section, middle_section, bottom_section],
-        layout=ipywidgets.Layout(
-            width='100%',
-            max_width='1280px',
-            padding='15px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            margin='10px auto',
-            box_shadow='0 1px 3px rgba(0,0,0,0.1)'
-        )
+    # 8. Assemble Main Container with all sections using default parameters
+    main_container = create_main_container(
+        header_container=header_container.container,
+        form_container=form_components['container'],
+        summary_container=summary_container.container
     )
     
-    # Store the log components for later use
-    ui_components['log_components'] = log_accordion
-    ui_components['ui'] = main_container
+    # Store the main UI container
+    ui_components['ui'] = main_container.container
+    ui_components['main_container'] = main_container
+    
     # Log any missing critical components
     from smartcash.ui.utils.ui_logger import UILogger
     logger = UILogger(ui_components, name=__name__)
@@ -177,4 +133,5 @@ def create_env_config_ui() -> Dict[str, Any]:
         logger.warning(f"Missing critical UI components: {', '.join(missing)}")
     else:
         logger.debug("All critical UI components present")
+        
     return ui_components

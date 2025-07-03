@@ -208,3 +208,81 @@ def create_api_key_info_html(config: Dict[str, Any]) -> str:
 is_colab_environment = lambda: get_available_secrets()['colab_available']
 has_roboflow_secret = lambda: any('roboflow' in s['name'].lower() for s in get_available_secrets().get('secrets', []))
 get_secret_count = lambda: get_available_secrets().get('secrets_found', 0)
+
+
+def update_config_with_api_key(config: Dict[str, Any], api_key: str) -> Dict[str, Any]:
+    """
+    Helper function untuk memperbarui config dengan API key.
+    
+    Args:
+        config: Config dictionary yang akan diperbarui
+        api_key: API key yang akan dimasukkan ke config
+        
+    Returns:
+        Config dictionary yang sudah diperbarui dengan API key
+    """
+    if not config:
+        config = {}
+    if 'data' not in config:
+        config['data'] = {}
+    if 'roboflow' not in config['data']:
+        config['data']['roboflow'] = {}
+    config['data']['roboflow']['api_key'] = api_key
+    return config
+
+
+def get_api_key_from_ui(ui_components: Dict[str, Any]) -> str:
+    """
+    Helper function untuk mendapatkan API key dari UI components.
+    
+    Args:
+        ui_components: Dictionary UI components yang berisi api_key_input
+        
+    Returns:
+        API key string atau empty string jika tidak ditemukan
+    """
+    api_key = ''
+    api_key_widget = ui_components.get('api_key_input')
+    if api_key_widget and hasattr(api_key_widget, 'value'):
+        api_key = api_key_widget.value.strip()
+    return api_key
+
+
+def detect_and_set_api_key(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Helper function untuk mendeteksi dan mengatur API key dari berbagai sumber.
+    
+    Prioritas:
+    1. UI components (jika disediakan)
+    2. Colab secrets
+    3. Konfigurasi yang ada
+    
+    Args:
+        config: Config dictionary yang akan diperbarui
+        ui_components: Optional UI components untuk mengambil API key
+        
+    Returns:
+        Config dictionary yang sudah diperbarui dengan API key
+    """
+    # Coba dapatkan dari UI jika disediakan
+    api_key = ''
+    if ui_components:
+        api_key = get_api_key_from_ui(ui_components)
+    
+    # Jika tidak ada di UI, coba dari Colab secrets
+    if not api_key:
+        detected_key = get_api_key_from_secrets()
+        if detected_key:
+            api_key = detected_key
+    
+    # Jika API key ditemukan, perbarui config
+    if api_key:
+        config = update_config_with_api_key(config, api_key)
+    else:
+        # Coba auto-deteksi dari Colab secrets sebagai fallback
+        try:
+            config = set_api_key_to_config(config, force_refresh=False)
+        except Exception:
+            pass
+    
+    return config

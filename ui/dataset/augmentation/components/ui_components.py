@@ -1,11 +1,18 @@
 """
 File: smartcash/ui/dataset/augmentation/components/ui_components.py
-Deskripsi: Updated UI components dengan live preview integration dan cleanup target
+Deskripsi: Updated UI components dengan shared container components dan live preview integration
 """
 
 from IPython.display import display, HTML
 import ipywidgets as widgets
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+# Import standard container components
+from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container
+from smartcash.ui.components.footer_container import create_footer_container
+from smartcash.ui.components.action_container import create_action_container
 
 # Internal components
 from smartcash.ui import components
@@ -14,14 +21,11 @@ from smartcash.ui.dataset.augmentation.utils.style_utils import (
 )
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.components import (
-    create_header,
-    create_confirmation_area,
-    create_action_buttons,
-    create_status_panel,
     create_log_accordion,
-    create_save_reset_buttons,
-    create_dual_progress_tracker
+    create_save_reset_buttons
 )
+from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
+from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 
 def _create_section_header(title: str, color: str) -> widgets.HTML:
     """Create styled section header"""
@@ -53,36 +57,81 @@ def _create_live_preview_group() -> Dict[str, Any]:
     return create_live_preview_widget()
 
 def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Main UI dengan live preview integration dan cleanup target update"""
+    """🎨 Create augmentation UI using shared container components while preserving unique form structure"""
+    config = config or {}
     
-    # Initialize ui_components dictionary
+    # Initialize UI components dictionary
     ui_components = {}
     
-    # Create confirmation area first with ui_components
-    confirmation_area = create_confirmation_area(ui_components=ui_components)
-    # Ensure confirmation_area is properly initialized
-    if not confirmation_area or not isinstance(confirmation_area, widgets.Output):
-        confirmation_area = widgets.Output()
-    ui_components['confirmation_area'] = confirmation_area  # Store reference in ui_components
+    # === CORE COMPONENTS ===
     
-    # Header and status panel with consistent styling
-    header = create_header(
-        "Dataset Augmentation",
-        "Pipeline augmentasi dengan live preview dan backend integration",
-        "🔄"
+    # 1. Create Header Container
+    header_container = create_header_container(
+        title="Dataset Augmentation",
+        subtitle="Pipeline augmentasi dengan live preview dan backend integration",
+        icon="🔄"
     )
-    status_panel = create_status_panel("✅ Pipeline augmentasi siap", "success")
+    ui_components['header_container'] = header_container.container
     
-    # Widget groups dengan live preview integration
-    basic_options = _create_basic_options_group()
-    advanced_options = _create_advanced_options_group()
-    augmentation_types = _create_augmentation_types_group()
-    live_preview = _create_live_preview_group()  # CHANGED: Menggantikan normalization
+    # 2. Create Form Container (will be populated with custom form layout later)
+    form_container = create_form_container()
     
-    # Progress tracker and buttons
-    progress_tracker = create_dual_progress_tracker("Augmentation Pipeline", auto_hide=True)
+    # 3. Create Footer Container with Log Accordion
+    log_components = create_log_accordion('augmentation', '250px')
+    footer_container = create_footer_container(
+        log_output=log_components['log_output'],
+        info_box=widgets.HTML(
+            """
+            <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px;">
+                <strong>Tips Augmentasi:</strong>
+                <ul style="margin: 5px 0 0 15px; padding: 0;">
+                    <li>Gunakan augmentasi yang sesuai dengan domain data</li>
+                    <li>Pastikan preview menunjukkan hasil yang diharapkan</li>
+                    <li>Cek hasil augmentasi sebelum menggunakannya untuk training</li>
+                </ul>
+            </div>
+            """
+        )
+    )
+    ui_components['footer_container'] = footer_container.container
     
-    # Save/Reset buttons
+    # 4. Create Action Container with standard approach
+    action_container = create_action_container(
+        buttons=[
+            {
+                "button_id": "augment",
+                "text": "🚀 Jalankan Augmentasi",
+                "style": "primary",
+                "order": 1
+            },
+            {
+                "button_id": "check",
+                "text": "🔍 Cek Data",
+                "style": "info",
+                "order": 2
+            },
+            {
+                "button_id": "cleanup",
+                "text": "🗑️ Bersihkan Hasil",
+                "style": "warning",
+                "tooltip": "Hapus hasil augmentasi sebelumnya",
+                "order": 3
+            }
+        ],
+        title="🚀 Augmentation Operations",
+        alignment="left"
+    )
+    ui_components['action_container'] = action_container.container
+    
+    # 5. Create Progress Tracker
+    progress_tracker = ProgressTracker(
+        title="Augmentation Pipeline",
+        levels=[ProgressLevel.OVERALL, ProgressLevel.CURRENT],
+        auto_hide=True
+    )
+    ui_components['progress_tracker'] = progress_tracker
+    
+    # 6. Create Save/Reset buttons for configuration
     config_buttons = create_save_reset_buttons(
         save_label="Simpan", 
         reset_label="Reset",
@@ -90,82 +139,26 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         sync_message="Konfigurasi disinkronkan dengan backend"
     )
     
-    # Action buttons with new API
-    action_buttons = create_action_buttons(
-        primary_button={
-            "label": "🚀 Jalankan Augmentasi",
-            "style": "success",
-            "width": "220px"
-        },
-        secondary_buttons=[
-            {
-                "label": "🔍 Cek Data",
-                "style": "info",
-                "width": "220px"
-            },
-            {
-                "label": "🗑️ Bersihkan Hasil",
-                "style": "warning",
-                "tooltip": "Hapus hasil augmentasi sebelumnya",
-                "width": "220px"
-            }
-        ]
-    )
+    # === BUTTON MAPPING ===
     
-    # Get buttons from the new action buttons component
-    augment_button = action_buttons.get('primary')
-    check_button = action_buttons.get('secondary_0')
-    cleanup_button = action_buttons.get('secondary_1')
-    button_container = action_buttons['container']
+    # Extract buttons from action container using standard approach
+    augment_button = action_container.get_button('augment')
+    check_button = action_container.get_button('check')
+    cleanup_button = action_container.get_button('cleanup')
     
-    # Fallback button creation if any button is missing
-    if augment_button is None:
-        print("[WARNING] Augment button not found, creating fallback")
-        augment_button = widgets.Button(description='🚀 Jalankan Augmentasi', 
-                                     button_style='success')
-        augment_button.layout = widgets.Layout(width='220px')
+    # === CUSTOM FORM LAYOUT ===
+    # Preserve the unique form structure of the augmentation module
     
-    if check_button is None:
-        print("[WARNING] Check button not found, creating fallback")
-        check_button = widgets.Button(description='🔍 Cek Data')
-        check_button.style.button_color = '#f0f0f0'
-        check_button.layout = widgets.Layout(width='220px')
-    
-    if cleanup_button is None:
-        print("[WARNING] Cleanup button not found, creating fallback")
-        cleanup_button = widgets.Button(description='🗑️ Bersihkan Hasil',
-                                      button_style='warning')
-        cleanup_button.layout = widgets.Layout(width='220px')
-    
-    # Update action_buttons for backward compatibility
-    action_buttons = {
-        'container': button_container,
-        'primary': augment_button,
-        'secondary_0': check_button,
-        'secondary_1': cleanup_button,
-        'augment_button': augment_button,
-        'check_button': check_button,
-        'cleanup_button': cleanup_button,
-        'download_button': augment_button,  # For backward compatibility
-        'buttons': [augment_button, check_button, cleanup_button] if cleanup_button else [augment_button, check_button]
-    }
-    
-    # Initialize UI components dictionary
-    ui_components = {}
-    
-    # Get confirmation area from ui_components with validation
-    confirmation_area = ui_components.get('confirmation_area')
-    if not confirmation_area or not isinstance(confirmation_area, widgets.Output):
-        confirmation_area = widgets.Output()
-        ui_components['confirmation_area'] = confirmation_area
-    
-    # Log accordion
-    log_components = create_log_accordion('augmentation', '250px')
+    # Widget groups dengan live preview integration
+    basic_options = _create_basic_options_group()
+    advanced_options = _create_advanced_options_group()
+    augmentation_types = _create_augmentation_types_group()
+    live_preview = _create_live_preview_group()  # Live preview component
     
     # Import style utilities
     from smartcash.ui.dataset.augmentation.utils.style_utils import styled_container
     
-    # 2x2 Grid with original styling and gradients
+    # 2x2 Grid with original styling and gradients - PRESERVED CUSTOM LAYOUT
     row1 = widgets.HBox([
         styled_container(basic_options['container'], "📋 Opsi Dasar", 'basic', '48%'),
         styled_container(advanced_options['container'], "⚙️ Parameter Lanjutan", 'advanced', '48%')
@@ -196,31 +189,9 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         box_sizing='border-box'
     ))
     
-    # Import shared action section component
-    from smartcash.ui.components.action_section import create_action_section
-    
-    # Pastikan container action buttons ada dan valid
-    button_container = action_buttons.get('container')
-    if button_container is None:
-        # Buat container baru jika tidak ada
-        button_container = widgets.HBox(
-            [b for b in action_buttons.get('buttons', []) if b is not None],
-            layout=widgets.Layout(justify_content='flex-end', width='100%')
-        )
-    
-    # Create action section using shared component with validation
-    try:
-        action_section = create_action_section(
-            action_buttons=button_container if button_container is not None else widgets.HBox(),
-            confirmation_area=confirmation_area,
-            title="🚀 Operations",
-            status_label="📋 Status & Konfirmasi:",
-            show_status=bool(confirmation_area)  # Only show status if we have a valid confirmation_area
-        )
-    except Exception as e:
-        print(f"Error creating action section: {str(e)}")
-        # Fallback to a simple container if action section creation fails
-        action_section = widgets.VBox()
+    # Place custom form layout in the form container
+    form_container['form_container'].children = (widgets.VBox([row1, row2]),)
+    ui_components['form_container'] = form_container['container']
     
     # Config section with consistent styling
     config_section = widgets.VBox([
@@ -228,68 +199,60 @@ def create_augmentation_main_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
             layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
     ], layout=widgets.Layout(margin='8px 0'))
     
-    # Main UI assembly with consistent styling
-    ui = widgets.VBox([
-        header,
-        status_panel,
-        row1,
-        row2,
-        config_section,
-        action_section,
-        progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([]),
-        log_components['log_accordion']
-    ], layout=widgets.Layout(
-        width='100%',
-        max_width='1280px',
-        margin='0 auto',
-        padding='15px',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
-        box_shadow='0 2px 4px rgba(0,0,0,0.05)'
-    ))
+    # Already created the 2x2 grid with original styling and gradients above
+    
+    # === MAIN UI ASSEMBLY ===
+    
+    # Assemble Main Container with shared components
+    main_container = create_main_container(
+        header_container=header_container.container,
+        form_container=ui_components['form_container'],
+        footer_container=footer_container.container,
+        action_container=action_container.container
+    )
+    
+    # Add config section to the main container (preserve unique augmentation feature)
+    main_container.children = list(main_container.children[:-1]) + [config_section] + [main_container.children[-1]]
+    
+    # Add progress tracker to the main container
+    if hasattr(progress_tracker, 'container'):
+        main_container.children = list(main_container.children) + [progress_tracker.container]
+    
+    # Store the main UI in ui_components
+    ui_components['ui'] = main_container
     
     # Update ui_components with all components
     ui_components.update({
-        'ui': ui, 
-        'header': header, 
-        'status_panel': status_panel,
-        'confirmation_area': confirmation_area,
+        # Core UI components
         **basic_options.get('widgets', {}), 
         **advanced_options.get('widgets', {}),
         **augmentation_types.get('widgets', {}), 
         **live_preview.get('widgets', {}),  # Live preview widgets
+        
+        # Buttons from action container
         'augment_button': augment_button,
         'check_button': check_button,
         'cleanup_button': cleanup_button,
         'download_button': augment_button,  # For backward compatibility
+        
+        # Config buttons
         'save_button': config_buttons.get('save_button'),
         'reset_button': config_buttons.get('reset_button'),
+        
+        # Progress and logging
         'progress_tracker': progress_tracker,
         'log_accordion': log_components.get('log_accordion'),
         'log_output': log_components.get('log_output'),
-        'status': log_components.get('log_output'),
-        'backend_ready': True, 
-        'service_integration': True,
+        
+        # Metadata
         'module_name': 'augmentation',
         'logger_namespace': 'smartcash.ui.dataset.augmentation',
         'augmentation_initialized': True,
         'config': config or {}
     })
     
-    # Make sure confirmation area is properly initialized
-    if 'confirmation_area' not in ui_components:
-        ui_components['confirmation_area'] = confirmation_area
-    
-    # Add action buttons to ui_components
-    ui_components.update({
-        'augment_button': action_buttons.get('primary_button'),
-        'check_button': next((btn for btn in action_buttons.get('secondary_buttons', []) if btn.get('label') == '🔍 Cek Data'), None),
-        'cleanup_button': next((btn for btn in action_buttons.get('secondary_buttons', []) if btn.get('label') == '🗑️ Bersihkan Hasil'), None),
-        'download_button': action_buttons.get('primary_button')  # For backward compatibility
-    })
-    
+    # Log any missing components for debugging
     from smartcash.ui.utils.logging_utils import log_missing_components
     log_missing_components(ui_components)
     
-    return ui_components
     return ui_components

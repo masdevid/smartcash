@@ -38,7 +38,12 @@ def handle_reset_config(ui_components: Dict[str, Any]):
     return _reset_handler
 
 def _execute_config_operation(ui_components: Dict[str, Any], operation_type: str):
-    """Consolidated config operation execution"""
+    """Consolidated config operation execution
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        operation_type: Tipe operasi ('save' atau 'reset')
+    """
     try:
         config_handler = ui_components.get('config_handler')
         if not config_handler:
@@ -46,9 +51,9 @@ def _execute_config_operation(ui_components: Dict[str, Any], operation_type: str
             log_to_ui(ui_components, "❌ Config handler tidak tersedia", "error")
             return
         
-        # Set UI components untuk logging
-        if hasattr(config_handler, 'set_ui_components'):
-            config_handler.set_ui_components(ui_components)
+        # Set UI components untuk logging - menggunakan method dari BaseHandler
+        # yang diwarisi oleh semua handler
+        config_handler.set_ui_components(ui_components)
         
         # Execute operation
         if operation_type == 'save':

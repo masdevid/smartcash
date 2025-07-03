@@ -5,10 +5,10 @@ Deskripsi: Enhanced CommonInitializer with proper logging sequence
 Initialization Flow:
 1. Load and validate configuration without suppression
 2. Create UI components
-3. Run pre-initialization checks (if _pre_initialize_checks exists)
+3. Run pre-initialization checks (if pre_initialize_checks exists)
 4. Set up event handlers (if _setup_handlers exists)
 5. Get and validate root UI component
-6. Run post-initialization checks (if _after_init_checks exists)
+6. Run post-initialization checks (if _post_initialization_checks exists)
 7. Log successful initialization
 8. Return UI components with proper cleanup
 
@@ -157,8 +157,8 @@ class CommonInitializer(ABC):
                 })
                 
                 # 4. Pre-initialization checks (optional) - silent
-                if hasattr(self, '_pre_initialize_checks'):
-                    self._pre_initialize_checks(config=config, **kwargs)
+                if hasattr(self, 'pre_initialize_checks'):
+                    self.pre_initialize_checks(config=config, **kwargs)
                 
                 # 6. Setup handlers SETELAH logger bridge ready
                 if hasattr(self, '_setup_handlers'):
@@ -170,8 +170,8 @@ class CommonInitializer(ABC):
                     raise ValueError("No root UI component found")
                 
                 # 8. Post-initialization checks (optional) - silent
-                if hasattr(self, '_after_init_checks'):
-                    self._after_init_checks(ui_components=ui_components, config=config, **kwargs)
+                if hasattr(self, 'post_initialization_checks'):
+                    self.post_initialization_checks(ui_components=ui_components, config=config, **kwargs)
                 
                 # 9. SUCCESS: Log ONLY to UI setelah everything ready
                 if hasattr(self.logger, 'info'):
@@ -182,7 +182,7 @@ class CommonInitializer(ABC):
             except Exception as e:
                 error_msg = f"❌ Gagal inisialisasi {self.module_name}: {str(e)}"
                 # Log the error first
-                self._handle_error(error_msg, exc_info=True)
+                self.handle_error(error_msg, exc_info=True)
                 # Then create and return the error response using imported function
                 try:
                     # Create error response with return_type=dict to ensure we get a dictionary
@@ -300,7 +300,7 @@ class CommonInitializer(ABC):
                 
         return None
         
-    def _pre_initialize_checks(self, **kwargs) -> None:
+    def pre_initialize_checks(self, **kwargs) -> None:
         """Override this method to perform pre-initialization checks.
         
         Raise an exception if any check fails.
@@ -313,7 +313,18 @@ class CommonInitializer(ABC):
         """
         pass
         
-    # _add_logger_bridge method removed - functionality now handled by BaseHandler
+    def post_initialization_checks(self, **kwargs) -> None:
+        """Override this method to perform post-initialization checks.
+        
+        Raise an exception if any check fails.
+        
+        Args:
+            **kwargs: Additional arguments that might be needed for checks
+            
+        Raises:
+            Exception: If any post-initialization check fails
+        """
+        pass
             
     def _get_timestamp(self) -> str:
         """Get current timestamp for tracking purposes.
@@ -324,7 +335,7 @@ class CommonInitializer(ABC):
         from datetime import datetime
         return datetime.now().isoformat()
     
-    def _handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
+    def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
         """Centralized error handling for all initializers.
         
         Args:
@@ -332,13 +343,24 @@ class CommonInitializer(ABC):
             exc_info: Whether to include exception info
             **kwargs: Additional arguments for logging
         """
-        # Use the logger directly for consistent error handling
-        if hasattr(self, 'logger') and self.logger:
-            self.logger.error(error_msg, exc_info=exc_info, **kwargs)
-        else:
-            # Fallback to print if logger is not available
+        # Use the error handler module for consistent error handling
+        try:
+            # Log the error first
+            if hasattr(self, 'logger') and self.logger:
+                self.logger.error(error_msg, exc_info=exc_info, **kwargs)
+            
+            # Only create error response if UI components are needed
+            if kwargs.get('create_ui', False):
+                return create_error_response(
+                    error_message=error_msg,
+                    error=kwargs.get('error'),
+                    title=f"{self.module_name} Error",
+                    include_traceback=exc_info
+                )
+        except Exception as e:
+            # Fallback to print if error handling itself fails
             print(f"[ERROR] {error_msg}", flush=True)
-            if exc_info and 'exc_info' in kwargs:
+            if exc_info:
                 import traceback
                 traceback.print_exc()
 

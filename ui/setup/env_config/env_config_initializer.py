@@ -173,7 +173,7 @@ class EnvConfigInitializer(CommonInitializer):
             self.logger.error(f"Failed to setup handlers: {str(e)}", exc_info=True)
             raise
             
-    def _pre_initialize_checks(self, config: Dict[str, Any], **kwargs) -> None:
+    def pre_initialize_checks(self, config: Dict[str, Any], **kwargs) -> None:
         """Perform pre-initialization checks for environment configuration.
         
         This method checks drive connectivity using EnvironmentManager before proceeding
@@ -283,7 +283,7 @@ class EnvConfigInitializer(CommonInitializer):
             self.logger.error(error_msg, exc_info=True)
             raise
     
-    def _after_init_checks(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    def post_initialization_checks(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Perform post-initialization checks and updates.
         
         This method is called after all initialization is complete to perform

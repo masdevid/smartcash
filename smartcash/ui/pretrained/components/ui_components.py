@@ -1,122 +1,155 @@
 """
 File: smartcash/ui/pretrained/components/ui_components.py
-Deskripsi: UI components untuk pretrained models dengan konsistensi module preprocessing
+Deskripsi: UI components untuk pretrained models dengan shared container components
 """
 
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from smartcash.ui.components import (
-    create_header, create_action_buttons, create_status_panel,
-    create_log_accordion, create_save_reset_buttons,
-    create_dual_progress_tracker, create_confirmation_area
-)
+
+# Import standard container components
+from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container
+from smartcash.ui.components.footer_container import create_footer_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components import create_log_accordion, create_save_reset_buttons
+from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
+from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 
 def create_pretrained_main_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-    """Create pretrained models UI dengan konsistensi module preprocessing"""
+    """🎨 Create pretrained models UI using shared container components"""
     config = config or {}
-    ui_components = {
-        'ui': widgets.VBox([]),
-        'ui_initialized': False
-    }
     
-    # Initialize UI components
-    from smartcash.ui.components.action_section import create_action_section
+    # Initialize UI components dictionary
+    ui_components = {}
     
-    # Create header and status
-    header = create_header(
-        "Pretrained Models",
-        "Manajemen model pretrained untuk deteksi mata uang",
-        "🤖"
+    # === CORE COMPONENTS ===
+    
+    # 1. Create Header Container
+    header_container = create_header_container(
+        title="Pretrained Models",
+        subtitle="Manajemen model pretrained untuk deteksi mata uang",
+        icon="🤖"
     )
+    ui_components['header_container'] = header_container.container
     
-    status_panel = create_status_panel(
-        "🚀 Siap mengelola model pretrained",
-        "info"
-    )
+    # 2. Create Form Container
+    form_container = create_form_container()
     
     # Create input options
     input_components = create_pretrained_input_options(config.get('pretrained_models', {}))
     
-    # Create action buttons
-    action_components = create_action_buttons(
-        primary_button={
-            "label": "📥 Download Model",
-            "style": "success",
-            "width": "180px",
-            "key": "download_button"
-        },
-        secondary_buttons=[
-            {
-                "label": "🔄 Sync Model", 
-                "style": "info", 
-                "width": "150px",
-                "key": "sync_button"
-            }
-        ]
-    )
+    # Place input options in the form container
+    form_container['form_container'].children = (input_components['ui'],)
+    ui_components['form_container'] = form_container['container']
     
-    # Initialize progress tracker
-    progress_tracker = create_dual_progress_tracker(
-        operation="Pretrained Models",
+    # 3. Create Footer Container with Log Accordion
+    log_components = create_log_accordion('pretrained', '200px')
+    footer_container = create_footer_container(
+        log_output=log_components['log_output'],
+        info_box=widgets.HTML(
+            """
+            <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px;">
+                <strong>Tips Model Pretrained:</strong>
+                <ul style="margin: 5px 0 0 15px; padding: 0;">
+                    <li>Gunakan model yang sesuai dengan kebutuhan deteksi</li>
+                    <li>Pastikan direktori model valid dan dapat diakses</li>
+                    <li>Sinkronisasi model untuk memastikan versi terbaru</li>
+                </ul>
+            </div>
+            """
+        )
+    )
+    ui_components['footer_container'] = footer_container.container
+    
+    # 4. Create Action Container with standard approach
+    action_container = create_action_container(
+        buttons=[
+            {
+                "button_id": "download",
+                "text": "📥 Download Model",
+                "style": "primary",
+                "order": 1
+            },
+            {
+                "button_id": "sync",
+                "text": "🔄 Sync Model",
+                "style": "info",
+                "order": 2
+            }
+        ],
+        title="🤖 Model Operations",
+        alignment="left"
+    )
+    ui_components['action_container'] = action_container.container
+    
+    # 5. Create Progress Tracker
+    progress_tracker = ProgressTracker(
+        title="Pretrained Models",
+        levels=[ProgressLevel.OVERALL, ProgressLevel.CURRENT],
         auto_hide=False
     )
+    ui_components['progress_tracker'] = progress_tracker
     
-    # Create log components
-    log_components = create_log_accordion(
-        module_name='pretrained',
-        height='200px'
-    )
-    
-    # Create confirmation area
-    confirmation_area = create_confirmation_area(ui_components=ui_components)
-    
-    # Create save/reset buttons
+    # 6. Create save/reset buttons
     save_reset_components = create_save_reset_buttons(
         save_label="Simpan",
         reset_label="Reset"
     )
     
-    # Create main UI layout
-    main_ui = widgets.VBox([
-        header,
-        status_panel,
-        input_components['ui'],
-        widgets.VBox([
-            widgets.Box([save_reset_components['container']], 
-                layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
-        ], layout=widgets.Layout(margin='8px 0')),
-        widgets.VBox([action_components.get('container', widgets.VBox([]))]),
-        progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([]),
-        log_components.get('log_accordion', widgets.VBox([]))
-    ], layout=widgets.Layout(
-        width='100%',
-        max_width='1280px',
-        margin='0 auto',
-        padding='15px',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
-        box_shadow='0 2px 4px rgba(0,0,0,0.05)'
-    ))
+    # Create config buttons container with proper styling
+    config_buttons_container = widgets.Box(
+        [save_reset_components['container']], 
+        layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0')
+    )
+    
+    # 7. Assemble the main UI using shared container approach
+    main_container = create_main_container(
+        header_container=ui_components['header_container'],
+        form_container=ui_components['form_container'],
+        footer_container=ui_components['footer_container'],
+        additional_components=[
+            config_buttons_container,
+            ui_components['action_container'],
+            progress_tracker.container
+        ]
+    )
+    
+    # Set main UI container
+    ui_components['ui'] = main_container
     
     # Update UI components with references to all interactive elements
     ui_components.update({
-        'ui': main_ui,
-        'header': header,
-        'status_panel': status_panel,
-        'progress_tracker': progress_tracker,
-        'log_output': log_components.get('log_output'),
-        'download_button': action_components.get('primary_button'),
-        'sync_button': action_components.get('secondary_buttons', [{}])[0].get('button') if action_components.get('secondary_buttons') else None,
-        'progress_tracker': progress_tracker,
-        'confirmation_area': confirmation_area,
-        'input_options': input_components,
+        # Standard container references
+        'main_container': main_container,
+        
+        # Button references with standard approach
+        'download_button': action_container.get_button('download'),
+        'sync_button': action_container.get_button('sync'),
+        
+        # For backward compatibility
+        'download_btn': action_container.get_button('download'),
+        'sync_btn': action_container.get_button('sync'),
+        
+        # Config buttons
         'save_button': save_reset_components.get('save_button'),
         'reset_button': save_reset_components.get('reset_button'),
-        'download_btn': action_components.get('primary'),
-        'sync_btn': action_components.get('secondary_0'),
-        'cleanup_btn': action_components.get('secondary_1'),
-        'ui_initialized': True
+        
+        # Input components
+        'input_options': input_components,
+        
+        # Log and progress
+        'log_output': log_components.get('log_output'),
+        'log_accordion': log_components.get('log_accordion'),
+        
+        # Metadata
+        'ui_initialized': True,
+        'module_name': 'pretrained'
     })
+    
+    # Log any missing components for debugging
+    from smartcash.ui.utils.logging_utils import log_missing_components
+    log_missing_components(ui_components)
     
     return ui_components
 

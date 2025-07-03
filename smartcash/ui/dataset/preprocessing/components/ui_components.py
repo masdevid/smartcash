@@ -1,180 +1,184 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_components.py
-Deskripsi: Fixed UI components dengan proper progress tracker integration dan button mapping
+Deskripsi: UI components for preprocessing using shared container components
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
+# Import standard container components
+from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container
+from smartcash.ui.components.footer_container import create_footer_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components import create_log_accordion
+from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
+from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
+
 def create_preprocessing_main_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create preprocessing UI dengan fixed progress tracker dan proper button mapping"""
+    """🎨 Create preprocessing UI using shared container components"""
     config = config or {}
     
     # Initialize UI components dictionary
     ui_components = {}
     
-    # Import dengan error handling
-    from smartcash.ui.components import (
-        create_header, create_action_buttons, create_status_panel,
-        create_log_accordion, create_save_reset_buttons,
-        create_dual_progress_tracker, create_confirmation_area
-    )
-
+    # Import preprocessing input options
     from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_input_options
     
     # === CORE COMPONENTS ===
     
-    # Header
-    header = create_header(
-        "Dataset Preprocessing", 
-        "Preprocessing dataset dengan YOLO normalization dan real-time progress",
-        "🚀"
+    # 1. Create Header Container
+    header_container = create_header_container(
+        title="Dataset Preprocessing",
+        subtitle="Preprocessing dataset dengan YOLO normalization dan real-time progress",
+        icon="🚀"
     )
+    ui_components['header_container'] = header_container.container
     
-    # Status panel
-    status_panel = create_status_panel(
-        "🚀 Siap memulai preprocessing", 
-        "info"
-    )
-    
-    # Input options
+    # 2. Create Form Components
     input_options = create_preprocessing_input_options(config)
     
-    # Save/Reset buttons
-    save_reset_components = create_save_reset_buttons(
-        save_label="Simpan",
-        reset_label="Reset", 
-        with_sync_info=False
-    )
+    # 3. Create Form Container
+    form_container = create_form_container()
     
-    # Action components - FIXED: Use proper button IDs
-    action_components = create_action_buttons(
-        primary_button={
-            "label": "🚀 Mulai Preprocessing",
-            "style": "success",
-            "width": "180px"
-        },
-        secondary_buttons=[
-            {
-                "label": "🔍 Check Dataset",
-                "style": "info",
-                "width": "150px"
-            },
-            {
-                "label": "🗑️ Cleanup",
-                "style": "warning",
-                "width": "120px"
-            }
-        ]
-    )
+    # Place input options in the form container
+    form_container['form_container'].children = (input_options,)
+    ui_components['form_container'] = form_container['container']
     
-    # Progress tracker - FIXED: Proper initialization
-    progress_tracker = create_dual_progress_tracker(
-        operation="Dataset Preprocessing",
-        auto_hide=False
-    )
-    
-    # CRITICAL: Show progress tracker initially untuk ensure proper attachment
-    if hasattr(progress_tracker, 'show'):
-        progress_tracker.show()
-    
-    # Log components
-    log_components = create_log_accordion(
+    # 4. Create Log Accordion
+    log_accordion = create_log_accordion(
         module_name='preprocessing',
         height='200px'
     )
+    ui_components['log_accordion'] = log_accordion
+    ui_components['log_output'] = log_accordion  # Alias for compatibility
     
-    # Confirmation area
-    confirmation_area = create_confirmation_area(ui_components=ui_components)
-    # Store reference in ui_components for consistency with other components
-    ui_components['confirmation_area'] = confirmation_area
-    
-    # === LAYOUT SECTIONS ===
-    
-    # Config section
-    config_section = widgets.VBox([
-        widgets.Box([save_reset_components['container']], 
-            layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%'))
-    ], layout=widgets.Layout(margin='8px 0'))
-    
-    # Import shared action section component
-    from smartcash.ui.components.action_section import create_action_section
-    
-    # Create action section using shared component
-    action_section = create_action_section(
-        action_buttons=action_components,
-        confirmation_area=confirmation_area,
-        title="🚀 Operations",
-        status_label="📋 Status:",
-        show_status=True
+    # 5. Create Progress Tracker
+    progress_tracker = ProgressTracker(
+        operation="Dataset Preprocessing",
+        level=ProgressLevel.DUAL,
+        auto_hide=False
     )
+    ui_components['progress_tracker'] = progress_tracker
+    ui_components['progress'] = progress_tracker  # Alias for compatibility
     
-    # === MAIN UI ASSEMBLY dengan Progress Tracker ===
+    # Show progress tracker initially
+    if hasattr(progress_tracker, 'show'):
+        progress_tracker.show()
     
-    ui = widgets.VBox([
-        header,
-        status_panel,
-        input_options,
-        config_section,
-        action_section,
-        # FIXED: Ensure progress tracker container exists dan visible
-        progress_tracker.container if hasattr(progress_tracker, 'container') else widgets.VBox([]),
-        log_components['log_accordion']
-    ], layout=widgets.Layout(
-        width='100%',
-        max_width='1280px',
-        margin='0 auto',
-        padding='15px',
-        border='1px solid #e0e0e0',
-        border_radius='8px',
-        box_shadow='0 2px 4px rgba(0,0,0,0.05)'
-    ))
+    # 6. Create Footer Container with log_output and info_box
+    footer_container = create_footer_container(
+        show_buttons=False,  # No buttons in footer
+        log_accordion=log_accordion,
+        info_box=widgets.HTML(
+            value="""
+            <div style="padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8; margin: 10px 0;">
+                <h5>ℹ️ Tips</h5>
+                <ul>
+                    <li>Gunakan resolusi yang sesuai dengan model target</li>
+                    <li>Min-Max normalization (0-1) direkomendasikan untuk YOLO</li>
+                    <li>Aktifkan validasi untuk memastikan dataset berkualitas</li>
+                </ul>
+            </div>
+            """
+        )
+    )
+    ui_components['footer_container'] = footer_container.container
     
-    # === FIXED BUTTON MAPPING ===
+    # 7. Create Action Container
+    action_container = create_action_container(
+        buttons=[
+            {
+                "button_id": "preprocess",
+                "text": "🚀 Mulai Preprocessing",
+                "style": "primary",
+                "order": 1
+            },
+            {
+                "button_id": "check",
+                "text": "🔍 Check Dataset",
+                "style": "info",
+                "order": 2
+            },
+            {
+                "button_id": "cleanup",
+                "text": "🗑️ Cleanup",
+                "style": "warning",
+                "tooltip": "Hapus data preprocessing yang sudah ada",
+                "order": 3
+            }
+        ],
+        title="🚀 Preprocessing Operations",
+        alignment="left"
+    )
+    ui_components['action_container'] = action_container
     
-    # Extract buttons dengan nama yang konsisten
-    preprocess_btn = action_components.get('primary') or action_components.get('mulai_preprocessing')
-    check_btn = action_components.get('secondary_0') or action_components.get('check_dataset')
-    cleanup_btn = action_components.get('secondary_1') or action_components.get('cleanup')
+    # === MAIN UI ASSEMBLY ===
     
-    # CRITICAL: Map dengan nama yang dicari handler
-    ui_components.update({
-        # REQUIRED COMPONENTS untuk CommonInitializer
-        'ui': ui,
-        'log_output': log_components.get('log_output'),
-        'status_panel': status_panel,
+    # 8. Assemble Main Container
+    main_container = create_main_container(
+        header_container=header_container.container,
+        form_container=ui_components['form_container'],
+        footer_container=footer_container.container,
+        action_container=action_container.container
+    )
+    ui_components['main_container'] = main_container.container
+    ui_components['ui'] = main_container.container  # Alias for compatibility
+    
+    # === HELPER METHODS ===
+    
+    def update_status(message: str, status_type: str = "info", show: bool = True) -> None:
+        """Update the status panel with a new message.
         
-        # BUTTONS dengan nama yang dicari handler
+        Args:
+            message: New status message
+            status_type: Status type (info, success, warning, error)
+            show: Whether to show the status panel
+        """
+        header_container.update_status(message, status_type, show)
+    
+    def update_title(title: str, subtitle: Optional[str] = None) -> None:
+        """Update the header title and subtitle.
+        
+        Args:
+            title: New title text
+            subtitle: New subtitle text (or None to keep current)
+        """
+        header_container.update_title(title, subtitle)
+    
+    def update_section(section_name: str, new_content: widgets.Widget) -> None:
+        """Update a section of the main container.
+        
+        Args:
+            section_name: Name of the section to update ('header', 'form', etc.)
+            new_content: New widget to replace the current section
+        """
+        main_container.update_section(section_name, new_content)
+    
+    # === BUTTON MAPPING ===
+    
+    # Extract buttons from action container using standard approach
+    preprocess_btn = action_container.get_button('preprocess')
+    check_btn = action_container.get_button('check')
+    cleanup_btn = action_container.get_button('cleanup')
+    
+    # Add helper methods to ui_components
+    ui_components.update({
+        # UPDATE METHODS
+        'update_status': update_status,
+        'update_title': update_title,
+        'update_section': update_section,
+        
+        # BUTTONS with consistent naming for handlers
         'preprocess_btn': preprocess_btn,
         'check_btn': check_btn, 
         'cleanup_btn': cleanup_btn,
-        'save_button': save_reset_components.get('save_button'),
-        'reset_button': save_reset_components.get('reset_button'),
         
-        # ALIASES untuk backward compatibility
+        # ALIASES for backward compatibility
         'preprocess_button': preprocess_btn,
         'check_button': check_btn,
         'cleanup_button': cleanup_btn,
-        
-        # UI SECTIONS
-        'header': header,
-        'input_options': input_options,
-        'config_section': config_section,
-        'action_section': action_section,
-        'confirmation_area': confirmation_area,
-        
-        # PROGRESS & LOG - FIXED: Proper progress tracker attachment
-        'progress_tracker': progress_tracker,
-        'progress': progress_tracker,  # Alias untuk compatibility
-        'log_accordion': log_components.get('log_accordion'),
-        
-        # ACTION COMPONENTS
-        'action_buttons': {
-            'preprocess_btn': preprocess_btn,
-            'check_btn': check_btn,
-            'cleanup_btn': cleanup_btn
-        },
-        'save_reset_buttons': save_reset_components,
         
         # INPUT FORM COMPONENTS
         'resolution_dropdown': getattr(input_options, 'resolution_dropdown', None),

@@ -4,12 +4,22 @@
 # =============================================================================
 
 import ipywidgets as widgets
+import re
 from typing import Dict, Any, List
-from .base_handler import BaseDependencyHandler
-from .defaults import get_package_by_key
+from smartcash.ui.setup.dependency.handlers.base_dependency_handler import BaseDependencyHandler 
+from smartcash.ui.setup.dependency.handlers.defaults import get_package_by_key
 
 class SelectionHandler(BaseDependencyHandler):
     """Handler untuk package selection dan custom packages"""
+    
+    def __init__(self, ui_components: Dict[str, Any], **kwargs):
+        """Initialize selection handler with UI components.
+        
+        Args:
+            ui_components: Dictionary containing UI components
+            **kwargs: Additional arguments passed to parent class
+        """
+        super().__init__(ui_components=ui_components, **kwargs)
     
     def setup_handlers(self) -> Dict[str, Any]:
         """Setup selection handlers"""
@@ -21,9 +31,10 @@ class SelectionHandler(BaseDependencyHandler):
                 component.observe(self.on_package_selection_change, names='value')
         
         # Setup custom package button handler
-        add_custom_btn = self.ui_components.get('add_custom_btn')
-        if add_custom_btn:
-            add_custom_btn.on_click(self.add_custom_package)
+        # Access the custom_packages_section component and its add_button
+        custom_packages_section = self.ui_components.get('custom_packages_section')
+        if custom_packages_section and hasattr(custom_packages_section, 'add_button'):
+            custom_packages_section.add_button.on_click(self.add_custom_package)
             handlers['add_custom'] = self.add_custom_package
         
         handlers['package_selection'] = self.on_package_selection_change
@@ -46,30 +57,37 @@ class SelectionHandler(BaseDependencyHandler):
                 package = get_package_by_key(package_key)
                 if package:
                     status = "dipilih ✅" if is_selected else "batal dipilih ❌"
-                    self.log_info(f"📝 {package['name']} {status}")
+                    self.logger.info(f"📝 {package['name']} {status}")
                     
                     # Update selected packages counter
                     self._update_selection_counter()
                 else:
-                    self.log_warning(f"⚠️ Package {package_key} tidak ditemukan")
+                    self.logger.warning(f"⚠️ Package {package_key} tidak ditemukan")
                     
         except Exception as e:
-            self.log_error(f"❌ Error package selection: {str(e)}")
+            self.handle_error(e, "Error package selection")
     
     def add_custom_package(self, *args):
         """Add custom package dari input"""
         try:
-            custom_input = self.ui_components.get('custom_packages_input')
-            custom_list = self.ui_components.get('custom_packages_list')
+            # Get the custom_packages_section component
+            custom_packages_section = self.ui_components.get('custom_packages_section')
             
-            if not custom_input or not custom_input.value.strip():
-                self.log_warning("⚠️ Input custom package kosong")
+            if not custom_packages_section or not hasattr(custom_packages_section, 'package_input'):
+                self.logger.warning("⚠️ Custom packages section tidak ditemukan")
+                return
+                
+            # Access the input field from the custom_packages_section
+            custom_input = custom_packages_section.package_input
+            
+            if not custom_input.value.strip():
+                self.logger.warning("⚠️ Input custom package kosong")
                 return
             
             custom_packages = [pkg.strip() for pkg in custom_input.value.split(',') if pkg.strip()]
             
             if not custom_packages:
-                self.log_warning("⚠️ Format custom package tidak valid")
+                self.logger.warning("⚠️ Format custom package tidak valid")
                 return
             
             # Validate package names
@@ -78,22 +96,34 @@ class SelectionHandler(BaseDependencyHandler):
                 if self._validate_package_name(pkg):
                     valid_packages.append(pkg)
                 else:
-                    self.log_warning(f"⚠️ Package name tidak valid: {pkg}")
+                    self.logger.warning(f"⚠️ Package name tidak valid: {pkg}")
             
             if valid_packages:
-                # Update custom packages list display
-                self._update_custom_packages_display(valid_packages, custom_list)
+                # Add packages to the custom_packages_section
+                for pkg in valid_packages:
+                    # Use the _add_package method of custom_packages_section if available
+                    if hasattr(custom_packages_section, '_add_package'):
+                        custom_packages_section._add_package(pkg)
+                    elif hasattr(custom_packages_section, 'packages') and isinstance(custom_packages_section.packages, list):
+                        # Fallback: add to packages list and refresh
+                        if pkg not in custom_packages_section.packages:
+                            custom_packages_section.packages.append(pkg)
+                            if hasattr(custom_packages_section, '_refresh_package_list'):
+                                custom_packages_section._refresh_package_list()
                 
-                # Clear input
+                # Update UI dengan package baru
+                self._update_custom_packages_display(valid_packages, custom_packages_section)
+                
+                # Reset input field
                 custom_input.value = ""
                 
                 # Log success
-                self.log_success(f"✅ {len(valid_packages)} custom package ditambahkan")
+                self.logger.info(f"✅ {len(valid_packages)} custom package ditambahkan")
             else:
-                self.log_error("❌ Tidak ada package valid yang ditambahkan")
+                self.logger.error("❌ Tidak ada package valid yang ditambahkan")
                 
         except Exception as e:
-            self.log_error(f"❌ Error add custom package: {str(e)}")
+            self.handle_error(e, "Error add custom package")
     
     def remove_custom_package(self, package_name: str):
         """Remove custom package dari list"""
@@ -105,11 +135,11 @@ class SelectionHandler(BaseDependencyHandler):
                 if package_name in current_packages:
                     current_packages.remove(package_name)
                     self._update_custom_packages_display(current_packages, custom_list)
-                    self.log_success(f"✅ {package_name} dihapus dari custom packages")
+                    self.logger.info(f"✅ {package_name} dihapus dari custom packages")
                 else:
-                    self.log_warning(f"⚠️ {package_name} tidak ditemukan dalam list")
+                    self.logger.warning(f"⚠️ {package_name} tidak ditemukan dalam list")
         except Exception as e:
-            self.log_error(f"❌ Error remove custom package: {str(e)}")
+            self.handle_error(e, "Error remove custom package")
     
     def _validate_package_name(self, package_name: str) -> bool:
         """Validate package name format"""
@@ -117,7 +147,6 @@ class SelectionHandler(BaseDependencyHandler):
             return False
         
         # Basic validation untuk pip package name
-        import re
         pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$'
         base_name = package_name.split('==')[0].split('>=')[0].split('<=')[0].strip()
         
@@ -167,13 +196,9 @@ class SelectionHandler(BaseDependencyHandler):
                     selected_count += 1
         
         # Update status panel dengan counter
-        status_panel = self.ui_components.get('status_panel')
-        if status_panel:
-            counter_msg = f"📦 {selected_count}/{total_count} packages dipilih"
-            # Hanya update jika ada perubahan
-            if counter_msg not in str(status_panel.value):
-                from smartcash.ui.components.status_panel import update_status_panel
-                update_status_panel(status_panel, counter_msg, 'info')
+        counter_msg = f"📦 {selected_count}/{total_count} packages dipilih"
+        # Update status panel
+        self.update_status_panel(self.ui_components, counter_msg, 'info')
 
 # Factory function
 def setup_selection_handlers(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:

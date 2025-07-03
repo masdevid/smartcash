@@ -3,10 +3,10 @@ File: smartcash/ui/dataset/split/__init__.py
 Deskripsi: Ekspor utilitas dan fungsi split dataset
 """
 
-from smartcash.ui.dataset.split.split_init import (
+from smartcash.ui.dataset.split.split_initializer import (
     create_split_config_cell,
     get_split_config_components,
-    SplitConfigInitializer
+    SplitInitializer
 )
 from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
 
@@ -53,6 +53,6 @@ __all__ = [
     'create_split_config_cell',
     'get_split_config_components',
     'display_split_config',  # Backward compatibility
-    'SplitConfigInitializer',
+    'SplitInitializer',  # Updated from SplitConfigInitializer
     'SplitConfigHandler'
 ]

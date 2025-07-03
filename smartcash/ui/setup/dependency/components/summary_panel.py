@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional, Callable
 import ipywidgets as widgets
 
 class DependencySummaryPanel:
-    """A summary panel that displays selected packages and actions."""
+    """A summary panel that displays selected packages and operation summaries."""
     
     def __init__(self):
         """Initialize the summary panel."""
@@ -11,57 +11,20 @@ class DependencySummaryPanel:
         self.total_count = 0
         self.install_required = False
         self.update_available = False
+        self.selected_packages = []
+        self.custom_packages = []
         
-        # Create summary text
+        # Create selection summary text
         self.summary_text = widgets.HTML(
             "<div style='padding: 10px; border-radius: 4px; background: #f8f9fa;'>"
-            "<b>Summary:</b> No packages selected"
+            "<b>Ringkasan:</b> Belum ada paket yang dipilih"
             "</div>"
         )
         
-        # Create action buttons
-        self.install_button = widgets.Button(
-            description="Install Selected",
-            button_style="success",
-            icon="download",
-            layout=widgets.Layout(width="180px"),
-            tooltip="Install selected packages",
-        )
-        
-        self.update_button = widgets.Button(
-            description="Update All",
-            button_style="info",
-            icon="refresh",
-            layout=widgets.Layout(width="150px"),
-            tooltip="Update all installed packages",
-            disabled=True,
-        )
-        
-        self.save_button = widgets.Button(
-            description="Save Configuration",
-            button_style="primary",
-            icon="save",
-            layout=widgets.Layout(width="180px"),
-            tooltip="Save current package selection",
-        )
-        
-        # Create button container
-        self.button_container = widgets.HBox(
-            [self.install_button, self.update_button, self.save_button],
-            layout=widgets.Layout(
-                margin="10px 0",
-                justify_content="flex-start",
-                flex_wrap="wrap",
-                gap="10px",
-            ),
-        )
-        
-        # Create the main panel
-        self.panel = widgets.VBox(
-            [
-                self.summary_text,
-                self.button_container,
-            ],
+        # Create the main panel for package selection summary only
+        # Action summaries will be displayed in the summary container
+        self.container = widgets.VBox(
+            [self.summary_text],
             layout=widgets.Layout(
                 width="100%",
                 padding="10px",
@@ -78,7 +41,7 @@ class DependencySummaryPanel:
         install_required: bool = False,
         update_available: bool = False,
     ) -> None:
-        """Update the summary text and button states.
+        """Update the selection summary text.
         
         Args:
             selected_count: Number of selected packages.
@@ -95,68 +58,86 @@ class DependencySummaryPanel:
         if selected_count == 0:
             self.summary_text.value = (
                 "<div style='padding: 10px; border-radius: 4px; background: #f8f9fa;'>"
-                "<b>Summary:</b> No packages selected"
+                "<b>Ringkasan:</b> Belum ada paket yang dipilih"
                 "</div>"
             )
         else:
-            status = []
-            if install_required:
-                status.append("<span style='color: #28a745;'>Installation required</span>")
-            if update_available:
-                status.append("<span style='color: #17a2b8;'>Updates available</span>")
-            
-            status_text = " | ".join(status) if status else "Ready to install"
+            status_class = "warning" if install_required else "success"
+            bg_color = "#fff3cd" if install_required else "#d1e7dd"
+            text_color = "#664d03" if install_required else "#0f5132"
             
             self.summary_text.value = (
-                f"<div style='padding: 10px; border-radius: 4px; background: #f8f9fa;'>"
-                f"<b>Summary:</b> {selected_count} of {total_count} packages selected"
-                f"<div style='margin-top: 5px;'>{status_text}</div>"
+                f"<div style='padding: 10px; border-radius: 4px; background: {bg_color}; color: {text_color};'>"
+                f"<b>Ringkasan:</b> {selected_count} dari {total_count} paket dipilih"
+                f"<div style='margin-top: 5px;'>"
+                f"{self._get_status_message(install_required, update_available)}"
+                f"</div>"
                 "</div>"
             )
+    
+    def _get_status_message(self, install_required: bool, update_available: bool) -> str:
+        """Get the status message based on the current state.
         
-        # Update button states
-        self.install_button.disabled = selected_count == 0
-        self.update_button.disabled = not update_available
-    
-    def on_install_click(self, callback: Callable) -> None:
-        """Set the callback for the install button."""
-        self.install_button.on_click(lambda _: callback())
-    
-    def on_update_click(self, callback: Callable) -> None:
-        """Set the callback for the update button."""
-        self.update_button.on_click(lambda _: callback())
-    
-    def on_save_click(self, callback: Callable) -> None:
-        """Set the callback for the save button."""
-        self.save_button.on_click(lambda _: callback())
-    
-    def show_loading(self, loading: bool = True) -> None:
-        """Show or hide loading state on buttons."""
-        self.install_button.disabled = loading
-        self.update_button.disabled = loading or not self.update_available
-        self.save_button.disabled = loading
+        Args:
+            install_required: Whether installation is required.
+            update_available: Whether updates are available.
+            
+        Returns:
+            Status message to display.
+        """
+        messages = []
         
-        if loading:
-            self.install_button.icon = "spinner fa-spin"
-            self.update_button.icon = "spinner fa-spin"
-            self.save_button.icon = "spinner fa-spin"
-        else:
-            self.install_button.icon = "download"
-            self.update_button.icon = "refresh"
-            self.save_button.icon = "save"
+        if install_required:
+            messages.append("<span style='font-weight: bold;'>✓ Siap untuk diinstall</span>")
+        
+        if update_available:
+            messages.append("<span style='font-weight: bold;'>⟳ Update tersedia</span>")
+            
+        if not messages:
+            return "Semua paket sudah terinstall"
+            
+        return " | ".join(messages)
     
-    def show_error(self, message: str) -> None:
-        """Show an error message in the summary panel."""
-        self.summary_text.value = (
-            f"<div style='padding: 10px; border-radius: 4px; background: #f8d7da; color: #721c24;'>"
-            f"<b>Error:</b> {message}"
-            "</div>"
+    # Button callbacks removed as they're now handled by the action container
+    
+    # Loading state handling is now managed by the action container
+    
+    # Error and success messages are now handled by the summary container
+    
+    def update_selection(self, package_key: str, is_checked: bool) -> None:
+        """Update the selected packages list based on checkbox selection.
+        
+        Args:
+            package_key: The key of the package
+            is_checked: Whether the package is checked/selected
+        """
+        if is_checked and package_key not in self.selected_packages:
+            self.selected_packages.append(package_key)
+        elif not is_checked and package_key in self.selected_packages:
+            self.selected_packages.remove(package_key)
+        
+        # Update the summary display
+        self.update_summary(
+            selected_count=len(self.selected_packages) + len(self.custom_packages),
+            total_count=self.total_count,
+            install_required=len(self.selected_packages) > 0 or len(self.custom_packages) > 0,
+            update_available=self.update_available
         )
     
-    def show_success(self, message: str) -> None:
-        """Show a success message in the summary panel."""
-        self.summary_text.value = (
-            f"<div style='padding: 10px; border-radius: 4px; background: #d4edda; color: #155724;'>"
-            f"<b>Success:</b> {message}"
-            "</div>"
+    def update_custom_packages(self, packages: List[str]) -> None:
+        """Update the custom packages list.
+        
+        Args:
+            packages: List of custom package specifications
+        """
+        self.custom_packages = packages
+        
+        # Update the summary display
+        self.update_summary(
+            selected_count=len(self.selected_packages) + len(self.custom_packages),
+            total_count=self.total_count,
+            install_required=len(self.selected_packages) > 0 or len(self.custom_packages) > 0,
+            update_available=self.update_available
         )
+        
+    # Duplicate error and success methods removed - these are now handled by the summary container

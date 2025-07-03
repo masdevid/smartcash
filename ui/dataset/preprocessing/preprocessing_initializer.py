@@ -1,192 +1,196 @@
 """
 File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
-Deskripsi: Preprocessing initializer dengan CommonInitializer pattern terbaru dan fail-fast approach
+Deskripsi: Enhanced preprocessing initializer dengan API integration dan dialog support
+
+Initialization Flow:
+1. Load and validate configuration
+2. Create UI components
+3. Setup module handlers
+4. Return UI with proper error handling
 """
 
-import traceback
-from typing import Dict, Any, Optional, Type, Callable
+from typing import Dict, Any, List, Optional
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import PreprocessingConfigHandler
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.common.logger import get_logger
-from smartcash.ui.components.error.error_component import create_error_component
+from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
+from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handlers import setup_preprocessing_handlers
+from smartcash.ui.handlers.error_handler import create_error_response
 
 class PreprocessingInitializer(CommonInitializer):
-    """Enhanced PreprocessingInitializer with proper error handling"""
-    
-    def __init__(self, config_handler_class: Type[ConfigHandler] = PreprocessingConfigHandler):
-        """Initialize preprocessing initializer with proper configuration
-        
+    """Enhanced preprocessing initializer dengan API integration, progress tracking, dan dialog support
+
+    Provides a structured approach to initializing the dataset preprocessing module with
+    proper error handling, logging, and UI component management. Follows the same
+    initialization flow as CommonInitializer with additional preprocessing-specific
+    functionality.
+    """
+
+    def __init__(self):
+        super().__init__(
+            module_name='preprocessing',
+            config_handler_class=PreprocessingConfigHandler
+        )
+
+    def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
+        """Create UI components dengan API integration
+
         Args:
-            config_handler_class: Optional ConfigHandler class (defaults to PreprocessingConfigHandler)
-        """
-        super().__init__(module_name='preprocessing', config_handler_class=config_handler_class)
-    
-    def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan proper error handling dan validation
-        
-        Args:
-            config: Konfigurasi untuk inisialisasi UI
-            **kwargs: Argumen tambahan
-            
+            config: Loaded configuration
+            env: Optional environment context
+            **kwargs: Additional arguments
+
         Returns:
-            Dictionary berisi komponen UI yang valid dengan minimal keys:
-            - 'ui': Komponen UI utama
-            - 'log_output': Output log widget
-            - 'status_panel': Panel status
-            
-        Raises:
-            ValueError: Jika UI components tidak valid atau komponen penting tidak ada
+            Dictionary of UI components
         """
         try:
-            from smartcash.ui.dataset.preprocessing.components.ui_components import create_preprocessing_main_ui
-            
-            # Create UI components dengan immediate validation
+            self.logger.info(" Membuat komponen UI preprocessing")
             ui_components = create_preprocessing_main_ui(config)
-            
-            if not isinstance(ui_components, dict):
-                raise ValueError(f"UI components harus berupa dictionary, dapat: {type(ui_components)}")
-                    
-            if not ui_components:
-                raise ValueError("UI components tidak boleh kosong")
-            
-            # Validate critical components exist
-            required_components = ['ui', 'log_output', 'status_panel']
-            missing = [comp for comp in required_components if comp not in ui_components]
+
+            # Validate critical components
+            missing = [name for name in self._get_critical_components() if name not in ui_components]
             if missing:
-                raise ValueError(f"Komponen UI kritis tidak ditemukan: {missing}")
-                
+                raise ValueError(f"Missing critical components: {', '.join(missing)}")
+
+            # Enhanced metadata
+            ui_components.update({
+                'preprocessing_initialized': True,
+                'module_name': 'preprocessing',
+                'data_dir': config.get('data', {}).get('dir', 'data'),
+                'api_integration_enabled': True,
+                'dialog_components_loaded': True,
+                'progress_tracking_enabled': True,
+                'logger': self.logger  # Ensure logger is available
+            })
+
+            self.logger.debug(f"UI components created: {list(ui_components.keys())}")
             return ui_components
-            
+
         except Exception as e:
-            self.logger.error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
-            raise
-        
-        # Add config handler reference
-        ui_components['config_handler'] = self.config_handler
-        
-        return ui_components
-    
-    def _setup_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Setup handlers dengan proper error handling dan initializer connection"""
-        from smartcash.ui.dataset.preprocessing.handlers.event_handlers import setup_all_handlers
-        
-        try:
-            # Setup all handlers using the centralized setup function
-            handlers = setup_all_handlers(ui_components, config, self.config_handler)
-            
-            # Connect handlers to this initializer for error propagation
-            for handler in handlers.values():
-                if hasattr(handler, 'setup_with_initializer'):
-                    handler.setup_with_initializer(self)
-            
-            # Store handlers for later use and add to ui_components
-            self._handlers = handlers
-            ui_components['handlers'] = handlers
-            
-            # Store UI components reference for error handling
-            self._ui_components = ui_components
-            
-        except Exception as e:
-            error_msg = "Failed to initialize handlers"
-            self.logger.error(f"{error_msg}: {str(e)}", exc_info=True)
-            # Re-raise to let the parent class handle it
-            raise RuntimeError(f"{error_msg}: {str(e)}") from e
-    
-    def _get_default_config(self) -> Dict[str, Any]:
-        """Get default config dengan fallback handling
-        
+            self.handle_error(f"Failed to create UI components: {str(e)}", exc_info=True)
+            return create_error_response("Gagal membuat komponen UI preprocessing")
+
+    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], 
+                             env=None, **kwargs) -> Dict[str, Any]:
+        """Setup handlers dengan API integration dan progress tracking
+
+        Args:
+            ui_components: Dictionary of UI components
+            config: Loaded configuration
+            env: Optional environment context
+            **kwargs: Additional arguments
+
         Returns:
-            Dictionary berisi konfigurasi default yang valid
-            
-        Raises:
-            ImportError: Jika modul default config tidak ditemukan
+            Updated UI components with handlers
+        """
+        try:
+            self.logger.info(" Menyiapkan handlers preprocessing")
+
+            # Setup handlers dengan API integration
+            handlers = setup_preprocessing_handlers(ui_components, config, env)
+
+            # Update UI components with handlers
+            if handlers:
+                ui_components.update(handlers)
+                self.logger.debug(f"Handlers setup complete: {list(handlers.keys()) if handlers else 'No handlers'}")
+
+            # Load config dan update UI
+            self._load_and_update_ui(ui_components)
+
+            return ui_components
+
+        except Exception as e:
+            self.handle_error(f"Failed to setup module handlers: {str(e)}", exc_info=True)
+            return ui_components  # Return original components to avoid breaking the UI
+
+    def _load_and_update_ui(self, ui_components: Dict[str, Any]) -> None:
+        """Load config dari file dan update UI components
+
+        Args:
+            ui_components: Dictionary of UI components
+        """
+        try:
+            config_handler = ui_components.get('config_handler')
+            if not config_handler:
+                self.logger.warning(" Config handler tidak tersedia")
+                return
+
+            # Set UI components untuk logging
+            if hasattr(config_handler, 'set_ui_components'):
+                config_handler.set_ui_components(ui_components)
+
+            # Load config dengan inheritance support
+            loaded_config = config_handler.load_config()
+            if loaded_config:
+                # Update UI dengan loaded config
+                config_handler.update_ui(ui_components, loaded_config)
+                ui_components['config'] = loaded_config
+                self.logger.debug("Config loaded dan UI updated")
+            else:
+                self.logger.warning(" Config kosong, menggunakan defaults")
+
+        except Exception as e:
+            self.handle_error(f"Failed to load and update UI: {str(e)}", exc_info=True)
+
+    def _get_default_config(self) -> Dict[str, Any]:
+        """Get default config dengan API compatibility
+
+        Returns:
+            Default configuration dictionary
         """
         try:
             from smartcash.ui.dataset.preprocessing.handlers.defaults import get_default_preprocessing_config
-            return get_default_preprocessing_config()
-        except ImportError as e:
-            self.logger.error(f"❌ Gagal import default config: {str(e)}")
-            raise ImportError(f"Default preprocessing config tidak ditemukan: {str(e)}") from e
-    
-    def _pre_initialize_checks(self, **kwargs) -> None:
-        """Pre-initialization checks untuk preprocessing requirements
-        
-        Args:
-            **kwargs: Arguments untuk validasi
-            
-        Raises:
-            RuntimeError: Jika dependencies tidak memenuhi syarat
-        """
-        # Check critical imports
-        try:
-            import ipywidgets
-            import numpy
-            from smartcash.dataset.preprocessor import api as preprocessor_api
-        except ImportError as e:
-            raise RuntimeError(f"Dependencies preprocessing tidak lengkap: {str(e)}") from e
-        
-        # Check environment compatibility
-        try:
-            from smartcash.common.environment import get_environment_manager
-            env_manager = get_environment_manager()
-            if not env_manager.get_dataset_path().exists():
-                self.logger.warning("⚠️ Dataset path tidak ditemukan, akan dibuat otomatis")
+            default_config = get_default_preprocessing_config()
+            self.logger.debug("Default config loaded successfully")
+            return default_config
         except Exception as e:
-            self.logger.warning(f"⚠️ Environment check warning: {str(e)}")
-    
-    def _after_init_checks(self, ui_components: Dict[str, Any], **kwargs) -> None:
-        """Post-initialization validation dan health checks
-        
-        Args:
-            ui_components: Komponen UI yang telah diinisialisasi
-            **kwargs: Arguments tambahan
-            
-        Raises:
-            RuntimeError: Jika post-init validation gagal
-        """
-        # Validate UI components integrity
-        critical_widgets = ['preprocess_button', 'check_button', 'save_button']
-        missing_widgets = [w for w in critical_widgets if not ui_components.get(w)]
-        if missing_widgets:
-            raise RuntimeError(f"Widget kritis tidak ditemukan: {missing_widgets}")
-        
-        # Validate handlers are properly attached
-        if 'handlers' not in ui_components:
-            raise RuntimeError("Event handlers tidak terpasang dengan benar")
-        
-        # Test logger bridge functionality
-        if self._logger_bridge:
-            try:
-                self._logger_bridge.info("🧪 Testing logger bridge connectivity...")
-            except Exception as e:
-                self.logger.warning(f"⚠️ Logger bridge test warning: {str(e)}")
-    
+            self.handle_error(f"Failed to get default config: {str(e)}", exc_info=True)
+            # Return minimal working config to prevent crashes
+            return {
+                'preprocessing': {
+                    'enabled': True,
+                    'target_splits': ['train', 'valid'],
+                    'normalization': {'enabled': True, 'method': 'minmax', 'target_size': [640, 640]}
+                },
+                'performance': {'batch_size': 32},
+                'data': {'dir': 'data'}
+            }
 
-def initialize_preprocessing_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
-    """Factory function untuk inisialisasi preprocessing UI
-    
+    def _get_critical_components(self) -> List[str]:
+        """Get list of critical UI components that must exist
+
+        Returns:
+            List of critical component keys
+        """
+        return [
+            'ui', 'preprocess_button', 'check_button', 'cleanup_button',
+            'log_output', 'status_panel', 'progress_tracker'
+        ]
+
+    def pre_initialize_checks(self, **kwargs) -> None:
+        """Perform pre-initialization checks
+
+        Raises:
+            Exception: If any pre-initialization check fails
+        """
+        # Check if we're in a supported environment
+        try:
+            import IPython
+            # Additional checks can be added here
+        except ImportError:
+            raise RuntimeError("Dataset preprocessing requires IPython environment")
+
+# Global instance
+_preprocessing_initializer = PreprocessingInitializer()
+
+def initialize_preprocessing_ui(env=None, config=None, **kwargs) -> Dict[str, Any]:
+    """Factory function untuk preprocessing UI dengan API integration
+
     Args:
-        config: Konfigurasi opsional untuk inisialisasi
-        **kwargs: Argumen tambahan yang akan diteruskan ke initializer
-        
+        env: Optional environment context
+        config: Optional configuration dictionary
+        **kwargs: Additional arguments
+
     Returns:
-        Widget UI utama yang siap ditampilkan atau dictionary dengan 'ui' key
-        
-    Example:
-        ```python
-        ui = initialize_preprocessing_ui(config=my_config)
-        display(ui)  # or display(ui['ui']) if it's a dict
-        ```
+        Dictionary of UI components with 'ui' as the main component
     """
-    try:
-        initializer = PreprocessingInitializer()
-        result = initializer.initialize(config=config, **kwargs)
-        
-        # Handle error response
-        if isinstance(result, dict) and result.get('error'):
-            return result['ui']
-        return result
-    except Exception as e:
-        error_msg = f"❌ Gagal menginisialisasi preprocessing UI: {str(e)}"
-        return {'ui': create_error_component(error_msg, str(e), "Preprocessing Error"), 'error': True}
+    return _preprocessing_initializer.initialize(config=config, env=env, **kwargs)

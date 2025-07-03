@@ -1,12 +1,12 @@
-
 """
-Event handlers for dependency management UI.
+File: smartcash/ui/setup/dependency/handlers/event_handlers.py
+Description: Event handlers for dependency management UI with centralized error handling.
 
 This module contains functions to set up and manage event handlers for the dependency management UI.
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from .base_dependency_handler import BaseDependencyHandler
 
 
 def setup_event_handlers(ui_components: Dict[str, Any]) -> None:
@@ -18,8 +18,8 @@ def setup_event_handlers(ui_components: Dict[str, Any]) -> None:
     if not ui_components:
         return
     
-    # Setup logger bridge if available
-    logger_bridge = ui_components.get('logger_bridge')
+    # Create handler for centralized error handling
+    handler = BaseDependencyHandler(ui_components=ui_components)
     
     # Setup operation handlers
     from .operation_handlers import setup_operation_handlers
@@ -31,37 +31,40 @@ def setup_event_handlers(ui_components: Dict[str, Any]) -> None:
         # Store reference to handlers if needed
         ui_components['_operation_handlers'] = operation_handlers
         
-        if logger_bridge:
-            logger_bridge.info("✅ Operation handlers berhasil disetup")
+        handler.logger.info("✅ Operation handlers berhasil disetup")
     except Exception as e:
-        if logger_bridge:
-            logger_bridge.error(f"❌ Gagal setup operation handlers: {str(e)}")
-    
-    # Setup logger bridge for components that need it
-    if logger_bridge:
-        if 'log_accordion' in ui_components and ui_components['log_accordion']:
-            ui_components['log_accordion'].logger_bridge = logger_bridge
-        
-        if 'progress_tracker' in ui_components and ui_components['progress_tracker']:
-            ui_components['progress_tracker'].logger_bridge = logger_bridge
+        handler.handle_error(e, "Gagal setup operation handlers")
     
     # Initialize save status
     if 'update_save_status' in ui_components and callable(ui_components['update_save_status']):
-        ui_components['update_save_status']()
+        try:
+            ui_components['update_save_status']()
+        except Exception as e:
+            handler.handle_error(e, "Gagal menginisialisasi status penyimpanan")
 
 
 def setup_all_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], 
-                      config_handler: Optional[ConfigHandler] = None) -> Dict[str, Any]:
-    """Setup semua handlers untuk dependency management"""
-    logger_bridge = ui_components.get('logger_bridge')
-    if not logger_bridge:
-        raise ValueError("Logger bridge belum diinisialisasi di UI components")
+                      config_handler: Optional['BaseConfigHandler'] = None) -> Dict[str, Any]:
+    """Setup semua handlers untuk dependency management.
+    
+    Args:
+        ui_components: Dictionary containing UI components
+        config: Configuration dictionary
+        config_handler: Optional config handler instance
+        
+    Returns:
+        Dictionary containing all handlers
+        
+    Raises:
+        ValueError: If setup fails
+    """
+    # Create handler for centralized error handling
+    handler = BaseDependencyHandler(ui_components=ui_components)
     
     handlers = {}
     
     try:
         # Setup config handlers
-        from .config_event_handlers import setup_config_handlers
         handlers['config'] = setup_config_handlers(ui_components, config_handler)
         
         # Setup operation handlers
@@ -72,33 +75,39 @@ def setup_all_handlers(ui_components: Dict[str, Any], config: Dict[str, Any],
         from .selection_handlers import setup_selection_handlers
         handlers['selections'] = setup_selection_handlers(ui_components, config)
         
-        logger_bridge.info("✅ Semua dependency handlers berhasil disetup")
+        handler.logger.info("✅ Semua dependency handlers berhasil disetup")
         return handlers
         
     except Exception as e:
-        logger_bridge.error(f"❌ Error setup handlers: {str(e)}")
+        result = handler.handle_error(e, "Error setup handlers")
         raise ValueError(f"Gagal setup handlers: {str(e)}") from e
 
-def setup_config_handlers(ui_components: Dict[str, Any], config_handler: ConfigHandler) -> Dict[str, Any]:
-    """Setup config event handlers"""
-    from .base_handler import BaseDependencyHandler
+def setup_config_handlers(ui_components: Dict[str, Any], config_handler) -> Dict[str, Any]:
+    """Setup config event handlers with centralized error handling.
     
+    Args:
+        ui_components: Dictionary containing UI components
+        config_handler: Configuration handler instance
+        
+    Returns:
+        Dictionary containing config event handlers
+    """
     class ConfigEventHandler(BaseDependencyHandler):
         def save_config(self, *args):
             try:
                 config = config_handler.extract_config(ui_components)
                 config_handler.save_config(config)
-                self.log_success("💾 Konfigurasi berhasil disimpan")
+                self.logger.info("💾 Konfigurasi berhasil disimpan")
             except Exception as e:
-                self.log_error(f"❌ Error save config: {str(e)}")
+                self.handle_error(e, "Error saving configuration")
         
         def reset_config(self, *args):
             try:
                 default_config = config_handler.get_default_config()
                 config_handler.update_ui(ui_components, default_config)
-                self.log_success("🔄 Konfigurasi direset ke default")
+                self.logger.info("🔄 Konfigurasi direset ke default")
             except Exception as e:
-                self.log_error(f"❌ Error reset config: {str(e)}")
+                self.handle_error(e, "Error resetting configuration")
     
-    handler = ConfigEventHandler(ui_components)
+    handler = ConfigEventHandler(ui_components=ui_components)
     return {'save': handler.save_config, 'reset': handler.reset_config}

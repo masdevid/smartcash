@@ -2,27 +2,25 @@
 Dependency Management UI Utilities.
 
 This package contains utility modules for the dependency management UI.
+Refactored to work with centralized error handling and dual progress tracking.
 """
 
+# Import only the components that are needed with the new centralized error handling
 from .ui_components import (
-    create_card,
     create_button,
-    create_status,
     create_package_card
 )
 
-from .ui_utils import (
-    create_header,
-    create_status_panel,
-    create_action_buttons
-)
+# Import package management utilities
+from .package_manager import PackageManager
+from .version_checker import VersionChecker
 
 __all__ = [
-    'create_card',
+    # UI Components
     'create_button',
-    'create_status',
     'create_package_card',
-    'create_header',
-    'create_status_panel',
-    'create_action_buttons',
+    
+    # Package Management
+    'PackageManager',
+    'VersionChecker',
 ]

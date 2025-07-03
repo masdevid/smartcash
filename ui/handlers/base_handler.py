@@ -802,6 +802,46 @@ class BaseHandler(ABC):
     
     # ===== Utility Methods =====
     
+    def log_info(self, message: str, *args, **kwargs) -> None:
+        """Helper function untuk logging info dalam Bahasa Indonesia.
+        
+        Args:
+            message: Pesan log dalam Bahasa Indonesia
+            *args: Argumen tambahan untuk logger
+            **kwargs: Keyword argumen tambahan untuk logger
+        """
+        self.logger.info(message, *args, **kwargs)
+    
+    def log_error(self, message: str, *args, **kwargs) -> None:
+        """Helper function untuk logging error dalam Bahasa Indonesia.
+        
+        Args:
+            message: Pesan error dalam Bahasa Indonesia
+            *args: Argumen tambahan untuk logger
+            **kwargs: Keyword argumen tambahan untuk logger
+        """
+        self.logger.error(message, *args, **kwargs)
+    
+    def log_warning(self, message: str, *args, **kwargs) -> None:
+        """Helper function untuk logging warning dalam Bahasa Indonesia.
+        
+        Args:
+            message: Pesan warning dalam Bahasa Indonesia
+            *args: Argumen tambahan untuk logger
+            **kwargs: Keyword argumen tambahan untuk logger
+        """
+        self.logger.warning(message, *args, **kwargs)
+    
+    def log_debug(self, message: str, *args, **kwargs) -> None:
+        """Helper function untuk logging debug dalam Bahasa Indonesia.
+        
+        Args:
+            message: Pesan debug dalam Bahasa Indonesia
+            *args: Argumen tambahan untuk logger
+            **kwargs: Keyword argumen tambahan untuk logger
+        """
+        self.logger.debug(message, *args, **kwargs)
+    
     def is_success_response(self, response: Dict[str, Any]) -> bool:
         """Check if API response indicates success.
         

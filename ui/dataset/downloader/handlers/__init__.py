@@ -1,12 +1,4 @@
 """
-Handlers for dataset downloader operations.
+File: smartcash/ui/dataset/downloader/handlers/__init__.py
+Deskripsi: Updated handlers export dengan unified handler approach
 """
-
-from .orchestrator import DownloaderOrchestrator, setup_download_handlers
-from .confirmation import confirmation_handler
-
-__all__ = [
-    'DownloaderOrchestrator',
-    'setup_download_handlers',
-    'confirmation_handler',
-]

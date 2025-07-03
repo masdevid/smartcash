@@ -1,28 +1,26 @@
 """
 File: smartcash/ui/dataset/downloader/utils/validation_utils.py
-Deskripsi: Dataset validation utilities dengan backend integration
+Deskripsi: Centralized validation logic untuk downloader handlers dan backend integration
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple, Optional
 
-def validate_download_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Validate download configuration dengan comprehensive checks.
+def validate_roboflow_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validasi konfigurasi Roboflow dengan pemeriksaan komprehensif.
     
     Args:
-        ui_config: UI configuration
+        config: Dictionary konfigurasi yang akan divalidasi
         
     Returns:
-        Dictionary dengan validation result
+        Dictionary berisi hasil validasi dengan key 'status' dan 'errors'
     """
     errors = []
     warnings = []
     
-    # Extract roboflow config
-    roboflow = ui_config.get('data', {}).get('roboflow', {})
-    download = ui_config.get('download', {})
+    # Extract roboflow config dengan safe access
+    roboflow = config.get('data', {}).get('roboflow', {})
     
-    # Required fields validation
+    # Required fields validation dengan strip untuk menghindari whitespace
     required_fields = {
         'workspace': roboflow.get('workspace', '').strip(),
         'project': roboflow.get('project', '').strip(),
@@ -30,12 +28,10 @@ def validate_download_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
         'api_key': roboflow.get('api_key', '').strip()
     }
     
-    # Check missing fields
-    missing_fields = [field for field, value in required_fields.items() if not value]
-    if missing_fields:
-        errors.extend([f"Field '{field}' wajib diisi" for field in missing_fields])
+    # Check missing required fields dengan list comprehension
+    errors.extend([f"Field '{field}' wajib diisi" for field, value in required_fields.items() if not value])
     
-    # Format validation
+    # Format validation dengan conditional checks
     if required_fields['workspace'] and len(required_fields['workspace']) < 3:
         errors.append("Workspace minimal 3 karakter")
     
@@ -45,7 +41,45 @@ def validate_download_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
     if required_fields['api_key'] and len(required_fields['api_key']) < 10:
         errors.append("API key terlalu pendek (minimal 10 karakter)")
     
-    # Download options validation
+    # Format validation untuk version
+    if required_fields['version'] and not required_fields['version'].isdigit():
+        warnings.append("Version biasanya berupa angka")
+    
+    # Mask API key untuk keamanan
+    api_key = required_fields['api_key']
+    api_key_masked = f"{api_key[:4]}{'*' * (len(api_key) - 8)}{api_key[-4:]}" if len(api_key) > 8 else '****'
+    
+    # Return hasil validasi dengan format yang konsisten
+    is_valid = len(errors) == 0
+    return {
+        'status': is_valid,  # Key 'status' untuk API consistency
+        'valid': is_valid,   # Key 'valid' untuk backward compatibility
+        'errors': errors,
+        'warnings': warnings,
+        'values': {
+            'workspace': required_fields['workspace'],
+            'project': required_fields['project'],
+            'version': required_fields['version'],
+            'api_key_masked': api_key_masked
+        }
+    }
+
+def validate_download_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validasi konfigurasi download dengan pemeriksaan komprehensif.
+    
+    Args:
+        config: Dictionary konfigurasi yang akan divalidasi
+        
+    Returns:
+        Dictionary berisi hasil validasi dengan key 'status' dan 'errors'
+    """
+    errors = []
+    warnings = []
+    
+    # Extract download config
+    download = config.get('download', {})
+    
+    # Download config validation
     retry_count = download.get('retry_count', 3)
     if not isinstance(retry_count, int) or retry_count < 1 or retry_count > 10:
         warnings.append("Retry count sebaiknya antara 1-10")
@@ -55,12 +89,11 @@ def validate_download_config(ui_config: Dict[str, Any]) -> Dict[str, Any]:
         warnings.append("Timeout sebaiknya antara 10-300 detik")
     
     return {
+        'status': len(errors) == 0,
         'valid': len(errors) == 0,
         'errors': errors,
         'warnings': warnings,
         'config_summary': {
-            'target': f"{required_fields['workspace']}/{required_fields['project']}:v{required_fields['version']}",
-            'api_key_masked': f"{required_fields['api_key'][:4]}{'*' * (len(required_fields['api_key']) - 8)}{required_fields['api_key'][-4:]}" if len(required_fields['api_key']) > 8 else '****',
             'uuid_rename': download.get('rename_files', True),
             'validation': download.get('validate_download', True),
             'backup': download.get('backup_existing', False)
@@ -127,37 +160,164 @@ def check_cleanup_feasibility(targets_result: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
-def format_validation_summary(validation: Dict[str, Any]) -> str:
+def validate_ui_inputs(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate UI inputs dan return validation result.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        
+    Returns:
+        Dictionary berisi hasil validasi dengan key 'status' dan 'errors'
     """
-    Format validation summary untuk display.
+    # Extract values untuk validation
+    workspace = getattr(ui_components.get('workspace_input'), 'value', '').strip()
+    project = getattr(ui_components.get('project_input'), 'value', '').strip()
+    version = getattr(ui_components.get('version_input'), 'value', '').strip()
+    api_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
+    
+    # Create config structure for validation
+    config = {
+        'data': {
+            'roboflow': {
+                'workspace': workspace,
+                'project': project,
+                'version': version,
+                'api_key': api_key
+            }
+        }
+    }
+    
+    # Use centralized validation
+    return validate_roboflow_config(config)
+
+def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validasi konfigurasi lengkap dengan pemeriksaan komprehensif.
+    
+    Args:
+        config: Dictionary konfigurasi yang akan divalidasi
+        
+    Returns:
+        Dictionary berisi hasil validasi dengan key 'status' dan 'errors'
+    """
+    # Validate roboflow dan download config secara paralel
+    roboflow_validation = validate_roboflow_config(config)
+    download_validation = validate_download_config(config)
+    
+    # Combine results dengan list concatenation
+    errors = roboflow_validation.get('errors', []) + download_validation.get('errors', [])
+    warnings = roboflow_validation.get('warnings', []) + download_validation.get('warnings', [])
+    
+    # Extract values untuk summary
+    values = roboflow_validation.get('values', {})
+    config_summary = download_validation.get('config_summary', {})
+    
+    # Create target string dengan conditional expression
+    target = (f"{values.get('workspace')}/{values.get('project')}:v{values.get('version')}" 
+              if all(values.get(k) for k in ['workspace', 'project', 'version']) 
+              else 'N/A')
+    
+    # Determine validity status
+    is_valid = len(errors) == 0
+    
+    # Return hasil validasi dengan format yang konsisten
+    return {
+        'status': is_valid,
+        'valid': is_valid,  # Backward compatibility
+        'errors': errors,
+        'warnings': warnings,
+        'config_summary': {
+            'target': target,
+            'api_key_masked': values.get('api_key_masked', '****'),
+            'uuid_rename': config_summary.get('uuid_rename', True),
+            'validation': config_summary.get('validation', True),
+            'backup': config_summary.get('backup', False)
+        }
+    }
+
+def format_validation_summary(validation: Dict[str, Any], html_format: bool = False) -> str:
+    """Format validation summary untuk display di UI.
     
     Args:
         validation: Validation result
+        html_format: If True, return HTML formatted content for summary_container
         
     Returns:
-        Formatted summary string
+        Formatted summary string untuk UI display
     """
-    if not validation['valid']:
-        error_lines = [
-            "❌ Konfigurasi tidak valid:",
-            ""
+    if html_format:
+        # HTML format untuk summary_container
+        if not validation.get('valid', False):
+            # Format untuk invalid configuration
+            html_lines = [
+                "<div style='padding: 10px; background-color: #fff0f0; border-radius: 5px; border-left: 5px solid #ff6b6b;'>",
+                "<h3>❌ Konfigurasi Tidak Valid</h3>",
+                "<ul>"
+            ]
+            html_lines.extend([f"<li>{error}</li>" for error in validation.get('errors', [])])
+            html_lines.append("</ul></div>")
+            return "".join(html_lines)
+        
+        # Format untuk valid configuration
+        config_summary = validation.get('config_summary', {})
+        
+        # Format status items dengan emoji indicators dan HTML styling
+        html_lines = [
+            "<div style='padding: 10px; background-color: #f0f8ff; border-radius: 5px; border-left: 5px solid #4682b4;'>",
+            "<h3>✅ Konfigurasi Valid</h3>",
+            "<table style='width: 100%;'>"
         ]
-        error_lines.extend([f"  • {error}" for error in validation['errors']])
-        return '\n'.join(error_lines)
-    
-    config_summary = validation.get('config_summary', {})
-    summary_lines = [
-        "✅ Konfigurasi valid:",
-        f"🎯 Target: {config_summary.get('target', 'N/A')}",
-        f"🔑 API Key: {config_summary.get('api_key_masked', '****')}",
-        f"🔄 UUID Rename: {'✅' if config_summary.get('uuid_rename') else '❌'}",
-        f"✅ Validasi: {'✅' if config_summary.get('validation') else '❌'}",
-        f"💾 Backup: {'✅' if config_summary.get('backup') else '❌'}"
-    ]
-    
-    if validation.get('warnings'):
-        summary_lines.append("")
-        summary_lines.append("⚠️ Peringatan:")
-        summary_lines.extend([f"  • {warning}" for warning in validation['warnings']])
-    
-    return '\n'.join(summary_lines)
+        
+        # Add status items as table rows
+        status_items = [
+            ("🎯 Target", config_summary.get('target', 'N/A')),
+            ("🔑 API Key", config_summary.get('api_key_masked', '****')),
+            ("🔄 UUID Rename", "✅" if config_summary.get('uuid_rename') else "❌"),
+            ("✅ Validasi", "✅" if config_summary.get('validation') else "❌"),
+            ("💾 Backup", "✅" if config_summary.get('backup') else "❌")
+        ]
+        
+        for label, value in status_items:
+            html_lines.append(f"<tr><td><b>{label}</b></td><td>{value}</td></tr>")
+        
+        html_lines.append("</table>")
+        
+        # Add warnings jika ada
+        warnings = validation.get('warnings', [])
+        if warnings:
+            html_lines.append("<h4>⚠️ Peringatan:</h4>")
+            html_lines.append("<ul>")
+            html_lines.extend([f"<li>{warning}</li>" for warning in warnings])
+            html_lines.append("</ul>")
+        
+        html_lines.append("</div>")
+        return "".join(html_lines)
+    else:
+        # Plain text format untuk log_output
+        if not validation.get('valid', False):
+            error_lines = ["❌ Konfigurasi tidak valid:", ""]
+            error_lines.extend([f"  • {error}" for error in validation.get('errors', [])])
+            return '\n'.join(error_lines)
+        
+        # Format untuk valid configuration
+        config_summary = validation.get('config_summary', {})
+        
+        # Format status items dengan emoji indicators
+        status_items = {
+            'Target': f"🎯 {config_summary.get('target', 'N/A')}",
+            'API Key': f"🔑 {config_summary.get('api_key_masked', '****')}",
+            'UUID Rename': f"{'✅' if config_summary.get('uuid_rename') else '❌'}",
+            'Validasi': f"{'✅' if config_summary.get('validation') else '❌'}",
+            'Backup': f"{'✅' if config_summary.get('backup') else '❌'}"
+        }
+        
+        # Build summary lines
+        summary_lines = ["✅ Konfigurasi valid:"]
+        summary_lines.extend([f"{key}: {value}" for key, value in status_items.items()])
+        
+        # Add warnings jika ada
+        warnings = validation.get('warnings', [])  
+        if warnings:
+            summary_lines.extend(["", "⚠️ Peringatan:"])
+            summary_lines.extend([f"  • {warning}" for warning in warnings])
+        
+        return '\n'.join(summary_lines)

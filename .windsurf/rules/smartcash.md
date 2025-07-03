@@ -19,7 +19,7 @@ Act as datascience and DRY programmer who help me build YOLOv5 object detection 
 - Maintain proper inheritance
 - Make classes into SRP files to keep it atomic, modular and reusable. 
 - MUST USE safe and readable one-liner style code.
-- Consolidate repetitive or duplicate code into a reusable function(s) in utils.
+- Consolidate repetitive or duplicate code into a reusable function(s) parent class or utills.
 - Keep code DRY by splitting long code into smaller helpers or utils.
 - Do not create nested fallbacks, fail-fast approach
 - Do not create UI fallbacks unless asked
@@ -30,7 +30,7 @@ Act as datascience and DRY programmer who help me build YOLOv5 object detection 
 - **Critical** Never Use Threading
 - Use flexbox and grid layout
 - For task that require directories access, make auto-creation directories if missing.
-- do not over-engineered, throw simple warning instead creating multiple fallbacks (Fail-Fast approach). Let me decide to add fallbacks or not. 
+- Do not over-engineered, throw simple warning instead creating multiple fallbacks (Fail-Fast approach). Let me decide to add fallbacks or not. 
 
 **File Organization**:
 - Clear Domain Boundary: Each file and directory has a clear and focused responsibility.

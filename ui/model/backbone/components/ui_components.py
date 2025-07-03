@@ -1,20 +1,27 @@
 """
 File: smartcash/ui/model/backbone/components/ui_components.py
-Deskripsi: UI components untuk backbone model configuration
+Deskripsi: UI components untuk backbone model configuration dengan shared container components
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
+
+# Import model-specific components
 from smartcash.ui.model.backbone.components.model_form import create_model_form
 from smartcash.ui.model.backbone.components.config_summary import create_config_summary
-from smartcash.ui.components import (
-    create_action_buttons, create_save_reset_buttons,
-    create_confirmation_area
-)
-from smartcash.ui.components.action_section import create_action_section
+
+# Import standard container components
+from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.form_container import create_form_container
+from smartcash.ui.components.footer_container import create_footer_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components import create_save_reset_buttons
+from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
+from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
 
 def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Create child components untuk backbone configuration
+    """Create child components untuk backbone configuration dengan shared container components
     
     Args:
         config: Optional configuration dictionary
@@ -25,7 +32,20 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     config = config or {}
     child_components = {}
     
-    # === MODEL CONFIGURATION SECTIONS ===
+    # === 1. HEADER CONTAINER ===
+    
+    # Create header container
+    header_container = create_header_container(
+        title="Model Configuration",
+        subtitle="Konfigurasi backbone model YOLOv5 dengan EfficientNet-B4",
+        icon="🤖"
+    )
+    child_components['header_container'] = header_container.container
+    
+    # === 2. FORM CONTAINER WITH TWO-COLUMN LAYOUT ===
+    
+    # Create form container to hold the two-column layout
+    form_container = create_form_container()
     
     # Model form (left column)
     model_form = create_model_form(config)
@@ -35,8 +55,8 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     config_summary = create_config_summary(config)
     child_components['config_summary'] = config_summary
     
-    # Two-column layout with optimized spacing
-    model_config_section = widgets.HBox([
+    # Create two-column layout with optimized spacing
+    two_column_layout = widgets.HBox([
         widgets.Box(
             [model_form],
             layout=widgets.Layout(width='65%', padding='0 5px 0 0')
@@ -54,17 +74,16 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
         padding='0'
     ))
     
-    # Prevent duplicate display by checking parent
-    if hasattr(model_form, 'parent') and model_form.parent is not None:
-        return child_components
+    # Place two-column layout in the form container
+    form_container['form_container'].children = (two_column_layout,)
+    child_components['form_container'] = form_container['container']
     
-    # Store the main section without adding it to the components yet
-    # to prevent duplicate display
-    child_components['model_config_section'] = model_config_section
+    # Store the two-column layout for reference
+    child_components['two_column_layout'] = two_column_layout
     
-    # === CONFIG SECTION ===
+    # === 2. CONFIG BUTTONS SECTION ===
     
-    # Tombol Simpan/Reset
+    # Create save/reset buttons with standard approach
     save_reset_components = create_save_reset_buttons(
         save_label="💾 Simpan",
         reset_label="🔄 Reset", 
@@ -72,58 +91,77 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     )
     child_components['save_reset_buttons'] = save_reset_components
     
-    # Config section dengan save/reset buttons
-    config_section = widgets.VBox([
-        widgets.Box([save_reset_components['container']], 
-            layout=widgets.Layout(
-                display='flex', 
-                justify_content='flex-end', 
-                width='100%'
-            ))
-    ], layout=widgets.Layout(margin='8px 0'))
-    child_components['config_section'] = config_section
+    # Create config buttons container with proper styling
+    config_buttons_container = widgets.Box(
+        [save_reset_components['container']], 
+        layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='8px 0')
+    )
+    child_components['config_buttons_container'] = config_buttons_container
     
-    # === ACTION SECTION ===
+    # === 3. ACTION CONTAINER ===
     
-    # Tombol Aksi
-    action_components = create_action_buttons(
-        primary_button={
-            "label": "🏗️ Bangun Model",
-            "style": "success",
-            "width": "160px"
-        },
-        secondary_buttons=[
+    # Create action container with standard button configuration
+    action_container = create_action_container(
+        buttons=[
             {
-                "label": "📊 Validasi Konfigurasi",
-                "style": "info",
-                "width": "150px"
+                "button_id": "build",
+                "text": "📝️ Bangun Model",
+                "style": "primary",
+                "order": 1,
+                "tooltip": "Membangun model dengan konfigurasi yang dipilih"
             },
             {
-                "label": "🔍 Info Model",
+                "button_id": "validate",
+                "text": "📊 Validasi Konfigurasi",
+                "style": "info",
+                "order": 2,
+                "tooltip": "Memvalidasi konfigurasi model sebelum membangun"
+            },
+            {
+                "button_id": "info",
+                "text": "🔍 Info Model",
                 "style": "warning",
-                "width": "120px"
+                "order": 3,
+                "tooltip": "Menampilkan informasi detail tentang model"
             }
-        ]
-    )
-    child_components['action_components'] = action_components
-    
-    # Confirmation area
-    confirmation_area = create_confirmation_area(ui_components=child_components)
-    child_components['confirmation_area'] = confirmation_area
-    
-    # Create action section
-    action_section = create_action_section(
-        action_buttons=action_components,
-        confirmation_area=confirmation_area,
+        ],
         title="🚀 Model Operations",
-        status_label="📋 Status:",
-        show_status=True
+        alignment="left",
+        with_confirmation=True
     )
-    child_components['action_section'] = action_section
+    child_components['action_container'] = action_container.container
     
-    # === EXTRACT INDIVIDUAL COMPONENTS ===
+    # === 4. FOOTER CONTAINER ===
     
-    # Extract form widgets dari model_form
+    # Create progress tracker
+    progress_tracker = ProgressTracker(
+        title="Model Building",
+        levels=[ProgressLevel.OVERALL, ProgressLevel.CURRENT],
+        auto_hide=True
+    )
+    child_components['progress_tracker'] = progress_tracker
+    
+    # Create footer container with log accordion and info box
+    footer_container = create_footer_container(
+        log_output=widgets.Output(),
+        info_box=widgets.HTML(
+            """
+            <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px;">
+                <strong>Tips Model Backbone:</strong>
+                <ul style="margin: 5px 0 0 15px; padding: 0;">
+                    <li>Pilih backbone yang sesuai dengan kebutuhan deteksi</li>
+                    <li>Layer mode yang tepat dapat meningkatkan performa model</li>
+                    <li>Feature optimization membantu pada perangkat dengan memori terbatas</li>
+                </ul>
+            </div>
+            """
+        )
+    )
+    child_components['footer_container'] = footer_container.container
+    
+    # === 5. EXTRACT INDIVIDUAL COMPONENTS ===
+    
+    # Extract form widgets dari model_form for direct access
     if hasattr(model_form, 'backbone_dropdown'):
         child_components['backbone_dropdown'] = model_form.backbone_dropdown
     if hasattr(model_form, 'detection_layers_select'):
@@ -135,12 +173,27 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     if hasattr(model_form, 'mixed_precision_checkbox'):
         child_components['mixed_precision_checkbox'] = model_form.mixed_precision_checkbox
     
-    # Extract buttons
-    child_components['build_btn'] = action_components.get('primary')
-    child_components['validate_btn'] = action_components.get('secondary_0')
-    child_components['info_btn'] = action_components.get('secondary_1')
+    # Extract buttons with standard approach
+    child_components['build_btn'] = action_container.get_button('build')
+    child_components['validate_btn'] = action_container.get_button('validate')
+    child_components['info_btn'] = action_container.get_button('info')
     child_components['save_button'] = save_reset_components.get('save_button')
     child_components['reset_button'] = save_reset_components.get('reset_button')
+    
+    # === 6. ASSEMBLE MAIN CONTAINER ===
+    
+    # Create main container with all components
+    main_container = create_main_container(
+        header_container=child_components['header_container'],
+        form_container=child_components['form_container'],
+        footer_container=child_components['footer_container'],
+        additional_components=[
+            config_buttons_container,
+            child_components['action_container'],
+            progress_tracker.container
+        ]
+    )
+    child_components['main_container'] = main_container
     
     return child_components
 
@@ -153,16 +206,27 @@ def get_layout_sections(child_components: Dict[str, Any]) -> list:
     Returns:
         List of widgets in display order
     """
+    # With the new shared container approach, we only need to return the main container
+    if 'main_container' in child_components:
+        return [child_components['main_container']]
+    
+    # Fallback to legacy approach if main_container is not available
     sections = []
     
-    # Add sections in order, but only if they're not already in a parent container
-    if 'model_config_section' in child_components and not hasattr(child_components['model_config_section'], 'parent'):
-        sections.append(child_components['model_config_section'])
+    # Add form container if available
+    if 'form_container' in child_components:
+        sections.append(child_components['form_container'])
     
-    if 'config_section' in child_components and not hasattr(child_components['config_section'], 'parent'):
-        sections.append(child_components['config_section'])
+    # Add config buttons container if available
+    if 'config_buttons_container' in child_components:
+        sections.append(child_components['config_buttons_container'])
     
-    if 'action_section' in child_components and not hasattr(child_components['action_section'], 'parent'):
-        sections.append(child_components['action_section'])
+    # Add action container if available
+    if 'action_container' in child_components:
+        sections.append(child_components['action_container'])
+    
+    # Add footer container if available
+    if 'footer_container' in child_components:
+        sections.append(child_components['footer_container'])
     
     return sections

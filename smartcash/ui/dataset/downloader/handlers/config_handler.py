@@ -1,457 +1,451 @@
 """
 File: smartcash/ui/dataset/downloader/handlers/config_handler.py
-Deskripsi: Fixed config handler dengan proper reset functionality dan error handling
+Description: Config handler for downloader module with centralized error handling
 """
 
-from typing import Dict, Any, Optional, List, Callable
-from functools import wraps
-
+from typing import Dict, Any, Optional, Callable, TypeVar, cast, Union, List
+import logging
 from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.ui_logger import get_module_logger
-from smartcash.ui.handlers.error_handler import create_error_response, handle_ui_errors
+from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.dataset.downloader.handlers.base_downloader_handler import BaseDownloaderHandler
 from smartcash.ui.dataset.downloader.handlers.config_extractor import extract_downloader_config
-from smartcash.ui.dataset.downloader.handlers.config_updater import update_downloader_ui, validate_ui_inputs
-from smartcash.ui.dataset.downloader.utils.colab_secrets import set_api_key_to_config, get_api_key_from_secrets
-from smartcash.common.config.manager import get_config_manager
+from smartcash.ui.dataset.downloader.handlers.config_updater import update_downloader_ui
+from smartcash.ui.dataset.downloader.utils.validation_utils import validate_config
+from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
+from smartcash.ui.dataset.downloader.utils.colab_secrets import (
+    set_api_key_to_config, 
+    get_api_key_from_secrets,
+    update_config_with_api_key,
+    get_api_key_from_ui,
+    detect_and_set_api_key
+)
+from smartcash.common.worker_utils import get_download_workers, get_rename_workers
 
-
-class DownloaderConfigHandler(ConfigHandler):
-    """Fixed config handler dengan proper reset dan API key handling"""
+class DownloaderConfigHandler(ConfigHandler, BaseDownloaderHandler):
+    """Config handler for downloader module with centralized error handling and API key management.
     
-    def __init__(self, module_name: str = 'downloader', parent_module: str = 'dataset'):
-        super().__init__(module_name, parent_module)
+    Features:
+    - Centralized error handling with proper logging
+    - API key auto-detection from Colab secrets
+    - Support for non-persistent configuration
+    - Proper merge strategy for dataset_config.yaml
+    """
+    
+    @handle_ui_errors(error_component_title="Config Handler Initialization Error", log_error=True)
+    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, module_name: str = 'downloader', 
+                 parent_module: str = 'dataset', persistence_enabled: bool = True, 
+                 use_shared_config: bool = True):
+        """Initialize downloader config handler with centralized error handling.
+        
+        Args:
+            ui_components: Dictionary containing UI components
+            module_name: Name of the module
+            parent_module: Parent module name
+            persistence_enabled: Whether to enable config persistence to disk
+            use_shared_config: Whether to use shared config manager
+        """
+        # Initialize both parent classes
+        ConfigHandler.__init__(self, module_name=module_name, parent_module=parent_module,
+                              persistence_enabled=persistence_enabled, use_shared_config=use_shared_config)
+        BaseDownloaderHandler.__init__(self, ui_components=ui_components, module_name=module_name, 
+                                      parent_module=parent_module)
+        
+        # Set config filename
         self.config_filename = 'dataset_config.yaml'
     
+    @handle_ui_errors(error_component_title="Config Extraction Error", log_error=True, return_type=dict)
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract config dari downloader UI components"""
-        return extract_downloader_config(ui_components)
+        """Ekstrak konfigurasi dari komponen UI dengan penanganan error.
+        
+        Args:
+            ui_components: Dictionary berisi komponen UI
+            
+        Returns:
+            Dictionary berisi konfigurasi yang diekstrak
+        """
+        try:
+            return extract_downloader_config(ui_components)
+        except Exception as e:
+            self.log_error(f"Gagal mengekstrak konfigurasi downloader: {str(e)}")
+            return self.get_default_config()
     
+    @handle_ui_errors(error_component_title="UI Update Error", log_error=True)
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
-        """Update UI dari config"""
-        update_downloader_ui(ui_components, config)
-    
-    @handle_ui_errors(error_component_title="Config Loading Error")
-    def load_config(self, config_filename: str = None) -> Dict[str, Any]:
-        """Load config dengan API key auto-detection dan fail-fast error handling"""
-        # Create error context for better tracing
-        ctx = ErrorContext(
-            component="DownloaderConfigHandler.load_config",
-            operation="load_config"
-        )
+        """Perbarui komponen UI dari konfigurasi yang dimuat dengan penanganan error.
         
-        # Use ErrorHandler for consistent error handling
-        handler = ErrorHandler(
-            context=ctx,
-            logger=self.logger
-        )
-        
-        filename = config_filename or self.config_filename
-        
-        # Load dari file - fail fast if file access issues
-        config = self.config_manager.load_config(filename)
-        
-        if not config:
-            self.logger.info(f"📂 File {filename} tidak ditemukan, menggunakan default")
+        Args:
+            ui_components: Dictionary berisi komponen UI
+            config: Dictionary konfigurasi yang akan diterapkan
+        """
+        if not config or not isinstance(config, dict):
+            self.log_warning("Konfigurasi tidak valid untuk pembaruan UI, menggunakan default")
             config = self.get_default_config()
             
-            # Save default ke file untuk pertama kali
-            self.config_manager.save_config(config, filename)
-            self.logger.info(f"💾 Default config tersimpan ke {filename}")
-        
-        # Ensure required sections exist with fail-fast validation
-        if not isinstance(config, dict):
-            error_msg = f"Invalid config format: expected dict, got {type(config)}"
-            handler.handle_error(message=error_msg)
-            return self.get_default_config()
-            
-        # Ensure downloader section exists
-        if 'downloader' not in config:
-            config['downloader'] = {}
-            
-        # Ensure basic structure exists
-        if 'basic' not in config['downloader']:
-            default_config = self.get_default_config()
-            config['downloader']['basic'] = default_config.get('downloader', {}).get('basic', {})
-            
-        # Ensure advanced structure exists
-        if 'advanced' not in config['downloader']:
-            default_config = self.get_default_config()
-            config['downloader']['advanced'] = default_config.get('downloader', {}).get('advanced', {})
-        
-        # Auto-detect dan set API key dari Colab secrets
-        try:
-            config = set_api_key_to_config(config, force_refresh=False)
-        except Exception as e:
-            error_msg = f"Error setting API key: {str(e)}"
-            handler.handle_error(error=e, message=error_msg, log_level="warning")
-            # Continue with existing config
-        
-        return config
+        update_downloader_ui(ui_components, config)
     
-    def save_config(self, ui_components: Dict[str, Any], config_filename: str = None, update_shared: bool = True) -> Dict[str, Any]:
-        """Save config dengan merge strategy untuk dataset_config.yaml
+    @handle_ui_errors(
+        error_component_title="Config Load Error",
+        log_error=True,
+        return_type=dict
+    )
+    def load_config(self, config_filename: str = None) -> Dict[str, Any]:
+        """Muat konfigurasi dengan auto-deteksi API key dan fallback ke default.
         
+        Untuk handler non-persistent, ini akan selalu mengembalikan konfigurasi default
+        atau state konfigurasi di memori saat ini.
+        
+        Args:
+            config_filename: Nama file opsional untuk memuat konfigurasi
+            
         Returns:
-            Dict[str, Any]: Dictionary dengan format {'status': str, 'error': Optional[str]}
+            Dictionary berisi konfigurasi yang dimuat
         """
+        # Untuk handler non-persistent, kembalikan state di memori atau default
+        if not self.persistence_enabled:
+            if hasattr(self, '_config_state') and self._config_state.data:
+                self.log_debug("Menggunakan state konfigurasi di memori untuk handler non-persistent")
+                return self._config_state.data
+            else:
+                self.log_debug("Menggunakan konfigurasi default untuk handler non-persistent")
+                return self.get_default_config()
+        
+        # Untuk handler persistent, muat dari file
         try:
             filename = config_filename or self.config_filename
             
-            # Extract current config dari UI
-            current_config = self.extract_config(ui_components)
+            # Muat dari file
+            config = self.config_manager.load_config(filename)
             
-            # Validate sebelum save
-            validation = self.validate_config(current_config)
-            if not validation['valid']:
-                error_msg = f"Config tidak valid: {'; '.join(validation['errors'])}"
-                self.logger.error(f"❌ {error_msg}")
-                return {'status': 'error', 'error': error_msg}
+            if not config:
+                self.log_info(f"File {filename} tidak ditemukan, menggunakan konfigurasi default")
+                config = self.get_default_config()
+                
+                # Simpan default ke file untuk pertama kali
+                if self.persistence_enabled:
+                    self.config_manager.save_config(config, filename)
+                    self.log_info(f"Konfigurasi default disimpan ke {filename}")
             
-            # Load existing config untuk merge
-            existing_config = self.config_manager.load_config(filename) or {}
+            # Auto-deteksi dan set API key dari Colab secrets
+            config = set_api_key_to_config(config, force_refresh=False)
             
-            # Merge dengan existing config
-            merged_config = self._merge_downloader_config(existing_config, current_config)
+            # Perbarui state di memori
+            if hasattr(self, '_config_state'):
+                self._config_state.data = config
             
-            # Save ke file
-            self.config_manager.save_config(merged_config, filename)
-            
-            # Update shared config if enabled
-            if update_shared and self.use_shared_config and self.shared_manager:
-                from smartcash.ui.config_cell.managers.shared_config_manager import broadcast_config_update
-                broadcast_config_update(self.parent_module, self.module_name, current_config)
-                self.logger.debug(f"Shared config updated for {self.full_module_name}")
-            
-            # Update local state
-            self._config_state.update(current_config)
-            
-            # Execute callbacks
-            self._notify_callbacks(current_config, 'save')
-            
-            # Handle success
-            self._handle_save_success(ui_components, current_config)
-            
-            self.logger.info(f"💾 Config saved to {filename}")
-            return {'status': 'success'}
+            return config
             
         except Exception as e:
-            error_msg = f"Error saving config: {str(e)}"
-            self.logger.error(f"❌ {error_msg}", exc_info=True)
-            
-            # Handle failure
-            self._handle_save_failure(ui_components, error_msg)
-            
-            return {'status': 'error', 'error': error_msg}
+            self.log_error(f"Error saat memuat konfigurasi: {str(e)}")
+            return self.get_default_config()
     
-    def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> Dict[str, Any]:
-        """Enhanced reset config dengan proper UI update dan error handling
+    @handle_ui_errors(
+        error_component_title="Config Save Error",
+        log_error=True,
+        return_type=bool
+    )
+    def save_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
+        """Save config with merge strategy for dataset_config.yaml.
         
+        For non-persistent handlers, this will only update the in-memory state
+        and will not attempt to save to disk.
+        
+        Args:
+            ui_components: Dictionary containing UI components
+            config_filename: Optional filename to save config to
+            
         Returns:
-            Dict[str, Any]: Dictionary dengan format {'status': str, 'error': Optional[str]}
+            True if successful, False otherwise
         """
         try:
-            # Get default config
+            # Ekstrak konfigurasi dari UI
+            current_config = self.extract_config(ui_components)
+            
+            # Validasi sebelum menyimpan
+            validation = self.validate_config(current_config)
+            if not validation['valid']:
+                self.logger.error(f"Validasi konfigurasi gagal: {'; '.join(validation['errors'])}")
+                return False
+            
+            # Gunakan implementasi parent class untuk non-persistent handlers
+            if not self.persistence_enabled:
+                # Panggil implementasi parent class untuk non-persistent handlers
+                return super().save_config(current_config, config_filename)
+            
+            # Untuk persistent handlers, gunakan merge strategy
+            filename = config_filename or self.config_filename
+            
+            # Muat konfigurasi yang ada untuk digabungkan
+            existing_config = self.config_manager.load_config(filename) or {}
+            
+            # Gabungkan dengan strategi yang aman
+            merged_config = self._merge_downloader_config(existing_config, current_config)
+            
+            # Simpan konfigurasi yang sudah digabungkan
+            success = self.config_manager.save_config(merged_config, filename)
+            
+            # Perbarui state di memori jika tersedia
+            if hasattr(self, '_config_state'):
+                self._config_state.data = merged_config
+            
+            if success:
+                self.logger.info(f"Konfigurasi berhasil disimpan ke {filename}")
+                return True
+            else:
+                self.logger.error(f"Gagal menyimpan konfigurasi ke {filename}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error saat menyimpan konfigurasi: {str(e)}")
+            return False
+    
+    @handle_ui_errors(
+        error_component_title="Config Reset Error",
+        log_error=True,
+        return_type=bool
+    )
+    def reset_config(self, ui_components: Dict[str, Any], config_filename: str = None) -> bool:
+        """Reset konfigurasi ke default dan perbarui UI.
+        
+        Untuk handler non-persistent, ini hanya akan mereset state di memori
+        dan tidak akan menyimpan ke disk.
+        
+        Args:
+            ui_components: Dictionary berisi komponen UI
+            config_filename: Nama file opsional untuk menyimpan konfigurasi reset
+            
+        Returns:
+            True jika berhasil, False jika gagal
+        """
+        try:
+            self.log_info("Memulai reset konfigurasi...")
+            
+            # Simpan API key saat ini dari UI menggunakan helper function
+            current_api_key = get_api_key_from_ui(ui_components)
+            if current_api_key:
+                self.log_info("Menyimpan API key saat ini dari UI")
+            
+            # Auto-deteksi API key dari berbagai sumber menggunakan helper function
             default_config = self.get_default_config()
+            default_config = detect_and_set_api_key(default_config, ui_components)
             
-            # Preserve current API key if available
+            # Log informasi tentang API key
+            if default_config.get('data', {}).get('roboflow', {}).get('api_key'):
+                self.log_info("API key disimpan ke konfigurasi default")
+            else:
+                # Auto-deteksi dari Colab secrets sudah dilakukan di detect_and_set_api_key
+                self.log_info("Tidak ada API key yang tersedia")
+            
+            # Gunakan implementasi parent class untuk non-persistent handlers
+            if not self.persistence_enabled:
+                # Perbarui UI dengan konfigurasi default
+                try:
+                    self.update_ui(ui_components, default_config)
+                    self.log_info("UI diperbarui dengan konfigurasi default (persistence dinonaktifkan)")
+                    # Panggil implementasi parent class untuk non-persistent handlers
+                    return super().reset_config(default_config, config_filename)
+                except Exception as e:
+                    self.log_error(f"Error saat memperbarui UI: {str(e)}")
+                    return False
+            
+            # Perbarui UI dengan konfigurasi default
             try:
-                current_api_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
-                if current_api_key:
-                    # Ensure nested structure exists
-                    if 'data' not in default_config:
-                        default_config['data'] = {}
-                    if 'roboflow' not in default_config['data']:
-                        default_config['data']['roboflow'] = {}
-                    
-                    default_config['data']['roboflow']['api_key'] = current_api_key
-                    self.logger.debug("Preserved API key during reset")
+                self.update_ui(ui_components, default_config)
+                self.log_info("UI diperbarui dengan konfigurasi default")
             except Exception as e:
-                self.logger.debug(f"Could not preserve API key: {str(e)}")
+                self.log_error(f"Error saat memperbarui UI: {str(e)}")
+                return False
             
-            # Update UI with default config
-            self.update_ui(ui_components, default_config)
+            # Simpan konfigurasi default ke file
+            try:
+                filename = config_filename or self.config_filename
+                success = self.config_manager.save_config(default_config, filename)
+                
+                # Perbarui state di memori jika tersedia
+                if hasattr(self, '_config_state'):
+                    self._config_state.data = default_config
+                
+                if success:
+                    self.log_info(f"Konfigurasi default disimpan ke {filename}")
+                    return True
+                else:
+                    self.log_error(f"Gagal menyimpan konfigurasi default ke {filename}")
+                    return False
+            except Exception as e:
+                self.log_error(f"Error saat menyimpan konfigurasi default: {str(e)}")
+                return False
+                
+        except Exception as e:
+            self.log_error(f"Error saat reset konfigurasi: {str(e)}")
+            return False
+    
+    @handle_ui_errors(
+        error_component_title="Config Validation Error",
+        log_error=True,
+        return_type=dict
+    )
+    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Validasi konfigurasi dengan pemeriksaan komprehensif untuk downloader.
+        
+        Args:
+            config: Dictionary konfigurasi yang akan divalidasi
             
-            # Reset progress indicators
-            self._reset_progress_indicators(ui_components)
+        Returns:
+            Dictionary berisi hasil validasi dengan key 'status' dan 'errors'
+        """
+        try:
+            # Gunakan centralized validation module dari utils
+            self.log_info("🔍 Memvalidasi konfigurasi downloader")
+            validation = validate_config(config)
             
-            # Save default config if filename provided
-            if config_filename:
-                filename = config_filename
-                self.config_manager.save_config(default_config, filename)
-                self.logger.info(f"💾 Default config saved to {filename}")
+            # Format validation summary untuk UI
+            from smartcash.ui.dataset.downloader.utils.validation_utils import format_validation_summary
             
-            # Update local state
-            self._config_state.update(default_config)
+            # Format untuk log output (plain text)
+            summary_text = format_validation_summary(validation, html_format=False)
             
-            # Execute callbacks
-            self._notify_callbacks(default_config, 'reset')
+            # Format untuk summary container (HTML)
+            summary_html = format_validation_summary(validation, html_format=True)
             
-            # Handle success
-            self._handle_reset_success(ui_components, default_config)
+            # Log hasil validasi ke log output
+            if validation.get('valid', False):
+                self.log_info(summary_text)
+            else:
+                self.log_error(summary_text)
             
-            self.logger.info("🔄 Config reset to defaults")
-            return {'status': 'success'}
+            # Update summary container dengan HTML format
+            summary_container = self.ui_components.get('summary_container')
+            if summary_container:
+                summary_container.clear_output()
+                summary_container.append_html(summary_html)
+            
+            # Ensure 'status' key untuk API consistency
+            validation['status'] = validation.get('valid', False)
+            
+            return validation
             
         except Exception as e:
-            error_msg = f"Error resetting config: {str(e)}"
-            self.logger.error(f"❌ {error_msg}", exc_info=True)
-            
-            # Handle failure
-            self._handle_reset_failure(ui_components, error_msg)
-            
-            return {'status': 'error', 'error': error_msg}
-    
-    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Enhanced validation dengan comprehensive checks untuk downloader"""
-        errors = []
-        warnings = []
-        
-        # Check required sections
-        if 'data' not in config:
-            errors.append("Missing 'data' section")
-        else:
-            data_config = config['data']
-            
-            # Check data source
-            if 'source' not in data_config:
-                errors.append("Missing 'data.source'")
-            elif data_config['source'] != 'roboflow':
-                warnings.append(f"Unsupported data source: {data_config['source']}")
-            
-            # Check Roboflow config
-            if 'roboflow' not in data_config:
-                errors.append("Missing 'data.roboflow' section")
-            else:
-                roboflow_config = data_config['roboflow']
-                
-                # Check required Roboflow fields
-                for field in ['workspace', 'project', 'version', 'api_key']:
-                    if field not in roboflow_config:
-                        errors.append(f"Missing 'data.roboflow.{field}'")
-                    elif not roboflow_config[field] and field != 'api_key':  # API key can be empty if using Colab secrets
-                        errors.append(f"Empty 'data.roboflow.{field}'")
-        
-        # Check download section
-        if 'download' not in config:
-            errors.append("Missing 'download' section")
-        
-        return {
-            'valid': len(errors) == 0,
-            'errors': errors,
-            'warnings': warnings
-        }
+            self.log_error(f"❌ Error saat memvalidasi konfigurasi: {str(e)}")
+            return {
+                'status': False,
+                'valid': False,
+                'errors': [f"Error validasi: {str(e)}"],
+                'warnings': []
+            }
     
     def _merge_downloader_config(self, existing: Dict[str, Any], new_downloader: Dict[str, Any]) -> Dict[str, Any]:
         """Enhanced merge downloader config dengan existing dataset_config.yaml"""
-        # Create a deep copy to avoid modifying the original
-        result = existing.copy()
+        # Start dengan existing config atau empty dict
+        merged = dict(existing) if existing else {}
         
-        # Ensure downloader section exists
-        if 'downloader' not in result:
-            result['downloader'] = {}
+        # Downloader-specific sections yang akan di-merge
+        downloader_sections = ['data', 'download', 'uuid_renaming', 'validation', 'cleanup']
         
-        # Update metadata
-        if 'config_version' in new_downloader:
-            result['config_version'] = new_downloader['config_version']
-        
-        if 'updated_at' in new_downloader:
-            result['updated_at'] = new_downloader['updated_at']
-        
-        # Update data section
-        if 'data' in new_downloader:
-            if 'data' not in result:
-                result['data'] = {}
-            
-            # Update source
-            if 'source' in new_downloader['data']:
-                result['data']['source'] = new_downloader['data']['source']
-            
-            # Update roboflow config
-            if 'roboflow' in new_downloader['data']:
-                if 'roboflow' not in result['data']:
-                    result['data']['roboflow'] = {}
-                
-                for key, value in new_downloader['data']['roboflow'].items():
-                    result['data']['roboflow'][key] = value
-            
-            # Update file naming
-            if 'file_naming' in new_downloader['data']:
-                if 'file_naming' not in result['data']:
-                    result['data']['file_naming'] = {}
-                
-                for key, value in new_downloader['data']['file_naming'].items():
-                    result['data']['file_naming'][key] = value
-        
-        # Update other sections
-        for section in ['download', 'uuid_renaming', 'validation', 'cleanup']:
+        for section in downloader_sections:
             if section in new_downloader:
-                result[section] = new_downloader[section]
+                if section == 'data':
+                    # Merge data section dengan hati-hati
+                    merged.setdefault('data', {})
+                    
+                    # Merge roboflow config menggunakan helper function
+                    if 'roboflow' in new_downloader['data']:
+                        if 'api_key' in new_downloader['data']['roboflow']:
+                            merged = update_config_with_api_key(merged, new_downloader['data']['roboflow']['api_key'])
+                        else:
+                            merged['data']['roboflow'] = new_downloader['data']['roboflow']
+                    
+                    # Merge file_naming config
+                    if 'file_naming' in new_downloader['data']:
+                        merged['data']['file_naming'] = new_downloader['data']['file_naming']
+                    
+                    # Merge local paths jika ada
+                    if 'local' in new_downloader['data']:
+                        merged['data']['local'] = new_downloader['data']['local']
+                    
+                    # Keep existing data source dan dir
+                    merged['data']['source'] = new_downloader['data'].get('source', 'roboflow')
+                    merged['data']['dir'] = new_downloader['data'].get('dir', 'data')
+                    
+                else:
+                    # Replace section completely untuk download, uuid_renaming, validation, cleanup
+                    merged[section] = new_downloader[section]
         
-        return result
+        # Preserve config metadata
+        merged['config_version'] = new_downloader.get('config_version', '1.0')
+        merged['updated_at'] = new_downloader.get('updated_at')
+        merged['_base_'] = new_downloader.get('_base_', 'base_config.yaml')
+        
+        return merged
     
     def extract_config_from_ui(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Wrapper untuk extract config dari UI dengan validation"""
         try:
             return self.extract_config(ui_components)
         except Exception as e:
-            self.logger.error(f"❌ Error extracting config from UI: {str(e)}", exc_info=True)
+            self.log_error(f"❌ Error saat mengekstrak konfigurasi dari UI: {str(e)}")
             return self.get_default_config()
     
     def get_api_key_status(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
-        """Get API key status dengan auto-detection info"""
+        """Dapatkan status API key dengan info auto-detection"""
         try:
             from smartcash.ui.dataset.downloader.utils.colab_secrets import validate_api_key
             
-            # Check current UI value
-            current_key = getattr(ui_components.get('api_key_input'), 'value', '').strip()
-            
-            # Check Colab secrets
+            # Dapatkan API key dari berbagai sumber
             detected_key = get_api_key_from_secrets()
+            current_key = get_api_key_from_ui(ui_components)
+            
+            # Tentukan sumber dan key yang akan digunakan
+            source = 'not_provided'
+            key = ''
             
             if detected_key:
-                validation = validate_api_key(detected_key)
-                return {
-                    'source': 'colab_secret',
-                    'valid': validation['valid'],
-                    'message': f"Auto-detect dari Colab: {validation['message']}",
-                    'key_preview': f"{detected_key[:4]}...{detected_key[-4:]}" if len(detected_key) > 8 else '****'
-                }
+                source = 'colab_secret'
+                key = detected_key
             elif current_key:
-                validation = validate_api_key(current_key)
-                return {
-                    'source': 'manual_input',
-                    'valid': validation['valid'],
-                    'message': f"Manual input: {validation['message']}",
-                    'key_preview': f"{current_key[:4]}...{current_key[-4:]}" if len(current_key) > 8 else '****'
-                }
+                source = 'manual_input'
+                key = current_key
+                
+            # Validasi key jika tersedia
+            if key:
+                validation = validate_api_key(key)
+                valid = validation['valid']
+                message = f"{'Auto-deteksi dari Colab' if source == 'colab_secret' else 'Input manual'}: {validation['message']}"
+                key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else '****'
             else:
-                return {
-                    'source': 'not_provided',
-                    'valid': False,
-                    'message': 'API key belum diisi',
-                    'key_preview': '****'
-                }
+                valid = False
+                message = 'API key belum diisi'
+                key_preview = '****'
+                
+            # Return hasil dengan format yang konsisten
+            return {
+                'source': source,
+                'valid': valid,
+                'status': valid,  # Untuk API consistency
+                'message': message,
+                'key_preview': key_preview
+            }
                 
         except Exception as e:
+            self.log_error(f"Error saat memeriksa API key: {str(e)}")
             return {
                 'source': 'error',
                 'valid': False,
-                'message': f"Error checking API key: {str(e)}",
+                'status': False,
+                'message': f"Error saat memeriksa API key: {str(e)}",
                 'key_preview': '****'
             }
     
-    @handle_ui_errors(error_component_title="Default Config Error")
     def get_default_config(self) -> Dict[str, Any]:
-        """Get default config dengan optimal workers dan fail-fast error handling"""
-        # Create error context for better tracing
-        ctx = ErrorContext(
-            component="DownloaderConfigHandler.get_default_config",
-            operation="get_defaults"
-        )
-        
-        # Use ErrorHandler for consistent error handling
-        handler = ErrorHandler(
-            context=ctx,
-            logger=self.logger
-        )
-        
+        """Dapatkan konfigurasi default dengan workers optimal dan struktur yang tepat"""
         try:
-            # Import with fail-fast error handling
-            try:
-                from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
-                from smartcash.common.worker_utils import get_worker_counts_for_operations
-            except ImportError as e:
-                error_msg = f"Failed to import required modules: {str(e)}"
-                handler.handle_error(error=e, message=error_msg)
-                # Don't return here - let it fail in the next step for better error context
-            
-            # Get default config with fail-fast error handling
+            # Import sudah ada di level modul, tidak perlu import lagi
             default_config = get_default_downloader_config()
             
-            # Validate default config structure
-            if not isinstance(default_config, dict):
-                error_msg = f"Invalid default config format: expected dict, got {type(default_config)}"
-                handler.handle_error(message=error_msg)
-                raise ValueError(error_msg)
-                
-            # Update with optimal workers using the centralized worker count function
-            worker_counts = get_worker_counts_for_operations()
-            
-            # Apply worker counts with safe dict access
-            if 'download' in default_config:
-                default_config['download']['max_workers'] = worker_counts.get('download', 4)
-                
-            if 'uuid_renaming' in default_config:
-                default_config['uuid_renaming']['parallel_workers'] = worker_counts.get('uuid_renaming', 2)
-            
-            # Add missing sections if not present with safe defaults
-            if 'validation' not in default_config:
-                default_config['validation'] = {
-                    'enabled': True,
-                    'parallel_workers': worker_counts.get('validation', 2)
-                }
-            
-            if 'cleanup' not in default_config:
-                default_config['cleanup'] = {
-                    'auto_cleanup_downloads': False,
-                    'parallel_workers': worker_counts.get('download', 4)  # Use same as download
-                }
+            # Perbarui dengan workers optimal
+            default_config['download']['max_workers'] = get_download_workers()
+            default_config['uuid_renaming']['parallel_workers'] = get_rename_workers(5000)
             
             return default_config
             
         except Exception as e:
-            error_msg = f"Failed to get default config: {str(e)}"
-            handler.handle_error(error=e, message=error_msg)
-            
-            # Instead of having a fallback here, raise the exception to be handled by the decorator
-            # This follows the fail-fast approach
+            self.log_error(f"❌ Error saat mendapatkan konfigurasi default: {str(e)}")
             raise
-    
-    # These methods are already implemented in the parent class and don't need custom behavior
-    # Removing unnecessary overrides to follow DRY principle
-    
-    @handle_ui_errors(error_component_title="Progress Reset Error")
-    def _reset_progress_indicators(self, ui_components: Dict[str, Any]) -> None:
-        """Reset progress indicators in UI components with fail-fast error handling"""
-        # Create error context for better tracing
-        ctx = ErrorContext(
-            component="DownloaderConfigHandler._reset_progress_indicators",
-            operation="reset_progress"
-        )
-        
-        # Use ErrorHandler for consistent error handling
-        handler = ErrorHandler(
-            context=ctx,
-            logger=self.logger,
-            log_level="debug"  # Use debug level for UI widget errors
-        )
-        
-        # Validate input
-        if not ui_components or not isinstance(ui_components, dict):
-            error_msg = "Invalid UI components provided"
-            handler.handle_error(message=error_msg)
-            return
-        
-        # Find progress indicators with fail-fast validation
-        progress_keys = [key for key in ui_components if isinstance(key, str) and 'progress' in key.lower()]
-        
-        for key in progress_keys:
-            try:
-                widget = ui_components[key]
-                
-                # Hide widget with safe attribute access
-                if hasattr(widget, 'layout'):
-                    widget.layout.visibility = 'hidden'
-                    widget.layout.display = 'none'
-                
-                # Reset value with safe attribute access
-                if hasattr(widget, 'value'):
-                    widget.value = 0
-                
-                # Reset progress tracker with safe method call
-                if hasattr(widget, 'reset') and callable(widget.reset):
-                    widget.reset()
-            except Exception as e:
-                error_msg = f"Error resetting {key}: {str(e)}"
-                handler.handle_error(error=e, message=error_msg, log_level="debug")
-                # Continue with other widgets - don't fail the entire operation

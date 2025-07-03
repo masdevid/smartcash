@@ -1,48 +1,53 @@
 """
 File: smartcash/ui/dataset/split/handlers/config_handler.py
-Deskripsi: Configuration handler untuk dataset split dengan logger bridge integration
+Deskripsi: Configuration handler untuk dataset split dengan centralized error handling
 """
 
 from typing import Dict, Any, Optional, Tuple
-from smartcash.ui.config_cell.handlers.config_handler import ConfigCellHandler
-from smartcash.ui.utils.logger_bridge import UILoggerBridge
+from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.handlers.error_handler import handle_ui_errors
+from .base_split_handler import BaseSplitHandler
 from .config_extractor import extract_split_config
 from .config_updater import update_split_ui, reset_ui_to_defaults
 from .defaults import get_default_split_config
 
-class SplitConfigHandler(ConfigCellHandler):
-    """Handler untuk dataset split configuration dengan logger bridge support.
+class SplitConfigHandler(ConfigHandler, BaseSplitHandler):
+    """Handler untuk dataset split configuration dengan centralized error handling.
     
     Handler ini mengintegrasikan dengan parent component untuk:
-    - Logging terpusat melalui logger bridge
-    - Update status panel otomatis
+    - Logging terpusat melalui BaseHandler
     - Error handling konsisten
+    - Config management melalui ConfigHandler
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, ui_components: Optional[Dict[str, Any]] = None, config: Optional[Dict[str, Any]] = None, **kwargs):
         """Initialize split config handler.
         
         Args:
+            ui_components: Optional UI components dictionary
             config: Optional initial configuration
+            **kwargs: Additional arguments passed to parent classes
         """
-        super().__init__(config or {})
-        self._logger_bridge: Optional[UILoggerBridge] = None
+        # Initialize ConfigHandler with module name
+        ConfigHandler.__init__(
+            self, 
+            module_name="split", 
+            persistence_enabled=True,
+            **kwargs
+        )
         
-    def set_logger_bridge(self, logger_bridge: UILoggerBridge) -> None:
-        """Set logger bridge untuk integrasi dengan parent component.
+        # Initialize BaseSplitHandler with UI components
+        BaseSplitHandler.__init__(
+            self,
+            ui_components=ui_components,
+            **kwargs
+        )
         
-        Args:
-            logger_bridge: Instance UILoggerBridge dari parent
-        """
-        self._logger_bridge = logger_bridge
-        
-    @property
-    def logger(self):
-        """Get logger instance, prefer logger bridge jika tersedia."""
-        if self._logger_bridge:
-            return self._logger_bridge
-        return super().logger
+        # Set initial config if provided
+        if config:
+            self.set_config(config)
     
+    @handle_ui_errors(error_component_title="Extract Config Error", log_error=True)
     def extract_config(self, ui_components: Dict[str, Any]) -> Dict[str, Any]:
         """Extract configuration dari UI components.
         
@@ -52,30 +57,11 @@ class SplitConfigHandler(ConfigCellHandler):
         Returns:
             Dictionary containing extracted configuration
         """
-        try:
-            config = extract_split_config(ui_components)
-            
-            # Log sukses via logger bridge
-            if self._logger_bridge:
-                self._logger_bridge.info("✅ Berhasil extract konfigurasi split")
-            
-            # Update status panel jika ada
-            self._update_status_panel(ui_components, "✅ Konfigurasi berhasil di-extract", "success")
-            
-            return config
-            
-        except Exception as e:
-            error_msg = f"❌ Gagal extract config: {str(e)}"
-            
-            # Log error via logger bridge
-            if self._logger_bridge:
-                self._logger_bridge.error(error_msg)
-            
-            # Update status panel dengan error
-            self._update_status_panel(ui_components, error_msg, "error")
-            
-            raise
+        config = extract_split_config(ui_components)
+        self.logger.info("✅ Berhasil extract konfigurasi split")
+        return config
     
+    @handle_ui_errors(error_component_title="Update UI Error", log_error=True)
     def update_ui(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
         """Update UI components dengan konfigurasi.
         
@@ -83,48 +69,20 @@ class SplitConfigHandler(ConfigCellHandler):
             ui_components: Dictionary of UI components
             config: Configuration to apply
         """
-        try:
-            update_split_ui(ui_components, config)
-            
-            # Log sukses
-            if self._logger_bridge:
-                self._logger_bridge.info("✅ UI berhasil di-update dengan konfigurasi")
-                
-            # Update status panel
-            self._update_status_panel(ui_components, "✅ UI berhasil di-update", "success")
-            
-        except Exception as e:
-            error_msg = f"❌ Gagal update UI: {str(e)}"
-            
-            if self._logger_bridge:
-                self._logger_bridge.error(error_msg)
-                
-            self._update_status_panel(ui_components, error_msg, "error")
-            raise
+        update_split_ui(ui_components, config)
+        self.logger.info("✅ UI berhasil di-update dengan konfigurasi")
     
+    @handle_ui_errors(error_component_title="Reset UI Error", log_error=True)
     def reset_ui(self, ui_components: Dict[str, Any]) -> None:
         """Reset UI components ke nilai default.
         
         Args:
             ui_components: Dictionary of UI components to reset
         """
-        try:
-            reset_ui_to_defaults(ui_components)
-            
-            if self._logger_bridge:
-                self._logger_bridge.info("🔄 UI berhasil di-reset ke default")
-                
-            self._update_status_panel(ui_components, "🔄 UI di-reset ke default", "info")
-            
-        except Exception as e:
-            error_msg = f"❌ Gagal reset UI: {str(e)}"
-            
-            if self._logger_bridge:
-                self._logger_bridge.error(error_msg)
-                
-            self._update_status_panel(ui_components, error_msg, "error")
-            raise
-        
+        reset_ui_to_defaults(ui_components)
+        self.logger.info("🔄 UI berhasil di-reset ke nilai default")
+    
+    @handle_ui_errors(error_component_title="Validate Config Error", log_error=True)
     def validate_config(self, config: Dict[str, Any]) -> Tuple[bool, str]:
         """Validate konfigurasi split.
         
@@ -141,28 +99,24 @@ class SplitConfigHandler(ConfigCellHandler):
             test = ratios.get('test', 0)
             
             # Validasi ratio sum = 1.0
-            if not self.validate_split_ratios(train, valid, test):
-                return False, "Split ratios harus berjumlah 1.0"
+            total = train + valid + test
+            if abs(total - 1.0) > 0.001:  # Allow small floating point error
+                return False, f"Split ratios harus berjumlah 1.0 (saat ini: {total:.3f})"
             
             # Validasi path configuration
             paths = config.get('dataset', {}).get('paths', {})
             if not paths.get('base_dir'):
                 return False, "Base directory tidak boleh kosong"
                 
-            # Log validasi sukses
-            if self._logger_bridge:
-                self._logger_bridge.debug(f"✅ Validasi sukses - Train: {train}, Valid: {valid}, Test: {test}")
-                
+            self.logger.debug(f"✅ Validasi sukses - Train: {train}, Valid: {valid}, Test: {test}")
             return True, ""
             
         except Exception as e:
             error_msg = f"Validation error: {str(e)}"
-            
-            if self._logger_bridge:
-                self._logger_bridge.error(f"❌ {error_msg}")
-                
+            self.logger.error(f"❌ {error_msg}")
             return False, error_msg
     
+    @handle_ui_errors(error_component_title="Save Config Error", log_error=True)
     def save_config(self, ui_components: Dict[str, Any]) -> bool:
         """Save konfigurasi dengan status update.
         
@@ -172,59 +126,21 @@ class SplitConfigHandler(ConfigCellHandler):
         Returns:
             True jika berhasil save
         """
-        try:
-            # Extract current config
-            config = self.extract_config(ui_components)
-            
-            # Validate sebelum save
-            is_valid, error_msg = self.validate_config(config)
-            if not is_valid:
-                raise ValueError(error_msg)
-            
-            # Save menggunakan parent method
-            result = super().save_config(ui_components)
-            
-            if result:
-                if self._logger_bridge:
-                    self._logger_bridge.info("💾 Konfigurasi berhasil disimpan")
-                self._update_status_panel(ui_components, "💾 Konfigurasi berhasil disimpan", "success")
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"❌ Gagal save config: {str(e)}"
-            
-            if self._logger_bridge:
-                self._logger_bridge.error(error_msg)
-                
-            self._update_status_panel(ui_components, error_msg, "error")
-            return False
-    
-    def _update_status_panel(self, ui_components: Dict[str, Any], message: str, status_type: str) -> None:
-        """Update status panel jika tersedia.
+        # Extract current config
+        config = self.extract_config(ui_components)
         
-        Args:
-            ui_components: Dictionary containing UI components
-            message: Status message
-            status_type: Status type (success, error, info, warning)
-        """
-        # Cari status panel dari parent atau ui_components
-        status_panel = ui_components.get('status_panel')
+        # Validate sebelum save
+        is_valid, error_msg = self.validate_config(config)
+        if not is_valid:
+            raise ValueError(error_msg)
         
-        # Coba dari parent jika ada
-        if not status_panel and 'parent' in ui_components:
-            parent = ui_components['parent']
-            if hasattr(parent, 'status_panel'):
-                status_panel = parent.status_panel
+        # Save menggunakan parent method
+        result = super().save_config(ui_components)
         
-        if status_panel:
-            try:
-                from smartcash.ui.components import update_status_panel
-                update_status_panel(status_panel, message, status_type)
-            except Exception as e:
-                # Log tapi jangan fail operasi utama
-                if self._logger_bridge:
-                    self._logger_bridge.debug(f"⚠️ Gagal update status panel: {str(e)}")
+        if result:
+            self.logger.info("💾 Konfigurasi berhasil disimpan")
+            
+        return result
     
     @classmethod
     def get_default_config(cls) -> Dict[str, Any]:

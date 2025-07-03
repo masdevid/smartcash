@@ -226,6 +226,8 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
             
             # Perform setup action
             result = self.perform_setup_action('setup_environment')
+            # Show error UI if needed
+            self.show_error_ui(result)
             
             # Update progress berdasarkan hasil
             if result.get('status', False):

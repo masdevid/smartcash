@@ -5,8 +5,27 @@ This module provides a flexible main container component that can be used
 to create a consistent layout for different parts of the application.
 """
 
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Sequence
 import ipywidgets as widgets
+import gc
+
+# Import utility functions if available, otherwise define inline
+try:
+    from smartcash.ui.core.utils.widget_utils import hide_stray_accordions
+except ImportError:
+    # Fallback implementation if the module isn't available
+    def hide_stray_accordions(safe_accordions=None):
+        """Hide any stray accordion widgets that might be causing UI issues."""
+        if safe_accordions is None:
+            safe_accordions = []
+            
+        hidden_count = 0
+        for obj in gc.get_objects():
+            if isinstance(obj, widgets.Accordion) and obj not in safe_accordions:
+                if hasattr(obj, 'layout'):
+                    obj.layout.display = 'none'
+                    hidden_count += 1
+        return hidden_count
 
 class MainContainer:
     """Flexible main container component with consistent styling.
@@ -123,6 +142,7 @@ def create_main_container(
     footer_container: Optional[widgets.Widget] = None,
     progress_container: Optional[widgets.Widget] = None,
     log_container: Optional[widgets.Widget] = None,
+    clean_stray_widgets: bool = True,
     **style_options
 ) -> MainContainer:
     """Create a main container with consistent styling.
@@ -139,7 +159,8 @@ def create_main_container(
     Returns:
         MainContainer instance
     """
-    return MainContainer(
+    # Create the main container
+    container = MainContainer(
         header_container=header_container,
         form_container=form_container,
         action_container=action_container,
@@ -148,3 +169,25 @@ def create_main_container(
         footer_container=footer_container,
         **style_options
     )
+    
+    # Clean up stray widgets if requested
+    if clean_stray_widgets:
+        # Find all accordions in the container to protect them
+        safe_accordions = []
+        
+        # Check all sections for accordions
+        for section in container.containers.values():
+            if section is not None:
+                # If it's an accordion itself
+                if isinstance(section, widgets.Accordion):
+                    safe_accordions.append(section)
+                # If it contains children that might be accordions
+                if hasattr(section, 'children') and isinstance(section.children, Sequence):
+                    for child in section.children:
+                        if isinstance(child, widgets.Accordion):
+                            safe_accordions.append(child)
+                            
+        # Hide any stray accordions
+        hide_stray_accordions(safe_accordions)
+    
+    return container

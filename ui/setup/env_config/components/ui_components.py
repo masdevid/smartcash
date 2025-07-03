@@ -61,9 +61,13 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Create a placeholder for the setup handler function that will be replaced
     # by EnvConfigHandler.handle_setup_button_click during initialization
     def placeholder_setup_handler(btn):
-        from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
-        # This is just a placeholder - the real handler will be connected during initialization
-        print("Setup button clicked - handler not yet connected")
+        # Get the log accordion if available
+        log_output = ui_components.get('log_output')
+        if log_output and hasattr(log_output, 'append_log'):
+            log_output.append_log("Setup button clicked - handler not yet connected", "info")
+        else:
+            # Fallback to print if log not available
+            print("Setup button clicked - handler not yet connected")
     
     # Attach the placeholder handler - will be replaced by the real handler during initialization
     setup_button.on_click(placeholder_setup_handler)
@@ -138,14 +142,20 @@ def create_env_config_ui() -> Dict[str, Any]:
         # Fix the status panel HTML element directly
         if hasattr(header_container.status_panel, 'children') and len(header_container.status_panel.children) > 0:
             status_html = header_container.status_panel.children[0]
-            status_html.layout.width = '100%'
-            status_html.layout.max_width = '100%'
-            # Don't use overflow hidden as it crops the border radius
+            # Apply custom CSS to fix the status panel styling
+            if hasattr(status_html, 'value') and isinstance(status_html.value, str):
+                # Extract the existing HTML content
+                html_content = status_html.value
+                # Replace the inline style with a style that doesn't overflow
+                html_content = html_content.replace(
+                    'padding: 8px 12px;', 
+                    'padding: 8px 12px; word-wrap: break-word; white-space: normal;'
+                )
+                status_html.value = html_content
             
         # Also fix the container
         header_container.status_panel.layout.width = '100%'
         header_container.status_panel.layout.max_width = '100%'
-        # Don't use overflow hidden as it crops the border radius
     
     # Fix summary container title duplication and vertical layout
     if hasattr(setup_summary, 'title_widget') and hasattr(setup_summary, 'value'):

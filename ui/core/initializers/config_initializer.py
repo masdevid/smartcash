@@ -4,7 +4,7 @@ Deskripsi: Initializer dengan configuration management terintegrasi.
 Extends BaseInitializer dengan config loading dan validation.
 """
 
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, List
 from pathlib import Path
 
 from smartcash.ui.core.initializers.base_initializer import BaseInitializer

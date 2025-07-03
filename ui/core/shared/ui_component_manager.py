@@ -333,3 +333,20 @@ class UIComponentManager:
         self._components.clear()
         self._component_validators.clear()
         self.logger.info(f"🧹 Cleaned up UIComponentManager: {count} components removed")
+
+# Global instance for convenience
+_component_manager_instance = None
+
+def get_component_manager(module_name: str = "default") -> UIComponentManager:
+    """Get or create a global UIComponentManager instance.
+    
+    Args:
+        module_name: Name of the module using the component manager.
+        
+    Returns:
+        UIComponentManager: The global component manager instance.
+    """
+    global _component_manager_instance
+    if _component_manager_instance is None:
+        _component_manager_instance = UIComponentManager(module_name)
+    return _component_manager_instance

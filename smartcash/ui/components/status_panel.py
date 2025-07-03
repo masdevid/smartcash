@@ -133,6 +133,10 @@ class StatusPanel(BaseUIComponent):
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             background-size: 200% 200%;
             animation: gradient 3s ease infinite;
+            word-wrap: break-word;
+            white-space: normal;
+            overflow-wrap: break-word;
+            max-width: 100%;
         ">
             {display_emoji} {clean_msg}
             <style>

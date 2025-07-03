@@ -158,16 +158,29 @@ class EnvConfigInitializer(ModuleInitializer):
         return self._handlers.get(name)
 
 
-def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  # noqa: ANN001
+def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  
     """Notebook/CLI helper that returns the rendered widget via `safe_display`."""
-
+    
+    # Clean up any existing UI components first to prevent duplicates
+    try:
+        from smartcash.ui.core.shared.ui_component_manager import get_component_manager
+        manager = get_component_manager('env_config')
+        manager.reset_components_silently()
+    except Exception:
+        # Silently continue if cleanup fails
+        pass
+        
+    # Clean up any stray accordions using our utility function
+    try:
+        from smartcash.ui.core.utils.widget_utils import hide_stray_accordions
+        hide_stray_accordions(safe_accordions=[])
+    except Exception:
+        # Silently continue if cleanup fails
+        pass
+    
+    # Initialize the UI
     initializer = EnvConfigInitializer()
     result = initializer.initialize(config=config, **kwargs)
-
-    # Check if initialization was successful (using 'status' key for API consistency)
     if not result.get('status', False):
-        # If there was an error, display the error UI
         return result.get('ui', {}).get('ui', {})
-    
-    # Return the main UI widget directly
     return result.get('ui', {}).get('ui', {})

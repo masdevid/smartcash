@@ -7,25 +7,9 @@ to create a consistent layout for different parts of the application.
 
 from typing import Dict, Any, Optional, List, Union, Sequence
 import ipywidgets as widgets
-import gc
 
-# Import utility functions if available, otherwise define inline
-try:
-    from smartcash.ui.core.utils.widget_utils import hide_stray_accordions
-except ImportError:
-    # Fallback implementation if the module isn't available
-    def hide_stray_accordions(safe_accordions=None):
-        """Hide any stray accordion widgets that might be causing UI issues."""
-        if safe_accordions is None:
-            safe_accordions = []
-            
-        hidden_count = 0
-        for obj in gc.get_objects():
-            if isinstance(obj, widgets.Accordion) and obj not in safe_accordions:
-                if hasattr(obj, 'layout'):
-                    obj.layout.display = 'none'
-                    hidden_count += 1
-        return hidden_count
+# Import utility functions
+from smartcash.ui.core.utils.widget_utils import hide_stray_accordions
 
 class MainContainer:
     """Flexible main container component with consistent styling.

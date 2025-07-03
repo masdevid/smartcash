@@ -298,5 +298,5 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
             error_type="error",
             show_traceback=True
         )
-        from smartcash.ui.utils.widget_utils import safe_display
-        return safe_display(error_component)
+        # from smartcash.ui.utils.widget_utils import safe_display
+        return error_component

@@ -316,33 +316,7 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
     Returns:
         Initialized UI widget dari EnvConfigInitializer
     """
-    # Get module logger
-    logger = get_module_logger('smartcash.ui.setup.env_config')
-    logger.debug("🚀 Initializing environment configuration UI")
-    
-    try:
-        # Create dan initialize initializer
-        initializer = EnvConfigInitializer()
-        return initializer.initialize(config=config, **kwargs)
+    # Create dan initialize initializer
+    initializer = EnvConfigInitializer()
+    return initializer.initialize(config=config, **kwargs)
         
-    except Exception as e:
-        from smartcash.ui.core.shared.error_handler import CoreErrorHandler
-        
-        # Get full traceback for the error component
-        import sys, traceback
-        exc_type, exc_value, exc_tb = sys.exc_info()
-        tb_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        
-        # Create error message
-        error_msg = str(e)
-        
-        # # Create error component with traceback
-        # error_component = create_error_component(
-        #     error_message=error_msg,
-        #     traceback=tb_str,
-        #     title="❌ Environment Configuration Error",
-        #     error_type="error",
-        #     show_traceback=True
-        # )
-        
-        return CoreErrorHandler('smartcash.ui.setup.env_config').handle_error(error_msg,'error',True,True,True)

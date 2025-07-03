@@ -282,18 +282,14 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         
     except Exception as e:
         # Use the centralized error handler
-        from smartcash.ui.core.shared.error_handler import CoreErrorHandler, create_error_component
+        from smartcash.ui.core.shared.error_handler import create_error_component
         # Get full traceback
         import sys, traceback
         exc_type, exc_value, exc_tb = sys.exc_info()
         tb_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
         
         # Format error message
-        error_msg = f"Gagal initialize environment configuration: {str(e)}"
-        
-        # Log the error with full traceback
-        logger.error(f"{error_msg}\n\nFull traceback:\n{tb_str}")
-        
+        error_msg = f"{str(e)}"
         # Create error component with traceback
         error_component = create_error_component(
             error_message=error_msg,

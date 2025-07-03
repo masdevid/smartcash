@@ -4,6 +4,7 @@ Progress tracker component for displaying operation progress with multiple level
 
 import time
 from typing import Dict, List, Optional, Callable, Any
+import ipywidgets as widgets
 from smartcash.ui.components.base_component import BaseUIComponent
 from smartcash.ui.components.progress_tracker.progress_config import ProgressConfig, ProgressLevel, ProgressBarConfig
 from smartcash.ui.components.progress_tracker.callback_manager import CallbackManager

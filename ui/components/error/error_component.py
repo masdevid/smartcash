@@ -76,8 +76,8 @@ class ErrorComponent:
                         'display': 'flex',
                         'justify-content': 'center',
                         'box-sizing': 'border-box',
-                        'max-width': '100% !important',
-                        'width': '100% !important',
+                        'max-width': '80% !important',
+                        'width': '80% !important',
                         'overflow': 'hidden',
                         'padding': '10px',
                         'position': 'relative'

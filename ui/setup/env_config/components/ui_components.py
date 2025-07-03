@@ -58,10 +58,12 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Store the button for later handler connection
     ui_components['setup_button'] = setup_button
     
-    # Create a placeholder for the setup handler function
+    # Create a placeholder for the setup handler function that will be replaced
+    # by EnvConfigHandler.handle_setup_button_click during initialization
     def placeholder_setup_handler(btn):
-        # This will be replaced by the actual handler in env_config_handler.py
-        pass
+        from smartcash.ui.setup.env_config.handlers.env_config_handler import EnvConfigHandler
+        # This is just a placeholder - the real handler will be connected during initialization
+        print("Setup button clicked - handler not yet connected")
     
     # Attach the placeholder handler - will be replaced by the real handler during initialization
     setup_button.on_click(placeholder_setup_handler)
@@ -90,7 +92,6 @@ def create_env_config_ui() -> Dict[str, Any]:
     setup_summary = create_setup_summary()
     summary_container = create_summary_container(
         theme="info",
-        title="Setup Summary",
         icon="📋"
     )
     summary_container.set_content(setup_summary.value)
@@ -139,12 +140,12 @@ def create_env_config_ui() -> Dict[str, Any]:
             status_html = header_container.status_panel.children[0]
             status_html.layout.width = '100%'
             status_html.layout.max_width = '100%'
-            status_html.layout.overflow_x = 'hidden'
-        
+            # Don't use overflow hidden as it crops the border radius
+            
         # Also fix the container
         header_container.status_panel.layout.width = '100%'
         header_container.status_panel.layout.max_width = '100%'
-        header_container.status_panel.layout.overflow_x = 'hidden'
+        # Don't use overflow hidden as it crops the border radius
     
     # Fix summary container title duplication and vertical layout
     if hasattr(setup_summary, 'title_widget') and hasattr(setup_summary, 'value'):
@@ -170,9 +171,11 @@ def create_env_config_ui() -> Dict[str, Any]:
             footer_children.append(ui_components['log_accordion'])
             footer_container.container.children = tuple(footer_children)
         
-        # Remove any duplicate log accordions from ui_components to prevent rendering outside container
-        # We'll keep only the reference to the one in the footer container
+        # Ensure we only have one reference to the log accordion
+        # This prevents the mysterious duplicate accordion from appearing
         ui_components['log_accordion'] = footer_container.log_accordion
+        ui_components['log_output'] = footer_container.log_accordion
+        ui_components['log_components'] = footer_container.log_accordion
         
         # Make sure the log accordion is visible
         if hasattr(footer_container.log_accordion, 'selected_index'):

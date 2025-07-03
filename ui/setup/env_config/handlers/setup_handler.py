@@ -804,6 +804,10 @@ class SetupHandler(OperationHandler, ConfigurableHandler):
                 'readiness': 0
             }
     
+    def verify_environment(self) -> Dict[str, Any]:
+        """Public method to verify environment (for external callers)."""
+        return self.validate_environment()
+
     def validate_environment(self) -> Dict[str, Any]:
         """Validate environment.
         

@@ -4,10 +4,10 @@ File: smartcash/ui/setup/env_config/handlers/operations/drive_operation.py
 Drive Operation Handler untuk stage-based setup.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 
-from smartcash.ui.core.handlers.operation_handler import OperationHandler
+from smartcash.ui.core.handlers.operation_handler import OperationHandler, OperationResult
 from smartcash.common.environment import get_environment_manager
 
 
@@ -22,6 +22,10 @@ class DriveOperation(OperationHandler):
         )
         
         self.env_manager = get_environment_manager()
+        self._is_initialized = False
+        
+        # Initialize the handler
+        self.initialize()
         
     def mount_drive(self) -> Dict[str, Any]:
         """Mount Google Drive.
@@ -140,3 +144,37 @@ class DriveOperation(OperationHandler):
                 'message': error_msg,
                 'error': str(e)
             }
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations for this handler.
+        
+        Returns:
+            Dictionary mapping operation names to their handler methods
+        """
+        return {
+            'mount_drive': self.mount_drive,
+            'verify_drive_mount': self.verify_drive_mount,
+            'get_drive_info': self.get_drive_info
+        }
+    
+    def initialize(self) -> bool:
+        """Initialize the operation handler.
+        
+        Returns:
+            bool: True if initialization was successful, False otherwise
+        """
+        if self._is_initialized:
+            return True
+            
+        try:
+            self.logger.info("Initializing drive operation handler...")
+            # Perform any necessary initialization here
+            self._is_initialized = True
+            self.logger.info("✅ Drive operation handler initialized")
+            return True
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to initialize drive operation handler: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self._is_initialized = False
+            return False

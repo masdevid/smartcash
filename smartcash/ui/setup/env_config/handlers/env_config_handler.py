@@ -224,10 +224,8 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
             self.update_status("🔄 Memulai environment setup...", 'info')
             self.update_progress(0.1, "Initializing...")
             
-            # Perform setup action
+            # Perform setup action (this will also handle error UI)
             result = self.perform_setup_action('setup_environment')
-            # Show error UI if needed
-            self.show_error_ui(result)
             
             # Update progress berdasarkan hasil
             if result.get('status', False):
@@ -260,57 +258,10 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
             
             # Delegate ke setup handler
             result = self.setup_handler.perform_action(action, **kwargs)
-            
+            self.show_error_ui(result) 
             # Update status berdasarkan hasil
-            if result.get('status', False):
-                self._status = 'success'
-                self.update_status(f"✅ {action} berhasil", 'success')
-            else:
-                self._status = 'error'
-                self.update_status(f"❌ {action} gagal", 'error')
-            
-            return result
-            
-        except Exception as e:
-            self._status = 'error'
-            error_msg = f"❌ Error performing {action}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            self.update_status(error_msg, 'error')
-            
-            return {
-                'status': False,
-                'error': str(e),
-                'message': error_msg
-            }
-    
-    def perform_setup_action(self, action: str, **kwargs) -> Dict[str, Any]:
-        """Perform setup action dengan UI updates.
-        
-        Args:
-            action: Action yang akan dilakukan
-            **kwargs: Additional arguments untuk action
-            
-        Returns:
-            Dictionary berisi hasil action
-        """
-        try:
-            self.logger.info(f"🚀 Performing setup action: {action}")
-            
-            # Update status
-            self._status = 'running'
-            self.update_status(f"Menjalankan {action}...", 'info')
-            
-            # Delegate ke setup handler
-            result = self.setup_handler.perform_action(action, **kwargs)
-            
-            # Update status berdasarkan hasil
-            if result.get('status', False):
-                self._status = 'success'
-                self.update_status(f"✅ {action} berhasil", 'success')
-            else:
-                self._status = 'error'
-                self.update_status(f"❌ {action} gagal", 'error')
-            
+            if result.get('error'):
+                return None                     # prevents dict display
             return result
             
         except Exception as e:

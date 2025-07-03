@@ -75,11 +75,57 @@ class EnvConfigInitializer(ModuleInitializer):
             # Initialize handlers storage
             self._handlers = {}
             
+            # Initialize UI components storage
+            self._ui_components = {}
+            
             self.logger.info("🔧 Environment configuration initializer siap")
             
         except Exception as e:
             error_msg = f"❌ Gagal initialize environment manager: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
+            
+    def initialize(self) -> Dict[str, Any]:
+        """Initialize the environment configuration UI.
+        
+        Returns:
+            Dict containing initialization status and UI components:
+                - success: Boolean indicating if initialization was successful
+                - ui: Dictionary of UI components if successful
+                - error: Error message if initialization failed
+        """
+        try:
+            # Run pre-initialization checks
+            self.pre_initialize_checks()
+            
+            # Create UI components
+            self._ui_components = self.create_ui_components()
+            
+            # Setup handlers
+            self.setup_handlers()
+            
+            # Run post-initialization checks
+            self.post_initialization_checks()
+            
+            # Mark as initialized
+            self._initialized = True
+            
+            self.logger.info("✅ Environment configuration UI initialized successfully")
+            
+            return {
+                'success': True,
+                'ui': self._ui_components,
+                'handlers': self._handlers
+            }
+            
+        except Exception as e:
+            error_msg = f"❌ Failed to initialize environment configuration UI: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return {
+                'success': False,
+                'error': error_msg,
+                'ui': self._create_error_ui(error_msg)
+            }
     
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default configuration untuk environment setup.

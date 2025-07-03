@@ -333,6 +333,65 @@ class UIComponentManager:
         self._components.clear()
         self._component_validators.clear()
         self.logger.info(f"🧹 Cleaned up UIComponentManager: {count} components removed")
+        
+    def cleanup_stray_widgets(self, widget_types: List[str] = None) -> Dict[str, int]:
+        """Clean up stray widgets that might be causing UI issues.
+        
+        This method finds and hides orphaned widgets that aren't properly attached to
+        the widget hierarchy, which can cause duplicate UI elements to appear.
+        
+        Args:
+            widget_types: List of widget type names to clean up. If None, cleans up
+                         common problematic widgets like Accordion, Output, etc.
+                         
+        Returns:
+            Dictionary with count of hidden widgets by type
+        """
+        if widget_types is None:
+            # Default list of widget types that commonly cause issues when orphaned
+            widget_types = ['Accordion', 'Output', 'VBox', 'HBox', 'Tab']
+            
+        import gc
+        results = {}
+        
+        for widget_type in widget_types:
+            results[widget_type] = 0
+            
+        for obj in gc.get_objects():
+            try:
+                # Skip objects without proper widget attributes
+                if not hasattr(obj, 'layout') or not hasattr(obj, '_dom_classes'):
+                    continue
+                    
+                # Get widget type name safely
+                widget_type_name = None
+                if hasattr(obj, '__class__') and hasattr(obj.__class__, '__name__'):
+                    widget_type_name = obj.__class__.__name__
+                    
+                # Skip if not in our target types
+                if widget_type_name not in widget_types:
+                    continue
+                    
+                # Check if it's an orphaned widget (not attached to any parent)
+                is_orphaned = True
+                if hasattr(obj, '_parent') and obj._parent is not None:
+                    is_orphaned = False
+                    
+                # Hide orphaned widgets
+                if is_orphaned:
+                    obj.layout.display = 'none'
+                    results[widget_type_name] += 1
+                    
+            except Exception:
+                # Skip any objects that cause errors during inspection
+                continue
+                
+        # Log results
+        for widget_type, count in results.items():
+            if count > 0:
+                self.logger.info(f"🧹 Hidden {count} orphaned {widget_type} widgets")
+                
+        return results
 
 # Global instance for convenience
 _component_manager_instance = None
@@ -350,3 +409,21 @@ def get_component_manager(module_name: str = "default") -> UIComponentManager:
     if _component_manager_instance is None:
         _component_manager_instance = UIComponentManager(module_name)
     return _component_manager_instance
+
+
+def cleanup_stray_widgets(widget_types: List[str] = None, module_name: str = "default") -> Dict[str, int]:
+    """Convenience function to clean up stray widgets.
+    
+    This is a global helper function that gets the component manager and calls
+    cleanup_stray_widgets on it. This makes it easy to clean up stray widgets
+    from anywhere in the codebase without having to get the component manager first.
+    
+    Args:
+        widget_types: List of widget type names to clean up
+        module_name: Name of the module using the component manager
+        
+    Returns:
+        Dictionary with count of hidden widgets by type
+    """
+    manager = get_component_manager(module_name)
+    return manager.cleanup_stray_widgets(widget_types)

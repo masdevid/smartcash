@@ -161,22 +161,20 @@ class EnvConfigInitializer(ModuleInitializer):
 def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  
     """Notebook/CLI helper that returns the rendered widget via `safe_display`."""
     
-    # Clean up any existing UI components first to prevent duplicates
+    # Clean up any existing UI components and stray widgets using the component manager
     try:
-        from smartcash.ui.core.shared.ui_component_manager import get_component_manager
+        from smartcash.ui.core.shared.ui_component_manager import get_component_manager, cleanup_stray_widgets
+        
+        # Reset registered components
         manager = get_component_manager('env_config')
         manager.reset_components_silently()
-    except Exception:
-        # Silently continue if cleanup fails
-        pass
         
-    # Clean up any stray accordions using our utility function
-    try:
-        from smartcash.ui.core.utils.widget_utils import hide_stray_accordions
-        hide_stray_accordions(safe_accordions=[])
-    except Exception:
-        # Silently continue if cleanup fails
-        pass
+        # Clean up any stray widgets (not just accordions)
+        cleanup_stray_widgets(['Accordion', 'Output', 'VBox', 'HBox', 'Tab'], 'env_config')
+    except Exception as e:
+        # Log but continue if cleanup fails
+        import logging
+        logging.getLogger('env_config').debug(f"Pre-initialization cleanup failed: {e}")
     
     # Initialize the UI
     initializer = EnvConfigInitializer()

@@ -26,14 +26,13 @@ def hide_stray_accordions(safe_accordions: List[Any] = None) -> int:
     # Get all objects and filter for Accordion widgets
     for obj in gc.get_objects():
         try:
-            # Check if it's an Accordion widget without using 'in' operator
-            # This avoids the FutureWarning from torch.distributed
-            is_accordion = False
-            if hasattr(obj, '__class__') and hasattr(obj.__class__, '__name__'):
-                if obj.__class__.__name__ == 'Accordion':
-                    is_accordion = True
-                    
-            if not is_accordion:
+            # Check if it's an Accordion widget by looking for specific accordion attributes
+            # This avoids the FutureWarning from torch.distributed by not checking class names
+            if not hasattr(obj, 'selected_index') or not hasattr(obj, '_titles'):
+                continue
+                
+            # Additional check for accordion-specific methods
+            if not hasattr(obj, 'get_title') or not hasattr(obj, 'set_title'):
                 continue
                     
             # Check if it's in our safe list

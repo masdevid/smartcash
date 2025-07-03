@@ -124,29 +124,22 @@ class StatusPanel(BaseUIComponent):
         
         return f"""
         <div style="
-            padding: 8px 12px;
-            background: {style['gradient']};
-            color: {style['color']};
-            border-radius: 4px;
-            margin: 5px 0;
-            font-weight: 500;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            background-size: 200% 200%;
-            animation: gradient 3s ease infinite;
+            padding: 10px; 
+            border-radius: 8px; 
+            background-color: {style['color']}; 
+            color: white; 
+            font-weight: bold;
             word-wrap: break-word;
             white-space: normal;
             overflow-wrap: break-word;
             max-width: 100%;
+            box-sizing: border-box;
+            display: inline-block;
+            width: 100%;
         ">
             {display_emoji} {clean_msg}
-            <style>
-                @keyframes gradient {{
-                    0% {{ background-position: 0% 50%; }}
-                    50% {{ background-position: 100% 50%; }}
-                    100% {{ background-position: 0% 50%; }}
-                }}
-            </style>
-        </div>"""
+        </div>
+        """
     
     def update_status(self, message: str, status_type: str = None) -> None:
         """Update the status message and optionally change the status type.

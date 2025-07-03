@@ -4,7 +4,7 @@ Deskripsi: Module-specific initializer dengan UI handler integration dan full li
 Kombinasi ConfigurableInitializer + ModuleUIHandler untuk complete module initialization.
 """
 
-from typing import Dict, Any, Optional, Type, List, Callable
+from typing import Dict, Any, Optional, Type, List, Callable, Tuple
 from pathlib import Path
 
 from smartcash.ui.core.initializers.config_initializer import ConfigurableInitializer

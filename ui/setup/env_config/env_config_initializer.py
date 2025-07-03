@@ -120,7 +120,6 @@ class EnvConfigInitializer(ModuleInitializer):
             
         except Exception as e:
             error_msg = f"❌ Failed to initialize environment configuration UI: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
             return {
                 'success': False,
                 'error': error_msg,

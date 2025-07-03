@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, Union, List
 import ipywidgets as widgets
 from IPython.display import display, HTML
 import re
+import uuid
 
 from smartcash.ui.components.base_component import BaseUIComponent
 

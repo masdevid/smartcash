@@ -217,7 +217,7 @@ class EnvConfigInitializer(ModuleInitializer):
         """
         return self._handlers
     
-    def get_handler(self, handler_name: str) -> Optional[Any]:
+    def get_handler(self, handler_name: str):
         """Get specific handler by name.
         
         Args:
@@ -227,6 +227,35 @@ class EnvConfigInitializer(ModuleInitializer):
             Handler instance atau None jika tidak ditemukan
         """
         return self._handlers.get(handler_name)
+        
+    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+        """Initialize the environment configuration UI.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional keyword arguments
+            
+        Returns:
+            The initialized UI component
+        """
+        try:
+            # Perform pre-initialization checks
+            self.pre_initialize_checks()
+            
+            # Create UI components
+            self.ui_components = self.create_ui_components()
+            
+            # Setup handlers
+            self.setup_handlers()
+            
+            # Perform post-initialization checks
+            self.post_initialization_checks()
+            
+            return self.ui_components.get('main_container')
+            
+        except Exception as e:
+            self.logger.error(f"❌ Gagal initialize environment config UI: {str(e)}", exc_info=True)
+            raise
 
 
 def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
@@ -267,5 +296,18 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
             create_ui_error=True
         )
         
-        # Return the UI error component
-        return error_handler.get_ui_error()
+        # Return a simple error message
+        from IPython.display import display, HTML
+        return HTML(f"""
+            <div style="
+                padding: 1rem;
+                color: #721c24;
+                background-color: #f8d7da;
+                border: 1px solid #f5c6cb;
+                border-radius: 0.25rem;
+                margin: 1rem 0;
+            ">
+                <h4>❌ Error Initializing Environment Configuration</h4>
+                <p>{error_msg}</p>
+            </div>
+        """)

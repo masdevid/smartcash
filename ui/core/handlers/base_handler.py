@@ -49,6 +49,31 @@ class BaseHandler(ABC):
     def last_error(self) -> Optional[str]:
         return self._last_error
     
+    from contextlib import contextmanager
+
+    @contextmanager
+    def error_context(self, context_msg: str, fail_fast: bool = True):
+        """Context manager for contextualized error handling.
+
+        Args:
+            context_msg: Description of the operation being performed.
+            fail_fast: If True, re-raise errors via ``handle_error``; otherwise just log.
+        """
+        try:
+            yield
+        except Exception as e:
+            # Build full message
+            full_msg = f"{context_msg} failed: {e}"
+            if fail_fast:
+                self.handle_error(full_msg, exc_info=True)
+            else:
+                # Only log and store error without raising
+                self._error_count += 1
+                self._last_error = full_msg
+                self.logger.error(f"❌ {full_msg}", exc_info=True)
+        finally:
+            pass
+
     def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
         """Centralized error handling dengan fail-fast principle.
         

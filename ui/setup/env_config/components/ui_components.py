@@ -114,8 +114,13 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Expose log components via footer container to maintain previous API keys
     if footer_container.log_accordion:
         ui_components['log_accordion'] = footer_container.log_accordion
-        ui_components['log_output'] = footer_container.log_accordion
-        ui_components['log_components'] = footer_container.log_accordion
+        # Output widget inside accordion
+        if getattr(footer_container, 'log_output', None):
+            ui_components['log_output'] = footer_container.log_output
+            ui_components['log_components'] = footer_container.log_output
+        else:
+            ui_components['log_output'] = footer_container.log_accordion
+            ui_components['log_components'] = footer_container.log_accordion
     
     # 8. Assemble Main Container with all sections using default parameters
     main_container = create_main_container(

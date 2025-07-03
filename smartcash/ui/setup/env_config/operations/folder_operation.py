@@ -149,6 +149,20 @@ class FolderOperation(OperationHandler):
                 'message': error_msg,
                 'error': str(e)
             }
+
+    # === OperationHandler abstract method implementations ===
+    def initialize(self) -> Dict[str, Any]:
+        """Concrete initialize to satisfy BaseHandler contract."""
+        # For this simple handler, initialization just verifies folders
+        return self.verify_folders()
+
+    def get_operations(self) -> Dict[str, Any]:
+        """Return available operations mapping."""
+        return {
+            'create_folders': self.create_folders,
+            'verify_folders': self.verify_folders,
+            'cleanup_folders': self.cleanup_folders
+        }
     
     def cleanup_folders(self) -> Dict[str, Any]:
         """Cleanup created folders (untuk rollback).

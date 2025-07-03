@@ -166,8 +166,8 @@ def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  #
 
     from smartcash.ui.utils.widget_utils import safe_display
 
-    # Check if initialization was successful
-    if not result.get('success', False):
+    # Check if initialization was successful (using 'status' key for API consistency)
+    if not result.get('status', False):
         # If there was an error, display the error UI
         return safe_display(result.get('ui', {}))
     

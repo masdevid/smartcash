@@ -123,13 +123,32 @@ def create_env_config_ui() -> Dict[str, Any]:
             ui_components['log_components'] = footer_container.log_accordion
     
     # 8. Assemble Main Container with all sections using default parameters
+    # Create a proper layout with all components in the right order
+    all_components = [
+        header_container.container,         # Header at the top
+        form_components['container'],       # Form section
+        summary_container.container,        # Summary section
+        action_container['container'],      # Action buttons
+        footer_container.container          # Footer at the bottom
+    ]
+    
+    # Filter out any None components
+    all_components = [c for c in all_components if c is not None]
+    
+    # Create a custom VBox container with all components in the right order
+    import ipywidgets as widgets
+    custom_container = widgets.VBox(all_components)
+    
+    # Create the main container with proper layout
     main_container = create_main_container(
         header_container=header_container.container,
         form_container=form_components['container'],
-        summary_container=summary_container.container,
         action_container=action_container['container'],
         footer_container=footer_container.container
     )
+    
+    # Replace the main container's children with our custom ordered components
+    main_container.container.children = all_components
     
     # Store the main UI container
     ui_components['ui'] = main_container.container

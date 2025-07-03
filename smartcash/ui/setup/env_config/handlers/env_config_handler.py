@@ -17,7 +17,7 @@ from smartcash.ui.core.handlers import ConfigurableHandler
 
 # Import module-specific handlers
 from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
-from smartcash.ui.setup.env_config.handlers.config_handler import ConfigHandler
+from smartcash.ui.setup.env_config.configs.config_handler import ConfigHandler
 from smartcash.ui.setup.env_config.constants import SetupStage
 
 

@@ -295,11 +295,12 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
             exc_info=True,
             create_ui_error=True
         )
-        
-        # Return a user-friendly error component
-        return create_error_component(
+        result = create_error_component(
             error_message=error_msg,
             title="❌ Environment Configuration Error",
             error_type="error",
             show_traceback=True
         )
+        # Return a user-friendly error component
+        from smartcash.ui.utils.widget_utils import safe_display
+        return safe_display(result)

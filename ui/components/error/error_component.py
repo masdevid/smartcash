@@ -42,27 +42,6 @@ class ErrorComponent:
         # Create main error display
         error_display = self._create_main_error_display(error_message, style, traceback is not None and show_traceback)
         
-        # Create a container with proper width constraints
-        container_style = """
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-sizing: border-box !important;
-            overflow: hidden !important;
-            position: relative !important;
-        """
-        
-        content_style = """
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto !important;
-            padding: 0 !important;
-            box-sizing: border-box !important;
-            overflow: hidden !important;
-            position: relative !important;
-        """
-        
         # Create traceback section if needed
         if traceback and show_traceback:
             traceback_widget = self._create_traceback_section(traceback)
@@ -76,8 +55,8 @@ class ErrorComponent:
                     margin='10px 0',
                     padding='0',
                     _css={
-                        'max-width': '100%',
-                        'width': '100% !important',
+                        'max-width': '80%',
+                        'width': '80% !important',
                         'box-sizing': 'border-box',
                         'overflow': 'hidden',
                         'padding': '0 8px',
@@ -97,10 +76,10 @@ class ErrorComponent:
                         'display': 'flex',
                         'justify-content': 'center',
                         'box-sizing': 'border-box',
-                        'max-width': '100%',
+                        'max-width': '100% !important',
                         'width': '100% !important',
                         'overflow': 'hidden',
-                        'padding': '0',
+                        'padding': '10px',
                         'position': 'relative'
                     }
                 )

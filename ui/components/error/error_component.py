@@ -55,8 +55,8 @@ class ErrorComponent:
                     margin='10px 0',
                     padding='0',
                     _css={
-                        'max-width': '80%',
-                        'width': '80% !important',
+                        'max-width': '100%',
+                        'width': '100% !important',
                         'box-sizing': 'border-box',
                         'overflow': 'hidden',
                         'padding': '0 8px',
@@ -135,7 +135,7 @@ class ErrorComponent:
             'traceback_widget': getattr(self, '_traceback_widget', None)
         }
         
-        return self._components['widget']
+        return self._components
     
     def _get_styles(self) -> Dict[str, Dict[str, str]]:
         """Glassmorphism color schemes"""

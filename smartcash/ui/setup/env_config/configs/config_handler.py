@@ -43,6 +43,25 @@ class ConfigHandler(ConfigurableHandler):
         self.logger = get_enhanced_logger(__name__)
         self.logger.info("🔧 Environment config handler initialized")
     
+    def error_context(self, context: str, fail_fast: bool = True, **kwargs):
+        """Create a context manager for error handling with UI feedback.
+        
+        Args:
+            context: Description of the operation being performed
+            fail_fast: If True, raises exception on error
+            **kwargs: Additional context for error handling
+            
+        Returns:
+            A context manager for error handling
+        """
+        from smartcash.ui.core.shared.error_handler import ErrorContext
+        return ErrorContext(
+            module_name=self.full_module_name,
+            operation=context,
+            fail_fast=fail_fast,
+            create_ui_error=True
+        )
+    
     def initialize(self) -> Dict[str, Any]:
         """Initialize the configuration handler.
         

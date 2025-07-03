@@ -326,30 +326,26 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
         return initializer.initialize(config=config, **kwargs)
         
     except Exception as e:
-        # Use the centralized error handler
-        from smartcash.ui.core.shared.error_handler import create_error_component
-        from IPython.display import display
+        # Import inside the function to avoid circular imports
+        from smartcash.ui.components.error import create_error_component
         
-        # Get full traceback
+        # Get full traceback for the error component
         import sys, traceback
         exc_type, exc_value, exc_tb = sys.exc_info()
         tb_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
         
-        # Format error message
-        error_msg = f"{str(e)}"
-        
         # Create error component with traceback
         error_component = create_error_component(
-            error_message=error_msg,
+            error_message=str(e),
             traceback=tb_str,
             title="❌ Environment Configuration Error",
             error_type="error",
             show_traceback=True
         )
         
-        # Display the error component
-        if hasattr(error_component, 'show'):
-            return error_component.show()
-        elif hasattr(error_component, 'widget'):
+        # Return the widget from the error component
+        if isinstance(error_component, dict) and 'widget' in error_component:
             return error_component['widget']
+        elif hasattr(error_component, 'widget'):
+            return error_component.widget
         return error_component

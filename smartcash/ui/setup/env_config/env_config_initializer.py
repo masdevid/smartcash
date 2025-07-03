@@ -119,11 +119,22 @@ class EnvConfigInitializer(ModuleInitializer):
             }
             
         except Exception as e:
-            error_msg = f"❌ Failed to initialize environment configuration UI: {str(e)}"
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            
+            error_msg = f"Failed to initialize environment configuration UI: {str(e)}"
+            error_handler = get_error_handler('env_config')
+            error_ui = error_handler.handle_error(
+                error_msg,
+                level='error',
+                exc_info=True,
+                fail_fast=False,
+                create_ui_error=True
+            )
+            
             return {
                 'success': False,
                 'error': error_msg,
-                'ui': self._create_error_ui(error_msg)
+                'ui': error_ui if error_ui else {}
             }
     
     def _get_default_config(self) -> Dict[str, Any]:
@@ -171,7 +182,6 @@ class EnvConfigInitializer(ModuleInitializer):
             
         except Exception as e:
             error_msg = f"❌ Gagal create UI components: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
     
     def setup_handlers(self):
@@ -213,7 +223,6 @@ class EnvConfigInitializer(ModuleInitializer):
             
         except Exception as e:
             error_msg = f"❌ Gagal setup handlers: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
     
     def post_initialization_checks(self):
@@ -273,35 +282,7 @@ class EnvConfigInitializer(ModuleInitializer):
         """
         return self._handlers.get(handler_name)
         
-    def initialize(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
-        """Initialize the environment configuration UI.
-        
-        Args:
-            config: Optional configuration dictionary
-            **kwargs: Additional keyword arguments
-            
-        Returns:
-            The initialized UI component
-        """
-        try:
-            # Perform pre-initialization checks
-            self.pre_initialize_checks()
-            
-            # Create UI components
-            self.ui_components = self.create_ui_components()
-            
-            # Setup handlers
-            self.setup_handlers()
-            
-            # Perform post-initialization checks
-            self.post_initialization_checks()
-            
-            return self.ui_components.get('main_container')
-            
-        except Exception as e:
-            self.logger.error(f"❌ Gagal initialize environment config UI: {str(e)}", exc_info=True)
-            raise
-
+    
 
 def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
     """Initialize dan return environment configuration UI.
@@ -318,5 +299,7 @@ def initialize_env_config_ui(config: Dict[str, Any] = None, **kwargs) -> Any:
     """
     # Create dan initialize initializer
     initializer = EnvConfigInitializer()
-    return initializer.initialize(config=config, **kwargs)
-        
+    result =  initializer.initialize(config=config, **kwargs)
+    from smartcash.ui.utils.widget_utils import safe_display
+    return safe_display(result)
+    

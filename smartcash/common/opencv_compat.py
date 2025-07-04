@@ -10,6 +10,14 @@ import numpy as np
 # Gunakan CV_8UC1 sebagai pengganti CV_8U
 CV_8U = cv2.CV_8UC1
 
+# Kompatibilitas untuk DictValue yang mungkin tidak ada di beberapa versi OpenCV
+try:
+    from cv2.dnn import DictValue
+except AttributeError:
+    class DictValue:
+        pass
+    DictValue = DictValue
+
 # Fungsi bantuan untuk thresholding yang kompatibel
 def threshold(src, thresh, maxval, type_flags):
     """

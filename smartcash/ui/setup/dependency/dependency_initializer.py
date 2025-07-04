@@ -398,7 +398,7 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         return {
             'ui_components': result.get('ui_components', {}),
             'module_handler': result.get('module_handler'),
-            'config_handler': result.get('config_handler'),
+            'config': result.get('config', {}),
             'operation_handlers': result.get('operation_handlers', {}),
             'success': result.get('success', False)
         }

@@ -13,6 +13,7 @@ from smartcash.ui.components.footer_container import create_footer_container
 from .components.dependency_tabs import create_dependency_tabs
 from .handlers.dependency_ui_handler import DependencyUIHandler
 from .configs.dependency_defaults import get_default_dependency_config
+from .components.dependency_ui import create_dependency_ui_components  # New import
 
 class DependencyInitializer(ModuleInitializer):
     """Initializer untuk dependency module dengan proper structure"""
@@ -38,7 +39,7 @@ class DependencyInitializer(ModuleInitializer):
             config = self.get_default_config()
             
             # Create UI components
-            ui_components = self.create_module_ui_components(config)
+            ui_components = create_dependency_ui_components(config)  # Updated to use new function
             
             # Setup handlers
             self.setup_handlers(ui_components)
@@ -64,77 +65,6 @@ class DependencyInitializer(ModuleInitializer):
                 'ui_components': {},
                 'config': {}
             }
-    
-    def create_module_ui_components(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-        """Create dependency UI components dengan standard layout"""
-        
-        current_config = config or self.get_default_config()
-        
-        # Header container
-        header_container = create_header_container(
-            title="📦 Dependency Manager",
-            subtitle="Kelola packages untuk SmartCash dengan interface yang mudah",
-            status_message="Siap mengelola dependencies",
-            status_type="info"
-        )
-        
-        # Form container (tabs)
-        dependency_tabs = create_dependency_tabs(current_config, self.logger)
-        
-        # Action container
-        action_container = create_action_container(
-            buttons=[
-                {'button_id': 'install_button', 'text': '📥 Install Selected', 'style': 'primary', 'order': 1},
-                {'button_id': 'check_updates_button', 'text': '🔄 Check Updates', 'style': 'info', 'order': 2},
-                {'button_id': 'uninstall_button', 'text': '🗑️ Uninstall Selected', 'style': 'danger', 'order': 3}
-            ],
-            title="🚀 Package Operations",
-            alignment="left"
-        )
-        
-        # Footer container
-        footer_container = create_footer_container(
-            show_logs=True,
-            show_info=True,
-            log_module_name="Dependency",
-            info_title="💡 Tips & Info",
-            info_content="""
-            <div style="padding: 10px;">
-                <h5>💡 Tips Penggunaan</h5>
-                <ul>
-                    <li>Gunakan tab pertama untuk packages berdasarkan kategori</li>
-                    <li>Tab kedua untuk packages custom yang tidak tersedia di kategori</li>
-                    <li>Default packages ditandai dengan ⭐ dan direkomendasikan untuk diinstall</li>
-                    <li>Status package akan terupdate secara real-time</li>
-                </ul>
-            </div>
-            """
-        )
-        
-        # Main container
-        main_container = create_main_container(
-            header_container=header_container.container,
-            form_container=dependency_tabs,
-            action_container=action_container['container'],
-            footer_container=footer_container.container
-        )
-        
-        return {
-            'main_container': main_container.container,
-            'ui': main_container.container,  # Alias for compatibility
-            'header_container': header_container,
-            'dependency_tabs': dependency_tabs,
-            'action_container': action_container,
-            'footer_container': footer_container,
-            'status_panel': header_container.status_panel,
-            'install_button': action_container['buttons'].get('install_button'),
-            'check_updates_button': action_container['buttons'].get('check_updates_button'),
-            'uninstall_button': action_container['buttons'].get('uninstall_button'),
-            'progress_tracker': None,  # Will be added by action container if needed
-            'confirmation_dialog': action_container.get('dialog_area'),
-            'log_accordion': footer_container.log_accordion,
-            'logger': self.logger
-        }
     
     def setup_handlers(self, ui_components: Dict[str, Any]) -> None:
         """Setup UI handlers untuk dependency"""

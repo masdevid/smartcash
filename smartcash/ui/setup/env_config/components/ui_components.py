@@ -115,27 +115,29 @@ def create_env_config_ui() -> Dict[str, Any]:
     tips_requirements = create_tips_requirements()
     ui_components['tips_requirements'] = tips_requirements
     
-    # 7. Create footer container with logs
+    # 7. Create footer container with logs (no tips panel)
     footer_container = create_footer_container(
         show_progress=False,
         show_logs=True,
         show_info=False,
-        show_tips=False,
+        show_tips=False,  # Explicitly disable tips panel
         log_module_name="Environment"
     )
     ui_components['footer_container'] = footer_container
-
-    # Create log accordion explicitly to ensure it exists
+    
+    # Use the modern LogAccordion implementation directly
     from smartcash.ui.components.log_accordion import LogAccordion
-    log_accordion = LogAccordion(module_name="Environment")
     
-    # Expose log components via footer container
+    # Get the log accordion from the footer container
+    # The footer container already creates a log accordion internally
+    log_accordion = footer_container.log_accordion
+    
+    # Expose log components via footer container for easy access
     ui_components['log_accordion'] = log_accordion
-    ui_components['log_output'] = log_accordion
-    ui_components['log_components'] = log_accordion
+    ui_components['log_output'] = footer_container.log_output
     
-    # Make sure the footer container has the log accordion
-    footer_container.log_accordion = log_accordion
+    # Add the log method for convenience
+    ui_components['log'] = footer_container.log
     
     # 8. Create the final UI layout using main_container
     

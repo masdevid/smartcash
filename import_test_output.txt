@@ -472,6 +472,12 @@ VBox(children=(HTML(value='<div style="background:#f8f9fa;padding:15px;border-ra
 --------------------------------------------------------------------------------
 <IPython.core.display.HTML object>
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='250px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('ENVIRONMENT LOGS',))
+2025-07-04 07:54:03,951 - LOGGER.20 - ERROR - Failed to initialize environment configuration UI: SetupHandler.__init__() takes 1 positional argument but 2 were given
+Traceback (most recent call last):
+  File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 71, in initialize
+    setup_handler = SetupHandler(ui_components)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: SetupHandler.__init__() takes 1 positional argument but 2 were given
 ✅ smartcash.ui.cells.cell_1_2_env_config berhasil diimpor
    - 9 simbol ditemukan
 --------------------------------------------------------------------------------
@@ -796,15 +802,15 @@ ImportError: cannot import name 'create_error_ui' from 'smartcash.ui.utils.fallb
 ✅ Ditemukan: /Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_5_dataset_visualization.py
 --------------------------------------------------------------------------------
 Warning: Failed to initialize suppression: 'PretrainedInitializer' object has no attribute 'ui_components'
-2025-07-04 07:32:35,196 - UI_LOGGER.smartcash.ui.ui.pretrained - ERROR - ❌ Modul defaults tidak ditemukan: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
+2025-07-04 07:54:04,001 - UI_LOGGER.smartcash.ui.ui.pretrained - ERROR - ❌ Modul defaults tidak ditemukan: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/config_handler.py", line 217, in get_default_config
     from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
 ImportError: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
-2025-07-04 07:32:35,196 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - WARNING - Failed to load config: "Attempt to overwrite 'message' in LogRecord"
+2025-07-04 07:54:04,002 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - WARNING - Failed to load config: "Attempt to overwrite 'message' in LogRecord"
 <IPython.core.display.HTML object>
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='300px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('200PX LOGS',))
-2025-07-04 07:32:35,207 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - ERROR - ❌ Gagal inisialisasi pretrained: 'log_output'
+2025-07-04 07:54:04,013 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - ERROR - ❌ Gagal inisialisasi pretrained: 'log_output'
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/initializers/common_initializer.py", line 150, in initialize
     ui_components = self._create_ui_components(config, **kwargs) or {}
@@ -1059,7 +1065,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    - 9 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.components berhasil diimpor
-   - 88 simbol ditemukan
+   - 87 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.components.action_buttons berhasil diimpor
    - 23 simbol ditemukan
@@ -1113,7 +1119,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    - 16 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.components.footer_container berhasil diimpor
-   - 25 simbol ditemukan
+   - 24 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.components.form_container berhasil diimpor
    - 16 simbol ditemukan
@@ -3393,7 +3399,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
 --------------------------------------------------------------------------------
 
 ================================================================================
-🏁 Selesai dalam 8.73 detik
+🏁 Selesai dalam 8.80 detik
 📊 Total modul diuji: 464
 ✅ Berhasil: 421
 ❌ Gagal: 43
@@ -3758,11 +3764,11 @@ ANALYSIS OF FAILED IMPORTS:
 1. Periksa apakah semua dependensi sudah terinstall
 2. Pastikan path modul sudah benar
 3. Periksa error di file log untuk detail lebih lanjut
-   Path log: /Users/masdevid/Projects/smartcash/logs/import_test_20250704_073226.log
+   Path log: /Users/masdevid/Projects/smartcash/logs/import_test_20250704_075355.log
 
 📝 Daftar modul yang gagal disimpan di: /Users/masdevid/Projects/smartcash/logs/failed_imports.txt
 
-❌ Error tidak terduga: 43 != 0 : 43 dari 464 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_073226.log untuk detail lengkap.
+❌ Error tidak terduga: 43 != 0 : 43 dari 464 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_075355.log untuk detail lengkap.
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/tests/unit/test_imports.py", line 526, in test_module_imports
     self.assertEqual(
@@ -3770,4 +3776,4 @@ Traceback (most recent call last):
     assertion_func(first, second, msg=msg)
   File "/opt/anaconda3/lib/python3.12/unittest/case.py", line 878, in _baseAssertEqual
     raise self.failureException(msg)
-AssertionError: 43 != 0 : 43 dari 464 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_073226.log untuk detail lengkap.
+AssertionError: 43 != 0 : 43 dari 464 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_075355.log untuk detail lengkap.

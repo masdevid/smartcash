@@ -1,32 +1,30 @@
-"""Tests ensuring that only a single legacy LogAccordion instance exists.
+"""Tests ensuring that only a single LogAccordion instance is created per footer container.
 
-The FooterContainer (and other components) rely on the legacy procedural
-`create_log_accordion` helper which stores references to created accordions in
-an internal registry (`_log_accordions`).  This test verifies that repeated
-creation of components that request the *same* accordion does **not** lead to
-multiple entries being registered – guarding against UI duplication and memory
-leaks.
+The FooterContainer now uses the modern LogAccordion implementation directly instead of
+the legacy procedural `create_log_accordion` helper. This test verifies that repeated
+creation of footer containers with the same parameters creates separate LogAccordion
+instances as expected, avoiding any shared state issues.
 """
 
 import pytest
 
 
 def test_no_duplicate_log_accordion():
-    """Repeated footer creation should not register duplicate log accordions."""
+    """Each footer container should have its own LogAccordion instance."""
     # Arrange
     from smartcash.ui.components.footer_container import create_footer_container
-    from smartcash.ui.components.log_accordion import legacy as legacy_log
 
-    # Ensure a clean slate
-    legacy_log._log_accordions.clear()
+    # Act – create two footers with log accordions
+    footer1 = create_footer_container(show_progress=False, show_info=False, show_tips=False, show_logs=True)
+    footer2 = create_footer_container(show_progress=False, show_info=False, show_tips=False, show_logs=True)
 
-    # Act – create two footers that each request the default log accordion
-    create_footer_container(show_progress=False, show_info=False, show_tips=False, show_logs=True)
-    first_count = len(legacy_log._log_accordions)
-
-    create_footer_container(show_progress=False, show_info=False, show_tips=False, show_logs=True)
-    second_count = len(legacy_log._log_accordions)
-
-    # Assert – the registry should still only contain ONE entry
-    assert first_count == 1, "Expected exactly one log accordion to be registered after first creation"
-    assert second_count == 1, "Duplicate log accordion detected – registry size increased after second creation"
+    # Assert - each footer should have its own log accordion instance
+    assert footer1.log_accordion is not None, "First footer should have a log accordion"
+    assert footer2.log_accordion is not None, "Second footer should have a log accordion"
+    
+    # Each footer should have its own unique log accordion instance
+    assert footer1.log_accordion is not footer2.log_accordion, "Each footer should have its own log accordion instance"
+    
+    # Both log accordions should be properly initialized
+    assert hasattr(footer1.log_accordion, 'log'), "First log accordion should have log method"
+    assert hasattr(footer2.log_accordion, 'log'), "Second log accordion should have log method"

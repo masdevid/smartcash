@@ -6,12 +6,22 @@
 - **Nama**: `smartcash-wo2us`
 - **Deskripsi**: Workspace untuk dataset deteksi mata uang Rupiah
 
-### Projekt Details
-- **Nama Projekt**: `rupiah-emisi-2022`
+### Project Details
+- **Nama Project**: `rupiah-emisi-2022`
 - **Versi**: `3`
 - **Lisensi**: CC BY 4.0
 
 ## Struktur Dataset
+
+### Format Gambar
+- Resolusi: 640x640 pixels
+- Format: JPG/JPEG
+- Channel: RGB
+- Kualitas: Minimum 80%
+
+### Format Label
+- Format: YOLO txt
+- Struktur: `<class_id> <x_center> <y_center> <width> <height>`
 
 ### Pembagian Dataset
 - **Train**: 70% data
@@ -21,7 +31,7 @@
 ### Kelas Deteksi
 Total 17 kelas yang dibagi dalam 3 layer:
 
-#### Layer 1 (Banknote)
+#### Layer 1 (Banknote) - SINGLE LAYER UTAMA
 1. `001` - 1.000 Rupiah
 2. `002` - 2.000 Rupiah
 3. `005` - 5.000 Rupiah

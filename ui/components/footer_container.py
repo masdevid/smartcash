@@ -7,17 +7,14 @@ It uses flexbox for responsive design and reuses existing components.
 """
 
 from typing import Dict, Any, Optional, List, Union, Callable
-import importlib
 import ipywidgets as widgets
 from IPython.display import HTML
 
 # Import shared components
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.components.progress_tracker.progress_config import ProgressConfig
-from smartcash.ui.components.log_accordion import create_log_accordion
 from smartcash.ui.components.log_accordion import LogLevel
-from smartcash.ui.components.info_accordion import create_info_accordion
-from smartcash.ui.components.closeable_tips_panel import create_closeable_tips_panel
+from smartcash.ui.components.info.info_component import InfoAccordion, InfoBox
 
 class FooterContainer:
     """Flexible footer container with progress, logs, and info panels.
@@ -27,61 +24,70 @@ class FooterContainer:
     It uses flexbox layout for responsive design.
     """
     
-    def __init__(self, 
+    def __init__(self,
                  show_progress: bool = True,
                  show_logs: bool = True,
                  show_info: bool = True,
                  show_tips: bool = False,
                  progress_config: Optional[ProgressConfig] = None,
-                 log_module_name: str = 'Process',
-                 log_height: str = '250px',
-                 tips_title: str = "💡 Tips & Requirements",
-                 tips_content: Optional[List[Union[str, List[str]]]] = None,
+                 log_module_name: str = "SmartCash",
+                 log_height: str = "200px",
+                 info_title: str = "Information",
+                 info_content: str = "",
+                 info_style: str = "info",
                  info_box_path: Optional[str] = None,
-                 info_title: str = 'Information',
-                 info_content: str = '',
-                 info_style: str = 'info',
-                 **style_options):
+                 tips_title: str = "Tips",
+                 tips_content: Optional[List[Dict[str, str]]] = None,
+                 style: Optional[Dict[str, str]] = None):
         """Initialize the footer container.
         
         Args:
             show_progress: Whether to show the progress tracker
             show_logs: Whether to show the log accordion
             show_info: Whether to show the info panel
-            show_tips: Whether to show the closeable tips panel above the info box
+            show_tips: Whether to show the tips panel
             progress_config: Configuration for the progress tracker
-            log_module_name: Name for the log accordion
-            log_height: Height for the log accordion
-            tips_title: Title for the tips panel
-            tips_content: List of tips for the tips panel
-            info_box_path: Path to info box file in smartcash/ui/info_boxes (e.g., 'preprocessing_info')
-                           If provided, this takes precedence over info_content
+            log_module_name: Name of the module for logging
+            log_height: Height of the log accordion
             info_title: Title for the info panel
-            info_content: HTML content for the info panel (used if info_box_path is None)
+            info_content: Content for the info panel (string or HTML widget)
             info_style: Style for the info panel ('info', 'success', 'warning', 'error')
-            **style_options: Additional styling options
+            info_box_path: Optional path to info box module
+            tips_title: Title for the tips panel
+            tips_content: List of tips to display
+            style: CSS styles for the container
         """
+        super().__init__()
+        
+        # Store visibility flags
         self.show_progress = show_progress
         self.show_logs = show_logs
         self.show_info = show_info
         self.show_tips = show_tips
-        self.info_box_path = info_box_path
+        self._tips_visible = False
         self.tips_title = tips_title
-        self.tips_content = tips_content
+        self.tips_content = tips_content or []
         
-        # Track progress state internally
-        self._progress = 0.0
+        # Store style
+        self.style = style or {}
         
-        # Default style options
-        self.style = {
-            'width': '100%',
-            'margin_top': '16px',
-            'padding_top': '8px',
-            'border_top': '1px solid #e0e0e0'
-        }
+        # Store info box path for later use
+        self.info_box_path = info_box_path
         
-        # Update with custom style options
-        self.style.update(style_options)
+        # Initialize components and container
+        self.progress_tracker = None
+        self.progress_component = None
+        self.log_accordion = None
+        self.log_output = None
+        self.info_panel = None
+        self.tips_panel = None
+        self._info_content = info_content  # Store raw content for testing
+        self.container = None  # Initialize container to avoid attribute errors
+        self._creating_container = False  # Flag to prevent recursion
+        
+        # Initialize progress component with layout
+        if show_progress:
+            self.progress_component = widgets.HBox(layout=widgets.Layout(display='flex' if show_progress else 'none'))
         
         # Create components
         self._create_components(
@@ -93,187 +99,188 @@ class FooterContainer:
             info_style=info_style
         )
         
-        # Create the container
-        self._create_container()
+        # Initialize tips if enabled
+        if show_tips:
+            self._init_tips(tips_title, tips_content)
     
     def _create_components(self, 
-                          progress_config: Optional[ProgressConfig],
-                          log_module_name: str,
-                          log_height: str,
-                          info_title: str,
-                          info_content: str,
-                          info_style: str):
-        """Create the footer components."""
+                         progress_config: Optional[ProgressConfig],
+                         log_module_name: str,
+                         log_height: str,
+                         info_title: str,
+                         info_content: str,
+                         info_style: str):
+        """Create and initialize all child components.
+        
+        Args:
+            progress_config: Configuration for the progress tracker
+            log_module_name: Name of the module for logging
+            log_height: Height of the log accordion
+            info_title: Title for the info panel
+            info_content: Content for the info panel (string or HTML widget)
+            info_style: Style for the info panel
+        """
         # Create progress tracker if enabled
         if self.show_progress:
-            self.progress_tracker = ProgressTracker(config=progress_config)
-            self.progress_component = self.progress_tracker.container
+            if self.progress_tracker is None:
+                self.progress_tracker = ProgressTracker(config=progress_config)
+                self.progress_component = self.progress_tracker.container
+                if hasattr(self.progress_component, 'layout'):
+                    self.progress_component.layout.display = 'flex' if self.show_progress else 'none'
         else:
             self.progress_tracker = None
             self.progress_component = None
         
         # Create log accordion if enabled
         if self.show_logs:
-            log_components = create_log_accordion(
-                module_name=log_module_name,
-                height=log_height,
-                width='100%',
-                auto_scroll=True,
-                enable_deduplication=True
-            )
-            # The legacy create_log_accordion returns 'accordion' as the key instead of 'log_accordion'
-            self.log_accordion = log_components['accordion']
-            # Save the append_log callable for easy logging
-            self._append_log = log_components.get('append_log')
-            # Try to get the output widget from the accordion's children
-            if hasattr(self.log_accordion, 'children') and len(self.log_accordion.children) > 0:
-                box = self.log_accordion.children[0]
-                if hasattr(box, 'children') and len(box.children) > 0:
-                    vbox = box.children[0]
-                    if hasattr(vbox, 'children') and len(vbox.children) > 0:
-                        # The output widget is typically the last child
-                        self.log_output = vbox.children[-1]
-                        return
-            
-            # Fallback to using the accordion itself if we can't find the output widget
-            self.log_output = widgets.Output()
-            
-            # Add the output widget to the accordion if it's not already there
-            if hasattr(self.log_accordion, 'children') and len(self.log_accordion.children) > 0:
-                box = self.log_accordion.children[0]
-                if hasattr(box, 'children') and len(box.children) > 0:
-                    vbox = box.children[0]
-                    if hasattr(vbox, 'children') and len(vbox.children) > 0:
-                        vbox.children = list(vbox.children[:-1]) + [self.log_output]
+            if self.log_accordion is None:
+                self.log_output = widgets.Output(layout={
+                    'border': '1px solid #e0e0e0',
+                    'height': log_height,
+                    'overflow_y': 'auto',
+                    'display': 'flex' if self.show_logs else 'none'
+                })
+                self.log_accordion = InfoAccordion(
+                    title=f"{log_module_name} Logs",
+                    content=self.log_output,
+                    style='info',
+                    open_by_default=False
+                )
+                if hasattr(self.log_accordion, 'layout'):
+                    self.log_accordion.layout.display = 'flex' if self.show_logs else 'none'
         else:
             self.log_accordion = None
             self.log_output = None
-            self._append_log = None
-            
-        # Create closeable tips panel if enabled
-        if self.show_tips:
-            tips_components = create_closeable_tips_panel(
-                title=self.tips_title,
-                tips=self.tips_content,
-                margin="0 0 16px 0"  # Add margin below tips panel
-            )
-            self.tips_panel = tips_components['container']
-            self.set_tips_visible = tips_components['set_visible']
-        else:
-            self.tips_panel = None
-            self.set_tips_visible = lambda visible: None  # No-op function
         
         # Create info panel if enabled
         if self.show_info:
-            # Map info_style to an appropriate icon
-            style_to_icon = {
-                'info': 'info',
-                'success': 'check_circle',
-                'warning': 'warning',
-                'error': 'error'
-            }
-            icon = style_to_icon.get(info_style, 'info')
-            
-            # Convert string content to HTML widget if needed
-            if isinstance(info_content, str):
-                info_content = widgets.HTML(value=info_content)
-            
-            # Load info content from info_boxes if path is provided
-            if self.info_box_path:
-                try:
-                    # Import the module dynamically
-                    module_path = f'smartcash.ui.info_boxes.{self.info_box_path}'
-                    module = importlib.import_module(module_path)
-                    
-                    # Get the info box function (convention: get_*_info)
-                    function_name = f'get_{self.info_box_path}'
-                    if not hasattr(module, function_name):
-                        function_name = 'get_info'
-                    
-                    # Call the function to get the content
-                    info_content = getattr(module, function_name)()
-                    
-                    # Convert string content to HTML widget if needed
-                    if isinstance(info_content, str):
-                        info_content = widgets.HTML(value=info_content)
-                    
-                    # Create the info panel with the loaded content and extract the container widget
-                    info_accordion = create_info_accordion(
-                        title=info_title,
-                        content=info_content,
-                        icon=icon
-                    )
-                    self.info_panel = info_accordion['container']
-                except (ImportError, AttributeError) as e:
-                    print(f"Warning: Could not load info box '{self.info_box_path}': {e}")
-                    # Create error accordion with the error message
-                    error_message = widgets.HTML(f"<p>Could not load info box: {e}</p>")
-                    error_accordion = create_info_accordion(
-                        title=f"{info_title} (Error)",
-                        content=error_message,
-                        icon='warning'
-                    )
-                    self.info_panel = error_accordion['container']
-            else:
-                # Use provided content and extract the container widget
-                info_accordion = create_info_accordion(
-                    title=info_title,
-                    content=info_content,
-                    icon=icon
+            if self.info_panel is None:
+                # Store raw content for testing
+                self._info_content = info_content
+                
+                # Store raw content for testing
+                self._info_content = info_content
+                content_to_use = info_content
+                
+                # Handle info box path if provided
+                if self.info_box_path:
+                    try:
+                        # Dynamically import the info box module
+                        import importlib
+                        info_box_module = importlib.import_module(self.info_box_path)
+                        
+                        # Get the content from the module
+                        if hasattr(info_box_module, 'get_info_content'):
+                            content_widget = info_box_module.get_info_content()
+                            if hasattr(content_widget, 'value'):
+                                content_to_use = content_widget.value
+                                self._info_content = content_to_use
+                            else:
+                                content_to_use = str(content_widget)
+                                self._info_content = content_to_use
+                        else:
+                            error_msg = f"Info box module {self.info_box_path} does not have get_info_content() function"
+                            content_to_use = error_msg
+                            info_style = 'warning'
+                            self._info_content = error_msg
+                    except Exception as e:
+                        error_msg = f"Failed to load info box from {self.info_box_path}: {str(e)}"
+                        content_to_use = error_msg
+                        info_style = 'warning'
+                        self._info_content = error_msg
+                
+                # Create the info panel with default title if none provided
+                self.info_panel = InfoBox(
+                    content=content_to_use,
+                    title=info_title or "Information",
+                    style=info_style
                 )
-                self.info_panel = info_accordion['container']
+                # Ensure layout exists before accessing it
+                if hasattr(self.info_panel, 'layout'):
+                    self.info_panel.layout = self.info_panel.layout or {}
+                    self.info_panel.layout.display = 'flex' if self.show_info else 'none'
         else:
             self.info_panel = None
-    
-    def _create_container(self):
-        """Create the main container with all components using vertical flexbox layout."""
-        # Filter out None components
-        components = []
-        if self.progress_component:
-            components.append(self.progress_component)
-        if self.log_accordion:
-            components.append(self.log_accordion)
+            self._info_content = ""
         
-        # For info section, we may need to combine tips and info panel
-        if self.show_info and self.show_tips:
-            # If both tips and info are shown, create a container for them
-            info_section_components = []
-            if self.tips_panel:
-                info_section_components.append(self.tips_panel)
-            if self.info_panel:
-                info_section_components.append(self.info_panel)
-                
-            # Create a container for tips and info
-            info_section = widgets.VBox(
-                info_section_components,
+        # Initialize tips panel if not already done
+        if self.show_tips and self.tips_panel is None:
+            self.tips_panel = widgets.HTML()
+            self.tips_panel.layout = widgets.Layout(
+                display='flex' if getattr(self, '_tips_visible', False) else 'none'
+            )
+        
+        # Create container after components are initialized
+        self._create_container()
+    
+    def _update_container_children(self):
+        """Update the container's children based on current visibility states."""
+        if not hasattr(self, 'container') or self.container is None:
+            self.container = widgets.VBox(
                 layout=widgets.Layout(
                     width='100%',
                     display='flex',
-                    flex_direction='column',
-                    gap='0px'
+                    flex_flow='column',
+                    align_items='stretch',
+                    margin='0',
+                    padding='0',
+                    border='none',
+                    **self.style
                 )
             )
-            components.append(info_section)
-        else:
-            # Add components individually if only one is shown
-            if self.tips_panel:
-                components.append(self.tips_panel)
-            if self.info_panel:
-                components.append(self.info_panel)
         
-        # Always use vertical layout
-        self.container = widgets.VBox(
-            components,
-            layout=widgets.Layout(
-                width=self.style.get('width', '100%'),
-                margin_top=self.style.get('margin_top', '16px'),
-                padding_top=self.style.get('padding_top', '8px'),
-                border_top=self.style.get('border_top', '1px solid #e0e0e0'),
-                display='flex',
-                flex_direction='column',
-                gap='8px'
+        components = []
+        
+        # Add progress component if enabled and exists
+        if self.show_progress and self.progress_component is not None:
+            widget = self.progress_component
+            if hasattr(widget, 'show'):
+                widget = widget.show()
+            components.append(widget)
+        
+        # Add log accordion if enabled and exists
+        if self.show_logs and self.log_accordion is not None:
+            widget = self.log_accordion
+            if hasattr(widget, 'show'):
+                widget = widget.show()
+            components.append(widget)
+        
+        # Add info panel if enabled and exists
+        if self.show_info and self.info_panel is not None:
+            widget = self.info_panel
+            if hasattr(widget, 'show'):
+                widget = widget.show()
+            components.append(widget)
+        
+        # Add tips panel if enabled and exists
+        if self.show_tips and self.tips_panel is not None:
+            widget = self.tips_panel
+            if hasattr(widget, 'show'):
+                widget = widget.show()
+            components.append(widget)
+        
+        # Update container children with proper widget instances
+        self.container.children = tuple(components)
+    
+    def _create_container(self):
+        """Create the main container with all components."""
+        # Initialize container if it doesn't exist
+        if not hasattr(self, 'container') or self.container is None:
+            self.container = widgets.VBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    display='flex',
+                    flex_flow='column',
+                    align_items='stretch',
+                    margin='0',
+                    padding='0',
+                    border='none',
+                    **self.style
+                )
             )
-        )
+        
+        # Update container children
+        self._update_container_children()
     
     def update_progress_status(self, message: str, level: str = 'main') -> None:
         """Update the progress tracker status message.
@@ -342,175 +349,150 @@ class FooterContainer:
             elif hasattr(self.progress_tracker, 'update'):
                 self.progress_tracker.update('main', 0, message="0%")
     
-    def log(self, message: str, level: str = 'info') -> None:
-        """Add a log message to the log accordion.
+    def log(self, message: str, level: LogLevel = LogLevel.INFO) -> None:
+        """Log a message to the log accordion.
         
         Args:
-            message: Log message
-            level: Log level ('debug', 'info', 'success', 'warning', 'error', 'critical')
+            message: The message to log
+            level: The log level (default: INFO)
         """
-        # Prefer using the underlying LogAccordion's append_log callable when available
-        if getattr(self, "_append_log", None):
-            log_level = LogLevel[level.upper()] if hasattr(LogLevel, level.upper()) else LogLevel.INFO
-            self._append_log(message, log_level)
-            return
-
         if self.log_output:
-            # For legacy log accordion, we need to find the output widget inside the Accordion
-            if hasattr(self.log_output, 'children') and len(self.log_output.children) > 0:
-                # Get the first child which should be the Box containing the output
-                box = self.log_output.children[0]
-                if hasattr(box, 'children') and len(box.children) > 0:
-                    # Get the VBox inside the Box
-                    vbox = box.children[0]
-                    if hasattr(vbox, 'children') and len(vbox.children) > 0:
-                        # Find the output widget (should be the last child)
-                        output_widget = vbox.children[-1]
-                        if hasattr(output_widget, 'append_stdout'):
-                            output_widget.append_stdout(f"[{level.upper()}] {message}\n")
-                            return
-            
-            # For newer log accordion with LogLevel
-            # For newer log accordion instances
-            if hasattr(LogLevel, level.upper()):
-                log_level = LogLevel[level.upper()]
-                if hasattr(self.log_output, 'append_log'):
-                    self.log_output.append_log(message, log_level)
-                    return
-            
-            # Fallback to simple logging
-            print(f"[{level.upper()}] {message}")
+            with self.log_output:
+                print(f"[{level.name}] {message}")
     
-    def update_info(self, title: str, content: Union[str, widgets.Widget], style: str = 'info', info_box_path: Optional[str] = None) -> None:
-        """Update the info panel content.
+    def update_info(self, title: str, content: Union[str, widgets.HTML], style: str = 'info') -> None:
+        """Update the info panel with new content.
         
         Args:
-            title: New title for the info panel
-            content: New content for the info panel (used if info_box_path is None)
+            title: Title for the info panel
+            content: Content to display (string or HTML widget)
             style: Style for the info panel ('info', 'success', 'warning', 'error')
-            info_box_path: Path to info box file in smartcash/ui/info_boxes (e.g., 'preprocessing_info')
-                           If provided, this takes precedence over content
         """
-        if self.info_panel:
-            # Determine if we should use info box path or direct content
-            if info_box_path:
-                try:
-                    # Import the module dynamically
-                    module_path = f'smartcash.ui.info_boxes.{info_box_path}'
-                    module = importlib.import_module(module_path)
-                    
-                    # Get the info box function (convention: get_*_info)
-                    function_name = f'get_{info_box_path}'
-                    if not hasattr(module, function_name):
-                        # Try without the 'get_' prefix
-                        function_name = info_box_path
-                    
-                    if hasattr(module, function_name):
-                        # Call the function to get the info accordion
-                        new_info_panel = getattr(module, function_name)(open_by_default=self.info_panel.selected_index == 0)
-                    else:
-                        # Fallback to creating a basic info panel with error message
-                        error_content = widgets.HTML(value=f"<p>Error: Could not find info box function in {module_path}</p>")
-                        new_info_panel = create_info_accordion(
-                            title=title,
-                            content=error_content,
-                            icon='warning'
-                        )
-                except ImportError as e:
-                    # Fallback to creating a basic info panel with error message
-                    error_content = widgets.HTML(value=f"<p>Error: Could not load info box from {info_box_path}: {str(e)}</p>")
-                    new_info_panel = create_info_accordion(
-                        title=title,
-                        content=error_content,
-                        icon='warning'
-                    )
-            else:
-                # Use provided content
-                new_info_panel = create_info_accordion(
-                    title=title,
-                    content=content,
-                    style=style,
-                    open_by_default=self.info_panel.selected_index == 0
-                )
-            
-            # Replace the old info panel in the container
-            for i, child in enumerate(self.container.children):
-                if child is self.info_panel:
-                    new_children = list(self.container.children)
-                    new_children[i] = new_info_panel
-                    self.container.children = tuple(new_children)
-                    break
-            
-            # Update the reference
-            self.info_panel = new_info_panel
-    
-    def show_component(self, component_type: str, show: bool = True) -> None:
-        """Show or hide a component.
-        
-        Args:
-            component_type: Type of component ('progress', 'logs', 'info', 'tips')
-            show: Whether to show the component
-        """
-        component = None
-        if component_type == 'progress' and self.progress_component:
-            component = self.progress_component
-        elif component_type == 'logs' and self.log_accordion:
-            component = self.log_accordion
-        elif component_type == 'info' and self.info_panel:
-            component = self.info_panel
-        elif component_type == 'tips' and self.tips_panel:
-            # Use the set_visible function for tips panel
-            self.set_tips_visible(show)
-            return
-        
-        if component:
-            component.layout.display = 'flex' if show else 'none'
-            
-    def update_tips(self, title: str, tips: List[Union[str, List[str]]], visible: bool = True) -> None:
-        """Update the tips panel content.
-        
-        Args:
-            title: New title for the tips panel
-            tips: New tips content
-            visible: Whether to show the tips panel after update
-        """
-        if self.tips_panel:
-            # Create a new tips panel with updated content
-            tips_components = create_closeable_tips_panel(
+        # Ensure info_panel exists
+        if self.info_panel is None:
+            from smartcash.ui.components.info.info_component import InfoBox
+            self.info_panel = InfoBox(
                 title=title,
-                tips=tips,
-                margin="0 0 16px 0",
-                initially_visible=visible
+                content="",
+                style=style
             )
+        
+        # Store the content for testing
+        if isinstance(content, widgets.HTML):
+            self._info_content = content.value if hasattr(content, 'value') else str(content)
+            content_widget = content
+        else:
+            self._info_content = str(content)
+            content_widget = widgets.HTML(value=str(content))
+        
+        # Update the info panel
+        if hasattr(self.info_panel, 'update_content'):
+            # For InfoBox component
+            self.info_panel.update_content(self._info_content)
+            if hasattr(self.info_panel, 'update_style'):
+                self.info_panel.update_style(style)
+        elif hasattr(self.info_panel, 'content'):
+            # For widgets with content attribute
+            self.info_panel.content = content_widget
+            if hasattr(self.info_panel, 'style'):
+                self.info_panel.style = style
+        
+        # Update title if supported
+        if hasattr(self.info_panel, 'title'):
+            self.info_panel.title = title
             
-            # Find the tips panel in the container structure
-            # This is more complex because tips might be in a nested container
-            if self.show_info and self.show_tips:
-                # Tips is in a nested container with info panel
-                for i, child in enumerate(self.container.children):
-                    # Look for the VBox containing both tips and info
-                    if isinstance(child, widgets.VBox) and len(child.children) > 0:
-                        if child.children[0] is self.tips_panel:
-                            # Replace the tips panel in the VBox
-                            new_children = list(child.children)
-                            new_children[0] = tips_components['container']
-                            child.children = tuple(new_children)
-                            break
+        # Ensure the panel is visible and has a layout
+        if not hasattr(self.info_panel, 'layout') or self.info_panel.layout is None:
+            self.info_panel.layout = widgets.Layout()
+            
+        # Ensure the panel is visible
+        self.show_component('info', True)
+        
+        # For testing purposes, make sure we can access the raw content
+        if not hasattr(self, '_info_content'):
+            if isinstance(content, widgets.HTML):
+                self._info_content = content.value if hasattr(content, 'value') else str(content)
             else:
-                # Tips is directly in the main container
-                for i, child in enumerate(self.container.children):
-                    if child is self.tips_panel:
-                        new_children = list(self.container.children)
-                        new_children[i] = tips_components['container']
-                        self.container.children = tuple(new_children)
-                        break
+                self._info_content = str(content)
+                
+    def show_component(self, component_name: str, visible: bool = True):
+        """Show or hide a component in the footer.
+        
+        Args:
+            component_name: Name of the component to show/hide ('progress', 'logs', 'info', 'tips')
+            visible: Whether to show (True) or hide (False) the component
+        """
+        component_name = component_name.lower()
+        component = None
+        
+        # Update the appropriate visibility flag and get the component
+        if component_name == 'progress':
+            self.show_progress = visible
+            # Ensure progress component exists and has a layout
+            if self.progress_component is None:
+                self.progress_component = widgets.HBox()
+                self.progress_component.layout = widgets.Layout(display='flex' if visible else 'none')
+            component = self.progress_component
+        elif component_name == 'logs':
+            self.show_logs = visible
+            component = self.log_accordion
+            # Ensure log accordion exists
+            if component is None and visible and hasattr(self, '_create_log_accordion'):
+                self._create_log_accordion()
+                component = self.log_accordion
+        elif component_name == 'info':
+            self.show_info = visible
+            component = self.info_panel
+            # Ensure info panel exists
+            if component is None and visible:
+                from smartcash.ui.components.info.info_component import InfoBox
+                self.info_panel = InfoBox(title="", content="", style="info")
+                component = self.info_panel
+        elif component_name == 'tips':
+            self.show_tips = visible
+            self._tips_visible = visible
+            component = self.tips_panel
+            # Ensure tips panel exists if needed
+            if component is None and visible and hasattr(self, '_init_tips'):
+                self._init_tips()
+                component = self.tips_panel
+        else:
+            return
             
-            # Update the references
-            self.tips_panel = tips_components['container']
-            self.set_tips_visible = tips_components['set_visible']
+        # Update the component's visibility if it exists
+        if component is not None:
+            # Ensure the component has a layout
+            if not hasattr(component, 'layout') or component.layout is None:
+                component.layout = widgets.Layout()
             
-            # Update visibility
-            self.set_tips_visible(visible)
+            # Set the display style
+            if hasattr(component.layout, 'display'):
+                component.layout.display = 'flex' if visible else 'none'
+        
+        # Update the container if it exists
+        if hasattr(self, 'container') and self.container is not None:
+            self._update_container_children()
+    
+    def set_tips_visible(self, visible: bool):
+        """Set the visibility of the tips panel.
+        
+        Args:
+            visible: Whether the tips panel should be visible
+        """
+        self.show_tips = True  # Keep the component in the layout
+        self._tips_visible = visible  # Control visibility with display style
+        
+        if self.tips_panel is None and visible:
+            self.tips_panel = widgets.HTML()
+            self.tips_panel.layout = widgets.Layout(
+                display='flex' if visible else 'none',
+                visibility='visible' if visible else 'hidden'
+            )
+        elif self.tips_panel is not None:
+            self.tips_panel.layout.display = 'flex' if visible else 'none'
+            
+        # Update the container to reflect changes
+        self._create_container()
     
     def add_class(self, class_name: str) -> None:
         """Add a CSS class to the container.
@@ -526,59 +508,100 @@ class FooterContainer:
         Args:
             class_name: CSS class name to remove
         """
-        self.container.remove_class(class_name)
+        if hasattr(self, 'container') and hasattr(self.container, 'remove_class'):
+            self.container.remove_class(class_name)
+    
+    @property
+    def info_content(self) -> str:
+        """Get the current info content as a string.
+        
+        Returns:
+            str: The raw string content of the info panel
+        """
+        # Return the stored raw content if available
+        if hasattr(self, '_info_content') and self._info_content is not None:
+            return self._info_content
+            
+        # Fallback to extracting from the info panel
+        if self.info_panel is not None:
+            # For InfoBox with content attribute
+            if hasattr(self.info_panel, 'content'):
+                content = self.info_panel.content
+                if hasattr(content, 'value'):
+                    return content.value
+                return str(content) if content is not None else ""
+            # For widgets with value attribute
+            if hasattr(self.info_panel, 'value'):
+                value = self.info_panel.value
+                return value if isinstance(value, str) else str(value)
+                
+        return ""
 
 def create_footer_container(
-    show_progress: bool = True,
-    show_logs: bool = True,
-    show_info: bool = True,
-    show_tips: bool = False,
+    show_progress: bool = False,
+    show_logs: bool = False,
+    show_info: bool = False,
     progress_config: Optional[ProgressConfig] = None,
-    log_module_name: str = 'Process',
-    log_height: str = '250px',
-    tips_title: str = "💡 Tips & Requirements",
-    tips_content: Optional[List[Union[str, List[str]]]] = None,
+    log_module_name: str = "Module",
+    log_height: str = "200px",
+    info_title: str = "Information",
+    info_content: str = "",
+    info_style: str = "info",
     info_box_path: Optional[str] = None,
-    info_title: str = 'Information',
-    info_content: str = '',
-    info_style: str = 'info',
-    **style_options
+    style: Optional[Dict] = None,
 ) -> FooterContainer:
-    """Create a footer container with progress, logs, info panels, and optional tips panel.
+    """Create a footer container with the specified components.
     
     Args:
         show_progress: Whether to show the progress tracker
         show_logs: Whether to show the log accordion
         show_info: Whether to show the info panel
-        show_tips: Whether to show the closeable tips panel above the info box
         progress_config: Configuration for the progress tracker
-        log_module_name: Name for the log accordion
-        log_height: Height for the log accordion
-        tips_title: Title for the tips panel
-        tips_content: List of tips for the tips panel
-        info_box_path: Path to info box file in smartcash/ui/info_boxes (e.g., 'preprocessing_info')
-                       If provided, this takes precedence over info_content
+        log_module_name: Name of the module for the log accordion
+        log_height: Height of the log output
         info_title: Title for the info panel
-        info_content: HTML content for the info panel (used if info_box_path is None)
-        info_style: Style for the info panel ('info', 'success', 'warning', 'error')
-        **style_options: Additional styling options
+        info_content: Initial content for the info panel
+        info_style: Style for the info panel
+        info_box_path: Optional path to a module containing a get_info_content() function
+        style: Additional CSS styles for the container
         
     Returns:
-        FooterContainer instance
+        FooterContainer: The created footer container
     """
-    return FooterContainer(
+    footer = FooterContainer(
         show_progress=show_progress,
         show_logs=show_logs,
         show_info=show_info,
-        show_tips=show_tips,
         progress_config=progress_config,
         log_module_name=log_module_name,
         log_height=log_height,
-        tips_title=tips_title,
-        tips_content=tips_content,
-        info_box_path=info_box_path,
         info_title=info_title,
         info_content=info_content,
         info_style=info_style,
-        **style_options
+        info_box_path=info_box_path,
+        style=style or {}
     )
+    
+    # Ensure the container is created
+    if not hasattr(footer, 'container') or footer.container is None:
+        footer._create_container()
+    
+    # Make sure the container is visible and has a layout
+    if hasattr(footer, 'container') and footer.container is not None:
+        if not hasattr(footer.container, 'layout') or footer.container.layout is None:
+            footer.container.layout = widgets.Layout()
+        footer.container.layout.display = 'flex'
+    
+    # Initialize tips panel if needed
+    if hasattr(footer, 'show_tips') and footer.show_tips and footer.tips_panel is None:
+        footer._init_tips(footer.tips_title, footer.tips_content)
+        
+    # Ensure the info panel is created if show_info is True
+    if footer.show_info and footer.info_panel is None:
+        footer.info_panel = InfoBox(
+            title=footer.info_title if hasattr(footer, 'info_title') else "Information",
+            content=footer._info_content if hasattr(footer, '_info_content') else "",
+            style=footer.info_style if hasattr(footer, 'info_style') else "info"
+        )
+        
+    return footer

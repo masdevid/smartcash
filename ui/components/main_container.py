@@ -152,25 +152,5 @@ def create_main_container(
         footer_container=footer_container,
         **style_options
     )
-    
-    # Clean up stray widgets if requested
-    if clean_stray_widgets:
-        # Find all accordions in the container to protect them
-        safe_accordions = []
-        
-        # Check all sections for accordions
-        for section in container.containers.values():
-            if section is not None:
-                # If it's an accordion itself
-                if isinstance(section, widgets.Accordion):
-                    safe_accordions.append(section)
-                # If it contains children that might be accordions
-                if hasattr(section, 'children') and isinstance(section.children, Sequence):
-                    for child in section.children:
-                        if isinstance(child, widgets.Accordion):
-                            safe_accordions.append(child)
-                            
-        # Hide any stray accordions
-        hide_stray_accordions(safe_accordions)
-    
+    ß
     return container

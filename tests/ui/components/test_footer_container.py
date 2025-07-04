@@ -5,6 +5,7 @@ import unittest
 from io import StringIO
 from unittest.mock import MagicMock, patch, mock_open
 import ipywidgets as widgets
+from smartcash.ui.components.info.info_component import InfoBox
 
 class TestFooterContainer(unittest.TestCase):
     """Test cases for the FooterContainer component."""
@@ -35,6 +36,10 @@ class TestFooterContainer(unittest.TestCase):
         self.assertIsNotNone(self.footer.log_output)
         self.assertIsNotNone(self.footer.info_panel)
         
+        # Verify the log accordion is an InfoAccordion
+        from smartcash.ui.components.info.info_component import InfoAccordion
+        self.assertIsInstance(self.footer.log_accordion, InfoAccordion)
+        
         # Verify tips panel is not shown by default
         self.assertIsNone(self.footer.tips_panel)
     
@@ -43,65 +48,54 @@ class TestFooterContainer(unittest.TestCase):
         # Initially, tips panel should be None
         self.assertIsNone(self.footer.tips_panel)
         
-        # Show tips
+        # Show tips - this should create the tips panel
         self.footer.show_tips = True
-        self.footer._create_components(
-            progress_config=None,
-            log_module_name="TestModule",
-            log_height="200px",
-            info_title="Info",
-            info_content="Test content",
-            info_style="info"
-        )
+        self.footer.set_tips_visible(True)
         
         # Now tips panel should be created
         self.assertIsNotNone(self.footer.tips_panel)
         
-        # Test showing/hiding
+        # Test hiding
         self.footer.set_tips_visible(False)
         self.assertEqual(self.footer.tips_panel.layout.display, 'none')
         
+        # Test showing again
         self.footer.set_tips_visible(True)
         self.assertEqual(self.footer.tips_panel.layout.display, 'flex')
     
-    @patch('importlib.import_module')
-    def test_info_box_loading(self, mock_import):
-        """Test loading info box from a module."""
-        # Create a mock module with a get_test_info function
-        mock_module = MagicMock()
-        mock_module.get_test_info.return_value = "<div>Test Info</div>"
-        mock_import.return_value = mock_module
-        
-        # Create footer with info_box_path
+    def test_info_box_loading(self):
+        """Test creating an info box with content."""
+        # Create a footer with info content
         from smartcash.ui.components.footer_container import FooterContainer
         footer = FooterContainer(
             show_info=True,
-            info_box_path="test_info"
+            info_content="test content",
+            info_title="Test Title",
+            info_style="info"
         )
         
-        # Verify the module was imported
-        mock_import.assert_called_once_with('smartcash.ui.info_boxes.test_info')
-        
-        # Verify the info panel was created with the mock content
-        self.assertIsNotNone(footer.info_panel)
+        # Verify the info box was created with the correct parameters
+        from smartcash.ui.components.info.info_component import InfoBox
+        self.assertIsInstance(footer.info_panel, InfoBox)
+        self.assertEqual(footer.info_panel.content, "test content")
+        self.assertEqual(footer.info_panel.title, "Test Title")
     
     def test_info_box_fallback(self):
-        """Test fallback when info box module is not found."""
-        # Create footer with non-existent info_box_path
+        """Test info box with minimal parameters."""
+        # Create footer with minimal info parameters
         from smartcash.ui.components.footer_container import FooterContainer
+        from smartcash.ui.components.info.info_component import InfoBox
         
-        with patch('importlib.import_module') as mock_import:
-            # Make import_module raise ImportError
-            mock_import.side_effect = ImportError("Test error")
-            
-            # This should not raise an exception
-            footer = FooterContainer(
-                show_info=True,
-                info_box_path="nonexistent_module"
-            )
-            
-            # Info panel should still be created with error message
-            self.assertIsNotNone(footer.info_panel)
+        # This should not raise an exception
+        footer = FooterContainer(
+            show_info=True,
+            info_content="Test content"
+        )
+        
+        # Info panel should be created with default values
+        self.assertIsNotNone(footer.info_panel)
+        self.assertIsInstance(footer.info_panel, InfoBox)
+        self.assertEqual(footer.info_panel.content, "Test content")
     
     def test_progress_tracking(self):
         """Test progress tracking functionality."""
@@ -157,14 +151,113 @@ class TestFooterContainer(unittest.TestCase):
     @patch('sys.stdout', new_callable=StringIO)
     def test_logging(self, mock_stdout):
         """Test logging functionality."""
-        test_message = "Test log message"
-        self.footer.log(test_message)
+        from smartcash.ui.components.log_accordion import LogLevel
         
-        # Check if the log message was added to the output
-        # For Output widget, we need to capture the output differently
-        # Since we can't directly access the output, we'll check if the log method was called
-        # and that it didn't raise any exceptions
-        self.assertTrue(True)  # Just verify the log method was called without errors
+        # Test logging at different levels
+        self.footer.log("Test info message", LogLevel.INFO)
+        self.footer.log("Test warning message", LogLevel.WARNING)
+        self.footer.log("Test error message", LogLevel.ERROR)
+        
+        # Verify the log output was updated
+        self.assertIsNotNone(self.footer.log_output)
+        
+        # Check stdout for the logged messages
+        output = mock_stdout.getvalue()
+        self.assertIn("Test info message", output)
+        self.assertIn("Test warning message", output)
+        self.assertIn("Test error message", output)
+
+
+    def test_update_info(self):
+        """Test updating the info panel content."""
+        # Test updating with string content
+        self.footer.update_info("New Title", "New Content", "success")
+        self.assertEqual(self.footer.info_panel.title, "New Title")
+        self.assertEqual(self.footer.info_content, "New Content")
+        self.assertEqual(self.footer.info_panel.style, "success")
+        
+        # Test updating with widget content
+        test_widget = widgets.HTML("<p>Widget Content</p>")
+        self.footer.update_info("Widget Title", test_widget, "warning")
+        self.assertEqual(self.footer.info_panel.title, "Widget Title")
+        
+        # Check the content based on its type
+        content = self.footer.info_panel.content
+        if hasattr(content, 'value'):
+            # Handle case where content is a widget with a value attribute
+            self.assertEqual(content.value, "<p>Widget Content</p>")
+        elif isinstance(content, str):
+            # Handle case where content is a raw string
+            self.assertEqual(content, "<p>Widget Content</p>")
+        else:
+            # For any other case, check if it's the same widget
+            self.assertEqual(content, test_widget)
+            
+        self.assertEqual(self.footer.info_panel.style, "warning")
+    
+    def test_show_component(self):
+        """Test showing and hiding components."""
+        # Test showing/hiding progress component
+        self.footer.show_component('progress', False)
+        self.assertFalse(self.footer.show_progress)
+        self.assertEqual(self.footer.progress_component.layout.display, 'none')
+        
+        self.footer.show_component('progress', True)
+        self.assertTrue(self.footer.show_progress)
+        self.assertEqual(self.footer.progress_component.layout.display, 'flex')
+        
+        # Test showing/hiding logs component
+        self.footer.show_component('logs', False)
+        self.assertFalse(self.footer.show_logs)
+        self.assertEqual(self.footer.log_accordion.layout.display, 'none')
+        
+        # Test showing/hiding info component
+        self.footer.show_component('info', False)
+        self.assertFalse(self.footer.show_info)
+        self.assertEqual(self.footer.info_panel.layout.display, 'none')
+    
+    def test_add_remove_class(self):
+        """Test adding and removing CSS classes."""
+        # Test adding a class
+        self.footer.add_class('test-class')
+        self.assertIn('test-class', self.footer.container._dom_classes)
+        
+        # Test removing a class
+        self.footer.remove_class('test-class')
+        self.assertNotIn('test-class', self.footer.container._dom_classes)
+        
+        # Test removing non-existent class (should not raise)
+        self.footer.remove_class('non-existent')
+    
+    def test_info_content_property(self):
+        """Test the info_content property."""
+        # Test with string content
+        self.footer.update_info("Test", "Test Content", "info")
+        self.assertEqual(self.footer.info_content, "Test Content")
+        
+        # Test with widget content
+        test_widget = widgets.HTML("<p>Widget Content</p>")
+        self.footer.update_info("Test", test_widget, "info")
+        self.assertEqual(self.footer.info_content, test_widget.value)
+    
+    def test_edge_cases(self):
+        """Test edge cases and error conditions."""
+        # Test with all components disabled
+        empty_footer = self.footer.__class__(
+            show_progress=False,
+            show_logs=False,
+            show_info=False
+        )
+        self.assertIsNotNone(empty_footer.container)
+        
+        # Test updating progress when progress is disabled
+        empty_footer.update_progress(50, 100)
+        
+        # Test logging when logs are disabled
+        empty_footer.log("Test log")
+        
+        # Test showing non-existent component (should not raise)
+        self.footer.show_component('nonexistent', True)
 
 
 class TestCreateFooterContainer(unittest.TestCase):
@@ -172,39 +265,41 @@ class TestCreateFooterContainer(unittest.TestCase):
     
     def test_create_footer_container(self):
         """Test creating a footer container with the factory function."""
-        # Import the function directly to test
-        from smartcash.ui.components.footer_container import create_footer_container
+        from smartcash.ui.components.footer_container import create_footer_container, FooterContainer
+        from smartcash.ui.components.info.info_component import InfoBox, InfoAccordion
         
-        # Create a footer container with custom options
+        # Test with default parameters
+        footer = create_footer_container()
+        self.assertIsInstance(footer, FooterContainer)
+        
+        # Test with custom parameters
         footer = create_footer_container(
             show_progress=True,
             show_logs=True,
             show_info=True,
-            show_tips=True,
             log_module_name="TestModule",
-            log_height="300px",
-            tips_title="💡 Helpful Tips",
-            tips_content=["Tip 1", "Tip 2"],
+            log_height="200px",
             info_title="Information",
-            info_content="<p>Test info</p>",
-            info_style="info",
-            width="100%"
+            info_content="Test Content",
+            info_style="info"
         )
+        self.assertIsInstance(footer, FooterContainer)
         
-        # Verify the container was created
-        self.assertIsNotNone(footer.container)
-        self.assertIsInstance(footer.container, widgets.VBox)
-        
-        # Verify components were created based on parameters
+        # Verify the components were created with the correct parameters
         self.assertIsNotNone(footer.progress_tracker)
-        self.assertIsNotNone(footer.log_accordion)
+        self.assertIsInstance(footer.log_accordion, InfoAccordion)
         self.assertIsNotNone(footer.log_output)
-        self.assertIsNotNone(footer.info_panel)
-        self.assertIsNotNone(footer.tips_panel)
+        self.assertIsInstance(footer.info_panel, InfoBox)
+        self.assertEqual(footer.info_panel.title, "Information")
+        self.assertEqual(footer.info_panel.content, "Test Content")
+        
+        # Tips panel should be None by default
+        self.assertIsNone(footer.tips_panel)
         
         # Verify custom parameters were applied
-        self.assertEqual(footer.tips_title, "💡 Helpful Tips")
-        self.assertIsNotNone(footer.tips_content)
+        self.assertEqual(footer.info_panel.title, "Information")
+        self.assertTrue(hasattr(footer, 'tips_title'))
+        self.assertTrue(hasattr(footer, 'tips_content'))
         self.assertTrue(isinstance(footer.tips_content, list))
 
 

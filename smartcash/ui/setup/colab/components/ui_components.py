@@ -52,7 +52,6 @@ def create_colab_ui() -> Dict[str, Any]:
     
     # 3. Create Progress Tracker
     progress_tracker = ProgressTracker(
-        title="Status Setup",
         layout={"margin": "20px 0"}
     )
     ui_components['progress_tracker'] = progress_tracker

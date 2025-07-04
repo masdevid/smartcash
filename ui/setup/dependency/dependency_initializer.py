@@ -378,16 +378,24 @@ class DependencyInitializer(ModuleInitializer):
                 self._update_status(f"❌ {operation.title()} gagal: {error_msg}", "error")
             
         except Exception as e:
-            from smartcash.ui.core.shared.error_handler import get_error_handler
+            from smartcash.ui.core.shared.error_handler import get_error_handler, CoreErrorHandler
             error_handler = get_error_handler('dependency')
+            error_ui = CoreErrorHandler('dependency').create_error_ui({'error': True, 'message': f"Error dalam {operation}: {str(e)}", 'title': "Error"})
             error_handler.handle_exception(e, 'executing operation', fail_fast=False)
             self._update_status(f"❌ Error dalam {operation}: {str(e)}", "error")
 
 # Global instance
 _dependency_initializer: Optional[DependencyInitializer] = None
 
-def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """🚀 Initialize dependency UI - main entry point"""
+def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
+    """🚀 Initialize dependency UI - main entry point
+    
+    Args:
+        config (Optional[Dict[str, Any]]): Configuration dictionary for initialization.
+    
+    Returns:
+        Any: The main UI container widget to be displayed.
+    """
     global _dependency_initializer
     
     try:
@@ -397,15 +405,42 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         # Initialize dengan config
         result = _dependency_initializer.initialize()
         
-        return {
-            'ui_components': result.get('ui_components', {}),
-            'module_handler': result.get('module_handler'),
-            'config': result.get('config', {}),
-            'operation_handlers': result.get('operation_handlers', {}),
-            'success': result.get('success', False)
-        }
-        
+        if result.get('success', False):
+            from smartcash.ui.utils.widget_utils import display_widget
+            main_container = result.get('ui_components', {}).get('main_container')
+            if main_container:
+                try:
+                    displayed_widget = display_widget(main_container)
+                    if displayed_widget is not None:
+                        print("Widget displayed successfully")
+                        return displayed_widget
+                    else:
+                        print("Widget display returned None - likely not in a UI-supported environment")
+                        return main_container  # Return the raw container if display fails
+                except Exception as display_error:
+                    print(f"Widget display failed with error: {str(display_error)}")
+                    print("Returning raw UI container as fallback - display may not be supported in this environment")
+                    return main_container
+            else:
+                raise ValueError("Main container not found in UI components")
+        else:
+            raise ValueError("Initialization failed")
+            
     except Exception as e:
-        from smartcash.ui.core.shared.error_handler import get_error_handler
+        from smartcash.ui.core.shared.error_handler import get_error_handler, CoreErrorHandler
         error_handler = get_error_handler('dependency')
-        return error_handler.handle_exception(e, 'initializing dependency UI', fail_fast=False)
+        error_ui = CoreErrorHandler('dependency').create_error_ui({'error': True, 'message': f"Error initializing dependency UI: {str(e)}", 'title': "Initialization Error"})
+        error_handler.handle_exception(e, 'initializing dependency UI', fail_fast=False)
+        try:
+            from smartcash.ui.utils.widget_utils import display_widget
+            displayed_error_widget = display_widget(error_ui)
+            if displayed_error_widget is not None:
+                print("Error widget displayed successfully")
+                return displayed_error_widget
+            else:
+                print("Error widget display returned None - likely not in a UI-supported environment")
+                return error_ui  # Return the raw error UI if display fails
+        except Exception as display_error:
+            print(f"Error widget display failed with error: {str(display_error)}")
+            print("Returning raw error UI as fallback - display may not be supported in this environment")
+            return error_ui

@@ -59,7 +59,9 @@ class DependencyInitializer(ModuleInitializer):
                 'success': False,
                 'error': str(e),
                 'ui_components': {},
-                'config': {}
+                'module_handler': None,
+                'config_handler': None,
+                'operation_handlers': {}
             }
     
     def setup_handlers(self, ui_components: Dict[str, Any]) -> None:

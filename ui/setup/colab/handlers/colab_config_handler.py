@@ -1,7 +1,7 @@
 """
-file_path: smartcash/ui/setup/colab/handlers/env_config_handler.py
+file_path: smartcash/ui/setup/colab/handlers/colab_config_handler.py
 
-Environment Configuration Handler for Colab.
+Colab Configuration Handler.
 
 This handler manages the environment setup process in Google Colab,
 including configuration management and setup orchestration.
@@ -19,7 +19,7 @@ from smartcash.ui.setup.colab.handlers.setup_handler import SetupHandler
 from smartcash.ui.setup.colab.configs.config_handler import ConfigHandler
 from smartcash.ui.setup.colab.constants import SetupStage
 
-class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
+class ColabConfigHandler(ModuleUIHandler, ConfigurableHandler):
     """Main orchestrator for environment configuration in Colab.
     
     This handler coordinates various environment configuration components:
@@ -32,7 +32,7 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
     """
     
     def __init__(self, module_name: str = 'colab'):
-        """Initialize the EnvConfigHandler.
+        """Initialize the ColabConfigHandler.
         
         Args:
             module_name: Name of the module this handler manages (default: 'colab')
@@ -67,8 +67,8 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
         """Initialize the handler and its components."""
         if not self._is_initialized:
             self._is_initialized = True
-            self.logger.debug("✅ EnvConfigHandler initialized")
-        return {"status": True, "message": "EnvConfigHandler initialized"}
+            self.logger.debug("✅ ColabConfigHandler initialized")
+        return {"status": True, "message": "ColabConfigHandler initialized"}
 
     def register_callback(self, event_type: str, callback: Callable) -> None:
         """Register a callback for specific events.
@@ -207,4 +207,4 @@ class EnvConfigHandler(ModuleUIHandler, ConfigurableHandler):
             return {"status": False, "message": error_msg}
 
 # Singleton instance for easy access
-env_config_handler = EnvConfigHandler()
+colab_config_handler = ColabConfigHandler()

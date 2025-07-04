@@ -84,7 +84,7 @@ class TestLoggingAndProgress:
     @pytest.fixture
     def mock_handlers(self, mocker):
         """Mock handler classes."""
-        with patch('smartcash.ui.setup.colab.colab_initializer.EnvConfigHandler') as mock_handler_cls, \
+        with patch('smartcash.ui.setup.colab.colab_initializer.ColabConfigHandler') as mock_handler_cls, \
              patch('smartcash.ui.setup.colab.colab_initializer.SetupHandler') as mock_setup_handler_cls:
             
             mock_handler = MagicMock()

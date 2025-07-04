@@ -21,7 +21,7 @@ from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 # Untuk sementara, gunakan handler/komponen lama dari env_config
 # ---------------------------------------------------------------------------
 # Import local modules
-from smartcash.ui.setup.colab.handlers.env_config_handler import EnvConfigHandler
+from smartcash.ui.setup.colab.handlers.colab_config_handler import ColabConfigHandler
 from smartcash.ui.setup.colab.handlers.setup_handler import SetupHandler
 from smartcash.ui.setup.colab.components import create_colab_ui
 from smartcash.ui.setup.colab.configs.defaults import DEFAULT_CONFIG
@@ -66,7 +66,7 @@ class ColabEnvInitializer(ModuleInitializer):
             ui_components = create_colab_ui()
             self._ui_components = ui_components
 
-            env_handler = EnvConfigHandler(ui_components)
+            env_handler = ColabConfigHandler(ui_components)
             self._handlers["env_config"] = env_handler
 
             setup_handler = SetupHandler(ui_components)

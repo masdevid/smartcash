@@ -111,11 +111,11 @@ def test_handlers_import():
     Test importing handler classes from smartcash.ui.setup.colab.handlers.
     """
     try:
-        from smartcash.ui.setup.colab.handlers.env_config_handler import EnvConfigHandler
+        from smartcash.ui.setup.colab.handlers.colab_config_handler import ColabConfigHandler
         from smartcash.ui.setup.colab.handlers.setup_handler import SetupHandler
-        assert hasattr(EnvConfigHandler, '__init__'), "EnvConfigHandler class does not have __init__ method"
+        assert hasattr(ColabConfigHandler, '__init__'), "ColabConfigHandler class does not have __init__ method"
         assert hasattr(SetupHandler, '__init__'), "SetupHandler class does not have __init__ method"
-        assert EnvConfigHandler.__name__ == "EnvConfigHandler", "EnvConfigHandler class has incorrect name"
+        assert ColabConfigHandler.__name__ == "ColabConfigHandler", "ColabConfigHandler class has incorrect name"
         assert SetupHandler.__name__ == "SetupHandler", "SetupHandler class has incorrect name"
         print("Successfully imported handler classes")
     except ImportError as e:

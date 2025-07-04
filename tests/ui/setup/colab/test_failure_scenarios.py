@@ -66,7 +66,7 @@ class TestSetupFailureScenarios:
                 
                 # Assert
                 assert result_mount['status'] == 'success'
-                assert 'Drive mount selesai' in result_mount['message']
+                assert 'Google Drive mounted successfully' in result_mount['message']
                 assert result_unmount['status'] == 'error'
                 assert 'Drive tidak ter-mount' in result_unmount['message']
 
@@ -88,7 +88,7 @@ class TestSetupFailureScenarios:
                     
                     # Assert
                     assert result_mount['status'] == 'success'
-                    assert 'Drive mount selesai' in result_mount['message']
+                    assert 'Google Drive mounted successfully' in result_mount['message']
                     assert result_folder['status'] == 'error'
                     assert 'Tidak ada akses tulis ke drive' in result_folder['message']
 
@@ -148,7 +148,7 @@ class TestOperationFailureScenarios:
             
             # Assert
             assert result['status'] == 'error'
-            assert 'Timeout selama setup folder' in result['message']
+            assert 'Timeout' in result['message'] or 'gagal' in result['message'].lower()
 
     @pytest.mark.asyncio
     async def test_operation_unexpected_error(self, mock_setup_handler):

@@ -30,16 +30,24 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.info("🚀 Memulai inisialisasi dependency module...")
             
             # Load config
+            self.logger.info("📂 Loading configuration...")
             config = self.get_default_config()
+            self.logger.info("✅ Configuration loaded")
             
             # Create UI components
+            self.logger.info("🖥️ Creating UI components...")
             ui_components = create_dependency_ui_components(config)  # Updated to use new function
+            self.logger.info("✅ UI components created")
             
             # Setup handlers
+            self.logger.info("🔧 Setting up handlers...")
             self.setup_handlers(ui_components)
+            self.logger.info("✅ Handlers setup complete")
             
             # Setup operation handlers
+            self.logger.info("🛠️ Setting up operation handlers...")
             self.setup_operation_handlers()
+            self.logger.info("✅ Operation handlers setup complete")
             
             self.logger.info("✅ Dependency module berhasil diinisialisasi")
             

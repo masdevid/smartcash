@@ -541,6 +541,7 @@ def create_footer_container(
     show_progress: bool = False,
     show_logs: bool = False,
     show_info: bool = False,
+    show_tips: bool = False,
     progress_config: Optional[ProgressConfig] = None,
     log_module_name: str = "Module",
     log_height: str = "200px",
@@ -548,6 +549,8 @@ def create_footer_container(
     info_content: str = "",
     info_style: str = "info",
     info_box_path: Optional[str] = None,
+    tips_title: str = "Tips",
+    tips_content: Optional[List[Dict[str, str]]] = None,
     style: Optional[Dict] = None,
 ) -> FooterContainer:
     """Create a footer container with the specified components.
@@ -572,6 +575,7 @@ def create_footer_container(
         show_progress=show_progress,
         show_logs=show_logs,
         show_info=show_info,
+        show_tips=show_tips,
         progress_config=progress_config,
         log_module_name=log_module_name,
         log_height=log_height,
@@ -579,6 +583,8 @@ def create_footer_container(
         info_content=info_content,
         info_style=info_style,
         info_box_path=info_box_path,
+        tips_title=tips_title,
+        tips_content=tips_content,
         style=style or {}
     )
     

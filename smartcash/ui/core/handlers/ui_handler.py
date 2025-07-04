@@ -295,22 +295,26 @@ class UIHandler(BaseHandler):
 
         Args:
             error_result: Dict returned from operations that includes
-                ``error`` bool and optionally ``container`` widget.
+                ``error`` bool, ``message`` string, and optionally ``container`` widget
+                or traceback information.
         """
+        if not error_result:
+            return
+            
         try:
-            if not (error_result and error_result.get('error')):
-                return
             # Hide normal components
             self.clear_all_components()
-            container = error_result.get('container')
-            if container is None:
-                # Build a simple ErrorComponent
-                from smartcash.ui.components.error.error_component import create_error_component
-                container = create_error_component(error_message=error_result.get('message', 'Unknown error'))['container']
-            display(container)
+            
+            # Use the centralized error handler to create and display the error UI
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler(self.full_module_name)
+            error_handler.create_error_ui(error_result)
+            
         except Exception as e:
             # Fall back to logging if even error UI fails
             self.logger.error(f"❌ Failed to display error UI: {e}")
+            import traceback
+            self.logger.debug(f"Error details: {traceback.format_exc()}")
 
     def cleanup(self):
         """Cleanup UI handler."""

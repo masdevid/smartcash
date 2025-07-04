@@ -48,6 +48,13 @@ logs/
 .coverage
 htmlcov/
 
+# Prevent test files in root directory (but allow in tests/ directory)
+/test_*.py
+/*_test.py
+/run_test*.py
+/pytest.ini
+!tests/
+
 # Distribution / packaging
 .Python
 *.manifest

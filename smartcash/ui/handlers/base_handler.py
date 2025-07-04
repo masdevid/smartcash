@@ -18,7 +18,7 @@ from smartcash.ui.handlers.error_handler import (
     create_error_response,
     ErrorContext
 )
-from smartcash.ui.decorators.ui_decorators import (
+from smartcash.ui.core.decorators.ui_decorators import (
     safe_ui_operation,
     safe_widget_operation,
     safe_progress_operation,

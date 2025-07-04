@@ -24,17 +24,23 @@ class EnvConfigInitializer(ModuleInitializer):
     """Boot-straps the Environment Configuration UI."""
 
     def __init__(self) -> None:
+        # Initialize the base class first to set up the logger
+        super().__init__(module_name="env_config", parent_module="setup")
+        
+        self._handlers: Dict[str, Any] = {}
+        self._ui_components: Dict[str, Any] = {}
+        
         try:
-            super().__init__(module_name="env_config", parent_module="setup")
-
+            # Try to import environment manager
             from smartcash.common.environment import get_environment_manager
-
             self._env_manager = get_environment_manager()
-            self._handlers: Dict[str, Any] = {}
-            self._ui_components: Dict[str, Any] = {}
-
             self.logger.info("🔧 Environment configuration initializer siap")
+        except ImportError as ie:
+            # Handle case where environment module is not available
+            self.logger.warning("⚠️ Environment module not available, using fallback")
+            self._env_manager = None
         except Exception as exc:  # pragma: no cover
+            # For all other exceptions, log and re-raise
             msg = f"❌ Gagal menginisialisasi environment manager: {exc}"
             self.logger.error(msg, exc_info=True)
             raise RuntimeError(msg) from exc

@@ -1,17 +1,14 @@
 """
-Dependency Management UI Components.
-
-This module provides the main UI components for dependency management.
+File: smartcash/ui/setup/dependency/components/__init__.py
+Deskripsi: Export public components untuk dependency UI
 """
 
-from smartcash.ui.setup.dependency.components.ui_components import create_dependency_main_ui
-from smartcash.ui.setup.dependency.components.summary_panel import DependencySummaryPanel
-from smartcash.ui.setup.dependency.components.ui_categories_section import create_categories_section
-from smartcash.ui.setup.dependency.components.ui_custom_packages_section import create_custom_packages_section
+from .dependency_tabs import create_dependency_tabs
+from .package_categories_tab import create_package_categories_tab
+from .custom_packages_tab import create_custom_packages_tab
 
 __all__ = [
-    'create_dependency_main_ui',
-    'DependencySummaryPanel',
-    'create_categories_section',
-    'create_custom_packages_section'
+    'create_dependency_tabs',
+    'create_package_categories_tab', 
+    'create_custom_packages_tab'
 ]

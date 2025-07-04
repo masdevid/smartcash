@@ -1,0 +1,641 @@
+smartcash
+├── __init__.py
+├── common
+│   ├── __init__.py
+│   ├── config
+│   │   ├── __init__.py
+│   │   ├── compat.py
+│   │   ├── manager.py
+│   ├── constants
+│   │   ├── __init__.py
+│   │   ├── core.py
+│   │   ├── dataset.py
+│   │   ├── enums.py
+│   │   ├── environment.py
+│   │   ├── file_types.py
+│   │   ├── log_messages.py
+│   │   ├── model.py
+│   │   ├── paths.py
+│   │   ├── ui.py
+│   ├── environment.py
+│   ├── exceptions.py
+│   ├── interfaces
+│   │   ├── __init__.py
+│   │   ├── layer_config_interface.py
+│   ├── layer_config.py
+│   ├── logger.py
+│   ├── opencv_compat.py
+│   ├── threadpools.py
+│   ├── types.py
+│   ├── utils
+│   │   ├── __init__.py
+│   │   ├── core.py
+│   │   ├── file_naming_manager.py
+│   ├── worker_utils.py
+├── configs
+│   ├── __init__.py
+│   ├── analysis_config.yaml
+│   ├── augmentation_config.yaml
+│   ├── backbone_config.yaml
+│   ├── base_config.yaml
+│   ├── colab_config.yaml
+│   ├── dataset_config.yaml
+│   ├── dependency_config.yaml
+│   ├── evaluation_config.yaml
+│   ├── hyperparameters_config.yaml
+│   ├── model_config.yaml
+│   ├── preprocessing_config.yaml
+│   ├── pretrained_config.yaml
+│   ├── split_config.yaml
+│   ├── strategy_config.yaml
+│   ├── training_config.yaml
+├── dataset
+│   ├── __init__.py
+│   ├── augmentor
+│   │   ├── __init__.py
+│   │   ├── balancer
+│   │   │   ├── __init__.py
+│   │   │   ├── balancer.py
+│   │   │   ├── selector.py
+│   │   ├── core
+│   │   │   ├── __init__.py
+│   │   │   ├── engine.py
+│   │   │   ├── normalizer.py
+│   │   │   ├── pipeline_factory.py
+│   │   ├── service.py
+│   │   ├── utils
+│   │       ├── __init__.py
+│   │       ├── balance_calculator.py
+│   │       ├── cleanup_manager.py
+│   │       ├── config_validator.py
+│   │       ├── file_processor.py
+│   │       ├── file_scanner.py
+│   │       ├── filename_manager.py
+│   │       ├── path_resolver.py
+│   │       ├── progress_bridge.py
+│   │       ├── sample_generator.py
+│   ├── components
+│   │   ├── __init__.py
+│   │   ├── collate
+│   │   │   ├── __init__.py
+│   │   │   ├── multilayer_collate.py
+│   │   │   ├── yolo_collate.py
+│   │   ├── datasets
+│   │   │   ├── __init__.py
+│   │   │   ├── base_dataset.py
+│   │   │   ├── multilayer_dataset.py
+│   │   │   ├── yolo_dataset.py
+│   │   ├── geometry
+│   │       ├── __init__.py
+│   │       ├── coord_converter.py
+│   │       ├── geometry_utils.py
+│   │       ├── polygon_handler.py
+│   ├── downloader
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── cleanup_behavior.py
+│   │   ├── cleanup_service.py
+│   │   ├── dataset_scanner.py
+│   │   ├── download_service.py
+│   │   ├── file_processor.py
+│   │   ├── progress_tracker.py
+│   │   ├── roboflow_client.py
+│   │   ├── validators.py
+│   ├── evaluation
+│   │   ├── augmentation_utils.py
+│   │   ├── evaluation_augmentation.py
+│   ├── organizer
+│   │   ├── dataset_file_renamer.py
+│   │   ├── dataset_organizer.py
+│   ├── preprocessor
+│   │   ├── __init__.py
+│   │   ├── api
+│   │   │   ├── __init__.py
+│   │   │   ├── cleanup_api.py
+│   │   │   ├── normalization_api.py
+│   │   │   ├── preprocessing_api.py
+│   │   │   ├── samples_api.py
+│   │   │   ├── stats_api.py
+│   │   ├── config
+│   │   │   ├── __init__.py
+│   │   │   ├── defaults.py
+│   │   │   ├── validator.py
+│   │   ├── core
+│   │   │   ├── __init__.py
+│   │   │   ├── file_processor.py
+│   │   │   ├── normalizer.py
+│   │   │   ├── stats_collector.py
+│   │   ├── service.py
+│   │   ├── utils
+│   │   │   ├── __init__.py
+│   │   │   ├── metadata_extractor.py
+│   │   │   ├── path_manager.py
+│   │   │   ├── progress_bridge.py
+│   │   │   ├── sample_generator.py
+│   │   ├── validation
+│   │       ├── __init__.py
+│   │       ├── directory_validator.py
+│   │       ├── filename_validator.py
+│   ├── utils
+│       ├── __init__.py
+│       ├── dataset_constants.py
+│       ├── dataset_utils.py
+│       ├── move_utils.py
+│       ├── path_validator.py
+├── model
+│   ├── __init__.py
+│   ├── analysis
+│   │   ├── __init__.py
+│   │   ├── analysis_service.py
+│   │   ├── class_analyzer.py
+│   │   ├── currency_analyzer.py
+│   │   ├── layer_analyzer.py
+│   │   ├── utils
+│   │   │   ├── __init__.py
+│   │   │   ├── analysis_progress_bridge.py
+│   │   │   ├── data_aggregator.py
+│   │   │   ├── metrics_processor.py
+│   │   ├── visualization
+│   │       ├── __init__.py
+│   │       ├── chart_generator.py
+│   │       ├── confusion_matrix_viz.py
+│   │       ├── visualization_manager.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── core.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── checkpoint_manager.py
+│   │   ├── model_builder.py
+│   │   ├── yolo_head.py
+│   ├── evaluation
+│   │   ├── __init__.py
+│   │   ├── checkpoint_selector.py
+│   │   ├── evaluation_metrics.py
+│   │   ├── evaluation_service.py
+│   │   ├── scenario_augmentation.py
+│   │   ├── scenario_manager.py
+│   │   ├── utils
+│   │       ├── __init__.py
+│   │       ├── evaluation_progress_bridge.py
+│   │       ├── inference_timer.py
+│   │       ├── results_aggregator.py
+│   ├── reporting
+│   │   ├── __init__.py
+│   │   ├── generators
+│   │   │   ├── __init__.py
+│   │   │   ├── comparison_generator.py
+│   │   │   ├── research
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── currency_generator.py
+│   │   │   │   ├── methodology_generator.py
+│   │   │   │   ├── performance_generator.py
+│   │   │   │   ├── recommendation_generator.py
+│   │   │   ├── research_generator.py
+│   │   │   ├── summary_generator.py
+│   │   ├── report_service.py
+│   ├── training
+│   │   ├── __init__.py
+│   │   ├── data_loader_factory.py
+│   │   ├── loss_manager.py
+│   │   ├── metrics_tracker.py
+│   │   ├── optimizer_factory.py
+│   │   ├── training_service.py
+│   │   ├── utils
+│   │       ├── __init__.py
+│   │       ├── early_stopping.py
+│   │       ├── lr_scheduler_factory.py
+│   │       ├── training_progress_bridge.py
+│   ├── utils
+│       ├── __init__.py
+│       ├── backbone_factory.py
+│       ├── device_utils.py
+│       ├── progress_bridge.py
+├── ui
+    ├── __init__.py
+    ├── cells
+    │   ├── cell_1_1_repo_clone.py
+    │   ├── cell_1_2_env_config.py
+    │   ├── cell_1_3_dependency_installer.py
+    │   ├── cell_2_1_dataset_download.py
+    │   ├── cell_2_2_split_config.py
+    │   ├── cell_2_3_preprocessing.py
+    │   ├── cell_2_4_augmentation.py
+    │   ├── cell_2_5_dataset_visualization.py
+    │   ├── cell_2_6_pretrained.py
+    │   ├── cell_3_1_backbone_selection.py
+    │   ├── cell_3_2_hyperparameters.py
+    │   ├── cell_3_3_training_strategy.py
+    │   ├── cell_4_1_model_training.py
+    │   ├── cell_4_2_model_evaluation.py
+    ├── charts
+    │   ├── __init__.py
+    ├── components
+    │   ├── __init__.py
+    │   ├── action_buttons.py
+    │   ├── action_container.py
+    │   ├── action_section.py
+    │   ├── alert.py
+    │   ├── alerts
+    │   │   ├── __init__.py
+    │   │   ├── alert.py
+    │   │   ├── constants.py
+    │   │   ├── info_box.py
+    │   │   ├── status_indicator.py
+    │   │   ├── status_updater.py
+    │   ├── base_component.py
+    │   ├── card.py
+    │   ├── closeable_tips_panel.py
+    │   ├── dialog
+    │   │   ├── __init__.py
+    │   │   ├── confirmation_dialog.py
+    │   │   ├── DIALOG_API.md
+    │   ├── error
+    │   │   ├── __init__.py
+    │   │   ├── error_component.py
+    │   ├── footer_container.py
+    │   ├── form_container.py
+    │   ├── header
+    │   │   ├── __init__.py
+    │   │   ├── header.py
+    │   ├── header_container.py
+    │   ├── header.py
+    │   ├── info
+    │   │   ├── __init__.py
+    │   │   ├── info_component.py
+    │   ├── info_accordion.py
+    │   ├── info_panel.py
+    │   ├── layout
+    │   │   ├── __init__.py
+    │   │   ├── layout_components.py
+    │   ├── log_accordion
+    │   │   ├── __init__.py
+    │   │   ├── legacy.py
+    │   │   ├── log_accordion.py
+    │   │   ├── log_entry.py
+    │   │   ├── log_level.py
+    │   ├── log_accordion.py.bak
+    │   ├── main_container.py
+    │   ├── progress_tracker
+    │   │   ├── __init__.py
+    │   │   ├── callback_manager.py
+    │   │   ├── factory.py
+    │   │   ├── progress_config.py
+    │   │   ├── progress_tracker.py
+    │   │   ├── PTRACKER_API.md
+    │   │   ├── tqdm_manager.py
+    │   │   ├── types.py
+    │   │   ├── ui_components.py
+    │   ├── save_reset_buttons.py
+    │   ├── status_panel.py
+    │   ├── summary_container.py
+    │   ├── summary_panel.py
+    │   ├── tabs.py
+    │   ├── tips_panel.py
+    │   ├── widgets
+    │       ├── __init__.py
+    │       ├── checkbox.py
+    │       ├── dropdown.py
+    │       ├── log_slider.py
+    │       ├── slider.py
+    │       ├── text_input.py
+    ├── config_cell
+    │   ├── __init__.py
+    │   ├── components
+    │   │   ├── __init__.py
+    │   │   ├── component_registry.py
+    │   │   ├── ui_factory.py
+    │   │   ├── ui_parent_components.py
+    │   ├── constants.py
+    │   ├── handlers
+    │   │   ├── config_handler.py
+    │   ├── managers
+    │       ├── shared_config_manager.py
+    ├── core
+    │   ├── __init__.py
+    │   ├── handlers
+    │   │   ├── __init__.py
+    │   │   ├── base_handler.py
+    │   │   ├── config_handler.py
+    │   │   ├── operation_handler.py
+    │   │   ├── ui_handler.py
+    │   ├── helpers
+    │   │   ├── reset_components_helper.py
+    │   ├── initializers
+    │   │   ├── __init__.py
+    │   │   ├── base_initializer.py
+    │   │   ├── config_initializer.py
+    │   │   ├── module_initializer.py
+    │   │   ├── operation_initializer.py
+    │   ├── shared
+    │   │   ├── __init__.py
+    │   │   ├── core_shared_config_manager.py
+    │   │   ├── error_handler.py
+    │   │   ├── logger.py
+    │   │   ├── shared_config_manager.py
+    │   │   ├── ui_component_manager.py
+    │   ├── utils
+    │       ├── widget_utils.py
+    ├── dataset
+    │   ├── __init__.py
+    │   ├── augmentation
+    │   │   ├── __init__.py
+    │   │   ├── augmentation_initializer.py
+    │   │   ├── augmentation_initializer.py.bak
+    │   │   ├── components
+    │   │   │   ├── __init__.py
+    │   │   │   ├── advanced_opts_widget.py
+    │   │   │   ├── augtypes_opts_widget.py
+    │   │   │   ├── basic_opts_widget.py
+    │   │   │   ├── live_preview_widget.py
+    │   │   │   ├── ui_components.py
+    │   │   │   ├── ui_components.py.bak
+    │   │   ├── handlers
+    │   │   │   ├── __init__.py
+    │   │   │   ├── augmentation_handlers.py
+    │   │   │   ├── augmentation_handlers.py.bak
+    │   │   │   ├── base_augmentation_handler.py
+    │   │   │   ├── config_extractor.py
+    │   │   │   ├── config_handler.py
+    │   │   │   ├── config_updater.py
+    │   │   │   ├── defaults.py
+    │   │   │   ├── operation
+    │   │   │       ├── __init__.py
+    │   │   │       ├── augment.py
+    │   │   │       ├── base_operation.py
+    │   │   │       ├── check.py
+    │   │   │       ├── cleanup.py
+    │   │   │       ├── manager.py
+    │   │   │       ├── preview.py
+    │   │   ├── utils
+    │   │       ├── __init__.py
+    │   │       ├── backend_utils.py
+    │   │       ├── button_manager.py
+    │   │       ├── config_handlers.py
+    │   │       ├── style_utils.py
+    │   │       ├── ui_utils.py
+    │   │       ├── validation_utils.py
+    │   ├── downloader
+    │   │   ├── __init__.py
+    │   │   ├── components
+    │   │   │   ├── __init__.py
+    │   │   │   ├── input_options.py
+    │   │   │   ├── ui_components.py
+    │   │   ├── downloader_initializer.py
+    │   │   ├── handlers
+    │   │   │   ├── __init__.py
+    │   │   │   ├── base_downloader_handler.py
+    │   │   │   ├── config_extractor.py
+    │   │   │   ├── config_handler.py
+    │   │   │   ├── config_updater.py
+    │   │   │   ├── defaults.py
+    │   │   │   ├── download_handler.py
+    │   │   │   ├── operation
+    │   │   │       ├── __init__.py
+    │   │   │       ├── check.py
+    │   │   │       ├── cleanup.py
+    │   │   │       ├── download.py
+    │   │   │       ├── manager.py
+    │   │   ├── utils
+    │   │       ├── __init__.py
+    │   │       ├── backend_utils.py
+    │   │       ├── colab_secrets.py
+    │   │       ├── progress_utils.py
+    │   │       ├── ui_utils.py
+    │   │       ├── validation_utils.py
+    │   ├── preprocessing
+    │   │   ├── __init__.py
+    │   │   ├── components
+    │   │   │   ├── __init__.py
+    │   │   │   ├── input_options.py
+    │   │   │   ├── ui_components.py
+    │   │   ├── configs
+    │   │   │   ├── __init__.py
+    │   │   │   ├── defaults.py
+    │   │   │   ├── extractor.py
+    │   │   │   ├── handler.py
+    │   │   │   ├── updater.py
+    │   │   │   ├── validator.py
+    │   │   ├── handlers
+    │   │   │   ├── __init__.py
+    │   │   │   ├── base_preprocessing_handler.py
+    │   │   │   ├── config_extractor.py
+    │   │   │   ├── config_handler.py
+    │   │   │   ├── config_updater.py
+    │   │   │   ├── defaults.py
+    │   │   │   ├── module_handler.py
+    │   │   │   ├── operation
+    │   │   │   │   ├── __init__.py
+    │   │   │   │   ├── base_operation.py
+    │   │   │   │   ├── check.py
+    │   │   │   │   ├── cleanup.py
+    │   │   │   │   ├── manager.py
+    │   │   │   │   ├── preprocess.py
+    │   │   │   ├── preprocessing_handlers.py
+    │   │   ├── operations
+    │   │   │   ├── __init__.py
+    │   │   │   ├── base_operation.py
+    │   │   │   ├── check.py
+    │   │   │   ├── cleanup.py
+    │   │   │   ├── preprocess.py
+    │   │   ├── preprocessing_initializer.py
+    │   │   ├── utils
+    │   │       ├── __init__.py
+    │   │       ├── ui_utils.py
+    │   ├── split
+    │   │   ├── __init__.py
+    │   │   ├── components
+    │   │   │   ├── __init__.py
+    │   │   │   ├── ui_components.py
+    │   │   │   ├── ui_form.py
+    │   │   │   ├── ui_layout.py
+    │   │   ├── handlers
+    │   │   │   ├── __init__.py
+    │   │   │   ├── base_split_handler.py
+    │   │   │   ├── config_extractor.py
+    │   │   │   ├── config_handler.py
+    │   │   │   ├── config_updater.py
+    │   │   │   ├── defaults.py
+    │   │   │   ├── event_handlers.py
+    │   │   │   ├── slider_handlers.py
+    │   │   ├── split_init.py.bak
+    │   │   ├── split_initializer.py
+    │   ├── visualization
+    │       ├── __init__.py
+    │       ├── visualization_components.py
+    ├── decorators
+    │   ├── __init__.py
+    │   ├── ui_decorators.py
+    ├── handlers
+    │   ├── __init__.py
+    │   ├── base_handler.py
+    │   ├── config_handlers.py
+    │   ├── error_handler.py
+    ├── helpers
+    │   ├── __init__.py
+    ├── info_boxes
+    │   ├── __init__.py
+    │   ├── augmentation_info.py
+    │   ├── backbone_info.py
+    │   ├── backbones_info.py
+    │   ├── dataset_info.py
+    │   ├── dependencies_info.py
+    │   ├── download_info.py
+    │   ├── environment_info.py
+    │   ├── hyperparameters_info.py
+    │   ├── model_info.py
+    │   ├── preprocessing_info.py
+    │   ├── split_info.py
+    │   ├── strategy_info.py
+    │   ├── training_info.py
+    │   ├── training_strategy_info.py
+    ├── initializers
+    │   ├── __init__.py
+    │   ├── blank_initializer.py
+    │   ├── common_initializer.py
+    │   ├── common_initializer.py.bak
+    │   ├── config_cell_initializer.py
+    │   ├── config_cell_initializer.py.bak
+    │   ├── visualization_initializer.py
+    ├── model
+    │   ├── __init__.py
+    │   ├── backbone
+    │       ├── __init__.py
+    │       ├── backbone_init.py
+    │       ├── components
+    │       │   ├── __init__.py
+    │       │   ├── config_summary.py
+    │       │   ├── model_form.py
+    │       │   ├── ui_components.py
+    │       ├── handlers
+    │       │   ├── __init__.py
+    │       │   ├── api_handler.py
+    │       │   ├── config_handler.py
+    │       │   ├── model_handler.py
+    │       ├── README.md
+    │       ├── utils
+    │           ├── __init__.py
+    │           ├── config_utils.py
+    │           ├── ui_utils.py
+    │           ├── validation.py
+    ├── pretrained
+    │   ├── __init__.py
+    │   ├── components
+    │   │   ├── __init__.py
+    │   │   ├── ui_components.py
+    │   ├── handlers
+    │   │   ├── __init__.py
+    │   │   ├── config_extractor.py
+    │   │   ├── config_handler.py
+    │   │   ├── config_updater.py
+    │   │   ├── defaults.py
+    │   │   ├── event_handlers.py
+    │   │   ├── model_handlers.py
+    │   │   ├── pretrained_handlers.py
+    │   │   ├── progress_handlers.py
+    │   ├── pretrained_initializer.py
+    │   ├── services
+    │   │   ├── __init__.py
+    │   │   ├── model_checker.py
+    │   │   ├── model_downloader.py
+    │   │   ├── model_syncer.py
+    │   ├── utils
+    │       ├── __init__.py
+    │       ├── error_handling.py
+    │       ├── model_utils.py
+    │       ├── progress_adapter.py
+    ├── setup
+    │   ├── __init__.py
+    │   ├── dependency
+    │   │   ├── __init__.py
+    │   │   ├── components
+    │   │   │   ├── __init__.py
+    │   │   │   ├── dependency_ui.py
+    │   │   │   ├── summary_panel.py
+    │   │   │   ├── ui_categories_section.py
+    │   │   │   ├── ui_components_new.py
+    │   │   │   ├── ui_components.py
+    │   │   │   ├── ui_custom_packages_section.py
+    │   │   ├── configs
+    │   │   │   ├── defaults.py
+    │   │   │   ├── extractor.py
+    │   │   │   ├── handler.py
+    │   │   │   ├── updater.py
+    │   │   │   ├── validator.py
+    │   │   ├── dependency_initializer.py
+    │   │   ├── handlers
+    │   │   │   ├── __init__.py
+    │   │   │   ├── base_dependency_handler.py
+    │   │   │   ├── config_extractor.py
+    │   │   │   ├── config_handler.py
+    │   │   │   ├── config_updater.py
+    │   │   │   ├── defaults.py
+    │   │   │   ├── event_handlers_new.py
+    │   │   │   ├── event_handlers.py
+    │   │   │   ├── operation_handlers_new.py
+    │   │   │   ├── operation_handlers.py
+    │   │   │   ├── selection_handlers_new.py
+    │   │   │   ├── selection_handlers.py
+    │   │   │   ├── summary_handler.py
+    │   │   ├── initializer.py
+    │   │   ├── operations
+    │   │   │   ├── *
+    │   │   ├── services
+    │   │   │   ├── *
+    │   │   ├── utils
+    │   │       ├── __init__.py
+    │   │       ├── package_manager.py
+    │   │       ├── version_checker.py
+    │   ├── env_config
+    │       ├── __init__.py
+    │       ├── components
+    │       │   ├── __init__.py
+    │       │   ├── env_info_panel.py
+    │       │   ├── setup_summary.py
+    │       │   ├── tips_panel.py
+    │       │   ├── ui_components.py
+    │       │   ├── ui_components.py.bak
+    │       ├── configs
+    │       │   ├── __init__.py
+    │       │   ├── config_handler.py
+    │       │   ├── defaults.py
+    │       │   ├── validator.py
+    │       ├── constants.py
+    │       ├── env_config_initializer.py
+    │       ├── handlers
+    │       │   ├── __init__.py
+    │       │   ├── env_config_handler.py
+    │       │   ├── operations
+    │       │   │   ├── *
+    │       │   ├── setup_handler.py
+    │       ├── operations
+    │       │   ├── __init__.py
+    │       │   ├── config_operation.py
+    │       │   ├── drive_operation.py
+    │       │   ├── folder_operation.py
+    │       ├── services
+    │       │   ├── __init__.py
+    │       │   ├── status_checker.py
+    │       ├── utils
+    │           ├── __init__.py
+    │           ├── env_detector.py
+    ├── types.py
+    ├── utils
+        ├── __init__.py
+        ├── constants.py
+        ├── defaults_template.py
+        ├── dialog_utils.py
+        ├── error_utils.py
+        ├── fallback_utils.py
+        ├── file_utils.py
+        ├── info_utils.py
+        ├── metric_utils.py
+        ├── responsive_styling.py
+        ├── restart_runtime_helper.py
+        ├── ui_logger.py
+        ├── validator_utils.py
+        ├── widget_utils.py
+
+# Summary
+Total directories: 117
+Total files: 517

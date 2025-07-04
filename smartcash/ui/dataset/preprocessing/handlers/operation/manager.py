@@ -5,7 +5,7 @@ Deskripsi: Manager untuk preprocessing operations dengan centralized error handl
 
 from typing import Dict, Any, Optional
 from smartcash.ui.handlers.error_handler import handle_ui_errors
-from smartcash.ui.decorators.ui_decorators import safe_ui_operation
+from smartcash.ui.core.decorators.ui_decorators import safe_ui_operation
 from smartcash.ui.dataset.preprocessing.handlers.base_preprocessing_handler import BasePreprocessingHandler
 
 class PreprocessingHandlerManager(BasePreprocessingHandler):

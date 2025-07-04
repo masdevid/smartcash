@@ -26,6 +26,49 @@ class CoreErrorHandler:
         self._error_count = 0
         self._last_error = None
         
+    def create_error_ui(self, error_result: Dict[str, Any]) -> Optional[Any]:
+        """Create and display error UI component.
+        
+        Args:
+            error_result: Dict containing error details with keys:
+                - error: bool indicating error state
+                - message: Error message
+                - container: Optional container widget
+                - traceback: Optional traceback string
+                
+        Returns:
+            The created error component or None if creation failed
+        """
+        if not (error_result and error_result.get('error')):
+            return None
+            
+        try:
+            container = error_result.get('container')
+            if container is not None:
+                return container
+                
+            # Create a new error component
+            from IPython.display import display
+            from smartcash.ui.components.error import create_error_component
+            
+            error_component = create_error_component(
+                error_message=error_result.get('message', 'An unknown error occurred'),
+                traceback=error_result.get('traceback'),
+                title="🚨 Error",
+                error_type="error"
+            )
+            
+            if error_component and 'container' in error_component:
+                display(error_component['container'])
+                return error_component
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to create error UI: {e}")
+            import traceback
+            self.logger.debug(f"Error details: {traceback.format_exc()}")
+            
+        return None
+    
     def handle_error(self, error_msg: str, level: ErrorLevel = ErrorLevel.ERROR, 
                     exc_info: bool = False, fail_fast: bool = True, 
                     create_ui_error: bool = False, **kwargs) -> Optional[Any]:

@@ -51,7 +51,7 @@ def create_colab_ui() -> Dict[str, Any]:
     ui_components['action_container'] = action_container
     
     # 3. Create Progress Tracker
-    progress_tracker = ProgressTracker()
+    progress_tracker = ProgressTracker(component_name="colab_progress_tracker")
     ui_components['progress_tracker'] = progress_tracker
     
     # 4. Create Environment Info Panel

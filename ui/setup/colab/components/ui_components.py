@@ -46,20 +46,13 @@ def create_colab_ui() -> Dict[str, Any]:
                 "style": "primary",
                 "order": 1
             }
-        ],
-        button_style="primary"
+        ]
     )
     ui_components['action_container'] = action_container
     
     # 3. Create Progress Tracker
     progress_tracker = ProgressTracker(
-        steps=[
-            {"id": "drive", "label": "Google Drive"},
-            {"id": "folders", "label": "Folder Structure"},
-            {"id": "env", "label": "Environment"},
-            {"id": "verify", "label": "Verification"}
-        ],
-        current_step=0,
+        title="Status Setup",
         layout={"margin": "20px 0"}
     )
     ui_components['progress_tracker'] = progress_tracker

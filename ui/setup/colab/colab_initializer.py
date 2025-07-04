@@ -102,14 +102,16 @@ class ColabEnvInitializer(ModuleInitializer):
 
             return {"status": True, "ui": ui_components, "handlers": self._handlers}
         except Exception as exc:  # pragma: no cover
-            from ipywidgets import HTML
+            from smartcash.ui.core.shared.error_handler import get_error_handler
 
             msg = f"❌ Gagal inisialisasi UI: {exc}"
             self.logger.error(msg, exc_info=True)
+            error_handler = get_error_handler("colab")
+            error_component = error_handler.handle_exception(exc, context="UI Initialization")
             return {
                 "status": False,
                 "error": str(exc),
-                "ui": {"ui": HTML(f"<div style='color:red'>{msg}</div>")},
+                "ui": {"ui": error_component if error_component else None},
             }
 
     # ------------------------------------------------------------------

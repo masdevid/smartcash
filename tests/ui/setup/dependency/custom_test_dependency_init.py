@@ -43,7 +43,10 @@ def test_custom_dependency_initialization(mock_config, mock_ui_components, dep_i
     mock_config.return_value = {'test_config': True}
     mock_ui_components.return_value = {'test_ui': 'component'}
 
+    # Add detailed logging to diagnose initialization
+    print("\n[TEST_DEBUG] Starting dependency initialization test")
     result = dep_initializer.initialize()
+    print("[TEST_DEBUG] Initialization result:", result)
 
     assert result['success'] is True
     assert 'ui_components' in result

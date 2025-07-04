@@ -19,6 +19,9 @@ class DependencyInitializer(ModuleInitializer):
             handler_class=DependencyUIHandler,
             auto_setup_handlers=True
         )
+        # Override the handler instantiation to ensure correct arguments
+        if not hasattr(self, '_module_handler') or self._module_handler is None:
+            self._module_handler = DependencyUIHandler(module_name='dependency', parent_module='setup')
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default dependency configuration"""
@@ -28,8 +31,10 @@ class DependencyInitializer(ModuleInitializer):
         """🚀 Initialize dependency module - implements abstract method"""
         try:
             self.logger.info("🚀 Memulai inisialisasi dependency module...")
-             # Pre-initialization checks
+            # Pre-initialization checks
+            self.logger.info("🔍 Melakukan pre-initialization checks...")
             self.pre_initialize_checks()
+            self.logger.info("✅ Pre-initialization checks selesai")
             # Load config
             self.logger.info("📂 Loading configuration...")
             config = self.get_default_config()
@@ -56,7 +61,9 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.info("✅ Operation handlers setup complete")
             
             # Post initialization
+            self.logger.info("🧹 Melakukan post-initialization cleanup...")
             self.post_initialize_cleanup()
+            self.logger.info("✅ Post-initialization cleanup selesai")
             
             # Mark as initialized
             self._is_initialized = True
@@ -74,6 +81,7 @@ class DependencyInitializer(ModuleInitializer):
             from smartcash.ui.core.shared.error_handler import get_error_handler
             error_handler = get_error_handler('dependency')
             error_handler.handle_exception(e, 'initialization', fail_fast=False)
+            self.logger.error(f"❌ Initialization failed: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
@@ -82,6 +90,7 @@ class DependencyInitializer(ModuleInitializer):
                 'config_handler': None,
                 'operation_handlers': {}
             }
+    
     def pre_initialize_checks(self) -> None:
         """Pre-initialization validation checks"""
         # Check if required imports are available
@@ -103,28 +112,34 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.warning(f"⚠️ Missing components: {missing}")
     
     def setup_handlers(self, ui_components: Dict[str, Any]) -> None:
-        """Setup UI handlers untuk dependency"""
+        """Setup module handler with UI components."""
+        self.logger.info("🔧 Setting up module handlers...")
+        
         try:
-            # Store UI components
-            self._ui_components = ui_components
-            
-            # Create and setup module handler
-            if not self._module_handler:
+            # Create main module handler if not already created
+            if not hasattr(self, '_module_handler') or self._module_handler is None:
                 self._module_handler = self.create_module_handler()
             
-            # Setup module handler with UI components
+            # Setup with UI components
             self._module_handler.setup(ui_components)
             
-            # Connect button handlers
-            self._connect_button_handlers()
+            # Register in handlers dict
+            self._handlers['module'] = self._module_handler
+            self._handlers['config'] = self._module_handler  # Alias for backward compat
             
-            self.logger.info("✅ Handlers berhasil di-setup")
-            
+            self.logger.info(f"✅ Handlers setup complete: {len(self._handlers)} handlers")
         except Exception as e:
             from smartcash.ui.core.shared.error_handler import get_error_handler
             error_handler = get_error_handler('dependency')
             error_handler.handle_exception(e, 'setting up handlers', fail_fast=False)
             raise
+    
+    def create_module_handler(self) -> DependencyUIHandler:
+        """Create module handler instance with correct arguments."""
+        return DependencyUIHandler(
+            module_name=self.module_name,
+            parent_module=self.parent_module
+        )
     
     def _connect_button_handlers(self) -> None:
         """Connect button click handlers"""

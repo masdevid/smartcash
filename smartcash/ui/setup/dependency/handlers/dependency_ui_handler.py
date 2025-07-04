@@ -141,6 +141,17 @@ class DependencyUIHandler(ModuleUIHandler):
         except Exception as e:
             self.logger.error(f"❌ Error updating custom packages: {e}")
     
+    def setup(self, ui_components: Dict[str, Any]) -> None:
+        """
+        Set up the handler with UI components.
+        
+        Args:
+            ui_components: Dictionary of UI components to be managed by this handler.
+        """
+        self.logger.info("🖥️ Setting up UI components for Dependency UI Handler")
+        self._ui_components = ui_components
+        self.logger.info("✅ UI components setup complete for Dependency UI Handler")
+    
     def sync_config_with_ui(self) -> None:
         """Sync configuration dengan UI state"""
         try:
@@ -202,3 +213,13 @@ class DependencyUIHandler(ModuleUIHandler):
         except Exception as e:
             self.logger.error(f"❌ Error updating custom packages: {e}")
             return False
+    
+    def initialize(self) -> None:
+        """
+        Initialize the UI handler for dependency module.
+        Implements the abstract method required by ModuleUIHandler.
+        """
+        self.logger.info("🚀 Initializing Dependency UI Handler")
+        # Perform any necessary initialization for the dependency UI handler
+        # This can be extended with specific initialization logic as needed
+        self.logger.info("✅ Dependency UI Handler initialized successfully")

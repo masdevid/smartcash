@@ -28,7 +28,8 @@ class DependencyInitializer(ModuleInitializer):
         """🚀 Initialize dependency module - implements abstract method"""
         try:
             self.logger.info("🚀 Memulai inisialisasi dependency module...")
-            
+             # Pre-initialization checks
+            self.pre_initialize_checks()
             # Load config
             self.logger.info("📂 Loading configuration...")
             config = self.get_default_config()
@@ -37,6 +38,11 @@ class DependencyInitializer(ModuleInitializer):
             # Create UI components
             self.logger.info("🖥️ Creating UI components...")
             ui_components = create_dependency_ui_components(config)  # Updated to use new function
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            
+            # Store UI components
+            self._ui_components = ui_components
             self.logger.info("✅ UI components created")
             
             # Setup handlers
@@ -49,6 +55,11 @@ class DependencyInitializer(ModuleInitializer):
             self.setup_operation_handlers()
             self.logger.info("✅ Operation handlers setup complete")
             
+            # Post initialization
+            self.post_initialize_cleanup()
+            
+            # Mark as initialized
+            self._is_initialized = True
             self.logger.info("✅ Dependency module berhasil diinisialisasi")
             
             return {
@@ -71,6 +82,25 @@ class DependencyInitializer(ModuleInitializer):
                 'config_handler': None,
                 'operation_handlers': {}
             }
+    def pre_initialize_checks(self) -> None:
+        """Pre-initialization validation checks"""
+        # Check if required imports are available
+        try:
+            from .components.dependency_tabs import create_dependency_tabs
+            from .handlers.dependency_ui_handler import DependencyUIHandler
+        except ImportError as e:
+            raise RuntimeError(f"Missing required components: {e}")
+    
+    def post_initialize_cleanup(self) -> None:
+        """Post-initialization cleanup and validation"""
+        # Validate that essential UI components were created
+        if not self._ui_components:
+            raise RuntimeError("No UI components were created")
+        
+        required_components = ['main_container', 'ui']
+        missing = [comp for comp in required_components if comp not in self._ui_components]
+        if missing:
+            self.logger.warning(f"⚠️ Missing components: {missing}")
     
     def setup_handlers(self, ui_components: Dict[str, Any]) -> None:
         """Setup UI handlers untuk dependency"""

@@ -404,25 +404,10 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
         
         # Initialize dengan config
         result = _dependency_initializer.initialize()
-        
+        raise ValueError('oko')
         if result.get('success', False):
-            from smartcash.ui.utils.widget_utils import display_widget
-            main_container = result.get('ui_components', {}).get('main_container')
-            if main_container:
-                try:
-                    displayed_widget = display_widget(main_container)
-                    if displayed_widget is not None:
-                        print("Widget displayed successfully")
-                        return displayed_widget
-                    else:
-                        print("Widget display returned None - likely not in a UI-supported environment")
-                        return main_container  # Return the raw container if display fails
-                except Exception as display_error:
-                    print(f"Widget display failed with error: {str(display_error)}")
-                    print("Returning raw UI container as fallback - display may not be supported in this environment")
-                    return main_container
-            else:
-                raise ValueError("Main container not found in UI components")
+            from smartcash.ui.utils.widget_utils import safe_display
+            return safe_display(result)
         else:
             raise ValueError("Initialization failed")
             

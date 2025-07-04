@@ -12,13 +12,14 @@ from .components.dependency_ui import create_dependency_ui_components  # New imp
 class DependencyInitializer(ModuleInitializer):
     """Initializer untuk dependency module dengan proper structure"""
     
-    def __init__(self):
-        super().__init__(
-            module_name='dependency',
-            parent_module='setup',
-            handler_class=DependencyUIHandler,
-            auto_setup_handlers=True
-        )
+    def __init__(self, module_name: str = 'dependency', parent_module: Optional[str] = 'setup'):
+        super().__init__(module_name, parent_module)
+        self._ui_components = None
+        self._handlers = {}
+        self._operation_handlers = {}
+        self._module_handler = None
+        self._is_initialized = False
+        self.logger.info(f"🛠️ DependencyInitializer dibuat untuk modul: {module_name}")
         # Override the handler instantiation to ensure correct arguments
         if not hasattr(self, '_module_handler') or self._module_handler is None:
             self._module_handler = DependencyUIHandler(module_name='dependency', parent_module='setup')
@@ -113,10 +114,9 @@ class DependencyInitializer(ModuleInitializer):
     
     def setup_handlers(self, ui_components: Dict[str, Any]) -> None:
         """Setup module handler with UI components."""
-        self.logger.info("🔧 Setting up module handlers...")
-        
         try:
-            # Create main module handler if not already created
+            self.logger.info("🔧 Memulai setup handlers...")
+            # Create module handler
             if not hasattr(self, '_module_handler') or self._module_handler is None:
                 self._module_handler = self.create_module_handler()
             
@@ -124,6 +124,8 @@ class DependencyInitializer(ModuleInitializer):
             self._module_handler.setup(ui_components)
             
             # Register in handlers dict
+            if not hasattr(self, '_handlers'):
+                self._handlers = {}
             self._handlers['module'] = self._module_handler
             self._handlers['config'] = self._module_handler  # Alias for backward compat
             

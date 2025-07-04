@@ -33,7 +33,7 @@ def test_colab_initializer_error_handling():
             # Verifikasi hasil
             assert result["status"] is False
             assert "error" in result
-            assert "Exception in UI Initialization" in result["error"]
+            assert "[colab] Exception in UI Initialization" in result["error"]
             assert "not defined" in result["error"]
             assert "ui" in result
             assert "ui" in result["ui"]

@@ -9,7 +9,6 @@ from typing import Dict, Any, Optional, List, Union, Sequence
 import ipywidgets as widgets
 
 # Import utility functions
-from smartcash.ui.core.utils.widget_utils import hide_stray_accordions
 
 class MainContainer:
     """Flexible main container component with consistent styling.

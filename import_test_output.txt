@@ -472,32 +472,6 @@ VBox(children=(HTML(value='<div style="background:#f8f9fa;padding:15px;border-ra
 --------------------------------------------------------------------------------
 <IPython.core.display.HTML object>
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='250px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('ENVIRONMENT LOGS',))
-<IPython.core.display.HTML object>
-2025-07-04 05:26:53,368 - LOGGER.20 - INFO - 📋 Config updated: 6 items
-2025-07-04 05:26:53,369 - LOGGER.20 - INFO - 🔧 Setup handler initialized
-2025-07-04 05:26:53,369 - LOGGER.20 - INFO - 📋 Config updated: 6 items
-2025-07-04 05:26:53,369 - LOGGER.20 - ERROR - ❌ Gagal setup handlers: Can't instantiate abstract class EnvConfigHandler without an implementation for abstract method 'initialize'
-Traceback (most recent call last):
-  File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 110, in setup_handlers
-    env_config_handler = EnvConfigHandler(ui_components=self._ui_components)
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-TypeError: Can't instantiate abstract class EnvConfigHandler without an implementation for abstract method 'initialize'
-2025-07-04 05:26:53,370 - LOGGER.20 - ERROR - Failed to initialize environment configuration UI: ❌ Gagal setup handlers: Can't instantiate abstract class EnvConfigHandler without an implementation for abstract method 'initialize'
-Traceback (most recent call last):
-  File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 110, in setup_handlers
-    env_config_handler = EnvConfigHandler(ui_components=self._ui_components)
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-TypeError: Can't instantiate abstract class EnvConfigHandler without an implementation for abstract method 'initialize'
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 52, in initialize
-    self.setup_handlers()
-  File "/Users/masdevid/Projects/smartcash/smartcash/ui/setup/env_config/env_config_initializer.py", line 126, in setup_handlers
-    raise RuntimeError(msg) from exc
-RuntimeError: ❌ Gagal setup handlers: Can't instantiate abstract class EnvConfigHandler without an implementation for abstract method 'initialize'
-{}
 ✅ smartcash.ui.cells.cell_1_2_env_config berhasil diimpor
    - 9 simbol ditemukan
 --------------------------------------------------------------------------------
@@ -732,14 +706,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.dataset.split.split_init'
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 
 ⚠️  Error tidak terduga saat mengimpor smartcash.ui.cells.cell_2_3_preprocessing: Unexpected error: safe_ui_operation() got an unexpected keyword argument 'error_title'
@@ -823,15 +796,15 @@ ImportError: cannot import name 'create_error_ui' from 'smartcash.ui.utils.fallb
 ✅ Ditemukan: /Users/masdevid/Projects/smartcash/smartcash/ui/cells/cell_2_5_dataset_visualization.py
 --------------------------------------------------------------------------------
 Warning: Failed to initialize suppression: 'PretrainedInitializer' object has no attribute 'ui_components'
-2025-07-04 05:26:53,421 - UI_LOGGER.smartcash.ui.ui.pretrained - ERROR - ❌ Modul defaults tidak ditemukan: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
+2025-07-04 07:32:35,196 - UI_LOGGER.smartcash.ui.ui.pretrained - ERROR - ❌ Modul defaults tidak ditemukan: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/config_handler.py", line 217, in get_default_config
     from smartcash.ui.pretrained.handlers.defaults import get_default_pretrained_config
 ImportError: cannot import name 'get_default_pretrained_config' from 'smartcash.ui.pretrained.handlers.defaults' (/Users/masdevid/Projects/smartcash/smartcash/ui/pretrained/handlers/defaults.py)
-2025-07-04 05:26:53,421 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - WARNING - Failed to load config: "Attempt to overwrite 'message' in LogRecord"
+2025-07-04 07:32:35,196 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - WARNING - Failed to load config: "Attempt to overwrite 'message' in LogRecord"
 <IPython.core.display.HTML object>
 Accordion(children=(Box(children=(VBox(layout=Layout(align_items='stretch', display='flex', flex_flow='column', margin='0', padding='8px', width='100%')),), layout=Layout(align_items='stretch', border_bottom='1px solid #e0e0e0', border_left='1px solid #e0e0e0', border_right='1px solid #e0e0e0', border_top='1px solid #e0e0e0', display='flex', flex_flow='column', height='300px', overflow='hidden', width='100%'), _dom_classes=('smartcash-log-container',)),), titles=('200PX LOGS',))
-2025-07-04 05:26:53,432 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - ERROR - ❌ Gagal inisialisasi pretrained: 'log_output'
+2025-07-04 07:32:35,207 - UI_LOGGER.smartcash.ui.pretrained.pretrained_initializer - ERROR - ❌ Gagal inisialisasi pretrained: 'log_output'
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/smartcash/ui/initializers/common_initializer.py", line 150, in initialize
     ui_components = self._create_ui_components(config, **kwargs) or {}
@@ -927,14 +900,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.hyperparameters'
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 
 ❌ Gagal mengimpor smartcash.ui.cells.cell_3_3_training_strategy: No module named 'smartcash.ui.strategy'
@@ -977,14 +949,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.strategy'
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 
 ❌ Gagal mengimpor smartcash.ui.cells.cell_4_1_model_training: No module named 'smartcash.ui.training'
@@ -1027,14 +998,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.training'
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 
 ❌ Gagal mengimpor smartcash.ui.cells.cell_4_2_model_evaluation: No module named 'smartcash.ui.evaluation'
@@ -1077,14 +1047,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.charts berhasil diimpor
    - 9 simbol ditemukan
@@ -1192,7 +1161,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    - 15 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.components.main_container berhasil diimpor
-   - 16 simbol ditemukan
+   - 17 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.components.progress_tracker berhasil diimpor
    - 29 simbol ditemukan
@@ -1285,7 +1254,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    - 22 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.core.handlers.base_handler berhasil diimpor
-   - 20 simbol ditemukan
+   - 19 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.core.handlers.config_handler berhasil diimpor
    - 26 simbol ditemukan
@@ -1294,7 +1263,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    - 33 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.core.handlers.ui_handler berhasil diimpor
-   - 18 simbol ditemukan
+   - 19 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.core.helpers.reset_components_helper berhasil diimpor
    - 23 simbol ditemukan
@@ -1330,7 +1299,10 @@ ModuleNotFoundError: No module named 'smartcash.ui.evaluation'
    - 25 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.core.shared.ui_component_manager berhasil diimpor
-   - 24 simbol ditemukan
+   - 25 simbol ditemukan
+--------------------------------------------------------------------------------
+✅ smartcash.ui.core.utils.widget_utils berhasil diimpor
+   - 13 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.dataset berhasil diimpor
    - 26 simbol ditemukan
@@ -3191,14 +3163,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 
 ❌ Gagal mengimpor smartcash.ui.setup.dependency.utils.package_manager: No module named 'smartcash.ui.setup.dependency.utils.ui_components'
@@ -3245,14 +3216,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 
 ❌ Gagal mengimpor smartcash.ui.setup.dependency.utils.version_checker: No module named 'smartcash.ui.setup.dependency.utils.ui_components'
@@ -3299,14 +3269,13 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
    4. /Users/masdevid/Projects/smartcash/tests/ui/components
    5. /Users/masdevid/Projects/smartcash
    6. /Users/masdevid/Projects/smartcash
-   7. /opt/anaconda3/bin
-   8. /opt/anaconda3/lib/python312.zip
-   9. /opt/anaconda3/lib/python3.12
-   10. /opt/anaconda3/lib/python3.12/lib-dynload
-   11. /opt/anaconda3/lib/python3.12/site-packages
-   12. /opt/anaconda3/lib/python3.12/site-packages/aeosa
-   13. /Users/masdevid/Projects/smartcash
-   14. /Users/masdevid/Projects/smartcash/tests
+   7. /opt/anaconda3/lib/python312.zip
+   8. /opt/anaconda3/lib/python3.12
+   9. /opt/anaconda3/lib/python3.12/lib-dynload
+   10. /opt/anaconda3/lib/python3.12/site-packages
+   11. /opt/anaconda3/lib/python3.12/site-packages/aeosa
+   12. /Users/masdevid/Projects/smartcash
+   13. /Users/masdevid/Projects/smartcash/tests
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.setup.env_config berhasil diimpor
    - 20 simbol ditemukan
@@ -3324,7 +3293,7 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
    - 11 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.setup.env_config.components.ui_components berhasil diimpor
-   - 24 simbol ditemukan
+   - 23 simbol ditemukan
 --------------------------------------------------------------------------------
 ✅ smartcash.ui.setup.env_config.configs berhasil diimpor
    - 16 simbol ditemukan
@@ -3424,9 +3393,9 @@ ModuleNotFoundError: No module named 'smartcash.ui.setup.dependency.utils.ui_com
 --------------------------------------------------------------------------------
 
 ================================================================================
-🏁 Selesai dalam 8.53 detik
-📊 Total modul diuji: 463
-✅ Berhasil: 420
+🏁 Selesai dalam 8.73 detik
+📊 Total modul diuji: 464
+✅ Berhasil: 421
 ❌ Gagal: 43
 
 🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍🔍
@@ -3789,11 +3758,11 @@ ANALYSIS OF FAILED IMPORTS:
 1. Periksa apakah semua dependensi sudah terinstall
 2. Pastikan path modul sudah benar
 3. Periksa error di file log untuk detail lebih lanjut
-   Path log: /Users/masdevid/Projects/smartcash/logs/import_test_20250704_052645.log
+   Path log: /Users/masdevid/Projects/smartcash/logs/import_test_20250704_073226.log
 
 📝 Daftar modul yang gagal disimpan di: /Users/masdevid/Projects/smartcash/logs/failed_imports.txt
 
-❌ Error tidak terduga: 43 != 0 : 43 dari 463 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_052645.log untuk detail lengkap.
+❌ Error tidak terduga: 43 != 0 : 43 dari 464 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_073226.log untuk detail lengkap.
 Traceback (most recent call last):
   File "/Users/masdevid/Projects/smartcash/tests/unit/test_imports.py", line 526, in test_module_imports
     self.assertEqual(
@@ -3801,4 +3770,4 @@ Traceback (most recent call last):
     assertion_func(first, second, msg=msg)
   File "/opt/anaconda3/lib/python3.12/unittest/case.py", line 878, in _baseAssertEqual
     raise self.failureException(msg)
-AssertionError: 43 != 0 : 43 dari 463 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_052645.log untuk detail lengkap.
+AssertionError: 43 != 0 : 43 dari 464 modul gagal diimport. Lihat file /Users/masdevid/Projects/smartcash/logs/import_test_20250704_073226.log untuk detail lengkap.

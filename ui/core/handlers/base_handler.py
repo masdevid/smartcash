@@ -5,9 +5,9 @@ Deskripsi: Base handler dengan fail-fast principle dan centralized error handlin
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Callable, Union, List
+from typing import Dict, Any, Optional, List, Union, Callable
+
 from smartcash.ui.utils.ui_logger import get_module_logger
-from smartcash.ui.core.shared.ui_component_manager import UIComponentManager
 
 class BaseHandler(ABC):
     """Base handler dengan fail-fast principle dan centralized error handling."""
@@ -24,11 +24,7 @@ class BaseHandler(ABC):
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
         # Setup logger
-        from smartcash.ui.core.shared.logger import get_enhanced_logger
-        self.logger = get_enhanced_logger(f"smartcash.ui.{self.full_module_name}")
-        
-        # Component manager
-        self._component_manager = UIComponentManager(self.full_module_name)
+        self.logger = get_module_logger(self.full_module_name)
         
         # Internal state
         self._is_initialized = False
@@ -101,22 +97,7 @@ class BaseHandler(ABC):
         self._last_error = None
         self.logger.debug(f"🔄 Reset error state for {self.full_module_name}")
     
-    def get_component(self, name: str, default: Any = None) -> Any:
-        """Get component from manager."""
-        return self._component_manager.get_component(name, default)
-    
-    def add_component(self, name: str, component: Any, shared: bool = False) -> None:
-        """Add component to manager."""
-        if not self._component_manager.add_component(name, component, shared):
-            self.handle_error(f"Failed to add component '{name}'")
-    
-    def remove_component(self, name: str) -> bool:
-        """Remove component from manager."""
-        return self._component_manager.remove_component(name)
-    
-    def get_component_stats(self) -> Dict[str, Any]:
-        """Get component statistics."""
-        return self._component_manager.get_stats()
+    # Component management methods have been removed to eliminate dependency on UIComponentManager
     
     @abstractmethod
     def initialize(self) -> Dict[str, Any]:

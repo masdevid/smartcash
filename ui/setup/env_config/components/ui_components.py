@@ -125,15 +125,17 @@ def create_env_config_ui() -> Dict[str, Any]:
     )
     ui_components['footer_container'] = footer_container
 
+    # Create log accordion explicitly to ensure it exists
+    from smartcash.ui.components.log_accordion import LogAccordion
+    log_accordion = LogAccordion(module_name="Environment")
+    
     # Expose log components via footer container
-    if footer_container.log_accordion:
-        ui_components['log_accordion'] = footer_container.log_accordion
-        if getattr(footer_container, 'log_output', None):
-            ui_components['log_output'] = footer_container.log_output
-            ui_components['log_components'] = footer_container.log_output
-        else:
-            ui_components['log_output'] = footer_container.log_accordion
-            ui_components['log_components'] = footer_container.log_accordion
+    ui_components['log_accordion'] = log_accordion
+    ui_components['log_output'] = log_accordion
+    ui_components['log_components'] = log_accordion
+    
+    # Make sure the footer container has the log accordion
+    footer_container.log_accordion = log_accordion
     
     # 8. Create the final UI layout using main_container
     

@@ -43,34 +43,87 @@ class EnvConfigInitializer(ModuleInitializer):
     # Public API
     # ------------------------------------------------------------------
     def initialize(self, config: Dict[str, Any] | None = None, **kwargs) -> Dict[str, Any]:
-        """Run the full initialization workflow and return a result dict."""
+        """Initialize environment configuration UI and handlers.
+        
+        Args:
+            config: Optional configuration dictionary
+            **kwargs: Additional keyword arguments
+            
+        Returns:
+            Dictionary with status and UI components
+        """
         try:
+            # Set config
             self._config = {**self._get_default_config(), **(config or {})}
-
+            
+            # Run pre-initialization checks
             self.pre_initialize_checks()
-            self._ui_components = self.create_ui_components()
-            self.setup_handlers()
+            
+            # Create UI components
+            ui_components = create_env_config_ui()
+            self._ui_components = ui_components
+            
+            # Initialize handlers
+            handler = EnvConfigHandler(ui_components)
+            self._handlers['env_config'] = handler
+            
+            # Initialize setup handler
+            setup_handler = SetupHandler(ui_components)
+            self._handlers['setup'] = setup_handler
+            
+            # Connect setup button to handler
+            if 'setup_button' in ui_components:
+                setup_button = ui_components['setup_button']
+                # Replace placeholder handler with actual handler
+                for callback in list(setup_button._click_callbacks):
+                    setup_button.on_click(callback, remove=True)
+                setup_button.on_click(handler.handle_setup_button_click)
+                self.logger.debug("✅ Connected setup button to handler")
+            
+            # Create main container
+            main_container = MainContainer(
+                header=ui_components.get('header_container'),
+                content=[
+                    ui_components.get('summary_container'),
+                    ui_components.get('progress_tracker').widget,
+                    ui_components.get('env_info_panel'),
+                    ui_components.get('form_container'),
+                    ui_components.get('tips_requirements')
+                ],
+                footer=ui_components.get('footer_container')
+            )
+            
+            # Store the main container in UI components
+            ui_components['main_container'] = main_container
+            ui_components['ui'] = main_container.widget
+            
+            # Run post-initialization checks
             self.post_initialization_checks()
             self._initialized = True
-
+            
             self.logger.info("✅ Environment configuration UI initialized successfully")
-            return {"success": True, "ui": self._ui_components, "handlers": self._handlers}
-        except Exception as exc:  # pragma: no cover – surfaced via UI
-            from smartcash.ui.core.shared.error_handler import get_error_handler
-
-            msg = f"Failed to initialize environment configuration UI: {exc}"
+            
+            # Return success with status key (not success) for API consistency
+            return {
+                'status': True,
+                'ui': ui_components,
+                'handlers': self._handlers
+            }
+            
+        except Exception as e:
+            # Log error and return failure
+            msg = f"Failed to initialize environment configuration UI: {e}"
             self.logger.error(msg, exc_info=True)
-            error_handler = get_error_handler("env_config")
-            error_ui = error_handler.handle_error(
-                msg,
-                level="error",
-                exc_info=True,
-                fail_fast=False,
-                create_ui_error=True,
-            )
-            if error_ui is None:
-                error_ui = {}
-            return {"success": False, "error": msg, "ui": error_ui}
+            
+            # Create simple error UI
+            from ipywidgets import HTML
+            error_ui = {'ui': HTML(f"<div style='color:red;padding:10px;'>❌ {msg}</div>")}
+            
+            return {
+                'status': False,
+                'error': str(e),
+                'ui': error_ui
+            }
 
     # ------------------------------------------------------------------
     # Phases
@@ -86,44 +139,6 @@ class EnvConfigInitializer(ModuleInitializer):
         for path in (Path.home(), Path.cwd()):
             if not path.exists():
                 self.logger.warning("⚠️ Path tidak ditemukan: %s", path)
-
-    def create_ui_components(self) -> Dict[str, Any]:
-        self.logger.info("🎨 Membuat UI components…")
-        try:
-            ui = create_env_config_ui()
-            self.logger.info("✅ UI components berhasil dibuat")
-            return ui
-        except Exception as exc:
-            msg = f"❌ Gagal create UI components: {exc}"
-            self.logger.error(msg, exc_info=True)
-            raise RuntimeError(msg) from exc
-
-    def setup_handlers(self) -> None:
-        self.logger.info("🔧 Setup handlers…")
-        try:
-            config_handler = ConfigHandler()
-            config_handler.config = self._config
-
-            setup_handler = SetupHandler()
-            setup_handler.config = self._config
-
-            env_config_handler = EnvConfigHandler(ui_components=self._ui_components)
-            env_config_handler.config = self._config
-            env_config_handler.setup_dependencies(
-                config_handler=config_handler,
-                setup_handler=setup_handler,
-            )
-
-            self._handlers = {
-                "env_config": env_config_handler,
-                "config": config_handler,
-                "setup": setup_handler,
-            }
-            self.logger.info("✅ Handlers berhasil di-setup")
-        except Exception as exc:
-            msg = f"❌ Gagal setup handlers: {exc}"
-            self.logger.error(msg, exc_info=True)
-            raise RuntimeError(msg) from exc
 
     def post_initialization_checks(self) -> None:
         self.logger.info("🔍 Melakukan post-initialization checks…")
@@ -161,34 +176,14 @@ class EnvConfigInitializer(ModuleInitializer):
 def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  
     """Notebook/CLI helper that returns the rendered widget via `safe_display`."""
     
-    # Initialize the UI first to ensure we have all components created
+    # Initialize the UI with a fresh instance
     initializer = EnvConfigInitializer()
     result = initializer.initialize(config=config, **kwargs)
     
-    # Get the UI components
-    ui_components = result.get('ui', {})
-    
-    # Only clean up stray widgets AFTER we've created our UI components
-    # This ensures we don't hide our own log accordion
-    try:
-        from smartcash.ui.core.shared.ui_component_manager import get_component_manager, cleanup_stray_widgets
-        
-        # Get the log accordion to preserve it during cleanup
-        log_accordion = ui_components.get('log_accordion')
-        safe_widgets = [log_accordion] if log_accordion else []
-        
-        # Reset registered components except our important ones
-        manager = get_component_manager('env_config')
-        manager.reset_components_silently()
-        
-        # Clean up any stray widgets but preserve our log accordion
-        cleanup_stray_widgets(['Accordion', 'Output', 'VBox', 'HBox', 'Tab'], 'env_config')
-    except Exception as e:
-        # Log but continue if cleanup fails
-        import logging
-        logging.getLogger('env_config').debug(f"Post-initialization cleanup failed: {e}")
-    
-    # Return the UI components
+    # Check for success using 'status' key for API consistency
+    # This follows the memory to use 'status' instead of 'success'
     if not result.get('status', False):
         return result.get('ui', {}).get('ui', {})
+    
+    # Return the main UI widget directly
     return result.get('ui', {}).get('ui', {})

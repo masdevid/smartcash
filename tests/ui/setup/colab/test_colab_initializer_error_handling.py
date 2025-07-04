@@ -18,7 +18,7 @@ def test_colab_initializer_error_handling():
     """
     # Mock create_colab_ui untuk melempar exception
     with patch('smartcash.ui.setup.colab.components.ui_components.create_colab_ui') as mock_create_ui:
-        mock_create_ui.side_effect = Exception("BaseUIComponent.__init__() got an unexpected keyword argument 'title'")
+        mock_create_ui.side_effect = Exception("BaseUIComponent.__init__() got an unexpected keyword argument 'layout'")
 
         # Mock get_error_handler dan handle_exception untuk memastikan dipanggil
         with patch('smartcash.ui.core.shared.error_handler.get_error_handler') as mock_get_handler:
@@ -33,7 +33,7 @@ def test_colab_initializer_error_handling():
             # Verifikasi hasil
             assert result["status"] is False
             assert "error" in result
-            assert "title" in result["error"]
+            assert "layout" in result["error"]
             assert "ui" in result
             assert "ui" in result["ui"]
             assert result["ui"]["ui"] == mock_error_component
@@ -42,7 +42,7 @@ def test_colab_initializer_error_handling():
             mock_get_handler.assert_called_once_with("colab")
             mock_error_handler.handle_exception.assert_called_once()
             call_args = mock_error_handler.handle_exception.call_args[0]
-            assert "title" in str(call_args[0])
+            assert "layout" in str(call_args[0])
             assert len(mock_error_handler.handle_exception.call_args[1]) >= 1
             assert mock_error_handler.handle_exception.call_args[1]["context"] == "UI Initialization"
 

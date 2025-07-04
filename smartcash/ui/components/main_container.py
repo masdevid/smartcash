@@ -152,5 +152,4 @@ def create_main_container(
         footer_container=footer_container,
         **style_options
     )
-    ß
     return container

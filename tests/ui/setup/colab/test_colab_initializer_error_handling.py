@@ -18,7 +18,7 @@ def test_colab_initializer_error_handling():
     """
     # Mock create_colab_ui untuk melempar exception
     with patch('smartcash.ui.setup.colab.components.ui_components.create_colab_ui') as mock_create_ui:
-        mock_create_ui.side_effect = Exception("name '\xdf' is not defined")
+        mock_create_ui.side_effect = RuntimeError("[colab] name '\xdf' is not defined")
 
         # Mock get_error_handler dan handle_exception untuk memastikan dipanggil
         with patch('smartcash.ui.core.shared.error_handler.get_error_handler') as mock_get_handler:

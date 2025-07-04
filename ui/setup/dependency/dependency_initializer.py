@@ -431,16 +431,17 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
         error_handler = get_error_handler('dependency')
         error_ui = CoreErrorHandler('dependency').create_error_ui({'error': True, 'message': f"Error initializing dependency UI: {str(e)}", 'title': "Initialization Error"})
         error_handler.handle_exception(e, 'initializing dependency UI', fail_fast=False)
-        try:
-            from smartcash.ui.utils.widget_utils import display_widget
-            displayed_error_widget = display_widget(error_ui)
-            if displayed_error_widget is not None:
-                print("Error widget displayed successfully")
-                return displayed_error_widget
-            else:
-                print("Error widget display returned None - likely not in a UI-supported environment")
-                return error_ui  # Return the raw error UI if display fails
-        except Exception as display_error:
-            print(f"Error widget display failed with error: {str(display_error)}")
-            print("Returning raw error UI as fallback - display may not be supported in this environment")
-            return error_ui
+        return error_ui
+        # try:
+        #     from smartcash.ui.utils.widget_utils import display_widget
+        #     displayed_error_widget = display_widget(error_ui)
+        #     if displayed_error_widget is not None:
+        #         print("Error widget displayed successfully")
+        #         return displayed_error_widget
+        #     else:
+        #         print("Error widget display returned None - likely not in a UI-supported environment")
+        #         return error_ui  # Return the raw error UI if display fails
+        # except Exception as display_error:
+        #     print(f"Error widget display failed with error: {str(display_error)}")
+        #     print("Returning raw error UI as fallback - display may not be supported in this environment")
+        #     return error_ui

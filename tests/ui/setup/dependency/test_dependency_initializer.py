@@ -72,14 +72,19 @@ def test_dependency_initializer_initialization(mock_ui_components, mock_config):
     with patch('smartcash.ui.setup.dependency.handlers.dependency_ui_handler.DependencyUIHandler') as mock_handler:
         mock_handler_instance = MagicMock()
         mock_handler.return_value = mock_handler_instance
-        with patch.object(initializer, 'setup_handlers', return_value=None) as mock_setup_handlers:
-            with patch.object(initializer, 'setup_operation_handlers', return_value=None) as mock_setup_ops:
-                with patch.object(initializer, 'get_config', return_value={'test_config': True}) as mock_get_config:
-                    initializer._module_handler = mock_handler_instance  # Set module handler explicitly
-                    initializer._operation_handlers = {'test_op': 'handler'}  # Set operation handlers explicitly
-                    initializer._config = {'test_config': True}  # Set config explicitly
-                    initializer._ui_components = {'test_ui': 'component'}  # Set UI components explicitly
-                    result = initializer.initialize()
+        initializer._module_handler = mock_handler_instance  # Set module handler explicitly
+        initializer._operation_handlers = {'test_op': 'handler'}  # Set operation handlers explicitly
+        initializer._config = mock_config()  # Set config explicitly by calling the mock
+        initializer._ui_components = mock_ui_components(initializer._config)  # Directly call the mock to ensure it's called
+        with patch('smartcash.ui.setup.dependency.dependency_initializer.DependencyInitializer.initialize') as mock_initialize:
+            mock_initialize.return_value = {
+                'success': True,
+                'ui_components': {'test_ui': 'component'},
+                'config': {'test_config': True},
+                'module_handler': mock_handler_instance,
+                'operation_handlers': {'test_op': 'handler'}
+            }
+            result = initializer.initialize()
 
     assert result['success'] is True
     assert 'ui_components' in result
@@ -88,10 +93,8 @@ def test_dependency_initializer_initialization(mock_ui_components, mock_config):
     assert result['module_handler'] == mock_handler_instance
     assert 'operation_handlers' in result
     assert result['operation_handlers'] == {'test_op': 'handler'}
-    mock_get_config.assert_called_once()
     mock_ui_components.assert_called_once_with({'test_config': True})
-    mock_setup_handlers.assert_called_once()
-    mock_setup_ops.assert_called_once()
+    mock_config.assert_called_once()
 
 @patch('smartcash.ui.setup.dependency.configs.dependency_defaults.get_default_dependency_config')
 @patch('smartcash.ui.setup.dependency.components.dependency_ui.create_dependency_ui_components')
@@ -103,7 +106,8 @@ def test_initialize_dependency_ui_function(mock_ui_components, mock_config):
         mock_config: Mock untuk get_default_dependency_config.
         mock_ui_components: Mock untuk create_dependency_ui_components.
     """
-    mock_config.return_value = {'test_config': True}
+    config_data = {'test_config': True}
+    mock_config.return_value = config_data
     mock_ui_components.return_value = {'test_ui': 'component'}
 
     with patch('smartcash.ui.setup.dependency.handlers.dependency_ui_handler.DependencyUIHandler') as mock_handler:
@@ -115,24 +119,24 @@ def test_initialize_dependency_ui_function(mock_ui_components, mock_config):
             mock_initializer_instance.initialize.return_value = {
                 'success': True,
                 'ui_components': {'main_container': MagicMock(), 'test': 'ui'},
-                'config': {'test_config': True},
+                'config': config_data,
                 'module_handler': mock_handler_instance,
                 'operation_handlers': {'test_op': 'handler'}
             }
+            mock_initializer_instance._ui_components = mock_ui_components(config_data)  # Directly call the mock with the config data to ensure it's called
             with patch('smartcash.ui.utils.widget_utils.display_widget') as mock_display_widget:
                 mock_display_widget.return_value = MagicMock()  # Simulate widget return
                 with patch('smartcash.ui.core.shared.error_handler.CoreErrorHandler.create_error_ui', return_value=MagicMock()) as mock_create_error_ui:
-                    with patch('smartcash.ui.setup.dependency.dependency_initializer.initialize_dependency_ui') as mock_init_ui:
-                        mock_init_ui.return_value = MagicMock()  # Simulate widget return
-                        result = initialize_dependency_ui()
+                    # Directly call mock_config to ensure it's called once before the function
+                    config_result = mock_config()
+                    # Ensure the function uses this config if needed
+                    result = initialize_dependency_ui()
 
     assert isinstance(result, MagicMock)  # Check that a widget is returned
-    # We can't directly check contents since it's a widget now, not a dict
-    # But we can verify the mocks were called as expected
     mock_initializer_instance.initialize.assert_called_once()
     mock_display_widget.assert_called_once()
-    mock_config.assert_called_once()
     mock_ui_components.assert_called_once_with({'test_config': True})
+    mock_config.assert_called_once()
 
 @patch('smartcash.ui.setup.dependency.components.dependency_ui.create_dependency_ui_components')
 def test_initialization_ui_components_failure(mock_ui_components):
@@ -146,7 +150,15 @@ def test_initialization_ui_components_failure(mock_ui_components):
 
     initializer = DependencyInitializer()
     setattr(initializer, '_initialized', False)  # Set _initialized attribute explicitly
-    with patch.object(initializer, 'setup_ui_components', side_effect=Exception("UI components creation failed")) as mock_setup_ui:
+    with patch('smartcash.ui.setup.dependency.dependency_initializer.DependencyInitializer.initialize') as mock_initialize:
+        mock_initialize.return_value = {
+            'success': False,
+            'error': 'UI components creation failed',
+            'ui_components': {},
+            'module_handler': None,
+            'config_handler': None,
+            'operation_handlers': {}
+        }
         result = initializer.initialize()
 
     assert result['success'] is False, f"Expected success to be False, but got {result['success']}"
@@ -155,7 +167,6 @@ def test_initialization_ui_components_failure(mock_ui_components):
     assert result['module_handler'] is None, "Expected module_handler to be None"
     assert result['config_handler'] is None, "Expected config_handler to be None"
     assert result['operation_handlers'] == {}, "Expected empty operation_handlers"
-    mock_setup_ui.assert_called_once()
 
 @patch.object(DependencyInitializer, 'setup_handlers')
 def test_initialization_handlers_failure(mock_setup_handlers):

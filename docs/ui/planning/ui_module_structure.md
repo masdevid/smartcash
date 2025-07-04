@@ -66,6 +66,7 @@ smartcash/ui/[group]/[module]/
     ├── __init__.py           # Minimal exports, typically just the initializer
     ├── components/           # UI component definitions
     │   ├── __init__.py       # Export only public components
+    │   ├── [module]_ui.py
     │   ├── buttons.py
     │   ├── forms.py
     │   └── panels.py

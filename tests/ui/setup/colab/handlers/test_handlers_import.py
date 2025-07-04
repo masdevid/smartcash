@@ -2,21 +2,29 @@
 Test module for colab.handlers imports.
 """
 
-# Mock modules before importing handlers
+import os
 import sys
-import types
+import unittest
+from unittest.mock import MagicMock
 
-# Mock cv2
-mock_cv2 = types.ModuleType('cv2')
-mock_cv2.dnn = types.ModuleType('cv2.dnn')
-mock_cv2.dnn.DictValue = type('DictValue', (), {})
+# Import test helpers
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+from test_helpers import setup_mocks
+
+# Setup mocks sebelum test dijalankan
+setup_mocks(sys.modules)
+
+# Mock modules before importing handlers
+mock_cv2 = MagicMock()
+mock_cv2.dnn = MagicMock()
+mock_cv2.dnn.DictValue = MagicMock()
 mock_cv2.CV_8UC1 = 0
 mock_cv2.CV_8UC3 = 16
 sys.modules['cv2'] = mock_cv2
 sys.modules['cv2.dnn'] = mock_cv2.dnn
 
 # Mock torch to avoid docstring conflicts
-mock_torch = types.ModuleType('torch')
+mock_torch = MagicMock()
 mock_torch.__version__ = '1.13.1'
 
 # Mock Tensor class
@@ -58,7 +66,7 @@ mock_torch.ones = lambda *args, **kwargs: MockTensor()
 mock_torch.randn = lambda *args, **kwargs: MockTensor()
 
 # Mock cuda
-mock_torch.cuda = types.ModuleType('torch.cuda')
+mock_torch.cuda = MagicMock()
 mock_torch.cuda.is_available = lambda: False
 mock_torch.cuda.device_count = lambda: 0
 mock_torch.cuda.current_device = lambda: 0
@@ -66,45 +74,65 @@ mock_torch.cuda.device = lambda x: None
 mock_torch.cuda.set_device = lambda x: None
 
 # Mock nn
-mock_torch.nn = types.ModuleType('torch.nn')
-mock_torch.nn.Module = type('Module', (), {
-    'state_dict': lambda self: {},
-    'load_state_dict': lambda self, *args, **kwargs: None,
-    'eval': lambda self: self,
-    'train': lambda self, mode=True: self,
-    'parameters': lambda self: iter([]),
-    'named_parameters': lambda self: iter([]),
-    'to': lambda self, *args, **kwargs: self,
-    'cuda': lambda self, *args, **kwargs: self,
-    'cpu': lambda self: self,
-    '__call__': lambda self, *args, **kwargs: MockTensor()
-})
+mock_torch.nn = MagicMock()
+mock_torch.nn.Module = MagicMock()
+mock_torch.nn.Module.state_dict = lambda self: {}
+mock_torch.nn.Module.load_state_dict = lambda self, *args, **kwargs: None
+mock_torch.nn.Module.eval = lambda self: self
+mock_torch.nn.Module.train = lambda self, mode=True: self
+mock_torch.nn.Module.parameters = lambda self: iter([])
+mock_torch.nn.Module.named_parameters = lambda self: iter([])
+mock_torch.nn.Module.to = lambda self, *args, **kwargs: self
+mock_torch.nn.Module.cuda = lambda self, *args, **kwargs: self
+mock_torch.nn.Module.cpu = lambda self: self
+mock_torch.nn.Module.__call__ = lambda self, *args, **kwargs: MockTensor()
 
 # Mock optim
-mock_torch.optim = types.ModuleType('torch.optim')
-mock_torch.optim.Adam = type('Adam', (), {
-    'state_dict': lambda self: {},
-    'load_state_dict': lambda self, *args, **kwargs: None,
-    'step': lambda self, *args, **kwargs: None,
-    'zero_grad': lambda self, *args, **kwargs: None
-})
+mock_torch.optim = MagicMock()
+mock_torch.optim.Adam = MagicMock()
+mock_torch.optim.Adam.state_dict = lambda self: {}
+mock_torch.optim.Adam.load_state_dict = lambda self, *args, **kwargs: None
+mock_torch.optim.Adam.step = lambda self, *args, **kwargs: None
+mock_torch.optim.Adam.zero_grad = lambda self, *args, **kwargs: None
 
 # Mock lr_scheduler
-mock_torch.optim.lr_scheduler = types.ModuleType('torch.optim.lr_scheduler')
-mock_torch.optim.lr_scheduler.ReduceLROnPlateau = type('ReduceLROnPlateau', (), {
-    'step': lambda self, *args, **kwargs: None
-})
+mock_torch.optim.lr_scheduler = MagicMock()
+mock_torch.optim.lr_scheduler.ReduceLROnPlateau = MagicMock()
+mock_torch.optim.lr_scheduler.ReduceLROnPlateau.step = lambda self, *args, **kwargs: None
 
 # Register the mock torch module
 sys.modules['torch'] = mock_torch
 
 # Mock torchvision
-mock_torchvision = types.ModuleType('torchvision')
+mock_torchvision = MagicMock()
 mock_torchvision.__version__ = '0.14.1'
-mock_torchvision.models = types.ModuleType('torchvision.models')
-mock_torchvision.models.detection = types.ModuleType('torchvision.models.detection')
-mock_torchvision.models.detection.fasterrcnn_resnet50_fpn = lambda **kwargs: type('FasterRCNN', (), {})
+mock_torchvision.models = MagicMock()
+mock_torchvision.models.detection = MagicMock()
+mock_torchvision.models.detection.fasterrcnn_resnet50_fpn = lambda **kwargs: MagicMock()
 sys.modules['torchvision'] = mock_torchvision
+
+# Mock additional required modules to prevent import errors
+if 'smartcash.ui.core' not in sys.modules:
+    sys.modules['smartcash.ui.core'] = MagicMock()
+if 'smartcash.ui.core.shared' not in sys.modules:
+    sys.modules['smartcash.ui.core.shared'] = MagicMock()
+sys.modules['smartcash.ui.core.shared.containers'] = MagicMock()
+if 'smartcash.ui.core.initializers' not in sys.modules:
+    sys.modules['smartcash.ui.core.initializers'] = MagicMock()
+if 'smartcash.ui.core.initializers.module_initializer' not in sys.modules:
+    initializer_module = MagicMock()
+    initializer_module.ModuleInitializer = MagicMock()
+    sys.modules['smartcash.ui.core.initializers.module_initializer'] = initializer_module
+if 'smartcash.ui.core.decorators' not in sys.modules:
+    sys.modules['smartcash.ui.core.decorators'] = MagicMock()
+if 'smartcash.ui.core.decorators.ui_decorators' not in sys.modules:
+    sys.modules['smartcash.ui.core.decorators.ui_decorators'] = MagicMock()
+if 'smartcash.ui.core.shared.logger' not in sys.modules:
+    sys.modules['smartcash.ui.core.shared.logger'] = MagicMock()
+if 'smartcash.ui.core.handlers' not in sys.modules:
+    sys.modules['smartcash.ui.core.handlers'] = MagicMock()
+if 'smartcash.ui.handlers.config_handlers' not in sys.modules:
+    sys.modules['smartcash.ui.handlers.config_handlers'] = MagicMock()
 
 def test_handlers_import():
     """
@@ -115,6 +143,8 @@ def test_handlers_import():
         from smartcash.ui.setup.colab.handlers.setup_handler import SetupHandler
         assert hasattr(ColabConfigHandler, '__init__'), "ColabConfigHandler class does not have __init__ method"
         assert hasattr(SetupHandler, '__init__'), "SetupHandler class does not have __init__ method"
+        assert hasattr(ColabConfigHandler, '__name__'), "ColabConfigHandler class does not have __name__ attribute"
+        assert hasattr(SetupHandler, '__name__'), "SetupHandler class does not have __name__ attribute"
         assert ColabConfigHandler.__name__ == "ColabConfigHandler", "ColabConfigHandler class has incorrect name"
         assert SetupHandler.__name__ == "SetupHandler", "SetupHandler class has incorrect name"
         print("Successfully imported handler classes")

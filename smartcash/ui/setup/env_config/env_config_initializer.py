@@ -161,24 +161,34 @@ class EnvConfigInitializer(ModuleInitializer):
 def initialize_env_config_ui(config: Dict[str, Any] | None = None, **kwargs):  
     """Notebook/CLI helper that returns the rendered widget via `safe_display`."""
     
-    # Clean up any existing UI components and stray widgets using the component manager
+    # Initialize the UI first to ensure we have all components created
+    initializer = EnvConfigInitializer()
+    result = initializer.initialize(config=config, **kwargs)
+    
+    # Get the UI components
+    ui_components = result.get('ui', {})
+    
+    # Only clean up stray widgets AFTER we've created our UI components
+    # This ensures we don't hide our own log accordion
     try:
         from smartcash.ui.core.shared.ui_component_manager import get_component_manager, cleanup_stray_widgets
         
-        # Reset registered components
+        # Get the log accordion to preserve it during cleanup
+        log_accordion = ui_components.get('log_accordion')
+        safe_widgets = [log_accordion] if log_accordion else []
+        
+        # Reset registered components except our important ones
         manager = get_component_manager('env_config')
         manager.reset_components_silently()
         
-        # Clean up any stray widgets (not just accordions)
+        # Clean up any stray widgets but preserve our log accordion
         cleanup_stray_widgets(['Accordion', 'Output', 'VBox', 'HBox', 'Tab'], 'env_config')
     except Exception as e:
         # Log but continue if cleanup fails
         import logging
-        logging.getLogger('env_config').debug(f"Pre-initialization cleanup failed: {e}")
+        logging.getLogger('env_config').debug(f"Post-initialization cleanup failed: {e}")
     
-    # Initialize the UI
-    initializer = EnvConfigInitializer()
-    result = initializer.initialize(config=config, **kwargs)
+    # Return the UI components
     if not result.get('status', False):
         return result.get('ui', {}).get('ui', {})
     return result.get('ui', {}).get('ui', {})

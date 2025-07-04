@@ -26,13 +26,23 @@ def hide_stray_accordions(safe_accordions: List[Any] = None) -> int:
     # Get all objects and filter for Accordion widgets
     for obj in gc.get_objects():
         try:
-            # Check if it's an Accordion widget by looking for specific accordion attributes
-            # This avoids the FutureWarning from torch.distributed by not checking class names
-            if not hasattr(obj, 'selected_index') or not hasattr(obj, '_titles'):
+            # Safe way to check if object is likely an Accordion widget
+            # First check if it has a __module__ attribute that contains 'ipywidgets'
+            is_likely_widget = False
+            try:
+                if hasattr(obj, '__module__') and 'ipywidget' in getattr(obj, '__module__', ''):
+                    is_likely_widget = True
+            except:
+                pass
+                
+            # Skip if not likely a widget
+            if not is_likely_widget:
                 continue
                 
-            # Additional check for accordion-specific methods
-            if not hasattr(obj, 'get_title') or not hasattr(obj, 'set_title'):
+            # Check for accordion-specific attributes without using class name
+            if not hasattr(obj, 'selected_index') or not hasattr(obj, 'get_title'):
+                continue
+            if not hasattr(obj, 'set_title'):
                 continue
                     
             # Check if it's in our safe list

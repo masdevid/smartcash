@@ -359,14 +359,29 @@ class UIComponentManager:
             
         for obj in gc.get_objects():
             try:
-                # Skip objects without proper widget attributes
-                if not hasattr(obj, 'layout') or not hasattr(obj, '_dom_classes'):
+                # Safe way to check if object is likely a widget without triggering warnings
+                # First check if it has a __module__ attribute that contains 'ipywidgets'
+                is_likely_widget = False
+                try:
+                    if hasattr(obj, '__module__') and 'ipywidget' in getattr(obj, '__module__', ''):
+                        is_likely_widget = True
+                except:
+                    pass
+                    
+                # Skip if not likely a widget
+                if not is_likely_widget:
+                    continue
+                    
+                # Now check for layout attribute which all widgets should have
+                if not hasattr(obj, 'layout'):
                     continue
                     
                 # Get widget type name safely
                 widget_type_name = None
-                if hasattr(obj, '__class__') and hasattr(obj.__class__, '__name__'):
+                try:
                     widget_type_name = obj.__class__.__name__
+                except:
+                    continue
                     
                 # Skip if not in our target types
                 if widget_type_name not in widget_types:

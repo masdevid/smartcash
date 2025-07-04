@@ -22,7 +22,7 @@ from smartcash.ui.setup.colab.components.tips_panel import create_tips_requireme
 
 def create_colab_ui() -> Dict[str, Any]:
     """
-    🎨 Buat komponen UI untuk konfigurasi Colab
+    Buat komponen UI untuk konfigurasi Colab
     
     Returns:
         Dictionary berisi semua komponen UI
@@ -32,7 +32,7 @@ def create_colab_ui() -> Dict[str, Any]:
     
     # 1. Create Header Container
     header_container = create_header_container(
-        title="🔧 Environment Setup",
+        title=" Environment Setup",
         subtitle="Konfigurasi lingkungan untuk SmartCash YOLOv5-EfficientNet"
     )
     ui_components['header_container'] = header_container
@@ -42,7 +42,7 @@ def create_colab_ui() -> Dict[str, Any]:
         buttons=[
             {
                 "button_id": "setup",
-                "text": "▶️ Setup Environment",
+                "text": " Setup Environment",
                 "style": "primary",
                 "order": 1
             }
@@ -51,7 +51,19 @@ def create_colab_ui() -> Dict[str, Any]:
     ui_components['action_container'] = action_container
     
     # 3. Create Progress Tracker
-    progress_tracker = ProgressTracker(component_name="colab_progress_tracker")
+    def create_progress_tracker(component_name: str = "progress_tracker") -> ProgressTracker:
+        """
+        Create a progress tracker component.
+
+        Args:
+            component_name: Unique name for the progress tracker component.
+
+        Returns:
+            ProgressTracker: Initialized progress tracker component.
+        """
+        return ProgressTracker(component_name=component_name)
+    
+    progress_tracker = create_progress_tracker(component_name="colab_progress_tracker")
     ui_components['progress_tracker'] = progress_tracker
     
     # 4. Create Environment Info Panel

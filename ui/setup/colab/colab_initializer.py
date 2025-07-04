@@ -23,7 +23,7 @@ from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 # Import local modules
 from smartcash.ui.setup.colab.handlers.colab_config_handler import ColabConfigHandler
 from smartcash.ui.setup.colab.handlers.setup_handler import SetupHandler
-from smartcash.ui.setup.colab.components import create_colab_ui
+from smartcash.ui.setup.colab.components.ui_components import create_colab_ui
 from smartcash.ui.setup.colab.configs.defaults import DEFAULT_CONFIG
 
 
@@ -79,7 +79,7 @@ class ColabEnvInitializer(ModuleInitializer):
                 setup_button.on_click(env_handler.handle_setup_button_click)
                 self.logger.debug("✅ Tombol setup terhubung ke handler")
 
-            from smartcash.ui.core.shared.containers import MainContainer  # type: ignore
+            from smartcash.ui.components import MainContainer  # type: ignore
             main_container = MainContainer(
                 header=ui_components.get("header_container"),
                 content=[

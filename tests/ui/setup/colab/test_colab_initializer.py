@@ -108,54 +108,54 @@ def mock_logger():
     return logger
 
 @pytest.fixture
-def colab_initializer(mocker, mock_logger):
-    """Fixture to create a ColabEnvInitializer instance with mocks."""
-    # Create a mock for the SetupHandler
-    with patch('smartcash.ui.core.shared.logger.get_enhanced_logger', return_value=mock_logger):
-        setup_handler = MagicMock()
-        setup_handler.perform_initial_status_check = Mock(return_value=None)
-        setup_handler.should_sync_config_templates = Mock(return_value=False)
-        setup_handler.sync_config_templates = Mock(return_value=None)
-        
-        # Create the initializer instance
-        try:
-            # Import after mocks are set up
-            from smartcash.ui.setup.colab.colab_initializer import ColabEnvInitializer
-            # Create the instance
-            init_instance = ColabEnvInitializer()
-            
-            # Setup the instance with our mocks
-            init_instance._env_manager = MagicMock()
-            init_instance._ui_components = {"test": "component"}
-            init_instance._handlers = {"setup": setup_handler}
-            init_instance._initialized = False
-            
-            # Ensure we're using our mock logger - double-check injection
-            init_instance.__dict__['logger'] = mock_logger
-            init_instance.logger = mock_logger
-            print(f"Logger injected into init_instance: {init_instance.logger}")
-            logger.info(f"Logger injected into init_instance: {init_instance.logger}")
-            log_to_file(f"Logger injected into init_instance: {init_instance.logger}")
-            
-            # Patch the initialize method to return our test values
-            mocker.patch.object(init_instance, 'initialize', return_value={
-                'success': True, 
-                'ui': {}, 
-                'handlers': {}
-            })
-            
-            # Verify logger after all setup
-            print(f"Final logger in init_instance after setup: {init_instance.logger}")
-            logger.info(f"Final logger in init_instance after setup: {init_instance.logger}")
-            log_to_file(f"Final logger in init_instance after setup: {init_instance.logger}")
-            
-            return init_instance, mock_logger, setup_handler
-        except Exception as e:
-            print(f"Fixture setup error: {e}")
-            traceback.print_exc()
-            logger.error(f"Fixture setup error: {e}", exc_info=True)
-            log_to_file(f"Fixture setup error: {e}")
-            pytest.fail(f"Failed to create test fixture: {e}")
+def colab_initializer(mocker):
+    """
+    Fixture untuk membuat instance ColabEnvInitializer dengan logger yang di-mock.
+    """
+    # Mock get_enhanced_logger() secara universal di semua modul yang relevan
+    mocker.patch("smartcash.ui.utils.ui_logger.get_enhanced_logger", return_value=MockEnhancedUILogger())
+    # Mock get_module_logger() untuk mencegah TypeError di ui_logger.py
+    mocker.patch("smartcash.ui.utils.ui_logger.get_module_logger", return_value=MockEnhancedUILogger())
+    mocker.patch("smartcash.ui.setup.colab.colab_initializer.get_module_logger", return_value=MockEnhancedUILogger())
+    mocker.patch("smartcash.ui.setup.colab.handlers.setup_handler.get_module_logger", return_value=MockEnhancedUILogger())
+    # Mock ColabConfigHandler untuk mencegah inisialisasi nyata
+    mocker.patch("smartcash.ui.setup.colab.handlers.colab_config_handler.ColabConfigHandler", return_value=MagicMock())
+    # Mock ConfigHandler langsung dari sumbernya untuk mencegah masalah impor sirkular
+    mocker.patch("smartcash.ui.handlers.config_handlers.ConfigHandler", return_value=MagicMock())
+    # Mock create_colab_ui to prevent real UI initialization
+    mocker.patch("smartcash.ui.setup.colab.components.create_colab_ui", return_value=MagicMock())
+    
+    # Buat mock untuk logger
+    mock_logger = MockEnhancedUILogger()
+    
+    # Buat mock untuk setup handler
+    setup_handler = MagicMock()
+    setup_handler.perform_initial_status_check = MagicMock(return_value={"status": "ok", "details": {}})
+    setup_handler.should_sync_config_templates = MagicMock(return_value=False)
+    setup_handler.sync_config_templates = MagicMock(return_value=None)
+    
+    # Buat mock untuk handlers
+    mock_handlers = {
+        "setup": setup_handler
+    }
+    
+    # Buat mock untuk ui_components
+    mock_ui_components = MagicMock()
+    mock_ui_components.update_status = MagicMock(return_value=None)
+    mock_ui_components.display_summary = MagicMock(return_value=None)
+    
+    # Buat instance dari ColabEnvInitializer
+    init_instance = ColabEnvInitializer()
+    
+    # Set logger, handlers, dan ui_components secara manual untuk menghindari inisialisasi nyata
+    init_instance.logger = mock_logger
+    init_instance._handlers = mock_handlers
+    init_instance._ui_components = mock_ui_components
+    
+    # Mock metode initialize untuk mencegah pembuatan handler nyata
+    mocker.patch.object(init_instance, "initialize", return_value=None)
+    
+    return init_instance, mock_logger, setup_handler
 
 # Import after mocks are set up
 try:
@@ -188,127 +188,43 @@ class TestColabEnvInitializer:
             pytest.fail(f"Failed to write to file during test: {e}")
 
     def test_post_checks_with_setup_handler(self, colab_initializer):
+        """
+        Test _post_checks method dengan setup handler.
+        """
+        init_instance, mock_logger, setup_handler = colab_initializer
+        
+        # Debug: Print setup before calling _post_checks
+        print("\n[DEBUG] Setup before _post_checks:")
+        print(f"[DEBUG] mock_logger: {mock_logger}")
+        print(f"[DEBUG] init_instance._handlers: {init_instance._handlers}")
+        print(f"[DEBUG] init_instance._ui_components: {init_instance._ui_components}")
+        print(f"[DEBUG] setup_handler.perform_initial_status_check: {setup_handler.perform_initial_status_check}")
+        print(f"[DEBUG] dir(init_instance): {dir(init_instance)}")
+        print(f"[DEBUG] init_instance attributes: {[attr for attr in dir(init_instance) if not attr.startswith('__')]}")
+        print(f"[DEBUG] setup_handler methods: {[attr for attr in dir(setup_handler) if not attr.startswith('__')]}")
+        
+        # Call _post_checks directly with mocked dependencies
         try:
-            # Unpack the fixture
-            init_instance, mock_logger, setup_handler = colab_initializer
-            
-            print("Starting test_post_checks_with_setup_handler")
-            logger.debug("Starting test_post_checks_with_setup_handler")
-            log_to_file("Starting test_post_checks_with_setup_handler")
-            
-            # Reset mocks
-            setup_handler.perform_initial_status_check.reset_mock()
-            setup_handler.should_sync_config_templates.reset_mock()
-            setup_handler.sync_config_templates.reset_mock()
-            mock_logger.info.reset_mock()
-            mock_logger.warning.reset_mock()
-            mock_logger.error.reset_mock()
-            
-            print("Mocks reset, calling _post_checks")
-            logger.debug("Mocks reset, calling _post_checks")
-            log_to_file("Mocks reset, calling _post_checks")
-            # Act - Call the method directly with extensive debugging
-            try:
-                print("Before _post_checks call")
-                logger.debug("Before _post_checks call")
-                log_to_file("Before _post_checks call")
-                print(f"init_instance type: {type(init_instance)}")
-                logger.debug(f"init_instance type: {type(init_instance)}")
-                log_to_file(f"init_instance type: {type(init_instance)}")
-                print(f"init_instance dir: {dir(init_instance)}")
-                logger.debug(f"init_instance dir: {dir(init_instance)}")
-                log_to_file(f"init_instance dir: {dir(init_instance)}")
-                print(f"init_instance._handlers: {init_instance._handlers}")
-                logger.debug(f"init_instance._handlers: {init_instance._handlers}")
-                log_to_file(f"init_instance._handlers: {init_instance._handlers}")
-                print(f"init_instance.logger: {init_instance.logger}")
-                logger.debug(f"init_instance.logger: {init_instance.logger}")
-                log_to_file(f"init_instance.logger: {init_instance.logger}")
-                print(f"setup_handler: {setup_handler}")
-                logger.debug(f"setup_handler: {setup_handler}")
-                log_to_file(f"setup_handler: {setup_handler}")
-                # Additional debug information
-                print(f"mock_logger.info: {mock_logger.info}")
-                logger.debug(f"mock_logger.info: {mock_logger.info}")
-                log_to_file(f"mock_logger.info: {mock_logger.info}")
-                print(f"mock_logger.warning: {mock_logger.warning}")
-                logger.debug(f"mock_logger.warning: {mock_logger.warning}")
-                log_to_file(f"mock_logger.warning: {mock_logger.warning}")
-                print(f"mock_logger.error: {mock_logger.error}")
-                logger.debug(f"mock_logger.error: {mock_logger.error}")
-                log_to_file(f"mock_logger.error: {mock_logger.error}")
-                print(f"setup_handler.perform_initial_status_check: {setup_handler.perform_initial_status_check}")
-                logger.debug(f"setup_handler.perform_initial_status_check: {setup_handler.perform_initial_status_check}")
-                log_to_file(f"setup_handler.perform_initial_status_check: {setup_handler.perform_initial_status_check}")
-                print(f"setup_handler.should_sync_config_templates: {setup_handler.should_sync_config_templates}")
-                logger.debug(f"setup_handler.should_sync_config_templates: {setup_handler.should_sync_config_templates}")
-                log_to_file(f"setup_handler.should_sync_config_templates: {setup_handler.should_sync_config_templates}")
-                print(f"setup_handler.sync_config_templates: {setup_handler.sync_config_templates}")
-                logger.debug(f"setup_handler.sync_config_templates: {setup_handler.sync_config_templates}")
-                log_to_file(f"setup_handler.sync_config_templates: {setup_handler.sync_config_templates}")
-                # Add specific debugging for setup_handler calls
-                def debug_setup_handler_call(method_name, *args, **kwargs):
-                    print(f"Calling {method_name} with args: {args}, kwargs: {kwargs}")
-                    logger.debug(f"Calling {method_name} with args: {args}, kwargs: {kwargs}")
-                    log_to_file(f"Calling {method_name} with args: {args}, kwargs: {kwargs}")
-                    # Return a simple dictionary instead of a MagicMock to avoid issues
-                    result = {"status": "success", "message": f"{method_name} completed"}
-                    print(f"Result of {method_name}: {result}")
-                    logger.debug(f"Result of {method_name}: {result}")
-                    log_to_file(f"Result of {method_name}: {result}")
-                    return result
-                
-                # Override setup_handler methods with debug wrappers
-                setup_handler.perform_initial_status_check = lambda *args, **kwargs: debug_setup_handler_call("perform_initial_status_check", *args, **kwargs)
-                setup_handler.should_sync_config_templates = lambda *args, **kwargs: debug_setup_handler_call("should_sync_config_templates", *args, **kwargs)
-                setup_handler.sync_config_templates = lambda *args, **kwargs: debug_setup_handler_call("sync_config_templates", *args, **kwargs)
-                
-                init_instance._post_checks()
-                print("After _post_checks call")
-                logger.debug("After _post_checks call")
-                log_to_file("After _post_checks call")
-            except Exception as inner_e:
-                print(f"Exception during _post_checks execution: {inner_e}")
-                logger.error(f"Exception during _post_checks execution: {inner_e}", exc_info=True)
-                log_to_file(f"Exception during _post_checks execution: {inner_e}")
-                traceback.print_exc()
-                # Additional traceback details
-                import sys
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                print(f"Exception type: {exc_type}")
-                logger.error(f"Exception type: {exc_type}")
-                log_to_file(f"Exception type: {exc_type}")
-                print(f"Exception value: {exc_value}")
-                logger.error(f"Exception value: {exc_value}")
-                log_to_file(f"Exception value: {exc_value}")
-                print(f"Traceback frames: {exc_traceback.tb_frame.f_globals['__file__']}:{exc_traceback.tb_lineno}")
-                logger.error(f"Traceback frames: {exc_traceback.tb_frame.f_globals['__file__']}:{exc_traceback.tb_lineno}")
-                log_to_file(f"Traceback frames: {exc_traceback.tb_frame.f_globals['__file__']}:{exc_traceback.tb_lineno}")
-                # No assertion failure here to capture full error
-                print("Captured exception for analysis")
-                logger.debug("Captured exception for analysis")
-                log_to_file("Captured exception for analysis")
-            
-            print("_post_checks called, beginning assertions")
-            logger.debug("_post_checks called, beginning assertions")
-            log_to_file("_post_checks called, beginning assertions")
-            # Assert - Removed assertion to prevent test failure before full error capture
-            print(f"Logger info call count: {mock_logger.info.call_count}")
-            logger.debug(f"Logger info call count: {mock_logger.info.call_count}")
-            log_to_file(f"Logger info call count: {mock_logger.info.call_count}")
-            
-            print("test_post_checks_with_setup_handler completed")
-            logger.debug("test_post_checks_with_setup_handler completed")
-            log_to_file("test_post_checks_with_setup_handler completed")
+            result = init_instance._post_checks()
+            print("[DEBUG] _post_checks result:", result)
         except Exception as e:
-            print(f"Error in test_post_checks_with_setup_handler: {e}")
+            print(f"[DEBUG] Exception in _post_checks: {type(e).__name__}: {str(e)}")
+            import traceback
             traceback.print_exc()
-            logger.error(f"Error in test_post_checks_with_setup_handler: {e}", exc_info=True)
-            log_to_file(f"Error in test_post_checks_with_setup_handler: {e}")
-            # No raise to prevent test failure before full error analysis
-            print("Captured outer exception for analysis")
-            logger.debug("Captured outer exception for analysis")
-            log_to_file("Captured outer exception for analysis")
+            raise
+        
+        # Debug: Print state after calling _post_checks
+        print("[DEBUG] State after _post_checks:")
+        print(f"[DEBUG] setup_handler.perform_initial_status_check called: {setup_handler.perform_initial_status_check.called}")
+        if setup_handler.perform_initial_status_check.called:
+            print(f"[DEBUG] perform_initial_status_check call args: {setup_handler.perform_initial_status_check.call_args}")
+        print(f"[DEBUG] mock_logger.info call count: {mock_logger.info.call_count}")
+        print(f"[DEBUG] mock_logger.info calls: {mock_logger.info.call_args_list}")
+        print(f"[DEBUG] mock_logger.error call count: {mock_logger.error.call_count}")
+        print(f"[DEBUG] mock_logger.error calls: {mock_logger.error.call_args_list}")
+        
+        # No assertions, just checking if it runs without errors
+        print("[DEBUG] Test completed without assertions")
 
     def test_post_checks_without_setup_handler(self, colab_initializer):
         try:
@@ -350,7 +266,6 @@ class TestColabEnvInitializer:
                 print(f"setup_handler: {setup_handler}")
                 logger.debug(f"setup_handler: {setup_handler}")
                 log_to_file(f"setup_handler: {setup_handler}")
-                # Additional debug information
                 print(f"mock_logger.info: {mock_logger.info}")
                 logger.debug(f"mock_logger.info: {mock_logger.info}")
                 log_to_file(f"mock_logger.info: {mock_logger.info}")

@@ -5,11 +5,13 @@ from typing import Optional, Dict, Any
 
 from smartcash.ui.core.shared.logger import get_enhanced_logger
 
-from .header_container import create_header_container
+
+from smartcash.ui.components.main_container import create_main_container
+from smartcash.ui.components.header_container import create_header_container
+from smartcash.ui.components.action_container import create_action_container
+from smartcash.ui.components.footer_container import create_footer_container
+
 from .dependency_tabs import create_dependency_tabs
-from .action_container import create_action_container
-from .footer_container import create_footer_container
-from .main_container import create_main_container
 
 def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, logger=None, **kwargs) -> Dict[str, Any]:
     """Create dependency UI components dengan standard layout

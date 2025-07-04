@@ -5,12 +5,6 @@ Deskripsi: Dependency module initializer dengan proper inheritance dan implement
 
 from typing import Dict, Any, Optional
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
-from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.footer_container import create_footer_container
-
-from .components.dependency_tabs import create_dependency_tabs
 from .handlers.dependency_ui_handler import DependencyUIHandler
 from .configs.dependency_defaults import get_default_dependency_config
 from .components.dependency_ui import create_dependency_ui_components  # New import
@@ -58,7 +52,9 @@ class DependencyInitializer(ModuleInitializer):
             }
             
         except Exception as e:
-            self.logger.error(f"❌ Gagal menginisialisasi dependency module: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'initialization', fail_fast=False)
             return {
                 'success': False,
                 'error': str(e),
@@ -85,7 +81,9 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.info("✅ Handlers berhasil di-setup")
             
         except Exception as e:
-            self.logger.error(f"❌ Error setting up handlers: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'setting up handlers', fail_fast=False)
             raise
     
     def _connect_button_handlers(self) -> None:
@@ -107,7 +105,9 @@ class DependencyInitializer(ModuleInitializer):
                 uninstall_btn.on_click(self._on_uninstall_click)
                 
         except Exception as e:
-            self.logger.error(f"❌ Error connecting button handlers: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'connecting button handlers', fail_fast=False)
     
     def _on_install_click(self, btn):
         """Handler untuk install button"""
@@ -130,7 +130,9 @@ class DependencyInitializer(ModuleInitializer):
             )
             
         except Exception as e:
-            self.logger.error(f"❌ Error dalam install operation: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'install operation', fail_fast=False)
             self._update_status(f"❌ Error: {str(e)}", "error")
     
     def _on_check_updates_click(self, btn):
@@ -160,7 +162,9 @@ class DependencyInitializer(ModuleInitializer):
                 self._update_status(f"❌ Check gagal: {error_msg}", "error")
             
         except Exception as e:
-            self.logger.error(f"❌ Error dalam check updates operation: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'check updates operation', fail_fast=False)
             self._update_status(f"❌ Error: {str(e)}", "error")
     
     def _on_uninstall_click(self, btn):
@@ -185,7 +189,9 @@ class DependencyInitializer(ModuleInitializer):
             )
             
         except Exception as e:
-            self.logger.error(f"❌ Error dalam uninstall operation: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'uninstall operation', fail_fast=False)
             self._update_status(f"❌ Error: {str(e)}", "error")
     
     def setup_operation_handlers(self) -> None:
@@ -204,7 +210,9 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.info("✅ Operation handlers berhasil di-setup")
             
         except Exception as e:
-            self.logger.warning(f"⚠️ Some operation handlers failed to setup: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'setting up operation handlers', fail_fast=False)
     
     def _get_packages_for_operation(self) -> list:
         """Extract packages yang dipilih dari UI untuk operations"""
@@ -228,7 +236,9 @@ class DependencyInitializer(ModuleInitializer):
             return list(set(packages))  # Remove duplicates
             
         except Exception as e:
-            self.logger.error(f"❌ Error getting packages for operation: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'getting packages for operation', fail_fast=False)
             return []
     
     def _update_status(self, message: str, status_type: str = "info") -> None:
@@ -311,7 +321,9 @@ class DependencyInitializer(ModuleInitializer):
                 self._update_status(f"❌ {operation.title()} gagal: {error_msg}", "error")
             
         except Exception as e:
-            self.logger.error(f"❌ Error executing {operation}: {e}")
+            from smartcash.ui.core.shared.error_handler import get_error_handler
+            error_handler = get_error_handler('dependency')
+            error_handler.handle_exception(e, 'executing operation', fail_fast=False)
             self._update_status(f"❌ Error dalam {operation}: {str(e)}", "error")
 
 # Global instance
@@ -337,12 +349,6 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Dict[st
         }
         
     except Exception as e:
-        print(f"❌ Error initializing dependency UI: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'ui_components': {},
-            'module_handler': None,
-            'config_handler': None,
-            'operation_handlers': {}
-        }
+        from smartcash.ui.core.shared.error_handler import get_error_handler
+        error_handler = get_error_handler('dependency')
+        return error_handler.handle_exception(e, 'initializing dependency UI', fail_fast=False)

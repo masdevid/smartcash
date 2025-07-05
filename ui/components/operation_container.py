@@ -160,6 +160,30 @@ class OperationContainer(BaseUIComponent):
         # Create main container
         self._create_container()
     
+    def _validate_layout_value(self, value: str, prop_name: str, default: str) -> str:
+        """Validate and sanitize layout property values.
+        
+        Args:
+            value: The value to validate
+            prop_name: The name of the property being validated
+            default: The default value to use if validation fails
+            
+        Returns:
+            A valid value for the specified property
+        """
+        if value is None:
+            return default
+            
+        value = str(value).lower()
+        
+        if prop_name == 'align_items':
+            valid_values = ['flex-start', 'flex-end', 'center', 'baseline', 'stretch', 'inherit', 'initial', 'unset']
+            if value not in valid_values:
+                self.logger.warning(f"Invalid {prop_name} value: '{value}'. Using default: '{default}'")
+                return default
+                
+        return value
+        
     def _create_container(self) -> None:
         """Create the main container widget.
         
@@ -171,11 +195,11 @@ class OperationContainer(BaseUIComponent):
         children = []
         
         # 1. Add progress tracker if enabled (top)
-        if self.progress_tracker:
+        if self.progress_tracker and hasattr(self.progress_tracker, 'container') and self.progress_tracker.container is not None:
             children.append(self.progress_tracker.container)
         
         # 2. Add dialog area (middle) - will be populated when needed
-        if hasattr(self, 'dialog_area'):
+        if hasattr(self, 'dialog_area') and self.dialog_area is not None:
             children.append(self.dialog_area)
         
         # 3. Add log accordion if enabled (bottom)
@@ -185,21 +209,51 @@ class OperationContainer(BaseUIComponent):
             if log_widget is not None:
                 children.append(log_widget)
         
-        # Create the main container with all components in order
-        self.container = widgets.VBox(
-            children=children,
-            layout=widgets.Layout(
-                width='100%',
-                margin='10px 0',
-                padding='10px',
-                border='1px solid #e0e0e0',
-                border_radius='5px',
-                flex='1 1 auto',
-                display='flex',
-                flex_flow='column',
-                position='relative'
-            )
-        )
+        # Filter out None values from children and ensure they're valid widgets
+        valid_children = []
+        for child in children:
+            if child is None:
+                self.logger.warning("Skipping None child in OperationContainer")
+                continue
+                
+            if not hasattr(child, 'value'):
+                try:
+                    # Try to display the widget to ensure it's valid
+                    display(child)
+                    valid_children.append(child)
+                except Exception as e:
+                    self.logger.error(f"Invalid widget in OperationContainer: {e}")
+                    continue
+            else:
+                valid_children.append(child)
+        
+        if not valid_children:
+            self.logger.warning("No valid children found for OperationContainer")
+            valid_children = [widgets.HTML("<div>No content available</div>")]
+        
+        # Create layout with validated properties
+        layout_kwargs = {
+            'width': '100%',
+            'margin': '10px 0',
+            'padding': '10px',
+            'border': '1px solid #e0e0e0',
+            'border_radius': '5px',
+            'flex': '1 1 auto',
+            'display': 'flex',
+            'flex_flow': 'column',
+            'position': 'relative',
+            'min_height': '0',  # Ensure flex container can shrink below content size
+            'align_items': 'stretch'  # Default value that will be validated
+        }
+        
+        # Create and validate the layout
+        layout = widgets.Layout(**{
+            k: self._validate_layout_value(v, k, 'stretch' if k == 'align_items' else v)
+            for k, v in layout_kwargs.items()
+        })
+        
+        # Create the main container with all valid components
+        self.container = widgets.VBox(children=valid_children, layout=layout)
     
     def _init_dialog_area(self) -> None:
         """Initialize the dialog area."""

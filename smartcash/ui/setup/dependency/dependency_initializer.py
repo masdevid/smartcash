@@ -339,8 +339,11 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
     global _dependency_initializer
     
     # If we already have an initialized instance, return its UI
-    if _dependency_initializer is not None and hasattr(_dependency_initializer, '_ui_components'):
+    if _dependency_initializer is not None and hasattr(_dependency_initializer, '_ui_components') and _dependency_initializer._ui_components is not None:
         return _dependency_initializer._ui_components.get('ui')
+    elif _dependency_initializer is not None:
+        # If _ui_components is None, force reinitialization
+        _dependency_initializer = None
     
     # Otherwise, create a new instance using ModuleInitializer
     from smartcash.ui.core.initializers.module_initializer import ModuleInitializer

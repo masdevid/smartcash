@@ -93,6 +93,25 @@ class ProgressTracker(BaseUIComponent):
         self.tqdm_manager = TqdmManager(self)
         self.tqdm_manager.initialize_bars(self._config.get_level_configs())
     
+    @property
+    def progress_bar(self):
+        """Backward compatibility property to return the main progress bar.
+        
+        Note: This is maintained for backward compatibility with existing code.
+        New code should use the progress_bars property instead.
+        """
+        # Return the first available progress bar for backward compatibility
+        if hasattr(self, 'tqdm_manager') and self.tqdm_manager and hasattr(self.tqdm_manager, 'bars'):
+            for bar in self.tqdm_manager.bars.values():
+                if bar is not None:
+                    return bar
+        return None
+        
+    @property
+    def status_label(self):
+        """Backward compatibility property to return status label."""
+        return self._ui_components.get('status')
+    
     def _update_container_height(self) -> None:
         """Update container height based on visible components."""
         if not hasattr(self, '_ui_components'):

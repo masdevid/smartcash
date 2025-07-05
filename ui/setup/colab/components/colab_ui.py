@@ -193,7 +193,7 @@ def create_colab_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs
         'progress_tracker': operation_container['progress_tracker'],
         'progress_bar': operation_container['progress_tracker'].progress_bar,  # For SetupHandler
         'status_label': operation_container['progress_tracker'].status_label,  # For SetupHandler
-        'confirmation_dialog': operation_container['dialog'],
+        'confirmation_dialog': operation_container['dialog_area'],  # Changed from 'dialog' to 'dialog_area'
         'log_accordion': operation_container['log_accordion'],
         'summary_widget': setup_summary  # For SetupHandler
     }

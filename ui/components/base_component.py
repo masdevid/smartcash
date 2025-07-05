@@ -1,20 +1,29 @@
 """Base UI component class with common functionality."""
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
+import logging
 import ipywidgets as widgets
+
+if TYPE_CHECKING:
+    from logging import Logger
 
 class BaseUIComponent(ABC):
     """Base class for all UI components with common functionality."""
     
-    def __init__(self, component_name: str):
+    def __init__(self, component_name: str, logger: Optional['Logger'] = None):
         """Initialize base component.
         
         Args:
             component_name: Unique name for this component instance
+            logger: Optional logger instance. If not provided, a default logger will be created.
         """
         self.component_name = component_name
         self._ui_components: Dict[str, Any] = {}
         self._initialized = False
+        
+        # Initialize logger
+        self.logger = logger or logging.getLogger(f"smartcash.ui.{self.__class__.__name__}")
+        self.logger.debug(f"Initializing {self.__class__.__name__} with component_name: {component_name}")
         
     def initialize(self) -> None:
         """Initialize the component and its UI elements."""

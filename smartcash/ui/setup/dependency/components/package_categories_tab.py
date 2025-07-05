@@ -143,28 +143,33 @@ def create_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker
     # Action buttons
     action_buttons = create_package_action_buttons(pkg, status_tracker, logger)
     
-    # Container
-    container = widgets.HBox([
-        selection_checkbox,
-        info_html,
-        status_widget,
-        action_buttons
-    ], layout=widgets.Layout(
-        border='1px solid #ddd',
-        border_radius='8px',
-        padding='10px',
-        background_color='#fafafa' if is_selected else 'white',
-        align_items='flex-start'
-    ))
+    # Create layout with validated properties
+    layout_kwargs = {
+        'border': '1px solid #ddd',
+        'border_radius': '8px',
+        'padding': '10px',
+        'background_color': '#fafafa' if is_selected else 'white'
+    }
     
-    # Update container style berdasarkan selection
+    # Create container with validated layout
+    container = widgets.HBox(
+        [selection_checkbox, info_html, status_widget, action_buttons],
+        layout=widgets.Layout(**layout_kwargs)
+    )
+    
+    # Update container style based on selection
     def on_selection_change(change):
         is_selected = change['new']
         border_color = '#4CAF50' if is_selected else '#ddd'
         bg_color = '#fafafa' if is_selected else 'white'
         
-        container.layout.border = f'1px solid {border_color}'
-        container.layout.background_color = bg_color
+        # Create new layout with updated properties
+        new_layout = container.layout.copy()
+        new_layout.border = f'1px solid {border_color}'
+        new_layout.background_color = bg_color
+        
+        # Apply the new layout
+        container.layout = new_layout
     
     selection_checkbox.observe(on_selection_change, names='value')
     

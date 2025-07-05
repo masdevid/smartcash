@@ -4,7 +4,7 @@ Deskripsi: Cleanup operation handler dengan centralized error handling
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.core.decorators.ui_decorators import safe_ui_operation
 from .base_operation import BaseOperationHandler
 

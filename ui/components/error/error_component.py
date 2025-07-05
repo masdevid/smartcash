@@ -4,16 +4,65 @@ Deskripsi: Simplified error component dengan traceback toggle yang reliable
 """
 
 import ipywidgets as widgets
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Union
 from IPython.display import display, HTML
 
 class ErrorComponent:
     """🚨 Clean error component dengan reliable traceback toggle"""
     
+    # Common layout styles
+    CONTENT_LAYOUT = {
+        'width': '100%',
+        'max_width': '100%',
+        'margin': '10px 0',
+        'padding': '0',
+        '_css': {
+            'max-width': '100%',
+            'width': '100% !important',
+            'box-sizing': 'border-box',
+            'overflow': 'hidden',
+            'padding': '0 8px',
+            'position': 'relative'
+        }
+    }
+    
+    CONTAINER_LAYOUT = {
+        'width': '100%',
+        'max_width': '100%',
+        'margin': '0',
+        'padding': '0',
+        '_css': {
+            'display': 'flex',
+            'justify-content': 'center',
+            'box-sizing': 'border-box',
+            'max-width': '100% !important',
+            'width': '100% !important',
+            'overflow': 'hidden',
+            'padding': '0',
+            'position': 'relative'
+        }
+    }
+    
     def __init__(self, title: str = "🚨 Error", width: str = '100%'):
         self.title = title
         self.width = width
         self._components = {}
+    
+    def _create_layout(self, layout_type: str = 'container') -> widgets.Layout:
+        """Create a layout based on type (container or content)"""
+        layout_data = self.CONTAINER_LAYOUT if layout_type == 'container' else self.CONTENT_LAYOUT
+        return widgets.Layout(**layout_data)
+    
+    def _create_container(self, children: List[widgets.Widget], **kwargs) -> widgets.VBox:
+        """Create a container with consistent styling"""
+        layout = self._create_layout('container')
+        container = widgets.VBox(children=children, layout=layout, **kwargs)
+        return container
+    
+    def _create_content(self, children: List[widgets.Widget], **kwargs) -> widgets.VBox:
+        """Create content area with consistent styling"""
+        layout = self._create_layout('content')
+        return widgets.VBox(children=children, layout=layout, **kwargs)
         
     def create(
         self,
@@ -35,109 +84,39 @@ class ErrorComponent:
         Returns:
             Dictionary berisi widget dan komponen lainnya
         """
-        # Color schemes
-        styles = self._get_styles()
-        style = styles.get(error_type.lower(), styles["error"])
+        style = self._get_styles().get(error_type.lower(), self._get_styles()["error"])
+        has_traceback = bool(traceback and show_traceback)
         
         # Create main error display
-        error_display = self._create_main_error_display(error_message, style, traceback is not None and show_traceback)
+        error_display = self._create_main_error_display(
+            error_message, 
+            style, 
+            has_traceback
+        )
         
-        # Create traceback section if needed
-        if traceback and show_traceback:
+        # Create container with appropriate children
+        children = [error_display]
+        if has_traceback:
             traceback_widget = self._create_traceback_section(traceback)
-            
-            # Create a VBox for the error and traceback with proper width constraints
-            content = widgets.VBox(
-                [error_display, traceback_widget],
-                layout=widgets.Layout(
-                    width='100%',
-                    max_width='100%',
-                    margin='10px 0',
-                    padding='0',
-                    _css={
-                        'max-width': '100%',
-                        'width': '100% !important',
-                        'box-sizing': 'border-box',
-                        'overflow': 'hidden',
-                        'padding': '0 8px',
-                        'position': 'relative'
-                    }
-                )
-            )
-            
-            # Create the outer container with proper width constraints
-            container = widgets.VBox(
-                layout=widgets.Layout(
-                    width='100%',
-                    max_width='100%',
-                    margin='0',
-                    padding='0',
-                    _css={
-                        'display': 'flex',
-                        'justify-content': 'center',
-                        'box-sizing': 'border-box',
-                        'max-width': '100% !important',
-                        'width': '100% !important',
-                        'overflow': 'hidden',
-                        'padding': '0',
-                        'position': 'relative'
-                    }
-                )
-            )
-            
-            # Add the content to the container
-            container.children = [content]
-            
-        else:
-            # For single error display without traceback
-            error_display.layout = widgets.Layout(
-                width='100%',
-                max_width='100%',
-                margin='10px 0',
-                _css={
-                    'max-width': '100%',
-                    'width': '100% !important',
-                    'box-sizing': 'border-box',
-                    'overflow': 'hidden',
-                    'padding': '0 8px',
-                    'position': 'relative'
-                }
-            )
-            
-            container = widgets.VBox(
-                layout=widgets.Layout(
-                    width='100%',
-                    max_width='100%',
-                    margin='0',
-                    padding='0',
-                    _css={
-                        'display': 'flex',
-                        'justify-content': 'center',
-                        'box-sizing': 'border-box',
-                        'max-width': '100%',
-                        'width': '100% !important',
-                        'overflow': 'hidden',
-                        'padding': '0',
-                        'position': 'relative'
-                    }
-                )
-            )
-            
-            # Add the error display to the container
-            container.children = [error_display]
+            children.append(traceback_widget)
         
-        # Store components
+        # Create content and container
+        content = self._create_content(children)
+        container = self._create_container([content])
+        
+        # Set up components dictionary
         self._components = {
             'widget': container,
             'container': container,
             'error_widget': error_display,
             'message_widget': error_display,
-            'traceback_widget': getattr(self, '_traceback_widget', None)
+            'traceback_widget': traceback_widget if has_traceback else None
         }
         
         return self._components
-    
-    def _get_styles(self) -> Dict[str, Dict[str, str]]:
+        
+    @staticmethod
+    def _get_styles() -> Dict[str, Dict[str, str]]:
         """Glassmorphism color schemes"""
         return {
             "error": {
@@ -170,7 +149,59 @@ class ErrorComponent:
         """Create main error display dengan toggle button"""
         error_id = f"error-{id(self)}"
         
-        toggle_button = f"""
+        # Create toggle button if traceback is available
+        toggle_button = self._create_toggle_button(error_id, style) if has_traceback else ""
+        
+        # Create HTML content for the error display
+        html_content = f"""
+        <div style="
+            width: 100% !important;
+            max-width: 100% !important;
+            background: {style['bg']};
+            border-left: 3px solid {style['border']};
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+        ">
+            {self._create_header(style, toggle_button)}
+            {self._create_message_content(message)}
+        </div>
+        """
+        
+        return widgets.HTML(html_content)
+    
+    def _create_message_content(self, message: str) -> str:
+        """Create the HTML content for the error message.
+        
+        Args:
+            message: The error message to display
+            
+        Returns:
+            HTML string with the formatted message
+        """
+        return f"""
+        <div style="
+            margin: 8px 0 0 0;
+            padding: 0;
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        ">
+            {message}
+        </div>
+        """
+    
+    @staticmethod
+    def _create_toggle_button(error_id: str, style: Dict[str, str]) -> str:
+        """Create toggle button HTML for traceback visibility"""
+        return f"""
         <button onclick="
             const traceback = document.getElementById('traceback-{error_id}');
             const button = this;
@@ -193,47 +224,28 @@ class ErrorComponent:
             ">
             📋 Detail
         </button>
-        """ if has_traceback else ""
-        
-        html_content = f"""
+        """
+    
+    def _create_header(self, style: Dict[str, str], toggle_button: str) -> str:
+        """Create the header section of the error display"""
+        return f"""
         <div style="
-            width: 100% !important;
-            max-width: 100% !important;
-            box-sizing: border-box !important;
-            padding: 0 !important;
-            margin: 8px 0 !important;
-            overflow: hidden !important;
-            word-wrap: break-word !important;
-            word-break: break-word !important;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
         ">
             <div style="
-                background: {style['bg']};
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid {style['border']};
-                border-radius: 12px;
-                padding: 16px;
-                margin: 0;
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-                width: 100% !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
-                overflow: hidden !important;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: {style['color']};
+                font-weight: 600;
+                font-size: 14px;
             ">
-                <div style="
-                    display: flex; 
-                    align-items: flex-start;
-                    margin-bottom: 12px;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                    width: 100% !important;
-                    max-width: 100% !important;
-                    box-sizing: border-box !important;
-                    overflow: hidden !important;
-                ">
-                    <span style="font-size: 18px; flex-shrink: 0; margin-top: 2px;">{style['icon']}</span>
-                    <h3 style="
-                        color: {style['color']}; 
+                <span style="font-size: 16px;">{style['icon']}</span>
+                <span>{self.title}</span>
                         margin: 0; 
                         font-size: 16px;
                         font-weight: 600;

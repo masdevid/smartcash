@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Type
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
 from smartcash.ui.pretrained.handlers.model_handlers import ModelOperationHandler
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
 
 class PretrainedInitializer(CommonInitializer):
     """🤖 Pretrained models initializer dengan CommonInitializer pattern terbaru"""

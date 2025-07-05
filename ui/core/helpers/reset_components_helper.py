@@ -4,7 +4,6 @@ Deskripsi: Helper utilities untuk reset UI components dengan safe null checks
 """
 
 from typing import Dict, Any, Optional, List, Union
-from smartcash.ui.utils.ui_logger import get_module_logger
 
 def safe_reset_ui_components(ui_components: Dict[str, Any], 
                            component_names: Optional[List[str]] = None,
@@ -19,8 +18,8 @@ def safe_reset_ui_components(ui_components: Dict[str, Any],
     Returns:
         Dict dengan component name sebagai key dan success status sebagai value
     """
-    from smartcash.ui.core.shared.logger import get_enhanced_logger
-    logger = get_enhanced_logger(logger_name)
+    from smartcash.ui.logger import get_module_logger
+    logger = get_module_logger(logger_name)
     results = {}
     
     if not ui_components:
@@ -239,8 +238,8 @@ def check_component_availability(ui_components: Dict[str, Any],
     Returns:
         Dict dengan component name sebagai key dan availability sebagai value
     """
-    from smartcash.ui.core.shared.logger import get_enhanced_logger
-    logger = get_enhanced_logger(logger_name)
+    from smartcash.ui.logger import get_module_logger
+    logger = get_module_logger(logger_name)
     availability = {}
     
     if not ui_components:

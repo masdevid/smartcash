@@ -305,7 +305,7 @@ class LogAccordion(BaseUIComponent):
             ns = entry.namespace or entry.module
             if ns:
                 # Try to get namespace from KNOWN_NAMESPACES first
-                from smartcash.ui.utils.ui_logger_namespace import KNOWN_NAMESPACES
+                from smartcash.ui.logger.namespace import KNOWN_NAMESPACES
                 ns_display = KNOWN_NAMESPACES.get(ns, ns.split('.')[-1])
                 ns_badge = (
                     f'<span style="display:inline-block;padding:1px 4px;margin:1px 4px 0 0;align-self:flex-start;'

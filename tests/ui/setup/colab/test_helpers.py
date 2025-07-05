@@ -182,7 +182,9 @@ def setup_mocks(sys_modules):
     sys_modules['smartcash.ui.utils.ui_logger'].get_ui_logger.return_value.info.return_value = None
 
     # Mock submodules of smartcash.ui.utils
-    sys_modules['smartcash.ui.utils.error_utils'] = MagicMock()
+    sys_modules['smartcash.ui.core.errors'] = MagicMock()
+    sys_modules['smartcash.ui.core.errors.decorators'] = MagicMock()
+    sys_modules['smartcash.ui.core.errors.handlers'] = MagicMock()
     sys_modules['smartcash.ui.utils.constants'] = MagicMock()
     sys_modules['smartcash.ui.utils.fallback_utils'] = MagicMock()
     sys_modules['smartcash.ui.utils.restart_runtime_helper'] = MagicMock()

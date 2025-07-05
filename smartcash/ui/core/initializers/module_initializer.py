@@ -11,7 +11,7 @@ from pathlib import Path
 
 from smartcash.ui.core.initializers.config_initializer import ConfigurableInitializer
 from smartcash.ui.core.handlers.ui_handler import ModuleUIHandler
-from smartcash.ui.handlers.config_handlers import ConfigHandler as LegacyConfigHandler
+from smartcash.ui.core.handlers.config_handler import ConfigHandler as LegacyConfigHandler
 
 
 class ModuleInitializer(ConfigurableInitializer):

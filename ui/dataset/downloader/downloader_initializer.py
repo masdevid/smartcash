@@ -14,7 +14,7 @@ from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
 from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
 from smartcash.ui.dataset.downloader.handlers.operation import DownloadHandlerManager
-from smartcash.ui.handlers.error_handler import create_error_response
+from smartcash.ui.core.errors.handlers import create_error_response
 
 class DownloaderInitializer(CommonInitializer):
     """Downloader initializer dengan complete UI dan backend service integration

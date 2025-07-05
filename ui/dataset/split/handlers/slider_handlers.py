@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Callable
 import logging
 
 # Import error handling
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Import constants
 from smartcash.ui.utils.constants import COLORS

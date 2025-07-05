@@ -8,10 +8,10 @@ import logging
 import copy
 
 # Import base handler
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
 
 # Import error handling
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Import config utilities
 from smartcash.ui.dataset.augmentation.handlers.config_extractor import extract_augmentation_config

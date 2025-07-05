@@ -7,7 +7,7 @@ Deskripsi: Config extractor untuk pretrained models dengan fail-fast approach
 from typing import Dict, Any, Optional, TypeVar, Callable
 from functools import wraps
 
-from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
+from smartcash.ui.logger import UILogger, get_module_logger
 
 # Type variables for generic function typing
 T = TypeVar('T')

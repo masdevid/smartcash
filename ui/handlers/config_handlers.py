@@ -1,8 +1,21 @@
 """
 File: smartcash/ui/handlers/config_handlers.py
+
+⚠️ DEPRECATED: This module is deprecated and will be removed in a future version.
+Please update your imports to use smartcash.ui.core.config instead.
+
 Description: ConfigHandler with shared configuration management, BaseHandler integration,
 and support for both persistent and non-persistent configuration handling.
 """
+import warnings
+
+# Issue deprecation warning
+warnings.warn(
+    "The 'smartcash.ui.handlers.config_handlers' module is deprecated and will be removed in a future version. "
+    "Please update your imports to use 'smartcash.ui.core.config' instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 from typing import Dict, Any, Optional, Callable, TypeVar, List
 from abc import abstractmethod
@@ -10,13 +23,49 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from smartcash.common.config.manager import get_config_manager
-from smartcash.ui.handlers.base_handler import BaseHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
-from smartcash.ui.config_cell.managers.shared_config_manager import (
-    get_shared_config_manager,
-    subscribe_to_config,
-    broadcast_config_update
-)
+from smartcash.ui.core.handlers import BaseHandler
+from smartcash.ui.core.errors.handlers import handle_ui_errors
+# Local implementation of shared config manager functionality
+class _SharedConfigManager:
+    """Simple in-memory shared config manager."""
+    _instances = {}
+    _subscribers = {}
+    
+    @classmethod
+    def get_manager(cls, module_name: str):
+        """Get or create a shared config manager for the module."""
+        if module_name not in cls._instances:
+            cls._instances[module_name] = {}
+        return cls._instances[module_name]
+    
+    @classmethod
+    def subscribe(cls, module_name: str, subscriber_id: str, callback: callable):
+        """Subscribe to config updates for a module."""
+        if module_name not in cls._subscribers:
+            cls._subscribers[module_name] = {}
+        cls._subscribers[module_name][subscriber_id] = callback
+        
+        def unsubscribe():
+            if module_name in cls._subscribers and subscriber_id in cls._subscribers[module_name]:
+                del cls._subscribers[module_name][subscriber_id]
+        
+        return unsubscribe
+    
+    @classmethod
+    def broadcast_update(cls, module_name: str, config: Dict[str, Any]):
+        """Broadcast config update to all subscribers."""
+        if module_name in cls._subscribers:
+            for callback in cls._subscribers[module_name].values():
+                try:
+                    callback(config)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Error in config update callback: {e}", exc_info=True)
+
+# Alias functions for backward compatibility
+get_shared_config_manager = _SharedConfigManager.get_manager
+subscribe_to_config = _SharedConfigManager.subscribe
+broadcast_config_update = _SharedConfigManager.broadcast_update
 
 # Type variable for generic return types
 T = TypeVar('T')
@@ -36,78 +85,45 @@ class ConfigState:
 
 
 class ConfigHandler(BaseHandler):
-    """ConfigHandler with shared configuration management and proper lifecycle handling.
+    """⚠️ DEPRECATED: This class is deprecated and will be removed in a future version.
+    Please use smartcash.ui.core.config.ConfigHandler instead.
     
-    Features:
-    - Shared configuration across components using SharedConfigManager
-    - Thread-safe operations with proper lifecycle hooks
-    - Automatic config change notifications
-    - Fallback to local config when shared config is not available
-    - Support for non-persistent configuration (in-memory only)
-    - Inherits from BaseHandler for centralized functionality:
-      - Consistent logging and log redirection to UI
-      - Standardized error handling with UI feedback
-      - Confirmation dialog utilities
-      - Button state management (enable/disable)
-      - Status panel updates
-      - Progress tracker integration
-      - UI component clearing and reset
-    
-    This handler standardizes API response success checking using the 'status' key
-    for consistency across the application.
-    
-    For handlers that don't require persistence (where load/save operations are irrelevant),
-    set persistence_enabled=False when initializing the handler. This will make the handler
-    operate in memory-only mode without attempting to load from or save to disk.
-    
-    When persistence_enabled=False:
-    - extract_config and update_ui methods become optional
-    - If extract_config is not implemented, in-memory state is used
-    - If update_ui is not implemented, UI updates are skipped
-    - No file operations are performed
-    - Shared config operations are skipped
-    
-    This allows for simpler handlers that only need to maintain state in memory
-    without the overhead of implementing UI extraction/update methods when they
-    aren't needed.
+    This is a compatibility layer that forwards all calls to the new implementation in core.
     """
     
     @handle_ui_errors(error_component_title="Config Error", log_error=True)
     def __init__(self, module_name: str, parent_module: str = None, use_shared_config: bool = True,
                  persistence_enabled: bool = True):
-        # Initialize BaseHandler first
-        super().__init__(module_name, parent_module)
+        # Issue deprecation warning
+        warnings.warn(
+            "The 'ConfigHandler' class is deprecated and will be removed in a future version. "
+            "Please use 'smartcash.ui.core.config.ConfigHandler' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         
-        # Config-specific attributes
-        self.use_shared_config = use_shared_config
-        self.persistence_enabled = persistence_enabled
-        self.config_manager = get_config_manager() if persistence_enabled else None
-        self.callbacks: List[Callable[[Dict[str, Any]], None]] = []
+        # Import the new implementation
+        from smartcash.ui.core.handlers.config_handler import ConfigHandler as CoreConfigHandler
         
-        # Initialize shared config manager if enabled and persistence is enabled
-        self.shared_manager = None
-        self._unsubscribe = None
-        if self.persistence_enabled and self.use_shared_config and self.parent_module:
-            try:
-                self.shared_manager = get_shared_config_manager(self.parent_module)
-                self._unsubscribe = subscribe_to_config(
-                    self.parent_module, 
-                    self.module_name,
-                    self._on_shared_config_updated
-                )
-                self.logger.debug(f"Using shared config for {self.full_module_name}")
-            except Exception as e:
-                self.logger.warning(
-                    f"Failed to initialize shared config: {e}",
-                    exc_info=True
-                )
+        # Initialize the core handler
+        self._core_handler = CoreConfigHandler(
+            module_name=module_name,
+            parent_module=parent_module,
+            use_shared_config=use_shared_config,
+            persistence_enabled=persistence_enabled
+        )
         
-        # Local config state (always available even for non-persistent config)
-        self._config_state = ConfigState()
+        # Set up forwarding for attribute access
+        self.module_name = module_name
+        self.parent_module = parent_module
+        self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
-        self.logger.debug(
-            f"Initialized ConfigHandler for {self.full_module_name} " +
-            f"(persistence {'enabled' if self.persistence_enabled else 'disabled'})"
+        # Get logger from core handler
+        self.logger = self._core_handler.logger
+        
+        # Log deprecation warning
+        self.logger.warning(
+            "This handler is deprecated. Please update to use smartcash.ui.core.config.ConfigHandler"
         )
     
     def __del__(self):
@@ -604,8 +620,11 @@ def create_config_handler(
     parent_module: str = None, 
     use_shared_config: bool = True,
     **kwargs
-) -> ConfigHandler:
-    """Create a new ConfigHandler instance with shared config support.
+) -> 'ConfigHandler':
+    """ DEPRECATED: This function is deprecated and will be removed in a future version.
+    Please use smartcash.ui.core.config.create_config_handler instead.
+    
+    Create a new ConfigHandler instance with shared config support.
     
     Args:
         module_name: Name of the module
@@ -616,20 +635,35 @@ def create_config_handler(
     Returns:
         ConfigHandler: New instance
     """
-    return ConfigHandler(
+    warnings.warn(
+        "The 'create_config_handler' function is deprecated and will be removed in a future version. "
+        "Please use 'smartcash.ui.core.config.create_config_handler' instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
+    # Import the new implementation
+    from smartcash.ui.core.handlers.config_handler import create_config_handler as core_create_config_handler
+    
+    # Forward to the new implementation
+    return core_create_config_handler(
         module_name=module_name,
         parent_module=parent_module,
         use_shared_config=use_shared_config,
         **kwargs
     )
 
+
 def get_or_create_handler(
     ui_components: Dict[str, Any], 
     module_name: str, 
     parent_module: str = None,
     **kwargs
-) -> ConfigHandler:
-    """Get existing handler or create a new one with shared config support.
+) -> 'ConfigHandler':
+    """ DEPRECATED: This function is deprecated and will be removed in a future version.
+    Please use smartcash.ui.core.config.get_or_create_handler instead.
+    
+    Get existing handler or create a new one with shared config support.
     
     Args:
         ui_components: Dictionary of UI components
@@ -640,13 +674,20 @@ def get_or_create_handler(
     Returns:
         ConfigHandler: Existing or new instance
     """
-    if 'config_handler' in ui_components:
-        return ui_components['config_handler']
-        
-    handler = create_config_handler(
+    warnings.warn(
+        "The 'get_or_create_handler' function is deprecated and will be removed in a future version. "
+        "Please use 'smartcash.ui.core.config.get_or_create_handler' instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
+    # Import the new implementation
+    from smartcash.ui.core.handlers.config_handler import get_or_create_handler as core_get_or_create_handler
+    
+    # Forward to the new implementation
+    return core_get_or_create_handler(
+        ui_components=ui_components,
         module_name=module_name,
         parent_module=parent_module,
         **kwargs
     )
-    ui_components['config_handler'] = handler
-    return handler

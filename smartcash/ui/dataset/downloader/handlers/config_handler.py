@@ -5,8 +5,8 @@ Description: Config handler for downloader module with centralized error handlin
 
 from typing import Dict, Any, Optional, Callable, TypeVar, cast, Union, List
 import logging
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.dataset.downloader.handlers.base_downloader_handler import BaseDownloaderHandler
 from smartcash.ui.dataset.downloader.handlers.config_extractor import extract_downloader_config
 from smartcash.ui.dataset.downloader.handlers.config_updater import update_downloader_ui

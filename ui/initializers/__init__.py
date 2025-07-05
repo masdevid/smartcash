@@ -1,8 +1,32 @@
 """
 File: smartcash/ui/initializers/__init__.py
-Deskripsi: Module untuk mengakses initializers terpusat dengan pendekatan modular
+
+⚠️ DEPRECATED: This module is deprecated and will be removed in a future version.
+Please update your imports to use smartcash.ui.core.initializers instead.
 """
+import warnings
 
-from .common_initializer import CommonInitializer
+# Issue deprecation warning
+warnings.warn(
+    "The 'smartcash.ui.initializers' module is deprecated and will be removed in a future version. "
+    "Please update your imports to use 'smartcash.ui.core.initializers' instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
-__all__ = ['CommonInitializer']
+# Forward imports from the new location
+from smartcash.ui.core.initializers import (
+    CommonInitializer,
+    BaseInitializer,
+    ConfigurableInitializer,
+    ModuleInitializer,
+    ColabEnvInitializer
+)
+
+__all__ = [
+    'CommonInitializer',
+    'BaseInitializer',
+    'ConfigurableInitializer',
+    'ModuleInitializer',
+    'ColabEnvInitializer'
+]

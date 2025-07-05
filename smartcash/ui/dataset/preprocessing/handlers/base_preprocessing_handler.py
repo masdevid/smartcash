@@ -4,7 +4,7 @@ Deskripsi: Base handler untuk preprocessing module dengan centralized error hand
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.base_handler import BaseHandler
+from smartcash.ui.core.handlers import BaseHandler
 
 class BasePreprocessingHandler(BaseHandler):
     """Base handler untuk preprocessing module dengan centralized error handling.

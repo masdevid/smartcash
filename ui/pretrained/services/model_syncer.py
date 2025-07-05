@@ -6,7 +6,7 @@ This module provides the PretrainedModelSyncer class for syncing model files wit
 tracking and error handling. Supports one-way and bi-directional sync operations.
 
 Example:
-    from smartcash.ui.utils.ui_logger import get_module_logger
+    from smartcash.ui.logger import get_module_logger
     
     syncer = PretrainedModelSyncer()
     
@@ -36,7 +36,7 @@ from typing import Dict, List, Optional, Any, Tuple, Callable, TypeVar, Union
 from pathlib import Path
 from functools import wraps
 
-from smartcash.ui.utils.ui_logger import get_module_logger, UILogger
+from smartcash.ui.logger import get_module_logger, UILogger
 from smartcash.ui.pretrained.utils import (
     with_error_handling,
     log_errors

@@ -5,7 +5,7 @@ Deskripsi: Module handler untuk preprocessing dengan ModuleUIHandler integration
 
 from typing import Dict, Any, Optional, List, Callable
 from smartcash.ui.core.handlers.ui_handler import ModuleUIHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.core.decorators.ui_decorators import safe_ui_operation
 
 

@@ -4,7 +4,7 @@ Deskripsi: Main preprocessing handlers dengan centralized error handling dan SRP
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.dataset.preprocessing.handlers.operation import create_preprocessing_handler_manager
 
 @handle_ui_errors(error_component_title="Preprocessing Handlers Setup Error", log_error=True)

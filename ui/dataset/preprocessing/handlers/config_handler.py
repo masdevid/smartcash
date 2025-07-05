@@ -4,8 +4,8 @@ Deskripsi: Preprocessing config handler dengan centralized error handling
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.dataset.preprocessing.handlers.base_preprocessing_handler import BasePreprocessingHandler
 from smartcash.ui.dataset.preprocessing.handlers.config_extractor import extract_preprocessing_config
 from smartcash.ui.dataset.preprocessing.handlers.config_updater import update_preprocessing_ui

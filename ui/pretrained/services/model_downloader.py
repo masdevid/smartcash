@@ -24,23 +24,23 @@ from smartcash.ui.pretrained.utils.progress_adapter import PretrainedProgressAda
 logger = get_logger()
 
 if TYPE_CHECKING:
-    from smartcash.ui.utils.ui_logger import UILogger as LoggerBridge
+    from smartcash.ui.logger import UILogger
 else:
-    LoggerBridge = Any  # For runtime type hints
+    UILogger = Any  # For runtime type hints
 
 class PretrainedModelDownloader:
     """🚀 Service untuk downloading pretrained models dengan progress tracking"""
     
     def __init__(self, 
-                 logger_bridge: Optional[LoggerBridge] = None,
+                 logger: Optional[UILogger] = None,
                  progress_tracker: Optional[PretrainedProgressAdapter] = None):
         """Initialize downloader with optional logger bridge and progress tracker
         
         Args:
-            logger_bridge: LoggerBridge instance for centralized logging
+            logger: UILogger instance for centralized logging
             progress_tracker: Optional progress tracker instance
         """
-        self._logger_bridge = logger_bridge
+        self._logger = logger
         self._progress_tracker = progress_tracker
         self._download_urls = {
             'yolov5s': 'https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5s.pt'
@@ -52,13 +52,13 @@ class PretrainedModelDownloader:
         self._progress_callback = None
         self._status_callback = None
         
-    def set_logger_bridge(self, logger_bridge: LoggerBridge) -> None:
-        """Set the logger bridge for this downloader
+    def set_logger(self, logger: UILogger) -> None:
+        """Set the logger for centralized logging
         
         Args:
-            logger_bridge: LoggerBridge instance for centralized logging
+            logger: UILogger instance for centralized logging
         """
-        self._logger_bridge = logger_bridge
+        self._logger = logger
         
     def set_progress_callbacks(self, 
                             progress_cb: Optional[ProgressTrackerType] = None,
@@ -141,11 +141,11 @@ class PretrainedModelDownloader:
             message: The message to log
             **kwargs: Additional arguments to pass to the logger
         """
-        if self._logger_bridge and hasattr(self._logger_bridge, level):
-            getattr(self._logger_bridge, level)(message, **kwargs)
+        if self._logger and hasattr(self._logger, level):
+            getattr(self._logger, level)(message, **kwargs)
     
     def _log_debug(self, message: str, **kwargs) -> None:
-        """Log debug message using logger_bridge if available
+        """Log debug message using logger if available
         
         Args:
             message: The message to log
@@ -154,23 +154,23 @@ class PretrainedModelDownloader:
         self._log('debug', message, **kwargs)
             
     def _log_info(self, message: str, **kwargs) -> None:
-        """Log info message using logger_bridge if available
+        """Log info message using logger if available
         
         Args:
             message: The message to log
         """
-        logger.info(message)
+        self._logger.info(message)
             
     def _log_warning(self, message: str) -> None:
-        """Log warning message using logger_bridge if available
+        """Log warning message using logger if available
         
         Args:
             message: The message to log
         """
-        logger.warning(f"⚠️ {message}")
+        self._logger.warning(f"⚠️ {message}")
             
     def _log_error(self, message: str, exc_info: bool = False) -> None:
-        """Log error message using logger_bridge if available
+        """Log error message using logger if available
         
         Args:
             message: The message to log

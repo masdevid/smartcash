@@ -13,13 +13,13 @@ import traceback
 from functools import wraps
 import logging
 from typing import Any, Callable, Dict, Optional, TypeVar, Type, Union
-from smartcash.ui.utils.error_utils import (
+from smartcash.ui.core.errors.handlers import CoreErrorHandler as ErrorHandler
+from smartcash.ui.core.errors.decorators import (
     with_error_handling as base_with_error_handling,
     log_errors as base_log_errors,
-    create_error_context,
-    ErrorHandler,
     safe_ui_operation as base_safe_ui_operation
 )
+from smartcash.ui.core.errors.context import create_error_context
 from smartcash.common.exceptions import (
     SmartCashError, 
     UIError, 

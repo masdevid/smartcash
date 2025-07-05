@@ -294,23 +294,9 @@ smartcash
     │   ├── tips_panel.py
     │   ├── widgets
     │       ├── __init__.py
-    │       ├── checkbox.py
-    │       ├── dropdown.py
-    │       ├── log_slider.py
-    │       ├── slider.py
-    │       ├── text_input.py
-    ├── config_cell
-    │   ├── __init__.py
-    │   ├── components
-    │   │   ├── __init__.py
-    │   │   ├── component_registry.py
-    │   │   ├── ui_factory.py
-    │   │   ├── ui_parent_components.py
-    │   ├── constants.py
-    │   ├── handlers
-    │   │   ├── config_handler.py
-    │   ├── managers
-    │       ├── shared_config_manager.py
+    │       ├── component_registry.py
+    │       ├── ui_factory.py
+    │       ├── ui_parent_components.py
     ├── core
     │   ├── __init__.py
     │   ├── handlers

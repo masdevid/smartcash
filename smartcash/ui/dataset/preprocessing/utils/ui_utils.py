@@ -4,7 +4,7 @@ Deskripsi: Optimized UI utilities untuk preprocessing handlers dengan centralize
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 @handle_ui_errors(error_component_title="Summary Panel Update Error", log_error=True)
 def update_summary_panel(ui_components: Dict[str, Any], message: str, status_type: str = "info", title: Optional[str] = None) -> None:

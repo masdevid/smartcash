@@ -11,8 +11,8 @@ import logging
 from abc import ABC
 from datetime import datetime
 
-from smartcash.ui.utils.ui_logger import get_module_logger
-from smartcash.ui.handlers.error_handler import (
+from smartcash.ui.logger import get_module_logger
+from smartcash.ui.core.errors.handlers import (
     handle_ui_errors, 
     safe_execute,
     create_error_response,
@@ -34,15 +34,12 @@ ProgressLevel = Literal['single', 'dual', 'triple']
 T = TypeVar('T')
 
 class BaseHandler(ABC):
-    """Base handler with centralized logging, error handling, and UI utilities.
+    """⚠️ DEPRECATED: This class is deprecated and will be removed in a future version.
+    Please use smartcash.ui.core.handlers.BaseHandler instead.
     
-    Features:
-    - Centralized logging with consistent module naming
-    - Error handling integration with error_handler.py
-    - Confirmation dialog utilities
-    - Button state management (enable/disable)
-    - Status panel update wrapper
-    - UI component management helpers
+    Base handler with centralized logging, error handling, and UI utilities.
+    
+    This is a compatibility layer that forwards all calls to the new implementation in core.
     """
     
     @handle_ui_errors(error_component_title="Handler Initialization Error", log_error=True)
@@ -53,27 +50,31 @@ class BaseHandler(ABC):
             module_name: Name of the module
             parent_module: Optional parent module name
         """
+        warnings.warn(
+            "The 'BaseHandler' class is deprecated and will be removed in a future version. "
+            "Please use 'smartcash.ui.core.handlers.BaseHandler' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
+        # Import the new implementation
+        from smartcash.ui.core.handlers import BaseHandler as CoreBaseHandler
+        
+        # Initialize the core handler
+        self._core_handler = CoreBaseHandler(module_name, parent_module)
+        
+        # Set up forwarding for attribute access
         self.module_name = module_name
         self.parent_module = parent_module
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
-        # Initialize logger with module-level logging
-        self.logger = get_module_logger(f"smartcash.ui.{self.full_module_name}")
+        # Get logger from core handler
+        self.logger = self._core_handler.logger
         
-        # Store confirmation dialog state
-        self._confirmation_state = {
-            'pending': False,
-            'message': '',
-            'timestamp': None,
-            'timeout_seconds': 120,  # Default 2-minute timeout
-            'callback': None
-        }
-        
-        # Log handler for redirecting logs to log_accordion
-        self._log_handler = None
-        self._log_ui_components = None
-        
-        self.logger.debug(f"Initialized BaseHandler for {self.full_module_name}")
+        # Log deprecation warning
+        self.logger.warning(
+            "This handler is deprecated. Please update to use smartcash.ui.core.handlers.BaseHandler"
+        )
     
     def setup_log_redirection(self, ui_components: Dict[str, Any]) -> None:
         """Set up log redirection to log_accordion component.

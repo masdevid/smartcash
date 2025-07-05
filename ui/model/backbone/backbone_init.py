@@ -1,58 +1,115 @@
 """
 File: smartcash/ui/model/backbone/backbone_init.py
-Deskripsi: Initializer untuk Backbone Model Configuration yang extends ConfigCellInitializer
+Deskripsi: Initializer untuk Backbone Model Configuration
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 import ipywidgets as widgets
-from smartcash.ui.initializers.config_cell_initializer import ConfigCellInitializer
 from smartcash.ui.model.backbone.handlers.model_handler import BackboneModelHandler
 
-class BackboneInitializer(ConfigCellInitializer):
+class BackboneInitializer:
     """
     Initializer untuk Backbone Model Configuration.
     
-    Extends ConfigCellInitializer dan hanya membuat child components spesifik.
-    Parent components (header, status panel, log accordion) sudah dibuat oleh parent class.
+    Handles initialization of backbone model configuration UI components.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize dengan config untuk backbone model"""
-        # Try to load existing config first
-        loaded_config = self._load_existing_config()
+    def __init__(self, module_name: str = "backbone", parent_module: str = None):
+        """Initialize the backbone model configuration.
         
-        # Get default config from config handler
-        from .handlers.config_handler import BackboneConfigHandler
-        default_config = BackboneConfigHandler.get_default_config()
+        Args:
+            module_name: Name of the module
+            parent_module: Optional parent module name
+        """
+        self.module_name = module_name
+        self.parent_module = parent_module
+        self.handler = None
+        self.ui_components = {}
+        self._callbacks = []
+    
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Initialize the backbone configuration UI.
         
-        # Priority: provided config > loaded config > default config
-        if loaded_config and 'model' in loaded_config:
-            # Deep update model config from loaded config
-            for key, value in loaded_config['model'].items():
-                if key in default_config['model']:
-                    if isinstance(value, dict) and isinstance(default_config['model'][key], dict):
-                        default_config['model'][key].update(value)
-                    else:
-                        default_config['model'][key] = value
-        
-        # Apply provided config (highest priority)
-        if config and 'model' in config:
-            for key, value in config['model'].items():
-                if key in default_config['model']:
-                    if isinstance(value, dict) and isinstance(default_config['model'][key], dict):
-                        default_config['model'][key].update(value)
-                    else:
-                        default_config['model'][key] = value
-        
-        # Initialize parent dengan merged config
-        super().__init__(
-            config=default_config,
-            component_id='backbone',
-            parent_id='model',
-            title='Model Configuration',
-            description='Konfigurasi backbone model YOLOv5 dengan EfficientNet-B4',
-            icon='🤖'
+        Args:
+            config: Optional initial configuration
+            
+        Returns:
+            Dictionary containing UI components
+        """
+        # Initialize handler
+        self.handler = BackboneModelHandler(
+            module_name=self.module_name,
+            parent_module=self.parent_module
         )
+        
+        # Create UI components
+        self._create_ui_components()
+        
+        # Load config if provided
+        if config:
+            self.handler.load_config(config)
+            self.handler.update_ui(self.ui_components, config)
+        
+        return self.ui_components
+    
+    def _create_ui_components(self) -> None:
+        """Create the UI components for backbone configuration."""
+        # Create main container
+        self.ui_components['main_container'] = widgets.VBox(layout={'border': '1px solid #cccccc'})
+        
+        # Add your UI components here
+        # Example:
+        # self.ui_components['model_select'] = widgets.Dropdown(
+        #     options=['resnet50', 'efficientnet', 'mobilenet'],
+        #     description='Model:',
+        #     disabled=False
+        # )
+        
+        # Add components to container
+        # children = [self.ui_components['model_select']]  # Add other components
+        # self.ui_components['main_container'].children = children
+    
+    def add_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+        """Add a callback to be called when configuration changes.
+        
+        Args:
+            callback: Function that takes a config dict as argument
+        """
+        if callback not in self._callbacks:
+            self._callbacks.append(callback)
+    
+    def remove_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+        """Remove a configuration change callback.
+        
+        Args:
+            callback: Callback function to remove
+        """
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get the current configuration.
+        
+        Returns:
+            Current configuration as a dictionary
+        """
+        if self.handler and hasattr(self.handler, 'extract_config'):
+            return self.handler.extract_config(self.ui_components)
+        return {}
+    
+    def update_ui(self, config: Dict[str, Any]) -> None:
+        """Update the UI with the given configuration.
+        
+        Args:
+            config: Configuration to apply to the UI
+        """
+        if self.handler and hasattr(self.handler, 'update_ui'):
+            self.handler.update_ui(self.ui_components, config)
+    
+    def reset(self) -> None:
+        """Reset the configuration to defaults."""
+        if self.handler and hasattr(self.handler, 'reset_config'):
+            self.handler.reset_config(self.ui_components)
     
     def _load_existing_config(self) -> Optional[Dict[str, Any]]:
         """Try to load existing configuration from file"""

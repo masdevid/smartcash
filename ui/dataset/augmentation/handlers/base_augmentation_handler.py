@@ -8,10 +8,10 @@ import logging
 import ipywidgets as widgets
 
 # Import base handler
-from smartcash.ui.handlers.base_handler import BaseHandler
+from smartcash.ui.core.handlers import BaseHandler
 
 # Import error handling
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 
 class BaseAugmentationHandler(BaseHandler):

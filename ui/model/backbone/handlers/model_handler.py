@@ -79,21 +79,32 @@ class BackboneModelHandler:
         return handlers
     
     def _setup_shared_config(self) -> None:
-        """Setup shared configuration manager"""
+        """Setup configuration manager
+        
+        Note: This previously used a shared config manager, but has been simplified
+        to use local configuration only.
+        """
         try:
-            from smartcash.ui.config_cell.managers.shared_config_manager import get_shared_config_manager
-            self.shared_config_manager = get_shared_config_manager('model')
-            
-            # Subscribe to config updates
-            self.shared_config_manager.subscribe('backbone', self._on_config_update)
-            
-            # Load existing config if available
-            existing_config = self.shared_config_manager.get_config('backbone')
-            if existing_config:
-                update_model_ui(self.ui_components, existing_config)
-                self.logger.info("📡 Loaded existing backbone configuration")
+            # Initialize config handler if not already done
+            if not hasattr(self, 'config_handler') or self.config_handler is None:
+                from .config_handler import BackboneConfigHandler
+                self.config_handler = BackboneConfigHandler(logger_bridge=self.logger_bridge)
+                
+                # Load existing config
+                existing_config = self.config_handler.get_config()
+                if existing_config:
+                    # Update UI with existing config
+                    if hasattr(self, 'update_model_ui'):
+                        self.update_model_ui(self.ui_components, existing_config)
+                    self.logger.info("📡 Loaded existing backbone configuration")
+                    
         except Exception as e:
-            self.logger.warning(f"⚠️ Shared config not available: {e}")
+            self.logger.warning(f"⚠️ Configuration setup failed: {e}")
+            # Fall back to default config
+            if hasattr(self, 'config_handler') and self.config_handler:
+                default_config = self.config_handler._get_default_config()
+                if hasattr(self, 'update_model_ui'):
+                    self.update_model_ui(self.ui_components, default_config)
     
     def _on_config_update(self, config: Dict[str, Any]) -> None:
         """Handle config updates from shared manager"""

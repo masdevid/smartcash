@@ -6,7 +6,7 @@ import os
 from typing import Dict, Any, Tuple, Optional, Callable, List
 from functools import wraps
 
-from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
+from smartcash.ui.logger import UILogger, get_module_logger
 
 from smartcash.ui.pretrained.utils import (
     with_error_handling,

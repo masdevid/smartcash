@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 # Import error handling
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 # Import validation utilities
 from smartcash.ui.dataset.split.handlers.defaults import normalize_split_ratios, validate_split_ratios

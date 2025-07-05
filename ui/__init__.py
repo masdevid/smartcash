@@ -1,31 +1,39 @@
 """
 File: smartcash/ui/__init__.py
-Deskripsi: UI package exports
+Deskripsi: UI package exports and logger interface
 """
 
 # Import subpackages to make them available as smartcash.ui.*
-from . import handlers
-from . import setup
-from . import types
+from .logger import UILogger, get_ui_logger, get_logger, get_module_logger, LogLevel
 
-# Initialize the initializers package
-initializers = None
+# Ensure all packages are properly imported
 try:
-    from . import initializers
+    # Core UI components
+    from . import core
+
+    # UI Components
+    from . import components
+
+    # Setup and other components
+    from . import types
 except ImportError as e:
     import warnings
-    warnings.warn(f"Could not import initializers: {e}")
+    warnings.warn(f"Could not import UI modules: {e}")
 
-# Ensure setup package is properly imported
-try:
-    from . import setup
-except ImportError as e:
-    import warnings
-    warnings.warn(f"Could not import setup modules: {e}")
-
+# Explicitly list all exported modules and symbols
 __all__ = [
-    'handlers',
-    'setup',
+    # Core modules
+    'core',
+    'components',
     'types',
-    'initializers',
+    
+    # Logger interface
+    'UILogger',
+    'get_ui_logger',
+    'get_logger',
+    'get_module_logger',
+    'LogLevel',
 ]
+
+# Create a default logger instance for the UI package
+logger = get_ui_logger('smartcash.ui')

@@ -8,7 +8,9 @@ from setuptools import setup, find_packages
 setup(
     name="smartcash",
     version="0.1.0",
-    packages=find_packages(),
+    packages=find_packages(include=['smartcash', 'smartcash.*']),
+    package_dir={'': '.'},
+    include_package_data=True,
     install_requires=[
         "numpy",
         "opencv-python",
@@ -18,4 +20,4 @@ setup(
         "tqdm",
     ],
     python_requires=">=3.8",
-) 
+)

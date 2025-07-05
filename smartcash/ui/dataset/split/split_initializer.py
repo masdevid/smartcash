@@ -17,7 +17,7 @@ from smartcash.ui.dataset.split.components.ui_layout import create_split_layout
 
 # Import handlers
 from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors, create_error_response
+from smartcash.ui.core.errors.handlers import handle_ui_errors, create_error_response
 
 # Constants
 MODULE_NAME = "split_config"

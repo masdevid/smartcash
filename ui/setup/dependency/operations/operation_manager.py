@@ -2,6 +2,7 @@
 File: smartcash/ui/setup/dependency/operations/operation_manager.py
 Deskripsi: Manages package operations with proper state and error handling.
 """
+import asyncio
 from typing import Dict, Any, List, Optional, Callable, Type, Tuple
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -44,6 +45,7 @@ class OperationManager:
         self.ui_components = ui_components or {}
         self._current_operation: Optional[OperationContext] = None
         self._operation_handlers: Dict[OperationType, Type[BaseOperationHandler]] = {}
+        self._operation_lock = asyncio.Lock()  # Lock for thread-safe operation execution
         self._setup_handlers()
     
     def _setup_handlers(self) -> None:
@@ -90,9 +92,42 @@ class OperationManager:
             
         Returns:
             Dict[str, Any]: The operation result.
+            
+        Raises:
+            RuntimeError: If another operation is already in progress.
         """
-        self._current_operation = context
+        # Check if an operation is already in progress
+        if not self._operation_lock.locked():
+            async with self._operation_lock:
+                self._current_operation = context
+                return await self._execute_operation(context)
+        else:
+            return {
+                'success': False,
+                'error': 'Another operation is already in progress',
+                'message': 'Cannot start a new operation while another is in progress'
+            }
         
+    async def _execute_operation(self, context: OperationContext) -> Dict[str, Any]:
+        """Internal method to execute an operation.
+        
+        Args:
+            context: The operation context.
+            
+        Returns:
+            Dict[str, Any]: The operation result.
+            
+        Raises:
+            ValueError: If no packages are provided for the operation.
+        """
+        # Validate packages
+        if not context.packages:
+            return {
+                'success': False,
+                'error': 'No packages provided',
+                'message': 'No packages specified for operation'
+            }
+            
         try:
             # Get the appropriate handler class
             handler_class = self._operation_handlers.get(context.operation_type)
@@ -109,7 +144,7 @@ class OperationManager:
             self._update_status(f"🚀 Starting {context.operation_type.name.lower()}...")
             
             # Execute the operation asynchronously
-            result = await handler.execute_operation()
+            result = await handler.execute_operation(context)
             
             # Update status based on result
             if result.get('success', False):
@@ -122,7 +157,11 @@ class OperationManager:
             
         except Exception as e:
             self._update_status(f"❌ {context.operation_type.name.capitalize()} failed: {str(e)}", "error")
-            raise
+            return {
+                'success': False,
+                'error': str(e),
+                'message': f"Operation failed: {str(e)}"
+            }
         finally:
             self._current_operation = None
     

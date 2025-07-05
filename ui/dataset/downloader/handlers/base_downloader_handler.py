@@ -4,8 +4,8 @@ Description: Base handler for downloader module with centralized error handling
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.base_handler import BaseHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.handlers import BaseHandler
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 class BaseDownloaderHandler(BaseHandler):
     """Base handler for downloader module with centralized error handling."""

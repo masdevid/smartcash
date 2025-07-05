@@ -7,7 +7,7 @@ Deskripsi: Config updater untuk pretrained models dengan safe update approach
 from typing import Dict, Any, Optional, Callable, TypeVar, Type, cast
 from functools import wraps
 
-from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
+from smartcash.ui.logger import UILogger, get_module_logger
 
 # Type variables for generic function typing
 T = TypeVar('T')

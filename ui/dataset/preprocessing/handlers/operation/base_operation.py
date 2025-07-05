@@ -5,7 +5,7 @@ Deskripsi: Base operation handler untuk preprocessing operations
 
 from typing import Dict, Any, Optional, Callable
 from abc import ABC, abstractmethod
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.core.decorators.ui_decorators import safe_ui_operation
 from smartcash.ui.dataset.preprocessing.handlers.base_preprocessing_handler import BasePreprocessingHandler
 

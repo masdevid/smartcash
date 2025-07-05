@@ -5,7 +5,7 @@ Deskripsi: Handler untuk operasi check dataset dengan centralized error handling
 
 from typing import Dict, Any, Optional
 from smartcash.ui.dataset.downloader.handlers.base_downloader_handler import BaseDownloaderHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 class CheckOperationHandler(BaseDownloaderHandler):
     """Handler untuk operasi check dataset dengan centralized error handling."""

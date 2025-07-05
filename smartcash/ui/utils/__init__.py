@@ -15,24 +15,42 @@ from typing import Optional, Any, Dict, List, Union, Callable, Tuple
 # Import core utilities
 from .widget_utils import display_widget, safe_display
 
-# Import error handling utilities
-from .error_utils import (
-    create_error_context,
-    error_handler_scope,
-    with_error_handling,
-    log_errors,
-    ErrorHandler
-)
+# Error handling utilities have been moved to smartcash.ui.core.errors
+# Importing them here would cause circular imports
+# Please import them directly from smartcash.ui.core.errors instead
 
 # Import logging utilities
-from .ui_logger import (
+from smartcash.ui.logger import (
     UILogger,
     get_module_logger,
-    setup_global_logging,
-    log_to_ui,
-    get_current_ui_logger,
-    LoggerType
+    get_ui_logger as get_current_ui_logger,
+    LogLevel as LoggerType
 )
+
+# Backward compatibility
+def log_to_ui(message: str, level: str = 'info', **kwargs):
+    """
+    Log a message to the UI logger.
+    
+    Args:
+        message: The message to log
+        level: Log level ('debug', 'info', 'warning', 'error', 'critical')
+        **kwargs: Additional arguments to pass to the logger
+    """
+    logger = get_current_ui_logger()
+    log_method = getattr(logger, level, logger.info)
+    log_method(message, **kwargs)
+
+def setup_global_logging(level: str = 'info', **kwargs):
+    """
+    Set up global logging configuration.
+    
+    Args:
+        level: Logging level ('debug', 'info', 'warning', 'error', 'critical')
+        **kwargs: Additional arguments to pass to the logger
+    """
+    # This is now a no-op as logging is configured per-logger
+    pass
 
 # For backward compatibility
 LoggerBridge = UILogger
@@ -44,22 +62,15 @@ __all__ = [
     'display_widget',
     'safe_display',
     
-    # Error handling
-    'ErrorHandler',
-    'create_error_context',
-    'error_handler_scope',
-    'with_error_handling',
-    'log_errors',
-    
     # Logging
     'UILogger',
+    'LoggerBridge',
     'get_module_logger',
-    'get_logger',  # Backward compatibility
+    'get_logger',
     'setup_global_logging',
     'log_to_ui',
     'get_current_ui_logger',
     'LoggerType',
-    'LoggerBridge',  # Backward compatibility
     
     # Common types for type hints
     'Path',

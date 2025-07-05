@@ -4,8 +4,8 @@ Deskripsi: Configuration handler untuk dataset split dengan centralized error ha
 """
 
 from typing import Dict, Any, Optional, Tuple
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from .base_split_handler import BaseSplitHandler
 from .config_extractor import extract_split_config
 from .config_updater import update_split_ui, reset_ui_to_defaults

@@ -4,7 +4,7 @@ Deskripsi: UI updater untuk essential preprocessing forms dengan centralized err
 """
 
 from typing import Dict, Any, Optional, Tuple, Union
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.core.decorators.ui_decorators import safe_ui_operation
 
 @handle_ui_errors(error_component_title="UI Update Error", log_error=True)

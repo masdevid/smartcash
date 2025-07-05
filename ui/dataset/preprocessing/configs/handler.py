@@ -5,7 +5,7 @@ Deskripsi: Config handler untuk preprocessing module dengan SharedConfigHandler 
 
 from typing import Dict, Any, Optional
 from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 
 class PreprocessingConfigHandler(SharedConfigHandler):

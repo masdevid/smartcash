@@ -38,8 +38,14 @@ class ColabConfigHandler(ModuleUIHandler, ConfigurableHandler):
             module_name: Name of the module this handler manages (default: 'colab')
         """
         # Initialize base classes with required parameters
-        ModuleUIHandler.__init__(self, module_name=module_name)
+        super().__init__(module_name=module_name)  # This will call ModuleUIHandler.__init__
         ConfigurableHandler.__init__(self, module_name=module_name)
+        
+        # Initialize logger
+        self.logger = getattr(self, 'logger', None)
+        if self.logger is None:
+            from smartcash.ui.logger import get_module_logger
+            self.logger = get_module_logger(self.__class__.__module__)
         
         # Initialize instance variables
         self._is_initialized = False

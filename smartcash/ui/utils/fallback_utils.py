@@ -12,8 +12,8 @@ from typing import Any, Dict, Optional, Tuple, TypeVar, Callable, Type
 import traceback
 from dataclasses import dataclass
 
-from smartcash.ui.components.error.error_component import create_error_component
-from smartcash.ui.utils.ui_logger import get_module_logger
+from smartcash.ui.core.errors import create_error_component
+from smartcash.ui.logger import get_module_logger
 
 # Type variable for generic function returns
 T = TypeVar('T')

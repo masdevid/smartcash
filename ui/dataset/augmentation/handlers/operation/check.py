@@ -10,7 +10,7 @@ import logging
 from smartcash.ui.dataset.augmentation.handlers.operation.base_operation import BaseOperationHandler
 
 # Import error handling
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 
 class CheckOperationHandler(BaseOperationHandler):

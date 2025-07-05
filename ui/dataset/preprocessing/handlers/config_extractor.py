@@ -5,7 +5,7 @@ Deskripsi: Config extractor dengan API compatibility dan centralized error handl
 
 from typing import Dict, Any, List, Optional
 from pathlib import Path
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 @handle_ui_errors(error_component_title="Config Extraction Error", log_error=True)
 def extract_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:

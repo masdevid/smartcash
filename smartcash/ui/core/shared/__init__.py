@@ -4,8 +4,7 @@ Deskripsi: Export shared utilities untuk SmartCash UI core module
 """
 
 # Import shared components
-from smartcash.ui.core.shared.logger import EnhancedUILogger, get_enhanced_logger
-from smartcash.ui.core.shared.error_handler import (
+from smartcash.ui.core.errors import (
     CoreErrorHandler,
     ErrorLevel,
     ErrorContext,
@@ -27,10 +26,6 @@ from smartcash.ui.core.shared.core_shared_config_manager import (
 
 # Public exports
 __all__ = [
-    # Logger
-    'EnhancedUILogger',
-    'get_enhanced_logger',
-    
     # Error handler
     'CoreErrorHandler',
     'ErrorLevel',

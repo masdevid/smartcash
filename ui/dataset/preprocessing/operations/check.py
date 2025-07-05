@@ -4,7 +4,7 @@ Deskripsi: Check operation handler untuk preprocessing module.
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 from smartcash.ui.dataset.preprocessing.operations.base_operation import BaseOperationHandler
 
 

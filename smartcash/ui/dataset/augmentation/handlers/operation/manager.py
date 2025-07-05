@@ -10,7 +10,7 @@ import logging
 from smartcash.ui.dataset.augmentation.handlers.base_augmentation_handler import BaseAugmentationHandler
 
 # Import error handling
-from smartcash.ui.handlers.error_handler import handle_ui_errors
+from smartcash.ui.core.errors.handlers import handle_ui_errors
 
 
 class AugmentationHandlerManager(BaseAugmentationHandler):

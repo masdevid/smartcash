@@ -8,8 +8,7 @@ from typing import Dict, Any, Optional, Type, List
 from pathlib import Path
 
 from smartcash.ui.core.initializers.base_initializer import BaseInitializer
-from smartcash.ui.core.handlers.config_handler import SharedConfigHandler
-from smartcash.ui.handlers.config_handlers import ConfigHandler as LegacyConfigHandler
+from smartcash.ui.core.handlers.config_handler import SharedConfigHandler, ConfigHandler as LegacyConfigHandler
 
 
 class ConfigurableInitializer(BaseInitializer):

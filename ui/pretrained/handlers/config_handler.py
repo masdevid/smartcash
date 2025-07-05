@@ -5,7 +5,7 @@ Deskripsi: Config handler untuk pretrained models dengan konsistensi pattern dan
 """
 
 from typing import Dict, Any, Optional, Type, cast, Union
-from smartcash.ui.handlers.config_handlers import ConfigHandler
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
 from smartcash.ui.pretrained.handlers.config_extractor import extract_pretrained_config
 from smartcash.ui.pretrained.handlers.config_updater import update_pretrained_ui
 from smartcash.common.config import ConfigManager, get_config_manager

@@ -27,14 +27,14 @@ import ipywidgets as widgets
 import contextlib
 
 # Import new consolidated logger and error handler
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.utils.ui_logger import (
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.logger import (
     UILogger,
     setup_global_logging,
     get_module_logger,
     LogSuppressor
 )
-from smartcash.ui.handlers.error_handler import create_error_response
+from smartcash.ui.core.errors.handlers import create_error_response
 
 class CommonInitializer(ABC):
     """Enhanced base class for initializing UI modules with comprehensive lifecycle management.

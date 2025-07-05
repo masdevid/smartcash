@@ -12,9 +12,9 @@ Initialization Flow:
 from typing import Dict, Any, Optional, Type, List
 from smartcash.ui.initializers.common_initializer import CommonInitializer
 from smartcash.ui.dataset.augmentation.handlers.config_handler import AugmentationConfigHandler
-from smartcash.ui.handlers.config_handlers import ConfigHandler
-from smartcash.ui.components.error.error_component import create_error_component
-from smartcash.ui.handlers.error_handler import create_error_response
+from smartcash.ui.core.handlers.config_handler import ConfigHandler
+from smartcash.ui.core.errors import create_error_component
+from smartcash.ui.core.errors.handlers import create_error_response
 from smartcash.common.logger import get_logger
 
 class AugmentationInitializer(CommonInitializer):

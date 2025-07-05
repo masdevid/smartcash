@@ -4,7 +4,7 @@ Deskripsi: Base handler untuk split module dengan centralized error handling
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.handlers.base_handler import BaseHandler
+from smartcash.ui.core.handlers import BaseHandler
 
 class BaseSplitHandler(BaseHandler):
     """Base handler untuk split module dengan centralized error handling.

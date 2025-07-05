@@ -5,9 +5,17 @@ Deskripsi: Base handler dengan fail-fast principle dan centralized error handlin
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Union, Callable
+from typing import Dict, Any, Optional, List, Union, Callable, Type, TypeVar, Tuple
 
-from smartcash.ui.utils.ui_logger import get_module_logger
+from smartcash.ui.core.errors import (
+    SmartCashUIError,
+    ErrorContext,
+    handle_errors,
+    get_error_handler
+)
+from smartcash.ui.core.errors.validators import safe_component_operation
+
+T = TypeVar('T')
 
 class BaseHandler(ABC):
     """Base handler dengan fail-fast principle dan centralized error handling."""
@@ -25,11 +33,21 @@ class BaseHandler(ABC):
         
         # Ensure full_module_name is a string
         if not isinstance(self.full_module_name, str):
-            self.logger.warning(f"full_module_name is not a string: {self.full_module_name}")
             self.full_module_name = str(self.full_module_name)
         
-        # Setup logger
-        self.logger = get_module_logger(self.full_module_name)
+        # Initialize error handler and context
+        self._error_handler = get_error_handler()
+        self._error_context = ErrorContext(
+            component=self.__class__.__name__,
+            operation="__init__",
+            details={
+                'module_name': module_name,
+                'parent_module': parent_module
+            }
+        )
+        
+        # Setup logger through error handler
+        self.logger = self._error_handler.get_logger(f"smartcash.ui.{self.full_module_name}")
         
         # Internal state
         self._is_initialized = False
@@ -75,26 +93,95 @@ class BaseHandler(ABC):
         finally:
             pass
 
-    def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
-        """Centralized error handling dengan fail-fast principle.
+    @contextmanager
+    def execute_safely(self, func: Callable[..., T], *args, **kwargs) -> T:
+        # Wrap the function call with safe_component_operation
+        safe_func = safe_component_operation(
+            self,  # component
+            func.__name__,  # operation name
+            component_name=self.__class__.__name__
+        )(func)
+        
+        """Execute a function with error handling.
         
         Args:
-            error_msg: Error message
-            exc_info: Include exception info
-            **kwargs: Additional context
+            func: Function to execute
+            *args: Positional arguments for the function
+            **kwargs: Keyword arguments for the function
+            
+        Returns:
+            Result of the function call
             
         Raises:
-            RuntimeError: Always raises untuk fail-fast behavior
+            SmartCashUIError: If the function raises an exception
+        """
+        try:
+            # Update context for the operation
+            self._error_context.operation = f"execute_safely:{func.__name__}"
+            self._error_context.details.update({
+                'function_name': func.__name__,
+                'function_module': getattr(func, '__module__', 'unknown'),
+                'args': str(args),
+                'kwargs': str(kwargs)
+            })
+            
+            return func(*args, **kwargs)
+            
+        except SmartCashUIError:
+            # Re-raise our custom errors
+            raise
+            
+        except Exception as e:
+            error_msg = f"Error in {func.__name__}"
+            self.handle_error(error_msg, exc_info=True, error_details=str(e))
+
+    @handle_errors(context_attr='_error_context')
+    def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
+        """Handle errors with proper logging and state management.
+        
+        Args:
+            error_msg: Error message to log
+            exc_info: If True, log exception info
+            **kwargs: Additional context for the error
+            
+        Raises:
+            SmartCashUIError: Always raises this error type for consistent error handling
         """
         self._error_count += 1
         self._last_error = error_msg
         
-        # Log error dengan context
-        context = f" | Context: {kwargs}" if kwargs else ""
-        self.logger.error(f"❌ {error_msg}{context}", exc_info=exc_info)
+        # Update error context
+        self._error_context.details.update(kwargs)
         
-        # Fail-fast: raise exception
-        raise RuntimeError(f"Handler Error [{self.full_module_name}]: {error_msg}")
+        # Log error through error handler
+        error_context = ErrorContext(
+            component=self.__class__.__name__,
+            operation="handle_error",
+            details={
+                'error_message': error_msg,
+                **kwargs
+            }
+        )
+        
+        if exc_info:
+            self._error_handler.handle_exception(
+                error_msg,
+                error_level='ERROR',
+                context=error_context,
+                exc_info=True
+            )
+        else:
+            self._error_handler.log_error(
+                error_msg,
+                error_level='ERROR',
+                context=error_context
+            )
+        
+        # Always raise a SmartCashUIError for consistent error handling
+        raise SmartCashUIError(
+            f"Handler Error [{self.full_module_name}]: {error_msg}",
+            context=error_context
+        )
     
     def reset_error_state(self) -> None:
         """Reset error state."""

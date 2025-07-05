@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Callable, TYPE_CHECKING, List, Union
 from pathlib import Path
 import shutil
 
-from smartcash.ui.utils.ui_logger import UILogger, get_module_logger
+from smartcash.ui.logger import UILogger, get_module_logger
 
 from smartcash.ui.pretrained.services.model_checker import check_model_exists
 from smartcash.ui.pretrained.services.model_downloader import PretrainedModelDownloader
@@ -17,7 +17,7 @@ from smartcash.ui.pretrained.utils import (
     log_errors,
     get_logger
 )
-from smartcash.ui.utils.error_utils import create_error_context
+from smartcash.ui.core.errors.context import create_error_context
 
 @with_error_handling(component="model_handlers", operation="ModelOperationError")
 class ModelOperationError(Exception):

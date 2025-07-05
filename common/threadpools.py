@@ -50,37 +50,71 @@ def process_in_parallel(items: List[Any], process_func: Callable[[Any], Any], ma
     
     return results
 
-def process_with_stats(items: List[Any], process_func: Callable[[Any], Dict[str, int]], max_workers: Optional[int] = None, desc: Optional[str] = None, show_progress: bool = True) -> Dict[str, int]:
-    """Proses items secara parallel dan kumpulkan statistik"""
-    from concurrent.futures import ThreadPoolExecutor
+def process_with_stats(
+    items: List[Any],
+    process_func: Callable[[Any], Dict[str, int]],
+    max_workers: Optional[int] = None,
+    desc: Optional[str] = None,
+    show_progress: bool = True,
+    progress_callback: Optional[Callable[[int, int], None]] = None
+) -> Dict[str, int]:
+    """Process items in parallel and collect statistics with progress tracking.
+    
+    Args:
+        items: List of items to process
+        process_func: Function to process each item, should return a dict of stats
+        max_workers: Maximum number of worker threads (default: optimal for I/O)
+        desc: Description for progress display
+        show_progress: Whether to show tqdm progress bar (ignored if progress_callback is provided)
+        progress_callback: Optional callback function(current: int, total: int) for progress updates
+        
+    Returns:
+        Dictionary of accumulated statistics
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from tqdm.auto import tqdm
     from collections import defaultdict
     
-    # One-liner untuk menentukan jumlah worker
-    max_workers = max_workers or get_optimal_thread_count('io')
+    total = len(items)
+    if total == 0:
+        return {}
+        
+    # Set up progress tracking
+    use_tqdm = show_progress and progress_callback is None
+    pbar = tqdm(total=total, desc=desc) if use_tqdm else None
     
-    # One-liner untuk progress bar
-    pbar = tqdm(total=len(items), desc=desc) if show_progress else None
-    
-    # Inisialisasi statistik
+    # Initialize statistics
     stats = defaultdict(int)
     
-    # Proses items secara parallel dengan one-liner untuk submit
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(process_func, item) for item in items]
-        
-        # One-liner untuk mengumpulkan statistik dan update progress
-        for future in futures:
-            result = future.result()
-            # Update stats dengan one-liner yang benar
-            if isinstance(result, dict):
-                for k, v in result.items():
-                    stats[k] += v
-            # Update progress dengan one-liner
-            pbar and pbar.update(1)
+    # Process items in parallel
+    max_workers = max_workers or get_optimal_thread_count('io')
+    completed = 0
     
-    # One-liner untuk menutup progress bar
-    pbar and pbar.close()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(process_func, item): i for i, item in enumerate(items)}
+        
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                # Update statistics
+                if isinstance(result, dict):
+                    for k, v in result.items():
+                        stats[k] += v
+                
+                # Update progress
+                completed += 1
+                if progress_callback:
+                    progress_callback(completed, total)
+                elif pbar:
+                    pbar.update(1)
+                    
+            except Exception as e:
+                # Update error count but continue processing other items
+                stats['errors'] = stats.get('errors', 0) + 1
+    
+    # Clean up progress bar if used
+    if pbar:
+        pbar.close()
     
     return dict(stats)
 # Convenience functions are now imported from worker_utils.py

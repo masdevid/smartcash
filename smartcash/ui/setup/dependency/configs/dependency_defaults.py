@@ -50,159 +50,149 @@ def get_default_dependency_config() -> Dict[str, Any]:
 def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
     """Get default package categories untuk SmartCash"""
     return {
-        'computer_vision': {
-            'name': 'Computer Vision',
-            'description': 'Packages untuk computer vision dan image processing',
-            'icon': '👁️',
+        'core_requirements': {
+            'name': 'Core Requirements',
+            'description': 'Package inti SmartCash',
+            'icon': '🔧',
             'color': '#4CAF50',
             'packages': [
                 {
-                    'name': 'opencv-python',
-                    'version': '>=4.8.0',
-                    'description': 'OpenCV untuk computer vision',
-                    'size': '~45MB',
-                    'is_default': True
+                    'name': 'ipywidgets',
+                    'version': '>=8.1.0',
+                    'description': 'Core utilities dan helpers untuk UI',
+                    'pip_name': 'ipywidgets>=8.1.0',
+                    'is_default': True,
+                    'size': '~5MB'
                 },
                 {
-                    'name': 'pillow',
-                    'version': '>=9.0.0',
-                    'description': 'Python Imaging Library',
-                    'size': '~3MB',
-                    'is_default': True
+                    'name': 'notebook_deps',
+                    'version': '>=8.12.0',
+                    'description': 'IPython dan Jupyter dependencies',
+                    'pip_name': 'ipython>=8.12.0',
+                    'is_default': True,
+                    'size': '~10MB'
                 },
                 {
-                    'name': 'scikit-image',
-                    'version': '>=0.20.0',
-                    'description': 'Image processing library',
-                    'size': '~12MB',
-                    'is_default': False
+                    'name': 'albumentations',
+                    'version': '>=1.4.0',
+                    'description': 'Augmentation library',
+                    'pip_name': 'albumentations>=1.4.0',
+                    'is_default': True,
+                    'size': '~2MB'
+                },
+                {
+                    'name': 'yaml_parser',
+                    'version': '>=6.0.0',
+                    'description': 'Configuration file parsing',
+                    'pip_name': 'pyyaml>=6.0.0',
+                    'is_default': True,
+                    'size': '~1MB'
                 }
             ]
         },
         
-        'machine_learning': {
-            'name': 'Machine Learning',
-            'description': 'Packages untuk machine learning dan deep learning',
+        'ml_ai_libraries': {
+            'name': 'ML/AI Libraries',
+            'description': 'Machine Learning frameworks',
             'icon': '🤖',
             'color': '#2196F3',
             'packages': [
                 {
-                    'name': 'torch',
-                    'version': '>=2.0.0',
-                    'description': 'PyTorch framework',
-                    'size': '~800MB',
-                    'is_default': True
+                    'name': 'pytorch',
+                    'version': '>=2.2.0',
+                    'description': 'Deep learning framework utama',
+                    'pip_name': 'torch>=2.2.0',
+                    'is_default': True,
+                    'size': '~800MB'
                 },
                 {
                     'name': 'torchvision',
-                    'version': '>=0.15.0',
-                    'description': 'PyTorch vision library',
-                    'size': '~25MB',
-                    'is_default': True
+                    'version': '>=0.17.0',
+                    'description': 'Computer vision untuk PyTorch',
+                    'pip_name': 'torchvision>=0.17.0',
+                    'is_default': True,
+                    'size': '~25MB'
                 },
                 {
                     'name': 'ultralytics',
-                    'version': '>=8.0.0',
-                    'description': 'YOLOv8 implementation',
-                    'size': '~15MB',
-                    'is_default': True
+                    'version': '>=8.1.0',
+                    'description': 'YOLO implementation terbaru',
+                    'pip_name': 'ultralytics>=8.1.0',
+                    'is_default': True,
+                    'size': '~15MB'
                 },
                 {
-                    'name': 'efficientnet-pytorch',
-                    'version': '>=0.7.0',
-                    'description': 'EfficientNet implementation',
-                    'size': '~5MB',
-                    'is_default': True
+                    'name': 'timm',
+                    'version': '>=0.9.12',
+                    'description': 'Library untuk model vision transformer dan CNN',
+                    'pip_name': 'timm>=0.9.12',
+                    'is_default': True,
+                    'size': '~5MB'
+                },
+                {
+                    'name': 'scikit_learn',
+                    'version': '>=1.5.0',
+                    'description': 'Machine learning library untuk klasifikasi dan evaluasi',
+                    'pip_name': 'scikit-learn>=1.5.0',
+                    'is_default': True,
+                    'size': '~10MB'
                 }
             ]
         },
         
-        'data_science': {
-            'name': 'Data Science',
-            'description': 'Packages untuk data analysis dan visualization',
+        'data_processing': {
+            'name': 'Data Processing',
+            'description': 'Data manipulation tools',
             'icon': '📊',
-            'color': '#FF9800',
-            'packages': [
-                {
-                    'name': 'numpy',
-                    'version': '>=1.24.0',
-                    'description': 'Numerical computing library',
-                    'size': '~15MB',
-                    'is_default': True
-                },
-                {
-                    'name': 'pandas',
-                    'version': '>=2.0.0',
-                    'description': 'Data manipulation library',
-                    'size': '~35MB',
-                    'is_default': True
-                },
-                {
-                    'name': 'matplotlib',
-                    'version': '>=3.7.0',
-                    'description': 'Plotting library',
-                    'size': '~40MB',
-                    'is_default': True
-                },
-                {
-                    'name': 'seaborn',
-                    'version': '>=0.12.0',
-                    'description': 'Statistical visualization',
-                    'size': '~5MB',
-                    'is_default': False
-                }
-            ]
-        },
-        
-        'utilities': {
-            'name': 'Utilities',
-            'description': 'Packages utilitas dan helper functions',
-            'icon': '🔧',
             'color': '#9C27B0',
             'packages': [
                 {
-                    'name': 'tqdm',
-                    'version': '>=4.65.0',
-                    'description': 'Progress bar library',
-                    'size': '~200KB',
-                    'is_default': True
+                    'name': 'pandas',
+                    'version': '>=2.1.0',
+                    'description': 'Data manipulation dan analysis',
+                    'pip_name': 'pandas>=2.1.0',
+                    'is_default': True,
+                    'size': '~35MB'
                 },
                 {
-                    'name': 'pyyaml',
-                    'version': '>=6.0',
-                    'description': 'YAML parser',
-                    'size': '~600KB',
-                    'is_default': True
+                    'name': 'numpy',
+                    'version': '>=1.24.0,<2.0.0',
+                    'description': 'Numerical computing foundation',
+                    'pip_name': 'numpy>=1.24.0,<2.0.0',
+                    'is_default': True,
+                    'size': '~15MB'
                 },
                 {
-                    'name': 'requests',
-                    'version': '>=2.31.0',
-                    'description': 'HTTP library',
-                    'size': '~500KB',
-                    'is_default': False
-                }
-            ]
-        },
-        
-        'jupyter': {
-            'name': 'Jupyter',
-            'description': 'Packages untuk Jupyter notebook dan widgets',
-            'icon': '📓',
-            'color': '#F44336',
-            'packages': [
-                {
-                    'name': 'ipywidgets',
-                    'version': '>=8.0.0',
-                    'description': 'Interactive widgets',
-                    'size': '~3MB',
-                    'is_default': True
+                    'name': 'opencv',
+                    'version': '>=4.8.0',
+                    'description': 'Computer vision library',
+                    'pip_name': 'opencv-python>=4.8.0',
+                    'is_default': True,
+                    'size': '~45MB'
                 },
                 {
-                    'name': 'jupyter',
-                    'version': '>=1.0.0',
-                    'description': 'Jupyter notebook',
-                    'size': '~50MB',
-                    'is_default': False
+                    'name': 'pillow',
+                    'version': '>=10.0.0',
+                    'description': 'Python Imaging Library',
+                    'pip_name': 'Pillow>=10.0.0',
+                    'is_default': True,
+                    'size': '~3MB'
+                },
+                {
+                    'name': 'matplotlib',
+                    'version': '>=3.8.0',
+                    'description': 'Plotting dan visualization',
+                    'pip_name': 'matplotlib>=3.8.0',
+                    'is_default': True,
+                    'size': '~40MB'
+                },
+                {
+                    'name': 'scipy',
+                    'version': '>=1.12.0',
+                    'description': 'Scientific computing library',
+                    'pip_name': 'scipy>=1.12.0',
+                    'is_default': True,
+                    'size': '~30MB'
                 }
             ]
         }

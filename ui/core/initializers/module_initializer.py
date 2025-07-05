@@ -4,6 +4,8 @@ Deskripsi: Module-specific initializer dengan UI handler integration dan full li
 Kombinasi ConfigurableInitializer + ModuleUIHandler untuk complete module initialization.
 """
 
+import contextlib
+import time
 from typing import Dict, Any, Optional, Type, List, Callable, Tuple
 from pathlib import Path
 
@@ -21,7 +23,11 @@ class ModuleInitializer(ConfigurableInitializer):
     - 📊 UI-Config synchronization
     - 🔄 Lifecycle management
     - 💾 Persistence support
+    - 🌐 Module instance management
     """
+    
+    # Class-level storage for module instances
+    _module_instances = {}
     
     def __init__(self, 
                  module_name: str, 
@@ -52,6 +58,10 @@ class ModuleInitializer(ConfigurableInitializer):
         self._operation_handlers: Dict[str, Any] = {}
         self._service_handlers: Dict[str, Any] = {}
         
+        # Register instance
+        self._instance_id = f"{parent_module}.{module_name}" if parent_module else module_name
+        self.__class__._module_instances[self._instance_id] = self
+        
         self.logger.debug(f"🎯 ModuleInitializer created with handler: {self._handler_class.__name__}")
     
     # === Handler Creation ===
@@ -69,6 +79,102 @@ class ModuleInitializer(ConfigurableInitializer):
     def get_default_config(self) -> Dict[str, Any]:
         """Get default configuration. Override di subclass."""
         return {}
+    
+    # === Module Instance Management ===
+    
+    @classmethod
+    def get_module_instance(cls, module_name: str, parent_module: Optional[str] = None, **kwargs) -> 'ModuleInitializer':
+        """Get or create a module instance.
+        
+        Args:
+            module_name: Name of the module
+            parent_module: Optional parent module name
+            **kwargs: Additional arguments passed to the constructor
+            
+        Returns:
+            ModuleInitializer: The module instance
+        """
+        instance_id = f"{parent_module}.{module_name}" if parent_module else module_name
+        
+        if instance_id not in cls._module_instances:
+            cls._module_instances[instance_id] = cls(
+                module_name=module_name,
+                parent_module=parent_module,
+                **kwargs
+            )
+            
+        return cls._module_instances[instance_id]
+    
+    @classmethod
+    def initialize_module_ui(cls, 
+                           module_name: str,
+                           parent_module: Optional[str] = None,
+                           config: Optional[Dict[str, Any]] = None,
+                           initializer_class: Optional[Type['ModuleInitializer']] = None,
+                           **kwargs) -> Any:
+        """Initialize a module UI with proper error handling.
+        
+        Args:
+            module_name: Name of the module to initialize
+            parent_module: Optional parent module name
+            config: Optional configuration dictionary
+            initializer_class: Custom initializer class (default: cls)
+            **kwargs: Additional arguments passed to the initializer
+            
+        Returns:
+            Any: The UI component or error UI
+        """
+        try:
+            # Get or create module instance
+            initializer = (initializer_class or cls).get_module_instance(
+                module_name=module_name,
+                parent_module=parent_module,
+                **kwargs
+            )
+            
+            # Initialize with config
+            result = initializer.initialize(config=config)
+            
+            # Return UI component
+            if result.get('success', False):
+                return result.get('ui_components', {}).get('ui')
+            else:
+                error_msg = result.get('error', 'Unknown initialization error')
+                raise RuntimeError(error_msg)
+                
+        except Exception as e:
+            # Handle initialization error
+            error_handler = cls(
+                module_name=module_name,
+                parent_module=parent_module,
+                **kwargs
+            )
+            error_result = error_handler.handle_initialization_error(e, f"initializing {module_name} UI")
+            return error_result.get('ui')
+    
+    # === Error Handling ===
+    
+    def handle_initialization_error(self, error: Exception, context: str = "initializing module") -> Dict[str, Any]:
+        """Handle initialization errors and return error UI."""
+        from smartcash.ui.core.shared.error_handler import CoreErrorHandler
+        
+        error_msg = str(error)
+        self.logger.error(f"❌ Error {context}: {error_msg}", exc_info=True)
+        
+        # Create error UI
+        error_handler = CoreErrorHandler(self.module_name)
+        error_ui = error_handler.create_error_ui({
+            'error': True,
+            'message': f"Error {context}: {error_msg}",
+            'title': f"{self.module_name.capitalize()} Initialization Error"
+        })
+        
+        # Return error result
+        return {
+            'success': False,
+            'error': error_msg,
+            'ui': error_ui['ui'] if isinstance(error_ui, dict) and 'ui' in error_ui else error_ui
+        }
     
     # === Extended Setup ===
     
@@ -109,8 +215,34 @@ class ModuleInitializer(ConfigurableInitializer):
         """Setup service/business logic handlers. Override di subclass."""
         pass
     
+    @contextlib.contextmanager
+    def _log_step(self, step_name: str):
+        """Context manager untuk menangani logging step dengan konsisten
+        
+        Args:
+            step_name: Nama step yang akan di-log
+            
+        Yields:
+            None
+            
+        Example:
+            with self._log_step("Processing data"):
+                # kode yang ingin di-log waktunya
+                pass
+        """
+        self.logger.info(f"🔍 {step_name}...")
+        start_time = time.time()
+        try:
+            yield
+            elapsed = time.time() - start_time
+            self.logger.info(f"✅ {step_name} selesai ({elapsed:.2f}s)")
+        except Exception as e:
+            elapsed = time.time() - start_time
+            self.logger.error(f"❌ Gagal {step_name.lower()} setelah {elapsed:.2f}s: {str(e)}")
+            raise
+    
     def setup_custom_handlers(self) -> None:
-        """Setup additional custom handlers. Override di subclass."""
+        """Override ini untuk menambahkan custom handlers."""
         pass
     
     # === UI Component Creation Helper ===

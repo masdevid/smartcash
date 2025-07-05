@@ -23,7 +23,7 @@ from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
 # Import local modules
 from smartcash.ui.setup.colab.handlers.colab_config_handler import ColabConfigHandler
 from smartcash.ui.setup.colab.handlers.setup_handler import SetupHandler
-from smartcash.ui.setup.colab.components.ui_components import create_colab_ui
+from smartcash.ui.setup.colab.components.colab_ui import create_colab_ui_components
 from smartcash.ui.setup.colab.configs.defaults import DEFAULT_CONFIG
 
 
@@ -63,37 +63,36 @@ class ColabEnvInitializer(ModuleInitializer):
             self._config = {**self._get_default_config(), **(config or {})}
             self._pre_checks()
 
-            ui_components = create_colab_ui()
+            # Initialize UI components with the new container structure
+            ui_components = create_colab_ui_components()
             self._ui_components = ui_components
 
+            # Initialize handlers with the UI components
             env_handler = ColabConfigHandler(ui_components)
             self._handlers["env_config"] = env_handler
 
             setup_handler = SetupHandler(ui_components)
             self._handlers["setup"] = setup_handler
 
-            if "setup_button" in ui_components:
-                setup_button = ui_components["setup_button"]
-                for cb in list(setup_button._click_callbacks):
-                    setup_button.on_click(cb, remove=True)
-                setup_button.on_click(env_handler.handle_setup_button_click)
-                self.logger.debug("✅ Tombol setup terhubung ke handler")
+            # Connect the setup button handler
+            action_container = ui_components.get("action_container", {})
+            if action_container and hasattr(action_container, 'get'):
+                setup_button = action_container.get('setup_button')
+                if setup_button:
+                    # Remove any existing click handlers
+                    if hasattr(setup_button, '_click_callbacks'):
+                        for cb in list(setup_button._click_callbacks):
+                            setup_button.on_click(cb, remove=True)
+                    # Add our handler
+                    setup_button.on_click(env_handler.handle_setup_button_click)
+                    self.logger.debug("✅ Tombol setup terhubung ke handler")
 
-            from smartcash.ui.components import MainContainer  # type: ignore
-            main_container = MainContainer(
-                header=ui_components.get("header_container"),
-                content=[
-                    ui_components.get("summary_container"),
-                    ui_components.get("progress_tracker").widget,
-                    ui_components.get("env_info_panel"),
-                    ui_components.get("form_container"),
-                    ui_components.get("tips_requirements"),
-                ],
-                footer=ui_components.get("footer_container"),
-            )
-
-            ui_components["main_container"] = main_container
-            ui_components["ui"] = main_container.widget
+            # The main container is already created in create_colab_ui_components()
+            main_container = ui_components.get("main_container")
+            if main_container:
+                ui_components["ui"] = main_container.container
+            else:
+                self.logger.warning("Main container not found in UI components")
 
             self._post_checks()
             self._initialized = True

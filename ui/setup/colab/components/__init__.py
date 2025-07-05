@@ -21,9 +21,9 @@ def __getattr__(name: str):  # pragma: no cover
         )
         return _lazy_import("smartcash.ui.setup.colab.components.ui_components").create_colab_ui
     
-    if name == "create_colab_ui":
-        return _lazy_import("smartcash.ui.setup.colab.components.ui_components").create_colab_ui
+    if name == "create_colab_ui" or name == "create_colab_ui_components":
+        return _lazy_import("smartcash.ui.setup.colab.components.colab_ui").create_colab_ui_components
         
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
-__all__ = ["create_colab_ui"]
+__all__ = ["create_colab_ui_components"]

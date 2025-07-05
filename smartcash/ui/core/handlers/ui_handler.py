@@ -62,16 +62,25 @@ class UIHandler(BaseHandler):
         
         return None
     
-    def update_status(self, message: str, status_type: str = 'info'):
-        """Update status panel dengan container-aware access."""
+    def update_status(self, message: str, status_type: str = 'info') -> None:
+        """Update status display in UI and log the message.
+        
+        Args:
+            message: The status message to display
+            status_type: Log level (info/warning/error/success)
+        """
+        if not message:
+            return
+            
         try:
+            # Update status panel if available
             status_panel = self._find_component('status_panel', 'status_panel')
             if status_panel and hasattr(status_panel, 'update'):
                 status_panel.update(message, status_type)
-                return
             
-            # Fallback: log status
-            self.logger.info(f"📢 Status: {message} ({status_type})")
+            # Log the message with appropriate log level
+            log_method = getattr(self.logger, status_type, self.logger.info)
+            log_method(f"[Status] {message}")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to update status: {str(e)}")

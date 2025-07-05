@@ -6,27 +6,36 @@ Deskripsi: Tab untuk custom packages management
 import ipywidgets as widgets
 from typing import Dict, Any
 
+from smartcash.ui.components.form_container import create_form_container, LayoutType
+
 def create_custom_packages_tab(config: Dict[str, Any], logger) -> widgets.VBox:
     """Create tab untuk custom packages"""
     
     custom_packages = config.get('custom_packages', '')
     
-    # Header
-    header = widgets.HTML("""
-    <div style="margin-bottom: 20px;">
+    # Create form container with column layout
+    form_container = create_form_container(
+        layout_type=LayoutType.COLUMN,
+        container_padding='20px',
+        gap='16px'
+    )
+    
+    # Add header
+    header_html = """
+    <div style="margin-bottom: 10px;">
         <h3 style="color: #333; margin: 0 0 10px 0;">🛠️ Custom Packages</h3>
         <p style="color: #666; margin: 0;">Tambahkan packages custom yang tidak tersedia di categories default.</p>
     </div>
-    """)
+    """
+    form_container['add_item'](widgets.HTML(header_html), height='auto')
     
-    # Instructions
-    instructions = widgets.HTML("""
+    # Add instructions
+    instructions_html = """
     <div style="
         background: #f8f9fa;
         border: 1px solid #dee2e6;
         border-radius: 8px;
         padding: 15px;
-        margin-bottom: 20px;
     ">
         <h4 style="color: #495057; margin: 0 0 10px 0;">📋 Format Input</h4>
         <ul style="margin: 0; padding-left: 20px; color: #6c757d;">
@@ -36,102 +45,67 @@ def create_custom_packages_tab(config: Dict[str, Any], logger) -> widgets.VBox:
             <li>Untuk git: <code>git+https://github.com/user/repo.git</code></li>
         </ul>
     </div>
-    """)
+    """
+    form_container['add_item'](widgets.HTML(instructions_html), height='auto')
     
-    # Text area for custom packages
-    packages_textarea = widgets.Textarea(
-        value=custom_packages,
-        placeholder="Masukkan packages custom di sini...\nContoh:\nnumpy>=1.20.0\nmatplotlib\ngit+https://github.com/user/repo.git",
-        layout=widgets.Layout(
-            width='100%',
-            height='300px',
-            border='1px solid #ddd',
-            border_radius='8px',
-            padding='10px'
-        )
-    )
+    # Create text area with button row
+    text_area_container = widgets.VBox([
+        widgets.Textarea(
+            value=custom_packages,
+            placeholder="Masukkan packages custom di sini...\nContoh:\nnumpy>=1.20.0\nmatplotlib\ngit+https://github.com/user/repo.git",
+            layout=widgets.Layout(
+                width='100%',
+                height='300px',
+                border='1px solid #ddd',
+                border_radius='8px',
+                padding='10px',
+                margin='0 0 10px 0'
+            )
+        ),
+        widgets.HBox([
+            widgets.Button(
+                description='Parse Packages',
+                button_style='info',
+                icon='check',
+                layout=widgets.Layout(width='150px')
+            )
+        ], layout=widgets.Layout(justify_content='flex-end'))
+    ])
     
-    # Parse and validate button
-    parse_btn = widgets.Button(
-        description="🔍 Parse & Validate",
-        button_style='info',
-        layout=widgets.Layout(width='150px', margin='10px 0')
-    )
+    # Add text area container to form
+    form_container['add_item'](text_area_container, height='auto')
     
-    # Clear button
-    clear_btn = widgets.Button(
-        description="🗑️ Clear All",
-        button_style='danger',
-        layout=widgets.Layout(width='120px', margin='10px 0 10px 10px')
-    )
+    # Get references to widgets
+    packages_textarea = text_area_container.children[0]
+    parse_button = text_area_container.children[1].children[0]
     
-    # Status output
-    status_output = widgets.HTML(
-        value="<p style='color: #666; margin: 10px 0;'>Status: Siap menerima input packages</p>"
-    )
+    # Output area for parsed packages
+    output_area = widgets.Output()
+    form_container['add_item'](output_area, height='auto')
     
-    # Parsed packages display
-    parsed_display = widgets.HTML(
-        value="",
-        layout=widgets.Layout(
-            width='100%',
-            max_height='200px',
-            overflow='auto',
-            border='1px solid #ddd',
-            border_radius='8px',
-            padding='10px',
-            margin='10px 0'
-        )
-    )
+    def on_parse_button_clicked(b):
+        with output_area:
+            output_area.clear_output()
+            packages = parse_custom_packages(packages_textarea.value)
+            if packages:
+                output_area.append_display_data(widgets.HTML(create_parsed_packages_html(packages)))
     
+    parse_button.on_click(on_parse_button_clicked)
     # Button handlers
-    def on_parse_click(btn):
-        """Handler untuk parse button"""
-        try:
-            packages_text = packages_textarea.value.strip()
-            if not packages_text:
-                status_output.value = "<p style='color: #ffa500;'>⚠️ Tidak ada packages untuk diparse</p>"
-                parsed_display.value = ""
-                return
-            
-            # Parse packages
-            parsed_packages = parse_custom_packages(packages_text)
-            
-            if parsed_packages:
-                status_output.value = f"<p style='color: #4CAF50;'>✅ Berhasil parse {len(parsed_packages)} packages</p>"
-                parsed_display.value = create_parsed_packages_html(parsed_packages)
-            else:
-                status_output.value = "<p style='color: #f44336;'>❌ Tidak ada packages valid ditemukan</p>"
-                parsed_display.value = ""
-                
-        except Exception as e:
-            status_output.value = f"<p style='color: #f44336;'>❌ Error parsing: {str(e)}</p>"
-            logger.error(f"Error parsing custom packages: {e}")
     
-    def on_clear_click(btn):
-        """Handler untuk clear button"""
-        packages_textarea.value = ""
-        status_output.value = "<p style='color: #666;'>🗑️ Packages cleared</p>"
-        parsed_display.value = ""
-    
-    parse_btn.on_click(on_parse_click)
-    clear_btn.on_click(on_clear_click)
-    
-    # Container
+    # Create container with max width
     container = widgets.VBox([
-        header,
-        instructions,
-        packages_textarea,
-        widgets.HBox([parse_btn, clear_btn]),
-        status_output,
-        parsed_display
-    ], layout=widgets.Layout(padding='20px'))
+        form_container['container']
+    ], layout=widgets.Layout(
+        width='100%',
+        max_width='1200px',
+        margin='0 auto',
+        padding='0'
+    ))
     
-    # Store reference untuk access dari handler
+    # Store references for external access
     container.packages_textarea = packages_textarea
-    container.status_output = status_output
-    container.parsed_display = parsed_display
-    
+    container.output_area = output_area
     return container
 
 def parse_custom_packages(packages_text: str) -> list:

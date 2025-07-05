@@ -1,5 +1,5 @@
 """
-Test module for ui_components imports.
+Test module for colab_ui imports.
 """
 
 # Mock modules before importing ui_components
@@ -106,18 +106,14 @@ mock_torchvision.models.detection = types.ModuleType('torchvision.models.detecti
 mock_torchvision.models.detection.fasterrcnn_resnet50_fpn = lambda **kwargs: type('FasterRCNN', (), {})
 sys.modules['torchvision'] = mock_torchvision
 
-def test_ui_components_import():
-    """Test that ui_components can be imported and has required functions."""
+def test_colab_ui_import():
+    """Test that colab_ui can be imported and has required functions."""
     try:
         # Re-import after setting up mocks
-        from smartcash.ui.setup.colab.components import ui_components
-        assert ui_components is not None
+        from smartcash.ui.setup.colab.components import colab_ui
+        assert colab_ui is not None
         # Check for the main function
-        assert hasattr(ui_components, 'create_colab_ui')
-        # Also check for backward compatibility with the old function name
-        assert hasattr(ui_components, 'create_env_config_ui')
-        # Verify they point to the same function
-        assert ui_components.create_colab_ui is ui_components.create_env_config_ui
+        assert hasattr(colab_ui, 'create_colab_ui_components')
     except ImportError as e:
         assert False, f"Failed to import ui_components: {e}"
     except Exception as e:

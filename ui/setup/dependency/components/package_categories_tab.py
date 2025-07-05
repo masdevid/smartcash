@@ -6,6 +6,7 @@ Deskripsi: Tab untuk package categories dengan card layout dan real-time status
 import ipywidgets as widgets
 from typing import Dict, Any, List
 
+from smartcash.ui.components.form_container import create_form_container, LayoutType
 from ..configs.dependency_defaults import get_default_package_categories, get_package_status_options, get_button_actions
 from ..utils.package_status_tracker import PackageStatusTracker
 
@@ -25,26 +26,30 @@ def create_package_categories_tab(config: Dict[str, Any], logger) -> widgets.VBo
         card = create_category_card(category_key, category_info, selected_packages, status_tracker, logger)
         category_cards.append(card)
     
-    # Create grid layout
-    grid_layout = widgets.GridBox(
-        category_cards,
-        layout=widgets.Layout(
-            width='100%',
-            grid_template_columns='repeat(auto-fit, minmax(400px, 1fr))',
-            grid_gap='20px',
-            padding='20px'
-        )
+    # Create form container with grid layout
+    form_container = create_form_container(
+        layout_type=LayoutType.GRID,
+        grid_columns='repeat(auto-fit, minmax(400px, 1fr))',
+        gap='20px',
+        container_padding='20px'
     )
+    
+    # Add category cards to the grid
+    for card in category_cards:
+        form_container['add_item'](card, height='auto')
+    
+    # Create header
+    header = widgets.HTML("""
+    <div style="margin-bottom: 20px;">
+        <h3 style="color: #333; margin: 0 0 10px 0;">📦 Package Categories</h3>
+        <p style="color: #666; margin: 0;">Pilih packages dari kategori yang tersedia. Default packages ditandai dengan ⭐.</p>
+    </div>
+    """)
     
     # Create container
     container = widgets.VBox([
-        widgets.HTML("""
-        <div style="margin-bottom: 20px;">
-            <h3 style="color: #333; margin: 0 0 10px 0;">📦 Package Categories</h3>
-            <p style="color: #666; margin: 0;">Pilih packages dari kategori yang tersedia. Default packages ditandai dengan ⭐.</p>
-        </div>
-        """),
-        grid_layout
+        header,
+        form_container['container']
     ])
     
     # Store status tracker untuk access dari luar

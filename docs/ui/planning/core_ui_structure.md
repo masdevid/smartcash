@@ -64,11 +64,7 @@ BaseInitializer (Core initialization)
     |               ├── AugmentationInitializer
     |               └── etc.
     |
-    └── OperationInitializer (Operation-specific initialization)
-            |
-            ├── DownloadOperationInitializer
-            ├── ProcessOperationInitializer
-            └── etc.
+    └── [Operation-specific initialization now handled by OperationContainer]
 ```
 
 ## Key Components
@@ -83,7 +79,7 @@ BaseInitializer (Core initialization)
 - **BaseInitializer**: Core initialization flow
 - **ConfigurableInitializer**: Configuration-aware initialization
 - **ModuleInitializer**: Module-specific initialization
-- **OperationInitializer**: Operation-specific initialization with progress tracking
+- **OperationContainer**: Handles operation-specific UI elements like progress tracking, dialogs, and logs
 
 ### Shared Utilities
 - **logger.py**: Enhanced logging with suppression support

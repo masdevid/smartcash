@@ -54,7 +54,7 @@ class CoreErrorHandler:
             error_component = create_error_component(
                 error_message=error_result.get('message', 'An unknown error occurred'),
                 traceback=error_result.get('traceback'),
-                title="🚨 Error",
+                title="Error",
                 error_type="error"
             )
             

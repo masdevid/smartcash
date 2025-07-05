@@ -60,26 +60,6 @@ tabs_component = Tabs(
 )
 ```
 
-## Container Components
-
-### ActionContainer (`action_container.py`)
-Container for action buttons and controls.
-
-### FormContainer (`form_container.py`)
-Container for form elements with consistent styling.
-
-### MainContainer (`main_container.py`)
-Main application container with proper spacing and layout.
-
-### FooterContainer (`footer_container.py`)
-Container for footer content.
-
-### HeaderContainer (`header_container.py`)
-Container for header content with navigation.
-
-### SummaryContainer (`summary_container.py`)
-Container for summary/dashboard widgets.
-
 ## Panel Components
 
 ### InfoPanel (`info_panel.py`)

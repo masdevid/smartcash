@@ -1,122 +1,239 @@
 """
 File: smartcash/ui/components/form_container.py
-Deskripsi: Reusable form container with save/reset buttons at the bottom
+Deskripsi: Reusable form container with responsive layout options (row, column, grid)
 """
 
-from typing import Dict, Any, Literal, Optional, Callable
+from enum import Enum, auto
+from typing import Dict, Any, Optional, List, Literal, Union, Tuple
 import ipywidgets as widgets
+from IPython.display import display
 
-from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+class LayoutType(Enum):
+    """Available layout types for the form container."""
+    COLUMN = auto()  # Vertical stacking (default)
+    ROW = auto()     # Horizontal arrangement
+    GRID = auto()    # Grid-based layout
+
+class FormItem:
+    """Wrapper for form items with optional layout configuration."""
+    def __init__(
+        self,
+        widget: widgets.Widget,
+        width: Optional[str] = None,
+        height: Optional[str] = None,
+        flex: Optional[Union[int, str]] = None,
+        grid_area: Optional[str] = None,
+        justify_content: Optional[str] = None,
+        align_items: Optional[str] = None,
+    ):
+        self.widget = widget
+        self.width = width
+        self.height = height
+        self.flex = flex
+        self.grid_area = grid_area
+        self.justify_content = justify_content
+        self.align_items = align_items
 
 def create_form_container(
-    save_label: str = "Simpan",
-    reset_label: str = "Reset",
-    save_tooltip: str = "Simpan konfigurasi saat ini",
-    reset_tooltip: str = "Reset ke nilai default",
-    button_width: str = '100px',
-    with_sync_info: bool = False,
-    sync_message: str = "Konfigurasi akan otomatis disinkronkan.",
-    show_icons: bool = False,
-    alignment: Literal['left', 'center', 'right'] = 'right',
+    layout_type: Union[LayoutType, str] = LayoutType.COLUMN,
     container_margin: str = "8px 0",
-    container_padding: str = "0",
-    form_spacing: str = "8px",
-    on_save: Optional[Callable] = None,
-    on_reset: Optional[Callable] = None,
-    show_buttons: bool = True
+    container_padding: str = "16px",
+    gap: str = "8px",
+    grid_columns: Optional[Union[int, str]] = None,
+    grid_template_areas: Optional[List[str]] = None,
+    grid_auto_flow: str = "row",
+    **layout_kwargs
 ) -> Dict[str, Any]:
     """
-    Create a form container with optional save/reset buttons at the bottom and an empty container for custom forms.
+    Create a form container with flexible layout options.
     
     Args:
-        save_label: Label text for save button
-        reset_label: Label text for reset button
-        save_tooltip: Tooltip text for save button
-        reset_tooltip: Tooltip text for reset button
-        button_width: Width of each button
-        with_sync_info: Whether to show sync info message
-        sync_message: Text for sync info message
-        show_icons: Whether to show icons on buttons (False for text only)
-        alignment: Button alignment ('left', 'center', or 'right')
-        container_margin: Margin around the container
-        container_padding: Padding inside the container
-        form_spacing: Spacing between form container and buttons
-        on_save: Callback function for save button
-        on_reset: Callback function for reset button
-        show_buttons: Whether to show save/reset buttons (default: True)
+        layout_type: Type of layout to use (COLUMN, ROW, or GRID)
+        container_margin: Margin around the container (e.g., "8px 0")
+        container_padding: Padding inside the container (e.g., "16px")
+        gap: Spacing between items (e.g., "8px")
+        grid_columns: For GRID layout, number of columns or template (e.g., 3 or "1fr 2fr")
+        grid_template_areas: For GRID layout, defines named grid areas
+        grid_auto_flow: For GRID layout, controls auto-placement of items ("row", "column", "row dense", "column dense")
+        **layout_kwargs: Additional layout properties (e.g., width, height, etc.)
         
     Returns:
         Dictionary containing:
-            - container: The main container widget
-            - form_container: Empty container for custom form widgets
-            - save_button: Save button widget
-            - reset_button: Reset button widget
+            - 'container': The main container widget
+            - 'form_container': The container for form elements
+            - 'add_item': Method to add items to the form
+            - 'set_layout': Method to change layout dynamically
     """
-    # Create an empty container for custom form widgets
-    form_container = widgets.VBox(
-        [],
-        layout=widgets.Layout(
-            width='100%',
-            display='flex',
-            flex_flow='column',
-            align_items='stretch',
-            margin='0' if not show_buttons else '0 0 ' + form_spacing + ' 0'  # Add spacing at bottom only if buttons are shown
-        )
-    )
+    # Convert string layout type to enum if needed
+    if isinstance(layout_type, str):
+        layout_type = LayoutType[layout_type.upper()]
     
-    # Create container components list
-    container_components = [form_container]
+    # Store items to maintain order and configuration
+    form_items: List[FormItem] = []
     
-    # Result dictionary
-    result = {
-        'form_container': form_container
-    }
+    # Create layout based on type
+    def create_layout():
+        if layout_type == LayoutType.COLUMN:
+            return widgets.VBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    padding=container_padding,
+                    gap=gap,
+                    **layout_kwargs
+                )
+            )
+        elif layout_type == LayoutType.ROW:
+            return widgets.HBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    padding=container_padding,
+                    gap=gap,
+                    flex_flow='row wrap',
+                    **layout_kwargs
+                )
+            )
+        else:  # GRID
+            grid_template_columns = (
+                f"repeat({grid_columns}, 1fr)" 
+                if isinstance(grid_columns, int) 
+                else grid_columns or "1fr"
+            )
+            
+            return widgets.GridBox(
+                layout=widgets.Layout(
+                    width='100%',
+                    padding=container_padding,
+                    gap=gap,
+                    grid_template_columns=grid_template_columns,
+                    grid_template_areas=' '.join(f'"{area}"' for area in grid_template_areas) if grid_template_areas else None,
+                    grid_auto_flow=grid_auto_flow,
+                    **layout_kwargs
+                )
+            )
     
-    # Create save/reset buttons if enabled
-    if show_buttons:
-        buttons = create_save_reset_buttons(
-            save_label=save_label,
-            reset_label=reset_label,
-            save_tooltip=save_tooltip,
-            reset_tooltip=reset_tooltip,
-            button_width=button_width,
-            with_sync_info=with_sync_info,
-            sync_message=sync_message,
-            show_icons=show_icons,
-            alignment=alignment
-        )
-        
-        # Connect callbacks if provided
-        if on_save:
-            buttons['save_button'].on_click(on_save)
-        
-        if on_reset:
-            buttons['reset_button'].on_click(on_reset)
-        
-        # Add buttons to container components
-        container_components.append(buttons['container'])
-        
-        # Add button references to result
-        result.update({
-            'save_button': buttons['save_button'],
-            'reset_button': buttons['reset_button'],
-            'sync_info': buttons.get('sync_info')
-        })
+    # Create form container
+    form_container = create_layout()
     
-    # Create main container with flex column layout
+    # Create main container
     container = widgets.VBox(
-        container_components,
+        [form_container],
         layout=widgets.Layout(
             width='100%',
-            display='flex',
-            flex_flow='column',
-            align_items='stretch',
             margin=container_margin,
-            padding=container_padding
+            padding='0',
+            overflow='visible'
         )
     )
     
-    # Add container to result
-    result['container'] = container
+    def add_item(
+        widget: Union[widgets.Widget, FormItem],
+        width: Optional[str] = None,
+        height: Optional[str] = None,
+        flex: Optional[Union[int, str]] = None,
+        grid_area: Optional[str] = None,
+        justify_content: Optional[str] = None,
+        align_items: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> None:
+        """Add an item to the form container.
+        
+        Args:
+            widget: The widget to add, or a FormItem instance
+            width: Width of the item (e.g., '100%', '200px')
+            height: Height of the item
+            flex: Flex grow/shrink value
+            grid_area: For GRID layout, the grid area name
+            justify_content: Justify content for the item's container
+            align_items: Align items for the item's container
+            index: Position to insert the item (None for append)
+        """
+        if isinstance(widget, FormItem):
+            form_item = widget
+        else:
+            form_item = FormItem(
+                widget=widget,
+                width=width,
+                height=height,
+                flex=flex,
+                grid_area=grid_area,
+                justify_content=justify_content,
+                align_items=align_items
+            )
+        
+        # Configure widget layout
+        widget_layout = widget.layout if widget.layout else {}
+        
+        if layout_type == LayoutType.GRID and form_item.grid_area:
+            widget_layout.grid_area = form_item.grid_area
+        
+        if form_item.width:
+            widget_layout.width = form_item.width
+        if form_item.height:
+            widget_layout.height = form_item.height
+        
+        # Add to items list and update container
+        if index is not None:
+            form_items.insert(index, form_item)
+        else:
+            form_items.append(form_item)
+        
+        update_container()
     
-    return result
+    def update_container():
+        """Update the container with current items and layout."""
+        children = []
+        
+        for item in form_items:
+            # Create a container for each item to support individual layout
+            item_container = widgets.Box(
+                [item.widget],
+                layout=widgets.Layout(
+                    width=item.width if layout_type != LayoutType.GRID else '100%',
+                    height=item.height,
+                    flex=item.flex if layout_type != LayoutType.GRID else None,
+                    justify_content=item.justify_content,
+                    align_items=item.align_items,
+                    overflow='visible'
+                )
+            )
+            
+            if layout_type == LayoutType.GRID and item.grid_area:
+                item_container.layout.grid_area = item.grid_area
+            
+            children.append(item_container)
+        
+        form_container.children = children
+    
+    def set_layout(
+        new_layout_type: Union[LayoutType, str],
+        **layout_kwargs
+    ) -> None:
+        """Change the layout type dynamically.
+        
+        Args:
+            new_layout_type: New layout type (COLUMN, ROW, or GRID)
+            **layout_kwargs: Additional layout properties
+        """
+        nonlocal form_container, layout_type
+        
+        # Update layout type
+        if isinstance(new_layout_type, str):
+            new_layout_type = LayoutType[new_layout_type.upper()]
+        layout_type = new_layout_type
+        
+        # Create new container with the same items
+        old_children = form_container.children
+        form_container = create_layout()
+        container.children = [form_container]
+        
+        # Re-add all items
+        for item in form_items:
+            add_item(item)
+    
+    return {
+        'container': container,
+        'form_container': form_container,
+        'add_item': add_item,
+        'set_layout': set_layout,
+        'items': form_items  # Expose items for advanced manipulation
+    }

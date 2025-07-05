@@ -205,6 +205,62 @@ class ColabConfigHandler(ModuleUIHandler, ConfigurableHandler):
             self.update_status(error_msg, "error")
             self.logger.error(error_msg, exc_info=True)
             return {"status": False, "message": error_msg}
+            
+    def handle_setup_button_click(self, button) -> None:
+        """Handle setup button click with phase management.
+        
+        Args:
+            button: The button widget that was clicked
+        """
+        try:
+            # Update to in_progress phase
+            if hasattr(button, 'set_phase'):
+                button.set_phase('in_progress')
+                
+            # Disable button during processing
+            if hasattr(button, 'disabled'):
+                button.disabled = True
+                
+            # Start the setup process
+            self.set_stage(SetupStage.STARTED)
+            self.update_status("Memulai proses setup environment...", "info")
+            
+            try:
+                # Execute the setup process
+                result = self.start_setup()
+                
+                if result.get("status"):
+                    # Update to completed phase on success
+                    if hasattr(button, 'set_phase'):
+                        button.set_phase('completed')
+                    self.set_stage(SetupStage.COMPLETED)
+                    self.update_status("Setup environment berhasil!", "success")
+                else:
+                    # Update to failed phase on error
+                    if hasattr(button, 'set_phase'):
+                        button.set_phase('failed')
+                    self.set_stage(SetupStage.FAILED)
+                    error_msg = result.get("message", "Terjadi kesalahan yang tidak diketahui")
+                    self.update_status(f"Gagal setup environment: {error_msg}", "error")
+                    
+            except Exception as e:
+                # Update to failed phase on exception
+                if hasattr(button, 'set_phase'):
+                    button.set_phase('failed')
+                self.set_stage(SetupStage.FAILED)
+                error_msg = f"Error selama setup: {str(e)}"
+                self.update_status(error_msg, "error")
+                self.logger.error(error_msg, exc_info=True)
+                
+        except Exception as e:
+            error_msg = f"Error handling button click: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self.update_status(error_msg, "error")
+            
+        finally:
+            # Re-enable the button if it's in a terminal state
+            if hasattr(button, 'disabled'):
+                button.disabled = False
 
 # Singleton instance for easy access
 colab_config_handler = ColabConfigHandler()

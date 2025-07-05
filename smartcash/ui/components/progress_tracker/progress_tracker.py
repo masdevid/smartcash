@@ -41,7 +41,7 @@ class ProgressTracker(BaseUIComponent):
     
     def _create_ui_components(self) -> None:
         """Create and initialize UI components."""
-        # Create main container
+        # Create main container with auto height
         self._ui_components['container'] = widgets.VBox(
             [],
             layout=widgets.Layout(
@@ -52,10 +52,10 @@ class ProgressTracker(BaseUIComponent):
                 border='1px solid #e0e0e0',
                 border_radius='8px',
                 background_color='#f8fff8',
-                min_height=self._config.get_container_height(),
-                max_height='400px',
-                overflow='hidden',
-                box_sizing='border-box'
+                min_height='0px',  # Will be updated based on visible bars
+                height='auto',     # Auto-adjust height
+                overflow='visible', # Allow content to determine height
+                box_sizing='content-box'  # Include padding in height calculation
             )
         )
         
@@ -71,19 +71,20 @@ class ProgressTracker(BaseUIComponent):
             layout=widgets.Layout(width='100%', margin='0 0 8px 0')
         )
         
-        # Create output widgets for progress bars
-        self._ui_components['overall_output'] = widgets.Output(
-            layout=widgets.Layout(width='100%', margin='1px 0', 
-                               min_height='25px', max_height='30px')
+        # Create output widgets for progress bars with consistent height
+        bar_height = '30px'
+        bar_layout = widgets.Layout(
+            width='100%',
+            margin='1px 0',
+            height=bar_height,
+            min_height=bar_height,
+            max_height=bar_height,
+            overflow='hidden'
         )
-        self._ui_components['step_output'] = widgets.Output(
-            layout=widgets.Layout(width='100%', margin='1px 0', 
-                               min_height='25px', max_height='30px')
-        )
-        self._ui_components['current_output'] = widgets.Output(
-            layout=widgets.Layout(width='100%', margin='1px 0', 
-                               min_height='25px', max_height='30px')
-        )
+        
+        self._ui_components['overall_output'] = widgets.Output(layout=bar_layout)
+        self._ui_components['step_output'] = widgets.Output(layout=bar_layout)
+        self._ui_components['current_output'] = widgets.Output(layout=bar_layout)
         
         # Assemble the container
         self._assemble_container()
@@ -92,12 +93,42 @@ class ProgressTracker(BaseUIComponent):
         self.tqdm_manager = TqdmManager(self)
         self.tqdm_manager.initialize_bars(self._config.get_level_configs())
     
+    def _update_container_height(self) -> None:
+        """Update container height based on visible components."""
+        if not hasattr(self, '_ui_components'):
+            return
+            
+        # Base height for header and status
+        base_height = 60  # px for header + status + padding
+        bar_height = 30   # px per progress bar
+        
+        # Count visible progress bars
+        visible_bars = sum(1 for level in self._active_levels 
+                          if self._config.get_level_config(level).visible)
+        
+        # Calculate total height
+        total_height = base_height + (visible_bars * bar_height)
+        
+        # Update container height
+        self._ui_components['container'].layout.height = f'{total_height}px'
+        self._ui_components['container'].layout.min_height = f'{total_height}px'
+    
     def _assemble_container(self) -> None:
         """Assemble the container with appropriate widgets based on config level."""
         container = self._ui_components['container']
+        
+        # Only include outputs for active and visible levels
+        outputs = []
+        for level in self._active_levels:
+            if self._config.get_level_config(level).visible:
+                output_key = f'{level}_output'
+                if output_key in self._ui_components:
+                    outputs.append(self._ui_components[output_key])
+        
         container.children = [
             self._ui_components['header'],
-            self._ui_components['status']
+            self._ui_components['status'],
+            *outputs
         ]
         
         # Add progress outputs based on level
@@ -154,6 +185,7 @@ class ProgressTracker(BaseUIComponent):
         
         self._ui_components['container'].layout.display = 'flex'
         self._ui_components['container'].layout.visibility = 'visible'
+        self._update_container_height()
     
     def hide(self) -> None:
         """Hide the progress tracker."""

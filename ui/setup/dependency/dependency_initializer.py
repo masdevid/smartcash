@@ -7,8 +7,10 @@ import contextlib
 import time
 from typing import Dict, Any, Optional
 import time
+import asyncio
 
 from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from .configs.dependency_defaults import get_default_dependency_config
 from .handlers.dependency_ui_handler import DependencyUIHandler
 from .components.dependency_ui import create_dependency_ui_components
 from .operations.factory import OperationHandlerFactory
@@ -18,35 +20,23 @@ class DependencyInitializer(ModuleInitializer):
     """Initializer untuk dependency module dengan proper structure"""
     
     def __init__(self, module_name: str = 'dependency', parent_module: Optional[str] = 'setup'):
-        super().__init__(module_name, parent_module)
+        # Initialize with handler class and proper module settings
+        super().__init__(
+            module_name=module_name,
+            parent_module=parent_module,
+            handler_class=DependencyUIHandler,
+            auto_setup_handlers=True
+        )
         self._ui_components = None
-        self._handlers = {}
         self._operation_handlers = {}
-        self._module_handler = None
-        self._is_initialized = False
-        self._confirmation_dialog = None
         self._current_operation = None
         self._current_packages = None
         self.logger.info(f"🛠️ DependencyInitializer dibuat untuk modul: {module_name}")
-        
-        # Initialize confirmation dialog
-        self._init_confirmation_dialog()
-        
-        # Override the handler instantiation to ensure correct arguments
-        if not hasattr(self, '_module_handler') or self._module_handler is None:
-            self._module_handler = DependencyUIHandler(module_name='dependency', parent_module='setup')
-    
-    def _init_confirmation_dialog(self) -> None:
-        """Initialize confirmation dialog state.
-        
-        Note: The actual dialog is now handled by the parent class's show_confirmation method.
-        This method is kept for backward compatibility and to maintain the same interface.
-        """
-        self.logger.debug("Confirmation dialog initialization is now handled by the parent UIHandler")
     
     def __del__(self) -> None:
         """Cleanup resources."""
-        # No cleanup needed for confirmation dialog as it's now managed by the parent class
+        # Cleanup will be handled by parent class
+        super().__del__()
     
     def get_default_config(self) -> Dict[str, Any]:
         """Get default dependency configuration"""
@@ -183,12 +173,7 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
     
-    def create_module_handler(self) -> DependencyUIHandler:
-        """Create module handler instance with correct arguments."""
-        return DependencyUIHandler(
-            module_name=self.module_name,
-            parent_module=self.parent_module
-        )
+    # Removed create_module_handler as it's now handled by the parent class
     
     def _connect_button_handlers(self) -> None:
         """Connect button click handlers to their respective operations.
@@ -285,51 +270,6 @@ class DependencyInitializer(ModuleInitializer):
             )
             self.update_status(f"❌ Error: {str(e)}", "error")
     
-    def _show_confirmation_dialog(self, context: 'OperationContext') -> None:
-        """Show confirmation dialog for potentially destructive operations.
-        
-        Args:
-            context: The operation context
-        """
-        if not context.packages:
-            self.logger.warning("No packages provided for confirmation dialog")
-            return
-            
-        # Prepare dialog content
-        operation_name = context.operation_type.name.lower()
-        title = f"Confirm {operation_name.capitalize()}"
-        message = (
-            f"Are you sure you want to {operation_name} {len(context.packages)} package(s)?\n\n"
-            f"Packages: {', '.join(context.packages[:5])}"
-            f"{'...' if len(context.packages) > 5 else ''}"
-        )
-        
-        # Define callbacks
-        async def on_confirm():
-            self.update_status(
-                f"🚀 Starting {operation_name} for {len(context.packages)} packages...", 
-                "info"
-            )
-            await self._execute_operation(context)
-            
-        def on_cancel():
-            self.update_status(f"⚠️ {operation_name.capitalize()} operation cancelled", "info")
-        
-        # Show confirmation using parent class method
-        try:
-            self.show_confirmation(
-                title=title,
-                message=message,
-                on_confirm=lambda: asyncio.create_task(on_confirm()),
-                on_cancel=on_cancel
-            )
-        except Exception as e:
-            error_msg = f"❌ Error showing confirmation dialog: {str(e)}"
-            self.update_status(error_msg, "error")
-            self.logger.error(error_msg, exc_info=True)
-    
-    # Removed duplicate _execute_operation method - using the async version instead
-
     def setup_operation_handlers(self) -> None:
         """Setup operation handlers untuk package management"""
         try:

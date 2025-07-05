@@ -60,7 +60,7 @@ class CoreErrorHandler:
             
             if error_component and 'container' in error_component:
                 display(error_component['container'])
-                return error_component
+                return error_component['container']
                 
         except Exception as e:
             self.logger.error(f"❌ Failed to create error UI: {e}")

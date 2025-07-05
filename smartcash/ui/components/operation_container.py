@@ -76,6 +76,7 @@ class OperationContainer(BaseUIComponent):
                  progress_levels: Literal['single', 'dual', 'triple'] = 'single',
                  show_progress: bool = True,
                  show_logs: bool = True,
+                 show_dialog: bool = True,
                  progress_config: Optional[ProgressConfig] = None,
                  log_module_name: str = "Operation",
                  log_height: str = "300px",
@@ -87,6 +88,7 @@ class OperationContainer(BaseUIComponent):
             progress_levels: Number of progress levels to show ('single', 'dual', or 'triple')
             show_progress: Whether to show the progress tracker
             show_logs: Whether to show the log accordion
+            show_dialog: Whether to enable dialog functionality
             progress_config: Configuration for the progress tracker
             log_module_name: Name of the module for logging
             log_height: Height of the log accordion
@@ -98,6 +100,7 @@ class OperationContainer(BaseUIComponent):
         self.progress_levels = progress_levels
         self.show_progress = show_progress
         self.show_logs = show_logs
+        self.show_dialog = show_dialog
         self.log_module_name = log_module_name
         self.log_height = log_height
         
@@ -111,8 +114,9 @@ class OperationContainer(BaseUIComponent):
         # Create UI components
         self._create_ui_components(progress_config)
         
-        # Initialize dialog area (must be before creating container)
-        self._init_dialog_area()
+        # Initialize dialog area if enabled (must be before creating container)
+        if self.show_dialog:
+            self._init_dialog_area()
     
     def _create_ui_components(self, progress_config: Optional[ProgressConfig] = None) -> None:
         """Create and initialize UI components.

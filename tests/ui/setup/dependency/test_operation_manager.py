@@ -227,8 +227,11 @@ async def test_execute_operation_concurrent_check(operation_manager):
     # Start first operation (it will block on the event)
     task = asyncio.create_task(operation_manager.execute_operation(context))
     
-    # Give the task a moment to start
-    await asyncio.sleep(0.1)
+    # Wait for the task to start (using a short timeout)
+    try:
+        await asyncio.wait_for(task, timeout=0.1)
+    except asyncio.TimeoutError:
+        pass  # Expected, since we're testing concurrent execution
     
     # Try to start second operation while first is still running
     result = await operation_manager.execute_operation(context)

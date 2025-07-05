@@ -324,7 +324,7 @@ class ActionContainer:
             icon = f'fa-{icon}'
             
         button = widgets.Button(
-            description=f"{f'<i class="fa {icon}"></i> ' if icon else ''}{text}",
+            description=f"{text}",
             layout=widgets.Layout(width='auto'),
             disabled=disabled,
             **kwargs

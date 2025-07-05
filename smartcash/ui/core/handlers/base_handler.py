@@ -23,6 +23,11 @@ class BaseHandler(ABC):
         self.parent_module = parent_module
         self.full_module_name = f"{parent_module}.{module_name}" if parent_module else module_name
         
+        # Ensure full_module_name is a string
+        if not isinstance(self.full_module_name, str):
+            self.logger.warning(f"full_module_name is not a string: {self.full_module_name}")
+            self.full_module_name = str(self.full_module_name)
+        
         # Setup logger
         self.logger = get_module_logger(self.full_module_name)
         

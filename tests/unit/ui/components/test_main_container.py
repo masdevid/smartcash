@@ -1,132 +1,160 @@
 """
-Tests for the MainContainer component.
+Unit tests for main_container.py
 """
 import unittest
 from unittest.mock import MagicMock, patch
 import ipywidgets as widgets
 
+# Import the component to test
+from smartcash.ui.components.main_container import MainContainer, create_main_container, ContainerConfig, ContainerType
+
+
 class TestMainContainer(unittest.TestCase):
-    """Test cases for the MainContainer component."""
+    """Test cases for the MainContainer class."""
     
     def setUp(self):
-        """Set up test fixtures."""
-        # Import here to avoid caching issues
-        from smartcash.ui.components.main_container import MainContainer
+        """Set up the test environment."""
+        # Create test widgets for each container type
+        self.header_widget = widgets.HTML("<h1>Test Header</h1>")
+        self.form_widget = widgets.VBox([widgets.Text(description="Test:")])
+        self.action_widget = widgets.HBox([widgets.Button(description="Test Button")])
+        self.operation_widget = widgets.VBox([widgets.Textarea(description="Log:")])
+        self.footer_widget = widgets.HTML("<div>Test Footer</div>")
+        self.custom_widget = widgets.Label("Custom Component")
         
-        # Create mock widgets for each section
-        self.mock_header = MagicMock(spec=widgets.Widget)
-        self.mock_form = MagicMock(spec=widgets.Widget)
-        self.mock_action = MagicMock(spec=widgets.Widget)
-        self.mock_footer = MagicMock(spec=widgets.Widget)
-        self.mock_progress = MagicMock(spec=widgets.Widget)
-        self.mock_log = MagicMock(spec=widgets.Widget)
-        
-        # Create a main container with all sections
+        # Create a test container with all components
         self.container = MainContainer(
-            header_container=self.mock_header,
-            form_container=self.mock_form,
-            action_container=self.mock_action,
-            footer_container=self.mock_footer,
-            progress_container=self.mock_progress,
-            log_container=self.mock_log,
-            width='90%',
-            max_width='1200px'
+            header_container=self.header_widget,
+            form_container=self.form_widget,
+            action_container=self.action_widget,
+            operation_container=self.operation_widget,
+            footer_container=self.footer_widget
         )
     
-    def test_initialization(self):
-        """Test that the container initializes with all sections."""
-        # Verify the container was created
-        self.assertIsInstance(self.container.container, widgets.VBox)
-        
-        # Verify all sections are included
-        self.assertEqual(len(self.container.container.children), 6)
-        self.assertIn(self.mock_header, self.container.container.children)
-        self.assertIn(self.mock_form, self.container.container.children)
-        self.assertIn(self.mock_action, self.container.container.children)
-        self.assertIn(self.mock_progress, self.container.container.children)
-        self.assertIn(self.mock_log, self.container.container.children)
-        self.assertIn(self.mock_footer, self.container.container.children)
-        
-        # Verify style was applied
-        self.assertEqual(self.container.container.layout.width, '90%')
-        self.assertEqual(self.container.container.layout.max_width, '1200px')
+    def tearDown(self):
+        """Tear down the test environment."""
+        pass
     
-    def test_update_section(self):
-        """Test updating a section of the container."""
-        # Create a new mock widget
-        new_header = MagicMock(spec=widgets.Widget)
+    def test_initialization_legacy(self):
+        """Test initialization with legacy parameters."""
+        # Test with all legacy parameters
+        container = MainContainer(
+            header_container=self.header_widget,
+            form_container=self.form_widget,
+            action_container=self.action_widget,
+            operation_container=self.operation_widget,
+            footer_container=self.footer_widget
+        )
         
-        # Update the header section
-        self.container.update_section('header', new_header)
-        
-        # Verify the section was updated
-        self.assertEqual(self.container.get_section('header'), new_header)
-        self.assertIn(new_header, self.container.container.children)
-        self.assertNotIn(self.mock_header, self.container.container.children)
-        
-        # Verify invalid section name raises an error
-        with self.assertRaises(ValueError):
-            self.container.update_section('invalid_section', new_header)
+        # Check if all widgets are added
+        self.assertIn(self.header_widget, container.container.children)
+        self.assertIn(self.form_widget, container.container.children)
+        self.assertIn(self.action_widget, container.container.children)
+        self.assertIn(self.operation_widget, container.container.children)
+        self.assertIn(self.footer_widget, container.container.children)
     
-    def test_get_section(self):
-        """Test retrieving a section from the container."""
-        # Test getting each section
-        self.assertEqual(self.container.get_section('header'), self.mock_header)
-        self.assertEqual(self.container.get_section('form'), self.mock_form)
-        self.assertEqual(self.container.get_section('action'), self.mock_action)
-        self.assertEqual(self.container.get_section('footer'), self.mock_footer)
-        self.assertEqual(self.container.get_section('progress'), self.mock_progress)
-        self.assertEqual(self.container.get_section('log'), self.mock_log)
+    def test_initialization_with_components(self):
+        """Test initialization with the new components parameter."""
+        components = [
+            {'type': 'header', 'component': self.header_widget, 'order': 0},
+            {'type': 'form', 'component': self.form_widget, 'order': 1},
+            {'type': 'action', 'component': self.action_widget, 'order': 2},
+            {'type': 'operation', 'component': self.operation_widget, 'order': 3},
+            {'type': 'footer', 'component': self.footer_widget, 'order': 4},
+            {'type': 'custom', 'component': self.custom_widget, 'order': 5, 'name': 'custom1'}
+        ]
         
-        # Test getting a non-existent section
-        self.assertIsNone(self.container.get_section('nonexistent'))
+        container = MainContainer(components=components)
+        
+        # Check if all widgets are added in the correct order
+        self.assertEqual(container.container.children[0], self.header_widget)
+        self.assertEqual(container.container.children[1], self.form_widget)
+        self.assertEqual(container.container.children[2], self.action_widget)
+        self.assertEqual(container.container.children[3], self.operation_widget)
+        self.assertEqual(container.container.children[4], self.footer_widget)
+        self.assertEqual(container.container.children[5], self.custom_widget)
     
-    def test_add_remove_class(self):
-        """Test adding and removing CSS classes."""
-        # Add a class
-        self.container.add_class('test-class')
-        self.assertIn('test-class', self.container.container._dom_classes)
+    def test_add_component(self):
+        """Test adding a component to the container."""
+        # Add a custom component
+        custom_widget = widgets.Label("New Custom Component")
+        component_name = self.container.add_component(custom_widget, 'custom', name='custom1')
         
-        # Remove the class
-        self.container.remove_class('test-class')
-        self.assertNotIn('test-class', self.container.container._dom_classes)
+        # Check if the component was added and the name is returned
+        self.assertEqual(component_name, 'custom1')
+        self.assertIn(custom_widget, self.container.container.children)
+        self.assertEqual(self.container.get_component('custom1'), custom_widget)
+    
+    def test_remove_component(self):
+        """Test removing a component from the container."""
+        # First add a custom component
+        custom_widget = widgets.Label("Custom to Remove")
+        component_name = self.container.add_component(custom_widget, 'custom', name='to_remove')
+        self.assertEqual(component_name, 'to_remove')
+        
+        # Then remove it
+        self.container.remove_component('to_remove')
+        
+        # Check if the component was removed
+        self.assertNotIn(custom_widget, self.container.container.children)
+        self.assertIsNone(self.container.get_component('to_remove'))
+    
+    def test_show_hide_component(self):
+        """Test showing and hiding a component."""
+        # First add a custom component
+        custom_widget = widgets.Label("Toggle Me")
+        component_name = self.container.add_component(custom_widget, 'custom', name='toggle')
+        self.assertEqual(component_name, 'toggle')
+        
+        # Hide the component
+        self.container.hide_component('toggle')
+        self.assertNotIn(custom_widget, self.container.container.children)
+        
+        # Show the component
+        self.container.show_component('toggle')
+        self.assertIn(custom_widget, self.container.container.children)
 
 
 class TestCreateMainContainer(unittest.TestCase):
     """Test cases for the create_main_container function."""
     
-    def test_create_main_container(self):
-        """Test creating a main container with the factory function."""
-        # Import the function directly to test
-        from smartcash.ui.components.main_container import create_main_container
+    def test_create_main_container_legacy(self):
+        """Test creating a main container with legacy parameters."""
+        # Create test widgets
+        header = widgets.HTML("<h1>Header</h1>")
+        form = widgets.VBox([widgets.Text(description="Test:")])
         
-        # Create mock widgets
-        mock_header = MagicMock(spec=widgets.Widget)
-        mock_form = MagicMock(spec=widgets.Widget)
-        
-        # Create a main container with some sections
+        # Create container with legacy parameters
         container = create_main_container(
-            header_container=mock_header,
-            form_container=mock_form,
-            width='80%',
-            margin='10px'
+            header_container=header,
+            form_container=form
         )
         
-        # Verify the container was created
-        self.assertIsInstance(container.container, widgets.VBox)
+        # Check if container was created with the widgets
+        self.assertIsInstance(container, MainContainer)
+        self.assertIn(header, container.container.children)
+        self.assertIn(form, container.container.children)
+    
+    def test_create_main_container_with_components(self):
+        """Test creating a main container with the components parameter."""
+        # Create test widgets
+        header = widgets.HTML("<h1>Header</h1>")
+        form = widgets.VBox([widgets.Text(description="Test:")])
         
-        # Verify the specified sections are included
-        self.assertEqual(container.get_section('header'), mock_header)
-        self.assertEqual(container.get_section('form'), mock_form)
+        # Define components
+        components = [
+            {'type': 'header', 'component': header, 'order': 0},
+            {'type': 'form', 'component': form, 'order': 1}
+        ]
         
-        # Verify style was applied
-        self.assertEqual(container.container.layout.width, '80%')
-        self.assertEqual(container.container.layout.margin, '10px')
+        # Create container with components
+        container = create_main_container(components=components)
         
-        # Verify other sections are None
-        self.assertIsNone(container.get_section('action'))
-        self.assertIsNone(container.get_section('footer'))
+        # Check if container was created with the widgets in the correct order
+        self.assertIsInstance(container, MainContainer)
+        self.assertEqual(container.container.children[0], header)
+        self.assertEqual(container.container.children[1], form)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

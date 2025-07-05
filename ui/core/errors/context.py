@@ -25,6 +25,27 @@ class ErrorContext:
     """
     _local = threading.local()
     
+    def __init__(self, **kwargs):
+        """Initialize the error context with optional initial values."""
+        self._context = {}
+        if kwargs:
+            self._context.update(kwargs)
+    
+    def __enter__(self):
+        """Enter the runtime context related to this object."""
+        # Save the current context
+        self._saved_context = self.get_context().copy()
+        # Update with new context
+        self.set_context(**self._context)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the runtime context and restore the previous context."""
+        # Restore the saved context
+        self._local.context = self._saved_context
+        # Don't suppress any exceptions
+        return False
+    
     @classmethod
     def get_context(cls) -> Dict[str, Any]:
         """

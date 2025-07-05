@@ -73,18 +73,33 @@ def handle_errors(
                 if args and hasattr(args[0], context_attr):
                     error_context = getattr(args[0], context_attr)
                 
+                # Prepare error context
+                error_kwargs = {
+                    'level': level,
+                    'exc_info': True,
+                    'fail_fast': reraise,
+                    'create_ui_error': create_ui,
+                    'function_name': func.__name__,
+                    'error_type': type(e).__name__,
+                    'error_context': error_context,
+                    **kwargs
+                }
+                
+                # Only include error_msg in kwargs if it's not already provided in the method signature
+                if 'error_msg' not in inspect.signature(error_handler.handle_error).parameters:
+                    error_kwargs['error_msg'] = formatted_msg
+                
+                # Debug: Print the error handler and kwargs being used
+                print(f"\n=== DEBUG: handle_errors decorator ===")
+                print(f"Error handler: {error_handler}")
+                print(f"Error kwargs: {error_kwargs}")
+                
                 # Handle the error using the error handler
                 result = error_handler.handle_error(
-                    error_msg=formatted_msg,
-                    level=level,
-                    exc_info=True,
-                    fail_fast=reraise,
-                    create_ui_error=create_ui,
-                    function_name=func.__name__,
-                    error_type=type(e).__name__,
-                    error_context=error_context,
-                    **kwargs
+                    **error_kwargs
                 )
+                
+                print(f"Error handler result: {result}")
                 
                 # If not re-raising, return the result from the error handler
                 if not reraise:

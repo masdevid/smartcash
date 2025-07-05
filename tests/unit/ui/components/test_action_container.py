@@ -1,179 +1,175 @@
 """
-Tests for the ActionContainer component.
+Unit tests for action_container.py
 """
 import unittest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch
 import ipywidgets as widgets
 
+# Import the component to test
+from smartcash.ui.components.action_container import ActionContainer, create_action_container, COLAB_PHASES
+
+
 class TestActionContainer(unittest.TestCase):
-    """Test cases for the ActionContainer component."""
+    """Test cases for the ActionContainer class."""
     
     def setUp(self):
-        """Set up test fixtures."""
-        # Create a real VBox for testing
-        self.mock_vbox = MagicMock(spec=widgets.VBox)
-        self.mock_vbox.children = []
+        """Set up the test environment."""
+        # Create a test instance of ActionContainer
+        self.container = ActionContainer(container_margin="10px 0")
         
-        # Patch widgets.VBox to return our mock
-        self.vbox_patcher = patch('ipywidgets.VBox', return_value=self.mock_vbox)
-        self.mock_vbox_class = self.vbox_patcher.start()
-        
-        # Create a real Button for testing
-        self.mock_button = MagicMock(spec=widgets.Button)
-        self.mock_button._click_handlers = MagicMock()
-        self.mock_button.on_click = MagicMock()  # Add this line to mock the on_click method
-        
-        # Patch create_action_buttons
-        self.action_buttons_patcher = patch(
-            'smartcash.ui.components.action_container.create_action_buttons',
-            return_value={
-                'buttons': {'test1': self.mock_button, 'test2': self.mock_button},
-                'container': MagicMock()
+        # Create test buttons
+        self.test_buttons = [
+            {
+                'id': 'test1',
+                'text': 'Test Button 1',
+                'style': 'primary',
+                'tooltip': 'Test tooltip 1',
+                'disabled': False
+            },
+            {
+                'id': 'test2',
+                'text': 'Test Button 2',
+                'style': 'danger',
+                'tooltip': 'Test tooltip 2',
+                'disabled': True
             }
-        )
-        self.mock_create_action_buttons = self.action_buttons_patcher.start()
+        ]
     
     def tearDown(self):
-        """Clean up after tests."""
-        self.vbox_patcher.stop()
-        self.action_buttons_patcher.stop()
+        """Tear down the test environment."""
+        pass
     
-    def test_create_action_container(self):
-        """Test creating an action container with buttons and dialog functions."""
-        # Import the function directly to avoid caching issues
-        from smartcash.ui.components.action_container import create_action_container
+    def test_initialization(self):
+        """Test ActionContainer initialization."""
+        # Check if container is created
+        self.assertIsInstance(self.container.container, widgets.VBox)
         
-        # Mock the dialog functions
-        with patch('smartcash.ui.components.action_container.create_confirmation_area') as mock_create_area, \
-             patch('smartcash.ui.components.action_container.show_confirmation_dialog') as mock_show_dialog, \
-             patch('smartcash.ui.components.action_container.show_info_dialog') as mock_show_info, \
-             patch('smartcash.ui.components.action_container.clear_dialog_area') as mock_clear_dialog, \
-             patch('smartcash.ui.components.action_container.is_dialog_visible') as mock_is_visible:
-            
-            # Setup mock return values
-            mock_dialog_area = MagicMock()
-            mock_create_area.return_value = mock_dialog_area
-            mock_is_visible.return_value = False
-            
-            # Create test buttons
-            test_buttons = [
-                {'button_id': 'test1', 'text': 'Test 1'},
-                {'button_id': 'test2', 'text': 'Test 2', 'style': 'danger'}
-            ]
-            
-            # Create the action container
-            action_container = create_action_container(
-                buttons=test_buttons,
-                title="Test Actions",
-                alignment='center'
-            )
-            
-            # Verify the container was created
-            self.assertIsInstance(action_container, dict)
-            self.assertIn('container', action_container)
-            self.assertEqual(action_container['container'], self.mock_vbox)
-            
-            # Verify buttons were created
-            self.assertIn('buttons', action_container)
-            self.assertIsInstance(action_container['buttons'], dict)
-            self.assertEqual(len(action_container['buttons']), 2)
-            self.assertIn('test1', action_container['buttons'])
-            self.assertIn('test2', action_container['buttons'])
-            
-            # Verify dialog area was created
-            self.assertEqual(action_container['dialog_area'], mock_dialog_area)
-            mock_create_area.assert_called_once()
-            
-            # Test dialog functions
-            test_callback = MagicMock()
-            
-            # Test show_dialog
-            action_container['show_dialog'](
-                title="Confirm",
-                message="Are you sure?",
-                on_confirm=test_callback
-            )
-            mock_show_dialog.assert_called_once()
-            
-            # Test show_info
-            action_container['show_info'](
-                title="Info",
-                message="Information message"
-            )
-            mock_show_info.assert_called_once()
-            
-            # Test clear_dialog
-            action_container['clear_dialog']()
-            mock_clear_dialog.assert_called_once()
-            
-            # Test is_dialog_visible
-            action_container['is_dialog_visible']()
-            mock_is_visible.assert_called_once()
+        # Check initial state
+        self.assertEqual(self.container.current_phase, 'initial')
+        self.assertDictEqual(self.container.phases, COLAB_PHASES)
+        
+        # Check if default buttons are initialized
+        self.assertIsNotNone(self.container.buttons['primary'])
+        self.assertIsNotNone(self.container.buttons['save_reset'])
+        self.assertIsNotNone(self.container.buttons['action'])
     
-    def test_action_container_button_click(self):
-        """Test that button click handlers work correctly."""
-        from smartcash.ui.components.action_container import create_action_container
-        
-        # Create a test click handler
-        test_clicked = MagicMock()
-        
-        # Create a test button with our click handler
-        test_button = {
-            'button_id': 'test_btn',
-            'text': 'Click Me',
-            'on_click': test_clicked
-        }
-        
-        # Create a mock for the button that will be created by create_action_buttons
-        mock_button = MagicMock(spec=widgets.Button)
-        mock_button.description = test_button['text']
-        
-        # Configure the mock to return our test button
-        self.mock_create_action_buttons.return_value = {
-            'buttons': {test_button['button_id']: mock_button},
-            'container': MagicMock()
-        }
-        
-        # Create the action container with our test button
-        action_container = create_action_container(buttons=[test_button])
-        
-        # Get the button that was created
-        created_button = action_container['buttons'][test_button['button_id']]
-        
-        # Verify the button was created with the correct text
-        self.assertEqual(created_button.description, test_button['text'])
-        
-        # Test that the click handler is called when the button is clicked
-        # We'll test this by calling the click handler directly
-        test_clicked.assert_not_called()  # Shouldn't be called yet
-        
-        # Simulate a button click by calling the handler directly
-        test_button['on_click'](mock_button)
-        
-        # Verify the test click handler was called
-        test_clicked.assert_called_once()
-    
-    def test_action_container_custom_styling(self):
-        """Test that custom styling is applied to the action container."""
-        from smartcash.ui.components.action_container import create_action_container
-        
-        # Create with custom styling
-        create_action_container(
-            buttons=[{'button_id': 'test', 'text': 'Test'}],
-            container_margin="20px 0"
+    def test_add_button(self):
+        """Test adding a button to the container."""
+        # Add a test button
+        button_id = 'test_button'
+        self.container.add_button(
+            button_id,
+            'Test',
+            'primary',
+            tooltip='Test button',
+            disabled=False
         )
         
-        # Verify the VBox was created with the correct layout
-        args, kwargs = self.mock_vbox_class.call_args
-        # The layout is a traitlets.traitlets.Instance, not a dict
-        layout = kwargs.get('layout')
-        self.assertIsNotNone(layout)
-        self.assertEqual(layout.margin, '20px 0')
+        # Get the button using get_button
+        button = self.container.get_button(button_id)
         
-        # Verify the action buttons were created with the correct alignment
-        args, kwargs = self.mock_create_action_buttons.call_args
-        self.assertEqual(kwargs.get('alignment'), 'left')  # Default alignment
+        # Check if button was added and has correct properties
+        self.assertIsNotNone(button)
+        self.assertEqual(button.description, 'Test')
+        self.assertEqual(button.tooltip, 'Test button')
+        self.assertFalse(button.disabled)
+    
+    def test_set_phases(self):
+        """Test setting custom phases."""
+        custom_phases = {
+            'start': {'text': 'Start', 'icon': 'play'},
+            'processing': {'text': 'Processing...', 'icon': 'spinner'}
+        }
+        
+        self.container.set_phases(custom_phases)
+        self.assertDictEqual(self.container.phases, custom_phases)
+    
+    def test_set_phase(self):
+        """Test changing the current phase."""
+        # Set up a test phase
+        test_phase = 'installing_deps'
+        self.container.set_phase(test_phase)
+        
+        # Check if phase was updated
+        self.assertEqual(self.container.current_phase, test_phase)
+        
+        # Check if primary button was updated if it exists
+        if self.container.buttons['primary']:
+            phase_config = COLAB_PHASES[test_phase]
+            self.assertEqual(self.container.buttons['primary'].description, phase_config['text'])
+            self.assertEqual(self.container.buttons['primary'].disabled, phase_config['disabled'])
+    
+    def test_enable_disable_buttons(self):
+        """Test enabling and disabling all buttons."""
+        # Get default buttons
+        primary_btn = self.container.buttons['primary']
+        save_reset_btn = self.container.buttons['save_reset']
+        action_btn = self.container.buttons['action']
+        
+        # Test disable
+        self.container.disable_all()
+        self.assertTrue(primary_btn.disabled)
+        self.assertTrue(save_reset_btn.disabled)
+        self.assertTrue(action_btn.disabled)
+        
+        # Test enable
+        self.container.enable_all()
+        self.assertFalse(primary_btn.disabled)
+        self.assertFalse(save_reset_btn.disabled)
+        self.assertFalse(action_btn.disabled)
+    
+    def test_get_button_nonexistent(self):
+        """Test getting a non-existent button."""
+        button = self.container.get_button('nonexistent')
+        self.assertIsNone(button)
 
 
-if __name__ == "__main__":
+class TestCreateActionContainer(unittest.TestCase):
+    """Test cases for the create_action_container function."""
+    
+    def test_create_action_container(self):
+        """Test creating an action container with buttons."""
+        # Define test buttons
+        test_buttons = [
+            {
+                'id': 'btn1',
+                'text': 'Button 1',
+                'style': 'primary',
+                'tooltip': 'First button',
+                'disabled': False
+            },
+            {
+                'id': 'btn2',
+                'text': 'Button 2',
+                'style': 'warning',
+                'tooltip': 'Second button',
+                'disabled': True
+            }
+        ]
+        
+        # Create container
+        result = create_action_container(
+            buttons=test_buttons,
+            title='Test Container',
+            alignment='center',
+            container_margin='10px 0'
+        )
+        
+        # Check if container was created
+        self.assertIn('container', result)
+        self.assertIsInstance(result['container'], widgets.VBox)
+        
+        # Check if buttons were added to the container
+        container_children = result['container'].children
+        self.assertGreaterEqual(len(container_children), 3)  # At least 3 default buttons
+        
+        # Check if the container has the expected widgets
+        self.assertIsInstance(container_children[0], widgets.HTML)  # Title
+        self.assertIn('Test Container', container_children[0].value)  # Title content
+        self.assertIsInstance(container_children[1], widgets.Button)  # Primary button
+        self.assertIsInstance(container_children[2], widgets.ToggleButton)  # Save/Reset button
+        self.assertIsInstance(container_children[3], widgets.Button)  # Action button
+
+
+if __name__ == '__main__':
     unittest.main()

@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import asyncio
-import threading
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, Future, as_completed
+
+from smartcash.ui.logger import get_module_logger
 
 from smartcash.common.threadpools import (
     process_in_parallel,
@@ -21,6 +22,7 @@ from smartcash.common.threadpools import (
     optimal_cpu_workers
 )
 from smartcash.ui.core.handlers.base_handler import BaseHandler
+from smartcash.ui.core.errors import handle_errors, ErrorLevel
 from smartcash.ui.components.operation_container import OperationContainer
 
 class ProgressLevel(Enum):
@@ -216,6 +218,7 @@ class OperationHandler(BaseHandler):
 
     # === Core Operation Methods ===
     
+    @handle_errors(error_msg="Failed to execute operation", level=ErrorLevel.ERROR, reraise=True)
     def execute_operation(self, 
                          operation_fn: Callable[..., T],
                          *args,

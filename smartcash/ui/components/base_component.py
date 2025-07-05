@@ -8,10 +8,10 @@ from smartcash.ui.core.errors import (
     ErrorLevel,
     CoreErrorHandler,
     handle_errors,
-    safe_component_operation,
     UIComponentError,
     ErrorContext
 )
+from smartcash.ui.core.errors.validators import safe_component_operation
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -76,9 +76,9 @@ class BaseUIComponent(ABC):
         pass
         
     @handle_errors(
-        error_message="Failed to set up event handlers",
+        error_msg="Failed to set up event handlers",
         level=ErrorLevel.WARNING,
-        component_type="UI Component"
+        context_attr="UI Component"
     )
     def _setup_event_handlers(self) -> None:
         """Set up event handlers with error handling.
@@ -89,10 +89,10 @@ class BaseUIComponent(ABC):
         """
         pass
         
-    @safe_component_operation(
-        error_message="Failed to get UI component",
-        level=ErrorLevel.WARNING,
-        default=None
+    @handle_errors(
+        error_msg="Failed to get component",
+        level=ErrorLevel.ERROR,
+        context_attr="component_name"
     )
     def get_component(self, name: str) -> Any:
         """Safely get a UI component by name with error handling.
@@ -105,14 +105,13 @@ class BaseUIComponent(ABC):
             
         Raises:
             UIComponentError: If the component exists but cannot be accessed
-            The requested component or None if not found
         """
         return self._ui_components.get(name)
         
     @handle_errors(
-        error_message="Failed to display component",
+        error_msg="Failed to display component",
         level=ErrorLevel.ERROR,
-        component_type="UI Component"
+        context_attr="UI Component"
     )
     def show(self) -> widgets.Widget:
         """Get the main widget for display with error handling.

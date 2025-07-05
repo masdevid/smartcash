@@ -67,7 +67,8 @@ class CoreErrorHandler:
         self, 
         module_name: str = "SmartCash",
         ui_components: Optional[Dict[str, Any]] = None,
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
+        component_name: Optional[str] = None
     ):
         """
         Initialize the error handler.
@@ -76,8 +77,10 @@ class CoreErrorHandler:
             module_name: The name of the module this handler is for.
             ui_components: Dictionary of UI components for error display.
             logger: Custom logger instance to use. If None, a default will be created.
+            component_name: Optional name of the component this handler is for.
+                           If provided, will be used as part of the module name.
         """
-        self.module_name = module_name
+        self.module_name = component_name or module_name
         self._error_count = 0
         self._last_error = None
         self._ui_components = ui_components or {}

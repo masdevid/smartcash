@@ -4,18 +4,16 @@ Deskripsi: Config handler hierarchy dengan in-memory, persistent, dan shared con
 Menggunakan composition over inheritance untuk mengurangi kompleksitas.
 """
 
-from typing import Dict, Any, Optional, List, Callable, Set
-from abc import abstractmethod
+import json
 from pathlib import Path
 from datetime import datetime
-import json
+from typing import Dict, Any, Optional, List, Callable, Type, TypeVar
 
+from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.handlers.base_handler import BaseHandler
-from smartcash.common.config.manager import get_config_manager
-from smartcash.ui.core.shared.shared_config_manager import (
-    get_shared_config_manager,
-    SharedConfigManager
-)
+from smartcash.common.config.manager import get_config_manager, SimpleConfigManager as ConfigManager
+from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager
+from smartcash.ui.core.errors import ErrorLevel, handle_errors
 
 class ConfigHandler(BaseHandler):
     """Base config handler dengan in-memory configuration.
@@ -202,30 +200,21 @@ class PersistentConfigHandler(ConfigurableHandler):
                  module_name: str, 
                  parent_module: Optional[str] = None,
                  default_config: Optional[Dict[str, Any]] = None,
-                 config_dir: Optional[Path] = None):
+                 config_manager: Optional[ConfigManager] = None):
         """Initialize dengan persistent storage support."""
         super().__init__(module_name, parent_module, default_config)
         
         # Config manager untuk file operations
-        self._config_manager = get_config_manager()
+        self._config_manager = config_manager or get_config_manager()
         self._config_dir = config_dir
         
         # Auto-load config saat init
         self.load_config()
     
-    def get_config_path(self, name: Optional[str] = None) -> Path:
-        """Get path untuk config file."""
-        config_name = name or f"{self.module_name}_config"
-        
-        if self._config_dir:
-            return self._config_dir / f"{config_name}.json"
-        
-        # Use config manager default
-        return Path(self._config_manager.get_config_path(config_name))
-    
     def load_config(self, name: Optional[str] = None) -> bool:
         """Load configuration dari file."""
-        try:
+        @handle_errors(error_msg="Failed to load configuration", level=ErrorLevel.ERROR, reraise=True)
+        def _load_config():
             config_name = name or f"{self.module_name}_config"
             
             # Load via config manager
@@ -247,53 +236,57 @@ class PersistentConfigHandler(ConfigurableHandler):
             else:
                 self.logger.info(f"📂 No existing config found: {config_name}")
                 return False
-                
+        
+        try:
+            return _load_config()
         except Exception as e:
-            self.handle_error(e, context="Loading config")
+            self.logger.error(f"❌ Failed to load config: {e}")
             return False
     
+    @handle_errors(error_msg="Failed to save configuration", level=ErrorLevel.ERROR, reraise=True)
     def save_config(self, name: Optional[str] = None) -> bool:
         """Save configuration ke file."""
-        try:
-            config_name = name or f"{self.module_name}_config"
-            
-            # Bundle config dengan metadata
-            config_bundle = {
-                'metadata': {
-                    'version': self.CONFIG_VERSION,
-                    'module': self.full_module_name,
-                    'saved_at': datetime.now().isoformat(),
-                },
-                'config': self.config
-            }
-            
-            # Save via config manager
-            self._config_manager.save_config(config_bundle, config_name)
-            
-            self.logger.info(f"💾 Saved config: {config_name}")
-            self.update_status("Configuration saved successfully", 'success')
-            return True
-            
-        except Exception as e:
-            self.handle_error(e, context="Saving config")
-            return False
+        config_name = name or f"{self.module_name}_config"
+        
+        # Bundle config dengan metadata
+        config_bundle = {
+            'metadata': {
+                'version': self.CONFIG_VERSION,
+                'module': self.full_module_name,
+                'saved_at': datetime.now().isoformat(),
+            },
+            'config': self.config
+        }
+        
+        # Save via config manager
+        self._config_manager.save_config(config_bundle, config_name)
+        
+        self.logger.info(f"💾 Saved config: {config_name}")
+        self.update_status("Configuration saved successfully", 'success')
+        return True
     
+    @handle_errors(error_msg="Failed to delete configuration", level=ErrorLevel.ERROR, reraise=True)
     def delete_config(self, name: Optional[str] = None) -> bool:
         """Delete configuration file."""
-        try:
-            config_path = self.get_config_path(name)
-            
-            if config_path.exists():
-                config_path.unlink()
-                self.logger.info(f"🗑️ Deleted config: {config_path.name}")
-                return True
-            else:
-                self.logger.warning(f"⚠️ Config not found: {config_path.name}")
-                return False
-                
-        except Exception as e:
-            self.handle_error(e, context="Deleting config")
+        config_path = self.get_config_path(name)
+        
+        if config_path.exists():
+            config_path.unlink()
+            self.logger.info(f"🗑️ Deleted config: {config_path.name}")
+            return True
+        else:
+            self.logger.warning(f"⚠️ Config not found: {config_path.name}")
             return False
+    
+    def get_config_path(self, name: Optional[str] = None) -> Path:
+        """Get path untuk config file."""
+        config_name = name or f"{self.module_name}_config"
+        
+        if self._config_dir:
+            return self._config_dir / f"{config_name}.json"
+        
+        # Use config manager default
+        return Path(self._config_manager.get_config_path(config_name))
 
 
 class SharedConfigHandler(PersistentConfigHandler):

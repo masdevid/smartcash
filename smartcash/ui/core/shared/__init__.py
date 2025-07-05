@@ -19,9 +19,9 @@ from smartcash.ui.core.shared.ui_component_manager import (
     ComponentRegistry,
     get_component_manager
 )
-from smartcash.ui.core.shared.core_shared_config_manager import (
-    CoreSharedConfigManager,
-    get_core_shared_manager
+from smartcash.ui.core.shared.shared_config_manager import (
+    SharedConfigManager,
+    get_shared_config_manager
 )
 
 # Public exports
@@ -44,6 +44,6 @@ __all__ = [
     'get_component_manager',
     
     # Config manager
-    'CoreSharedConfigManager',
-    'get_core_shared_manager',
+    'SharedConfigManager',
+    'get_shared_config_manager',
 ]

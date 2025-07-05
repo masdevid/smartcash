@@ -186,7 +186,7 @@ class MainContainer:
         """Add a new component to the container.
         
         Args:
-            component: The widget to add
+            component: The widget to add. Must be an instance of ipywidgets.Widget.
             component_type: Type of the component (header, form, action, etc.)
             name: Optional unique name for the component
             order: Optional order index (lower numbers come first)
@@ -194,7 +194,14 @@ class MainContainer:
             
         Returns:
             str: The name assigned to the component
+            
+        Raises:
+            TypeError: If component is not an instance of ipywidgets.Widget
         """
+        # Validate that component is a widget
+        if not isinstance(component, widgets.Widget):
+            raise TypeError(f"Component must be an instance of ipywidgets.Widget, got {type(component).__name__}")
+            
         if name is None:
             # Generate a unique name if not provided
             base_name = f"{component_type}_"
@@ -207,23 +214,32 @@ class MainContainer:
             # Default to the end if no order is specified
             order = len(self.containers)
         
-        # Add the component
-        self.containers[name] = {
-            'type': component_type,
-            'component': component,
-            'order': order,
-            'name': name,
-            'visible': visible
-        }
-        
-        # Update the component order
-        if visible:
-            self._update_component_order()
-        
-        # Rebuild the container
-        self._create_container()
-        
-        return name
+        try:
+            # Add the component
+            self.containers[name] = {
+                'type': component_type,
+                'component': component,
+                'order': order,
+                'name': name,
+                'visible': visible
+            }
+            
+            # Update the component order
+            if visible:
+                self._update_component_order()
+            
+            # Rebuild the container
+            self._create_container()
+            
+            return name
+            
+        except Exception as e:
+            # Clean up if something goes wrong
+            if name in self.containers:
+                del self.containers[name]
+            if name in self._component_order:
+                self._component_order.remove(name)
+            raise RuntimeError(f"Failed to add component '{name}': {str(e)}") from e
     
     def remove_component(self, name: str) -> None:
         """Remove a component from the container.
@@ -279,6 +295,22 @@ class MainContainer:
             The component widget, or None if not found
         """
         return self.containers.get(name, {}).get('component')
+    
+    def hide_component(self, name: str) -> None:
+        """Hide a component by name.
+        
+        Args:
+            name: Name of the component to hide
+        """
+        self.set_component_visibility(name, False)
+    
+    def show_component(self, name: str) -> None:
+        """Show a component by name.
+        
+        Args:
+            name: Name of the component to show
+        """
+        self.set_component_visibility(name, True)
     
     def update_section(self, section_name: str, new_content: widgets.Widget) -> None:
         """Legacy method: Update a section of the container.

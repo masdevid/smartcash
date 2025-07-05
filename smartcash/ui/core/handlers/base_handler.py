@@ -7,13 +7,15 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Union, Callable, Type, TypeVar, Tuple
 
+from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.errors import (
     SmartCashUIError,
     ErrorContext,
+    ErrorLevel,
     handle_errors,
+    safe_component_operation,
     get_error_handler
 )
-from smartcash.ui.core.errors.validators import safe_component_operation
 
 T = TypeVar('T')
 
@@ -67,6 +69,11 @@ class BaseHandler(ABC):
     @property
     def last_error(self) -> Optional[str]:
         return self._last_error
+        
+    @property
+    def error_handler(self):
+        """Get the error handler instance."""
+        return self._error_handler
     
     from contextlib import contextmanager
 
@@ -136,22 +143,34 @@ class BaseHandler(ABC):
             self.handle_error(error_msg, exc_info=True, error_details=str(e))
 
     @handle_errors(context_attr='_error_context')
-    def handle_error(self, error_msg: str, exc_info: bool = False, **kwargs) -> None:
+    def handle_error(self, error_msg: str = None, error: Exception = None, exc_info: bool = False, **kwargs) -> None:
         """Handle errors with proper logging and state management.
         
         Args:
-            error_msg: Error message to log
+            error_msg: Error message to log (alternative to error parameter)
+            error: Exception object (alternative to error_msg)
             exc_info: If True, log exception info
             **kwargs: Additional context for the error
             
         Raises:
             SmartCashUIError: Always raises this error type for consistent error handling
         """
+        # Support both error_msg and error parameters for backward compatibility
+        if error is not None and error_msg is None:
+            error_msg = str(error)
+        elif error_msg is None:
+            error_msg = "An unknown error occurred"
+            
         self._error_count += 1
         self._last_error = error_msg
         
-        # Update error context
+        # Update error context with any additional kwargs
         self._error_context.details.update(kwargs)
+        
+        # If we have an actual exception, include its details
+        if error is not None:
+            self._error_context.details['exception_type'] = error.__class__.__name__
+            self._error_context.details['exception_args'] = str(error.args) if error.args else ''
         
         # Log error through error handler
         error_context = ErrorContext(
@@ -159,16 +178,16 @@ class BaseHandler(ABC):
             operation="handle_error",
             details={
                 'error_message': error_msg,
-                **kwargs
+                **self._error_context.details
             }
         )
         
-        if exc_info:
+        if exc_info or error is not None:
             self._error_handler.handle_exception(
                 error_msg,
                 error_level='ERROR',
                 context=error_context,
-                exc_info=True
+                exc_info=exc_info or error is not None
             )
         else:
             self._error_handler.log_error(

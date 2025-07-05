@@ -67,6 +67,15 @@ class FormItem:
         self.grid_area = grid_area
         self.justify_content = justify_content
         self.align_items = self._validate_align_items(align_items)
+        
+        # Ensure the widget has a layout
+        if not hasattr(self.widget, 'layout') or self.widget.layout is None:
+            self.widget.layout = widgets.Layout()
+    
+    @property
+    def layout(self):
+        """Return the widget's layout."""
+        return self.widget.layout
 
 def create_form_container(
     layout_type: Union[LayoutType, str] = LayoutType.COLUMN,
@@ -98,72 +107,41 @@ def create_form_container(
             - 'add_item': Method to add items to the form
             - 'set_layout': Method to change layout dynamically
     """
-    # Convert string layout type to enum if needed
-    if isinstance(layout_type, str):
-        layout_type = LayoutType[layout_type.upper()]
-    
-    # Store items to maintain order and configuration
-    form_items: List[FormItem] = []
-    
-    # Create layout based on type
+    state = {
+        'layout_type': LayoutType[layout_type.upper()] if isinstance(layout_type, str) else layout_type,
+        'form_items': [],
+        'form_container': None,
+        'grid_columns': grid_columns,
+        'grid_template_areas': grid_template_areas,
+        'grid_auto_flow': grid_auto_flow,
+        'container_padding': container_padding,
+        'gap': gap
+    }
+    state.update(layout_kwargs)
+
     def create_layout():
-        # Create a copy of layout_kwargs without padding to avoid duplicates
-        layout_kwargs_copy = layout_kwargs.copy()
-        if 'padding' in layout_kwargs_copy:
-            layout_kwargs_copy.pop('padding')
-            
-        if layout_type == LayoutType.COLUMN:
-            return widgets.VBox(
-                layout=widgets.Layout(
-                    width='100%',
-                    padding=container_padding,
-                    gap=gap,
-                    **layout_kwargs_copy
-                )
-            )
-        elif layout_type == LayoutType.ROW:
-            return widgets.HBox(
-                layout=widgets.Layout(
-                    width='100%',
-                    padding=container_padding,
-                    gap=gap,
-                    flex_flow='row wrap',
-                    **layout_kwargs_copy
-                )
-            )
-        else:  # GRID
-            grid_template_columns = (
-                f"repeat({grid_columns}, 1fr)" 
-                if isinstance(grid_columns, int) 
-                else grid_columns or "1fr"
-            )
-            
-            return widgets.GridBox(
-                layout=widgets.Layout(
-                    width='100%',
-                    padding=container_padding,
-                    gap=gap,
-                    grid_template_columns=grid_template_columns,
-                    grid_template_areas=' '.join(f'"{area}"' for area in grid_template_areas) if grid_template_areas else None,
-                    grid_auto_flow=grid_auto_flow,
-                    **layout_kwargs_copy
-                )
-            )
-    
-    # Create form container
-    form_container = create_layout()
-    
-    # Create main container
-    container = widgets.VBox(
-        [form_container],
-        layout=widgets.Layout(
-            width='100%',
-            margin=container_margin,
-            padding='0',
-            overflow='visible'
-        )
-    )
-    
+        l_type = state['layout_type']
+        layout_props = {
+            'width': '100%',
+            'padding': state['container_padding'],
+            'gap': state['gap'],
+            **{k: v for k, v in state.items() if k not in ['layout_type', 'form_items', 'form_container', 'grid_columns', 'grid_template_areas', 'grid_auto_flow', 'container_padding', 'gap']}
+        }
+
+        if l_type == LayoutType.COLUMN:
+            return widgets.VBox([], layout=widgets.Layout(display='flex', flex_flow='column', align_items='stretch', **layout_props))
+        elif l_type == LayoutType.ROW:
+            layout_props['flex_flow'] = 'row wrap'
+            return widgets.HBox([], layout=widgets.Layout(display='flex', **layout_props))
+        elif l_type == LayoutType.GRID:
+            if state['grid_columns']:
+                layout_props['grid_template_columns'] = f"repeat({state['grid_columns']}, 1fr)" if isinstance(state['grid_columns'], int) else state['grid_columns']
+            if state['grid_template_areas']:
+                layout_props['grid_template_areas'] = ' '.join([f'"{area}"' for area in state['grid_template_areas']])
+            if state['grid_auto_flow']:
+                layout_props['grid_auto_flow'] = state['grid_auto_flow']
+            return widgets.GridBox([], layout=widgets.Layout(display='grid', **layout_props))
+
     def add_item(
         widget: Union[widgets.Widget, FormItem],
         width: Optional[str] = None,
@@ -186,93 +164,53 @@ def create_form_container(
             align_items: Align items for the item's container
             index: Position to insert the item (None for append)
         """
-        if isinstance(widget, FormItem):
-            form_item = widget
-        else:
-            form_item = FormItem(
+        if not isinstance(widget, FormItem):
+            widget = FormItem(
                 widget=widget,
-                width=width,
-                height=height,
-                flex=flex,
-                grid_area=grid_area,
-                justify_content=justify_content,
-                align_items=align_items
+                width=width, height=height, flex=flex, grid_area=grid_area,
+                justify_content=justify_content, align_items=align_items
             )
         
-        # Configure widget layout
-        widget_layout = widget.layout if widget.layout else {}
-        
-        if layout_type == LayoutType.GRID and form_item.grid_area:
-            widget_layout.grid_area = form_item.grid_area
-        
-        if form_item.width:
-            widget_layout.width = form_item.width
-        if form_item.height:
-            widget_layout.height = form_item.height
-        
-        # Add to items list and update container
         if index is not None:
-            form_items.insert(index, form_item)
+            state['form_items'].insert(index, widget)
         else:
-            form_items.append(form_item)
+            state['form_items'].append(widget)
         
         update_container()
     
     def update_container():
         """Update the container with current items and layout."""
         children = []
-        
-        for item in form_items:
-            # Create a container for each item to support individual layout
-            item_container = widgets.Box(
-                [item.widget],
-                layout=widgets.Layout(
-                    width=item.width if layout_type != LayoutType.GRID else '100%',
-                    height=item.height,
-                    flex=item.flex if layout_type != LayoutType.GRID else None,
-                    justify_content=item.justify_content,
-                    align_items=item.align_items,
-                    overflow='visible'
-                )
-            )
-            
-            if layout_type == LayoutType.GRID and item.grid_area:
-                item_container.layout.grid_area = item.grid_area
-            
-            children.append(item_container)
-        
-        form_container.children = children
+        for item in state['form_items']:
+            item.widget.layout.width = item.width
+            item.widget.layout.height = item.height
+            if state['layout_type'] == LayoutType.GRID:
+                item.widget.layout.grid_area = item.grid_area
+            else:
+                item.widget.layout.flex = item.flex
+            children.append(item.widget)
+        state['form_container'].children = tuple(children)
     
     def set_layout(
         new_layout_type: Union[LayoutType, str],
-        **layout_kwargs
+        **kwargs
     ) -> None:
-        """Change the layout type dynamically.
-        
-        Args:
-            new_layout_type: New layout type (COLUMN, ROW, or GRID)
-            **layout_kwargs: Additional layout properties
-        """
-        nonlocal form_container, layout_type
-        
-        # Update layout type
-        if isinstance(new_layout_type, str):
-            new_layout_type = LayoutType[new_layout_type.upper()]
-        layout_type = new_layout_type
-        
-        # Create new container with the same items
-        old_children = form_container.children
-        form_container = create_layout()
-        container.children = [form_container]
-        
-        # Re-add all items
-        for item in form_items:
-            add_item(item)
+        """Change the layout type dynamically."""
+        state['layout_type'] = LayoutType[new_layout_type.upper()] if isinstance(new_layout_type, str) else new_layout_type
+        state.update(kwargs)
+        state['form_container'] = create_layout()
+        container.children = (state['form_container'],)
+        update_container()
     
+    container = widgets.Box(
+        layout=widgets.Layout(width='100%', margin=container_margin, padding='0', overflow='visible')
+    )
+    set_layout(state['layout_type'])
+
     return {
         'container': container,
-        'form_container': form_container,
         'add_item': add_item,
         'set_layout': set_layout,
-        'items': form_items  # Expose items for advanced manipulation
+        'get_form_container': lambda: state['form_container'],
+        'get_items': lambda: state['form_items']
     }

@@ -7,9 +7,9 @@ Extends BaseInitializer dengan config loading dan validation.
 from typing import Dict, Any, Optional, Type, List
 from pathlib import Path
 
+from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.initializers.base_initializer import BaseInitializer
 from smartcash.ui.core.handlers.config_handler import SharedConfigHandler, ConfigHandler as LegacyConfigHandler
-
 
 class ConfigurableInitializer(BaseInitializer):
     """Initializer dengan configuration management.
@@ -114,34 +114,27 @@ class ConfigurableInitializer(BaseInitializer):
             self.logger.error(f"❌ Failed to load config: {e}")
             return False
     
-    def save_config(self, name: Optional[str] = None) -> bool:
-        """Save configuration ke file.
-        
-        Args:
-            name: Optional config name
-            
-        Returns:
-            True jika berhasil save
-        """
-        try:
-            # Extract dari UI dulu jika ada
-            if hasattr(self.config_handler, 'extract_config_from_ui'):
-                self.config_handler.sync_config_with_ui()
-            
-            # Save
-            if hasattr(self.config_handler, 'save_config'):
-                return self.config_handler.save_config(name)
+    def save_config(self) -> bool:
+        """Save current configuration."""
+        @handle_errors(error_msg="Failed to save configuration", level=ErrorLevel.ERROR, reraise=True)
+        def _save_config():
+            if self.config_handler.save_config():
+                self.logger.info("💾 Configuration saved")
+                return True
             else:
-                self.logger.warning("⚠️ Config handler doesn't support saving")
+                self.logger.warning("⚠️ Configuration save failed")
                 return False
-                
-        except Exception as e:
+        
+        try:
+            return _save_config()
+        except SmartCashUIError as e:
             self.logger.error(f"❌ Failed to save config: {e}")
             return False
     
     def reset_config(self) -> None:
         """Reset configuration ke defaults."""
-        try:
+        @handle_errors(error_msg="Failed to reset configuration", level=ErrorLevel.ERROR, reraise=True)
+        def _reset_config():
             self.config_handler.reset_config()
             
             # Update UI jika ada
@@ -149,9 +142,12 @@ class ConfigurableInitializer(BaseInitializer):
                 self.config_handler.update_ui_from_config(self.config)
                 
             self.logger.info("🔄 Configuration reset to defaults")
-            
-        except Exception as e:
+        
+        try:
+            _reset_config()
+        except SmartCashUIError as e:
             self.logger.error(f"❌ Failed to reset config: {e}")
+            raise
     
     # === Config Validation ===
     

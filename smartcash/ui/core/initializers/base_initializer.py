@@ -6,9 +6,12 @@ Deskripsi: Base initializer dengan fail-fast principle dan centralized error han
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Type, TypeVar, Callable
 
+from smartcash.ui.logger import get_module_logger
+
 from smartcash.ui.core.errors import (
     SmartCashUIError,
     ErrorContext,
+    ErrorLevel,
     handle_errors,
     safe_component_operation,
     get_error_handler
@@ -135,11 +138,12 @@ class BaseInitializer(ABC):
             # Update context for the operation
             self._error_context.operation = "initialize"
             self._error_context.details.update({
-                'initialization_args': args,
-                'initialization_kwargs': kwargs
+                'module': self.module_name,
+                'args': str(args),
+                'kwargs': str(kwargs)
             })
             
-            self.logger.info(f"🚀 Starting initialization of {self.module_name}")
+            # Call implementation
             self._initialization_result = self._initialize_impl(*args, **kwargs)
             self._is_initialized = True
             self.logger.info(f"✅ Successfully initialized {self.module_name}")

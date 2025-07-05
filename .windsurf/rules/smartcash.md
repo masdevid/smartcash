@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-Always start new conversation by activate conda env "smartcash"
+Always start new conversation by conda init & activate conda env "smartcash" `cd /Users/masdevid/Projects/smartcash && conda init zsh && conda activate smartcash`
 
 ## DONT'S:
 - Don't use threading on colab environment
@@ -10,6 +10,10 @@ Always start new conversation by activate conda env "smartcash"
 
 ## DO:
 - Always consider colab environment compatibility and limitation
+- Use `smartcash/ui/logger` for UI related logs or any modules under `smartcash/ui`
+- Use `smartcash/common/logger` for non-UI logs
+- Common logger no save to file, save to file only model builder verbose logs related. 
+- Check and use existing test_helpers before creating new test. 
 
 ## Performance 
 - Use ThreadPoolExecutor or ProcessPoolExecutor for parallelism.

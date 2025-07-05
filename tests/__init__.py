@@ -1,5 +1,1 @@
-"""
-Test package for SmartCash
-"""
-
-__version__ = '0.1.0'
+# This file makes Python treat the directory as a package

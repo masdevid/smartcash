@@ -490,6 +490,9 @@ class OperationContainer(BaseUIComponent):
         if self.log_accordion:
             self.log_accordion.log(message, level)
     
+    # Alias for backward compatibility
+    log_message = log
+    
     def debug(self, message: str) -> None:
         """Log a debug message."""
         self.log(message, LogLevel.DEBUG)

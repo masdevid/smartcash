@@ -180,7 +180,10 @@ class OperationContainer(BaseUIComponent):
         
         # 3. Add log accordion if enabled (bottom)
         if self.log_accordion:
-            children.append(self.log_accordion.container)
+            # Use show() method to get the container widget
+            log_widget = self.log_accordion.show()
+            if log_widget is not None:
+                children.append(log_widget)
         
         # Create the main container with all components in order
         self.container = widgets.VBox(

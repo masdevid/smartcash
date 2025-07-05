@@ -204,13 +204,25 @@ class FooterContainer:
             )
         )
         
-        # Create the main container
+        # Merge layout_config and style, with style taking precedence
+        merged_layout = self.layout_config.copy()
+        
+        # Remove padding from style if it exists to avoid duplicates
+        if 'padding' in self.style:
+            style = self.style.copy()
+            style_padding = style.pop('padding')
+            # Only use the style padding if padding isn't already in layout_config
+            if 'padding' not in merged_layout:
+                merged_layout['padding'] = style_padding
+            # Merge the rest of the style
+            merged_layout.update(style)
+        else:
+            merged_layout.update(self.style)
+        
+        # Create the main container with the merged layout
         self.container = widgets.VBox(
             [flex_container],
-            layout=widgets.Layout(
-                **self.layout_config,
-                **self.style
-            )
+            layout=widgets.Layout(**merged_layout)
         )
     
     def show_panel(self, panel_id: str, visible: bool = True) -> None:

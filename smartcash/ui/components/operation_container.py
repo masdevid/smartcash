@@ -463,6 +463,9 @@ class OperationContainer(BaseUIComponent):
                 ok_text=ok_text
             )
     
+    # Alias for backward compatibility
+    show_info_dialog = show_info
+    
     def clear_dialog(self) -> None:
         """Clear any currently displayed dialog."""
         if self.dialog_area:

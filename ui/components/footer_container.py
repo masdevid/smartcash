@@ -179,11 +179,15 @@ class FooterContainer:
             return
             
         # Create a horizontal box for the panels
-        panel_widgets = [
-            panel['widget'].container 
-            for panel in self._panels.values()
-            if panel['widget'] is not None
-        ]
+        panel_widgets = []
+        for panel in self._panels.values():
+            if panel['widget'] is not None:
+                # Use show() method to get the widget container
+                widget = panel['widget']
+                if hasattr(widget, 'show') and callable(widget.show):
+                    panel_widgets.append(widget.show())
+                elif hasattr(widget, 'container'):
+                    panel_widgets.append(widget.container)
         
         if not panel_widgets:
             return

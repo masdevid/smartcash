@@ -109,13 +109,20 @@ class OperationContainer(BaseUIComponent):
         self.dialog_area = None
         
         # Create UI components
-        self._create_components(progress_config)
+        self._create_ui_components(progress_config)
         
         # Initialize dialog area (must be before creating container)
         self._init_dialog_area()
     
-    def _create_components(self, progress_config: Optional[ProgressConfig] = None) -> None:
-        """Create and initialize UI components."""
+    def _create_ui_components(self, progress_config: Optional[ProgressConfig] = None) -> None:
+        """Create and initialize UI components.
+        
+        This method is called by BaseUIComponent.initialize() and should set up
+        all UI components used by this container.
+        
+        Args:
+            progress_config: Optional configuration for the progress tracker
+        """
         # Create progress tracker if enabled
         if self.show_progress:
             # Create progress tracker with the specified number of levels

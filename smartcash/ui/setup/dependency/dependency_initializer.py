@@ -52,8 +52,16 @@ class DependencyInitializer(ModuleInitializer):
         """Get default dependency configuration"""
         return get_default_dependency_config()
     
-    def initialize(self) -> Dict[str, Any]:
-        """🚀 Initialize dependency module - implements abstract method"""
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """🚀 Initialize dependency module - implements abstract method
+        
+        Args:
+            config: Optional configuration to use for initialization. If not provided,
+                   default configuration will be used.
+                   
+        Returns:
+            Dict containing initialization results including UI components and handlers
+        """
         try:
             self.logger.info("🚀 Memulai inisialisasi modul dependensi...")
             
@@ -63,7 +71,8 @@ class DependencyInitializer(ModuleInitializer):
             
             # Configuration phase
             with self._log_step("Load konfigurasi"):
-                config = self.get_default_config()
+                if config is None:
+                    config = self.get_default_config()
             
             # UI components phase
             with self._log_step("Membuat komponen UI"):

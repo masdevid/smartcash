@@ -144,13 +144,22 @@ class ModuleInitializer(ConfigurableInitializer):
                 
         except Exception as e:
             # Handle initialization error
-            error_handler = cls(
-                module_name=module_name,
-                parent_module=parent_module,
-                **kwargs
-            )
-            error_result = error_handler.handle_initialization_error(e, f"initializing {module_name} UI")
-            return error_result.get('ui')
+            try:
+                # Try to create an instance of the provided initializer class or use the default
+                initializer_cls = initializer_class or cls
+                error_handler = initializer_cls(
+                    module_name=module_name,
+                    parent_module=parent_module,
+                    **kwargs
+                )
+                error_result = error_handler.handle_initialization_error(e, f"initializing {module_name} UI")
+                return error_result.get('ui')
+            except Exception as inner_e:
+                # If we can't create the error handler, return a simple error message
+                import traceback
+                error_msg = f"Failed to initialize {module_name} UI and error handling failed: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+                from IPython.display import HTML
+                return HTML(f'<div style="color: red; padding: 10px; border: 1px solid red;">{error_msg}</div>')
     
     # === Error Handling ===
     

@@ -68,10 +68,6 @@ class FooterContainer:
         if panels:
             for panel in panels:
                 self.add_panel(panel)
-        
-        # Initialize tips if enabled
-        if show_tips:
-            self._init_tips(tips_title, tips_content)
     
     def add_panel(self, config: PanelConfig) -> str:
         """Add a new panel to the footer.

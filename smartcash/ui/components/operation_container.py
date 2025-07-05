@@ -51,7 +51,7 @@ def create_operation_container(
     return {
         'container': container.container,
         'progress_tracker': container.progress_tracker if show_progress else None,
-        'dialog': container.dialog if show_dialog else None,
+        'dialog_area': container.dialog_area if show_dialog else None,
         'log_accordion': container.log_accordion if show_logs else None,
         'show_dialog': container.show_dialog,
         'show_info_dialog': container.show_info_dialog,

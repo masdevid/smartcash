@@ -16,6 +16,40 @@ class LayoutType(Enum):
 
 class FormItem:
     """Wrapper for form items with optional layout configuration."""
+    
+    @staticmethod
+    def _validate_align_items(value: Optional[str]) -> str:
+        """Validate and normalize align_items value.
+        
+        Args:
+            value: The align_items value to validate
+            
+        Returns:
+            str: A valid flexbox align-items value
+        """
+        if not value:
+            return 'stretch'
+            
+        valid_values = {
+            'flex-start', 'flex-end', 'center', 
+            'baseline', 'stretch', 'inherit', 'initial', 'unset'
+        }
+        
+        # Map common aliases to valid values
+        alias_map = {
+            'left': 'flex-start',
+            'right': 'flex-end',
+            'middle': 'center'
+        }
+        
+        # Convert to lowercase and check if it's a known alias
+        normalized = str(value).lower()
+        if normalized in alias_map:
+            return alias_map[normalized]
+            
+        # Return the value if valid, otherwise default to 'stretch'
+        return value if value in valid_values else 'stretch'
+    
     def __init__(
         self,
         widget: widgets.Widget,
@@ -32,7 +66,7 @@ class FormItem:
         self.flex = flex
         self.grid_area = grid_area
         self.justify_content = justify_content
-        self.align_items = align_items
+        self.align_items = self._validate_align_items(align_items)
 
 def create_form_container(
     layout_type: Union[LayoutType, str] = LayoutType.COLUMN,

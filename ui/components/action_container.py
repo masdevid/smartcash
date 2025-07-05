@@ -88,9 +88,16 @@ def create_action_container(
             container.add_button(**btn_config)
             button_widgets[btn_id] = container.get_button(btn_id)
     
-    # Apply alignment
-    if alignment != 'center':
-        container.container.layout.align_items = alignment
+    # Apply alignment with proper flexbox values
+    alignment_map = {
+        'left': 'flex-start',
+        'center': 'center',
+        'right': 'flex-end'
+    }
+    
+    # Default to 'center' if invalid alignment is provided
+    flex_align = alignment_map.get(alignment, 'center')
+    container.container.layout.align_items = flex_align
     
     # Add title if provided
     if title:

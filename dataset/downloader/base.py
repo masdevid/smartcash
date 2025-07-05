@@ -124,6 +124,7 @@ class ProgressTracker:
         self._callback = None
         self.current_step = ""
         self.overall_progress = 0
+        self.progress_bar = None  # Add progress_bar attribute for UI compatibility
     
     def set_callback(self, callback: Callable) -> None:
         self._callback = callback

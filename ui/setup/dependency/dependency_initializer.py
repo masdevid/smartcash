@@ -33,11 +33,6 @@ class DependencyInitializer(ModuleInitializer):
         self._current_packages = None
         self.logger.info(f"🛠️ DependencyInitializer dibuat untuk modul: {module_name}")
     
-    def __del__(self) -> None:
-        """Cleanup resources."""
-        # Cleanup will be handled by parent class
-        super().__del__()
-    
     def get_default_config(self) -> Dict[str, Any]:
         """Get default dependency configuration"""
         return get_default_dependency_config()
@@ -333,8 +328,7 @@ _dependency_initializer: Optional[DependencyInitializer] = None
 def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
     """🚀 Initialize dependency UI - main entry point
     
-    This is a thin wrapper around ModuleInitializer.initialize_module_ui that provides
-    backward compatibility with existing code.
+    This function ensures only one instance of the dependency UI is created and displayed.
     
     Args:
         config (Optional[Dict[str, Any]]): Configuration dictionary for initialization.
@@ -342,12 +336,24 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
     Returns:
         Any: The main UI container widget to be displayed.
     """
+    global _dependency_initializer
+    
+    # If we already have an initialized instance, return its UI
+    if _dependency_initializer is not None and hasattr(_dependency_initializer, '_ui_components'):
+        return _dependency_initializer._ui_components.get('ui')
+    
+    # Otherwise, create a new instance using ModuleInitializer
     from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
     
     # Use the centralized initialization
-    return ModuleInitializer.initialize_module_ui(
+    result = ModuleInitializer.initialize_module_ui(
         module_name='dependency',
         parent_module='setup',
         config=config,
         initializer_class=DependencyInitializer
     )
+    
+    # Store the initializer instance for future use
+    _dependency_initializer = ModuleInitializer.get_module_instance('dependency', 'setup')
+    
+    return result

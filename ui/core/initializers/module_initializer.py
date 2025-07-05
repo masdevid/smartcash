@@ -29,6 +29,20 @@ class ModuleInitializer(ConfigurableInitializer):
     # Class-level storage for module instances
     _module_instances = {}
     
+    def __del__(self):
+        """Cleanup resources during garbage collection.
+        
+        This method is called when the object is about to be destroyed.
+        It ensures proper cleanup of resources and calls the parent's __del__ if it exists.
+        """
+        try:
+            # Only call parent's __del__ if it exists
+            if hasattr(super(), '__del__'):
+                super().__del__()
+        except Exception:
+            # Prevent any exceptions during cleanup from being raised
+            pass
+            
     def __init__(self, 
                  module_name: str, 
                  parent_module: Optional[str] = None,

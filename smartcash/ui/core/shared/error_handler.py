@@ -26,6 +26,13 @@ class CoreErrorHandler:
         self._error_count = 0
         self._last_error = None
         
+    def _display_widget(self, widget: Any) -> Any:
+        """Helper to display and return a widget if it's not None."""
+        if widget is not None:
+            from IPython.display import display
+            display(widget)
+        return widget
+
     def create_error_ui(self, error_result: Dict[str, Any]) -> Optional[Any]:
         """Create and display error UI component.
         
@@ -43,24 +50,33 @@ class CoreErrorHandler:
             return None
             
         try:
-            container = error_result.get('container')
-            if container is not None:
-                return container
-                
-            # Create a new error component
-            from IPython.display import display
+            # Handle BaseUIComponent instances or objects with show() method
+            if hasattr(error_result, 'show') and callable(error_result.show):
+                return self._display_widget(error_result.show())
+            
+            # Handle dictionary with 'container' key
+            if isinstance(error_result, dict):
+                container = error_result.get('container')
+                if container is not None:
+                    return (self._display_widget(container.show()) 
+                           if hasattr(container, 'show') and callable(container.show) 
+                           else container)
+            
+            # Create a new error component as fallback
             from smartcash.ui.components.error import create_error_component
             
             error_component = create_error_component(
-                error_message=error_result.get('message', 'An unknown error occurred'),
-                traceback=error_result.get('traceback'),
+                error_message=error_result.get('message', 'An unknown error occurred') if isinstance(error_result, dict) else str(error_result),
+                traceback=error_result.get('traceback') if isinstance(error_result, dict) else None,
                 title="Error",
                 error_type="error"
             )
             
-            if error_component and 'container' in error_component:
-                display(error_component['container'])
-                return error_component['container']
+            if error_component:
+                if hasattr(error_component, 'show') and callable(error_component.show):
+                    return self._display_widget(error_component.show())
+                elif isinstance(error_component, dict) and 'container' in error_component:
+                    return self._display_widget(error_component['container'])
                 
         except Exception as e:
             self.logger.error(f"❌ Failed to create error UI: {e}")

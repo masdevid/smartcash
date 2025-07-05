@@ -154,7 +154,7 @@ def create_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker
         border_radius='8px',
         padding='10px',
         background_color='#fafafa' if is_selected else 'white',
-        align_items='center'
+        align_items='flex-start'
     ))
     
     # Update container style berdasarkan selection

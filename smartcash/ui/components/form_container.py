@@ -107,13 +107,18 @@ def create_form_container(
     
     # Create layout based on type
     def create_layout():
+        # Create a copy of layout_kwargs without padding to avoid duplicates
+        layout_kwargs_copy = layout_kwargs.copy()
+        if 'padding' in layout_kwargs_copy:
+            layout_kwargs_copy.pop('padding')
+            
         if layout_type == LayoutType.COLUMN:
             return widgets.VBox(
                 layout=widgets.Layout(
                     width='100%',
                     padding=container_padding,
                     gap=gap,
-                    **layout_kwargs
+                    **layout_kwargs_copy
                 )
             )
         elif layout_type == LayoutType.ROW:
@@ -123,7 +128,7 @@ def create_form_container(
                     padding=container_padding,
                     gap=gap,
                     flex_flow='row wrap',
-                    **layout_kwargs
+                    **layout_kwargs_copy
                 )
             )
         else:  # GRID
@@ -141,7 +146,7 @@ def create_form_container(
                     grid_template_columns=grid_template_columns,
                     grid_template_areas=' '.join(f'"{area}"' for area in grid_template_areas) if grid_template_areas else None,
                     grid_auto_flow=grid_auto_flow,
-                    **layout_kwargs
+                    **layout_kwargs_copy
                 )
             )
     

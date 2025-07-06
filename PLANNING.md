@@ -1,7 +1,15 @@
-# Refactoring Plan: UI Initialization System
+# SmartCash Development Plan
 
 ## Overview
-This document outlines the strategy for refactoring the initialization system to align with the new UI Core patterns while maintaining backward compatibility with existing forms and workflows.
+Dokumen ini menjelaskan strategi pengembangan SmartCash dengan fokus pada:
+1. Menyelesaikan fungsionalitas form UI yang sudah ada
+2. Melanjutkan pengembangan modul model/**
+3. Mengembangkan modul visualisasi sebagai tahap terakhir
+
+## Fokus Utama
+- **UI Forms**: Memastikan semua form UI yang sudah ada berfungsi dengan baik
+- **Modul Model**: Mengembangkan fitur-fitur terkait model machine learning
+- **Visualisasi**: Pengembangan visualisasi data dan hasil model (tahap terakhir)
 
 ## Architecture
 

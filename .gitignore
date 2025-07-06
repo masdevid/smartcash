@@ -82,6 +82,8 @@ ENV/
 
 # Project data and backups
 backup/
+backups/
+backups.bak/
 data/
 !.vscode/settings.json
 !.vscode/tasks.json

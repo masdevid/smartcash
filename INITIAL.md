@@ -2,7 +2,44 @@
 
 ## FEATURE:
 
-Build Colab IPython widget interfaces for YOLOv5 object detection algorithm by integrating it with the EfficientNet-B4 architecture as a backbone to improve the detection of currency denomination in Rupiah.
+A modular deep learning pipeline for Rupiah currency detection, featuring a YOLOv5-based architecture with support for multiple backbones (CSPDarknet and EfficientNet-B4) through a flexible factory pattern. The implementation includes comprehensive data preprocessing, model training, and evaluation pipelines, all accessible through an intuitive Colab interface.
+
+## ⚠️ Technical Constraints
+
+- **Input Resolution**: Fixed at 640x640 pixels
+- **Backbone Options**: CSPDarknet or EfficientNet-B4
+- **Test Scenarios**:
+  - Single currency detection
+  - Multiple currency detection
+  - Various lighting conditions
+  - Different angles and orientations
+- **Supported Formats**:
+  - Images: JPG/PNG (RGB)
+  - Annotations: YOLO format
+- **Minimum Requirements**:
+  - 8GB RAM, 2GB VRAM GPU
+  - Python 3.8+, PyTorch 1.7.0+
+  - CUDA 11.0+ for GPU acceleration
+
+### Cells to Create:
+
+1. **Setup & Configuration**
+   - `cell_1_1_repo_clone.py`: Clone the repository and set up the environment
+   - `cell_1_2_colab.py`: Configure Colab-specific settings and requirements
+   - `cell_1_3_dependency.py`: Install and verify dependencies
+
+2. **Data Processing**
+   - `cell_2_1_downloader.py`: Download from Roboflow and organize the dataset
+   - `cell_2_2_split.py`: Split data into training, validation, and test sets configuration cell
+   - `cell_2_3_preprocess.py`: Preprocess images and annotations
+   - `cell_2_4_augment.py`: Apply data augmentation techniques
+   - `cell_2_5_visualize.py`: Visualize dataset samples and annotations
+
+3. **Model Training**
+   - `cell_3_1_pretrained.py`: Download -> Sync pretrained model for later use
+   - `cell_3_2_backbone.py`: Set up EfficientNet-B4 backbone for YOLOv5
+   - `cell_3_3_train.py`: Train the model with configurable parameters
+   - `cell_3_4_evaluate.py`: Evaluate model performance on test set
 
 ## EXAMPLES:
 
@@ -39,21 +76,47 @@ Build Colab IPython widget interfaces for YOLOv5 object detection algorithm by i
    - Research objectives and methodology for Rupiah currency detection
    - Implementation of YOLOv5 and EfficientNet-B4 hybrid approach
    - Performance optimization strategies
+   - System requirements and dependencies
 
-2. **Dataset Preparation** (`docs/dataset/README.md`)
-   - Image specifications: 640x640px, JPG/JPEG, RGB
-   - Label format: YOLO txt format with class IDs for Rupiah denominations
-   - Dataset structure and organization
+2. **Backend Architecture** (`docs/backend/`)
+   - Model Training Pipeline (`MODEL_TRAINING_PIPELINE.md`)
+   - Model Evaluation Pipeline (`MODEL_EVALUATION_PIPELINE.md`)
+   - Data Augmentation API (`AUGMENTATION_API.md`)
+   - Data Downloader API (`DOWNLOADER_API.md`)
+   - Preprocessing API (`PREPROCESSING_API.md`)
+   - Model Analysis & Reporting (`MODEL_ANALYSIS_REPORTING_PIPELINE.md`)
+   - Core Model Components (`MODEL_CORE.md`)
 
-3. **Preprocessing Pipeline** (`docs/dataset/PREPROCESSING.md`)
-   - Image resizing and normalization
-   - Data augmentation techniques
-   - Dataset splitting (train/validation/test)
+3. **Dataset Management** (`docs/dataset/`)
+   - Dataset Preparation (`README.md`)
+     - Image specifications: 640x640px, JPG/JPEG, RGB
+     - Label format: YOLO txt format with class IDs for Rupiah denominations
+     - Dataset structure and organization
+   - Preprocessing Pipeline (`PREPROCESSING.md`)
+     - Image resizing and normalization
+     - Data augmentation techniques
+     - Dataset splitting (train/validation/test)
 
 4. **Technical Architecture** (`docs/technical/`)
-   - System architecture (`ARSITEKTUR.md`)
-   - Model specifications (`MODEL.md`)
-   - Evaluation methodology (`EVALUASI.md`)
+   - System Architecture (`ARSITEKTUR.md`)
+   - Model Specifications (`MODEL.md`)
+   - Evaluation Methodology (`EVALUASI.md`)
+   - Dataset Documentation (`DATASET.md`)
+
+5. **Common Utilities** (`docs/common/`)
+   - Environment & Configuration Management (`ENV_AND_CONFIG_MANAGER.md`)
+   - Exception Handling (`EXCEPTIONS.md`)
+   - Logging System (`LOGGER.md`)
+   - Thread Pool Management (`THREADPOOLS.md`)
+   - Worker Utilities (`WORKER_UTILS.md`)
+
+6. **UI Components** (`docs/components/`)
+   - Base Components (`BASE_COMPONENTS.md`)
+   - Container System (`CONTAINERS.md`)
+   - Dialog System (`DIALOG.md`)
+   - Logging Components (`LOGGING.md`)
+   - Progress Tracking (`PROGRESS_TRACKER.md`)
+   - Widget Library (`WIDGETS.md`)
 
 ### External References
 1. **YOLOv5 Official Documentation**
@@ -66,5 +129,5 @@ Build Colab IPython widget interfaces for YOLOv5 object detection algorithm by i
 
 
 ## OTHER CONSIDERATIONS:
-
-
+- On commit `~/smartcash/**` will copied to active directory `~/` so colab can imports using `from smartcash.ui.xxx` instead of `from smartcash.smartcash.ui.xxx` 
+- Drive might limited in capacity, so no need excessive backups

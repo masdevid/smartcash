@@ -97,8 +97,8 @@ class DependencyInitializer(ModuleInitializer):
             
         except Exception as e:
             from smartcash.ui.core.errors.handlers import get_error_handler
-            error_handler = get_error_handler('dependency')
-            error_handler.handle_exception(e, 'initialization', fail_fast=False)
+            error_handler = get_error_handler()  # Get the global error handler
+            error_handler.handle_exception(e, 'initialization', fail_fast=False, component_name='dependency')
             self.logger.error(f"❌ Initialization failed: {str(e)}")
             return {
                 'success': False,

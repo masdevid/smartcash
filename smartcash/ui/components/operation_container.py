@@ -92,9 +92,13 @@ class OperationContainer(BaseUIComponent):
             progress_config: Configuration for the progress tracker
             log_module_name: Name of the module for logging
             log_height: Height of the log accordion
-            **kwargs: Additional arguments for BaseUIComponent
+            **kwargs: Additional arguments for BaseUIComponent (logger, error_handler)
         """
-        super().__init__(component_name, **kwargs)
+        # Filter out unexpected kwargs for BaseUIComponent
+        base_kwargs = {k: v for k, v in kwargs.items() 
+                      if k in ('logger', 'error_handler')}
+        
+        super().__init__(component_name, **base_kwargs)
         
         # Store configuration
         self.progress_levels = progress_levels

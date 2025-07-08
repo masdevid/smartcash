@@ -57,147 +57,68 @@ scripts/
 *.log
 logs/
 
-# Test coverage
+# Test configuration and coverage
+test_config*
+*.test.json
+*.test.yaml
+*.test.yml
+*.test.toml
+pytest.ini
+tox.ini
+.coveragerc
 .coverage
-htmlcov/
-
-# Prevent test files in root directory (but allow in tests/ directory)
-/test_*.py
-/*_test.py
-/run_test*.py
-/pytest.ini
-!tests/
-
-# Distribution / packaging
-.Python
-*.manifest
-*.spec
-
-# Unit test / coverage reports
+.coverage.*
+setup.cfg  # Exclude setup.cfg as it may contain test settings
+conftest.py  # Exclude test configuration files
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
-.cache
+.cache/
 nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
 
-# VS Code
-.vscode/*
-
-# Project data and backups
-backup/
-backups/
-backups.bak/
-data/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# Project specific
-*.pth
-*.pkl
-*.pth
-*.h5
-*.hdf5
-*.pt
-*.pth
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-.venv
-env/
-venv/
-ENV/
-
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Local development
-*.log
-logs/
-
-# Test coverage
-.coverage
-htmlcov/
-
-# Prevent test files in root directory (but allow in tests/ directory)
+# Test files in root directory (allowed in tests/ directory)
 /test_*.py
 /*_test.py
 /run_test*.py
-/pytest.ini
 !tests/
 
 # Distribution / packaging
-.Python
 *.manifest
 *.spec
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Virtual Environment
-venv/
-ENV/
-
 # VS Code
 .vscode/*
-
-# Project data and backups
-backup/
-backups/
-backups.bak/
-data/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Project specific
+# Project data and artifacts
+backup/
+backups/
+backups.bak/
+data/
 *.pth
 *.pkl
-*.pth
 *.h5
 *.hdf5
 *.pt
-*.pth
 *.onnx
 *.tflite
 *.pb
 
-# Dataset files
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.gif
-*.mp4
-*.avi
+# Dataset files (commonly excluded, uncomment if needed)
+# *.jpg
+# *.jpeg
+# *.png
+# *.bmp
+# *.gif
+# *.mp4
+# *.avi
 *.mov
 *.zip
 *.tar.gz

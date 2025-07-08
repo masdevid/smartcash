@@ -1,8 +1,7 @@
 """
-File: smartcash/ui/model/train/__init__.py
-Deskripsi: Entry point untuk model training
+Training module for SmartCash UI.
 """
 
-from .train_initializer import initialize_train_ui
+from .training_initializer import initialize_training_ui, get_training_initializer
 
-__all__ = ['initialize_train_ui']
+__all__ = ['initialize_training_ui', 'get_training_initializer']

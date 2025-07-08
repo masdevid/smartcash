@@ -1,4 +1,18 @@
 """
-File: smartcash/ui/dataset/split/__init__.py
-Deskripsi: Ekspor utilitas dan fungsi split dataset
+Dataset Split UI Components.
+
+This module contains UI components for the dataset split functionality,
+organized in a container-based pattern.
 """
+
+from .split_ui import create_split_ui_components
+from .ratio_section import create_ratio_section
+from .path_section import create_path_section
+from .advanced_section import create_advanced_section
+
+__all__ = [
+    'create_split_ui_components',
+    'create_ratio_section',
+    'create_path_section',
+    'create_advanced_section'
+]

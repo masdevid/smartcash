@@ -6,7 +6,7 @@ Deskripsi: Export public operation handlers untuk dependency
 from .install_operation import InstallOperationHandler
 from .update_operation import UpdateOperationHandler
 from .uninstall_operation import UninstallOperationHandler
-from .check_status_operation import CheckStatusOperationHandler
+from .check_operation import CheckStatusOperationHandler
 
 __all__ = [
     'InstallOperationHandler',

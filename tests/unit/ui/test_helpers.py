@@ -1,8 +1,44 @@
 """Test helpers for UI component tests."""
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 import contextlib
 import ipywidgets as widgets
+import logging
+import sys
+from typing import Optional, Dict, Any
+
+# Setup mock CoreErrorHandler before any imports
+class MockCoreErrorHandler:
+    """Mock for CoreErrorHandler with both get_logger and _get_logger methods."""
+    
+    def __init__(self, *args, **kwargs):
+        self._logger = logging.getLogger('mock')
+        self._error_count = 0
+        self._last_error = None
+        
+    def _get_logger(self) -> logging.Logger:
+        """Private method to get logger."""
+        return self._logger
+        
+    def get_logger(self, *args, **kwargs) -> logging.Logger:
+        """Public method to get logger."""
+        return self._get_logger()
+        
+    def handle_error(self, *args, **kwargs):
+        """Mock handle_error method."""
+        pass
+        
+    def handle_exception(self, *args, **kwargs):
+        """Mock handle_exception method."""
+        pass
+        
+    def log_error(self, *args, **kwargs):
+        """Mock log_error method."""
+        pass
+
+# Apply the mock to the module path where CoreErrorHandler is imported
+sys.modules['smartcash.ui.core.errors.handlers'] = MagicMock()
+sys.modules['smartcash.ui.core.errors.handlers'].CoreErrorHandler = MockCoreErrorHandler
 
 @contextlib.contextmanager
 def patch_ui_dependencies():

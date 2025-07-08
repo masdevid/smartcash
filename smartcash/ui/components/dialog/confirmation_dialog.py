@@ -346,39 +346,28 @@ class ConfirmationDialog(BaseUIComponent):
                 }}
                 
                 setTimeout(() => {{
-                    // Hide the dialog
-                    const container = document.querySelector('.confirmation-area');
-                    if (container) {{
-                        container.style.transition = 'all 0.3s ease';
-                        container.style.height = '0';
-                        container.style.minHeight = '0';
-                        container.style.maxHeight = '0';
-                        container.style.padding = '0';
-                        container.style.margin = '0';
-                        container.style.overflow = 'hidden';
-                        container.style.border = 'none';
-                    }}
-                    
-                    // Execute the appropriate callback
+                    // Execute callback via Jupyter kernel
                     if (window.jupyter && window.jupyter.notebook && window.jupyter.notebook.kernel) {{
                         const code = `
-from IPython.display import clear_output
-from smartcash.ui.components.dialog.confirmation_dialog import clear_dialog_area
+# Execute dialog callback
+import time
+dialog_instance = None
+for key, value in globals().items():
+    if hasattr(value, '__class__') and 'ConfirmationDialog' in str(value.__class__):
+        if hasattr(value, '_callbacks') and value._callbacks:
+            dialog_instance = value
+            break
 
-# Clear the output
-if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-    with ui_components['confirmation_area']:
-        clear_output(wait=True)
-
-# Execute the callback
-if '${action_type}' in ui_components._callbacks and ui_components._callbacks['${action_type}']:
-    try:
-        ui_components._callbacks['${action_type}']()
-    except Exception as e:
-        print(f"⚠️ Error in ${action_type} callback: {str(e) if 'e' in locals() else 'Unknown error'}")
-
-# Clear callbacks
-ui_components._callbacks = {{}}
+if dialog_instance and hasattr(dialog_instance, '_callbacks'):
+    callback = dialog_instance._callbacks.get('${action_type}')
+    if callback and callable(callback):
+        try:
+            callback()
+        except Exception as e:
+            print(f"⚠️ Error in ${action_type} callback: {{e}}")
+    
+    # Hide the dialog and clean up
+    dialog_instance.hide()
 `;
                         window.jupyter.notebook.kernel.execute(code);
                     }}
@@ -441,6 +430,10 @@ ui_components._callbacks = {{}}
         
         container = self._ui_components['container']
         
+        # Always clear first to ensure clean state
+        with container:
+            clear_output(wait=True)
+        
         # Update container styles
         container.layout.display = 'flex'
         container.layout.visibility = 'visible'
@@ -454,7 +447,6 @@ ui_components._callbacks = {{}}
         
         # Display the dialog
         with container:
-            clear_output(wait=True)
             display(HTML(html_content))
         
         self._is_visible = True
@@ -466,11 +458,11 @@ ui_components._callbacks = {{}}
         
         container = self._ui_components.get('container')
         if container:
-            # Clear the output
+            # Clear the output first
             with container:
                 clear_output(wait=True)
             
-            # Reset container styles
+            # Reset container styles to initial state
             container.layout.display = 'none'
             container.layout.visibility = 'hidden'
             container.layout.height = None
@@ -481,7 +473,9 @@ ui_components._callbacks = {{}}
             container.layout.overflow = 'auto'
             container.layout.border = '1px solid #e0e0e0'
             container.layout.border_radius = '4px'
+            container.layout.flex = '1 1 auto'
         
+        # Clean up state
         self._is_visible = False
         self._callbacks = {}
     

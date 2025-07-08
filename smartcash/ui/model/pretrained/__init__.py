@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/model/pretrained/__init__.py
-Deskripsi: Entry point untuk model pretrained
+Minimal exports for pretrained models module.
 """
 
 from .pretrained_initializer import initialize_pretrained_ui

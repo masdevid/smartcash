@@ -12,7 +12,9 @@ from .validators import (
     safe_component_operation,
     validate_ui_components
 )
+from .utils import with_error_handling
 from .error_component import ErrorComponent, create_error_component
+from .context import ErrorContext
 from .exceptions import (
     # Base exceptions
     SmartCashUIError,
@@ -25,10 +27,7 @@ from .exceptions import (
     # Common exceptions
     ConfigError,
     ValidationError,
-    NotSupportedError,
-    
-    # Error context
-    ErrorContext
+    NotSupportedError
 )
 
 __all__ = [

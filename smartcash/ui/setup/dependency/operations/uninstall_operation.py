@@ -48,6 +48,10 @@ class UninstallOperationHandler(BaseOperationHandler):
             success_count = sum(1 for r in results if r.get('success'))
             total = len(results)
             
+            # Update config by removing successfully uninstalled packages
+            if success_count > 0:
+                await self._update_config_after_uninstall(results)
+            
             if self._cancelled:
                 status_msg = f"⏹️ Penghapusan dibatalkan: {success_count}/{total} paket berhasil dihapus"
                 await self.log(status_msg, 'warning')
@@ -175,6 +179,73 @@ class UninstallOperationHandler(BaseOperationHandler):
                 'message': f"Kesalahan: {str(e)}"
             }
     
+    async def _update_config_after_uninstall(self, results: List[Dict[str, Any]]) -> None:
+        """Update config by removing successfully uninstalled packages."""
+        try:
+            import yaml
+            import os
+            
+            config_path = os.path.join('/Users/masdevid/Projects/smartcash', 'configs', 'dependency_config.yaml')
+            
+            # Read existing config
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = yaml.safe_load(f) or {}
+            else:
+                existing_config = {}
+            
+            # Get successfully uninstalled packages
+            uninstalled_packages = [r['package'] for r in results if r.get('success')]
+            
+            # Get default packages to check which ones should be preserved
+            from ..configs.dependency_defaults import get_default_package_categories
+            default_categories = get_default_package_categories()
+            default_packages = set()
+            for category in default_categories.values():
+                for pkg in category.get('packages', []):
+                    if pkg.get('is_default', False):
+                        default_packages.add(pkg['name'])
+            
+            # Only remove non-default packages from selected_packages
+            selected_packages = existing_config.get('selected_packages', [])
+            updated_selected = [pkg for pkg in selected_packages 
+                              if pkg not in uninstalled_packages or pkg in default_packages]
+            
+            # Add uninstalled default packages to uninstalled_defaults list
+            uninstalled_defaults = existing_config.get('uninstalled_defaults', [])
+            for pkg in uninstalled_packages:
+                if pkg in default_packages and pkg not in uninstalled_defaults:
+                    uninstalled_defaults.append(pkg)
+            
+            # Remove from custom packages (these can be fully removed)
+            custom_packages = existing_config.get('custom_packages', '')
+            if custom_packages:
+                custom_lines = custom_packages.split('\n')
+                updated_custom_lines = []
+                for line in custom_lines:
+                    line = line.strip()
+                    if line and not any(pkg in line for pkg in uninstalled_packages):
+                        updated_custom_lines.append(line)
+                updated_custom = '\n'.join(updated_custom_lines)
+            else:
+                updated_custom = ''
+            
+            # Update config
+            existing_config.update({
+                'selected_packages': updated_selected,
+                'custom_packages': updated_custom,
+                'uninstalled_defaults': uninstalled_defaults
+            })
+            
+            # Write back to file
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
+            
+            await self.log(f"💾 Configuration updated after uninstalling {len(uninstalled_packages)} packages", 'info')
+            
+        except Exception as e:
+            await self.log(f"❌ Failed to update config after uninstall: {str(e)}", 'error')
+
     async def cancel_operation(self) -> None:
         """Cancel the current uninstallation operation."""
         self._cancelled = True

@@ -1,292 +1,173 @@
-# File: smartcash/ui/pretrained/pretrained_initializer.py
 """
-File: smartcash/ui/pretrained/pretrained_initializer.py
-Deskripsi: Pretrained initializer dengan CommonInitializer pattern terbaru dan fail-fast approach
+File: smartcash/ui/model/pretrained/pretrained_initializer.py
+Pretrained models initializer following core UI structure with DisplayInitializer pattern.
 """
 
-from typing import Dict, Any, Optional, Type
-from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.pretrained.handlers.config_handler import PretrainedConfigHandler
-from smartcash.ui.pretrained.handlers.model_handlers import ModelOperationHandler
-from smartcash.ui.core.handlers.config_handler import ConfigHandler
+import asyncio
+from typing import Dict, Any, Optional
 
-class PretrainedInitializer(CommonInitializer):
-    """🤖 Pretrained models initializer dengan CommonInitializer pattern terbaru"""
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from smartcash.ui.core.initializers.display_initializer import create_ui_display_function
+
+from .components.pretrained_ui import create_pretrained_ui
+from .handlers.pretrained_ui_handler import PretrainedUIHandler
+from .configs.pretrained_config_handler import PretrainedConfigHandler
+from .services.pretrained_service import PretrainedService
+from .constants import DEFAULT_CONFIG
+
+
+class PretrainedInitializer(ModuleInitializer):
+    """
+    Pretrained models initializer following core UI structure standard.
+    Manages YOLOv5s and EfficientNet-B4 pretrained model downloads.
+    """
     
-    def __init__(self, module_name: str = 'pretrained', 
-                 config_handler_class: Type[ConfigHandler] = PretrainedConfigHandler,
-                 **kwargs):
-        """Initialize pretrained initializer dengan fail-fast validation
-        
-        Args:
-            module_name: Nama modul (default: 'pretrained')
-            config_handler_class: Kelas handler konfigurasi
-            **kwargs: Argumen tambahan untuk parent class
-        """
-        self._last_models_dir = None
-        # Initialize parent with module name and config handler
+    def __init__(self):
+        """Initialize the pretrained initializer."""
         super().__init__(
-            module_name=module_name,
-            config_handler_class=config_handler_class,
-            **kwargs
+            module_name="pretrained",
+            parent_module="model",
+            config_handler_class=PretrainedConfigHandler
         )
-        # Now self.logger and self._logger_bridge are available from parent
+        self.service = PretrainedService()
     
-    def _get_default_config(self) -> Dict[str, Any]:
-        """Return default configuration for pretrained models
-        
-        Returns:
-            Dictionary berisi konfigurasi default untuk pretrained models
+    def _initialize_impl(self, config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
         """
-        return {
-            'model_name': 'yolov5s',
-            'version': 'latest',
-            'device': 'cuda:0',  # Default to GPU if available
-            'conf_threshold': 0.25,
-            'iou_threshold': 0.45,
-            'classes': None,  # None means all classes
-            'max_detections': 1000,
-            'agnostic_nms': False,
-            'augment': False,
-            'models_dir': '/data/pretrained',
-            'model_urls': {
-                'yolov5s': 'https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5s.pt',
-                'efficientnet': 'https://github.com/lukemelas/EfficientNet-PyTorch/releases/download/1.0/adv-efficientnet-b0-64a7f98d.pth'
-            }
-        }
-    
-    def _create_ui_components(self, config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Create UI components dengan proper error handling dan validation
+        Implementation of pretrained module initialization.
         
         Args:
-            config: Konfigurasi untuk inisialisasi UI
-            **kwargs: Argumen tambahan
+            config: Optional configuration dictionary
+            **kwargs: Additional parameters
             
         Returns:
-            Dictionary berisi komponen UI yang valid dengan minimal keys:
-            - 'ui': Komponen UI utama
-            - 'log_output': Output log widget
-            - 'status_panel': Panel status
-            
-        Raises:
-            ValueError: Jika UI components tidak valid atau komponen penting tidak ada
+            Dictionary containing UI components
         """
         try:
-            from smartcash.ui.pretrained.components.ui_components import create_pretrained_main_ui
+            # Get default config and merge with provided config
+            final_config = DEFAULT_CONFIG.copy()
+            if config:
+                final_config.update(config)
             
-            # Add logger_bridge to kwargs for UI components
-            if hasattr(self, '_logger_bridge') and self._logger_bridge:
-                kwargs['logger_bridge'] = self._logger_bridge
+            # Validate configuration
+            validated_config = self.config_handler.validate_config(final_config)
             
-            # Create UI components dengan immediate validation
-            ui_components = create_pretrained_main_ui(config, **kwargs)
+            # Create UI components
+            ui_components = create_pretrained_ui(validated_config, **kwargs)
             
-            if not ui_components or not isinstance(ui_components, dict):
-                error_msg = f"❌ Gagal membuat UI components untuk {self.module_name}"
-                self._log_error(error_msg)
-                raise ValueError(error_msg)
+            # Initialize UI handler
+            ui_handler = PretrainedUIHandler(ui_components)
+            ui_components['ui_handler'] = ui_handler
             
-            # Validate critical components exist
-            required_components = ['ui', 'log_output', 'status_panel']
-            missing = [comp for comp in required_components if comp not in ui_components]
-            if missing:
-                error_msg = f"Komponen UI kritis tidak ditemukan: {missing}"
-                self._log_error(error_msg)
-                raise ValueError(error_msg)
+            # Update UI from config
+            self.config_handler.update_ui_from_config(ui_components, validated_config)
             
-            # Add logger_bridge to ui_components if not already present
-            if hasattr(self, '_logger_bridge') and self._logger_bridge:
-                ui_components['logger_bridge'] = self._logger_bridge
+            # Perform post-initialization checks
+            asyncio.create_task(self._post_init_check(ui_components, validated_config))
             
-            # Mark sebagai initialized untuk lifecycle management
-            ui_components['pretrained_initialized'] = True
-            
-            self._log_info(f"✅ UI components berhasil dibuat untuk {self.module_name}")
             return ui_components
             
         except Exception as e:
-            self._log_error(f"Gagal membuat komponen UI: {str(e)}", exc_info=True)
-            raise
+            error_msg = f"Failed to initialize pretrained module: {str(e)}"
+            return self._create_error_response(error_msg, str(e))
     
-    def _log_debug(self, message: str, **kwargs) -> None:
-        """Log debug message using logger_bridge if available"""
-        if hasattr(self, '_logger_bridge') and self._logger_bridge and hasattr(self._logger_bridge, 'debug'):
-            self._logger_bridge.debug(message, **kwargs)
-            
-    def _log_info(self, message: str, **kwargs) -> None:
-        """Log info message using logger_bridge if available"""
-        if hasattr(self, '_logger_bridge') and self._logger_bridge and hasattr(self._logger_bridge, 'info'):
-            self._logger_bridge.info(message, **kwargs)
-            
-    def _log_warning(self, message: str, **kwargs) -> None:
-        """Log warning message using logger_bridge if available"""
-        if hasattr(self, '_logger_bridge') and self._logger_bridge and hasattr(self._logger_bridge, 'warning'):
-            self._logger_bridge.warning(message, **kwargs)
-            
-    def _log_error(self, message: str, exc_info: bool = False, **kwargs) -> None:
-        """Log error message using logger_bridge if available"""
-        if hasattr(self, '_logger_bridge') and self._logger_bridge and hasattr(self._logger_bridge, 'error'):
-            self._logger_bridge.error(message, exc_info=exc_info, **kwargs)
-    
-    def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """Setup module-specific handlers dengan error handling
+    async def _post_init_check(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+        """
+        Perform post-initialization checks for existing pretrained models.
         
         Args:
-            ui_components: Dictionary UI components
-            config: Konfigurasi sistem
-            **kwargs: Parameter tambahan
-            
-        Returns:
-            Updated UI components dengan handlers
+            ui_components: UI components dictionary
+            config: Configuration dictionary
         """
         try:
-            # Inisialisasi model handler dengan logger bridge
-            model_handler = ModelOperationHandler(ui_components, self._logger_bridge)
+            # Get UI handler
+            ui_handler = ui_components.get('ui_handler')
+            if not ui_handler:
+                return
             
-            # Setup button handlers
-            if 'download_button' in ui_components:
-                def on_download_clicked(b):
-                    try:
-                        model_handler.check_and_download_model(config.get('pretrained_models', {}))
-                    except Exception as e:
-                        self.handle_error(f"Gagal memproses download: {str(e)}", exc_info=True)
-                        self._update_status(ui_components, f"❌ Gagal memproses download", 'error')
+            # Check models status
+            models_status = await ui_handler.check_models_status()
+            
+            # Update log with status
+            log_output = ui_components.get('log_output')
+            if log_output and hasattr(log_output, 'log'):
+                total_found = models_status.get('total_found', 0)
+                total_models = 2  # YOLOv5s + EfficientNet-B4
                 
-                ui_components['download_button'].on_click(on_download_clicked)
-            
-            # Setup sync button if exists
-            if 'sync_button' in ui_components:
-                def on_sync_clicked(b):
-                    try:
-                        model_handler.check_and_download_model(config.get('pretrained_models', {}))
-                    except Exception as e:
-                        self.handle_error(f"Gagal melakukan sinkronisasi: {str(e)}", exc_info=True)
-                        self._update_status(ui_components, f"❌ Gagal melakukan sinkronisasi", 'error')
+                if models_status.get('all_present', False):
+                    log_output.log("✅ All pretrained models are available and ready to use!")
+                elif total_found > 0:
+                    log_output.log(f"📋 Found {total_found}/{total_models} pretrained models. Use download button to get missing models.")
+                else:
+                    log_output.log("📋 No pretrained models found. Use download button to download YOLOv5s and EfficientNet-B4.")
                 
-                ui_components['sync_button'].on_click(on_sync_clicked)
-            
-            self._logger_bridge.info("Module handlers berhasil disetup")
-            return ui_components
-            
-        except Exception as e:
-            self.handle_error(f"Gagal setup module handlers: {str(e)}", exc_info=True)
-            return ui_components
-    
-    def post_initialization_checks(self, ui_components: Dict[str, Any], config: Dict[str, Any], **kwargs) -> None:
-        """Post-initialization checks untuk validasi model pretrained
-        
-        Args:
-            ui_components: Komponen UI yang telah diinisialisasi
-            config: Konfigurasi sistem
-            **kwargs: Arguments tambahan
-            
-        Raises:
-            RuntimeError: Jika post-init validation gagal
-        """
-        try:
-            # Check critical UI components
-            critical_widgets = {
-                'download_btn': 'Download button',
-                'save_button': 'Save button',
-                'reset_button': 'Reset button'
-            }
-            missing_widgets = [name for key, name in critical_widgets.items() if not ui_components.get(key)]
-            if missing_widgets:
-                raise RuntimeError(f"Widget kritis tidak ditemukan: {', '.join(missing_widgets)}")
-            
-            # Check pretrained model existence
-            self._check_pretrained_model_exists(ui_components, config)
-            
-            # Test logger bridge functionality
-            if self._logger_bridge:
-                try:
-                    self._logger_bridge.info("🤖 Pretrained module initialized successfully")
-                except Exception as e:
-                    logger.warning(f"⚠️ Logger bridge test warning: {str(e)}")
+                # List found models
+                for model in models_status.get('models_found', []):
+                    size_mb = model.get('file_size_mb', 0)
+                    log_output.log(f"  ✓ {model['name']}: {size_mb} MB")
+                
+                # List missing models
+                for model in models_status.get('models_missing', []):
+                    log_output.log(f"  ❌ {model['name']}: Not found")
                     
         except Exception as e:
-            logger.error(f"❌ Post-initialization checks failed: {str(e)}")
-            raise
+            # Don't fail initialization for post-init check errors
+            log_output = ui_components.get('log_output')
+            if log_output and hasattr(log_output, 'log'):
+                log_output.log(f"⚠️ Warning: Could not check models status: {str(e)}")
     
-    def _cleanup_old_models_dir(self, old_dir: str, new_dir: str) -> None:
-        """🧹 Membersihkan direktori model lama jika berbeda dengan yang baru
-        
-        Args:
-            old_dir: Path direktori model lama
-            new_dir: Path direktori model baru
+    def _create_error_response(self, error_msg: str, details: str) -> Dict[str, Any]:
         """
-        if not old_dir or old_dir == new_dir:
-            return
-            
-        try:
-            import shutil
-            from pathlib import Path
-            
-            old_path = Path(old_dir)
-            if old_path.exists() and old_path.is_dir():
-                logger.info(f"🧹 Membersihkan direktori model lama: {old_dir}")
-                shutil.rmtree(old_dir, ignore_errors=True)
-                logger.info(f"✅ Direktori model lama berhasil dibersihkan")
-        except Exception as e:
-            logger.warning(f"⚠️ Gagal membersihkan direktori model lama: {str(e)}")
-    
-
-    def _check_pretrained_model_exists(self, ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
-        """🔍 Check dan download otomatis pretrained model jika tidak ditemukan
+        Create error response with error component.
         
         Args:
-            ui_components: Dictionary UI components untuk update status
-            config: Konfigurasi sistem untuk mendapatkan path model
+            error_msg: Main error message
+            details: Detailed error information
             
         Returns:
-            bool: True jika model tersedia atau berhasil didownload
+            Dictionary containing error UI component
         """
         try:
-            # Inisialisasi handler dengan logger bridge
-            model_handler = ModelOperationHandler(ui_components, self._logger_bridge)
-            
-            # Lakukan pengecekan dan download jika diperlukan
-            success = model_handler.check_and_download_model(config.get('pretrained_models', {}))
-            
-            # Update status di UI
-            if success:
-                self._update_status(ui_components, "✅ Model siap digunakan", 'success')
-            else:
-                self._update_status(ui_components, "❌ Gagal memuat model", 'error')
-            
-            return success
-            
-        except Exception as e:
-            error_msg = f"Gagal memeriksa model: {str(e)}"
-            self.handle_error(error_msg, exc_info=True)
-            self._update_status(ui_components, f"❌ {error_msg}", 'error')
-            return False
+            from smartcash.ui.components.error.error_component import create_error_component
+            error_ui = create_error_component(
+                error_msg, 
+                details, 
+                "Pretrained Models Error"
+            )
+            return {
+                'ui': error_ui,
+                'error': True,
+                'error_message': error_msg
+            }
+        except Exception:
+            # Fallback error display
+            import ipywidgets as widgets
+            error_ui = widgets.HTML(f"<div style='color: red; padding: 20px;'><h3>❌ {error_msg}</h3><p>{details}</p></div>")
+            return {
+                'ui': error_ui,
+                'error': True,
+                'error_message': error_msg
+            }
 
 
-def initialize_pretrained_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
-    """Factory function untuk inisialisasi pretrained UI
+def _pretrained_initialize_legacy(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Legacy function wrapper for pretrained module initialization.
     
     Args:
-        config: Konfigurasi opsional untuk inisialisasi
-        **kwargs: Parameter tambahan yang akan diteruskan ke initializer
+        config: Optional configuration dictionary
+        **kwargs: Additional parameters
         
     Returns:
-        Widget UI utama yang siap ditampilkan atau dictionary dengan 'ui' key
-        
-    Example:
-        ```python
-        ui = initialize_pretrained_ui(config=my_config)
-        display(ui)  # or display(ui['ui']) if it's a dict
-        ```
+        Dictionary containing UI components
     """
-    try:
-        initializer = PretrainedInitializer()
-        result = initializer.initialize(config=config, **kwargs)
-        
-        # Handle error response
-        if isinstance(result, dict) and result.get('error'):
-            return result['ui']
-        return result
-    except Exception as e:
-        error_msg = f"❌ Gagal menginisialisasi pretrained UI: {str(e)}"
-        return {'ui': create_error_component(error_msg, str(e), "Pretrained Model Error"), 'error': True}
+    initializer = PretrainedInitializer()
+    return initializer._initialize_impl(config, **kwargs)
+
+
+# Create the standard UI display function using DisplayInitializer pattern
+initialize_pretrained_ui = create_ui_display_function(
+    module_name='pretrained',
+    parent_module='model',
+    initializer_class=PretrainedInitializer,
+    legacy_function=_pretrained_initialize_legacy
+)

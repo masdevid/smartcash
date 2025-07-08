@@ -45,6 +45,9 @@ class UpdateOperationHandler(BaseOperationHandler):
                 'custom_packages': '\n'.join(custom)
             })
             
+            # Save config to YAML file
+            await self._save_config_to_file(self.config)
+            
             # Execute update
             start_time = time.time()
             results = await self._update_packages(packages)
@@ -184,6 +187,36 @@ class UpdateOperationHandler(BaseOperationHandler):
                 'message': f"Kesalahan: {str(e)}"
             }
     
+    async def _save_config_to_file(self, config: Dict[str, Any]) -> None:
+        """Save configuration to dependency_config.yaml file."""
+        try:
+            import yaml
+            import os
+            
+            config_path = os.path.join('/Users/masdevid/Projects/smartcash', 'configs', 'dependency_config.yaml')
+            
+            # Read existing config
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = yaml.safe_load(f) or {}
+            else:
+                existing_config = {}
+            
+            # Update with new values
+            existing_config.update({
+                'selected_packages': config.get('selected_packages', []),
+                'custom_packages': config.get('custom_packages', '')
+            })
+            
+            # Write back to file
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
+            
+            await self.log(f"💾 Configuration saved to {config_path}", 'info')
+            
+        except Exception as e:
+            await self.log(f"❌ Failed to save config: {str(e)}", 'error')
+
     async def cancel_operation(self) -> None:
         """Cancel the current update operation."""
         self._cancelled = True

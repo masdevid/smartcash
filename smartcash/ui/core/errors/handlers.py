@@ -10,6 +10,7 @@ import logging
 import sys
 import traceback
 from contextlib import contextmanager
+from dataclasses import asdict
 from functools import wraps
 from typing import (
     Any, Callable, Dict, Iterator, List, Optional, 
@@ -20,6 +21,7 @@ from IPython.display import display, HTML
 
 from .enums import ErrorLevel
 from .context import ErrorContext
+from .error_component import create_error_component
 from smartcash.common.exceptions import ErrorContext as CommonErrorContext
 
 # Type variable for generic typing
@@ -86,14 +88,30 @@ class CoreErrorHandler:
         self._ui_components = ui_components or {}
         self._logger = logger or self._get_logger()
     
-    def _get_logger(self) -> logging.Logger:
+    def get_logger(self, name: Optional[str] = None) -> logging.Logger:
         """
-        Get or create a logger for this error handler.
+        Get or create a logger with the specified name.
         
+        Args:
+            name: Optional logger name. If None, uses default module name.
+            
         Returns:
             logging.Logger: The logger instance.
         """
-        logger = logging.getLogger(f"smartcash.ui.core.errors.{self.module_name}")
+        logger_name = name or f"smartcash.ui.core.errors.{self.module_name}"
+        return self._get_logger_by_name(logger_name)
+    
+    def _get_logger_by_name(self, logger_name: str) -> logging.Logger:
+        """
+        Get or create a logger with the specified name.
+        
+        Args:
+            logger_name: Name for the logger
+            
+        Returns:
+            logging.Logger: The logger instance.
+        """
+        logger = logging.getLogger(logger_name)
         if not logger.handlers:
             # Configure the logger if it hasn't been configured yet
             handler = logging.StreamHandler()
@@ -104,6 +122,15 @@ class CoreErrorHandler:
             logger.addHandler(handler)
             logger.setLevel(logging.INFO)
         return logger
+    
+    def _get_logger(self) -> logging.Logger:
+        """
+        Get or create a logger for this error handler.
+        
+        Returns:
+            logging.Logger: The logger instance.
+        """
+        return self._get_logger_by_name(f"smartcash.ui.core.errors.{self.module_name}")
     
     @property
     def error_count(self) -> int:
@@ -444,3 +471,132 @@ class CoreErrorHandler:
                 **asdict(error_context)
             )
             raise
+
+
+# Decorator function for backward compatibility
+def handle_ui_errors(
+    error_component_title: str = "UI Error",
+    log_error: bool = True,
+    return_type: Optional[type] = None,
+    level: ErrorLevel = ErrorLevel.ERROR,
+    fail_fast: bool = False,
+    create_ui: bool = False
+):
+    """
+    Decorator for handling UI errors with backward compatibility.
+    
+    Args:
+        error_component_title: Title for error component
+        log_error: Whether to log the error
+        return_type: Type to return on error (None, dict, bool, etc.)
+        level: Error level for logging
+        fail_fast: Whether to raise exception after handling
+        create_ui: Whether to create UI error component
+    
+    Returns:
+        Decorator function
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                # Get error handler instance
+                handler = get_error_handler()
+                
+                # Handle the error
+                error_msg = f"[{error_component_title}] {func.__name__}: {str(e)}"
+                
+                if log_error:
+                    handler.handle_error(
+                        error_msg=error_msg,
+                        level=level,
+                        exc_info=True,
+                        fail_fast=fail_fast,
+                        create_ui_error=create_ui
+                    )
+                
+                # Return appropriate value based on return_type
+                if return_type == dict:
+                    return {}
+                elif return_type == list:
+                    return []
+                elif return_type == bool:
+                    return False
+                elif return_type == str:
+                    return ""
+                elif return_type is not None:
+                    try:
+                        return return_type()
+                    except:
+                        return None
+                else:
+                    return None
+        
+        return wrapper
+    return decorator
+
+
+def create_error_response(
+    error_message: str,
+    error: Optional[Exception] = None,
+    title: str = "Error",
+    include_traceback: bool = True,
+    return_type: type = dict,
+    **kwargs
+) -> Any:
+    """
+    Create an error response with proper formatting.
+    
+    Args:
+        error_message: The error message
+        error: Optional exception object
+        title: Title for the error
+        include_traceback: Whether to include traceback
+        return_type: Type of response to return
+        **kwargs: Additional context
+    
+    Returns:
+        Error response of specified type
+    """
+    # Create error component for UI display
+    traceback_str = None
+    if error and include_traceback:
+        traceback_str = traceback.format_exc()
+    
+    error_component = create_error_component(
+        error_message=error_message,
+        traceback=traceback_str,
+        title=title,
+        **kwargs
+    )
+    
+    # Return appropriate response type
+    if return_type == dict:
+        return {
+            'success': False,
+            'error': error_message,
+            'error_component': error_component,
+            'traceback': traceback_str
+        }
+    elif return_type == bool:
+        return False
+    elif return_type == str:
+        return error_message
+    else:
+        try:
+            return return_type()
+        except:
+            return None
+
+
+# Export for convenience
+__all__ = [
+    'CoreErrorHandler',
+    'get_error_handler', 
+    'set_error_handler',
+    'handle_ui_errors',
+    'create_error_response',
+    'create_error_component'
+]

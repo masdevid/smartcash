@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/model/backbone/components/ui_components.py
-Deskripsi: UI components untuk backbone model configuration dengan shared container components
+Description: UI components for backbone model configuration following dependency pattern
 """
 
 import ipywidgets as widgets
@@ -19,6 +19,33 @@ from smartcash.ui.components.action_container import create_action_container
 from smartcash.ui.components import create_save_reset_buttons
 from smartcash.ui.components.progress_tracker.progress_tracker import ProgressTracker
 from smartcash.ui.components.progress_tracker.progress_config import ProgressLevel
+
+
+def create_backbone_ui_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create backbone UI components following dependency pattern.
+    
+    Args:
+        config: Optional configuration dictionary
+        
+    Returns:
+        Dictionary containing UI components and main UI
+    """
+    config = config or {}
+    
+    # Create child components
+    child_components = create_backbone_child_components(config)
+    
+    # Create main UI from layout sections
+    layout_sections = get_layout_sections(child_components)
+    if layout_sections:
+        main_ui = widgets.VBox(layout_sections)
+    else:
+        main_ui = child_components.get('main_container', widgets.VBox([]))
+    
+    # Store main UI component
+    child_components['ui'] = main_ui
+    
+    return child_components
 
 def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create child components untuk backbone configuration dengan shared container components
@@ -100,32 +127,39 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     
     # === 3. ACTION CONTAINER ===
     
-    # Create action container with standard button configuration
+    # Create action container with new operations structure
     action_container = create_action_container(
         buttons=[
             {
-                "button_id": "build",
-                "text": "📝️ Bangun Model",
-                "style": "primary",
-                "order": 1,
-                "tooltip": "Membangun model dengan konfigurasi yang dipilih"
-            },
-            {
                 "button_id": "validate",
-                "text": "📊 Validasi Konfigurasi",
+                "text": "🔍 Validate",
                 "style": "info",
-                "order": 2,
-                "tooltip": "Memvalidasi konfigurasi model sebelum membangun"
+                "order": 1,
+                "tooltip": "Validate backbone configuration"
             },
             {
-                "button_id": "info",
-                "text": "🔍 Info Model",
-                "style": "warning",
+                "button_id": "load",
+                "text": "📥 Load Model",
+                "style": "primary",
+                "order": 2,
+                "tooltip": "Load backbone model with current configuration"
+            },
+            {
+                "button_id": "build",
+                "text": "🏗️ Build",
+                "style": "success",
                 "order": 3,
-                "tooltip": "Menampilkan informasi detail tentang model"
+                "tooltip": "Build backbone architecture"
+            },
+            {
+                "button_id": "summary",
+                "text": "📊 Summary", 
+                "style": "warning",
+                "order": 4,
+                "tooltip": "Generate model summary and statistics"
             }
         ],
-        title="🚀 Model Operations",
+        title="🚀 Backbone Operations",
         alignment="left",
         with_confirmation=True
     )
@@ -173,10 +207,11 @@ def create_backbone_child_components(config: Optional[Dict[str, Any]] = None) ->
     if hasattr(model_form, 'mixed_precision_checkbox'):
         child_components['mixed_precision_checkbox'] = model_form.mixed_precision_checkbox
     
-    # Extract buttons with standard approach
-    child_components['build_btn'] = action_container.get_button('build')
+    # Extract buttons with new operations structure
     child_components['validate_btn'] = action_container.get_button('validate')
-    child_components['info_btn'] = action_container.get_button('info')
+    child_components['load_btn'] = action_container.get_button('load')
+    child_components['build_btn'] = action_container.get_button('build')
+    child_components['summary_btn'] = action_container.get_button('summary')
     child_components['save_button'] = save_reset_components.get('save_button')
     child_components['reset_button'] = save_reset_components.get('reset_button')
     

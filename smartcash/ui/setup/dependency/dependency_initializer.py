@@ -37,16 +37,21 @@ class DependencyInitializer(ModuleInitializer):
         """Get default dependency configuration"""
         return get_default_dependency_config()
     
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """🚀 Initialize dependency module - implements abstract method
+    def _initialize_impl(self, *args, **kwargs) -> Dict[str, Any]:
+        """Implementation of initialization logic.
         
-        Args:
-            config: Optional configuration to use for initialization. If not provided,
-                   default configuration will be used.
-                   
         Returns:
-            Dict containing initialization results including UI components and handlers
+            Dict containing initialization results
         """
+        # Extract config from args/kwargs
+        config = None
+        if args:
+            config = args[0]
+        elif 'config' in kwargs:
+            config = kwargs['config']
+        
+        if config is None:
+            config = self.get_default_config()
         try:
             self.logger.info("🚀 Memulai inisialisasi modul dependensi...")
             
@@ -91,7 +96,7 @@ class DependencyInitializer(ModuleInitializer):
             }
             
         except Exception as e:
-            from smartcash.ui.core.shared.error_handler import get_error_handler
+            from smartcash.ui.core.errors.handlers import get_error_handler
             error_handler = get_error_handler('dependency')
             error_handler.handle_exception(e, 'initialization', fail_fast=False)
             self.logger.error(f"❌ Initialization failed: {str(e)}")
@@ -279,7 +284,7 @@ class DependencyInitializer(ModuleInitializer):
             self.logger.info("✅ Operation handlers berhasil di-setup")
             
         except Exception as e:
-            from smartcash.ui.core.shared.error_handler import get_error_handler
+            from smartcash.ui.core.errors.handlers import get_error_handler
             error_handler = get_error_handler('dependency')
             error_handler.handle_exception(e, 'setting up operation handlers', fail_fast=False)
 
@@ -325,16 +330,16 @@ class DependencyInitializer(ModuleInitializer):
 # Global instance for backward compatibility
 _dependency_initializer: Optional[DependencyInitializer] = None
 
-def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
-    """🚀 Initialize dependency UI - main entry point
+def initialize_dependency_ui_internal(config: Optional[Dict[str, Any]] = None) -> Any:
+    """Internal dependency UI initialization that returns components.
     
-    This function ensures only one instance of the dependency UI is created and displayed.
+    This function ensures only one instance of the dependency UI is created.
     
     Args:
-        config (Optional[Dict[str, Any]]): Configuration dictionary for initialization.
+        config: Configuration dictionary for initialization.
     
     Returns:
-        Any: The main UI container widget to be displayed.
+        The main UI container widget or dict of components
     """
     global _dependency_initializer
     
@@ -360,3 +365,14 @@ def initialize_dependency_ui(config: Optional[Dict[str, Any]] = None) -> Any:
     _dependency_initializer = ModuleInitializer.get_module_instance('dependency', 'setup')
     
     return result
+
+
+# Import the display function creator
+from smartcash.ui.core.initializers.display_initializer import create_ui_display_function
+
+# Create the initialize function using the consistent pattern with legacy fallback
+initialize_dependency_ui = create_ui_display_function(
+    module_name='dependency',
+    parent_module='setup',
+    legacy_function=initialize_dependency_ui_internal
+)

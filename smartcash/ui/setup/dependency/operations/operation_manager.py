@@ -9,10 +9,11 @@ from enum import Enum, auto
 import importlib
 
 from .base_operation import BaseOperationHandler
+from smartcash.ui.core.handlers.operation_handler import OperationHandler
 from .install_operation import InstallOperationHandler
 from .update_operation import UpdateOperationHandler
 from .uninstall_operation import UninstallOperationHandler
-from .check_status_operation import CheckStatusOperationHandler
+from .check_operation import CheckStatusOperationHandler
 
 
 class OperationType(Enum):
@@ -184,3 +185,170 @@ class OperationManager:
             Optional[OperationContext]: The current operation context, or None if no operation is in progress.
         """
         return self._current_operation
+
+
+class DependencyOperationManager(OperationHandler):
+    """Operation manager for dependency management that extends OperationHandler."""
+    
+    def __init__(self, config: Dict[str, Any], operation_container=None, **kwargs):
+        """Initialize the dependency operation manager."""
+        super().__init__(
+            module_name='dependency_operation_manager',
+            parent_module='dependency',
+            operation_container=operation_container,
+            **kwargs
+        )
+        self.config = config
+        self.operation_manager = OperationManager(ui_components={})
+    
+    def initialize(self) -> None:
+        """Initialize the dependency operation manager."""
+        self.logger.info("🚀 Initializing Dependency operation manager")
+        # No specific initialization needed
+        self.logger.info("✅ Dependency operation manager initialization complete")
+    
+    def get_operations(self) -> Dict[str, Callable]:
+        """Get available operations."""
+        return {
+            'install': self.execute_install,
+            'uninstall': self.execute_uninstall, 
+            'update': self.execute_update,
+            'check_status': self.execute_check_status
+        }
+    
+    async def execute_install(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
+        """Execute package installation using real pip install."""
+        try:
+            from .install_operation import InstallOperationHandler
+            
+            # Create install handler with UI components including operation container
+            ui_components = getattr(self, '_ui_components', {})
+            if hasattr(self.operation_container, 'get_ui_components'):
+                ui_components.update(self.operation_container.get_ui_components())
+            
+            # Ensure operation container is available for progress tracking and logging
+            ui_components['operation_container'] = self.operation_container
+                
+            install_handler = InstallOperationHandler(ui_components, self.config)
+            
+            # Execute the actual installation
+            result = await install_handler.execute_operation()
+            
+            # Update operation summary with results
+            await self._update_operation_summary('install', result)
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error in execute_install: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def execute_uninstall(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
+        """Execute package uninstallation using real pip uninstall."""
+        try:
+            from .uninstall_operation import UninstallOperationHandler
+            
+            # Create uninstall handler with UI components including operation container
+            ui_components = getattr(self, '_ui_components', {})
+            if hasattr(self.operation_container, 'get_ui_components'):
+                ui_components.update(self.operation_container.get_ui_components())
+            
+            # Ensure operation container is available for progress tracking and logging
+            ui_components['operation_container'] = self.operation_container
+                
+            uninstall_handler = UninstallOperationHandler(ui_components, self.config)
+            
+            # Execute the actual uninstallation
+            result = await uninstall_handler.execute_operation()
+            
+            # Update operation summary with results
+            await self._update_operation_summary('uninstall', result)
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error in execute_uninstall: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def execute_update(self, packages: List[str], progress_callback=None) -> Dict[str, Any]:
+        """Execute package update using real pip install --upgrade."""
+        try:
+            from .update_operation import UpdateOperationHandler
+            
+            # Create update handler with UI components including operation container
+            ui_components = getattr(self, '_ui_components', {})
+            if hasattr(self.operation_container, 'get_ui_components'):
+                ui_components.update(self.operation_container.get_ui_components())
+            
+            # Ensure operation container is available for progress tracking and logging
+            ui_components['operation_container'] = self.operation_container
+                
+            update_handler = UpdateOperationHandler(ui_components, self.config)
+            
+            # Execute the actual update
+            result = await update_handler.execute_operation()
+            
+            # Update operation summary with results
+            await self._update_operation_summary('update', result)
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error in execute_update: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def execute_check_status(self, packages: List[str] = None, progress_callback=None) -> Dict[str, Any]:
+        """Execute package status check using real pip show."""
+        try:
+            from .check_status_operation import CheckStatusOperationHandler
+            
+            # Create check status handler with UI components including operation container
+            ui_components = getattr(self, '_ui_components', {})
+            if hasattr(self.operation_container, 'get_ui_components'):
+                ui_components.update(self.operation_container.get_ui_components())
+            
+            # Ensure operation container is available for progress tracking and logging
+            ui_components['operation_container'] = self.operation_container
+                
+            check_handler = CheckStatusOperationHandler(ui_components, self.config)
+            
+            # Execute the actual status check
+            result = await check_handler.execute_operation()
+            
+            # Update operation summary with results
+            await self._update_operation_summary('check_status', result)
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error in execute_check_status: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _update_operation_summary(self, operation_type: str, result: Dict[str, Any]) -> None:
+        """Update operation summary with operation results."""
+        try:
+            from ..components.operation_summary import update_operation_summary
+            
+            # Get the operation summary widget from UI components
+            ui_components = getattr(self, '_ui_components', {})
+            if hasattr(self.operation_container, 'get_ui_components'):
+                ui_components.update(self.operation_container.get_ui_components())
+            
+            operation_summary = ui_components.get('operation_summary')
+            if operation_summary:
+                # Determine status type based on result
+                if result.get('cancelled'):
+                    status_type = 'warning'
+                elif result.get('success'):
+                    status_type = 'success'
+                else:
+                    status_type = 'error'
+                
+                # Update the summary widget
+                update_operation_summary(operation_summary, operation_type, result, status_type)
+                self.logger.info(f"✅ Updated operation summary for {operation_type}")
+            else:
+                self.logger.warning("⚠️ Operation summary widget not found in UI components")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to update operation summary: {e}")

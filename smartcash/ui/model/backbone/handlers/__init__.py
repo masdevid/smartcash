@@ -1,14 +1,12 @@
 """
 File: smartcash/ui/model/backbone/handlers/__init__.py
-Deskripsi: Handlers module exports untuk backbone model
+Description: Handlers module exports for backbone model following core UI structure
 """
 
-from .model_handler import BackboneModelHandler
-from .config_handler import BackboneConfigHandler
-from .api_handler import BackboneAPIHandler
+from .backbone_ui_handler import BackboneUIHandler
+from .operation_manager import BackboneOperationManager
 
 __all__ = [
-    'BackboneModelHandler',
-    'BackboneConfigHandler',
-    'BackboneAPIHandler'
+    'BackboneUIHandler',
+    'BackboneOperationManager'
 ]

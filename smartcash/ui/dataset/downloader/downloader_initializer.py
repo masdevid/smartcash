@@ -10,13 +10,13 @@ Initialization Flow:
 """
 
 from typing import Dict, Any, List, Optional
-from smartcash.ui.initializers.common_initializer import CommonInitializer
-from smartcash.ui.dataset.downloader.components.ui_components import create_downloader_main_ui
-from smartcash.ui.dataset.downloader.handlers.config_handler import DownloaderConfigHandler
-from smartcash.ui.dataset.downloader.handlers.operation import DownloadHandlerManager
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from smartcash.ui.dataset.downloader.components.downloader_ui import create_downloader_ui_components
+from smartcash.ui.dataset.downloader.configs.downloader_config_handler import DownloaderConfigHandler
+from smartcash.ui.dataset.downloader.operations.manager import DownloaderOperationManager, DownloadHandlerManager
 from smartcash.ui.core.errors.handlers import create_error_response
 
-class DownloaderInitializer(CommonInitializer):
+class DownloaderInitializer(ModuleInitializer):
     """Downloader initializer dengan complete UI dan backend service integration
 
     Provides a structured approach to initializing the dataset downloader module with
@@ -32,7 +32,7 @@ class DownloaderInitializer(CommonInitializer):
         )
 
     def _create_ui_components(self, config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Create downloader UI components dengan environment awareness
+        """Create downloader UI components following colab/dependency pattern
 
         Args:
             config: Loaded configuration
@@ -43,26 +43,28 @@ class DownloaderInitializer(CommonInitializer):
             Dictionary of UI components
         """
         try:
-            self.logger.info(" Membuat komponen UI downloader")
-            ui_components = create_downloader_main_ui(config)
+            self.logger.info("🔧 Creating downloader UI components with operation container")
+            ui_components = create_downloader_ui_components(config, **kwargs)
 
-            # Add metadata
+            # Add metadata following the established pattern
             ui_components.update({
                 'downloader_initialized': True,
                 'module_name': 'downloader',
                 'data_dir': config.get('data', {}).get('dir', 'data'),
                 'target_dir': config.get('download', {}).get('target_dir', 'data'),
-                'logger': self.logger  # Ensure logger is available
+                'logger': self.logger,
+                'config': config,
+                'env': env
             })
 
-            self.logger.debug(f"UI components created: {list(ui_components.keys())}")
+            self.logger.info(f"✅ UI components created successfully: {len(ui_components)} components")
             return ui_components
         except Exception as e:
             self.handle_error(f"Failed to create UI components: {str(e)}", exc_info=True)
             return create_error_response("Gagal membuat komponen UI downloader")
 
     def _setup_module_handlers(self, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, **kwargs) -> Dict[str, Any]:
-        """Setup handlers dengan backend service integration
+        """Setup handlers following colab/dependency pattern with OperationHandler
 
         Args:
             ui_components: Dictionary of UI components
@@ -74,16 +76,36 @@ class DownloaderInitializer(CommonInitializer):
             Updated UI components with handlers
         """
         try:
-            self.logger.info(" Menyiapkan handlers downloader")
+            self.logger.info("🔧 Setting up downloader operation manager")
 
-            # Buat instance DownloadHandlerManager dan setup handlers
-            handler_manager = DownloadHandlerManager(ui_components, config, env)
-            handlers = handler_manager.setup_handlers()
-
-            # Update UI components with handlers
-            if handlers:
-                ui_components.update(handlers)
-                self.logger.debug(f"Handlers setup complete: {list(handlers.keys()) if handlers else 'No handlers'}")
+            # Get operation container from UI components and set up operation handler
+            operation_container = ui_components.get('operation_manager')
+            if operation_container:
+                # Create operation manager with operation container
+                operation_manager = DownloaderOperationManager(
+                    config=config,
+                    operation_container=operation_container
+                )
+                
+                # Store UI components reference in operation manager
+                operation_manager._ui_components = ui_components
+                
+                # Initialize the operation manager
+                operation_manager.initialize()
+                
+                # Store operation manager in UI components
+                ui_components['downloader_operation_manager'] = operation_manager
+                
+                self.logger.info("✅ Downloader operation manager setup complete")
+            else:
+                self.logger.warning("⚠️ Operation container not found, using legacy handler")
+                
+                # Fallback to legacy handler
+                handler_manager = DownloadHandlerManager(ui_components, config, env)
+                handlers = handler_manager.setup_handlers()
+                
+                if handlers:
+                    ui_components.update(handlers)
 
             return ui_components
         except Exception as e:
@@ -97,7 +119,7 @@ class DownloaderInitializer(CommonInitializer):
             Default configuration dictionary
         """
         try:
-            from smartcash.ui.dataset.downloader.handlers.defaults import get_default_downloader_config
+            from smartcash.ui.dataset.downloader.configs.downloader_defaults import get_default_downloader_config
             default_config = get_default_downloader_config()
             self.logger.debug("Default config loaded successfully")
             return default_config

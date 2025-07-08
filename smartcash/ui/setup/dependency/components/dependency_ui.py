@@ -1,125 +1,218 @@
-# file_path: /Users/masdevid/Projects/smartcash/smartcash/ui/setup/dependency/components/dependency_ui.py
-# Deskripsi: Berisi fungsi untuk membuat komponen UI Dependency Manager.
+"""
+File: smartcash/ui/setup/dependency/components/dependency_ui.py
+Description: Modern dependency manager UI using latest container standards
+"""
 
 from typing import Optional, Dict, Any
 
-from smartcash.ui.components.form_container import create_form_container, LayoutType
-from smartcash.ui.components.main_container import create_main_container
-from smartcash.ui.components.header_container import create_header_container
-from smartcash.ui.components.action_container import create_action_container
-from smartcash.ui.components.operation_container import create_operation_container
-from smartcash.ui.components.footer_container import create_footer_container
+# Import shared UI components using latest standards
+from smartcash.ui.components import (
+    create_main_container,
+    create_header_container, 
+    create_action_container,
+    create_operation_container,
+    create_footer_container,
+    create_form_container,
+    create_save_reset_buttons
+)
+from smartcash.ui.components.form_container import LayoutType
 
 from .dependency_tabs import create_dependency_tabs
 
-def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, logger=None, **kwargs) -> Dict[str, Any]:
-    """Create dependency UI components dengan standard layout
-
-    Args:
-        config (Optional[Dict[str, Any]], optional): Konfigurasi untuk UI components. Defaults to None.
-        logger (Any, optional): Logger instance untuk mencatat aktivitas UI. Defaults to None.
-
-    Returns:
-        Dict[str, Any]: Dictionary berisi semua komponen UI yang telah dibuat.
+def create_dependency_ui_components(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
+    Create dependency UI components following latest container standards.
     
+    Args:
+        config: Configuration for UI components
+        **kwargs: Additional arguments
+        
+    Returns:
+        Dictionary containing all created UI components
+    """
     current_config = config or {}
+    child_components = {}
     
-    # Header container
+    # 1. Create Header Container
     header_container = create_header_container(
         title="📦 Dependency Manager",
-        subtitle="Kelola packages untuk SmartCash dengan interface yang mudah",
-        status_message="Siap mengelola dependencies",
+        subtitle="Manage packages for SmartCash with modern interface",
+        status_message="Ready to manage dependencies",
         status_type="info"
     )
+    child_components['header_container'] = header_container.container
     
-    # Create form container with tabs
+    # 2. Create Operation Container (centralized progress and logging)
+    operation_container = create_operation_container(
+        component_name="dependency_operation_container",
+        show_progress=True,
+        show_logs=True,
+        initial_message="Dependency manager ready...",
+        log_height="200px"
+    )
+    child_components['operation_container'] = operation_container['container']
+    child_components['operation_manager'] = operation_container  # For handlers to access
+    
+    # 3. Create dependency tabs with improved design
+    dependency_tabs = create_dependency_tabs(current_config)
+    child_components['dependency_tabs'] = dependency_tabs
+    
+    # 4. Create Form Container to hold the tabs
     form_container = create_form_container(
         layout_type=LayoutType.COLUMN,
         container_margin="0",
-        container_padding="0",
-        gap="0"
+        container_padding="16px",
+        gap="12px"
     )
+    form_container['form_container'].children = (dependency_tabs,)
+    child_components['form_container'] = form_container['container']
     
-    # Add tabs to form container
-    dependency_tabs = create_dependency_tabs(current_config, logger)
-    form_container['add_item'](dependency_tabs, height="auto")
+    # 5. Create Save/Reset buttons for configurations
+    try:
+        save_reset_components = create_save_reset_buttons(
+            save_label="💾 Save Config",
+            reset_label="🔄 Reset",
+            with_sync_info=True
+        )
+        child_components['save_reset_buttons'] = save_reset_components
+        child_components['save_button'] = save_reset_components.get('save_button')
+        child_components['reset_button'] = save_reset_components.get('reset_button')
+    except Exception:
+        # Fallback buttons
+        import ipywidgets as widgets
+        save_button = widgets.Button(description="💾 Save Config", button_style='primary')
+        reset_button = widgets.Button(description="🔄 Reset", button_style='warning')
+        child_components['save_button'] = save_button
+        child_components['reset_button'] = reset_button
     
-    # Action container
+    # 6. Create Action Container with multiple operation buttons
     action_container = create_action_container(
         buttons=[
-            {'button_id': 'install_button', 'text': '📥 Install Selected', 'style': 'primary', 'order': 1},
-            {'button_id': 'check_updates_button', 'text': '🔄 Check Updates', 'style': 'info', 'order': 2},
-            {'button_id': 'uninstall_button', 'text': '🗑️ Uninstall Selected', 'style': 'danger', 'order': 3}
+            {
+                'button_id': 'install_button',
+                'text': '📥 Install',
+                'style': 'success',
+                'icon': 'download',
+                'tooltip': 'Install selected packages',
+                'order': 1
+            },
+            {
+                'button_id': 'check_button', 
+                'text': '🔍 Check & Updates',
+                'style': 'info',
+                'icon': 'refresh',
+                'tooltip': 'Check package status and available updates',
+                'order': 2
+            },
+            {
+                'button_id': 'uninstall_button',
+                'text': '🗑️ Uninstall',
+                'style': 'danger',
+                'icon': 'trash',
+                'tooltip': 'Uninstall selected packages',
+                'order': 3
+            }
         ],
-        title="🚀 Package Operations",
-        alignment="left"
+        title="🚀 Package Operations", 
+        alignment="center"
     )
+    child_components['action_container'] = action_container['container']
+    child_components['install_button'] = action_container.get('install_button')
+    child_components['check_button'] = action_container.get('check_button')
+    child_components['uninstall_button'] = action_container.get('uninstall_button')
+    child_components['action_container_manager'] = action_container  # For button management
     
-    # Footer container with InfoAccordion for tips
-    from smartcash.ui.components.footer_container import PanelConfig, PanelType
-    
-    tips_content = """
-    <div style="padding: 10px;">
-        <h5>💡 Tips Penggunaan</h5>
-        <ul>
-            <li>Gunakan tab pertama untuk packages berdasarkan kategori</li>
-            <li>Tab kedua untuk packages custom yang tidak tersedia di kategori</li>
-            <li>Default packages ditandai dengan ⭐ dan direkomendasikan untuk diinstall</li>
-            <li>Status package akan terupdate secara real-time</li>
-        </ul>
-    </div>
-    """
-    
+    # 7. Create Footer Container with enhanced tips
+    import ipywidgets as widgets
     footer_container = create_footer_container(
-        panels=[
-            PanelConfig(
-                panel_type=PanelType.INFO_ACCORDION,
-                title="💡 Tips & Info",
-                content=tips_content,
-                style="info",
-                flex="1",
-                min_width="300px",
-                open_by_default=True
-            )
-        ],
-        style={"border_top": "1px solid #e0e0e0", "padding": "10px 0"},
-        flex_flow="row wrap",
-        justify_content="space-between",
-        align_items="flex-start"
+        info_box=widgets.HTML(
+            value="""
+            <div class="alert alert-info" style="font-size: 0.9em; padding: 8px 12px;">
+                <strong>💡 Dependency Management Tips:</strong>
+                <ul style="margin: 5px 0 0 15px; padding: 0;">
+                    <li>Use Categories tab for predefined package collections</li>
+                    <li>Use Custom tab for individual packages and git repositories</li>
+                    <li>Default packages (⭐) are recommended for optimal performance</li>
+                    <li>Real-time status tracking shows installation progress</li>
+                    <li>Check updates regularly to maintain security and compatibility</li>
+                </ul>
+            </div>
+            """
+        )
     )
+    child_components['footer_container'] = footer_container.container
     
-    # Create operation container for progress and dialogs
-    operation_container = create_operation_container(
-        show_progress=True,
-        show_dialog=True,
-        show_logs=True,
-        log_module_name="Dependency"
-    )
+    # 8. Create Operation Summary for displaying results
+    from .operation_summary import create_operation_summary
+    operation_summary = create_operation_summary("🔧 Dependency operations ready...")
+    child_components['operation_summary'] = operation_summary
     
-    # Main container
+    # 9. Create Main Container using latest pattern
     main_container = create_main_container(
-        header_container=header_container.container,
-        form_container=form_container['container'],
-        action_container=action_container['container'],
-        operation_container=operation_container['container'],
-        footer_container=footer_container.container
+        # Define the layout structure with explicit ordering
+        components=[
+            # Header section
+            {
+                'type': 'header',
+                'component': child_components['header_container'],
+                'order': 0,
+                'name': 'header'
+            },
+            # Operation container (progress and logs)
+            {
+                'type': 'operation',
+                'component': child_components['operation_container'],
+                'order': 1,
+                'name': 'operations'
+            },
+            # Form section (tabs)
+            {
+                'type': 'form',
+                'component': child_components['form_container'],
+                'order': 2,
+                'name': 'form'
+            },
+            # Config buttons (if available)
+            {
+                'type': 'action',
+                'component': child_components.get('save_reset_buttons', {}).get('container'),
+                'order': 3,
+                'name': 'config_buttons'
+            },
+            # Main action container
+            {
+                'type': 'action',
+                'component': child_components['action_container'],
+                'order': 4,
+                'name': 'actions'
+            },
+            # Operation summary for results
+            {
+                'type': 'summary',
+                'component': child_components['operation_summary'],
+                'order': 5,
+                'name': 'operation_summary'
+            },
+            # Footer
+            {
+                'type': 'footer',
+                'component': child_components['footer_container'],
+                'order': 6,
+                'name': 'footer'
+            }
+        ],
+        # Styling options
+        container_style={
+            'width': '100%',
+            'padding': '20px',
+            'border': '1px solid #ddd',
+            'border_radius': '10px'
+        }
     )
     
-    return {
-        'main_container': main_container.container,
-        'ui': main_container.container,  # Alias for compatibility
-        'header_container': header_container,
-        'form_container': form_container,
-        'dependency_tabs': dependency_tabs,
-        'action_container': action_container,
-        'footer_container': footer_container,
-        'operation_container': operation_container,
-        'status_panel': header_container.status_panel,
-        'install_button': action_container['buttons'].get('install_button'),
-        'check_updates_button': action_container['buttons'].get('check_updates_button'),
-        'uninstall_button': action_container['buttons'].get('uninstall_button'),
-        'progress_tracker': operation_container['progress_tracker'],
-        'confirmation_dialog': operation_container['dialog'],
-        'log_accordion': operation_container['log_accordion'],
-    }
+    # Store the main container and its UI reference
+    child_components['main_container'] = main_container.container
+    child_components['ui'] = main_container.container  # Main UI reference
+    child_components['main_container_manager'] = main_container  # For programmatic control
+    
+    return child_components

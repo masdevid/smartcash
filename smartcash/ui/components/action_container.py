@@ -22,28 +22,56 @@ COLAB_PHASES = {
         'tooltip': 'Start setting up the Colab environment',
         'disabled': False
     },
-    'installing_deps': {
-        'text': '⏳ Installing Dependencies...',
-        'icon': 'spinner spin',
+    'init': {
+        'text': '⚙️ Initializing...',
+        'icon': 'cog',
         'style': 'info',
-        'tooltip': 'Installing required dependencies',
+        'tooltip': 'Initializing environment setup',
         'disabled': True
     },
-    'downloading_models': {
-        'text': '📥 Downloading Models...',
-        'icon': 'download',
+    'drive': {
+        'text': '📁 Mounting Drive...',
+        'icon': 'cloud',
         'style': 'info',
-        'tooltip': 'Downloading required model files',
+        'tooltip': 'Mounting Google Drive for persistent storage',
         'disabled': True
     },
-    'verifying': {
+    'symlink': {
+        'text': '🔗 Creating Symlinks...',
+        'icon': 'link',
+        'style': 'info',
+        'tooltip': 'Creating symbolic links for project structure',
+        'disabled': True
+    },
+    'folders': {
+        'text': '📂 Creating Folders...',
+        'icon': 'folder',
+        'style': 'info',
+        'tooltip': 'Setting up project directory structure',
+        'disabled': True
+    },
+    'config': {
+        'text': '⚙️ Syncing Config...',
+        'icon': 'sync',
+        'style': 'info',
+        'tooltip': 'Synchronizing configuration files',
+        'disabled': True
+    },
+    'env': {
+        'text': '🌍 Setting Environment...',
+        'icon': 'globe',
+        'style': 'info',
+        'tooltip': 'Configuring environment variables',
+        'disabled': True
+    },
+    'verify': {
         'text': '🔍 Verifying Setup...',
         'icon': 'search',
         'style': 'info',
         'tooltip': 'Verifying environment setup',
         'disabled': True
     },
-    'ready': {
+    'complete': {
         'text': '✅ Environment Ready!',
         'icon': 'check',
         'style': 'success',
@@ -54,7 +82,7 @@ COLAB_PHASES = {
         'text': '❌ Setup Failed',
         'icon': 'exclamation-triangle',
         'style': 'danger',
-        'tooltip': 'Click to see error details',
+        'tooltip': 'Click to see error details or retry',
         'disabled': False
     }
 }
@@ -107,6 +135,7 @@ def create_action_container(
     return {
         'container': container.container,
         'buttons': button_widgets,
+        'primary_button': container.buttons.get('primary'),  # Add primary button access
         'set_phase': container.set_phase,
         'set_phases': container.set_phases,
         'enable_all': container.enable_all,
@@ -334,12 +363,16 @@ class ActionContainer:
             description=f"{text}",
             layout=widgets.Layout(width='auto'),
             disabled=disabled,
+            button_style=style,
             **kwargs
         )
         
         if tooltip:
             button.tooltip = tooltip
             
+        # Store order for sorting
+        button._order = order
+        
         # Store button reference
         self.buttons[button_id] = button
         

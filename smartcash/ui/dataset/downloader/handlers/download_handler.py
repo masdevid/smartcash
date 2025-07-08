@@ -4,8 +4,8 @@ Deskripsi: Entry point untuk download handlers dengan operation/ structure
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.dataset.downloader.handlers.operation.manager import DownloadHandlerManager
-from smartcash.ui.dataset.downloader.utils.validation_utils import validate_config
+from smartcash.ui.dataset.downloader.operations.manager import DownloadHandlerManager
+from smartcash.ui.dataset.downloader.services.validation_utils import validate_config
 
 def setup_download_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None) -> Dict[str, Any]:
     """Setup download handlers dengan centralized error handling dan SRP.
@@ -71,14 +71,14 @@ def _setup_config_buttons(ui_components: Dict[str, Any]) -> None:
         reset_button.on_click(lambda b: _handle_reset_config(ui_components))
 
 def _handle_download_button(ui_components: Dict[str, Any], handler_manager: DownloadHandlerManager) -> None:
-    """Handle download button click.
+    """Handle download button click (dataset download).
     
     Args:
         ui_components: Dictionary UI components
         handler_manager: Download handler manager instance
     """
     # Clear outputs using handler method
-    self.clear_ui_outputs
+    handler_manager.clear_outputs()
     
     # Extract dan validate config
     config_handler = ui_components.get('config_handler')
@@ -113,7 +113,7 @@ def _handle_check_button(ui_components: Dict[str, Any], handler_manager: Downloa
     handler_manager.handle_check_button()
 
 def _handle_cleanup_button(ui_components: Dict[str, Any], handler_manager: DownloadHandlerManager) -> None:
-    """Handle cleanup button click.
+    """Handle cleanup button click (dataset removal).
     
     Args:
         ui_components: Dictionary UI components

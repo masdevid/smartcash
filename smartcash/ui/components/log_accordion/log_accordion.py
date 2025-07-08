@@ -408,6 +408,12 @@ class LogAccordion(BaseUIComponent):
         display(accordion)
         return accordion
     
+    def show(self) -> widgets.Accordion:
+        """Show the log accordion (alias for display for backward compatibility)."""
+        if not self._initialized:
+            self.initialize()
+        return self._ui_components['accordion']
+    
     def _ipython_display_(self):
         """IPython display integration."""
         return self.display()._ipython_display_()

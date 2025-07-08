@@ -25,7 +25,9 @@ class ConfigurableInitializer(BaseInitializer):
                  module_name: str, 
                  parent_module: Optional[str] = None,
                  config_handler_class: Optional[Type] = None,
-                 enable_shared_config: bool = True):
+                 enable_shared_config: bool = True,
+                 initial_config: Optional[Dict[str, Any]] = None,
+                 **kwargs):
         """Initialize dengan config support.
         
         Args:
@@ -33,22 +35,41 @@ class ConfigurableInitializer(BaseInitializer):
             parent_module: Parent module untuk shared config
             config_handler_class: Custom config handler class
             enable_shared_config: Enable shared config antar modules
+            initial_config: Optional initial configuration dictionary
+            **kwargs: Additional keyword arguments passed to parent class
         """
-        super().__init__(module_name, parent_module)
+        super().__init__(module_name, parent_module, **kwargs)
+        
+        # Store initial config for later use
+        self._initial_config = initial_config or {}
         
         # Setup config handler
         if config_handler_class:
-            # Use custom handler (untuk backward compatibility)
-            self.config_handler = config_handler_class(module_name)
+            # For custom handlers, try to pass initial config to constructor if supported
+            try:
+                # First try passing config to constructor if it accepts it
+                self.config_handler = config_handler_class(
+                    module_name=module_name,
+                    config=self._initial_config or {}
+                )
+            except (TypeError, ValueError):
+                # Fall back to loading config after initialization
+                self.logger.debug("Falling back to loading config after handler initialization")
+                self.config_handler = config_handler_class(module_name)
+                if self._initial_config and hasattr(self.config_handler, 'load_config'):
+                    self.config_handler.load_config(self._initial_config)
         else:
-            # Use new SharedConfigHandler
+            # Use new SharedConfigHandler with initial config if provided
             self.config_handler = SharedConfigHandler(
-                module_name, 
-                parent_module,
-                enable_sharing=enable_shared_config
+                module_name=module_name,
+                parent_module=parent_module,
+                enable_sharing=enable_shared_config,
+                config=self._initial_config or {}
             )
         
         self.logger.debug(f"📋 ConfigurableInitializer setup with {type(self.config_handler).__name__}")
+        if self._initial_config:
+            self.logger.debug(f"Loaded initial config with {len(self._initial_config)} items")
     
     # === Config Properties ===
     

@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List, Callable, Type, TypeVar
 from smartcash.ui.logger import get_module_logger
 from smartcash.ui.core.handlers.base_handler import BaseHandler
 from smartcash.common.config.manager import get_config_manager, SimpleConfigManager as ConfigManager
-from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager
+from smartcash.ui.core.shared.shared_config_manager import SharedConfigManager, get_shared_config_manager
 from smartcash.ui.core.errors import ErrorLevel, handle_errors
 
 class ConfigHandler(BaseHandler):
@@ -200,6 +200,7 @@ class PersistentConfigHandler(ConfigurableHandler):
                  module_name: str, 
                  parent_module: Optional[str] = None,
                  default_config: Optional[Dict[str, Any]] = None,
+                 config_dir: Optional[Path] = None,
                  config_manager: Optional[ConfigManager] = None):
         """Initialize dengan persistent storage support."""
         super().__init__(module_name, parent_module, default_config)
@@ -428,7 +429,7 @@ class SharedConfigHandler(PersistentConfigHandler):
     
     def __del__(self):
         """Cleanup shared config subscription."""
-        if self._unsubscribe_fn:
+        if hasattr(self, '_unsubscribe_fn') and self._unsubscribe_fn:
             try:
                 self._unsubscribe_fn()
             except:

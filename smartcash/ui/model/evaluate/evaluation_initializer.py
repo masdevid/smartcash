@@ -1,0 +1,287 @@
+"""
+File: smartcash/ui/model/evaluate/evaluation_initializer.py
+Description: Evaluation module initializer following DisplayInitializer pattern
+"""
+
+from typing import Dict, Any, Optional
+from IPython.display import display
+
+from smartcash.ui.core.initializers.display_initializer import DisplayInitializer
+from smartcash.ui.logger import get_module_logger
+from .components.evaluation_ui import create_evaluation_ui
+from .handlers.evaluation_ui_handler import EvaluationUIHandler
+from .constants import UI_CONFIG
+
+
+class EvaluationInitializer(DisplayInitializer):
+    """Initializer for evaluation module following UI standards."""
+    
+    def __init__(self):
+        """Initialize evaluation initializer."""
+        super().__init__(
+            module_name="evaluate",
+            parent_module="model"
+        )
+        self.logger = get_module_logger(__name__)
+        self.ui_handler: Optional[EvaluationUIHandler] = None
+        self._ui_components: Dict[str, Any] = {}
+    
+    def create_ui_components(self) -> Dict[str, Any]:
+        """Create evaluation UI components.
+        
+        Returns:
+            Dictionary containing all UI components
+        """
+        self.logger.info("🎯 Creating evaluation UI components")
+        
+        try:
+            # Create UI components
+            self._ui_components = create_evaluation_ui()
+            
+            self.logger.info(f"✅ Created {len(self._ui_components)} evaluation UI components")
+            return self._ui_components
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to create evaluation UI components: {e}")
+            self.handle_error(f"Failed to create evaluation UI: {str(e)}", exc_info=True)
+            return {}
+    
+    def initialize_handlers(self, ui_components: Dict[str, Any]) -> bool:
+        """Initialize evaluation UI handlers.
+        
+        Args:
+            ui_components: UI components dictionary
+            
+        Returns:
+            True if initialization successful, False otherwise
+        """
+        self.logger.info("🔧 Initializing evaluation UI handlers")
+        
+        try:
+            # Create UI handler
+            self.ui_handler = EvaluationUIHandler()
+            
+            # Setup handler with UI components
+            self.ui_handler.setup(ui_components)
+            
+            self.logger.info("✅ Evaluation UI handlers initialized successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize evaluation handlers: {e}")
+            self.handle_error(f"Failed to initialize evaluation handlers: {str(e)}", exc_info=True)
+            return False
+    
+    def display_ui(self, ui_components: Dict[str, Any]) -> None:
+        """Display the evaluation UI.
+        
+        Args:
+            ui_components: UI components dictionary
+        """
+        self.logger.info("🖥️ Displaying evaluation UI")
+        
+        try:
+            if 'main_container' in ui_components:
+                display(ui_components['main_container'])
+                self.logger.info("✅ Evaluation UI displayed successfully")
+            else:
+                raise ValueError("Main container not found in UI components")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to display evaluation UI: {e}")
+            self.handle_error(f"Failed to display evaluation UI: {str(e)}", exc_info=True)
+    
+    def _initialize_impl(self, **kwargs) -> Dict[str, Any]:
+        """Implementation of initialization logic for DisplayInitializer.
+        
+        Args:
+            **kwargs: Additional initialization parameters
+            
+        Returns:
+            Dictionary containing initialization results
+        """
+        return self.initialize_full(**kwargs)
+    
+    def initialize_full(self, **kwargs) -> Dict[str, Any]:
+        """Initialize the complete evaluation module.
+        
+        Args:
+            **kwargs: Additional initialization parameters
+            
+        Returns:
+            Dictionary containing initialization results
+        """
+        self.logger.info("🚀 Initializing evaluation module")
+        
+        try:
+            # Step 1: Create UI components
+            ui_components = self.create_ui_components()
+            if not ui_components:
+                raise Exception("Failed to create UI components")
+            
+            # Step 2: Initialize handlers
+            if not self.initialize_handlers(ui_components):
+                raise Exception("Failed to initialize handlers")
+            
+            # Step 3: Display UI
+            self.display_ui(ui_components)
+            
+            # Step 4: Return success result
+            result = {
+                "success": True,
+                "module": "evaluate",
+                "ui_components": ui_components,
+                "ui_handler": self.ui_handler,
+                "message": "Evaluation module initialized successfully"
+            }
+            
+            self.logger.info("🎉 Evaluation module initialization completed successfully")
+            return result
+            
+        except Exception as e:
+            error_result = {
+                "success": False,
+                "module": "evaluate",
+                "error": str(e),
+                "message": f"Evaluation module initialization failed: {str(e)}"
+            }
+            
+            self.logger.error(f"❌ Evaluation module initialization failed: {e}")
+            
+            # Display error UI
+            self.handle_error(f"Module initialization failed: {str(e)}", exc_info=True)
+            
+            return error_result
+    
+    def get_ui_handler(self) -> Optional[EvaluationUIHandler]:
+        """Get the evaluation UI handler instance.
+        
+        Returns:
+            EvaluationUIHandler instance or None if not initialized
+        """
+        return self.ui_handler
+    
+    def get_ui_components(self) -> Dict[str, Any]:
+        """Get the UI components dictionary.
+        
+        Returns:
+            Dictionary of UI components
+        """
+        return self._ui_components.copy()
+    
+    def cleanup(self) -> None:
+        """Cleanup evaluation module resources."""
+        try:
+            if self.ui_handler:
+                # Cleanup handler resources
+                if hasattr(self.ui_handler, 'cleanup'):
+                    self.ui_handler.cleanup()
+                self.ui_handler = None
+            
+            # Clear UI components
+            self._ui_components.clear()
+            
+            self.logger.info("🧹 Evaluation module cleanup completed")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error during evaluation module cleanup: {e}")
+
+
+# Global initializer instance
+_evaluation_initializer: Optional[EvaluationInitializer] = None
+
+
+def get_evaluation_initializer() -> EvaluationInitializer:
+    """Get or create evaluation initializer instance.
+    
+    Returns:
+        EvaluationInitializer instance
+    """
+    global _evaluation_initializer
+    if _evaluation_initializer is None:
+        _evaluation_initializer = EvaluationInitializer()
+    return _evaluation_initializer
+
+
+def initialize_evaluation_ui(**kwargs) -> Dict[str, Any]:
+    """Initialize evaluation UI module.
+    
+    Args:
+        **kwargs: Additional initialization parameters
+        
+    Returns:
+        Dictionary containing initialization results
+    """
+    initializer = get_evaluation_initializer()
+    return initializer.initialize(**kwargs)
+
+
+# Legacy function for backward compatibility
+def initialize_evaluate_ui(**kwargs) -> Dict[str, Any]:
+    """Initialize evaluation UI (legacy function name).
+    
+    Args:
+        **kwargs: Additional initialization parameters
+        
+    Returns:
+        Dictionary containing initialization results
+    """
+    return initialize_evaluation_ui(**kwargs)
+
+
+# Main entry point function for cell execution
+def init_evaluation_ui(**kwargs):
+    """Initialize and display evaluation UI.
+    
+    This is the main entry point function that should be called from notebook cells.
+    It creates the evaluation initializer and displays the UI directly.
+    
+    Args:
+        **kwargs: Additional initialization parameters
+    """
+    try:
+        # Suppress early logging
+        import logging
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        root_logger.setLevel(logging.CRITICAL)
+        
+        smartcash_logger = logging.getLogger('smartcash')
+        original_smartcash_level = smartcash_logger.level
+        smartcash_logger.setLevel(logging.CRITICAL)
+        
+        try:
+            # Create and initialize
+            initializer = EvaluationInitializer()
+            ui_result = initializer.initialize_full(**kwargs)
+            
+            # Restore logging
+            root_logger.setLevel(original_level)
+            smartcash_logger.setLevel(original_smartcash_level)
+            
+            # Display UI components if available
+            if ui_result and 'ui_components' in ui_result:
+                ui_components = ui_result['ui_components']
+                if 'main_container' in ui_components:
+                    display(ui_components['main_container'])
+                    
+        except Exception as e:
+            # Restore logging
+            root_logger.setLevel(original_level)
+            smartcash_logger.setLevel(original_smartcash_level)
+            
+            # Display error
+            from IPython.display import HTML
+            error_html = f"""
+            <div style="color: #d32f2f; padding: 15px; border-left: 4px solid #d32f2f; 
+                        margin: 10px 0; background: rgba(244, 67, 54, 0.05); border-radius: 4px;">
+                <strong>🚨 Evaluation Initialization Error</strong><br>
+                <div style="margin-top: 8px; font-family: monospace; font-size: 13px;">
+                    Failed to initialize evaluation UI: {str(e)}
+                </div>
+            </div>
+            """
+            display(HTML(error_html))
+            
+    except Exception as e:
+        print(f"❌ Critical error in evaluation initialization: {e}")

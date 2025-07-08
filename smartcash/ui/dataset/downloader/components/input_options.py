@@ -6,7 +6,7 @@ Deskripsi: Form input components untuk downloader dengan responsive layout
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.dataset.downloader.utils.colab_secrets import get_api_key_from_secrets, create_api_key_info_html
+from smartcash.ui.dataset.downloader.services.colab_secrets import get_api_key_from_secrets, create_api_key_info_html
 
 
 def create_downloader_input_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:

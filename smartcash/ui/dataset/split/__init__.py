@@ -1,58 +1,68 @@
 """
-File: smartcash/ui/dataset/split/__init__.py
-Deskripsi: Ekspor utilitas dan fungsi split dataset
+Dataset Split Module.
+
+This module provides functionality for splitting datasets into training, validation, and test sets.
 """
 
-from smartcash.ui.dataset.split.split_initializer import (
+from typing import Dict, Any, Optional
+
+from .split_initializer import (
     create_split_config_cell,
     get_split_config_components,
     SplitInitializer
 )
-from smartcash.ui.dataset.split.handlers.config_handler import SplitConfigHandler
+from .handlers.config_handler import SplitConfigHandler
 
-# Untuk backward compatibility
+# Backward compatibility aliases
 create_split_config_ui = create_split_config_cell
-display_split_config = create_split_config_cell  # Alias untuk backward compatibility
+display_split_config = create_split_config_cell
+create_split_init = create_split_config_cell
+create_split_ui = create_split_config_cell
+display_split_ui = create_split_config_cell
+get_split_config = get_split_config_components
 
 # Public API
-def initialize_split_ui(config=None):
-    """🎯 Inisialisasi UI split dataset dengan konfigurasi opsional.
-    
-    Ini adalah entry point utama untuk fungsionalitas split dataset.
-    Menampilkan UI di notebook tanpa mengembalikan komponen.
+def initialize_split_ui(config: Optional[Dict[str, Any]] = None) -> None:
+    """🎯 Initialize the dataset split UI with optional configuration.
     
     Args:
-        config: Dictionary konfigurasi opsional
+        config: Optional configuration dictionary
     """
-    create_split_config_cell(config)
+    return create_split_config_cell(config)
 
 
-def get_split_ui_components(config=None):
-    """📦 Mendapatkan komponen UI split dataset untuk akses programmatik.
+def get_split_ui_components(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """📦 Get dataset split UI components for programmatic access.
     
-    Fungsi ini mengembalikan dictionary komponen UI untuk manipulasi programmatik
-    tanpa menampilkan UI di notebook.
+    Returns a dictionary of UI components for programmatic manipulation
+    without displaying the UI in the notebook.
     
     Args:
-        config: Dictionary konfigurasi opsional
+        config: Optional configuration dictionary
         
     Returns:
-        Dictionary komponen UI
+        Dictionary containing UI components
     """
     return get_split_config_components(config)
 
 
-# Alias untuk backward compatibility
-create_split_init = create_split_config_cell
-
+# Export public API
 __all__ = [
-    'initialize_split_ui',
-    'get_split_ui_components',
-    'create_split_init',
-    'create_split_config_ui',  # Backward compatibility
+    # Main API
     'create_split_config_cell',
     'get_split_config_components',
-    'display_split_config',  # Backward compatibility
-    'SplitInitializer',  # Updated from SplitConfigInitializer
-    'SplitConfigHandler'
+    'SplitInitializer',
+    'SplitConfigHandler',
+    
+    # Convenience functions
+    'initialize_split_ui',
+    'get_split_ui_components',
+    'get_split_config',
+    
+    # Backward compatibility
+    'create_split_config_ui',
+    'display_split_config',
+    'create_split_init',
+    'create_split_ui',
+    'display_split_ui'
 ]

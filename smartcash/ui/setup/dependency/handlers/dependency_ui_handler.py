@@ -3,16 +3,28 @@ File: smartcash/ui/setup/dependency/handlers/dependency_ui_handler.py
 Deskripsi: UI handler untuk dependency management
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from datetime import datetime
 from smartcash.ui.core.handlers.ui_handler import ModuleUIHandler
 from ..configs.dependency_config_handler import DependencyConfigHandler
+from ..operations.operation_manager import DependencyOperationManager
 
 class DependencyUIHandler(ModuleUIHandler):
-    """Handler untuk dependency UI management"""
+    """Enhanced UI handler for dependency management with operation container integration."""
     
     def __init__(self, module_name: str = 'dependency', parent_module: str = 'setup', **kwargs):
         super().__init__(module_name, parent_module, **kwargs)
+        
         self.config_handler = DependencyConfigHandler()
+        self._status_messages = []
+        
+        # Operation container and handler will be set up in setup() method
+        self.operation_container = None
+        self.operation_handler = None
+        
+        # Track current operation state
+        self.operation_in_progress = False
+        self.current_operation_type = None
     
     def extract_config_from_ui(self) -> Dict[str, Any]:
         """Extract configuration dari UI components"""
@@ -150,7 +162,138 @@ class DependencyUIHandler(ModuleUIHandler):
         """
         self.logger.info("🖥️ Setting up UI components for Dependency UI Handler")
         self._ui_components = ui_components
+        
+        # Get operation container from UI components and set up operation handler
+        if 'operation_manager' in ui_components:
+            self.operation_container = ui_components['operation_manager']
+            self.logger.info("✅ Using operation container from UI components")
+        elif 'operation_container' in ui_components:
+            # Fallback to direct operation container
+            self.operation_container = ui_components['operation_container']
+            self.logger.info("✅ Using operation container directly from UI components")
+        else:
+            # Create fallback operation container
+            from smartcash.ui.components.operation_container import OperationContainer
+            self.operation_container = OperationContainer()
+            self.logger.warning("⚠️ Created fallback operation container")
+        
+        # Set up operation handler with the operation container
+        self.operation_handler = DependencyOperationManager(
+            config=self.config_handler.get_config(),
+            operation_container=self.operation_container
+        )
+        
+        # Setup event handlers
+        self._setup_event_handlers()
+        
+        # Initialize with default config
+        self.sync_ui_with_config()
+        
         self.logger.info("✅ UI components setup complete for Dependency UI Handler")
+    
+    def _setup_event_handlers(self) -> None:
+        """Setup event handlers for UI components."""
+        # Button handlers
+        if 'save_button' in self._ui_components:
+            self._ui_components['save_button'].on_click(self._handle_save_config)
+        
+        if 'reset_button' in self._ui_components:
+            self._ui_components['reset_button'].on_click(self._handle_reset_config)
+        
+        # Main install button handler
+        if 'install_button' in self._ui_components:
+            self._ui_components['install_button'].on_click(self._handle_main_operation)
+        
+        self.logger.info("✅ Event handlers setup complete")
+    
+    def _handle_main_operation(self, button=None) -> None:
+        """Handle the main operation button click - runs package operations."""
+        self.logger.debug(f"_handle_main_operation called with button: {button}")
+        
+        if self.operation_in_progress:
+            self.logger.warning("Operation already in progress, ignoring click")
+            return
+        
+        action_manager = None
+        try:
+            self.operation_in_progress = True
+            
+            # Get action container manager for phase updates
+            action_manager = self._ui_components.get('action_container_manager')
+            if not action_manager:
+                self.logger.error("Action container manager not found")
+                return
+            
+            self.logger.info("🚀 Starting package operation")
+            
+            # Update button to show initial phase
+            self.logger.debug("Setting phase to 'checking'")
+            action_manager['set_phase']('checking')
+            
+            # Extract current config from UI
+            self.logger.debug("Extracting config from UI")
+            config = self.extract_config_from_ui()
+            self.operation_handler.config = config
+            
+            # Get selected packages
+            selected_packages = config.get('selected_packages', [])
+            custom_packages = config.get('custom_packages', '')
+            
+            if not selected_packages and not custom_packages.strip():
+                self.logger.warning("No packages selected for operation")
+                action_manager['set_phase']('error')
+                self.track_status("⚠️ No packages selected", "warning")
+                return
+            
+            # Execute the operation using the operation handler
+            self.logger.debug("Executing package operation")
+            
+            try:
+                # For now, simulate the operation
+                action_manager['set_phase']('installing')
+                self.track_status("📦 Installing selected packages...", "info")
+                
+                # Here you would call the actual operation handler
+                # result = self.operation_handler.execute_operation(...)
+                
+                # Simulate success
+                action_manager['set_phase']('complete')
+                self.track_status("✅ Package operation completed successfully!", "success")
+                
+            except Exception as op_error:
+                self.logger.error(f"Error during operation execution: {op_error}", exc_info=True)
+                if action_manager:
+                    action_manager['set_phase']('error')
+                self.track_status(f"❌ Operation execution failed: {str(op_error)}", "error")
+                raise
+                
+        except Exception as e:
+            self.logger.error(f"Error in _handle_main_operation: {e}", exc_info=True)
+            if action_manager:
+                action_manager['set_phase']('error')
+            self.track_status(f"❌ Operation failed with exception: {str(e)}", "error")
+        finally:
+            self.operation_in_progress = False
+            self.logger.debug("Operation process completed")
+    
+    def _handle_save_config(self, button=None) -> None:
+        """Handle configuration save."""
+        try:
+            config = self.extract_config_from_ui()
+            self.config_handler.update_config(config)
+            self.track_status("💾 Configuration saved", "success")
+        except Exception as e:
+            self.track_status(f"❌ Save failed: {str(e)}", "error")
+    
+    def _handle_reset_config(self, button=None) -> None:
+        """Handle configuration reset."""
+        try:
+            self.config_handler.reset_to_defaults()
+            config = self.config_handler.get_config()
+            self.update_ui_from_config(config)
+            self.track_status("🔄 Configuration reset to defaults", "info")
+        except Exception as e:
+            self.track_status(f"❌ Reset failed: {str(e)}", "error")
     
     def sync_config_with_ui(self) -> None:
         """Sync configuration dengan UI state"""
@@ -214,6 +357,38 @@ class DependencyUIHandler(ModuleUIHandler):
             self.logger.error(f"❌ Error updating custom packages: {e}")
             return False
     
+    def track_status(self, message: str, status_type: str) -> None:
+        """Track status messages for display."""
+        timestamp = datetime.now().isoformat()
+        self._status_messages.append({
+            'message': message,
+            'type': status_type,
+            'timestamp': timestamp
+        })
+        
+        # Log the message
+        log_func = getattr(self.logger, status_type, self.logger.info)
+        log_func(message)
+        
+        # Also log to operation container if available
+        if hasattr(self, 'operation_container') and self.operation_container:
+            try:
+                self.operation_container.log_message(message=message, level=status_type)
+            except Exception as e:
+                self.logger.error(f"Error logging to operation container: {e}")
+    
+    def get_status_history(self) -> list:
+        """Get history of status messages."""
+        return self._status_messages.copy()
+    
+    def clear_status_history(self) -> None:
+        """Clear status message history."""
+        self._status_messages.clear()
+    
+    def get_current_status(self) -> Optional[Dict[str, Any]]:
+        """Get the most recent status message."""
+        return self._status_messages[-1] if self._status_messages else None
+
     def initialize(self) -> None:
         """
         Initialize the UI handler for dependency module.

@@ -7,7 +7,7 @@ consistent error handling, logging, and fallbacks using the centralized error
 handling system.
 """
 
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, cast
 from functools import wraps, partial
 
 from smartcash.ui.core.errors import (
@@ -21,11 +21,11 @@ T = TypeVar('T')
 
 # Re-export core error handling decorators for convenience
 safe_component_operation = core_safe_component_operation
-with_error_handling = core_with_error_handling
 
 def safe_ui_operation(operation_name: str = "ui_operation", 
                      level: ErrorLevel = ErrorLevel.ERROR,
-                     fallback_return: Any = None):
+                     fallback_return: Any = None,
+                     error_title: str = None):
     """Decorator for safely executing UI operations with centralized error handling.
     
     This decorator wraps a function with error handling using the centralized
@@ -35,10 +35,12 @@ def safe_ui_operation(operation_name: str = "ui_operation",
         operation_name: Name of the operation for error context
         level: Error severity level (default: ErrorLevel.ERROR)
         fallback_return: Value to return if an exception occurs
+        error_title: Custom title for error messages (defaults to operation_name)
         
     Returns:
         Decorated function that safely handles exceptions
     """
+    error_title = error_title or f"Error in UI operation: {operation_name}"
     def decorator(func):
         @wraps(func)
         @core_with_error_handling(

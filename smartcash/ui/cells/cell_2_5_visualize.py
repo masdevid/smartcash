@@ -1,9 +1,11 @@
 """
 File: smartcash/ui/cells/cell_2_5_visualize.py
-Deskripsi: Entry point untuk visualisasi dataset
-NOTE: Cell Code should remain minimal (import and run initializer only). 
-      Initializer should handle all the logic.
+Description: Entry point for dataset visualization
+NOTE: Cell code should remain minimal (import and run initializer only).
+      Initializer handles all the logic.
 """
 
-from smartcash.ui.dataset.visualize import initialize_visualize_ui
-initialize_visualize_ui()
+from smartcash.ui.dataset.visualization import initialize_visualization
+
+# Initialize and display the visualization UI
+initialize_visualization()

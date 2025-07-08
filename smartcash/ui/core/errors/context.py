@@ -28,8 +28,14 @@ class ErrorContext:
     def __init__(self, **kwargs):
         """Initialize the error context with optional initial values."""
         self._context = {}
+        self.details = {}  # Add details attribute for compatibility
         if kwargs:
             self._context.update(kwargs)
+            # If details are provided, store them separately
+            if 'details' in kwargs:
+                self.details = kwargs.pop('details')
+            # Store any remaining kwargs as details
+            self.details.update(kwargs)
     
     def __enter__(self):
         """Enter the runtime context related to this object."""

@@ -48,8 +48,9 @@ class BaseHandler(ABC):
             }
         )
         
-        # Setup logger through error handler
-        self.logger = self._error_handler.get_logger(f"smartcash.ui.{self.full_module_name}")
+        # Setup logger
+        from smartcash.ui.logger import get_module_logger
+        self.logger = get_module_logger(f"smartcash.ui.{self.full_module_name}")
         
         # Internal state
         self._is_initialized = False
@@ -210,10 +211,16 @@ class BaseHandler(ABC):
     
     # Component management methods have been removed to eliminate dependency on UIComponentManager
     
-    @abstractmethod
     def initialize(self) -> Dict[str, Any]:
-        """Initialize handler (to be implemented by subclasses)."""
-        pass
+        """Initialize handler (default implementation, can be overridden by subclasses)."""
+        if not self._is_initialized:
+            self._is_initialized = True
+            self.logger.info(f"✅ Initialized {self.__class__.__name__}")
+        return {
+            'status': 'success',
+            'module': self.full_module_name,
+            'initialized': self._is_initialized
+        }
     
     def cleanup(self) -> None:
         """Cleanup handler resources."""

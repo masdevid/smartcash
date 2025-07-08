@@ -8,54 +8,142 @@ from typing import Dict, Any, List
 
 from smartcash.ui.components.form_container import create_form_container, LayoutType
 from ..configs.dependency_defaults import get_default_package_categories, get_package_status_options, get_button_actions
-from ..utils.package_status_tracker import PackageStatusTracker
+from ..services.package_status_tracker import PackageStatusTracker
 
-def create_package_categories_tab(config: Dict[str, Any], logger) -> widgets.VBox:
-    """Create tab untuk package categories"""
+def create_package_categories_tab(config: Dict[str, Any], logger=None) -> widgets.VBox:
+    """Create enhanced tab for package categories with compact responsive design."""
     
-    # Get package categories
+    # Get package categories and load custom packages
     categories = get_default_package_categories()
     selected_packages = config.get('selected_packages', [])
+    
+    # Load custom packages from config and add to custom_packages category
+    categories = _load_custom_packages_to_categories(categories, config)
     
     # Initialize status tracker
     status_tracker = PackageStatusTracker(config, logger)
     
-    # Create category cards
+    # Create category cards with improved design
     category_cards = []
     for category_key, category_info in categories.items():
-        card = create_category_card(category_key, category_info, selected_packages, status_tracker, logger)
+        card = create_enhanced_category_card(category_key, category_info, selected_packages, status_tracker, logger)
         category_cards.append(card)
     
-    # Create form container with grid layout
+    # Create responsive grid container
     form_container = create_form_container(
         layout_type=LayoutType.GRID,
-        grid_columns='repeat(auto-fit, minmax(400px, 1fr))',
-        gap='20px',
-        container_padding='20px'
+        grid_columns='repeat(auto-fit, minmax(350px, 1fr))',  # More compact minimum width
+        gap='16px',  # Smaller gap for tighter layout
+        container_padding='16px'  # Reduced padding
     )
     
     # Add category cards to the grid
     for card in category_cards:
         form_container['add_item'](card, height='auto')
     
-    # Create header
+    # Create compact header
     header = widgets.HTML("""
-    <div style="margin-bottom: 20px;">
-        <h3 style="color: #333; margin: 0 0 10px 0;">📦 Package Categories</h3>
-        <p style="color: #666; margin: 0;">Pilih packages dari kategori yang tersedia. Default packages ditandai dengan ⭐.</p>
+    <div style="margin-bottom: 16px; padding: 0 16px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <span style="font-size: 24px;">📦</span>
+            <div>
+                <h3 style="color: #333; margin: 0; font-size: 1.25rem;">Package Categories</h3>
+                <p style="color: #666; margin: 0; font-size: 0.9rem;">Select packages from predefined categories. Default packages (⭐) are recommended.</p>
+            </div>
+        </div>
     </div>
     """)
     
-    # Create container
+    # Create container with better responsive layout
     container = widgets.VBox([
         header,
         form_container['container']
-    ])
+    ], layout=widgets.Layout(
+        width='100%',
+        overflow='visible'
+    ))
     
-    # Store status tracker untuk access dari luar
+    # Store status tracker for external access
     container.status_tracker = status_tracker
+    container.category_cards = category_cards
     
     return container
+
+def create_enhanced_category_card(category_key: str, category_info: Dict[str, Any], selected_packages: List[str], status_tracker: PackageStatusTracker, logger) -> widgets.VBox:
+    """Create enhanced compact card for package category."""
+    
+    icon = category_info.get('icon', '📦')
+    name = category_info.get('name', category_key)
+    description = category_info.get('description', '')
+    color = category_info.get('color', '#2196F3')
+    packages = category_info.get('packages', [])
+    
+    # Create compact header with better styling
+    header = widgets.HTML(f"""
+    <div style="
+        background: linear-gradient(135deg, {color}15, {color}08);
+        border-left: 3px solid {color};
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        border-radius: 6px;
+        border: 1px solid {color}30;
+    ">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">{icon}</span>
+            <div style="flex: 1; min-width: 0;">
+                <h4 style="margin: 0; color: {color}; font-size: 1.1rem; font-weight: 600;">{name}</h4>
+                <p style="margin: 2px 0 0 0; color: #666; font-size: 0.85rem; line-height: 1.2;">{description}</p>
+            </div>
+            <div style="
+                background: {color}20;
+                color: {color};
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            ">
+                {len(packages)} packages
+            </div>
+        </div>
+    </div>
+    """)
+    
+    # Create compact package list
+    package_widgets = []
+    for pkg in packages:
+        pkg_widget = create_compact_package_widget(pkg, pkg['name'] in selected_packages, status_tracker, logger)
+        package_widgets.append(pkg_widget)
+    
+    # Create scrollable container for packages if there are many
+    package_container = widgets.VBox(
+        package_widgets, 
+        layout=widgets.Layout(
+            gap='8px',
+            max_height='400px' if len(packages) > 6 else 'auto',
+            overflow_y='auto' if len(packages) > 6 else 'visible',
+            padding='0 4px'
+        )
+    )
+    
+    # Create card with improved styling
+    card = widgets.VBox([
+        header,
+        package_container
+    ], layout=widgets.Layout(
+        border='1px solid #e0e0e0',
+        border_radius='8px',
+        padding='0',
+        background_color='white',
+        box_shadow='0 2px 4px rgba(0,0,0,0.1)',
+        overflow='visible'
+    ))
+    
+    # Store metadata
+    card.category_key = category_key
+    card.category_info = category_info
+    card.package_widgets = package_widgets
+    
+    return card
 
 def create_category_card(category_key: str, category_info: Dict[str, Any], selected_packages: List[str], status_tracker: PackageStatusTracker, logger) -> widgets.VBox:
     """Create card untuk satu category"""
@@ -104,6 +192,115 @@ def create_category_card(category_key: str, category_info: Dict[str, Any], selec
     ))
     
     return card
+
+def create_compact_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
+    """Create compact widget for package with modern design."""
+    
+    name = pkg.get('name', '')
+    version = pkg.get('version', '')
+    description = pkg.get('description', '')
+    size = pkg.get('size', '')
+    is_default = pkg.get('is_default', False)
+    
+    # Selection checkbox with smaller size
+    selection_checkbox = widgets.Checkbox(
+        value=is_selected,
+        description='',
+        layout=widgets.Layout(width='24px', height='24px')
+    )
+    
+    # Package info with compact layout
+    info_html = widgets.HTML(f"""
+    <div style="flex: 1; min-width: 0; padding: 0 8px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <span style="font-weight: 600; color: #333; font-size: 0.9rem;">{name}</span>
+            {f'<span style="color: #666; font-size: 0.75rem;">v{version}</span>' if version else ''}
+            {'<span style="color: #ff9800; font-size: 0.8rem;">⭐</span>' if is_default else ''}
+        </div>
+        <div style="color: #666; font-size: 0.8rem; line-height: 1.2; margin-bottom: 1px;">{description[:60] + '...' if len(description) > 60 else description}</div>
+        {f'<div style="color: #999; font-size: 0.7rem;">{size}</div>' if size else ''}
+    </div>
+    """)
+    
+    # Compact status widget
+    status_widget = status_tracker.create_compact_status_widget(name)
+    
+    # Compact action buttons
+    action_buttons = create_compact_action_buttons(pkg, status_tracker, logger)
+    
+    # Create container with responsive design
+    container = widgets.HBox(
+        [selection_checkbox, info_html, status_widget, action_buttons],
+        layout=widgets.Layout(
+            border='1px solid #e8e8e8',
+            border_radius='6px',
+            padding='8px',
+            background_color='#fafafa' if is_selected else 'white',
+            margin='0 0 2px 0',
+            align_items='center'
+        )
+    )
+    
+    # Update container style on selection change
+    def on_selection_change(change):
+        is_selected = change['new']
+        border_color = '#4CAF50' if is_selected else '#e8e8e8'
+        bg_color = '#f8fff8' if is_selected else 'white'
+        
+        container.layout.border = f'1px solid {border_color}'
+        container.layout.background_color = bg_color
+    
+    selection_checkbox.observe(on_selection_change, names='value')
+    
+    # Store references
+    container.package_info = pkg
+    container.selection_checkbox = selection_checkbox
+    container.status_widget = status_widget
+    container.is_selected = is_selected
+    
+    return container
+
+def create_compact_action_buttons(pkg: Dict[str, Any], status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
+    """Create compact action buttons for package."""
+    
+    package_name = pkg['name']
+    
+    # Compact install button
+    install_btn = widgets.Button(
+        description='',
+        icon='download',
+        button_style='primary',
+        layout=widgets.Layout(width='32px', height='28px'),
+        tooltip=f"Install {package_name}"
+    )
+    
+    # Compact check button  
+    check_btn = widgets.Button(
+        description='',
+        icon='refresh',
+        button_style='info',
+        layout=widgets.Layout(width='32px', height='28px'),
+        tooltip=f"Check {package_name}"
+    )
+    
+    # Button handlers
+    def on_install_click(btn):
+        if logger:
+            logger.info(f"📥 Installing {package_name}...")
+        status_tracker.update_package_status(package_name, 'installing')
+    
+    def on_check_click(btn):
+        if logger:
+            logger.info(f"🔍 Checking {package_name}...")
+        status_tracker.check_package_status_async(package_name)
+    
+    install_btn.on_click(on_install_click)
+    check_btn.on_click(on_check_click)
+    
+    return widgets.HBox([
+        install_btn,
+        check_btn
+    ], layout=widgets.Layout(gap='4px', width='auto'))
 
 def create_package_widget(pkg: Dict[str, Any], is_selected: bool, status_tracker: PackageStatusTracker, logger) -> widgets.HBox:
     """Create widget untuk satu package dengan real-time status"""
@@ -234,3 +431,31 @@ def create_package_action_buttons(pkg: Dict[str, Any], status_tracker: PackageSt
         check_btn,
         uninstall_btn
     ], layout=widgets.Layout(gap='5px'))
+
+def _load_custom_packages_to_categories(categories: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    """Load custom packages from config and add to custom_packages category."""
+    
+    # Get custom packages from config
+    custom_packages_text = config.get('custom_packages', '')
+    
+    if custom_packages_text:
+        custom_packages = []
+        for line in custom_packages_text.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('#'):
+                # Parse package name (handle version specs)
+                package_name = line.split('>')[0].split('<')[0].split('=')[0].strip()
+                
+                custom_packages.append({
+                    'name': package_name,
+                    'version': '',  # Version handled in pip_name
+                    'description': f'Custom package: {line}',
+                    'pip_name': line,
+                    'is_default': False,  # Custom packages are not default
+                    'size': '~Unknown'
+                })
+        
+        # Update custom_packages category
+        categories['custom_packages']['packages'] = custom_packages
+    
+    return categories

@@ -55,10 +55,15 @@ def detect_environment_info() -> Dict[str, Any]:
     
     # Get additional info with error handling
     try:
-        # Get GPU info
+        # Get basic GPU info (backward compatibility)
         gpu_info = safe_get(_get_gpu_info, 'Unknown')
         if gpu_info != 'Unknown':
             result['gpu'] = gpu_info
+        
+        # Get detailed GPU info
+        gpu_details = safe_get(_get_gpu_details, {})
+        if gpu_details:
+            result['gpu_details'] = gpu_details
         
         # Get storage info
         storage_info = safe_get(_get_storage_info, {})
@@ -73,6 +78,21 @@ def detect_environment_info() -> Dict[str, Any]:
         total_ram = safe_get(_get_total_ram, 'Unknown')
         if total_ram != 'Unknown':
             result['total_ram'] = total_ram
+        
+        # Get detailed memory info
+        memory_info = safe_get(_get_memory_info, {})
+        if memory_info:
+            result['memory_info'] = memory_info
+        
+        # Get network info
+        network_info = safe_get(_get_network_info, {})
+        if network_info:
+            result['network_info'] = network_info
+        
+        # Get environment variables
+        env_vars = safe_get(_get_environment_variables, {})
+        if env_vars:
+            result['environment_variables'] = env_vars
         
         # Check Google Drive mount status
         is_drive_mounted, mount_path = safe_get(_is_drive_mounted, (False, ''))
@@ -175,25 +195,135 @@ def _get_cpu_cores() -> int:
     return multiprocessing.cpu_count()
 
 def _get_total_ram() -> int:
-    """💾 Get total RAM in GB"""
+    """💾 Get total RAM in bytes"""
     try:
         import psutil
         return psutil.virtual_memory().total
     except ImportError:
         return 0
 
-def _get_storage_info() -> Dict[str, Any]:
-    """💽 Get storage information"""
+def _get_memory_info() -> Dict[str, Any]:
+    """💾 Get detailed memory information"""
     try:
         import psutil
+        memory = psutil.virtual_memory()
         return {
-            'total': psutil.disk_usage('/').total,
-            'used': psutil.disk_usage('/').used,
-            'free': psutil.disk_usage('/').free,
-            'percent': psutil.disk_usage('/').percent
+            'total': memory.total,
+            'available': memory.available,
+            'percent_used': memory.percent,
+            'used': memory.used,
+            'free': memory.free,
+            'total_gb': round(memory.total / (1024**3), 2),
+            'available_gb': round(memory.available / (1024**3), 2),
+            'used_gb': round(memory.used / (1024**3), 2)
         }
     except ImportError:
         return {}
+
+def _get_storage_info() -> Dict[str, Any]:
+    """💽 Get detailed storage information"""
+    try:
+        import psutil
+        disk = psutil.disk_usage('/')
+        return {
+            'total': disk.total,
+            'used': disk.used,
+            'free': disk.free,
+            'percent_used': round((disk.used / disk.total) * 100, 2),
+            'total_gb': round(disk.total / (1024**3), 2),
+            'used_gb': round(disk.used / (1024**3), 2),
+            'free_gb': round(disk.free / (1024**3), 2)
+        }
+    except ImportError:
+        return {}
+
+def _get_gpu_details() -> Dict[str, Any]:
+    """🎮 Get detailed GPU information"""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device_count = torch.cuda.device_count()
+            devices = []
+            for i in range(device_count):
+                props = torch.cuda.get_device_properties(i)
+                devices.append({
+                    'id': i,
+                    'name': torch.cuda.get_device_name(i),
+                    'memory_total': props.total_memory,
+                    'memory_total_gb': round(props.total_memory / (1024**3), 2),
+                    'major': props.major,
+                    'minor': props.minor,
+                    'multi_processor_count': props.multi_processor_count
+                })
+            
+            return {
+                'available': True,
+                'device_count': device_count,
+                'current_device': torch.cuda.current_device(),
+                'devices': devices,
+                'cuda_version': torch.version.cuda
+            }
+        else:
+            return {
+                'available': False,
+                'reason': 'CUDA not available',
+                'device_count': 0,
+                'devices': []
+            }
+    except ImportError:
+        return {
+            'available': False,
+            'reason': 'PyTorch not installed',
+            'device_count': 0,
+            'devices': []
+        }
+
+def _get_network_info() -> Dict[str, Any]:
+    """🌐 Get network information"""
+    try:
+        import psutil
+        import socket
+        
+        # Get hostname
+        hostname = socket.gethostname()
+        
+        # Get network interfaces
+        interfaces = []
+        for interface, addrs in psutil.net_if_addrs().items():
+            for addr in addrs:
+                if addr.family == socket.AF_INET:  # IPv4
+                    interfaces.append({
+                        'interface': interface,
+                        'ip': addr.address,
+                        'netmask': addr.netmask,
+                        'broadcast': addr.broadcast
+                    })
+        
+        return {
+            'hostname': hostname,
+            'interfaces': interfaces
+        }
+    except ImportError:
+        return {}
+
+def _get_environment_variables() -> Dict[str, str]:
+    """🌍 Get relevant environment variables"""
+    import os
+    
+    relevant_vars = [
+        'PATH', 'PYTHONPATH', 'HOME', 'USER', 'SHELL',
+        'LANG', 'LC_ALL', 'TZ', 'DISPLAY',
+        'SMARTCASH_ROOT', 'SMARTCASH_ENV', 'SMARTCASH_DATA_ROOT',
+        'CUDA_VISIBLE_DEVICES', 'NVIDIA_VISIBLE_DEVICES'
+    ]
+    
+    env_vars = {}
+    for var in relevant_vars:
+        value = os.environ.get(var)
+        if value is not None:
+            env_vars[var] = value
+    
+    return env_vars
 
 def get_runtime_type() -> Dict[str, str]:
     """Get detailed runtime type information.

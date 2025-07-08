@@ -47,29 +47,30 @@ env_paths = get_paths_for_environment(
 
 # Folder yang wajib tersedia di runtime Colab SmartCash
 REQUIRED_FOLDERS: list[str] = [
-    str(Path(COLAB_PATH) / APP_NAME),  # /content/smartcash
-    str(Path(COLAB_DATA_ROOT)),  # /content/smartcash/data
-    str(Path(COLAB_DOWNLOADS_PATH)),  # /content/smartcash/data/downloads
-    str(Path(COLAB_BACKUP_PATH)),  # /content/smartcash/data/backup
-    str(Path(COLAB_TRAIN_PATH)),  # /content/smartcash/data/train
-    str(Path(COLAB_TEST_PATH)),  # /content/smartcash/data/test
-    str(Path(COLAB_VALID_PATH)),  # /content/smartcash/data/valid
-    str(Path(COLAB_INVALID_PATH)),  # /content/smartcash/data/invalid
-    str(Path(COLAB_PREPROCESSED_PATH)),  # /content/smartcash/data/preprocessed
-    str(Path(COLAB_AUGMENTED_PATH)),  # /content/smartcash/data/augmented
-    str(Path(COLAB_PATH) / APP_NAME / "models"),  # /content/smartcash/models
-    str(Path(COLAB_CONFIG_PATH)),  # /content/smartcash/configs
-    str(Path(COLAB_PATH) / APP_NAME / "outputs"),  # /content/smartcash/outputs
-    str(Path(COLAB_PATH) / APP_NAME / "logs"),  # /content/smartcash/logs
+    str(Path(COLAB_PATH)),  # /content/
+    str(Path(COLAB_DATA_ROOT)),  # /content/data
+    str(Path(COLAB_DOWNLOADS_PATH)),  # /content/data/downloads
+    str(Path(COLAB_BACKUP_PATH)),  # /content/data/backup
+    str(Path(COLAB_TRAIN_PATH)),  # /content/data/train
+    str(Path(COLAB_TEST_PATH)),  # /content/data/test
+    str(Path(COLAB_VALID_PATH)),  # /content/data/valid
+    str(Path(COLAB_INVALID_PATH)),  # /content/data/invalid
+    str(Path(COLAB_PREPROCESSED_PATH)),  # /content/data/preprocessed
+    str(Path(COLAB_AUGMENTED_PATH)),  # /content/data/augmented
+    str(Path(COLAB_DATA_ROOT) / "pretrained"),  # /content/data/pretrained
+    str(Path(COLAB_PATH) / "models"),  # /content/models
+    str(Path(COLAB_CONFIG_PATH)),  # /content/configs
+    str(Path(COLAB_PATH) / "outputs"),  # /content/outputs
+    str(Path(COLAB_PATH) / "logs"),  # /content/logs
 ]
 
 # Direktori sumber di Google Drive yang harus ada
 SOURCE_DIRECTORIES: list[str] = [
-    str(Path(DRIVE_PATH) / DATA_ROOT),  # .../SmartCash/data
-    str(Path(DRIVE_PATH) / "models"),  # .../SmartCash/models
-    str(Path(DRIVE_PATH) / DEFAULT_CONFIG_DIR),  # .../SmartCash/configs
-    str(Path(DRIVE_PATH) / "outputs"),  # .../SmartCash/outputs
-    str(Path(DRIVE_PATH) / "logs"),  # .../SmartCash/logs
+    str(Path(DRIVE_PATH) / DATA_ROOT),  # /content/drive/MyDrive/SmartCash/data
+    str(Path(DRIVE_PATH) / "models"),  # /content/drive/MyDrive/SmartCash/models
+    str(Path(DRIVE_PATH) / DEFAULT_CONFIG_DIR),  # /content/drive/MyDrive/SmartCash/configs
+    str(Path(DRIVE_PATH) / "outputs"),  # /content/drive/MyDrive/SmartCash/outputs
+    str(Path(DRIVE_PATH) / "logs"),  # /content/drive/MyDrive/SmartCash/logs
 ]
 
 # Pemetaan symlink => {source: target}

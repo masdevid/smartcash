@@ -8,6 +8,7 @@ import functools
 import logging
 import inspect
 import traceback
+from dataclasses import asdict
 from functools import wraps
 from typing import (
     Any, Callable, Dict, Optional, Type, TypeVar, cast, 
@@ -85,17 +86,9 @@ def handle_errors(
                     **kwargs
                 }
                 
-                # Only include error_msg in kwargs if it's not already provided in the method signature
-                if 'error_msg' not in inspect.signature(error_handler.handle_error).parameters:
-                    error_kwargs['error_msg'] = formatted_msg
-                
-                # Debug: Print the error handler and kwargs being used
-                print(f"\n=== DEBUG: handle_errors decorator ===")
-                print(f"Error handler: {error_handler}")
-                print(f"Error kwargs: {error_kwargs}")
-                
-                # Handle the error using the error handler
+                # Handle the error using the error handler with error_msg as positional argument
                 result = error_handler.handle_error(
+                    formatted_msg,
                     **error_kwargs
                 )
                 

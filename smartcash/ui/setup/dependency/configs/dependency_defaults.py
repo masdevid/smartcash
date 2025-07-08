@@ -19,6 +19,9 @@ def get_default_dependency_config() -> Dict[str, Any]:
         # Custom packages string
         'custom_packages': '',
         
+        # Uninstalled default packages (to track which defaults were uninstalled)
+        'uninstalled_defaults': [],
+        
         # Install options
         'install_options': {
             'use_venv': True,
@@ -195,6 +198,14 @@ def get_default_package_categories() -> Dict[str, Dict[str, Any]]:
                     'size': '~30MB'
                 }
             ]
+        },
+        
+        'custom_packages': {
+            'name': 'Custom Packages',
+            'description': 'User-defined packages and repositories',
+            'icon': '📦',
+            'color': '#607D8B',
+            'packages': []  # Dynamic packages loaded from config
         }
     }
 
@@ -242,6 +253,12 @@ def get_package_status_options() -> Dict[str, Dict[str, Any]]:
             'color': '#F44336',
             'text': 'Error',
             'bg_color': '#FFEBEE'
+        },
+        'uninstalled_default': {
+            'icon': '⭐❌',
+            'color': '#FF5722',
+            'text': 'Default (Uninstalled)',
+            'bg_color': '#FFEBE9'
         }
     }
 

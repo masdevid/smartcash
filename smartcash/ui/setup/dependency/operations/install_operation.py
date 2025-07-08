@@ -38,12 +38,15 @@ class InstallOperationHandler(BaseOperationHandler):
                 await self.log("⚠️ Tidak ada paket yang dipilih untuk diinstal", 'warning')
                 return {'success': False, 'error': 'Tidak ada paket yang dipilih'}
             
-            # Update config with current packages
+            # Update and save config with current packages
             selected, custom = self._categorize_packages(packages)
             self.config.update({
                 'selected_packages': selected,
                 'custom_packages': '\n'.join(custom)
             })
+            
+            # Save config to YAML file
+            await self._save_config_to_file(self.config)
             
             # Execute installation
             start_time = time.time()
@@ -101,7 +104,7 @@ class InstallOperationHandler(BaseOperationHandler):
         return selected, custom
     
     async def _install_packages(self, packages: List[str]) -> List[Dict[str, Any]]:
-        """Install multiple packages in parallel with progress tracking.
+        """Install multiple packages sequentially with progress tracking.
         
         Args:
             packages: List of package names/requirements to install
@@ -112,18 +115,30 @@ class InstallOperationHandler(BaseOperationHandler):
         if not packages:
             return []
             
+        results = []
         total = len(packages)
         
-        # Process packages in parallel with progress tracking
-        processed_results = await self._process_packages(
-            packages,
-            self._install_single_package,
-            progress_message="Menginstal paket",
-            max_workers=min(4, len(packages))  # Limit concurrent installations
-        )
+        for i, package in enumerate(packages, 1):
+            if self._cancelled:
+                break
+                
+            self._update_progress(
+                message=f"Installing package {i}/{total}: {package}",
+                current=(i-1) / total * 100,
+                level_name='primary'
+            )
+            
+            result = await self._install_single_package(package)
+            results.append(result)
+            
+            # Update progress after completion
+            self._update_progress(
+                message=f"Completed {i}/{total}: {package}",
+                current=i / total * 100,
+                level_name='primary'
+            )
         
-        # Extract and return the results
-        return [r for r in processed_results['details'] if r.get('status') != 'error']
+        return results
     
     async def _install_single_package(self, package: str) -> Dict[str, Any]:
         """Install a single package asynchronously.
@@ -197,6 +212,55 @@ class InstallOperationHandler(BaseOperationHandler):
                 'message': f"Kesalahan: {str(e)}"
             }
     
+    async def _save_config_to_file(self, config: Dict[str, Any]) -> None:
+        """Save configuration to dependency_config.yaml file."""
+        try:
+            import yaml
+            import os
+            
+            config_path = os.path.join('/Users/masdevid/Projects/smartcash', 'configs', 'dependency_config.yaml')
+            
+            # Read existing config
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    existing_config = yaml.safe_load(f) or {}
+            else:
+                existing_config = {}
+            
+            # Remove successfully installed packages from uninstalled_defaults
+            uninstalled_defaults = existing_config.get('uninstalled_defaults', [])
+            selected_packages = config.get('selected_packages', [])
+            custom_packages = config.get('custom_packages', '')
+            
+            # Parse installed packages from both selected and custom
+            all_installed_packages = set(selected_packages)
+            if custom_packages:
+                for line in custom_packages.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        package_name = line.split('>')[0].split('<')[0].split('=')[0].strip()
+                        all_installed_packages.add(package_name)
+            
+            # Remove any installed packages from uninstalled_defaults
+            updated_uninstalled_defaults = [pkg for pkg in uninstalled_defaults 
+                                          if pkg not in all_installed_packages]
+            
+            # Update with new values
+            existing_config.update({
+                'selected_packages': selected_packages,
+                'custom_packages': custom_packages,
+                'uninstalled_defaults': updated_uninstalled_defaults
+            })
+            
+            # Write back to file
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(existing_config, f, default_flow_style=False, allow_unicode=True)
+            
+            await self.log(f"💾 Configuration saved to {config_path}", 'info')
+            
+        except Exception as e:
+            await self.log(f"❌ Failed to save config: {str(e)}", 'error')
+
     async def cancel_operation(self) -> None:
         """Cancel the current installation operation."""
         self._cancelled = True

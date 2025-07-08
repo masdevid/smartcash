@@ -20,6 +20,25 @@ from smartcash.model.training.utils.training_progress_bridge import TrainingProg
 from smartcash.model.training.utils.early_stopping import create_early_stopping
 from smartcash.model.utils.device_utils import setup_device, model_to_device
 
+
+class SimpleCallbackLogger:
+    """Simple logger adapter for callback functions."""
+    
+    def __init__(self, callback_func):
+        self.callback = callback_func
+    
+    def info(self, message):
+        if self.callback:
+            self.callback(message)
+    
+    def error(self, message):
+        if self.callback:
+            self.callback(f"❌ {message}")
+    
+    def warning(self, message):
+        if self.callback:
+            self.callback(f"⚠️ {message}")
+
 class TrainingService:
     """Main training orchestrator dengan comprehensive progress tracking dan UI integration"""
     
@@ -42,7 +61,8 @@ class TrainingService:
         self.ui_components = ui_components or {}
         
         # Setup device
-        self.device = setup_device()
+        device_config = self.config.get('device', {'auto_detect': True, 'preferred': 'cuda'})
+        self.device = setup_device(device_config)
         
         # Initialize components
         self.data_factory = DataLoaderFactory(self.config)
@@ -69,8 +89,13 @@ class TrainingService:
         self.best_metrics = {}
         self.training_stopped = False
         
-        # Logging
-        self.logger = ui_components.get('logger') if ui_components else None
+        # Logging - handle both logger objects and callback functions
+        logger_component = ui_components.get('logger') if ui_components else None
+        if callable(logger_component):
+            # If it's a function, wrap it in a simple logger interface
+            self.logger = SimpleCallbackLogger(logger_component)
+        else:
+            self.logger = logger_component
     
     def _load_training_config(self) -> Dict[str, Any]:
         """Load training configuration dari file"""
@@ -94,6 +119,16 @@ class TrainingService:
                     'metric': 'val_map50',
                     'mode': 'max'
                 }
+            },
+            'device': {
+                'auto_detect': True,
+                'preferred': 'cuda',
+                'mixed_precision': True
+            },
+            'data': {
+                'dataset_dir': 'data/preprocessed',
+                'batch_size': 16,
+                'num_workers': 2
             }
         }
     

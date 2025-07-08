@@ -1,191 +1,204 @@
 """
 File: smartcash/ui/model/backbone/backbone_init.py
-Deskripsi: Initializer untuk Backbone Model Configuration
+Description: Backbone Model Configuration Initializer following core UI structure
 """
 
-from typing import Dict, Any, Optional, Callable
-import ipywidgets as widgets
-from smartcash.ui.model.backbone.handlers.model_handler import BackboneModelHandler
+from typing import Dict, Any, Optional
+from smartcash.ui.core.initializers.display_initializer import create_ui_display_function
+from smartcash.ui.core.initializers.module_initializer import ModuleInitializer
+from .configs.backbone_defaults import get_default_backbone_config
+from .handlers.backbone_ui_handler import BackboneUIHandler
 
-class BackboneInitializer:
-    """
-    Initializer untuk Backbone Model Configuration.
+
+class BackboneInitializer(ModuleInitializer):
+    """Initializer for backbone module following core UI structure."""
     
-    Handles initialization of backbone model configuration UI components.
-    """
-    
-    def __init__(self, module_name: str = "backbone", parent_module: str = None):
-        """Initialize the backbone model configuration.
+    def __init__(self, module_name: str = 'backbone', parent_module: Optional[str] = 'model'):
+        """Initialize backbone module initializer.
         
         Args:
             module_name: Name of the module
-            parent_module: Optional parent module name
+            parent_module: Parent module name
         """
-        self.module_name = module_name
-        self.parent_module = parent_module
-        self.handler = None
-        self.ui_components = {}
-        self._callbacks = []
-    
-    def initialize(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Initialize the backbone configuration UI.
-        
-        Args:
-            config: Optional initial configuration
-            
-        Returns:
-            Dictionary containing UI components
-        """
-        # Initialize handler
-        self.handler = BackboneModelHandler(
-            module_name=self.module_name,
-            parent_module=self.parent_module
+        super().__init__(
+            module_name=module_name,
+            parent_module=parent_module,
+            handler_class=BackboneUIHandler,
+            auto_setup_handlers=True
         )
-        
-        # Create UI components
-        self._create_ui_components()
-        
-        # Load config if provided
-        if config:
-            self.handler.load_config(config)
-            self.handler.update_ui(self.ui_components, config)
-        
-        return self.ui_components
+        self._ui_components = None
+        self._backbone_factory = None
+        self.logger.info(f"🛠️ BackboneInitializer created for module: {module_name}")
     
-    def _create_ui_components(self) -> None:
-        """Create the UI components for backbone configuration."""
-        # Create main container
-        self.ui_components['main_container'] = widgets.VBox(layout={'border': '1px solid #cccccc'})
-        
-        # Add your UI components here
-        # Example:
-        # self.ui_components['model_select'] = widgets.Dropdown(
-        #     options=['resnet50', 'efficientnet', 'mobilenet'],
-        #     description='Model:',
-        #     disabled=False
-        # )
-        
-        # Add components to container
-        # children = [self.ui_components['model_select']]  # Add other components
-        # self.ui_components['main_container'].children = children
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default backbone configuration."""
+        return get_default_backbone_config()
     
-    def add_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
-        """Add a callback to be called when configuration changes.
-        
-        Args:
-            callback: Function that takes a config dict as argument
-        """
-        if callback not in self._callbacks:
-            self._callbacks.append(callback)
-    
-    def remove_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
-        """Remove a configuration change callback.
-        
-        Args:
-            callback: Callback function to remove
-        """
-        if callback in self._callbacks:
-            self._callbacks.remove(callback)
-    
-    def get_config(self) -> Dict[str, Any]:
-        """Get the current configuration.
-        
-        Returns:
-            Current configuration as a dictionary
-        """
-        if self.handler and hasattr(self.handler, 'extract_config'):
-            return self.handler.extract_config(self.ui_components)
-        return {}
-    
-    def update_ui(self, config: Dict[str, Any]) -> None:
-        """Update the UI with the given configuration.
-        
-        Args:
-            config: Configuration to apply to the UI
-        """
-        if self.handler and hasattr(self.handler, 'update_ui'):
-            self.handler.update_ui(self.ui_components, config)
-    
-    def reset(self) -> None:
-        """Reset the configuration to defaults."""
-        if self.handler and hasattr(self.handler, 'reset_config'):
-            self.handler.reset_config(self.ui_components)
-    
-    def _load_existing_config(self) -> Optional[Dict[str, Any]]:
-        """Try to load existing configuration from file"""
+    def pre_initialize_checks(self) -> None:
+        """Pre-initialization validation checks."""
+        # Check if required imports are available
         try:
-            import os
-            import yaml
-            
-            config_path = os.path.join(os.getcwd(), 'config', 'model_config.yaml')
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    return yaml.safe_load(f)
-        except Exception:
-            pass
-        return None
+            from .components.ui_components import create_backbone_ui_components
+            from .handlers.backbone_ui_handler import BackboneUIHandler
+        except ImportError as e:
+            raise RuntimeError(f"Missing required components: {e}")
     
-    def create_child_components(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Create child components spesifik untuk backbone configuration.
+    def post_initialize_cleanup(self) -> None:
+        """Post-initialization cleanup and validation."""
+        # Validate that essential UI components were created
+        if not self._ui_components:
+            raise RuntimeError("No UI components were created")
+        
+        required_components = ['main_container', 'ui']
+        missing = [comp for comp in required_components if comp not in self._ui_components]
+        if missing:
+            self.logger.warning(f"⚠️ Missing components: {missing}")
+    
+    def setup_handlers(self, ui_components: Dict[str, Any]) -> None:
+        """Setup module handler with UI components.
         
         Args:
-            config: Configuration dictionary (optional, falls back to self.config)
+            ui_components: Dictionary containing UI components
+        """
+        self.logger.info("🔧 Setting up backbone module handlers...")
+        
+        # Validate input
+        if not ui_components:
+            error_msg = "No UI components provided for handler setup"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        try:
+            # Create module handler if it doesn't exist
+            if not hasattr(self, '_module_handler') or self._module_handler is None:
+                self.logger.debug("Creating new module handler instance")
+                self._module_handler = self.create_module_handler()
             
-        Returns:
-            Dictionary berisi form components dan sections
-        """
-        from smartcash.ui.model.backbone.components.ui_components import (
-            create_backbone_child_components, get_layout_sections
-        )
-        
-        # Use provided config or fall back to instance config
-        config = config or self.config
-        
-        # Create all child components
-        child_components = create_backbone_child_components(config)
-        
-        # Store layout sections for parent to use
-        child_components['_layout_sections'] = get_layout_sections(child_components)
-        
-        return child_components
+            # Setup handler with UI components
+            self.logger.debug("Setting up module handler with UI components")
+            self._module_handler.setup(ui_components)
+            
+            # Initialize handlers dictionary
+            if not hasattr(self, '_handlers') or not isinstance(self._handlers, dict):
+                self._handlers = {}
+            
+            # Register handlers
+            self._handlers.update({
+                'module': self._module_handler,
+                'config': self._module_handler  # Alias for backward compatibility
+            })
+            
+            self.logger.info(f"✅ Successfully set up {len(self._handlers)} handlers")
+            
+        except Exception as e:
+            error_msg = f"Failed to set up handlers: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise RuntimeError(error_msg) from e
     
-    def create_handler(self) -> BackboneModelHandler:
-        """
-        Create handler instance untuk backbone operations.
-        
-        Returns:
-            BackboneModelHandler instance
-        """
-        # Ensure logger_bridge is passed to handler
-        if 'logger_bridge' not in self.ui_components:
-            self.ui_components['logger_bridge'] = self.logger_bridge
-        
-        return BackboneModelHandler(self.ui_components)
+    def setup_backbone_factory(self) -> None:
+        """Setup backbone factory for operations."""
+        try:
+            import sys
+            sys.path.append('.')
+            from model.utils.backbone_factory import BackboneFactory
+            self._backbone_factory = BackboneFactory()
+            self.logger.info("✅ Backbone factory initialized")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Failed to initialize backbone factory: {e}")
+            self._backbone_factory = None
     
-    def get_info_content(self) -> str:
-        """
-        Get content untuk info accordion.
+    def _initialize_impl(self, *args, **kwargs) -> Dict[str, Any]:
+        """Implementation of initialization logic.
         
         Returns:
-            HTML string dengan informasi backbone model
+            Dict containing initialization results
         """
-        from smartcash.ui.info_boxes.model_info import get_model_info_content
-        return get_model_info_content()
+        # Extract config from args/kwargs
+        config = None
+        if args:
+            config = args[0]
+        elif 'config' in kwargs:
+            config = kwargs['config']
+        
+        if config is None:
+            config = self.get_default_config()
+        
+        try:
+            self.logger.info("🚀 Starting backbone module initialization...")
+            
+            # Pre-initialization phase
+            self.pre_initialize_checks()
+            
+            # UI components phase
+            from .components.ui_components import create_backbone_ui_components
+            ui_components = create_backbone_ui_components(config)
+            if not ui_components:
+                raise RuntimeError("Failed to create UI components")
+            self._ui_components = ui_components
+            
+            # Handlers setup phase (including operation container setup)
+            self.setup_handlers(ui_components)
+            
+            # Backbone factory setup phase
+            self.setup_backbone_factory()
+            
+            # Post-initialization phase
+            self.post_initialize_cleanup()
+            
+            self.logger.info("✅ Backbone module initialized successfully")
+            
+            return {
+                'success': True,
+                'ui_components': self._ui_components,
+                'module_handler': self._module_handler,
+                'config_handler': getattr(self, 'config_handler', None),
+                'backbone_factory': self._backbone_factory,
+                'config': config
+            }
+            
+        except Exception as e:
+            from smartcash.ui.core.errors import get_error_handler
+            error_handler = get_error_handler('backbone')
+            error_handler.handle_exception(e, 'initialization', fail_fast=False)
+            self.logger.error(f"❌ Initialization failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'ui_components': {},
+                'module_handler': None,
+                'config_handler': None,
+                'backbone_factory': None
+            }
+
+
+def _backbone_initialize_legacy(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    """Legacy initialization function for backbone module."""
+    initializer = BackboneInitializer()
+    return initializer._initialize_impl(config, **kwargs)
+
+
+# Create the display function following core UI structure pattern
+initialize_backbone_ui = create_ui_display_function(
+    module_name='backbone',
+    parent_module='model',
+    initializer_class=BackboneInitializer,
+    legacy_function=_backbone_initialize_legacy
+)
+
+
+# Global instance for backward compatibility
+_backbone_initializer: Optional[BackboneInitializer] = None
+
+
+def get_backbone_initializer() -> BackboneInitializer:
+    """Get or create backbone initializer instance.
     
-    def get_container_layout(self) -> widgets.Layout:
-        """
-        Override untuk custom container layout jika diperlukan.
-        
-        Returns:
-            Layout untuk main container
-        """
-        return widgets.Layout(
-            width='100%',
-            max_width='1280px',
-            margin='0 auto',
-            padding='15px',
-            border='1px solid #e0e0e0',
-            border_radius='8px',
-            box_shadow='0 2px 4px rgba(0,0,0,0.05)'
-        )
+    Returns:
+        BackboneInitializer instance
+    """
+    global _backbone_initializer
+    
+    if _backbone_initializer is None:
+        _backbone_initializer = BackboneInitializer()
+    
+    return _backbone_initializer

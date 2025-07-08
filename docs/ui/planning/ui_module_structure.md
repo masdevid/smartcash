@@ -12,52 +12,64 @@ Based on the cells structure, here's how modules are organized into functional g
 - **1.1 Repository Setup** (`cell_1_1_repo_clone.py`)
   - Module: `setup/repo`
   - Purpose: Handles repository cloning and initialization
+  - Persistence Configs: `False`
 
 - **1.2 Google Colab Environment** (`cell_1_2_colab.py`)
   - Module: `setup/colab`
   - Purpose: Manages Google Colab-specific environment configuration and setup
+  - Persistence Configs: `False`
 
 - **1.3 Dependency Management** (`cell_1_3_dependency.py`)
   - Module: `setup/dependencies`
   - Purpose: Handles package and dependency management
+  - Persistence Configs: `True`
 
 ### 2. Data Management (2.x)
 - **2.1 Dataset Downloader** (`cell_2_1_downloader.py`)
   - Module: `dataset/downloader`
   - Purpose: Manages dataset downloading and extraction
+  - Persistence Configs: `True`
 
 - **2.2 Data Splitting** (`cell_2_2_split.py`)
   - Module: `dataset/split`
   - Purpose: Handles train/validation/test splitting
+  - Persistence Configs: `True`
 
 - **2.3 Data Preprocessing** (`cell_2_3_preprocess.py`)
   - Module: `dataset/preprocessing`
   - Purpose: Implements data preprocessing pipelines
+  - Persistence Configs: `True`
 
 - **2.4 Data Augmentation** (`cell_2_4_augment.py`)
   - Module: `dataset/augmentation`
   - Purpose: Manages data augmentation operations
+  - Persistence Configs: `True`
 
 - **2.5 Data Visualization** (`cell_2_5_visualize.py`)
   - Module: `dataset/visualization`
   - Purpose: Handles data visualization and exploration
+  - Persistence Configs: `False`
 
 ### 3. Model Development (3.x)
 - **3.1 Pretrained Models** (`cell_3_1_pretrained.py`)
   - Module: `model/pretrained`
   - Purpose: Manages pretrained model loading and setup
+  - Persistence Configs: `True`
 
 - **3.2 Model Architecture** (`cell_3_2_backbone.py`)
   - Module: `model/architecture`
   - Purpose: Defines model architectures and backbones
+  - Persistence Configs: `True`
 
 - **3.3 Model Training** (`cell_3_3_train.py`)
   - Module: `model/training`
   - Purpose: Handles model training workflows
+  - Persistence Configs: `True`
 
 - **3.4 Model Evaluation** (`cell_3_4_evaluate.py`)
   - Module: `model/evaluation`
-  - Purpose: Manages model evaluation and metrics
+  - Purpose: Manages model evaluation and metrics based on research objectives and limitations
+  - Persistence Configs: `True`
 
 ## Standard Module Structure
 
@@ -72,59 +84,91 @@ smartcash/ui/[group]/[module]/
     │   └── panels.py
     ├── configs/              # Configuration management (SRP)
     │   ├── __init__.py       # Export only get_config_handler
-    │   ├── defaults.py      # Default minimal config + YAML definition
-    │   ├── extractor.py     # UI config extraction logic
-    │   ├── updater.py       # UI update from config logic
-    │   ├── validator.py     # Config validation logic
-    │   └── handler.py       # Config handler implementation
+    │   ├── [module]_defaults.py      # Default minimal config + YAML definition
+    │   ├── [module]_extractor.py     # UI config extraction logic (if functions too big)
+    │   ├── [module]_updater.py       # UI update from config logic (if functions too big)
+    │   ├── [module]_validator.py     # Config validation logic (if functions too big)
+    │   └── [module]_config_handler.py       # Config handler implementation
     ├── handlers/            # Module-specific handlers
     │   ├── __init__.py      # Export only public handlers
-    │   ├── [module]_handler.py
+    │   ├── [module]_ui_handler.py
     │   └── [specific]_handler.py
     ├── operations/          # Operation handlers
     │   ├── __init__.py      # Export only public operation handlers
-    │   ├── [operation1]_handler.py
-    │   └── [operation2]_handler.py
+    │   ├── [operation1]_operation.py
+    │   └── [operation2]_operation.py
     ├── services/            # Backend bridge services (Optional)
     │   ├── __init__.py      # Export only public services
     │   ├── [module]_service.py
     │   └── [specific]_service.py
     ├── constants.py         # Module-specific constants
-    └── [module]_initializer.py  # Module initializer with ui_components
+    └── [module]_initializer.py  # Module initializer
 ```
-## Directory Responsibilities
+## Files & Directory Responsibilities
+- `__init__.py`: Export only public components
+- `constants.py`: Define constants specific to this module
+- `[module]_initializer.py`: Initialize module, inherit from `core/initializers/module_initializer.py`
 
 ### components/
 - Contains UI component definitions
 - Each component should be self-contained
 - Exports only public components through `__init__.py`
 - Follows the principle of composition over inheritance
+- Using defaults container based component with order:
+    - Header Container:
+        - Header
+        - Status Panel
+    - Form Container (Custom to each module)
+    - Action Container:
+        - Big Primary Buttons (for single operation only)
+        - Save/Reset Buttons (only if need persistence config)
+        - Action Buttons (for multiple operations)
+    - Summary Container (Custom to each module)
+    - Operation Container:
+        - Progress Tracker
+        - Dialogs
+        - Log Accordion
+    - Footer Container:
+        - Info Accordion
+- `[module]_ui.py`: Contains main UI component definitions
+- `*_section.py`: Contains section UI component definitions
+- `*_panel.py`: Contains panel UI component
+- `*_widget.py`: Contains specific widget UI component
 
 ### configs/
-- Manages all configuration-related functionality
-- `defaults.py`: Defines default configuration values
-- `extractor.py`: Extracts configuration from UI components
-- `updater.py`: Updates UI components from configuration
-- `validator.py`: Validates configuration values
-- `handler.py`: Implements configuration handling logic
+- Manages all configuration-related functionality. 
+- Split codes into multiple files is a must if `[module]_config_handler.py` has more than 500 lines
+- `[module]_defaults.py`: Defines default configuration values
+- `[module]_extractor.py`: Extracts configuration from UI components if too complex
+- `[module]_updater.py`: Updates UI components from configuration if too complex
+- `[module]_validator.py`: Validates configuration values if too complex
+- `[module]_config_handler.py`: Implements configuration handling logic (Inherit `core/handlers/config_handler.py`)
 
 ### handlers/
 - Contains module-specific handler implementations
 - Each handler should have a single responsibility
-- Should inherit from appropriate base handlers
+- Should inherit from appropriate base handlers. For main handler, inherit from `core/handlers/ui_handler.py`
 - Handles user interactions and business logic
+- naming: `[module]_ui_handler.py` (for main handler), `[module]_specific_handler.py` (for specific handler)
+- `[module]_ui_handler.py` should inherit `smartcash/ui/core/handlers/ui_handler.py`
 
-### operations/
+### operations/ 
 - Contains operation-specific handlers
 - Implements complex operations that may span multiple components
 - Handles long-running tasks with progress reporting
 - Manages operation state and cleanup
+- naming: `[name]_operation.py`
+- `[name]_operation.py` should inherit `smartcash/ui/core/handlers/operation_handler.py`
 
 ### services/
-- Acts as a bridge to backend functionality
+- Optional if no backend functionality is needed
+- Contains service classes/helpers
+- It's not UI utility/helper folders. Should leverage parent class shared functions instead of creating utility/helper files
+- Acts as a bridge to backend functionality such as progress and log callbacks
 - Implements API calls and data transformations
 - Handles error conditions and retries
 - Provides a clean interface for UI components
+- naming: `[name]_service.py`
 
 ## Best Practices
 

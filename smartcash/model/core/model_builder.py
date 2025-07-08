@@ -87,8 +87,7 @@ class ModelBuilder:
         
         neck = FPN_PAN(
             in_channels=backbone_channels,
-            out_channels=out_channels,
-            use_attention=feature_optimization.get('use_attention', False)
+            out_channels=out_channels
         )
         
         self.logger.debug(f"🔗 Neck built: {backbone_channels} → {out_channels}")

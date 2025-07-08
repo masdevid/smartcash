@@ -13,6 +13,9 @@ selected_packages: []
 # Custom packages yang ditambahkan manual
 custom_packages: ""
 
+# Uninstalled default packages (tracking which defaults were uninstalled)
+uninstalled_defaults: []
+
 # Install options
 install_options:
   use_venv: true

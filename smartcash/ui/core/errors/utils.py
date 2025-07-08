@@ -9,7 +9,7 @@ import inspect
 import logging
 import sys
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
 
 from .enums import ErrorLevel
 from .context import ErrorContext

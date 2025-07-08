@@ -158,7 +158,7 @@ class BackboneInitializer(ModuleInitializer):
             
         except Exception as e:
             from smartcash.ui.core.errors import get_error_handler
-            error_handler = get_error_handler('backbone')
+            error_handler = get_error_handler()
             error_handler.handle_exception(e, 'initialization', fail_fast=False)
             self.logger.error(f"❌ Initialization failed: {str(e)}")
             return {

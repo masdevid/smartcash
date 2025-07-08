@@ -7,7 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from IPython.display import display
 
-from smartcash.ui.components import create_operation_container
+from smartcash.ui.components.operation_container import create_operation_container
 from smartcash.ui.components.header_container import create_header_container
 from smartcash.ui.components.form_container import create_form_container
 from smartcash.ui.components.action_container import create_action_container
@@ -39,10 +39,13 @@ def create_evaluation_ui() -> Dict[str, Any]:
         value=_create_initial_summary(),
         layout=widgets.Layout(width='100%', margin='10px 0')
     )
-    ui_components.update(create_summary_container(
-        content_widget=ui_components["evaluation_summary"],
+    # Create summary container with just the title
+    summary_container = create_summary_container(
         title="Evaluation Overview"
-    ))
+    )
+    # Add the content widget to the container
+    summary_container.add_content(ui_components["evaluation_summary"])
+    ui_components["summary_container"] = summary_container
     
     # 3. Form Container - Scenario and Model Selection
     form_widgets = _create_evaluation_form()
@@ -55,10 +58,24 @@ def create_evaluation_ui() -> Dict[str, Any]:
     # 4. Action Container - Control Buttons
     action_widgets = _create_action_buttons()
     ui_components.update(action_widgets)
-    ui_components.update(create_action_container(
-        action_widgets=action_widgets,
-        layout="horizontal"
-    ))
+    
+    # Convert widget dictionary to list of button configs
+    button_configs = [
+        {
+            'button_id': btn_id,
+            'text': btn.description,
+            'style': btn.button_style if hasattr(btn, 'button_style') else '',
+            'tooltip': btn.tooltip if hasattr(btn, 'tooltip') else ''
+        }
+        for btn_id, btn in action_widgets.items()
+    ]
+    
+    # Create action container with proper alignment
+    action_container = create_action_container(
+        buttons=button_configs,
+        alignment="left"  # Align buttons to the left
+    )
+    ui_components.update(action_container)
     
     # 5. Operation Container - Progress and Logs
     operation_components = create_operation_container(

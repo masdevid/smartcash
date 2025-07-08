@@ -33,7 +33,7 @@ class BaseOperationHandler(OperationHandler):
         super().__init__(operation_type, 'dependency.setup')
         self.ui_components = ui_components
         self.config = config
-        self.error_handler = get_error_handler('dependency')
+        self.error_handler = get_error_handler()
         
         # Set default operation container if available in UI components
         if 'operation_container' in ui_components:

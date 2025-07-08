@@ -225,6 +225,69 @@ class PackageStatusTracker:
             self.logger.error(f"Error getting installed packages: {e}")
             return []
     
+    def create_compact_status_widget(self, package_name: str) -> 'widgets.HBox':
+        """Create a compact status widget for a package.
+        
+        Args:
+            package_name: Name of the package to create status widget for
+            
+        Returns:
+            ipywidgets.HBox containing the status indicator and version
+        """
+        import ipywidgets as widgets
+        from IPython.display import display, clear_output
+        
+        # Create status indicator
+        status_indicator = widgets.HTML(
+            value='<div style="width: 12px; height: 12px; border-radius: 50%; background: #ccc; display: inline-block;"></div>',
+            layout=widgets.Layout(width='14px', margin='0 8px 0 0')
+        )
+        
+        # Version label
+        version_label = widgets.HTML(
+            value='',
+            layout=widgets.Layout(font_size='0.8em', color='#666')
+        )
+        
+        # Container for status and version
+        container = widgets.HBox(
+            [status_indicator, version_label],
+            layout=widgets.Layout(align_items='center')
+        )
+        
+        # Store references
+        container.status_indicator = status_indicator
+        container.version_label = version_label
+        
+        # Update function
+        def update_status(status_info: Dict[str, Any]) -> None:
+            status = status_info.get('status', '')
+            version = status_info.get('version', '')
+            
+            # Update status indicator
+            status_colors = {
+                'installed': '#4CAF50',  # Green
+                'not_installed': '#f44336',  # Red
+                'checking': '#FFC107',  # Yellow
+                'error': '#9E9E9E',  # Grey
+                'uninstalled_default': '#FF9800',  # Orange
+            }
+            
+            color = status_colors.get(status.lower(), '#9E9E9E')
+            status_indicator.value = f'<div style="width: 12px; height: 12px; border-radius: 50%; background: {color}; display: inline-block;" title="{status}"></div>'
+            
+            # Update version
+            version_label.value = f'<span style="font-size: 0.8em; color: #666;">{version}</span>' if version else ''
+        
+        # Register for updates
+        self.register_callback(package_name, update_status)
+        
+        # Set initial status
+        status_info = self.get_package_status(package_name)
+        update_status(status_info)
+        
+        return container
+        
     def cleanup(self) -> None:
         """Cleanup resources"""
         try:

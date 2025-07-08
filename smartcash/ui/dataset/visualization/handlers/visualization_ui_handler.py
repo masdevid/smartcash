@@ -24,7 +24,14 @@ class VisualizationUIHandler(UIHandler):
             logger: Logger instance
             scanner: Optional dataset scanner instance
         """
-        super().__init__(ui_components=ui_components, logger=logger or get_logger(__name__))
+        # Initialize parent class with required parameters
+        super().__init__(module_name='visualization', parent_module='dataset')
+        
+        # Store the logger from parent or use the provided one
+        self.logger = logger or self.logger or get_logger(__name__)
+        
+        # Store UI components
+        self.ui_components = ui_components
         self.env_manager = get_environment_manager()
         self.dataset_path = self.env_manager.get_dataset_path()
         self.scanner = scanner or self._init_scanner()

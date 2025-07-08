@@ -95,18 +95,6 @@ class VisualizationInitializer(BaseInitializer):
             self.ui_components['refresh_button'].on_click(self.handler.refresh_data)
 
 
-def initialize_visualization(config: Optional[Dict[str, Any]] = None):
-    """Initialize the visualization module.
-    
-    Args:
-        config: Optional configuration for initialization
-        
-    Returns:
-        Instance of VisualizationInitializer
-    """
-    return VisualizationInitializer(config=config)
-
-
 def init_visualization_ui(config: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
     """
     Initialize visualization UI module.

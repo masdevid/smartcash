@@ -285,7 +285,7 @@ class DependencyInitializer(ModuleInitializer):
             
         except Exception as e:
             from smartcash.ui.core.errors.handlers import get_error_handler
-            error_handler = get_error_handler('dependency')
+            error_handler = get_error_handler()
             error_handler.handle_exception(e, 'setting up operation handlers', fail_fast=False)
 
     def _get_packages_for_operation(self) -> list:

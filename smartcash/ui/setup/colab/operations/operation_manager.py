@@ -91,6 +91,32 @@ class ColabOperationManager(OperationHandler):
         
         self.logger.info("✅ Colab operation manager initialization complete")
     
+    def clear_outputs(self) -> None:
+        """Clear outputs from the operation container if available."""
+        try:
+            if hasattr(self, 'operation_container') and self.operation_container is not None:
+                if hasattr(self.operation_container, 'clear_logs'):
+                    self.operation_container.clear_logs()
+                if hasattr(self.operation_container, 'clear_dialog'):
+                    self.operation_container.clear_dialog()
+                self.logger.debug("Cleared operation container outputs")
+        except Exception as e:
+            self.logger.error(f"Error clearing outputs: {e}")
+    
+    def cleanup(self) -> None:
+        """Clean up resources."""
+        self.logger.info("🧹 Cleaning up Colab operation manager")
+        self.clear_outputs()
+        
+        for operation in self.operations.values():
+            try:
+                operation.cleanup()
+            except Exception as e:
+                self.logger.error(f"Error cleaning up operation {operation.__class__.__name__}: {e}")
+        
+        self._executor.shutdown(wait=False)
+        self.logger.info("✅ Colab operation manager cleanup complete")
+    
     def _init_operation(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """Execute initialization operation."""
         return self.operations['init'].execute_init(progress_callback)

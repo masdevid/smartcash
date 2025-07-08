@@ -20,33 +20,33 @@ from smartcash.ui.dataset.split.split_initializer import (
 from smartcash.ui.dataset.split.configs.split_defaults import DEFAULT_SPLIT_CONFIG
 
 
+@pytest.fixture
+def mock_config():
+    """Provide a mock configuration for testing."""
+    return copy.deepcopy(DEFAULT_SPLIT_CONFIG)
+
+@pytest.fixture
+def mock_components():
+    """Provide mock UI components for testing."""
+    return {
+        'main_container': Mock(),
+        'header_container': Mock(),
+        'form_container': Mock(),
+        'action_container': Mock(),
+        'footer_container': Mock(),
+        'form_components': {
+            'train_ratio': Mock(value=0.7),
+            'val_ratio': Mock(value=0.15),
+            'test_ratio': Mock(value=0.15),
+            'save_button': Mock(),
+            'reset_button': Mock()
+        },
+        'log_output': MagicMock(__enter__=Mock(return_value=Mock(write=Mock())), __exit__=Mock(return_value=None)),
+        'log_accordion': Mock()
+    }
+
 class TestSplitInitializer:
     """Test cases for SplitInitializer."""
-    
-    @pytest.fixture
-    def mock_config(self):
-        """Provide a mock configuration for testing."""
-        return copy.deepcopy(DEFAULT_SPLIT_CONFIG)
-    
-    @pytest.fixture
-    def mock_components(self):
-        """Provide mock UI components for testing."""
-        return {
-            'main_container': Mock(),
-            'header_container': Mock(),
-            'form_container': Mock(),
-            'action_container': Mock(),
-            'footer_container': Mock(),
-            'form_components': {
-                'train_ratio': Mock(value=0.7),
-                'val_ratio': Mock(value=0.15),
-                'test_ratio': Mock(value=0.15),
-                'save_button': Mock(),
-                'reset_button': Mock()
-            },
-            'log_output': Mock(),
-            'log_accordion': Mock()
-        }
     
     def test_initialization_default(self):
         """Test initializer with default parameters."""

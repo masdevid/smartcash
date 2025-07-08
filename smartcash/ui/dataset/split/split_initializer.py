@@ -113,9 +113,13 @@ class SplitInitializer(DisplayInitializer):
     def display(self) -> None:
         """Display the UI using the container-based pattern."""
         if not hasattr(self, 'components') or 'main_container' not in self.components:
-            self._create_ui_components(self.initial_config, **self.kwargs)
+            self._create_ui_components(self.config, **self.kwargs)
             
-        display(self.components['main_container'])
+        if 'main_container' in self.components:
+            from IPython.display import display
+            display(self.components['main_container'])
+        else:
+            self.logger.error("Main container not found in components")
     
     def _setup_handlers(self) -> None:
         """Set up event handlers for UI components.
@@ -170,12 +174,24 @@ class SplitInitializer(DisplayInitializer):
     
     def _log_message(self, message: str) -> None:
         """Log a message to the UI log output.
-        
+
         Args:
             message: The message to log
         """
         if hasattr(self, 'components') and 'log_output' in self.components:
-            with self.components['log_output']:
+            log_output = self.components['log_output']
+            # If it's a mock or has context manager protocol, use it
+            if hasattr(log_output, '__enter__') and hasattr(log_output, '__exit__'):
+                with log_output:
+                    print(message)
+            # If it's a mock with a value attribute (like an Output widget)
+            elif hasattr(log_output, 'value'):
+                log_output.value = f"{log_output.value}\n{message}"
+            # If it's a mock with an append_stdout method
+            elif hasattr(log_output, 'append_stdout'):
+                log_output.append_stdout(f"{message}\n")
+            # Last resort, just print
+            else:
                 print(message)
 
 @handle_ui_errors(error_component_title="Split Config Error", log_error=True)
@@ -219,8 +235,8 @@ def get_split_config_components(
         initializer.initialize()
         
         # Ensure UI components are created
-        if not hasattr(initializer, 'components'):
-            initializer._create_ui_components(initializer.initial_config, **kwargs)
+        if not hasattr(initializer, 'components') or not initializer.components:
+            initializer._create_ui_components(initializer.config, **kwargs)
             
         return {
             'initializer': initializer,
